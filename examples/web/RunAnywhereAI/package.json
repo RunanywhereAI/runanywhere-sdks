@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sync-solutions": "node scripts/sync-solutions.mjs"
   },
   "devDependencies": {
     "@bufbuild/protobuf": "^2.12.0",

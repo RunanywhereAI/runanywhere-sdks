@@ -178,7 +178,7 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
   /// cosine similarities that rarely exceed ~0.5 even for relevant chunks,
   /// so a 0.7 floor filters out every match and retrieval returns nothing
-  /// (validated in the Kotlin SDK; see RAGProtoHelpers.kt).
+  /// (validated by generated SDK helpers and commons session creation).
   public var similarityThreshold: Float {
     get {_similarityThreshold ?? 0}
     set {_similarityThreshold = newValue}

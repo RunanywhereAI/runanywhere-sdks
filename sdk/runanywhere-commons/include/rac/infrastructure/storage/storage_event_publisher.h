@@ -15,9 +15,9 @@
 
 #ifdef RAC_HAVE_PROTOBUF
 
-#include "rac/core/rac_types.h"
-
 #include "storage_types.pb.h"
+
+#include "rac/core/rac_types.h"
 
 namespace rac::storage {
 

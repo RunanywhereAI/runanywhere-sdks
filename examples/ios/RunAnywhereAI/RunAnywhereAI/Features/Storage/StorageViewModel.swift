@@ -84,14 +84,7 @@ class StorageViewModel: ObservableObject {
     }
 
     func deleteModel(_ model: RAStoredModel) async {
-        var request = RAStorageDeleteRequest()
-        request.modelIds = [model.id]
-        request.deleteFiles = true
-        request.clearRegistryPaths_p = true
-        request.unloadIfLoaded = true
-        request.allowPlatformDelete = true
-
-        let result = await RunAnywhere.deleteStorage(request)
+        let result = await RunAnywhere.deleteModel(model.id)
         guard result.success else {
             errorMessage = result.errorMessage.isEmpty
                 ? "Failed to delete model"

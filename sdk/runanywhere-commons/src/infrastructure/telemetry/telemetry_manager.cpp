@@ -747,18 +747,16 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                                      ? g.model_name().c_str()
                                      : (!g.model_id().empty() ? g.model_id().c_str() : nullptr);
             payload.input_tokens = g.input_tokens();
-            payload.output_tokens =
-                g.tokens_used() != 0 ? g.tokens_used() : g.tokens_count();
+            payload.output_tokens = g.tokens_used() != 0 ? g.tokens_used() : g.tokens_count();
             payload.total_tokens = payload.input_tokens + payload.output_tokens;
             const double dur =
                 g.duration_ms() != 0.0 ? g.duration_ms() : static_cast<double>(g.latency_ms());
             payload.processing_time_ms = dur;
             payload.generation_time_ms = dur;
             payload.tokens_per_second = g.tokens_per_second();
-            payload.time_to_first_token_ms =
-                g.time_to_first_token_ms() != 0
-                    ? static_cast<double>(g.time_to_first_token_ms())
-                    : static_cast<double>(g.first_token_latency_ms());
+            payload.time_to_first_token_ms = g.time_to_first_token_ms() != 0
+                                                 ? static_cast<double>(g.time_to_first_token_ms())
+                                                 : static_cast<double>(g.first_token_latency_ms());
             payload.is_streaming = g.is_streaming() ? RAC_TRUE : RAC_FALSE;
             payload.has_is_streaming = RAC_TRUE;
             framework_str = framework_proto_to_string(g.framework());
@@ -804,10 +802,9 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             if (is_stt) {
                 if (!v.model_id().empty())
                     payload.model_id = v.model_id().c_str();
-                payload.model_name =
-                    !v.model_name().empty()
-                        ? v.model_name().c_str()
-                        : (!v.model_id().empty() ? v.model_id().c_str() : nullptr);
+                payload.model_name = !v.model_name().empty()
+                                         ? v.model_name().c_str()
+                                         : (!v.model_id().empty() ? v.model_id().c_str() : nullptr);
                 payload.processing_time_ms = static_cast<double>(v.duration_ms());
                 payload.audio_duration_ms = static_cast<double>(v.audio_length_ms());
                 payload.audio_size_bytes = v.audio_size_bytes();
@@ -821,7 +818,8 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 payload.has_is_streaming = RAC_TRUE;
                 framework_str = framework_proto_to_string(v.framework());
                 payload.framework = framework_str.c_str();
-                if (v.kind() == runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED && !ev.has_error()) {
+                if (v.kind() == runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED &&
+                    !ev.has_error()) {
                     payload.success = RAC_TRUE;
                     payload.has_success = RAC_TRUE;
                 }
@@ -830,10 +828,9 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     payload.model_id = v.model_id().c_str();
                     payload.voice = v.model_id().c_str();  // voice == model_id for TTS
                 }
-                payload.model_name =
-                    !v.model_name().empty()
-                        ? v.model_name().c_str()
-                        : (!v.model_id().empty() ? v.model_id().c_str() : nullptr);
+                payload.model_name = !v.model_name().empty()
+                                         ? v.model_name().c_str()
+                                         : (!v.model_id().empty() ? v.model_id().c_str() : nullptr);
                 payload.character_count = v.character_count();
                 payload.output_duration_ms = static_cast<double>(v.audio_duration_ms());
                 payload.audio_size_bytes = v.audio_size_bytes_tts();

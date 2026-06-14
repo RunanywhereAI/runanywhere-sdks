@@ -142,6 +142,32 @@ final class VLMViewModel: NSObject {
 
     // MARK: - Describe
 
+    /// Drain a typed VLM stream, forwarding TOKEN text via `onToken`.
+    /// Throws when the stream terminates with an ERROR event so callers'
+    /// existing catch blocks surface it like any other failure.
+    private func consumeVLMStream(
+        _ stream: AsyncStream<RAVLMStreamEvent>,
+        onToken: (String) -> Void
+    ) async throws {
+        for await event in stream {
+            switch event.kind {
+            case .token:
+                if !event.token.isEmpty { onToken(event.token) }
+            case .completed:
+                let result = event.result
+                logger.info("VLM streaming completed: \(result.completionTokens) tokens, \(result.tokensPerSecond) tok/s")
+            case .error:
+                throw NSError(
+                    domain: "com.runanywhere.RunAnywhereAI",
+                    code: Int(event.errorCode),
+                    userInfo: [NSLocalizedDescriptionKey: event.errorMessage.isEmpty ? "VLM stream failed" : event.errorMessage]
+                )
+            default:
+                break
+            }
+        }
+    }
+
     func describeCurrentFrame() async {
         guard let pixelBuffer = currentFrame, !isProcessing else { return }
 
@@ -158,10 +184,7 @@ final class VLMViewModel: NSObject {
             options.maxTokens = 200
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await event in stream where !event.generation.token.isEmpty {
-                currentDescription += event.generation.token
-            }
-            logger.info("VLM streaming completed")
+            try await consumeVLMStream(stream) { currentDescription += $0 }
         } catch {
             self.error = error
             logger.error("VLM error: \(error.localizedDescription)")
@@ -185,10 +208,7 @@ final class VLMViewModel: NSObject {
             options.maxTokens = 300
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await event in stream where !event.generation.token.isEmpty {
-                currentDescription += event.generation.token
-            }
-            logger.info("VLM streaming completed")
+            try await consumeVLMStream(stream) { currentDescription += $0 }
         } catch {
             self.error = error
         }
@@ -212,10 +232,7 @@ final class VLMViewModel: NSObject {
             options.maxTokens = 300
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await event in stream where !event.generation.token.isEmpty {
-                currentDescription += event.generation.token
-            }
-            logger.info("VLM streaming completed")
+            try await consumeVLMStream(stream) { currentDescription += $0 }
         } catch {
             self.error = error
         }
@@ -264,11 +281,10 @@ final class VLMViewModel: NSObject {
             options.maxTokens = 100
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await event in stream where !event.generation.token.isEmpty {
-                newDescription += event.generation.token
+            try await consumeVLMStream(stream) {
+                newDescription += $0
                 currentDescription = newDescription
             }
-            logger.info("VLM streaming completed")
         } catch {
             // Don't show errors during auto-stream, just log
             logger.error("Auto-stream VLM error: \(error.localizedDescription)")

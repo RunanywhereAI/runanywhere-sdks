@@ -23,11 +23,12 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
+#include "sdk_events.pb.h"
+
 #include <string>
 #include <utility>
 
 #include "infrastructure/events/sdk_event_publish.h"
-#include "sdk_events.pb.h"
 #endif
 
 namespace {
@@ -80,7 +81,6 @@ void emit_voice_agent_state(v1::SDKComponent component, rac_voice_agent_componen
 
 }  // namespace
 
-
 // =============================================================================
 // HELPER FUNCTIONS FOR C++ COMPONENTS / JNI BRIDGE
 // =============================================================================
@@ -101,7 +101,8 @@ void emit_llm_generation_started(const char* generation_id, const char* model_id
     g.set_temperature(temperature);
     g.set_max_tokens(max_tokens);
     g.set_context_length(context_length);
-    publish_with_session(v1::SDK_COMPONENT_LLM, v1::EVENT_CATEGORY_LLM, std::move(g), generation_id);
+    publish_with_session(v1::SDK_COMPONENT_LLM, v1::EVENT_CATEGORY_LLM, std::move(g),
+                         generation_id);
 }
 
 void emit_llm_generation_completed(const char* generation_id, const char* model_id,
@@ -125,7 +126,8 @@ void emit_llm_generation_completed(const char* generation_id, const char* model_
     g.set_temperature(temperature);
     g.set_max_tokens(max_tokens);
     g.set_context_length(context_length);
-    publish_with_session(v1::SDK_COMPONENT_LLM, v1::EVENT_CATEGORY_LLM, std::move(g), generation_id);
+    publish_with_session(v1::SDK_COMPONENT_LLM, v1::EVENT_CATEGORY_LLM, std::move(g),
+                         generation_id);
 }
 
 void emit_llm_generation_failed(const char* generation_id, const char* model_id,
@@ -151,7 +153,8 @@ void emit_llm_first_token(const char* generation_id, const char* model_id,
         g.set_model_id(model_id);
     g.set_first_token_latency_ms(static_cast<int64_t>(time_to_first_token_ms));
     g.set_framework(framework_to_proto_int(framework));
-    publish_with_session(v1::SDK_COMPONENT_LLM, v1::EVENT_CATEGORY_LLM, std::move(g), generation_id);
+    publish_with_session(v1::SDK_COMPONENT_LLM, v1::EVENT_CATEGORY_LLM, std::move(g),
+                         generation_id);
 }
 
 void emit_llm_streaming_update(const char* generation_id, int32_t tokens_generated) {
@@ -626,8 +629,8 @@ void emit_stt_transcription_completed(const char*, const char*, const char*, flo
 void emit_stt_transcription_failed(const char*, const char*, rac_result_t, const char*) {}
 void emit_tts_synthesis_started(const char*, const char*, int32_t, int32_t,
                                 rac_inference_framework_t) {}
-void emit_tts_synthesis_completed(const char*, const char*, int32_t, double, int32_t, double, double,
-                                  int32_t, rac_inference_framework_t) {}
+void emit_tts_synthesis_completed(const char*, const char*, int32_t, double, int32_t, double,
+                                  double, int32_t, rac_inference_framework_t) {}
 void emit_tts_synthesis_failed(const char*, const char*, rac_result_t, const char*) {}
 void emit_vad_started() {}
 void emit_vad_stopped() {}

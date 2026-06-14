@@ -42,7 +42,7 @@ import kotlinx.serialization.json.put
 fun StructuredOutputOptions.Companion.defaults(
     schema: RAJSONSchema,
     includeSchemaInPrompt: Boolean = true,
-    strict: Boolean = true,
+    strict: Boolean = false,
 ): StructuredOutputOptions =
     StructuredOutputOptions(
         schema = schema,

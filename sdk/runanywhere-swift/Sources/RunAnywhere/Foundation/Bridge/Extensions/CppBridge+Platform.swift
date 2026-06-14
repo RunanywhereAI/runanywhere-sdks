@@ -240,71 +240,15 @@ extension CppBridge {
             }
 
             callbacks.create = { _, _, _ -> rac_handle_t? in
-                // Create Foundation Models service
-                guard SystemFoundationModels.isAvailable else {
-                    Platform.logger.error(
-                        "Foundation Models unavailable: \(SystemFoundationModels.unavailableReason ?? "unknown reason")"
-                    )
-                    return nil
-                }
-
-                guard #available(iOS 26.0, macOS 26.0, *) else {
-                    return nil
-                }
-
-                return Platform.syncWait {
-                    let service = SystemFoundationModelsService()
-                    try await service.initialize(modelPath: "built-in")
-                    // Retain the service and hand its opaque pointer back as the
-                    // handle; `generate`/`destroy` recover it via Unmanaged.
-                    let handle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
-                    Platform.logger.info("Foundation Models service created")
-                    return handle
-                } onTimeout: {
-                    Platform.logger.error("Foundation Models service creation timed out")
-                } onError: { error in
-                    Platform.logger.error("Failed to create Foundation Models service: \(error)")
-                } releaseAfterTimeout: { handle in
-                    guard #available(iOS 26.0, macOS 26.0, *) else { return }
-                    Unmanaged<SystemFoundationModelsService>.fromOpaque(handle).release()
-                }
+                Platform.createFoundationModelsHandle()
             }
 
             callbacks.generate = { handle, promptPtr, _, outResponsePtr, _ -> rac_result_t in
-                guard let handle = handle,
-                      let promptPtr = promptPtr,
-                      let outResponsePtr = outResponsePtr else {
-                    return RAC_ERROR_INVALID_PARAMETER
-                }
-
-                guard #available(iOS 26.0, macOS 26.0, *) else {
-                    return RAC_ERROR_NOT_SUPPORTED
-                }
-
-                let service = Unmanaged<SystemFoundationModelsService>
-                    .fromOpaque(handle).takeUnretainedValue()
-
-                let prompt = String(cString: promptPtr)
-
-                let waitResult = Platform.syncWaitValue {
-                    try await service.generate(
-                        prompt: prompt,
-                        options: RALLMGenerationOptions.defaults()
-                    )
-                } onError: { error in
-                    Platform.logger.error("Foundation Models generate failed: \(error)")
-                }
-                guard waitResult.result == RAC_SUCCESS else {
-                    return waitResult.result
-                }
-                guard let response = waitResult.value else {
-                    return RAC_ERROR_INTERNAL
-                }
-                guard let responsePtr = strdup(response) else {
-                    return RAC_ERROR_OUT_OF_MEMORY
-                }
-                outResponsePtr.pointee = responsePtr
-                return RAC_SUCCESS
+                Platform.foundationModelsGenerate(
+                    handle: handle,
+                    promptPtr: promptPtr,
+                    outResponsePtr: outResponsePtr
+                )
             }
 
             callbacks.destroy = { handle, _ in
@@ -324,6 +268,82 @@ extension CppBridge {
             } else {
                 logger.error("Failed to register LLM callbacks: \(result)")
             }
+        }
+
+        /// Body of the `create` LLM callback — verbatim extraction so
+        /// `registerLLMCallbacks()` stays within the lint body-length limit.
+        private static func createFoundationModelsHandle() -> rac_handle_t? {
+            // Create Foundation Models service
+            guard SystemFoundationModels.isAvailable else {
+                Platform.logger.error(
+                    "Foundation Models unavailable: \(SystemFoundationModels.unavailableReason ?? "unknown reason")"
+                )
+                return nil
+            }
+
+            guard #available(iOS 26.0, macOS 26.0, *) else {
+                return nil
+            }
+
+            return Platform.syncWait {
+                let service = SystemFoundationModelsService()
+                try await service.initialize(modelPath: "built-in")
+                // Retain the service and hand its opaque pointer back as the
+                // handle; `generate`/`destroy` recover it via Unmanaged.
+                let handle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
+                Platform.logger.info("Foundation Models service created")
+                return handle
+            } onTimeout: {
+                Platform.logger.error("Foundation Models service creation timed out")
+            } onError: { error in
+                Platform.logger.error("Failed to create Foundation Models service: \(error)")
+            } releaseAfterTimeout: { handle in
+                guard #available(iOS 26.0, macOS 26.0, *) else { return }
+                Unmanaged<SystemFoundationModelsService>.fromOpaque(handle).release()
+            }
+        }
+
+        /// Body of the `generate` LLM callback — verbatim extraction so
+        /// `registerLLMCallbacks()` stays within the lint body-length limit.
+        private static func foundationModelsGenerate(
+            handle: rac_handle_t?,
+            promptPtr: UnsafePointer<CChar>?,
+            outResponsePtr: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+        ) -> rac_result_t {
+            guard let handle = handle,
+                  let promptPtr = promptPtr,
+                  let outResponsePtr = outResponsePtr else {
+                return RAC_ERROR_INVALID_PARAMETER
+            }
+
+            guard #available(iOS 26.0, macOS 26.0, *) else {
+                return RAC_ERROR_NOT_SUPPORTED
+            }
+
+            let service = Unmanaged<SystemFoundationModelsService>
+                .fromOpaque(handle).takeUnretainedValue()
+
+            let prompt = String(cString: promptPtr)
+
+            let waitResult = Platform.syncWaitValue {
+                try await service.generate(
+                    prompt: prompt,
+                    options: RALLMGenerationOptions.defaults()
+                )
+            } onError: { error in
+                Platform.logger.error("Foundation Models generate failed: \(error)")
+            }
+            guard waitResult.result == RAC_SUCCESS else {
+                return waitResult.result
+            }
+            guard let response = waitResult.value else {
+                return RAC_ERROR_INTERNAL
+            }
+            guard let responsePtr = strdup(response) else {
+                return RAC_ERROR_OUT_OF_MEMORY
+            }
+            outResponsePtr.pointee = responsePtr
+            return RAC_SUCCESS
         }
 
         // MARK: - TTS Callbacks (System TTS)

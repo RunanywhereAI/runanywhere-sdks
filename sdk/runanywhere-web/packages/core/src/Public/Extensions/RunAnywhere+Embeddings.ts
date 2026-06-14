@@ -15,6 +15,7 @@ import { ModelCategory, type ModelLoadResult, type ModelUnloadResult } from '@ru
 import { SDKComponent } from '@runanywhere/proto-ts/sdk_events';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import type {
+  EmbeddingVector,
   EmbeddingsOptions,
   EmbeddingsRequest,
   EmbeddingsResult,
@@ -206,6 +207,49 @@ function currentModelID(): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// EmbeddingVector helpers — Swift parity: EmbeddingsProto+Helpers.swift
+// ---------------------------------------------------------------------------
+
+function l2Norm(values: number[]): number {
+  let sumSquares = 0;
+  for (const value of values) sumSquares += value * value;
+  return Math.sqrt(sumSquares);
+}
+
+/**
+ * Cosine similarity between two embedding vectors. Uses the precomputed
+ * `norm` field when present, recomputing the L2 norm otherwise. Returns 0
+ * for mismatched/empty vectors or zero norms.
+ * Swift parity: `RAEmbeddingVector.cosineSimilarity(with:)`
+ * (EmbeddingsProto+Helpers.swift:18).
+ */
+export function embeddingCosineSimilarity(a: EmbeddingVector, b: EmbeddingVector): number {
+  if (a.values.length !== b.values.length || a.values.length === 0) return 0;
+  let dot = 0;
+  for (let i = 0; i < a.values.length; i += 1) dot += a.values[i]! * b.values[i]!;
+  const aNorm = a.norm !== undefined ? a.norm : l2Norm(a.values);
+  const bNorm = b.norm !== undefined ? b.norm : l2Norm(b.values);
+  if (aNorm <= 0 || bNorm <= 0) return 0;
+  return dot / (aNorm * bNorm);
+}
+
+/**
+ * L2 norm of the vector's values.
+ * Swift parity: `RAEmbeddingVector.computeNorm()` (EmbeddingsProto+Helpers.swift:28).
+ */
+export function embeddingComputeNorm(vector: EmbeddingVector): number {
+  return l2Norm(vector.values);
+}
+
+/**
+ * Processing time in seconds (from `processingTimeMs`).
+ * Swift parity: `RAEmbeddingsResult.processingTime` (EmbeddingsProto+Helpers.swift:40).
+ */
+export function embeddingsResultProcessingTime(result: EmbeddingsResult): number {
+  return result.processingTimeMs / 1000;
+}
+
+// ---------------------------------------------------------------------------
 // Public namespace
 // ---------------------------------------------------------------------------
 
@@ -245,4 +289,4 @@ export const Embeddings = {
   unload,
 };
 
-export type { EmbeddingsOptions, EmbeddingsRequest, EmbeddingsResult };
+export type { EmbeddingVector, EmbeddingsOptions, EmbeddingsRequest, EmbeddingsResult };

@@ -19,7 +19,7 @@ import {
   ButtonHeight,
 } from '../../theme/spacing';
 
-export type RequiredModelKind = 'llm' | 'stt' | 'tts' | 'vlm';
+export type RequiredModelKind = 'llm' | 'stt' | 'tts' | 'vad' | 'vlm';
 
 interface ModelRequiredOverlayProps {
   /** Modality context for icon and text */
@@ -43,6 +43,8 @@ const getModalityIcon = (modality: RequiredModelKind): string => {
       return 'mic-outline';
     case 'tts':
       return 'volume-high-outline';
+    case 'vad':
+      return 'pulse-outline';
     case 'vlm':
       return 'eye-outline';
     default:
@@ -61,6 +63,8 @@ const getDefaultTitle = (modality: RequiredModelKind): string => {
       return 'No Speech Model Selected';
     case 'tts':
       return 'No Voice Model Selected';
+    case 'vad':
+      return 'No VAD Model Selected';
     case 'vlm':
       return 'No Vision Model Selected';
     default:
@@ -79,6 +83,8 @@ const getDefaultDescription = (modality: RequiredModelKind): string => {
       return 'Select a speech recognition model to transcribe audio.';
     case 'tts':
       return 'Select a text-to-speech model to generate audio.';
+    case 'vad':
+      return 'Select a voice activity model to detect speech in microphone audio.';
     case 'vlm':
       return 'Select a vision model to analyze images.';
     default:

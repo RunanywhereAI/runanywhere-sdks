@@ -43,11 +43,10 @@ import {
 } from '@runanywhere/proto-ts/sdk_init';
 import type { SDKInitOptions } from '../types/models';
 import { EventBus } from '../Foundation/EventBus';
-import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
+import { SDKLogger } from '../Foundation/SDKLogger';
 import { requestPersistentStorage } from '../Infrastructure/BrowserStorage';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { OPFSBridge } from '../Infrastructure/OPFSBridge';
-import { AudioPlayback } from '../Infrastructure/AudioPlayback';
 import {
   frameworkOPFSDir,
   primaryFilenameFromModel,
@@ -68,21 +67,26 @@ import { StructuredOutput as StructuredOutputCapability } from './Extensions/Run
 import { ToolCalling as ToolCallingCapability } from './Extensions/RunAnywhere+ToolCalling';
 import { Logging as LoggingCapability } from './Extensions/RunAnywhere+Logging';
 import { STT as STTCapability } from './Extensions/RunAnywhere+STT';
-import { TTS as TTSCapability } from './Extensions/RunAnywhere+TTS';
+import { TTS as TTSCapability, sharedTTSPlayback } from './Extensions/RunAnywhere+TTS';
 import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
+import type {
+  VLMGenerationOptions,
+  VLMImage,
+  VLMResult,
+  VLMStreamEvent,
+} from '@runanywhere/proto-ts/vlm_options';
 import { Hybrid as HybridCapability } from './Extensions/RunAnywhere+Hybrid';
 import { Backends as BackendsCapability } from './Extensions/Backends/onnxStatus';
 import {
   createStorageNamespace,
   setRegisterModelHydrateHook,
 } from './Extensions/RunAnywhere+Storage';
-import { disposeSpeechProvider } from './Extensions/SpeechProvider';
 import { flatFacade } from './Extensions/RunAnywhere+FlatFacade';
 import { StorageAdapter } from '../Adapters/StorageAdapter';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter';
-import { SDK_VERSION } from '../Foundation/Version';
+import { SDK_PLATFORM, SDK_VERSION } from '../Foundation/Version';
 import {
   clearRunanywhereModule,
   getAllRegisteredModules,
@@ -130,12 +134,6 @@ let _initializingPromise: Promise<void> | null = null;
 let _localFileStorage: LocalFileStorage | null = null;
 let _deviceId: string | null = null;
 let _hasCompletedNativePhase1 = false;
-/** True once the commons WASM loaded successfully during initialize(). When
- * false, `isInitialized` reflects TS-layer readiness only; WASM-backed APIs
- * will fail until a backend module registers and calls
- * `completeNativePhase1ForModule`. This flag has the same semantics as
- * Swift's `isInitializedFlag` combined with the Phase 1 proto success path. */
-let _jsOnlyInit = false;
 
 // Phase 2 (services) init state — mirrors Swift's
 // `hasCompletedServicesInit` + `hasCompletedHTTPSetup` split.
@@ -311,7 +309,7 @@ export function completeNativePhase1ForModule(module: EmscriptenRunanywhereModul
     apiKey: _initOptions?.apiKey ?? '',
     baseUrl: _initOptions?.baseURL ?? '',
     deviceId: ensureDeviceId(),
-    platform: 'web',
+    platform: SDK_PLATFORM,
     sdkVersion: SDK_VERSION,
   }).finish();
 
@@ -401,8 +399,8 @@ function attachSignalToCancel(
  *
  * The Web Audio API ultimately wants Float32 samples in [-1, 1]; we
  * interpret the engine bytes as follows:
- *   - `AUDIO_FORMAT_PCM`: typed Float32 native bytes (4-byte aligned). This
- *     is what the standalone Sherpa SpeechProvider produces.
+ *   - `AUDIO_FORMAT_PCM`: typed Float32 native bytes (4-byte aligned), as
+ *     produced by the sherpa TTS engines.
  *   - `AUDIO_FORMAT_PCM_S16LE`: signed 16-bit little-endian PCM; convert
  *     by normalizing to [-1, 1].
  *   - Any other (WAV/MP3/Opus/...): unsupported here without a decoder,
@@ -503,6 +501,31 @@ async function resolveHydratedModelPath(
  * commons WASM's `s_model_registry`. `registerModel` broadcasts to every
  * known module via `ModelRegistryAdapter`.
  */
+/**
+ * Invoke one of the `rac_wasm_file_manager_clear_*` shims (wasm_exports.cpp)
+ * on the commons-owning module. The shims build the rac_file_callbacks_t in
+ * C++ against the module's own filesystem, so commons keeps ownership of the
+ * Cache/Temp path computation and clear semantics.
+ */
+async function callWasmFileManagerClear(
+  operation: 'clearCache' | 'cleanTempFiles',
+  exportName: '_rac_wasm_file_manager_clear_cache' | '_rac_wasm_file_manager_clear_temp',
+): Promise<void> {
+  const module = getModuleForCapability('commons') ?? tryRunanywhereModule();
+  const fn = (module as unknown as Record<string, (() => number) | undefined>)?.[exportName];
+  if (!module || typeof fn !== 'function') {
+    throw SDKException.backendNotAvailable(
+      operation,
+      `The loaded WASM artifact does not export ${exportName}; rebuild with ` +
+        `sdk/runanywhere-web/scripts/build-core-wasm.sh to enable ${operation}.`,
+    );
+  }
+  const rc = fn();
+  if (rc !== 0) {
+    throw SDKException.fromCode(rc, `${exportName} failed with code ${rc}`);
+  }
+}
+
 function mirrorDownloadCompletionToRegistry(model: ModelInfo, localPath: string): void {
   const importedModel: ModelInfo = {
     ...model,
@@ -511,7 +534,27 @@ function mirrorDownloadCompletionToRegistry(model: ModelInfo, localPath: string)
     isAvailable: true,
     updatedAtUnixMs: Date.now(),
   };
-  ModelRegistryCapability.registerModel(importedModel);
+  // Swift parity (RunAnywhere+Storage.swift persistDownloadCompletion):
+  // route through the commons import path (ModelImportRequest →
+  // rac_model_registry_import_proto) so C++ owns import semantics instead
+  // of a bare registerModel write.
+  const result = ModelRegistryCapability.importModel({
+    model: importedModel,
+    sourcePath: localPath,
+    copyIntoManagedStorage: false,
+    overwriteExisting: true,
+    validateBeforeRegister: false,
+    files: importedModel.multiFile?.files ?? [],
+  });
+  if (!result?.success) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+      result?.errorMessage
+        ? result.errorMessage
+        : 'Downloaded model could not be imported into the registry',
+      'downloadModel',
+    );
+  }
 }
 
 /**
@@ -549,7 +592,7 @@ async function syncVisionLanguageProviderToLifecycle(): Promise<void> {
       await VisionLanguageCapability.unloadModel();
     }
   } catch (err) {
-    if (err instanceof SDKException && err.code === -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE) {
+    if (err instanceof SDKException && err.code === ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE) {
       return;
     }
     logger.debug(
@@ -667,12 +710,9 @@ export const RunAnywhere = {
     return _isInitialized;
   },
 
-  /** Mirror Swift `RunAnywhere.areServicesReady` (Phase 2 complete).
-   * Returns false when commons WASM failed to load during initialize() so
-   * callers know native Phase 1 was deferred and WASM-backed APIs are not yet
-   * available, even though `isInitialized` is true. */
+  /** Mirror Swift `RunAnywhere.areServicesReady` (Phase 2 complete). */
   get areServicesReady(): boolean {
-    return _hasCompletedServicesInit && !_jsOnlyInit;
+    return _hasCompletedServicesInit;
   },
 
   /** Mirror Swift `RunAnywhere.isActive`. */
@@ -784,9 +824,10 @@ export const RunAnywhere = {
         const env = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
         _initOptions = { ...options, environment: env };
 
-        if (options.debug) {
-          SDKLogger.level = LogLevel.LOG_LEVEL_DEBUG;
-        }
+        // Swift parity (RunAnywhere.swift performCoreInitSerial): set the
+        // environment first so logging boots with the correct config
+        // (dev=debug, prod=warning/local-off).
+        SDKLogger.applyEnvironmentConfiguration(env);
 
         logger.info(`Initializing RunAnywhere Web SDK (${env})...`);
 
@@ -809,31 +850,17 @@ export const RunAnywhere = {
 
         // Load the core commons WASM so the SDK facade (init, environment,
         // auth, model registry, lifecycle, proto events) has its native
-        // backing. Failure is non-fatal — backend packages (LlamaCPP, ONNX)
-        // load their own WASM modules and install them via
-        // `setRunanywhereModule`, so apps that only need backend-specific
-        // operations can still proceed if the core artifact is missing.
-        // When it fails, `_jsOnlyInit = true` so `areServicesReady` accurately
-        // reflects that native Phase 1 was deferred (mirrors Swift's
-        // `isInitializedFlag = false` on Phase 1 failure, adapted to Web's
-        // intentional non-fatal policy).
-        try {
-          await CommonsModule.shared.ensureLoaded();
-        } catch (err) {
-          logger.warning(
-            `Failed to load core Commons WASM (non-fatal — backend packages can still install their own modules): ${
-              err instanceof Error ? err.message : String(err)
-            }`,
-          );
-          _jsOnlyInit = true;
-        }
+        // backing. Swift parity (RunAnywhere.swift performCoreInitSerial):
+        // Phase 1 failure is fatal — initialize() rethrows and
+        // `isInitialized` stays false.
+        await CommonsModule.shared.ensureLoaded();
 
         _isInitialized = true;
 
         ensureDeviceId();
 
         logger.info('RunAnywhere Web SDK initialized successfully');
-        EventBus.shared.emit('sdk.initialized', EventCategory.EVENT_CATEGORY_INITIALIZATION, {
+        EventBus.shared.publish('sdk.initialized', EventCategory.EVENT_CATEGORY_INITIALIZATION, {
           environment: env,
         });
 
@@ -847,7 +874,7 @@ export const RunAnywhere = {
         void RunAnywhere.completeServicesInitialization().catch((err) => {
           const message = err instanceof Error ? err.message : String(err);
           logger.warning(`Phase 2 init failed (non-fatal): ${message}`);
-          EventBus.shared.emit(
+          EventBus.shared.publish(
             'sdk.initializationFailed',
             EventCategory.EVENT_CATEGORY_INITIALIZATION,
             { error: message, source: 'completeServicesInitialization' },
@@ -867,6 +894,18 @@ export const RunAnywhere = {
             `Initial model registry hydrate failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
           );
         }
+      } catch (error) {
+        // Swift parity (RunAnywhere.swift performCoreInitSerial error path):
+        // reset init state fully and rethrow so callers observe the failure.
+        logger.error(
+          `Initialization failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        _isInitialized = false;
+        _initOptions = null;
+        _hasCompletedServicesInit = false;
+        _hasCompletedHTTPSetup = false;
+        _servicesInitPromise = null;
+        throw error;
       } finally {
         _initializingPromise = null;
       }
@@ -969,6 +1008,13 @@ export const RunAnywhere = {
 
   // =========================================================================
   // Storage namespace
+  //
+  // Intentionally PUBLIC despite having no Swift namespace counterpart:
+  // File System Access API / OPFS directory selection, persistence restore,
+  // and backend probing are genuinely Web-platform surface (the browser is
+  // the only platform where the host must ask the user for a persistent
+  // filesystem), so this stays a web-justified namespace rather than being
+  // folded into the Swift-shaped flat facade.
   // =========================================================================
 
   storage: createStorageNamespace({
@@ -1010,7 +1056,7 @@ export const RunAnywhere = {
 
       const success = await _localFileStorage.chooseDirectory();
       if (success) {
-        EventBus.shared.emit('storage.localDirectorySelected', EventCategory.EVENT_CATEGORY_STORAGE, {
+        EventBus.shared.publish('storage.localDirectorySelected', EventCategory.EVENT_CATEGORY_STORAGE, {
           directoryName: _localFileStorage.directoryName,
         });
       }
@@ -1045,16 +1091,17 @@ export const RunAnywhere = {
 
   // =========================================================================
   // Namespace extensions — proto-byte adapter facades.
+  //
+  // The raw download / model-registry proto bridges (`Downloads`,
+  // `ModelRegistry`) are NOT exposed here — Swift keeps its CppBridge
+  // internal, and the canonical cross-SDK surface is the flat verbs
+  // (`downloadModel` / `downloadModelStream` / `listModels` / `queryModels` /
+  // `getModel` / `downloadedModels` / `importModel` / `refreshModelRegistry`).
+  // Backend packages reach the bridge objects via `@runanywhere/web/internal`.
   // =========================================================================
-
-  /** C++-owned download workflow — plan/start/cancel/resume/progress. */
-  downloads: DownloadsCapability,
 
   /** C++ SDKEvent proto stream — subscribe/publish/poll/failure. */
   sdkEvents: SDKEventsCapability,
-
-  /** C++ model registry proto bridge — list/query/listDownloaded/get/mutate. */
-  modelRegistry: ModelRegistryCapability,
 
   // Cross-SDK lifecycle surface is the four top-level flat verbs below
   // (`loadModel` / `unloadModel` / `currentModel` /
@@ -1067,7 +1114,9 @@ export const RunAnywhere = {
   /** Text generation — `RunAnywhere.textGeneration.generate(options)` etc. */
   textGeneration: TextGenerationCapability,
 
-  /** Structured output — `RunAnywhere.structuredOutput.generate(prompt, schema)` */
+  /** Web-only structured-output extras (export probe + raw proto primitives).
+   * Generation itself is the flat Swift-named `RunAnywhere.generateStructured`
+   * / `generateStructuredStream`. */
   structuredOutput: StructuredOutputCapability,
 
   /** Tool calling — `RunAnywhere.toolCalling.generate(prompt, tools)` */
@@ -1088,17 +1137,26 @@ export const RunAnywhere = {
   /** LoRA adapter management — `RunAnywhere.lora.apply(request)` etc. */
   lora: LoRACapability,
 
-  /** RAG retrieval pipeline — `RunAnywhere.rag.query(...)` etc. */
+  /** Web-only RAG extras (provider wiring, availability, document list/remove).
+   * Pipeline operations are the flat Swift-named verbs (`ragCreatePipeline`,
+   * `ragIngest`, `ragQuery`, ...). */
   rag: RAGCapability,
 
   /** Embeddings generation — `RunAnywhere.embeddings.embed('text', {modelID})` etc. */
   embeddings: EmbeddingsCapability,
 
-  /** Voice-agent orchestration — `RunAnywhere.voiceAgent.processTurn(...)` etc. */
+  /** Web-only voice-agent extras (availability/readiness probes, provider
+   * sub-operations). Orchestration is the flat Swift-named verbs
+   * (`initializeVoiceAgent`, `processVoiceTurn`, `streamVoiceAgent`, ...). */
   voiceAgent: VoiceAgentCapability,
 
   /** Vision-language model inference — `RunAnywhere.visionLanguage.processImage(...)`. */
   visionLanguage: VisionLanguageCapability,
+
+  /** Model-registry proto bridge — `RunAnywhere.modelRegistry.registerModel(model)`
+   * etc. (documented public namespace; the flat Swift-named verbs
+   * `registerModel`/`listModels`/`refreshModelRegistry` delegate to it). */
+  modelRegistry: ModelRegistryCapability,
 
   /** Hybrid STT router — `RunAnywhere.hybrid.createSttRouter()` etc. Per-request
    * offline(sherpa)↔online(cloud) dispatch; commons owns all routing. */
@@ -1190,15 +1248,19 @@ export const RunAnywhere = {
     });
     ModelRegistryCapability.registerModel(model);
 
+    // Plan defaults mirror Swift RunAnywhere+Storage.swift:187-189:
+    // resumeExisting=true, validateExistingBytes=true,
+    // verifyChecksums=!checksum.isEmpty.
     const planRequest = {
       modelId: request.modelId,
       model,
-      resumeExisting: request.resumeExisting ?? false,
+      resumeExisting: request.resumeExisting ?? true,
       availableStorageBytes: request.availableStorageBytes ?? 0,
       allowMeteredNetwork: request.allowMeteredNetwork ?? true,
       storageNamespace: request.storageNamespace ?? '',
-      validateExistingBytes: request.validateExistingBytes ?? false,
-      verifyChecksums: request.verifyChecksums ?? false,
+      validateExistingBytes: request.validateExistingBytes ?? true,
+      verifyChecksums:
+        request.verifyChecksums ?? (model.checksumSha256?.length ?? 0) > 0,
       requiredFreeBytesAfterDownload: request.requiredFreeBytesAfterDownload ?? 0,
     };
     const plan = await planDownloadWithSelfHeal(request.modelId, planRequest);
@@ -1209,12 +1271,17 @@ export const RunAnywhere = {
       );
     }
 
+    // Swift parity (RunAnywhere+Storage.swift:207-210): commons does NOT
+    // update the registry on completion; the explicit import below
+    // (mirrorDownloadCompletionToRegistry — Web's RAModelImportRequest
+    // equivalent) is the canonical persistence step, run after the OPFS
+    // flush. Callers may still opt out via updateRegistryOnCompletion=false.
     const start = DownloadsCapability.start({
       modelId: request.modelId,
       plan,
-      resume: request.resumeExisting ?? false,
+      resume: request.resumeExisting ?? true,
       resumeToken: plan.resumeToken,
-      updateRegistryOnCompletion: request.updateRegistryOnCompletion ?? true,
+      updateRegistryOnCompletion: false,
     });
     if (!start?.accepted) {
       throw SDKException.backendNotAvailable(
@@ -1334,6 +1401,71 @@ export const RunAnywhere = {
   },
 
   /**
+   * Stream download progress for a registered model. Mirrors Swift's
+   * `downloadModelStream(_:)` (RunAnywhere+Storage.swift:263) — a thin
+   * async-iterable over the callback-based `downloadModel`. Consumer
+   * cancellation (break / `return()`) cancels the in-flight download,
+   * matching Swift's `onTermination == .cancelled` branch.
+   */
+  downloadModelStream(
+    input: string | DownloadModelOptions,
+    extra: CancellableCall = {},
+  ): AsyncIterable<DownloadProgress> {
+    return (async function* downloadProgressStream(): AsyncGenerator<DownloadProgress> {
+      const queue: DownloadProgress[] = [];
+      let notify: (() => void) | null = null;
+      let done = false;
+      let failure: unknown = null;
+      const controller = new AbortController();
+      const detachOuter = attachSignalToCancel(extra.signal, () => controller.abort());
+      const request = typeof input === 'string' ? { modelId: input } : { ...input };
+      const callerOnProgress = request.onProgress;
+
+      const downloadPromise = RunAnywhere.downloadModel(
+        {
+          ...request,
+          onProgress: (progress) => {
+            callerOnProgress?.(progress);
+            queue.push(progress);
+            notify?.();
+          },
+        },
+        { signal: controller.signal },
+      ).then(
+        () => {
+          done = true;
+          notify?.();
+        },
+        (err: unknown) => {
+          failure = err;
+          done = true;
+          notify?.();
+        },
+      );
+
+      try {
+        for (;;) {
+          while (queue.length > 0) {
+            yield queue.shift()!;
+          }
+          if (done) break;
+          await new Promise<void>((resolve) => {
+            notify = resolve;
+          });
+          notify = null;
+        }
+        if (failure) throw failure;
+        await downloadPromise;
+      } finally {
+        detachOuter();
+        if (!done) {
+          controller.abort();
+        }
+      }
+    })();
+  },
+
+  /**
    * Scan the Origin Private File System for models that were downloaded in a
    * previous session and update the C++ registry's `localPath` for any
    * that are found on disk but not yet reflected in the in-memory registry.
@@ -1391,7 +1523,7 @@ export const RunAnywhere = {
       // Notify UI subscribers (Storage tab, model
       // sheet) so they re-query the registry and render Downloaded/Load
       // instead of Download after a fresh page load.
-      EventBus.shared.emit(
+      EventBus.shared.publish(
         'models.hydrated',
         EventCategory.EVENT_CATEGORY_STORAGE,
         { count: patched },
@@ -1412,18 +1544,35 @@ export const RunAnywhere = {
     return RunAnywhere.storage.delete(request);
   },
 
-  clearCache(): never {
-    throw SDKException.backendNotAvailable(
-      'clearCache',
-      'The Web SDK has no exported rac_file_manager_clear_cache bridge yet.',
-    );
+  deleteModel(
+    modelId: string,
+  ): ReturnType<ReturnType<typeof createStorageNamespace>['deleteModel']> {
+    return RunAnywhere.storage.deleteModel(modelId);
   },
 
-  cleanTempFiles(): never {
-    throw SDKException.backendNotAvailable(
-      'cleanTempFiles',
-      'The Web SDK has no exported rac_file_manager_clear_temp bridge yet.',
-    );
+  /**
+   * Clear the SDK's Cache directory. Mirrors Swift `clearCache()`
+   * (RunAnywhere+Storage.swift:305-313): init guard + ensureServicesReady,
+   * then the commons file manager clears {base}/RunAnywhere/Cache
+   * (delete-recursive + recreate) via the `rac_wasm_file_manager_clear_cache`
+   * shim. Platform note: on Web that directory lives in the commons module's
+   * volatile MEMFS — OPFS is untouched by design (cache/temp are never
+   * flushed there; OPFS reclamation is `deleteStorage`/`storage.delete`).
+   * Throws backendNotAvailable against older WASM artifacts without the shim.
+   */
+  async clearCache(): Promise<void> {
+    await RunAnywhere.ensureServicesReady();
+    await callWasmFileManagerClear('clearCache', '_rac_wasm_file_manager_clear_cache');
+  },
+
+  /**
+   * Clear the SDK's Temp directory. Mirrors Swift `cleanTempFiles()`
+   * (RunAnywhere+Storage.swift:315-325); same platform semantics as
+   * [clearCache].
+   */
+  async cleanTempFiles(): Promise<void> {
+    await RunAnywhere.ensureServicesReady();
+    await callWasmFileManagerClear('cleanTempFiles', '_rac_wasm_file_manager_clear_temp');
   },
 
   async generate(
@@ -1500,14 +1649,12 @@ export const RunAnywhere = {
       try {
         const samples = decodeTTSAudioToFloat32(output);
         if (samples && samples.length > 0) {
-          const playback = new AudioPlayback({
-            sampleRate: output.sampleRate > 0 ? output.sampleRate : 22050,
-          });
-          try {
-            await playback.play(samples, output.sampleRate || undefined);
-          } finally {
-            playback.dispose();
-          }
+          // Shared playback instance (Swift parity: `ttsAudioPlayback`
+          // singleton) so `stopSpeaking()` can stop in-flight speech.
+          await sharedTTSPlayback().play(
+            samples,
+            output.sampleRate > 0 ? output.sampleRate : 22050,
+          );
         }
       } catch (err) {
         logger.warning(
@@ -1537,10 +1684,10 @@ export const RunAnywhere = {
   },
 
   async processImage(
-    image: Parameters<typeof VisionLanguageCapability.processImage>[0],
-    options: Parameters<typeof VisionLanguageCapability.processImage>[1],
+    image: VLMImage,
+    options: VLMGenerationOptions,
     extra: CancellableCall = {},
-  ): Promise<Awaited<ReturnType<typeof VisionLanguageCapability.processImage>>> {
+  ): Promise<VLMResult> {
     throwIfAborted(extra.signal, 'processImage');
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
@@ -1552,16 +1699,30 @@ export const RunAnywhere = {
     return VisionLanguageCapability.processImage(image, options).finally(detach);
   },
 
+  // Explicit overloads (the capability function is overloaded; deriving the
+  // param types via Parameters<> would collapse to the LAST overload and
+  // reject VLMGenerationOptions at the facade).
   async processImageStream(
-    image: Parameters<typeof VisionLanguageCapability.processImageStream>[0],
-    options: Parameters<typeof VisionLanguageCapability.processImageStream>[1],
-    extra: CancellableCall = {},
-  ): ReturnType<typeof VisionLanguageCapability.processImageStream> {
+    image: VLMImage,
+    optionsOrPrompt: VLMGenerationOptions | string,
+    maybeOptionsOrExtra?: VLMGenerationOptions | CancellableCall,
+    maybeExtra: CancellableCall = {},
+  ): Promise<AsyncIterable<VLMStreamEvent>> {
+    const promptForm = typeof optionsOrPrompt === 'string';
+    const extra: CancellableCall = promptForm
+      ? maybeExtra
+      : ((maybeOptionsOrExtra as CancellableCall | undefined) ?? {});
     throwIfAborted(extra.signal, 'processImageStream');
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
     }
-    const stream = await VisionLanguageCapability.processImageStream(image, options);
+    const stream = promptForm
+      ? await VisionLanguageCapability.processImageStream(
+        image,
+        optionsOrPrompt,
+        maybeOptionsOrExtra as VLMGenerationOptions | undefined,
+      )
+      : await VisionLanguageCapability.processImageStream(image, optionsOrPrompt);
     attachSignalToCancel(
       extra.signal,
       () => { void VisionLanguageCapability.cancelVLMGeneration(); },
@@ -1588,17 +1749,8 @@ export const RunAnywhere = {
     HTTPAdapter.clearDefaultModule();
     StorageAdapter.clearDefaultHandles();
 
-    // Await speech-provider teardown before resetting _isInitialized so that
-    // a subsequent initialize() cannot allocate fresh WASM handles while the
-    // previous provider's dispose() is still in flight. Mirrors Swift's
-    // async reset() which serializes teardown before clearing state flags.
-    await disposeSpeechProvider().catch((err) => {
-      logger.warning(`SpeechProvider.dispose() threw during shutdown: ${String(err)}`);
-    });
-
     // Tear down the Worker streaming pipeline. The WASM ownership boundary
-    // is `clearRunanywhereModule()` + `disposeSpeechProvider()`,
-    // but the Worker singletons
+    // is `clearRunanywhereModule()`, but the Worker singletons
     // (`OffscreenRuntimeBridge._instance`, `_init` payload, and the
     // `StreamWorkerFactoryRegistry._factory`) live outside that
     // boundary. Without explicit teardown the spawned worker keeps its
@@ -1616,7 +1768,6 @@ export const RunAnywhere = {
     EventBus.reset();
 
     _isInitialized = false;
-    _jsOnlyInit = false;
     _initOptions = null;
     _initializingPromise = null;
     _localFileStorage = null;

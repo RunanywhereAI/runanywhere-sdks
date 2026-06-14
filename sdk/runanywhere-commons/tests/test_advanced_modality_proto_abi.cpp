@@ -434,23 +434,94 @@ int test_vlm_process_stream_events() {
           "VLM process emits completed capability event");
     rac_proto_buffer_free(&out);
 
+    // Typed stream ABI (rac_vlm_stream_proto) uses the lifecycle-owned VLM,
+    // so register a llamacpp-named mock plugin + multimodal model and load
+    // it through rac_model_lifecycle_load_proto — exercising the proto path
+    // exactly the way the v2 SDK bridges call it.
     rac_sdk_event_clear_queue();
-    StreamCapture capture;
+    auto stream_root = temp_root("vlm-stream");
+    auto stream_model_path = stream_root / "model.gguf";
+    write_file(stream_model_path, "GGUFmodel");
+
+    rac_vlm_service_ops_t stream_ops = make_vlm_ops();
+    rac_engine_vtable_t stream_vtable = make_vtable("llamacpp", nullptr, nullptr, &stream_ops);
+    (void)rac_plugin_unregister("llamacpp");
+    CHECK(rac_plugin_register(&stream_vtable) == RAC_SUCCESS, "VLM stream test plugin registers");
+
+    rac_model_registry_handle_t stream_registry = nullptr;
+    CHECK(rac_model_registry_create(&stream_registry) == RAC_SUCCESS && stream_registry != nullptr,
+          "VLM stream test model registry creates");
+    runanywhere::v1::ModelInfo stream_model;
+    stream_model.set_id("mock-vlm-stream");
+    stream_model.set_name("Mock VLM Stream");
+    stream_model.set_category(runanywhere::v1::MODEL_CATEGORY_MULTIMODAL);
+    stream_model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
+    stream_model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    stream_model.set_local_path(stream_model_path.string());
+    stream_model.set_is_downloaded(true);
+    stream_model.set_is_available(true);
+    std::vector<uint8_t> stream_model_bytes;
+    CHECK(serialize(stream_model, &stream_model_bytes), "VLM stream ModelInfo serializes");
+    CHECK(rac_model_registry_register_proto(stream_registry, stream_model_bytes.data(),
+                                            stream_model_bytes.size()) == RAC_SUCCESS,
+          "VLM stream model registers");
+
+    runanywhere::v1::ModelLoadRequest stream_load;
+    stream_load.set_model_id("mock-vlm-stream");
+    std::vector<uint8_t> stream_load_bytes;
+    CHECK(serialize(stream_load, &stream_load_bytes), "VLM stream ModelLoadRequest serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_vlm_process_stream_proto(&service, image_bytes.data(), image_bytes.size(),
-                                      options_bytes.data(), options_bytes.size(),
-                                      vlm_stream_capture, &capture, &out);
-    runanywhere::v1::VLMResult stream_result;
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &stream_result),
-          "VLM stream returns aggregate VLMResult");
-    CHECK(stream_result.text() == "hello vision", "VLM stream aggregates tokens");
-    CHECK(capture.events.size() == 2, "VLM stream callback receives token events");
-    runanywhere::v1::SDKEvent token_event;
-    CHECK(token_event.ParseFromArray(capture.events[0].data(),
-                                     static_cast<int>(capture.events[0].size())) &&
-              token_event.has_generation(),
-          "VLM stream callback receives SDKEvent generation payload");
+    rc = rac_model_lifecycle_load_proto(stream_registry, stream_load_bytes.data(),
+                                        stream_load_bytes.size(), &out);
+    runanywhere::v1::ModelLoadResult stream_load_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &stream_load_result) &&
+              stream_load_result.success(),
+          "VLM stream lifecycle load succeeds");
     rac_proto_buffer_free(&out);
+
+    runanywhere::v1::VLMGenerationRequest stream_request;
+    stream_request.set_request_id("vlm-stream-test");
+    *stream_request.add_images() = image;
+    *stream_request.mutable_options() = options;
+    std::vector<uint8_t> stream_request_bytes;
+    CHECK(serialize(stream_request, &stream_request_bytes), "VLMGenerationRequest serializes");
+
+    StreamCapture capture;
+    rc = rac_vlm_stream_proto(stream_request_bytes.data(), stream_request_bytes.size(),
+                              vlm_stream_capture, &capture);
+    CHECK(rc == RAC_SUCCESS, "VLM typed stream succeeds");
+    // STARTED, "hello", " vision", terminal COMPLETED.
+    CHECK(capture.events.size() == 4, "VLM typed stream delivers started/token/terminal events");
+    runanywhere::v1::VLMStreamEvent started_event;
+    CHECK(started_event.ParseFromArray(capture.events[0].data(),
+                                       static_cast<int>(capture.events[0].size())) &&
+              started_event.kind() == runanywhere::v1::VLM_STREAM_EVENT_KIND_STARTED,
+          "VLM typed stream opens with STARTED");
+    runanywhere::v1::VLMStreamEvent token_event;
+    CHECK(token_event.ParseFromArray(capture.events[1].data(),
+                                     static_cast<int>(capture.events[1].size())) &&
+              token_event.kind() == runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN &&
+              token_event.token() == "hello",
+          "VLM typed stream delivers token deltas");
+    runanywhere::v1::VLMStreamEvent terminal_event;
+    CHECK(terminal_event.ParseFromArray(capture.events.back().data(),
+                                        static_cast<int>(capture.events.back().size())) &&
+              terminal_event.kind() == runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED &&
+              terminal_event.is_final() && terminal_event.result().text() == "hello vision",
+          "VLM typed stream terminal COMPLETED carries the aggregate result");
+
+    // Unload + teardown so later tests don't observe a lifecycle VLM.
+    runanywhere::v1::ModelUnloadRequest stream_unload;
+    stream_unload.set_model_id("mock-vlm-stream");
+    stream_unload.set_category(runanywhere::v1::MODEL_CATEGORY_MULTIMODAL);
+    std::vector<uint8_t> stream_unload_bytes;
+    CHECK(serialize(stream_unload, &stream_unload_bytes), "VLM stream unload serializes");
+    rac_proto_buffer_init(&out);
+    (void)rac_model_lifecycle_unload_proto(stream_unload_bytes.data(), stream_unload_bytes.size(),
+                                           &out);
+    rac_proto_buffer_free(&out);
+    (void)rac_plugin_unregister("llamacpp");
+    rac_model_registry_destroy(stream_registry);
 
     CHECK(rac_vlm_cancel_proto(&service) == RAC_SUCCESS, "VLM cancel proto succeeds");
     CHECK(impl.cancel_count == 1, "VLM cancel dispatches backend cancel");

@@ -7,12 +7,7 @@ enum class ModelSelectionContext(val title: String) {
     LLM("Select LLM Model"),
     STT("Select STT Model"),
     TTS("Select TTS Voice"),
-
-    // Voice-agent TTS picker. Same category as TTS but excludes built-ins:
-    // the voice agent needs a lifecycle-loaded TTS and the commons System TTS
-    // plugin is Apple-only, so on Android a built-in selection passes the
-    // screen's ready gate and then fails init with "Models not loaded: TTS".
-    VOICE_TTS("Select TTS Voice"),
+    VAD("Select VAD Model"),
     VLM("Select Vision Model"),
     RAG_EMBEDDING("Select Embedding Model"),
     RAG_LLM("Select LLM Model"),
@@ -21,7 +16,8 @@ enum class ModelSelectionContext(val title: String) {
     fun accepts(category: ModelCategory): Boolean = when (this) {
         LLM, RAG_LLM -> category == ModelCategory.MODEL_CATEGORY_LANGUAGE
         STT -> category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-        TTS, VOICE_TTS -> category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+        TTS -> category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+        VAD -> category == ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         VLM -> category == ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
             category == ModelCategory.MODEL_CATEGORY_VISION
         RAG_EMBEDDING -> category == ModelCategory.MODEL_CATEGORY_EMBEDDING
@@ -32,13 +28,9 @@ enum class ModelSelectionContext(val title: String) {
     val loadCategory: ModelCategory? get() = when (this) {
         LLM -> ModelCategory.MODEL_CATEGORY_LANGUAGE
         STT -> ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-        TTS, VOICE_TTS -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+        TTS -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+        VAD -> ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         VLM -> ModelCategory.MODEL_CATEGORY_MULTIMODAL
         RAG_EMBEDDING, RAG_LLM -> null
     }
-
-    // Whether built-in entries (System TTS, Foundation Models) are selectable.
-    // Built-ins are picked by reference (no lifecycle load), which the voice
-    // agent cannot consume.
-    val allowsBuiltIn: Boolean get() = this != VOICE_TTS
 }

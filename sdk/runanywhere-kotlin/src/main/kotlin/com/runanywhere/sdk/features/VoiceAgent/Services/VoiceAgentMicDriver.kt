@@ -22,6 +22,7 @@ import ai.runanywhere.proto.v1.VoiceAgentTurnRequest
 import ai.runanywhere.proto.v1.VoiceEvent
 import com.runanywhere.sdk.features.STT.Services.AudioCaptureManager
 import com.runanywhere.sdk.features.TTS.Services.AudioPlaybackManager
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.ByteArrayOutputStream
@@ -70,11 +71,26 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
         var inSpeech = false
         var speechMs = 0
         var silenceMs = 0
+        var noiseFloor = SPEECH_RMS_THRESHOLD
 
         while (currentCoroutineContext().isActive) {
             val chunk = chunks.receive()
             val chunkMs = chunk.size * 1000 / (SAMPLE_RATE_HZ * BYTES_PER_SAMPLE)
-            val speech = rms(chunk) >= SPEECH_RMS_THRESHOLD
+            // Adaptive endpointing. A fixed RMS threshold misses the end-of-
+            // utterance pause on devices whose mic noise floor sits above the
+            // constant: silence is never seen, so an utterance only ends at the
+            // MAX_UTTERANCE_MS cap (a ~1s turn then waits ~15s). Track the ambient
+            // floor — drop instantly to any quieter level, and creep up only while
+            // not in speech so loud speech can't inflate it — and require a chunk
+            // to rise clearly above that floor to count as speech.
+            val level = rms(chunk)
+            val speechThreshold = maxOf(SPEECH_RMS_THRESHOLD, noiseFloor * SPEECH_FLOOR_MULTIPLIER)
+            val speech = level >= speechThreshold
+            noiseFloor = when {
+                level < noiseFloor -> level
+                !speech -> noiseFloor + (level - noiseFloor) * NOISE_FLOOR_RISE
+                else -> noiseFloor
+            }
 
             if (!inSpeech) {
                 preRoll.addLast(chunk)
@@ -134,8 +150,9 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
         val ttsPcm = ByteArrayOutputStream()
         var ttsSampleRate = 0
         var ttsEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
+        var rc = RunAnywhereBridge.RAC_SUCCESS
         try {
-            val rc =
+            rc =
                 RunAnywhereBridge.racVoiceAgentProcessTurnProto(
                     handle,
                     VoiceAgentTurnRequest.ADAPTER.encode(request),
@@ -154,13 +171,20 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
                     }
                     true
                 }
-            if (rc != RunAnywhereBridge.RAC_SUCCESS) {
-                logger.warning("Voice turn failed: rc=$rc")
-            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             logger.error("Voice turn threw: ${e.message}")
+        }
+
+        if (rc == RunAnywhereBridge.RAC_ERROR_NOT_INITIALIZED) {
+            // The agent was torn down (session cleaned up) while this driver was
+            // still capturing. Stop instead of re-submitting every utterance to a
+            // dead agent, which spams "voice agent is not initialized" failures.
+            throw SDKException.voiceAgent("Voice agent is no longer initialized")
+        }
+        if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+            logger.warning("Voice turn failed: rc=$rc")
         }
 
         playTtsAudio(ttsPcm.toByteArray(), ttsSampleRate, ttsEncoding)
@@ -241,8 +265,14 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
         const val SAMPLE_RATE_HZ = 16_000
         const val BYTES_PER_SAMPLE = 2
 
-        /** Normalized RMS above which a chunk counts as speech. */
+        /** Absolute floor for the adaptive speech threshold (normalized RMS). */
         const val SPEECH_RMS_THRESHOLD = 0.015
+
+        /** Speech must exceed this multiple of the tracked ambient noise floor. */
+        const val SPEECH_FLOOR_MULTIPLIER = 2.2
+
+        /** Per-chunk rate at which the ambient floor creeps up toward louder ambient. */
+        const val NOISE_FLOOR_RISE = 0.05
 
         /** Trailing silence that closes an utterance. */
         const val END_OF_UTTERANCE_SILENCE_MS = 800

@@ -47,4 +47,53 @@ public extension RunAnywhere {
             return (0..<int16Count).map { Float(int16Buffer[$0]) / 32768.0 }
         }
     }
+
+    /// Wrap raw 16-bit mono PCM samples in a canonical 44-byte WAV (RIFF)
+    /// container: `RIFF` + `fmt ` (16-byte PCM chunk, format tag 1, 1
+    /// channel) + `data`. Matches Kotlin
+    /// `RunAnywhere.pcm16ToWav(int16Bytes:sampleRate:)`.
+    ///
+    /// Use this when a consumer needs a self-describing audio container
+    /// rather than headerless PCM — e.g. cloud STT providers that upload the
+    /// bytes as an `audio/wav` file part. `HybridSTTRouter.transcribe`
+    /// applies it automatically to raw PCM16 input.
+    ///
+    /// - Parameters:
+    ///   - int16Data: Raw Int16 mono PCM samples encoded as `Data`
+    ///     (little-endian). The sample bytes are copied verbatim after the
+    ///     header.
+    ///   - sampleRate: Capture sample rate in Hz (e.g. 16000).
+    /// - Returns: The same samples prefixed with a WAV header.
+    static func pcm16ToWav(_ int16Data: Data, sampleRate: Int) -> Data {
+        let pcmFormatTag = 1
+        let channels = 1
+        let bitsPerSample = 16
+        let blockAlign = channels * bitsPerSample / 8
+        let byteRate = sampleRate * blockAlign
+        let fmtChunkSize = 16
+
+        var wav = Data(capacity: 44 + int16Data.count)
+        func appendUInt32(_ value: Int) {
+            withUnsafeBytes(of: UInt32(value).littleEndian) { wav.append(contentsOf: $0) }
+        }
+        func appendUInt16(_ value: Int) {
+            withUnsafeBytes(of: UInt16(value).littleEndian) { wav.append(contentsOf: $0) }
+        }
+
+        wav.append(contentsOf: Array("RIFF".utf8))
+        appendUInt32(36 + int16Data.count)
+        wav.append(contentsOf: Array("WAVE".utf8))
+        wav.append(contentsOf: Array("fmt ".utf8))
+        appendUInt32(fmtChunkSize)
+        appendUInt16(pcmFormatTag)
+        appendUInt16(channels)
+        appendUInt32(sampleRate)
+        appendUInt32(byteRate)
+        appendUInt16(blockAlign)
+        appendUInt16(bitsPerSample)
+        wav.append(contentsOf: Array("data".utf8))
+        appendUInt32(int16Data.count)
+        wav.append(int16Data)
+        return wav
+    }
 }

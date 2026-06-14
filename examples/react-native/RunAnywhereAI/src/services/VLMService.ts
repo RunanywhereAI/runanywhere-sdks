@@ -7,13 +7,10 @@ import {
   VLMGenerationOptions,
   VLMImage,
   VLMImageFormat,
-  VLMModelFamily,
 } from '@runanywhere/proto-ts/vlm_options';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 
 export class VLMService {
-  private _isLoaded: boolean = false;
-
   /**
    * Load the model and track internal state
    */
@@ -33,16 +30,13 @@ export class VLMService {
       const success = result.success;
 
       if (success) {
-        this._isLoaded = true;
         // eslint-disable-next-line no-console -- demo VLM lifecycle diagnostic
         console.log('[VLMService] Load success');
       } else {
-        this._isLoaded = false;
         throw new Error('SDK returned failure for model load');
       }
     } catch (error) {
       console.error('[VLMService] Load failed:', error);
-      this._isLoaded = false;
       throw error;
     }
   }
@@ -51,7 +45,6 @@ export class VLMService {
    * Check if model is loaded through the SDK lifecycle state.
    */
   async isModelLoaded(): Promise<boolean> {
-    if (!this._isLoaded) return false;
     try {
       return await isModelLoadedForCategory(
         ModelCategory.MODEL_CATEGORY_MULTIMODAL
@@ -70,7 +63,7 @@ export class VLMService {
     maxTokens: number,
     onToken: (token: string) => void
   ): Promise<void> {
-    if (!this._isLoaded) {
+    if (!(await this.isModelLoaded())) {
       throw new Error('Model not loaded. Please select a model first.');
     }
 
@@ -93,19 +86,7 @@ export class VLMService {
         VLMGenerationOptions.fromPartial({
           prompt,
           maxTokens,
-          temperature: 0.7,
-          topP: 0.9,
-          topK: 0,
-          stopSequences: [],
           streamingEnabled: true,
-          maxImageSize: 0,
-          nThreads: 0,
-          useGpu: true,
-          modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_AUTO,
-          seed: 0,
-          repetitionPenalty: 1,
-          minP: 0,
-          emitImageEmbeddings: false,
         })
       );
 
@@ -133,7 +114,6 @@ export class VLMService {
   }
 
   release(): void {
-    this._isLoaded = false;
     // eslint-disable-next-line no-console -- demo VLM lifecycle diagnostic
     console.log('[VLMService] Service state released');
   }

@@ -20,11 +20,14 @@ import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_SDK
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.launch
 
 /**
  * Central event bus for SDK-wide event distribution.
@@ -116,6 +119,31 @@ object EventBus {
     fun events(category: EventCategory): Flow<SDKEvent> {
         return events.filter { it.category == category }
     }
+
+    /**
+     * Subscribe to all events with a closure. The returned [Job] is the
+     * subscription token; cancel it to stop receiving events.
+     */
+    fun on(
+        scope: CoroutineScope,
+        handler: suspend (SDKEvent) -> Unit,
+    ): Job =
+        scope.launch {
+            events.collect { event -> handler(event) }
+        }
+
+    /**
+     * Subscribe to events of a specific category with a closure. The returned
+     * [Job] is the subscription token; cancel it to stop receiving events.
+     */
+    fun on(
+        scope: CoroutineScope,
+        category: EventCategory,
+        handler: suspend (SDKEvent) -> Unit,
+    ): Job =
+        scope.launch {
+            events(category).collect { event -> handler(event) }
+        }
 
     /**
      * Extract a specific payload type from the proto envelope stream for

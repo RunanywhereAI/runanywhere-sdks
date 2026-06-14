@@ -1416,6 +1416,15 @@ rac_result_t rac_vad_start_lifecycle_proto(rac_proto_buffer_t* out_result) {
     if (ref.ops && ref.ops->start) {
         op_rc = ref.ops->start(ref.impl);
     }
+    if (op_rc == RAC_SUCCESS) {
+        // The lifecycle-proto start path (Android/JNI bridge) drives ref.ops->start
+        // directly and never goes through rac_vad_component_start, so without this
+        // the VAD session emits no VAD_STARTED telemetry row.
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED);
+        rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
+                             runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
+    }
 
     rc = emit_vad_service_state(
         ref, op_rc, RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_SAMPLE_RATE,
@@ -1440,6 +1449,14 @@ rac_result_t rac_vad_stop_lifecycle_proto(rac_proto_buffer_t* out_result) {
     rac_result_t op_rc = RAC_SUCCESS;
     if (ref.ops && ref.ops->stop) {
         op_rc = ref.ops->stop(ref.impl);
+    }
+    if (op_rc == RAC_SUCCESS) {
+        // Mirror rac_vad_start_lifecycle_proto: the lifecycle path bypasses
+        // rac_vad_component_stop, so emit the paired VAD_STOPPED telemetry here.
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STOPPED);
+        rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
+                             runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
     }
 
     rc = emit_vad_service_state(

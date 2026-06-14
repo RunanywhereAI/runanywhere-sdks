@@ -1398,7 +1398,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_embedding_dimension(::int32_t value);
 
   public:
-  // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
+  // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5", (.runanywhere.v1.rac_min) = 1];
   [[nodiscard]] bool has_top_k()
       const;
   void clear_top_k() ;
@@ -1422,7 +1422,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_similarity_threshold(float value);
 
   public:
-  // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
+  // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
   [[nodiscard]] bool has_chunk_size()
       const;
   void clear_chunk_size() ;
@@ -1434,7 +1434,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_chunk_size(::int32_t value);
 
   public:
-  // optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
+  // optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64", (.runanywhere.v1.rac_min) = 0];
   [[nodiscard]] bool has_chunk_overlap()
       const;
   void clear_chunk_overlap() ;
@@ -4118,7 +4118,7 @@ inline void RAGConfiguration::_internal_set_embedding_dimension(::int32_t value)
   _impl_.embedding_dimension_ = value;
 }
 
-// optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
+// optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5", (.runanywhere.v1.rac_min) = 1];
 inline bool RAGConfiguration::has_top_k() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
   return value;
@@ -4174,7 +4174,7 @@ inline void RAGConfiguration::_internal_set_similarity_threshold(float value) {
   _impl_.similarity_threshold_ = value;
 }
 
-// optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
+// optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
 inline bool RAGConfiguration::has_chunk_size() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000400U);
   return value;
@@ -4202,7 +4202,7 @@ inline void RAGConfiguration::_internal_set_chunk_size(::int32_t value) {
   _impl_.chunk_size_ = value;
 }
 
-// optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
+// optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64", (.runanywhere.v1.rac_min) = 0];
 inline bool RAGConfiguration::has_chunk_overlap() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000800U);
   return value;

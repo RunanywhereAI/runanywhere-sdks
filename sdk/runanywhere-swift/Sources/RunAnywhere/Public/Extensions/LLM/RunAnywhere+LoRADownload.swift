@@ -2,7 +2,7 @@
 //  RunAnywhere+LoRADownload.swift
 //  RunAnywhere SDK
 //
-//  SDK-owned LoRA adapter download.
+//  SDK-owned LoRA adapter download and local-file import.
 //
 //  An adapter stays a LoRA catalog entry for apply/remove semantics, while its
 //  bytes are represented as a generated model artifact so download/storage
@@ -138,5 +138,49 @@ public extension RunAnywhere.LoRA {
         completed.localPath = localPath
         _ = try await markDownloadCompleted(completed)
         return localPath
+    }
+}
+
+// MARK: - SDK-owned local-file import
+
+public extension RunAnywhere.LoRA {
+
+    /// Import a user-picked LoRA adapter file (document picker / share sheet)
+    /// into SDK-owned storage.
+    ///
+    /// Swift only resolves the platform-specific access (security-scoped URL);
+    /// commons owns everything past the readable source path: deterministic
+    /// catalog matching, canonical placement, artifact registry record +
+    /// manifest persistence, and catalog completion for matched entries.
+    /// Apps apply the returned `localPath`; they never construct on-disk
+    /// paths themselves.
+    @discardableResult
+    func importAdapter(from url: URL) async throws -> RALoraAdapterImportResult {
+        guard RunAnywhere.isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessed {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        var request = RALoraAdapterImportRequest()
+        request.sourcePath = url.path
+
+        let handle = try await CppBridge.LoraRegistry.shared.requireHandle()
+        let result = try await CppBridge.LoraRegistry.shared.importAdapter(handle: handle, request)
+        guard result.success else {
+            throw SDKException(
+                code: .processingFailed,
+                message: result.errorMessage.isEmpty
+                    ? "LoRA adapter import failed"
+                    : result.errorMessage,
+                category: .internal
+            )
+        }
+        return result
     }
 }

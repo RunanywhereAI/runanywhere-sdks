@@ -102,6 +102,13 @@ export class STTProtoAdapter {
         ))
       )),
       (event) => event.isFinal,
+      undefined,
+      // Swift parity (ModalityProtoABI+Generated.swift:394-398): terminal
+      // final partial instead of rejecting the iterator.
+      (rc) => STTPartialResult.fromPartial({
+        isFinal: true,
+        text: `STT stream failed: ${rc}`,
+      }),
     );
   }
 

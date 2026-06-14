@@ -30,6 +30,7 @@ import type {
   LoraAdapterCatalogQuery,
   LoraAdapterDownloadCompletedRequest,
   LoraAdapterDownloadCompletedResult,
+  LoraAdapterImportResult,
   LoraCompatibilityResult,
 } from '@runanywhere/proto-ts/lora_options';
 import {
@@ -46,10 +47,29 @@ import {
   LoraAdapterCatalogQuery as LoraAdapterCatalogQueryMessage,
   LoraAdapterDownloadCompletedRequest as LoraAdapterDownloadCompletedRequestMessage,
   LoraAdapterDownloadCompletedResult as LoraAdapterDownloadCompletedResultMessage,
+  LoraAdapterImportRequest as LoraAdapterImportRequestMessage,
+  LoraAdapterImportResult as LoraAdapterImportResultMessage,
   LoraCompatibilityResult as LoraCompatibilityResultMessage,
 } from '@runanywhere/proto-ts/lora_options';
+import { ErrorCategory, ErrorCode } from '@runanywhere/proto-ts/errors';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
+import {
+  ModelCategory,
+  ModelFileRole,
+  ModelFormat,
+  ModelInfo as ModelInfoCodec,
+  ModelGetRequest,
+  ModelSource,
+  InferenceFramework,
+  type ModelInfo,
+} from '@runanywhere/proto-ts/model_types';
+import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
+import {
+  downloadModel as downloadRegisteredModel,
+  getModel,
+} from '../Models/RunAnywhere+ModelRegistry';
 
 const logger = new SDKLogger('RunAnywhere.LoRA');
 
@@ -223,6 +243,8 @@ async function checkCompatibility(
 async function register(
   entry: LoraAdapterCatalogEntry
 ): Promise<LoraAdapterCatalogEntry> {
+  // Swift parity: guard isInitialized (RunAnywhere+LoRA.swift:77-79).
+  requireInitialized();
   const native = ensureNative();
   const result = decodeRequired(
     await native.loraRegisterCatalogEntryProto(encodeCatalogEntry(entry)),
@@ -236,6 +258,8 @@ async function register(
 async function listCatalog(
   request?: LoraAdapterCatalogListRequest
 ): Promise<LoraAdapterCatalogListResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+LoRA.swift:88-90).
+  requireInitialized();
   const native = ensureNative();
   return decodeRequired(
     await native.loraCatalogListProto(encodeCatalogListRequest(request)),
@@ -247,6 +271,8 @@ async function listCatalog(
 async function queryCatalog(
   query: LoraAdapterCatalogQuery
 ): Promise<LoraAdapterCatalogListResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+LoRA.swift:99-101).
+  requireInitialized();
   const native = ensureNative();
   return decodeRequired(
     await native.loraCatalogQueryProto(encodeCatalogQuery(query)),
@@ -258,6 +284,8 @@ async function queryCatalog(
 async function getCatalogEntry(
   request: LoraAdapterCatalogGetRequest
 ): Promise<LoraAdapterCatalogGetResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+LoRA.swift:110-112).
+  requireInitialized();
   const native = ensureNative();
   return decodeRequired(
     await native.loraCatalogGetProto(encodeCatalogGetRequest(request)),
@@ -269,6 +297,8 @@ async function getCatalogEntry(
 async function markDownloadCompleted(
   request: LoraAdapterDownloadCompletedRequest
 ): Promise<LoraAdapterDownloadCompletedResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+LoRA.swift:125-127).
+  requireInitialized();
   const native = ensureNative();
   return decodeRequired(
     await native.loraCatalogMarkDownloadCompletedProto(
@@ -280,85 +310,220 @@ async function markDownloadCompleted(
 }
 
 // ============================================================================
-// Attach (high-level adapter staging)
+// Import completion + catalog conveniences (Swift RunAnywhere+LoRA.swift:138-181)
 // ============================================================================
 
 /**
- * Input shape for `RunAnywhere.lora.attachAdapter({...})`. The
- * convenience API resolves an adapter file by id, returning the
- * sandboxed local path where the artifact is staged so consumers do
- * not need to know about platform-specific sandboxed file system
- * roots (RNFS.DocumentDirectoryPath, etc.).
- */
-export interface LoRAAttachAdapterRequest {
-  /** Stable adapter identifier (catalog-id / fixture-id). */
-  adapterId: string;
-  /** Model id this adapter binds to. */
-  modelId: string;
-  /** Optional download URL — used for catalog registration only. */
-  url?: string;
-  /** Filename on disk under the SDK's sandboxed lora/ directory. */
-  filename: string;
-  /** Adapter scale (defaults to 1.0). */
-  scale?: number;
-  /** Optional target modules (e.g. ["q_proj", "v_proj"]). */
-  targetModules?: string[];
-  /** Optional adapter metadata. */
-  metadata?: Record<string, string>;
-}
-
-/**
- * Result of `RunAnywhere.lora.attachAdapter({...})`. Carries the
- * fully-resolved `LoRAAdapterConfig` ready for `lora.apply(...)` and
- * the absolute sandboxed `adapterPath` the SDK staged for the
- * caller.
- */
-export interface LoRAAttachAdapterResult {
-  config: LoRAAdapterConfig;
-  adapterPath: string;
-}
-
-const SANDBOX_LORA_DIR = 'lora';
-
-function resolveAdapterPath(filename: string): string {
-  const RNFS = require('react-native-fs');
-  return `${RNFS.DocumentDirectoryPath}/${SANDBOX_LORA_DIR}/${filename}`;
-}
-
-/**
- * Compose a `LoRAAdapterConfig` for a sandboxed adapter file without
- * the example app having to know about platform sandbox layout. The
- * file must already be present at the returned `adapterPath` (the
- * harness operator stages it per
- * `cross-platform-e2e-test-catalog.md §9b`).
+ * Persist native-reported LoRA adapter import completion in commons.
  *
- * The returned `config` is ready to feed directly into
- * `RunAnywhere.lora.apply(...)`.
+ * Uses the generated download-completed message with `imported` asserted,
+ * matching the IDL contract for platform file-picker/import completion.
+ * Mirrors Swift `lora.markImportCompleted(_:)`.
  */
-async function attachAdapter(
-  request: LoRAAttachAdapterRequest
-): Promise<LoRAAttachAdapterResult> {
-  const adapterPath = resolveAdapterPath(request.filename);
-  const config: LoRAAdapterConfig = LoRAAdapterConfigMessage.create({
-    adapterPath,
-    adapterId: request.adapterId,
-    scale: request.scale ?? 1.0,
-    targetModules: request.targetModules ?? [],
-    metadata: request.metadata ?? {},
+async function markImportCompleted(
+  request: LoraAdapterDownloadCompletedRequest
+): Promise<LoraAdapterDownloadCompletedResult> {
+  const importRequest = LoraAdapterDownloadCompletedRequestMessage.fromPartial({
+    ...request,
+    imported: true,
+    statusMessage: request.statusMessage || 'import completed',
   });
-  logger.info(
-    `LoRA attach resolved sandboxed adapter '${request.adapterId}' for model '${request.modelId}' -> ${adapterPath}`
+  return markDownloadCompleted(importRequest);
+}
+
+/**
+ * Import a user-picked local adapter file into SDK-owned storage.
+ *
+ * TS only resolves platform access (a readable file path from the picker)
+ * before calling; commons owns everything past the source path:
+ * deterministic catalog matching, canonical placement, artifact registry
+ * record + manifest persistence, and catalog completion for matched entries.
+ * Mirrors Swift `RunAnywhere.lora.importAdapter(from:)`.
+ */
+async function importAdapter(sourcePath: string): Promise<LoraAdapterImportResult> {
+  requireInitialized();
+  const native = ensureNative();
+  return decodeRequired(
+    await native.loraAdapterImportProto(
+      encodeProtoMessage(
+        LoraAdapterImportRequestMessage.fromPartial({ sourcePath }),
+        LoraAdapterImportRequestMessage
+      )
+    ),
+    LoraAdapterImportResultMessage.decode,
+    'loraAdapterImportProto'
   );
-  return { config, adapterPath };
+}
+
+/**
+ * Get all LoRA adapters compatible with a specific model (CANONICAL_API §3).
+ * Mirrors Swift `lora.adaptersForModel(_:)`.
+ */
+async function adaptersForModel(
+  modelId: string
+): Promise<LoraAdapterCatalogEntry[]> {
+  const result = await queryCatalog(
+    LoraAdapterCatalogQueryMessage.fromPartial({ modelId })
+  );
+  if (!result.success) {
+    // Swift parity: .processingFailed (RunAnywhere+LoRA.swift:157-163).
+    throw SDKException.processingFailed(
+      result.errorMessage || 'LoRA catalog query failed'
+    );
+  }
+  return result.entries;
+}
+
+/**
+ * Get all registered LoRA adapters (CANONICAL_API §3).
+ * Mirrors Swift `lora.allRegistered()`.
+ */
+async function allRegistered(): Promise<LoraAdapterCatalogEntry[]> {
+  const result = await listCatalog();
+  if (!result.success) {
+    // Swift parity: .processingFailed (RunAnywhere+LoRA.swift:172-178).
+    throw SDKException.processingFailed(
+      result.errorMessage || 'LoRA catalog list failed'
+    );
+  }
+  return result.entries;
 }
 
 // ============================================================================
-// Canonical namespace export
+// SDK-owned artifact registration + download
+// (Swift RunAnywhere+LoRADownload.swift:97-160)
 // ============================================================================
 
+const loraArtifactModelIDPrefix = 'lora-adapter:';
+const loraArtifactTag = 'lora-adapter';
+
+/** Stable model-registry id used for an adapter's download artifact. */
+function loraArtifactModelID(entry: LoraAdapterCatalogEntry): string {
+  return entry.id.startsWith(loraArtifactModelIDPrefix)
+    ? entry.id
+    : loraArtifactModelIDPrefix + entry.id;
+}
+
 /**
- * `RunAnywhere.lora` namespace backed by the generated LoRA service messages.
+ * Convert a catalog entry into model-registry metadata used by the generic
+ * download path. Catalog filtering and completion state remain owned by the
+ * LoRA catalog ABI. Mirrors Swift `RALoraAdapterCatalogEntry.toLoraArtifactModelInfo()`.
  */
+function toLoraArtifactModelInfo(entry: LoraAdapterCatalogEntry): ModelInfo {
+  const urlTail = entry.url.split('/').pop() ?? entry.url;
+  const artifactFilename =
+    entry.filename || urlTail.split('?')[0] || urlTail;
+
+  const descriptor = {
+    role: ModelFileRole.MODEL_FILE_ROLE_COMPANION,
+    url: entry.url,
+    filename: artifactFilename,
+    relativePath: artifactFilename,
+    isRequired: true,
+    ...(entry.sizeBytes > 0 ? { sizeBytes: entry.sizeBytes } : {}),
+    ...(entry.checksumSha256 ? { checksumSha256: entry.checksumSha256 } : {}),
+  };
+  const expectedFiles = {
+    files: [descriptor],
+    requiredPatterns: [artifactFilename],
+    description: 'LoRA adapter artifact',
+  };
+
+  const tags = [
+    loraArtifactTag,
+    ...entry.compatibleModels.map((m) => `base-model:${m}`),
+    ...entry.tags,
+  ].filter((tag, idx, all) => all.indexOf(tag) === idx);
+
+  return ModelInfoCodec.fromPartial({
+    id: loraArtifactModelID(entry),
+    name: entry.name,
+    category: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
+    downloadUrl: entry.url,
+    source: ModelSource.MODEL_SOURCE_REMOTE,
+    description: entry.description,
+    singleFile: {
+      requiredPatterns: [artifactFilename],
+      expectedFiles,
+    },
+    expectedFiles,
+    ...(entry.sizeBytes > 0 ? { downloadSizeBytes: entry.sizeBytes } : {}),
+    ...(entry.checksumSha256 ? { checksumSha256: entry.checksumSha256 } : {}),
+    metadata: {
+      description: entry.description,
+      ...(entry.author !== undefined ? { author: entry.author } : {}),
+      ...(entry.license !== undefined ? { license: entry.license } : {}),
+      tags,
+    },
+    isAvailable: true,
+  });
+}
+
+/**
+ * Register both the LoRA catalog entry and its downloadable artifact record.
+ * Does not fetch bytes. Mirrors Swift `lora.registerArtifact(_:)`.
+ */
+async function registerArtifact(
+  entry: LoraAdapterCatalogEntry
+): Promise<ModelInfo> {
+  const native = ensureNative();
+  const registered = await register(entry);
+  const artifact = toLoraArtifactModelInfo(registered);
+  const accepted = await native.registerModelProto(
+    encodeProtoMessage(artifact, ModelInfoCodec)
+  );
+  if (!accepted) {
+    throw SDKException.generationFailedWith(
+      `Model registry rejected LoRA artifact '${artifact.id}'`
+    );
+  }
+  return artifact;
+}
+
+/**
+ * Download a LoRA adapter through the canonical model-download pipeline.
+ *
+ * One call does everything: registers the catalog entry + artifact, downloads
+ * with resume/checksum/progress via commons, records completion in the LoRA
+ * catalog, and returns the stable local path of the adapter file.
+ * Mirrors Swift `lora.download(_:onProgress:)`.
+ */
+async function download(
+  entry: LoraAdapterCatalogEntry,
+  onProgress?: (progress: DownloadProgress) => void
+): Promise<string> {
+  const artifact = await registerArtifact(entry);
+  const finalProgress = await downloadRegisteredModel(artifact, onProgress);
+
+  let localPath = finalProgress.localPath;
+  if (!localPath) {
+    // The import step persisted the path on the registry record.
+    const lookup = await getModel(
+      ModelGetRequest.fromPartial({ modelId: artifact.id })
+    );
+    if (lookup.found) {
+      localPath = lookup.model?.localPath ?? '';
+    }
+  }
+  if (!localPath) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+      `LoRA adapter '${entry.id}' downloaded but no local path was recorded`,
+      { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
+    );
+  }
+
+  await markDownloadCompleted(
+    LoraAdapterDownloadCompletedRequestMessage.fromPartial({
+      adapterId: entry.id,
+      localPath,
+    })
+  );
+  return localPath;
+}
+
 export const lora = {
   apply,
   remove,
@@ -370,5 +535,10 @@ export const lora = {
   queryCatalog,
   getCatalogEntry,
   markDownloadCompleted,
-  attachAdapter,
+  markImportCompleted,
+  importAdapter,
+  adaptersForModel,
+  allRegistered,
+  registerArtifact,
+  download,
 };

@@ -154,14 +154,9 @@ object CppBridge {
 
             setupSentryHooks(environment)
 
-            // Register telemetry HTTP callback (just sets isRegistered flag)
-            CppBridgeTelemetry.register()
-
             // CRITICAL: Set environment early so CppBridgeDevice.isDeviceRegisteredCallback()
             // can determine correct behavior for production/staging modes
             CppBridgeTelemetry.setEnvironment(environment)
-
-            CppBridgeDevice.register()
 
             initializeTelemetryManager(environment)
 
@@ -173,6 +168,8 @@ object CppBridge {
             } else {
                 logger.warn("Telemetry handle not available, analytics events will not be tracked")
             }
+
+            CppBridgeDevice.register()
 
             CppBridgeState.isInitialized = true
 

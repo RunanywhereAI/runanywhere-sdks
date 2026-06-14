@@ -7,6 +7,8 @@
  * use (see model_registry_internal.h). No behaviour change.
  */
 
+#include "model_registry_internal.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -18,8 +20,6 @@
 #include "rac/core/rac_logger.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
-
-#include "model_registry_internal.h"
 
 using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 
@@ -442,14 +442,22 @@ rac_result_t rac_model_registry_get_proto(rac_model_registry_handle_t handle, co
     *proto_bytes_out = nullptr;
     *proto_size_out = 0;
 
-    std::lock_guard<std::mutex> lock(handle->mutex);
-    auto it = handle->models.find(model_id);
-    if (it == handle->models.end()) {
-        return RAC_ERROR_NOT_FOUND;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        {
+            std::lock_guard<std::mutex> lock(handle->mutex);
+            auto it = handle->models.find(model_id);
+            if (it != handle->models.end()) {
+                return model_to_proto_bytes_locked(handle, model_id, it->second, proto_bytes_out,
+                                                   proto_size_out);
+            }
+        }
+        // Lookup miss: an ad-hoc pull from a previous run may exist on disk
+        // with a manifest sidecar but no re-seeded entry. Restore once, retry.
+        if (attempt > 0 || !try_restore_model_manifest_by_id(handle, model_id)) {
+            break;
+        }
     }
-
-    return model_to_proto_bytes_locked(handle, model_id, it->second, proto_bytes_out,
-                                       proto_size_out);
+    return RAC_ERROR_NOT_FOUND;
 #endif
 }
 

@@ -40,20 +40,17 @@ class SDKState {
     // Initialization
     // ==========================================================================
 
+    // Lifecycle STARTED/COMPLETED/FAILED events are published by the sole
+    // caller (rac_sdk_init_phase1_proto), which owns the whole Phase-1 span —
+    // including validation — and the duration_ms payload.
     rac_result_t initialize(rac_environment_t env, const char* api_key, const char* base_url,
                             const char* device_id) {
-        rac::events::publish_initialization_started();
-
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            environment_ = env;
-            api_key_ = api_key ? api_key : "";
-            base_url_ = base_url ? base_url : "";
-            device_id_ = device_id ? device_id : "";
-            is_initialized_ = true;
-        }
-
-        rac::events::publish_initialization_completed();
+        std::lock_guard<std::mutex> lock(mutex_);
+        environment_ = env;
+        api_key_ = api_key ? api_key : "";
+        base_url_ = base_url ? base_url : "";
+        device_id_ = device_id ? device_id : "";
+        is_initialized_ = true;
         return RAC_SUCCESS;
     }
 

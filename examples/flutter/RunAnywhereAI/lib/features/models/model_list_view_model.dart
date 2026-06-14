@@ -172,7 +172,7 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('🗑️ Deleting model: ${model.name}');
 
-      await sdk.RunAnywhere.downloads.delete(model.id);
+      await sdk.RunAnywhere.deleteModel(model.id);
 
       // Refresh models from registry
       await loadModelsFromRegistry();
@@ -202,6 +202,8 @@ class ModelListViewModel extends ChangeNotifier {
           sdk.RunAnywhere.stt.currentModelId,
         ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS =>
           sdk.RunAnywhere.tts.currentVoiceId,
+        ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION =>
+          sdk.RunAnywhere.vad.currentModelId,
         _ => await sdk.RunAnywhere.llm.currentModel().then((m) => m?.id),
       };
 
@@ -223,7 +225,16 @@ class ModelListViewModel extends ChangeNotifier {
         case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
           await sdk.RunAnywhere.tts.loadVoice(model.id);
           break;
+        case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+          // Route VAD models through the VAD lifecycle (mirrors iOS, which
+          // preloads with category .voiceActivityDetection). Falling through
+          // to llm.load would load a 2 MB silero model as an LLM and fail.
+          await sdk.RunAnywhere.vad.loadModel(model.id);
+          break;
         default:
+          // After the picker filters (model_types.dart), only contexts the
+          // sheet already skips preload for (RAG, VLM/multimodal) reach
+          // here; their views own the correct lifecycle call.
           await sdk.RunAnywhere.llm.load(model.id);
       }
 
@@ -239,10 +250,9 @@ class ModelListViewModel extends ChangeNotifier {
     }
   }
 
-  /// Get models for a specific context
+  /// Get models for a specific context (category + framework allow-list +
+  /// supporting-file exclusion via the shared `includes` predicate).
   List<ModelInfo> modelsForContext(ModelSelectionContext context) {
-    return _availableModels.where((model) {
-      return context.relevantCategories.contains(model.category);
-    }).toList();
+    return _availableModels.where(context.includes).toList();
   }
 }

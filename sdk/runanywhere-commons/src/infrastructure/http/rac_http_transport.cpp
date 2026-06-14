@@ -28,6 +28,8 @@
 
 #include "rac/infrastructure/http/rac_http_transport.h"
 
+#include "rac_http_transport_ref.h"
+
 #include <cstddef>
 #include <memory>
 #include <mutex>
@@ -36,7 +38,6 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
-#include "rac_http_transport_ref.h"
 
 namespace {
 

@@ -6,13 +6,18 @@
  * between an on-device (offline, sherpa) and a cloud (online, cloud) STT
  * service, with commons owning the entire routing decision.
  *
- * Thin facade over `HybridSttRouter` + `CloudSTT` + the device-state /
+ * Thin facade over `HybridSttRouter` + `Cloud` + the device-state /
  * custom-filter installers. See `Hybrid/HybridWasmModule.ts` for the WASM
  * build delta this needs to run end-to-end.
  */
 
 import { HybridSttRouter } from './Hybrid/HybridSttRouter';
-import { CloudSTT, cloud, type CloudSTTConfig } from './Hybrid/CloudSTT';
+import { Cloud, cloud, type CloudSTTConfig } from './Hybrid/Cloud';
+import {
+  registerCloudSttProvider,
+  unregisterCloudSttProvider,
+  type SttProviderHandler,
+} from './Hybrid/CloudSttProvider';
 import {
   setHybridDeviceStateProvider,
   browserDeviceStateProvider,
@@ -36,7 +41,7 @@ export const Hybrid = {
   /** Register a cloud-STT model the router can refer to by id from the online
    * side (`onlineCloud(id)`). Provider is data (default "sarvam"). */
   registerCloudModel(config: CloudSTTConfig): void {
-    CloudSTT.register(config);
+    Cloud.register(config);
   },
 
   /** Build a cloud-STT registry entry from a generic provider config without
@@ -46,7 +51,19 @@ export const Hybrid = {
   /** Fold the cloud engine plugin into the WASM registry so the online
    * side is routable. Returns false when the build doesn't link the cloud engine. */
   registerCloudBackend(): boolean {
-    return CloudSTT.registerBackend();
+    return Cloud.registerBackend();
+  },
+
+  /** Register a developer-defined cloud STT provider handler by name (the
+   * host owns build + HTTP + parse). Mirrors Swift `Cloud.registerProvider`. */
+  registerCloudProvider(name: string, handler: SttProviderHandler): boolean {
+    return registerCloudSttProvider(name, handler);
+  },
+
+  /** Remove a developer-defined cloud STT provider. Idempotent for unknown
+   * names. Mirrors Swift `Cloud.unregisterProvider`. */
+  unregisterCloudProvider(name: string): void {
+    unregisterCloudSttProvider(name);
   },
 
   /** Install the host device-state provider the router consults for the

@@ -21,7 +21,7 @@
 
 #include "core/internal/platform_compat.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
-#include "rac/infrastructure/model_management/rac_model_strategy.h"
+#include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
 #ifdef _WIN32
@@ -1026,10 +1026,11 @@ static TestResult test_extract_and_resolve_archive() {
 }
 
 // =============================================================================
-// Test: default model strategy post-process extracts and resolves archive
+// Test: archive extraction followed by canonical artifact resolution
+// (the same extract→resolve sequence the download orchestrator runs)
 // =============================================================================
 
-static TestResult test_model_strategy_default_post_process_archive() {
+static TestResult test_archive_extract_then_resolve_artifact() {
     if (!has_tar()) {
         TestResult r;
         r.passed = true;
@@ -1050,24 +1051,30 @@ static TestResult test_model_strategy_default_post_process_archive() {
     std::string dest_dir = create_temp_dir("strategy_archive_dest");
     ASSERT_TRUE(!dest_dir.empty(), "Should create destination dir");
 
-    rac_model_download_config_t config = {};
-    config.model_id = "strategy";
-    config.source_url = "https://example.com/strategy.tar.gz";
-    config.destination_folder = dest_dir.c_str();
-    config.archive_type = RAC_ARCHIVE_TYPE_TAR_GZ;
-    config.expected_size = 123;
+    rac_extraction_options_t options = RAC_EXTRACTION_OPTIONS_DEFAULT;
+    options.archive_type_hint = RAC_ARCHIVE_TYPE_TAR_GZ;
+    rac_extraction_result_t extraction = {};
+    rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), &options,
+                                                 nullptr, nullptr, &extraction);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Extraction should succeed");
+    ASSERT_TRUE(extraction.files_extracted > 0, "Extraction should report files");
 
-    rac_download_result_t result = {};
-    rac_result_t rc = rac_model_strategy_post_process(RAC_FRAMEWORK_LLAMACPP, &config,
-                                                      archive_path.c_str(), &result);
-    ASSERT_EQ(rc, RAC_SUCCESS, "Default strategy should extract and resolve archive");
-    ASSERT_EQ(result.was_extracted, RAC_TRUE, "Default strategy should report extraction");
-    ASSERT_EQ(result.downloaded_size, static_cast<int64_t>(123),
-              "Downloaded size should propagate from config");
-    ASSERT_TRUE(result.final_path != nullptr, "Final path should be set");
-    ASSERT_TRUE(std::string(result.final_path).find("strategy.gguf") != std::string::npos,
-                "Final path should point to resolved GGUF");
-    rac_download_result_free(&result);
+    rac_model_info_t model = {};
+    model.id = const_cast<char*>("strategy");
+    model.framework = RAC_FRAMEWORK_LLAMACPP;
+    model.format = RAC_MODEL_FORMAT_UNKNOWN;
+    model.artifact_info.kind = RAC_ARTIFACT_KIND_ARCHIVE;
+    model.artifact_info.archive_type = RAC_ARCHIVE_TYPE_TAR_GZ;
+    model.artifact_info.archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN;
+
+    rac_model_path_resolution_t resolution = {};
+    rc = rac_model_paths_resolve_artifact(&model, dest_dir.c_str(), nullptr, &resolution);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Artifact resolution should succeed after extraction");
+    ASSERT_TRUE(resolution.primary_model_path != nullptr, "Primary path should be set");
+    ASSERT_TRUE(std::string(resolution.primary_model_path).find("strategy.gguf") !=
+                    std::string::npos,
+                "Resolution should point to the extracted GGUF");
+    rac_model_path_resolution_free(&resolution);
     remove_dir(archive_dir);
     remove_dir(dest_dir);
 
@@ -1075,21 +1082,31 @@ static TestResult test_model_strategy_default_post_process_archive() {
 }
 
 // =============================================================================
-// Test: default model strategy find_path uses canonical resolver
+// Test: artifact resolution prefers the model-id-named file
 // =============================================================================
 
-static TestResult test_model_strategy_default_find_path() {
+static TestResult test_resolve_artifact_prefers_model_id_filename() {
     std::string dir = create_temp_dir("strategy_find");
     ASSERT_TRUE(!dir.empty(), "Should create temp dir");
     ASSERT_TRUE(write_file(dir + "/other.gguf", "other"), "Should write fallback model");
     ASSERT_TRUE(write_file(dir + "/strategy.gguf", "model"), "Should write preferred model");
 
-    char out_path[1024];
-    rac_result_t rc = rac_model_strategy_find_path(RAC_FRAMEWORK_LLAMACPP, "strategy", dir.c_str(),
-                                                   out_path, sizeof(out_path));
-    ASSERT_EQ(rc, RAC_SUCCESS, "Default strategy should resolve model path");
-    ASSERT_TRUE(std::string(out_path).find("strategy.gguf") != std::string::npos,
-                "Default strategy should prefer model_id filename");
+    rac_model_info_t model = {};
+    model.id = const_cast<char*>("strategy");
+    model.framework = RAC_FRAMEWORK_LLAMACPP;
+    model.format = RAC_MODEL_FORMAT_UNKNOWN;
+    model.artifact_info.kind = RAC_ARTIFACT_KIND_MULTI_FILE;
+    model.artifact_info.archive_type = RAC_ARCHIVE_TYPE_NONE;
+    model.artifact_info.archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN;
+
+    rac_model_path_resolution_t resolution = {};
+    rac_result_t rc = rac_model_paths_resolve_artifact(&model, dir.c_str(), nullptr, &resolution);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Artifact resolution should succeed");
+    ASSERT_TRUE(resolution.primary_model_path != nullptr, "Primary path should be set");
+    ASSERT_TRUE(std::string(resolution.primary_model_path).find("strategy.gguf") !=
+                    std::string::npos,
+                "Resolution should prefer the model_id filename");
+    rac_model_path_resolution_free(&resolution);
     remove_dir(dir);
 
     return TEST_PASS();
@@ -1378,9 +1395,9 @@ int main_impl(int argc, char** argv) {
     suite.add("resolve_file_descriptor_required", test_resolve_file_descriptor_required);
     suite.add("resolve_checksum_mismatch", test_resolve_checksum_mismatch);
     suite.add("extract_and_resolve_archive", test_extract_and_resolve_archive);
-    suite.add("model_strategy_default_post_process_archive",
-              test_model_strategy_default_post_process_archive);
-    suite.add("model_strategy_default_find_path", test_model_strategy_default_find_path);
+    suite.add("archive_extract_then_resolve_artifact", test_archive_extract_then_resolve_artifact);
+    suite.add("resolve_artifact_prefers_model_id_filename",
+              test_resolve_artifact_prefers_model_id_filename);
     suite.add("progress_callback", test_progress_callback_invoked);
     suite.add("extraction_result_stats", test_extraction_result_stats);
     suite.add("creates_dest_dir", test_creates_dest_dir);

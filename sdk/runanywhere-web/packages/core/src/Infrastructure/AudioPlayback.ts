@@ -92,14 +92,14 @@ export class AudioPlayback {
       source.onended = () => {
         this._isPlaying = false;
         this.currentSource = null;
-        EventBus.shared.emit('playback.completed', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs });
+        EventBus.shared.publish('playback.completed', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs });
         resolve();
       };
 
       this.currentSource = source;
       this._isPlaying = true;
 
-      EventBus.shared.emit('playback.started', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs, sampleRate: rate });
+      EventBus.shared.publish('playback.started', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs, sampleRate: rate });
       source.start();
     });
   }
@@ -117,6 +117,27 @@ export class AudioPlayback {
       this.currentSource = null;
     }
     this._isPlaying = false;
+  }
+
+  /**
+   * Pause playback (suspends the AudioContext so the current buffer can be
+   * resumed). Swift parity: `AudioPlaybackManager.pause()`.
+   */
+  pause(): void {
+    if (!this._isPlaying) return;
+    if (this.audioContext && this.audioContext.state === 'running') {
+      void this.audioContext.suspend();
+    }
+  }
+
+  /**
+   * Resume playback previously paused with `pause()`. Swift parity:
+   * `AudioPlaybackManager.resume()`.
+   */
+  resume(): void {
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      void this.audioContext.resume();
+    }
   }
 
   /**

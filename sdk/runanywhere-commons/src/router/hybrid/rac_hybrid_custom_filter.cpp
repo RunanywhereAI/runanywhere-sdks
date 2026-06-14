@@ -31,9 +31,9 @@
 namespace {
 
 struct Entry {
-    std::string                          name;
+    std::string name;
     rac_hybrid_custom_filter_predicate_t predicate = nullptr;
-    void*                                user_data = nullptr;
+    void* user_data = nullptr;
 };
 
 // Immutable once published. Mutations allocate a fresh Snapshot rather than
@@ -56,9 +56,8 @@ void publish(const Snapshot* next) {
 // Build the next snapshot from the current one with `name`'s entry inserted or
 // replaced (predicate != nullptr) or removed (predicate == nullptr). Returns
 // nullptr only on allocation failure.
-const Snapshot* build_next(const char*                          name,
-                           rac_hybrid_custom_filter_predicate_t predicate,
-                           void*                                user_data) {
+const Snapshot* build_next(const char* name, rac_hybrid_custom_filter_predicate_t predicate,
+                           void* user_data) {
     auto* next = new (std::nothrow) Snapshot();
     if (next == nullptr) {
         return nullptr;
@@ -89,10 +88,9 @@ const Snapshot* build_next(const char*                          name,
 
 extern "C" {
 
-rac_result_t rac_hybrid_register_custom_filter(
-    const char*                          name,
-    rac_hybrid_custom_filter_predicate_t predicate,
-    void*                                user_data) {
+rac_result_t rac_hybrid_register_custom_filter(const char* name,
+                                               rac_hybrid_custom_filter_predicate_t predicate,
+                                               void* user_data) {
     if (name == nullptr || name[0] == '\0' || predicate == nullptr) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -119,10 +117,9 @@ rac_result_t rac_hybrid_unregister_custom_filter(const char* name) {
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_hybrid_invoke_custom_filter(
-    const char*                         name,
-    const rac_hybrid_routing_context_t* ctx,
-    rac_bool_t*                         out_pass) {
+rac_result_t rac_hybrid_invoke_custom_filter(const char* name,
+                                             const rac_hybrid_routing_context_t* ctx,
+                                             rac_bool_t* out_pass) {
     if (name == nullptr || ctx == nullptr || out_pass == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }

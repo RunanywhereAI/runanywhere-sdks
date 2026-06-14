@@ -108,7 +108,8 @@ export const PluginLoader = {
 
   load(path: string): PluginInfo {
     if (!path.trim()) {
-      throw SDKException.invalidInput('Plugin path is required');
+      // Swift taxonomy: bad input throws `validationFailed` (SDKException.swift:188-190).
+      throw SDKException.validationFailed('Plugin path is required');
     }
     const module = activeModule();
     if (!module || typeof module._rac_registry_load_plugin !== 'function') {
@@ -124,7 +125,8 @@ export const PluginLoader = {
 
   unload(name: string): void {
     if (!name.trim()) {
-      throw SDKException.invalidInput('Plugin name is required');
+      // Swift taxonomy: bad input throws `validationFailed` (SDKException.swift:188-190).
+      throw SDKException.validationFailed('Plugin name is required');
     }
     const module = activeModule();
     if (!module || typeof module._rac_registry_unload_plugin !== 'function') {

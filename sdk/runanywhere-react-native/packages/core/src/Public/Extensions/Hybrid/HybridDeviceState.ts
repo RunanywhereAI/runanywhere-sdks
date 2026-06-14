@@ -18,6 +18,8 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { getNitroModulesProxySync } from '../../../native/NitroModulesGlobalInit';
+import type { RunAnywhereDeviceInfo } from '../../../specs/RunAnywhereDeviceInfo.nitro';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 
 /**
@@ -32,6 +34,22 @@ export interface HybridDeviceStateProvider {
   batteryPercent(): number;
   /** True when the device is currently thermally throttled. */
   isThermalThrottled(): boolean;
+}
+
+// Lazily-created `RunAnywhereDeviceInfo` Nitro hybrid object used by
+// `refreshFromDevice()` to read live battery / thermal state.
+let _deviceInfo: RunAnywhereDeviceInfo | null = null;
+
+function getDeviceInfo(): RunAnywhereDeviceInfo {
+  if (_deviceInfo) return _deviceInfo;
+  const proxy = getNitroModulesProxySync();
+  if (!proxy) {
+    throw SDKException.nativeModuleUnavailable('RunAnywhereDeviceInfo');
+  }
+  _deviceInfo = proxy.createHybridObject(
+    'RunAnywhereDeviceInfo'
+  ) as RunAnywhereDeviceInfo;
+  return _deviceInfo;
 }
 
 /**
@@ -71,6 +89,46 @@ export const HybridDeviceState = {
       isOnline: provider.isOnline(),
       batteryPercent: provider.batteryPercent(),
       thermalThrottled: provider.isThermalThrottled(),
+    });
+  },
+
+  /**
+   * Query the device's CURRENT battery / thermal state through the
+   * `RunAnywhereDeviceInfo` Nitro hybrid object and push it as a fresh
+   * snapshot. This is the RN analog of Swift's live
+   * `AppleDeviceStateProvider` (AppleDeviceStateProvider.swift:16-67):
+   * the same battery (`level < 0 → 100`, else `round(level*100)` clamped
+   * to [0, 100]) and thermal (`serious`/`critical` → throttled) mappings,
+   * read on demand instead of from a stale one-shot snapshot.
+   *
+   * Call before each transcribe (or on connectivity/battery change). RN
+   * cannot install a live JS callback into the commons routing thread, so
+   * a per-call refresh is the closest equivalent of Swift's vtable.
+   *
+   * KNOWN GAP — network: `RunAnywhereDeviceInfo` exposes no connectivity
+   * API, so online-ness cannot be queried here. Pass `isOnline` from a
+   * host reachability source (e.g. @react-native-community/netinfo);
+   * when omitted it defaults to `true`, the commons optimistic default.
+   */
+  async refreshFromDevice(options?: { isOnline?: boolean }): Promise<boolean> {
+    const deviceInfo = getDeviceInfo();
+    const [batteryLevel, thermalState] = await Promise.all([
+      deviceInfo.getBatteryLevel(),
+      deviceInfo.getThermalState(),
+    ]);
+    // Swift parity (AppleDeviceStateProvider.swift:48-56): unknown level
+    // (< 0) reports 100; otherwise scale 0..1 → 0..100 and clamp.
+    const batteryPercent =
+      batteryLevel < 0
+        ? 100
+        : Math.min(100, Math.max(0, Math.round(batteryLevel * 100)));
+    // Swift parity (AppleDeviceStateProvider.swift:58-67): serious (2) and
+    // critical (3) thermal states count as throttled.
+    const thermalThrottled = thermalState >= 2;
+    return this.setSnapshot({
+      isOnline: options?.isOnline ?? true,
+      batteryPercent,
+      thermalThrottled,
     });
   },
 

@@ -16,9 +16,10 @@
 #include <memory>
 #include <string>
 
-#include "rac/core/rac_error.h"
 #include "rac/core/rac_core.h"
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
@@ -81,8 +82,7 @@ inline rac_result_t resolve_model_reference(const char* model_id,
         const char* last_slash = strrchr(model_id, '/');
         if (last_slash && last_slash[1] != '\0') {
             const char* extracted_id = last_slash + 1;
-            RAC_LOG_DEBUG(options.log_cat, "Trying extracted model ID from path: %s",
-                          extracted_id);
+            RAC_LOG_DEBUG(options.log_cat, "Trying extracted model ID from path: %s", extracted_id);
             result = rac_get_model(extracted_id, &raw_info);
         }
     }
@@ -93,9 +93,33 @@ inline rac_result_t resolve_model_reference(const char* model_id,
         out_reference->model_info.reset(raw_info);
         out_reference->framework = raw_info->framework;
 
-        const char* registry_path =
-            (raw_info->local_path && raw_info->local_path[0] != '\0') ? raw_info->local_path
-                                                                      : model_id;
+        // Empty local_path falls through to the literal model ID, which is
+        // not a filesystem path — engines stat() it and fail. Before
+        // accepting that, try the canonical on-disk folder for this
+        // model/framework and let the artifact resolver recover the primary
+        // file (mirrors the lifecycle load path's lazy resolution). Read-only
+        // here: the registry self-heal lives once, on the lifecycle path.
+        std::string registry_path = (raw_info->local_path && raw_info->local_path[0] != '\0')
+                                        ? raw_info->local_path
+                                        : model_id;
+        if (!raw_info->local_path || raw_info->local_path[0] == '\0') {
+            char canonical_folder[1024] = {0};
+            if (rac_model_paths_get_model_folder(model_id, raw_info->framework, canonical_folder,
+                                                 sizeof(canonical_folder)) == RAC_SUCCESS &&
+                canonical_folder[0] != '\0') {
+                rac_model_path_resolution_t resolution = {};
+                const rac_result_t resolve_rc = rac_model_paths_resolve_artifact(
+                    raw_info, canonical_folder, nullptr, &resolution);
+                if ((resolve_rc == RAC_SUCCESS || resolution.primary_model_path) &&
+                    resolution.primary_model_path && resolution.primary_model_path[0] != '\0') {
+                    registry_path = resolution.primary_model_path;
+                    RAC_LOG_INFO(options.log_cat,
+                                 "Resolved empty local_path for %s via canonical folder: %s",
+                                 model_id, registry_path.c_str());
+                }
+                rac_model_path_resolution_free(&resolution);
+            }
+        }
         if (options.prefer_input_path_when_contains &&
             strstr(model_id, options.prefer_input_path_when_contains) != nullptr) {
             out_reference->path = model_id;
@@ -142,7 +166,8 @@ rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>
     const rac_engine_vtable_t* vt = rac_plugin_find(spec.primitive);
     const OpsT* ops = (vt && spec.select_ops) ? spec.select_ops(vt) : nullptr;
     if (!vt || !ops || !ops->create) {
-        RAC_LOG_ERROR(spec.log_cat, "no registered plugin serves %s", rac_primitive_name(spec.primitive));
+        RAC_LOG_ERROR(spec.log_cat, "no registered plugin serves %s",
+                      rac_primitive_name(spec.primitive));
         return RAC_ERROR_BACKEND_NOT_FOUND;
     }
     RAC_LOG_INFO(spec.log_cat, "Routed to plugin: %s", vt->metadata.name);

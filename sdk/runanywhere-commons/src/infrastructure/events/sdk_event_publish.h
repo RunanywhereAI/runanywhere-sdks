@@ -48,8 +48,7 @@ namespace rac::events {
 // operation_id, correlation_id, an explicit destination, an explicit error,
 // extra properties) are preserved.
 // ---------------------------------------------------------------------------
-rac_result_t publish(runanywhere::v1::SDKEvent& event,
-                     runanywhere::v1::SDKComponent component,
+rac_result_t publish(runanywhere::v1::SDKEvent& event, runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category);
 
 // ---------------------------------------------------------------------------
@@ -83,8 +82,7 @@ rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
                      runanywhere::v1::GenerationEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
-                     runanywhere::v1::EventCategory category,
-                     runanywhere::v1::ModelEvent payload);
+                     runanywhere::v1::EventCategory category, runanywhere::v1::ModelEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
                      runanywhere::v1::PerformanceEvent payload);
@@ -98,8 +96,7 @@ rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
                      runanywhere::v1::FrameworkEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
-                     runanywhere::v1::EventCategory category,
-                     runanywhere::v1::DeviceEvent payload);
+                     runanywhere::v1::EventCategory category, runanywhere::v1::DeviceEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
                      runanywhere::v1::ComponentInitializationEvent payload);
@@ -116,8 +113,7 @@ rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
                      runanywhere::v1::SessionEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
-                     runanywhere::v1::EventCategory category,
-                     runanywhere::v1::AuthEvent payload);
+                     runanywhere::v1::EventCategory category, runanywhere::v1::AuthEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
                      runanywhere::v1::ModelRegistryEvent payload);

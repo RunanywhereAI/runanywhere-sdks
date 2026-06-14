@@ -22,8 +22,8 @@
 #include <string>
 #include <vector>
 
-#include "features/rac_nonllm_lifecycle_bridge.h"
 #include "features/common/rac_component_lifecycle_internal.h"
+#include "features/rac_nonllm_lifecycle_bridge.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -39,9 +39,10 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "diffusion_options.pb.h"
+#include "sdk_events.pb.h"
+
 #include "foundation/rac_proto_marshal_internal.h"
 #include "infrastructure/events/sdk_event_publish.h"
-#include "sdk_events.pb.h"
 #endif
 
 // =============================================================================
@@ -759,13 +760,16 @@ bool serialize_proto(const google::protobuf::MessageLite& message, std::vector<u
 }
 
 void publish_event(const runanywhere::v1::SDKEvent& event) {
-    // Route through the events layer so diffusion (imagegen) telemetry reaches
-    // the telemetry + log sinks per the destination bitmask, not just public.
+    // Route through the destination router (sdk_event_publish) so the envelope's
+    // TELEMETRY destination bit reaches the telemetry manager. A direct
+    // rac_sdk_event_publish_proto call feeds only the PUBLIC stream, so these
+    // capability events would never be recorded as telemetry.
     (void)rac::events::publish_prebuilt(event);
 }
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
-                        float progress, const char* error) {
+                        float progress, const char* error, double duration_ms = 0.0,
+                        const char* model_id = nullptr) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -778,6 +782,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
+    if (model_id != nullptr && model_id[0] != '\0') {
+        cap->set_model_id(model_id);
+    }
     if (operation) {
         event.set_operation_id(operation);
         cap->set_operation(operation);
@@ -785,6 +792,11 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     cap->set_progress(progress);
     if (error)
         cap->set_error(error);
+    // CapabilityOperationEvent has no duration field; telemetry reads it from
+    // the envelope properties map (see telemetry_manager kCapability extraction).
+    if (duration_ms > 0.0) {
+        (*event.mutable_properties())["duration_ms"] = std::to_string(duration_ms);
+    }
     publish_event(event);
 }
 
@@ -895,8 +907,9 @@ rac_result_t rac_diffusion_generate_proto(rac_handle_t handle, const uint8_t* op
         return rc;
     }
 
+    const char* model_id = rac_diffusion_component_get_model_id(handle);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED,
-                       "diffusion.generate", 0.0f, nullptr);
+                       "diffusion.generate", 0.0f, nullptr, 0.0, model_id);
     rac_diffusion_result_t result = {};
     rc = rac_diffusion_generate(handle, &options, &result);
     if (rc != RAC_SUCCESS) {
@@ -913,7 +926,8 @@ rac_result_t rac_diffusion_generate_proto(rac_handle_t handle, const uint8_t* op
         rc = copy_proto(proto, out_result);
     }
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
-                       "diffusion.generate", 1.0f, nullptr);
+                       "diffusion.generate", 1.0f, nullptr,
+                       static_cast<double>(result.generation_time_ms), model_id);
     rac_diffusion_result_free(&result);
     free_options(&options);
     return rc;
@@ -949,8 +963,9 @@ rac_result_t rac_diffusion_generate_with_progress_proto(
         return rc;
     }
 
+    const char* model_id = rac_diffusion_component_get_model_id(handle);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED,
-                       "diffusion.generate", 0.0f, nullptr);
+                       "diffusion.generate", 0.0f, nullptr, 0.0, model_id);
     ProgressCtx ctx;
     ctx.callback = progress_callback;
     ctx.user_data = user_data;
@@ -970,7 +985,8 @@ rac_result_t rac_diffusion_generate_with_progress_proto(
         rc = copy_proto(proto, out_result);
     }
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
-                       "diffusion.generate", 1.0f, nullptr);
+                       "diffusion.generate", 1.0f, nullptr,
+                       static_cast<double>(result.generation_time_ms), model_id);
     rac_diffusion_result_free(&result);
     free_options(&options);
     return rc;
@@ -1080,15 +1096,8 @@ rac_result_t rac_diffusion_generate_lifecycle_proto(const uint8_t* request_proto
 
     rac_diffusion_service_t service{ref.ops, ref.impl, ref.model_id};
     rac_diffusion_result_t raw = {};
-
-    // The lifecycle path calls the service vtable directly; emit the capability
-    // lifecycle events here (mirrors rac_diffusion_generate_proto) so imagegen
-    // telemetry flows for any SDK that wires the lifecycle entry point.
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED,
-                       "diffusion.generate", 0.0f, nullptr);
     rc = rac_diffusion_generate(&service, &options, &raw);
     if (rc != RAC_SUCCESS) {
-        publish_failure(rc, "diffusion.generate", rac_error_message(rc));
         free_diffusion_options(&options);
         rac::lifecycle::release_lifecycle_diffusion(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
@@ -1103,8 +1112,6 @@ rac_result_t rac_diffusion_generate_lifecycle_proto(const uint8_t* request_proto
                                           "failed to encode DiffusionResult");
     }
     rc = copy_proto(result, out_result);
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
-                       "diffusion.generate", 1.0f, nullptr);
     rac_diffusion_result_free(&raw);
     free_diffusion_options(&options);
     rac::lifecycle::release_lifecycle_diffusion(&ref);

@@ -14,10 +14,12 @@
 #include "rac/core/rac_sdk_state.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/lifecycle/rac_sdk_init.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "sdk_events.pb.h"
+#include "sdk_init.pb.h"
 #endif
 
 namespace {
@@ -137,10 +139,36 @@ int main() {
           "state shutdown before initialization emits no SDKEvent");
     rac_proto_buffer_free(&uninitialized_shutdown_poll);
 
+    // Single-source lifecycle contract: rac_state_initialize emits nothing —
+    // the STARTED/COMPLETED pair is published once by rac_sdk_init_phase1_proto
+    // (sdk_init.cpp), which owns the whole Phase-1 span and the duration_ms
+    // payload. Platform SDKs no longer hand-emit duplicates either.
     rac_sdk_event_clear_queue();
     rc =
         rac_state_initialize(RAC_ENV_DEVELOPMENT, "api-key", "https://example.invalid", "device-1");
     CHECK(rc == RAC_SUCCESS, "state initialize succeeds");
+    {
+        rac_proto_buffer_t state_poll;
+        rac_proto_buffer_init(&state_poll);
+        CHECK(rac_sdk_event_poll(&state_poll) == RAC_ERROR_NOT_FOUND,
+              "state initialize emits no lifecycle events (phase1 proto owns them)");
+        rac_proto_buffer_free(&state_poll);
+    }
+
+    rac_sdk_event_clear_queue();
+    {
+        runanywhere::v1::SdkInitPhase1Request phase1_request;
+        phase1_request.set_environment(runanywhere::v1::SDK_INIT_ENVIRONMENT_DEVELOPMENT);
+        phase1_request.set_device_id("device-1");
+        const std::string phase1_bytes = phase1_request.SerializeAsString();
+        rac_proto_buffer_t phase1_result;
+        rac_proto_buffer_init(&phase1_result);
+        rc = rac_sdk_init_phase1_proto(
+            reinterpret_cast<const uint8_t*>(phase1_bytes.data()), phase1_bytes.size(),
+            &phase1_result);
+        CHECK(rc == RAC_SUCCESS, "phase1 proto succeeds");
+        rac_proto_buffer_free(&phase1_result);
+    }
 
     runanywhere::v1::SDKEvent first_state;
     runanywhere::v1::SDKEvent second_state;
@@ -148,10 +176,12 @@ int main() {
     CHECK(poll_event(&second_state), "poll returns initialization completed event");
     CHECK(first_state.has_initialization() &&
               first_state.initialization().stage() == runanywhere::v1::INITIALIZATION_STAGE_STARTED,
-          "state emits initialization started first");
+          "phase1 emits initialization started first");
     CHECK(second_state.has_initialization() && second_state.initialization().stage() ==
                                                    runanywhere::v1::INITIALIZATION_STAGE_COMPLETED,
-          "state emits initialization completed second");
+          "phase1 emits initialization completed second");
+    CHECK(second_state.properties().count("duration_ms") == 1,
+          "completed event carries duration_ms property");
     rac_proto_buffer_t empty_poll;
     rac_proto_buffer_init(&empty_poll);
     CHECK(rac_sdk_event_poll(&empty_poll) == RAC_ERROR_NOT_FOUND,

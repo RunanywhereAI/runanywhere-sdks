@@ -95,6 +95,17 @@ private enum RegistryProtoABI {
         "rac_model_registry_import_proto",
         as: RegistryRequestProto.self
     )
+    // Canonical registration factories (global registry, no handle): commons
+    // owns id/name/format/artifact derivation, hf.co/org/repo[:quant]
+    // resolution, and merge-on-reseed download-state preservation.
+    static let registerFromUrlProto = NativeProtoABI.load(
+        "rac_register_model_from_url_proto",
+        as: NativeProtoABI.ProtoRequest.self
+    )
+    static let registerMultiFileProto = NativeProtoABI.load(
+        "rac_register_multi_file_model_proto",
+        as: NativeProtoABI.ProtoRequest.self
+    )
     static let freeProto = load(
         "rac_model_registry_proto_free",
         as: FreeProto.self
@@ -447,6 +458,32 @@ extension CppBridge {
         /// Import platform-normalized local model metadata through the
         /// generated registry import contract. Swift supplies stable paths after
         /// URLSession/file-picker/sandbox work; commons owns the registry merge.
+        /// Register a model from a URL or Hugging Face reference through the
+        /// canonical commons factory. Commons derives id/name/format/artifact,
+        /// resolves hf.co/org/repo[:quant] refs (quant selection, mmproj
+        /// pairing, shard sets, checksums), and preserves prior download state
+        /// on catalog re-seed (merge-not-replace).
+        public func registerFromUrl(_ request: RARegisterModelFromUrlRequest) throws -> RAModelInfo {
+            try NativeProtoABI.invoke(
+                request,
+                symbol: RegistryProtoABI.registerFromUrlProto,
+                symbolName: "rac_register_model_from_url_proto",
+                responseType: RAModelInfo.self
+            )
+        }
+
+        /// Register a multi-file model (VLM gguf+mmproj pairs, embedding
+        /// model+vocab sets) through the canonical commons factory — replaces
+        /// the hand-built MultiFileArtifact ModelInfo assembly.
+        public func registerMultiFile(_ request: RARegisterMultiFileModelRequest) throws -> RAModelInfo {
+            try NativeProtoABI.invoke(
+                request,
+                symbol: RegistryProtoABI.registerMultiFileProto,
+                symbolName: "rac_register_multi_file_model_proto",
+                responseType: RAModelInfo.self
+            )
+        }
+
         public func importModel(_ request: RAModelImportRequest) throws -> RAModelImportResult {
             try invokeRegistryProto(
                 request,

@@ -14,7 +14,6 @@
  */
 
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -23,10 +22,10 @@
 #include <cstring>
 #include <mutex>
 #include <string>
-
-#include "rac/core/rac_error.h"
+#include <sys/stat.h>
 
 #include "desktop/desktop_internal.h"
+#include "rac/core/rac_error.h"
 
 namespace rac::desktop {
 

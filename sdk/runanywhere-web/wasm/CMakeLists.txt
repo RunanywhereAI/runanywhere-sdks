@@ -415,6 +415,12 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_model_registry_get_model_proto"
     "_rac_model_registry_list_models_proto"
     "_rac_model_registry_import_proto"
+    # Canonical registration factories: single/HF-ref URL form and multi-file
+    # form. Exporting them keeps the commons HF resolver + merge-on-reseed
+    # registration reachable from TS (and prevents the linker from GC'ing
+    # the whole chain).
+    "_rac_register_model_from_url_proto"
+    "_rac_register_multi_file_model_proto"
     "_rac_model_registry_discover_proto"
     "_rac_model_registry_refresh_proto"
     "_rac_model_registry_proto_free"
@@ -427,6 +433,12 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_model_info_free"
     "_rac_model_info_array_free"
     "_rac_model_info_copy"
+    # Canonical ModelInfo factory (Swift RAModelInfo.make parity) so the Web
+    # SDK never hand-assembles ModelInfo defaults in TS.
+    "_rac_model_info_make_proto"
+    # Expected-files derivation for an artifact (Swift
+    # RAModelInfo.expectedArtifactFiles parity).
+    "_rac_artifact_expected_files_proto"
     "_rac_model_registry_discover_downloaded"
     "_rac_discovery_result_free"
 
@@ -529,6 +541,10 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_tool_call_normalize_json"
     "_rac_tool_call_definitions_to_json"
     "_rac_tool_call_result_to_json"
+    # ToolValue <-> JSON bridge (Swift ToolValueJSONABI parity) — backs the
+    # Web executeTool argument parsing / result serialization.
+    "_rac_tool_value_to_json_proto"
+    "_rac_tool_value_from_json_proto"
     "_rac_tool_calling_run_loop_proto"
     # Session-based orchestration so the Web SDK can delegate
     # the tool-calling run loop to commons even when TS executors are async
@@ -729,6 +745,22 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_storage_analyzer_delete_plan_proto"
     "_rac_storage_analyzer_delete_proto"
 
+    # File manager cache/temp clears. C++-side shims (wasm_exports.cpp) build
+    # the rac_file_callbacks_t against this module's MEMFS and forward to
+    # commons rac_file_manager_clear_cache/clear_temp — Swift clearCache /
+    # cleanTempFiles parity for the Web flat API.
+    "_rac_wasm_file_manager_clear_cache"
+    "_rac_wasm_file_manager_clear_temp"
+
+    # Model-category / framework capability wrappers (wasm_exports.cpp) —
+    # proto-int ABI over rac_model_category_requires_context_length /
+    # supports_thinking / default_framework and rac_framework_display_name,
+    # so the capability/display tables stay in commons (Swift parity).
+    "_rac_model_category_requires_context_length_proto"
+    "_rac_model_category_supports_thinking_proto"
+    "_rac_model_category_default_framework_proto"
+    "_rac_framework_display_name_proto"
+
     # VLM service
     "_rac_vlm_get_builtin_template"
     "_rac_vlm_result_free"
@@ -739,7 +771,9 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_vlm_get_info"
     "_rac_vlm_cancel"
     "_rac_vlm_process_proto"
-    "_rac_vlm_process_stream_proto"
+    # Typed stream ABI (VLMGenerationRequest in, VLMStreamEvent out) — the
+    # canonical cross-SDK VLM streaming surface.
+    "_rac_vlm_stream_proto"
     "_rac_vlm_cancel_proto"
     "_rac_vlm_cleanup"
     "_rac_vlm_destroy"
@@ -838,6 +872,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_lora_catalog_query_proto"
     "_rac_lora_catalog_get_proto"
     "_rac_lora_catalog_mark_download_completed_proto"
+    "_rac_lora_adapter_import_proto"
     "_rac_lora_compatibility_proto"
     "_rac_lora_apply_proto"
     "_rac_lora_remove_proto"
@@ -929,7 +964,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_wasm_sizeof_tts_result"
     "_rac_wasm_sizeof_vad_config"
     "_rac_wasm_sizeof_voice_agent_config"
-    "_rac_wasm_sizeof_voice_agent_result"
     "_rac_wasm_sizeof_vlm_options"
     "_rac_wasm_sizeof_vlm_result"
     "_rac_wasm_sizeof_vlm_image"
@@ -1020,6 +1054,11 @@ set(RAC_EXPORTED_FUNCTIONS_SHERPA
 set(RAC_EXPORTED_FUNCTIONS_CLOUD
     "_rac_backend_cloud_register"
     "_rac_backend_cloud_unregister"
+    # Host-supplied cloud STT provider registry (rac_cloud_stt_provider.h) —
+    # backs CloudSTT.registerProvider/unregisterProvider on the Web facade
+    # (Swift Cloud.registerProvider parity).
+    "_rac_cloud_register_stt_provider"
+    "_rac_cloud_unregister_stt_provider"
 )
 
 # RAG generated-proto pipeline. The RAG OBJECT library folds into
@@ -1070,7 +1109,7 @@ set(RAC_JSPI_EXPORTS
     "rac_vlm_component_process_stream"
     "rac_vlm_component_unload"
     "rac_vlm_process_proto"
-    "rac_vlm_process_stream_proto"
+    "rac_vlm_stream_proto"
 )
 
 # =============================================================================

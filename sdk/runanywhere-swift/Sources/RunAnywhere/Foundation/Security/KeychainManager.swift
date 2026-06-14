@@ -17,11 +17,6 @@ public final class KeychainManager {
     // MARK: - Keychain Keys
 
     private enum KeychainKey: String {
-        // SDK Core
-        case apiKey = "com.runanywhere.sdk.apiKey"
-        case baseURL = "com.runanywhere.sdk.baseURL"
-        case environment = "com.runanywhere.sdk.environment"
-
         // Device Identity
         case deviceUUID = "com.runanywhere.sdk.device.uuid"
     }
@@ -29,48 +24,6 @@ public final class KeychainManager {
     // MARK: - Initialization
 
     private init() {}
-
-    // MARK: - Public Methods - SDK Credentials
-
-    /// Store SDK initialization parameters securely
-    /// - Parameter params: SDK initialization parameters
-    /// - Throws: KeychainError if storage fails
-    public func storeSDKParams(_ params: SDKInitParams) throws {
-        // Store API key
-        try store(params.apiKey, for: KeychainKey.apiKey.rawValue)
-
-        // Store base URL
-        try store(params.baseURL.absoluteString, for: KeychainKey.baseURL.rawValue)
-
-        // Store environment
-        try store(params.environment.wireString, for: KeychainKey.environment.rawValue)
-
-        logger.info("SDK parameters stored securely in keychain")
-    }
-
-    /// Retrieve stored SDK parameters
-    /// - Returns: Stored SDK parameters if available
-    public func retrieveSDKParams() -> SDKInitParams? {
-        guard let apiKey = try? retrieve(for: KeychainKey.apiKey.rawValue),
-              let urlString = try? retrieve(for: KeychainKey.baseURL.rawValue),
-              let url = URL(string: urlString),
-              let envString = try? retrieve(for: KeychainKey.environment.rawValue),
-              let environment = SDKEnvironment.from(wireString: envString) else {
-            logger.debug("No stored SDK parameters found in keychain")
-            return nil
-        }
-
-        logger.debug("Retrieved SDK parameters from keychain")
-        return try? SDKInitParams(apiKey: apiKey, baseURL: url, environment: environment)
-    }
-
-    /// Clear stored SDK parameters
-    public func clearSDKParams() throws {
-        try delete(for: KeychainKey.apiKey.rawValue)
-        try delete(for: KeychainKey.baseURL.rawValue)
-        try delete(for: KeychainKey.environment.rawValue)
-        logger.info("SDK parameters cleared from keychain")
-    }
 
     // MARK: - Device Identity Methods
 

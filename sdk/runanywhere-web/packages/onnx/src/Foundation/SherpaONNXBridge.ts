@@ -473,6 +473,23 @@ export class SherpaONNXBridge {
     if (adapterPtr && module.HEAPU8) {
       module.HEAPU8.fill(0, adapterPtr, adapterPtr + adapterSize);
     }
+    // ABI guard fields (MUST be set even on the stub): rac_init rejects an
+    // adapter whose abi_version/struct_size don't match the commons build.
+    // 1 == RAC_PLATFORM_ADAPTER_ABI_VERSION (rac_platform_adapter.h:38).
+    // Guarded on the offset exports so a pre-guard prebuilt WASM (which has
+    // neither the exports nor the check) keeps working.
+    const adapterOffsetOf = (name: string): number | null => {
+      const fn = (module as unknown as Record<string, unknown>)[
+        `_rac_wasm_offsetof_platform_adapter_${name}`
+      ];
+      return typeof fn === 'function' ? (fn as () => number)() : null;
+    };
+    const abiVersionOffset = adapterOffsetOf('abi_version');
+    const structSizeOffset = adapterOffsetOf('struct_size');
+    if (adapterPtr && module.HEAPU32 && abiVersionOffset !== null && structSizeOffset !== null) {
+      module.HEAPU32[(adapterPtr + abiVersionOffset) >>> 2] = 1;
+      module.HEAPU32[(adapterPtr + structSizeOffset) >>> 2] = adapterSize;
+    }
     // Install log callback so rac_log output (including backend-init errors)
     // reaches the browser console. Offset comes from the runtime helper —
     // never hard-coded. void (*)(rac_log_level_t, const char*, const char*, void*)

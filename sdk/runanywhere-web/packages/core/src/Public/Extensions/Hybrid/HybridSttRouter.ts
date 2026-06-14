@@ -57,7 +57,7 @@ import {
   RAC_PRIMITIVE_TRANSCRIBE,
   type HybridWasmModule,
 } from './HybridWasmModule';
-import { CloudSTT } from './CloudSTT';
+import { Cloud } from './Cloud';
 import {
   registerHybridCustomFilter,
   unregisterHybridCustomFilter,
@@ -92,8 +92,8 @@ function pinnedEngineName(backend: HybridBackendKind): string {
  *
  * Usage:
  * ```ts
- * CloudSTT.registerBackend();
- * CloudSTT.register({ id: 'saaras', provider: 'sarvam', model: 'saaras:v2.5', apiKey: '…' });
+ * Cloud.registerBackend();
+ * Cloud.register({ id: 'saaras', provider: 'sarvam', model: 'saaras:v2.5', apiKey: '…' });
  * setHybridDeviceStateProvider(browserDeviceStateProvider());  // optional
  *
  * const router = await HybridSttRouter.create();
@@ -141,16 +141,14 @@ export class HybridSttRouter {
     const bridge = new ProtoWasmBridge(module, logger);
     const outHandlePtr = bridge.allocOutPtr();
     if (!outHandlePtr) {
-      throw SDKException.componentNotReady('hybrid.stt', 'failed to allocate router handle slot');
+      throw SDKException.serviceNotAvailable('failed to allocate router handle slot');
     }
     try {
       const rc = module._rac_stt_hybrid_router_create!(outHandlePtr);
       const handle = bridge.readU32(outHandlePtr);
       if (rc !== RAC_OK || !handle) {
-        throw SDKException.componentNotReady(
-          'hybrid.stt',
-          `rac_stt_hybrid_router_create failed (rc=${rc})`,
-        );
+        // Swift parity: HybridSTTRouter.swift:99 throws `.serviceNotAvailable` + `.component`.
+        throw SDKException.serviceNotAvailable(`rac_stt_hybrid_router_create failed (rc=${rc})`);
       }
       return new HybridSttRouter(module, handle);
     } finally {
@@ -194,13 +192,27 @@ export class HybridSttRouter {
       throw error;
     }
 
+    // Serialize all proto bytes (descriptors + policy) up-front, BEFORE
+    // mutating any installed state — Swift parity (HybridSTTRouter.swift
+    // setPair): an encode failure only destroys the freshly created services
+    // and leaves the previously installed pair / filters untouched.
+    let offDescriptor: Uint8Array;
+    let onDescriptor: Uint8Array;
+    let policyBytes: Uint8Array;
+    try {
+      offDescriptor = encodeModelDescriptor(offline);
+      onDescriptor = encodeModelDescriptor(online);
+      policyBytes = encodeRoutingPolicy(policy);
+    } catch (error) {
+      this.destroyService(offlineService);
+      this.destroyService(onlineService);
+      throw error;
+    }
+
     // Detach + destroy any previously attached services (clear slots first —
     // header UAF note) and retire the previous policy's custom filters.
     this.clearAndDestroyServices();
     this.retireCustomFilters();
-
-    const offDescriptor = encodeModelDescriptor(offline);
-    const onDescriptor = encodeModelDescriptor(online);
 
     const rcOff = bridge.withHeapBytes(offDescriptor, (ptr, size) =>
       mod._rac_stt_hybrid_router_set_offline_service_proto!(
@@ -210,7 +222,7 @@ export class HybridSttRouter {
     if (rcOff !== RAC_OK) {
       this.destroyService(offlineService);
       this.destroyService(onlineService);
-      throw SDKException.componentNotReady('hybrid.stt', `set_offline_service_proto failed (rc=${rcOff})`);
+      throw SDKException.serviceNotAvailable(`set_offline_service_proto failed (rc=${rcOff})`);
     }
 
     const rcOn = bridge.withHeapBytes(onDescriptor, (ptr, size) =>
@@ -222,7 +234,7 @@ export class HybridSttRouter {
       mod._rac_stt_hybrid_router_set_offline_service_proto!(this.handle, 0, 0, 0);
       this.destroyService(offlineService);
       this.destroyService(onlineService);
-      throw SDKException.componentNotReady('hybrid.stt', `set_online_service_proto failed (rc=${rcOn})`);
+      throw SDKException.serviceNotAvailable(`set_online_service_proto failed (rc=${rcOn})`);
     }
 
     // Register custom-filter predicates with commons BEFORE installing the
@@ -234,7 +246,6 @@ export class HybridSttRouter {
     }
     const customNames = customs.map((f) => f.name);
 
-    const policyBytes = encodeRoutingPolicy(policy);
     const rcPolicy = bridge.withHeapBytes(policyBytes, (ptr, size) =>
       mod._rac_stt_hybrid_router_set_policy_proto!(this.handle, ptr, size),
     );
@@ -244,7 +255,7 @@ export class HybridSttRouter {
       mod._rac_stt_hybrid_router_set_online_service_proto!(this.handle, 0, 0, 0);
       this.destroyService(offlineService);
       this.destroyService(onlineService);
-      throw SDKException.componentNotReady('hybrid.stt', `set_policy_proto failed (rc=${rcPolicy})`);
+      throw SDKException.serviceNotAvailable(`set_policy_proto failed (rc=${rcPolicy})`);
     }
 
     this.offline = offlineService;
@@ -266,7 +277,7 @@ export class HybridSttRouter {
   ): HybridTranscribeResult {
     this.ensureOpen();
     if (!this.offline || !this.online) {
-      throw SDKException.componentNotReady('hybrid.stt', 'setPair() must be called before transcribe()');
+      throw SDKException.serviceNotAvailable('setPair() must be called before transcribe()');
     }
     const mod = this.module;
     const bridge = new ProtoWasmBridge(mod, logger);
@@ -277,7 +288,7 @@ export class HybridSttRouter {
     if (!outBytesPtr || !outSizePtr) {
       if (outBytesPtr) bridge.free(outBytesPtr);
       if (outSizePtr) bridge.free(outSizePtr);
-      throw SDKException.componentNotReady('hybrid.stt', 'failed to allocate transcribe out-pointers');
+      throw SDKException.serviceNotAvailable('failed to allocate transcribe out-pointers');
     }
 
     let responsePtr = 0;
@@ -290,16 +301,13 @@ export class HybridSttRouter {
       responsePtr = bridge.readU32(outBytesPtr);
       const responseSize = bridge.readU32(outSizePtr);
       if (rc !== RAC_OK || !responsePtr || responseSize === 0) {
-        throw SDKException.componentNotReady(
-          'hybrid.stt',
-          `rac_stt_hybrid_router_transcribe_proto failed (rc=${rc})`,
-        );
+        throw SDKException.serviceNotAvailable(`rac_stt_hybrid_router_transcribe_proto failed (rc=${rc})`);
       }
       const responseBytes = mod.HEAPU8.slice(responsePtr, responsePtr + responseSize);
       const decoded = decodeTranscribeResponse(responseBytes);
       if (decoded.rc !== 0) {
         const message = decoded.errorMessage || `Hybrid STT transcribe failed (rc=${decoded.rc})`;
-        throw SDKException.componentNotReady('hybrid.stt', message);
+        throw SDKException.serviceNotAvailable(message);
       }
       return decoded.result;
     } finally {
@@ -360,13 +368,13 @@ export class HybridSttRouter {
         'hybrid.stt',
         `No '${engineName}' STT plugin registered for RAC_PRIMITIVE_TRANSCRIBE. ` +
           `Register the backend first ` +
-          `(load the ONNX/sherpa backend for sherpa; CloudSTT.registerBackend() for cloud).`,
+          `(load the ONNX/sherpa backend for sherpa; Cloud.registerBackend() for cloud).`,
       );
     }
 
     // cloud config JSON (provider/api_key/model/...); sherpa = no config.
     const configJSON = model.backend === HybridBackendKind.HYBRID_BACKEND_CLOUD
-      ? CloudSTT.configJSON(model.id)
+      ? Cloud.configJSON(model.id)
       : null;
     // cloud takes everything via config_json; no model path. sherpa resolves
     // its model from the registry by id.
@@ -457,7 +465,7 @@ export class HybridSttRouter {
 
   private ensureOpen(): void {
     if (!this.handle) {
-      throw SDKException.componentNotReady('hybrid.stt', 'HybridSttRouter is closed');
+      throw SDKException.serviceNotAvailable('HybridSttRouter is closed');
     }
   }
 }

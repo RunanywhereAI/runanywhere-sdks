@@ -47,6 +47,9 @@ import {
   ToolPromptFormatRequest as ToolPromptFormatRequestMessage,
   ToolPromptFormatResult as ToolPromptFormatResultMessage,
   ToolResult as ToolResultMessage,
+  ToolValue as ToolValueMessage,
+  ToolValueJSON as ToolValueJSONMessage,
+  type ToolValue,
   type ToolCall,
   type ToolCallValidationRequest,
   type ToolCallValidationResult,
@@ -79,7 +82,9 @@ type ToolCallingExport =
   | '_rac_tool_calling_session_create_proto'
   | '_rac_tool_calling_session_step_with_result_proto'
   | '_rac_tool_calling_session_destroy_proto'
-  | '_rac_tool_calling_session_cancel_proto';
+  | '_rac_tool_calling_session_cancel_proto'
+  | '_rac_tool_value_to_json_proto'
+  | '_rac_tool_value_from_json_proto';
 
 type RegisteredTool = {
   definition: ToolDefinition;
@@ -90,9 +95,63 @@ export type ToolCallingGenerationOptions = Omit<Partial<LLMGenerationOptions>, '
   toolCalling?: Partial<ToolCallingOptions>;
 };
 
-export type ToolExecutor = (toolCall: ToolCall) => ToolResult | Promise<ToolResult>;
+/**
+ * Extra options accepted by [generateWithTools]. Mirrors Swift's
+ * `generateWithTools(prompt:options:toolOptions:...)` two-channel shape
+ * (RunAnywhere+ToolCalling.swift:250-257) the same way the RN SDK does.
+ */
+export interface GenerateWithToolsOptions {
+  signal?: AbortSignal;
+  /**
+   * LLM generation options channel — Swift parity
+   * (`generateWithTools(prompt:options:toolOptions:...)`): tool options that
+   * are unset fall back to these, and `topP` comes from here exclusively.
+   * Defaults mirror Swift `RALLMGenerationOptions.defaults()`
+   * (maxTokens 100, temperature 0.8, topP 1.0).
+   */
+  llmOptions?: Partial<
+    Pick<
+      LLMGenerationOptions,
+      'maxTokens' | 'temperature' | 'topP' | 'systemPrompt' | 'disableThinking'
+    >
+  >;
+  /**
+   * Swift parity: when omitted the proto field stays UNSET so commons applies
+   * its documented default (true). Hosts that delegate validation to their
+   * executor pass `false`.
+   */
+  validateCalls?: boolean;
+}
+
+/**
+ * Function type for JS-native tool executors — Swift parity:
+ * `ToolExecutor = ([String: RAToolValue]) async throws -> [String: RAToolValue]`
+ * (ToolCallingTypes.swift:19). Receives the parsed `argumentsJson` object and
+ * returns the result object the SDK serializes into `resultJson`; throw to
+ * surface a failure.
+ */
+export type ToolExecutor = (
+  args: Record<string, ToolValue>,
+) => Record<string, ToolValue> | Promise<Record<string, ToolValue>>;
 
 const registeredTools = new Map<string, RegisteredTool>();
+
+/**
+ * Swift parity: ToolCallingTypes.swift `maxToolCallCount` — an explicit
+ * `maxToolCalls` wins over `maxIterations`; a non-positive value resolves to
+ * the canonical default of 5.
+ */
+function maxToolCallCount(options: ToolCallingOptions): number {
+  const explicit = options.maxToolCalls !== undefined
+    ? options.maxToolCalls
+    : (options.maxIterations ?? 0);
+  return explicit > 0 ? explicit : 5;
+}
+
+/** Swift parity: `toolCallIdentifier` prefers `id`, then `callId`. */
+function toolCallIdentifier(toolCall: ToolCall): string {
+  return toolCall.id || toolCall.callId || '';
+}
 
 function buildToolCallingOptions(
   tools: ToolDefinition[],
@@ -101,7 +160,8 @@ function buildToolCallingOptions(
   const overrides = options.toolCalling ?? {};
   return ToolCallingOptionsMessage.fromPartial({
     tools: overrides.tools ?? tools,
-    maxIterations: overrides.maxIterations ?? overrides.maxToolCalls ?? 0,
+    // Swift parity: RAToolCallingOptions.defaults() resolves to 5 iterations.
+    maxIterations: overrides.maxIterations ?? overrides.maxToolCalls ?? 5,
     autoExecute: overrides.autoExecute ?? true,
     temperature: overrides.temperature ?? options.temperature,
     maxTokens: overrides.maxTokens ?? options.maxTokens,
@@ -126,7 +186,8 @@ function buildPromptOptions(
   return ToolCallingOptionsMessage.fromPartial({
     ...options,
     tools: options.tools ?? tools,
-    maxIterations: options.maxIterations ?? options.maxToolCalls ?? 0,
+    // Swift parity: RAToolCallingOptions.defaults() resolves to 5 iterations.
+    maxIterations: options.maxIterations ?? options.maxToolCalls ?? 5,
     autoExecute: options.autoExecute ?? true,
     formatHint: options.formatHint ?? '',
     toolChoice: options.toolChoice ?? ToolChoiceMode.TOOL_CHOICE_MODE_AUTO,
@@ -250,49 +311,135 @@ function readToolCallValidation(
   return result;
 }
 
-function toolResultWithDefaults(
-  toolCall: ToolCall,
-  result: ToolResult,
-  startedAtMs: number,
-): ToolResult {
+/**
+ * ToolValue -> JSON via commons (`rac_tool_value_to_json_proto`) — Swift
+ * parity: `RAToolValue.toJSONString()` (ToolCallingTypes.swift). The
+ * recursive walk lives in C++ so every SDK shares one source of truth.
+ */
+function toolValueToJSONString(value: ToolValue): string | null {
+  const module = requireToolCallingModule('toolCalling.toolValueToJSON', [
+    '_rac_tool_value_to_json_proto',
+  ]);
+  const result = new ProtoWasmBridge(module, logger).withEncodedRequest(
+    ToolValueMessage.fromPartial(value),
+    ToolValueMessage,
+    ToolValueJSONMessage,
+    (requestPtr, requestSize, outResult) => (
+      module._rac_tool_value_to_json_proto!(requestPtr, requestSize, outResult)
+    ),
+    'rac_tool_value_to_json_proto',
+  );
+  return result?.json ?? null;
+}
+
+/**
+ * Parse a JSON object string into a ToolValue field map via commons
+ * (`rac_tool_value_from_json_proto`) — Swift parity:
+ * `RAToolValue.parseObjectJSON` (ToolCallingTypes.swift:94). Throws when the
+ * input is not valid JSON or the root is not an object.
+ */
+function parseObjectJSON(json: string): Record<string, ToolValue> {
+  const module = requireToolCallingModule('toolCalling.toolValueFromJSON', [
+    '_rac_tool_value_from_json_proto',
+  ]);
+  const value = new ProtoWasmBridge(module, logger).withEncodedRequest(
+    ToolValueJSONMessage.fromPartial({ json }),
+    ToolValueJSONMessage,
+    ToolValueMessage,
+    (requestPtr, requestSize, outResult) => (
+      module._rac_tool_value_from_json_proto!(requestPtr, requestSize, outResult)
+    ),
+    'rac_tool_value_from_json_proto',
+  );
+  if (!value) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_INVALID_INPUT,
+      'Failed to parse tool arguments JSON',
+      'rac_tool_value_from_json_proto returned no ToolValue bytes.',
+    );
+  }
+  if (!value.objectValue) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_INVALID_INPUT,
+      'ToolCall.argumentsJson must decode to a JSON object',
+    );
+  }
+  return value.objectValue.fields;
+}
+
+/** Swift parity: `RAToolValue.jsonString(from:)` (ToolCallingTypes.swift:112). */
+function jsonStringFromObject(object: Record<string, ToolValue>): string {
+  // Empty object short-circuits to the canonical "{}" the C ABI would emit,
+  // keeping failure-path results independent of the WASM bridge.
+  if (Object.keys(object).length === 0) return '{}';
+  return toolValueToJSONString(
+    ToolValueMessage.fromPartial({ objectValue: { fields: object } }),
+  ) ?? '{}';
+}
+
+/**
+ * Swift parity: `makeToolResult` (RunAnywhere+ToolCalling.swift:463) —
+ * `resultJson` is the canonical wire shape; the typed result map is
+ * serialized through commons.
+ */
+function makeToolResult(params: {
+  name: string;
+  success: boolean;
+  result?: Record<string, ToolValue>;
+  error?: string;
+  toolCallId?: string;
+  startedAtMs: number;
+}): ToolResult {
   return ToolResultMessage.fromPartial({
-    ...result,
-    toolCallId: result.toolCallId || toolCall.callId || toolCall.id,
-    name: result.name || toolCall.name,
-    startedAtMs: result.startedAtMs || startedAtMs,
-    completedAtMs: result.completedAtMs || Date.now(),
+    name: params.name,
+    success: params.success,
+    resultJson: jsonStringFromObject(params.result ?? {}),
+    error: params.error,
+    toolCallId: params.toolCallId,
+    callId: params.toolCallId,
+    startedAtMs: params.startedAtMs,
+    completedAtMs: Date.now(),
   });
 }
 
 /**
  * Build the ToolCallingSessionCreateRequest proto consumed by
  * `_rac_tool_calling_session_create_proto`. Mirrors Swift's
- * `makeRunLoopRequest` (RunAnywhere+ToolCalling.swift:320) so the C++ loop
- * receives identical input regardless of SDK.
+ * `makeRunLoopRequest` (RunAnywhere+ToolCalling.swift:491-548) so the C++
+ * loop receives identical input regardless of SDK: tool options take
+ * precedence, unset values fall back to the LLM options channel, whose
+ * defaults are Swift's `RALLMGenerationOptions.defaults()`
+ * (maxTokens 100, temperature 0.8, topP 1.0).
  */
 function buildSessionCreateRequest(
   prompt: string,
   tools: ToolDefinition[],
   effectiveOptions: ToolCallingOptions,
+  extra: GenerateWithToolsOptions = {},
 ): Uint8Array {
-  const maxIterations =
-    (effectiveOptions.maxIterations ?? 0) > 0
-      ? effectiveOptions.maxIterations
-      : (effectiveOptions.maxToolCalls ?? 0);
+  const llm = extra.llmOptions;
+  const toolMaxTokens = effectiveOptions.maxTokens;
   const request = ToolCallingSessionCreateRequestMessage.fromPartial({
     prompt,
-    maxTokens: effectiveOptions.maxTokens ?? 0,
-    temperature: effectiveOptions.temperature ?? 0,
-    topP: 0,
-    systemPrompt: effectiveOptions.systemPrompt ?? '',
+    maxTokens:
+      toolMaxTokens !== undefined && toolMaxTokens > 0
+        ? toolMaxTokens
+        : (llm?.maxTokens ?? 100),
+    temperature: effectiveOptions.temperature ?? llm?.temperature ?? 0.8,
+    // topP has no slot on ToolCallingOptions — Swift reads it from the LLM
+    // options channel exclusively (RunAnywhere+ToolCalling.swift:516).
+    topP: llm?.topP ?? 1.0,
+    systemPrompt: effectiveOptions.systemPrompt || llm?.systemPrompt || '',
     tools,
     formatHint: effectiveOptions.formatHint ?? '',
-    maxIterations: maxIterations ?? 0,
+    // Swift parity: `UInt32(max(toolOptions.maxToolCallCount, 0))`
+    // (RunAnywhere+ToolCalling.swift:526) — never 0, defaults to 5.
+    maxIterations: Math.max(maxToolCallCount(effectiveOptions), 0),
     keepToolsAvailable: effectiveOptions.keepToolsAvailable ?? false,
-    // Commons default is validateCalls=true; pass true explicitly so that the
-    // C++ run loop validates each parsed tool call against the request's tools
-    // before invoking the JS executor (parity with Swift makeRunLoopRequest).
-    validateCalls: true,
+    // `validate_calls` is `optional bool` on the proto. Leave it UNSET unless
+    // the caller chose, so commons applies its documented default (true) —
+    // parity with Swift makeRunLoopRequest (RunAnywhere+ToolCalling.swift:528-537).
+    validateCalls: extra.validateCalls,
     // pass2-syn-006-followup-web: thread the OpenAI-style tool_choice /
     // forced_tool_name knobs into the canonical request envelope (idl
     // fields 7/8). Commons build_options_snapshot copies them onto every
@@ -306,8 +453,11 @@ function buildSessionCreateRequest(
       effectiveOptions.forcedToolName && effectiveOptions.forcedToolName.length > 0
         ? effectiveOptions.forcedToolName
         : undefined,
-    // Suppress thinking when requested (commons prepends the no-think directive).
-    disableThinking: effectiveOptions.disableThinking ?? false,
+    // Suppress thinking when EITHER options surface asks for it — Swift:
+    // `toolOptions.disableThinking || options.disableThinking`
+    // (RunAnywhere+ToolCalling.swift:548).
+    disableThinking:
+      (effectiveOptions.disableThinking ?? false) || (llm?.disableThinking ?? false),
   });
   return ToolCallingSessionCreateRequestMessage.encode(request).finish();
 }
@@ -387,36 +537,49 @@ export const ToolCalling = {
 
   async executeTool(toolCall: ToolCall): Promise<ToolResult> {
     const startedAtMs = Date.now();
+    const toolCallId = toolCallIdentifier(toolCall);
     const registered = registeredTools.get(toolCall.name);
     if (!registered) {
-      return ToolResultMessage.fromPartial({
-        toolCallId: toolCall.callId || toolCall.id,
+      return makeToolResult({
         name: toolCall.name,
-        resultJson: '',
         success: false,
         error: `Unknown tool: ${toolCall.name}`,
-        callId: toolCall.callId || toolCall.id,
+        toolCallId,
         startedAtMs,
-        completedAtMs: Date.now(),
+      });
+    }
+
+    let parsedArgs: Record<string, ToolValue>;
+    try {
+      parsedArgs = parseObjectJSON(toolCall.argumentsJson);
+    } catch (error) {
+      // Swift parity (RunAnywhere+ToolCalling.swift:171-184): surface bad-JSON
+      // arguments as success=false so callers can distinguish parse errors
+      // from genuine empty-argument calls.
+      return makeToolResult({
+        name: toolCall.name,
+        success: false,
+        error: `Failed to parse tool arguments: ${error instanceof Error ? error.message : String(error)}`,
+        toolCallId,
+        startedAtMs,
       });
     }
 
     try {
-      return toolResultWithDefaults(
-        toolCall,
-        await registered.executor(toolCall),
-        startedAtMs,
-      );
-    } catch (error) {
-      return ToolResultMessage.fromPartial({
-        toolCallId: toolCall.callId || toolCall.id,
+      return makeToolResult({
         name: toolCall.name,
-        resultJson: '',
+        success: true,
+        result: await registered.executor(parsedArgs),
+        toolCallId,
+        startedAtMs,
+      });
+    } catch (error) {
+      return makeToolResult({
+        name: toolCall.name,
         success: false,
         error: error instanceof Error ? error.message : String(error),
-        callId: toolCall.callId || toolCall.id,
+        toolCallId,
         startedAtMs,
-        completedAtMs: Date.now(),
       });
     }
   },
@@ -521,7 +684,7 @@ export const ToolCalling = {
   async generateWithTools(
     prompt: string,
     options: Partial<ToolCallingOptions> = {},
-    extra: { signal?: AbortSignal } = {},
+    extra: GenerateWithToolsOptions = {},
   ): Promise<ToolCallingResult> {
     // pass3-syn-153: short-circuit when the AbortSignal is already aborted
     // BEFORE allocating the trampoline / handle slot or calling commons.
@@ -558,7 +721,7 @@ export const ToolCalling = {
     }
 
     const bridge = new ProtoWasmBridge(module, logger);
-    const requestBytes = buildSessionCreateRequest(prompt, tools, effectiveOptions);
+    const requestBytes = buildSessionCreateRequest(prompt, tools, effectiveOptions, extra);
 
     // Event queue: the C session callback fires synchronously inside
     // session_create_proto / session_step_with_result_proto. We buffer events
@@ -708,7 +871,7 @@ export const ToolCalling = {
 
         // Execute the tool in TS (async).
         const toolResult = await this.executeTool(pendingToolCall);
-        const toolCallId = toolResult.toolCallId || pendingToolCall.callId || pendingToolCall.id;
+        const toolCallId = toolResult.toolCallId || toolCallIdentifier(pendingToolCall);
         const stepBytes = encodeStepRequest(
           sessionHandle,
           toolCallId,

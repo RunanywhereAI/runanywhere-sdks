@@ -34,8 +34,11 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.SDKEvent
 import ai.runanywhere.proto.v1.VLMGenerationOptions
+import ai.runanywhere.proto.v1.VLMGenerationRequest
 import ai.runanywhere.proto.v1.VLMImage
 import ai.runanywhere.proto.v1.VLMResult
+import ai.runanywhere.proto.v1.VLMStreamEvent
+import ai.runanywhere.proto.v1.VLMStreamEventKind
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -80,7 +83,7 @@ object CppBridgeVLM {
      * Proto ABI handle for VLM inference. Mirrors Swift's `getHandle()` surface
      * but returns `0L` because Kotlin has no `rac_vlm_component_create` JNI
      * binding yet — commons/JNI treat handle `0` as "use lifecycle-owned VLM"
-     * (see `rac_vlm_process_stream_proto` / `RunAnywhereBridge` comments).
+     * (see `rac_vlm_process_proto` / `RunAnywhereBridge` comments).
      * Do not route through [ComponentActor.getHandle]: the VLM vtable
      * `createFn` returns `0L` by design and the actor rejects that as failure.
      */
@@ -155,41 +158,56 @@ object CppBridgeVLM {
         )
 
     /**
-     * Stream VLM output as canonical [SDKEvent] envelopes.
+     * Stream typed [VLMStreamEvent]s from the lifecycle-owned VLM model.
      *
-     * Mirrors Swift `CppBridge.VLM.processStream` — the native call delivers
-     * token events through the callback; the aggregate [VLMResult] returned
-     * by the C ABI is validated but not forwarded to callers (public API is
-     * event-driven via [RunAnywhere.processImageStream]).
+     * Mirrors Swift `CppBridge.VLM.processStream` over the canonical typed
+     * ABI (`rac_vlm_stream_proto`): serialized `VLMGenerationRequest` in,
+     * one `VLMStreamEvent` per callback (STARTED → TOKEN* → exactly one
+     * terminal COMPLETED/ERROR; COMPLETED carries the full [VLMResult]).
+     * `model_id` is left unset — commons resolves the lifecycle-owned model
+     * and only validates the field when non-empty.
+     *
+     * [onEvent] returns false to stop the native stream (consumer cancel).
      */
     suspend fun processStream(
         image: RAVLMImage,
         options: RAVLMGenerationOptions,
-        onEvent: (SDKEvent) -> Boolean,
-    ): RAVLMResult {
-        val handle = getHandle()
-        return decodeOrThrow(
-            VLMResult.ADAPTER,
-            RunAnywhereBridge.racVlmProcessStreamProto(
-                handle,
-                VLMImage.ADAPTER.encode(image),
-                VLMGenerationOptions.ADAPTER.encode(options),
+        onEvent: (VLMStreamEvent) -> Boolean,
+    ) {
+        val request =
+            VLMGenerationRequest(
+                images = listOf(image),
+                options = options.copy(streaming_enabled = true),
+            )
+        val rc =
+            RunAnywhereBridge.racVlmStreamProto(
+                VLMGenerationRequest.ADAPTER.encode(request),
                 NativeProtoProgressListener { bytes ->
                     try {
-                        // `rac_vlm_process_stream_proto` emits canonical SDKEvent
-                        // envelopes (per-token TOKEN_GENERATED + terminal
-                        // STREAM_COMPLETED — vlm_module.cpp stream_token_trampoline).
-                        // Decode SDKEvent directly: trying VLMStreamEvent first
-                        // mis-decodes these bytes (proto skips unknown fields,
-                        // kind stays UNSPECIFIED) and every event gets dropped.
-                        onEvent(SDKEvent.ADAPTER.decode(bytes))
+                        val event = VLMStreamEvent.ADAPTER.decode(bytes)
+                        onEvent(event) && shouldContinueNativeStream(event)
+                    } catch (e: SDKException) {
+                        throw e
                     } catch (e: Exception) {
                         logger.warning("Failed to decode VLM stream event: ${e.message}")
                         true
                     }
                 },
-            ),
-            "racVlmProcessStreamProto",
-        )
+            )
+        if (rc != 0) {
+            throw SDKException.vlm("rac_vlm_stream_proto failed: rc=$rc")
+        }
     }
+
+    /**
+     * Native-stream continuation policy: stop after the terminal
+     * COMPLETED/ERROR event (or any event flagged `is_final`).
+     */
+    private fun shouldContinueNativeStream(event: VLMStreamEvent): Boolean =
+        when (event.kind) {
+            VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED,
+            VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR,
+            -> false
+            else -> !event.is_final
+        }
 }

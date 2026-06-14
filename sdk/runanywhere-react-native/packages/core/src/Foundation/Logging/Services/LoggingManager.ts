@@ -100,6 +100,8 @@ export class LoggingManager {
     }
     if (!this.config.enableSentryLogging) {
       this.removeDestinationByIdentifier(SentryDestination.DESTINATION_ID);
+    } else if (!this.destinations.has(SentryDestination.DESTINATION_ID)) {
+      this.addDestination(new SentryDestination());
     }
   }
 
@@ -124,6 +126,12 @@ export class LoggingManager {
     this.config.enableSentryLogging = enabled;
     if (!enabled) {
       this.removeDestinationByIdentifier(SentryDestination.DESTINATION_ID);
+    } else if (!this.destinations.has(SentryDestination.DESTINATION_ID)) {
+      // Swift parity: setupSentryLogging() adds the destination on enable
+      // (SDKLogger.swift:104-106, 221-225). The app supplies the Sentry
+      // instance later via `SentryDestination.initialize(...)` /
+      // `addDestination`; until then the destination reports unavailable.
+      this.addDestination(new SentryDestination());
     }
   }
 
@@ -146,15 +154,16 @@ export class LoggingManager {
     metadata?: Record<string, unknown>
   ): void {
     if (level < this.config.minLogLevel) return;
-    if (!this.config.enableLocalLogging && !this.config.enableSentryLogging) {
-      return;
-    }
+    // Note: no global enableLocalLogging/enableSentryLogging early-return —
+    // those flags govern the console/Sentry destinations' presence in the
+    // map; app-registered custom destinations keep receiving entries
+    // (Swift parity: SDKLogger.swift routes to `destinations` directly).
 
     const entry: LogEntry = {
       level,
       category,
       message,
-      metadata,
+      metadata: sanitizeMetadata(metadata),
       timestamp: new Date(),
     };
 
@@ -196,4 +205,50 @@ function describeLevel(level: LogLevel): string {
     default:
       return 'INFO';
   }
+}
+
+// ============================================================================
+// Metadata sanitization (Swift SDKLogger.swift:255-280 / commons log_redact.cpp)
+// ============================================================================
+
+/**
+ * Canonical sensitive-substring list. Lowercase, in declaration order; the
+ * C++ logger (`rac_log_metadata_should_redact`, log_redact.cpp), Swift
+ * `SDKLogger`, and this list must stay in lockstep. Duplicated here (instead
+ * of delegating to the C ABI like Swift) because the RN bridge is async and
+ * `log()` is synchronous.
+ */
+const SENSITIVE_SUBSTRINGS = [
+  'key',
+  'secret',
+  'password',
+  'token',
+  'auth',
+  'credential',
+] as const;
+
+function shouldRedact(key: string): boolean {
+  const lowered = key.toLowerCase();
+  return SENSITIVE_SUBSTRINGS.some((needle) => lowered.includes(needle));
+}
+
+/**
+ * Redact sensitive metadata values (recursively for nested objects) before
+ * the entry reaches any destination. Mirrors Swift `sanitizeMetadata(_:)`.
+ */
+function sanitizeMetadata(
+  metadata?: Record<string, unknown>
+): Record<string, unknown> | undefined {
+  if (!metadata) return undefined;
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    if (shouldRedact(key)) {
+      sanitized[key] = '[REDACTED]';
+    } else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      sanitized[key] = sanitizeMetadata(value as Record<string, unknown>) ?? {};
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
 }

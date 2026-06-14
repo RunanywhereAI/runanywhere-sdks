@@ -13,9 +13,9 @@
 #include <cstring>
 #include <string>
 
+#include "../common/rac_service_factory_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
-#include "../common/rac_service_factory_internal.h"
 
 static const char* LOG_CAT = "TTS.Service";
 
@@ -50,9 +50,9 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
          .allow_null_model_id = false,
          .lookup_last_path_component = true,
          .prefer_input_path_when_contains = "/"},  // explicit caller paths win over
-         // the registry row (LLM uses ".gguf" for the same rule) — required for
-         // archive models whose registry local_path is the outer extract folder
-         // while loaders need the resolved inner artifact dir
+        // the registry row (LLM uses ".gguf" for the same rule) — required for
+        // archive models whose registry local_path is the outer extract folder
+        // while loaders need the resolved inner artifact dir
         &model_ref);
     if (result != RAC_SUCCESS) {
         return result;

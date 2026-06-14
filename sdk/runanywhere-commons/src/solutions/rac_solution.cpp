@@ -8,11 +8,13 @@
 #include "solutions.pb.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/solutions/config_loader.hpp"
+#include "rac/solutions/operator_registry.hpp"
 #include "rac/solutions/solution_runner.hpp"
 
 using rac::solutions::SolutionRunner;
@@ -21,6 +23,22 @@ namespace {
 
 SolutionRunner* as_runner(rac_solution_handle_t h) {
     return static_cast<SolutionRunner*>(h);
+}
+
+// The engine-backed operator factories (generate_text, transcribe, synthesize,
+// detect_voice, embed, retrieve) are not part of the registry's builtin
+// scaffolding — they must be registered into the shared OperatorRegistry before
+// any pipeline that references them is built, or PipelineExecutor::build() fails
+// the operator with RAC_ERROR_FEATURE_NOT_AVAILABLE. Nothing in the C core wired
+// this up (only the unit tests registered them, on a private registry), so every
+// Voice Agent / RAG / STT / TTS solution failed at build time. Register once,
+// here at the solution-create entry, so all SDKs get working solutions.
+void ensure_engine_backed_operators_registered() {
+    static std::once_flag once;
+    std::call_once(once, [] {
+        rac::solutions::register_engine_backed_operators(
+            rac::solutions::OperatorRegistry::instance());
+    });
 }
 
 /// Heuristic: a YAML document whose top level declares `operators:` is
@@ -78,6 +96,7 @@ RAC_API rac_result_t rac_solution_create_from_proto(const void* proto_bytes, siz
     if (!out_handle)
         return RAC_ERROR_INVALID_ARGUMENT;
     *out_handle = nullptr;
+    ensure_engine_backed_operators_registered();
 
     runanywhere::v1::SolutionConfig config;
     rac_result_t st = rac::solutions::load_solution_from_proto_bytes(proto_bytes, len, &config);
@@ -96,6 +115,7 @@ RAC_API rac_result_t rac_solution_create_from_yaml(const char* yaml_text,
     *out_handle = nullptr;
     if (!yaml_text)
         return RAC_ERROR_INVALID_ARGUMENT;
+    ensure_engine_backed_operators_registered();
 
     const std::string yaml(yaml_text);
     if (yaml_looks_like_pipeline_spec(yaml)) {

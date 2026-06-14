@@ -40,6 +40,7 @@ int main(int argc, char** argv) {
     rcli::commands::register_info(app, options);
     rcli::commands::register_backends(app, options);
     rcli::commands::register_list(app, options);
+    rcli::commands::register_lora(app, options);
     rcli::commands::register_pull(app, options);
     rcli::commands::register_rm(app, options);
     rcli::commands::register_show(app, options);

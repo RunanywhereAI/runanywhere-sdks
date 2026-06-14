@@ -28,8 +28,9 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "hardware_profile.pb.h"
-#include "infrastructure/events/sdk_event_publish.h"
 #include "sdk_events.pb.h"
+
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 // =============================================================================
@@ -362,14 +363,18 @@ rac_result_t publish_initialization_started() {
 #endif
 }
 
-rac_result_t publish_initialization_completed() {
+rac_result_t publish_initialization_completed(int64_t duration_ms) {
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_INITIALIZATION,
                       runanywhere::v1::ERROR_SEVERITY_INFO);
     event.mutable_initialization()->set_stage(runanywhere::v1::INITIALIZATION_STAGE_COMPLETED);
+    if (duration_ms >= 0) {
+        (*event.mutable_properties())["duration_ms"] = std::to_string(duration_ms);
+    }
     return publish_message(event);
 #else
+    (void)duration_ms;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #endif
 }

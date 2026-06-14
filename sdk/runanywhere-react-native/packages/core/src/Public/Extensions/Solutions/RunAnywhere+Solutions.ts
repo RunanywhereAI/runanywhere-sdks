@@ -21,6 +21,8 @@ import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
 import { bytesToArrayBuffer } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
 
 function ensureNative() {
   if (!isNativeModuleAvailable()) {
@@ -59,35 +61,37 @@ export class SolutionHandle {
   async start(): Promise<void> {
     this.requireAlive();
     const ok = await ensureNative().solutionStart(this.handle);
-    if (!ok) throw SDKException.generationFailedWith('rac_solution_start failed');
+    // Swift parity: lifecycle-verb failures throw .processingFailed
+    // (RunAnywhere+Solutions.swift:108-117).
+    if (!ok) throw SDKException.processingFailed('rac_solution_start failed');
   }
 
   /** Request a graceful shutdown. Non-blocking. */
   async stop(): Promise<void> {
     this.requireAlive();
     const ok = await ensureNative().solutionStop(this.handle);
-    if (!ok) throw SDKException.generationFailedWith('rac_solution_stop failed');
+    if (!ok) throw SDKException.processingFailed('rac_solution_stop failed');
   }
 
   /** Force-cancel the graph; returns once workers observe cancellation. */
   async cancel(): Promise<void> {
     this.requireAlive();
     const ok = await ensureNative().solutionCancel(this.handle);
-    if (!ok) throw SDKException.generationFailedWith('rac_solution_cancel failed');
+    if (!ok) throw SDKException.processingFailed('rac_solution_cancel failed');
   }
 
   /** Feed one UTF-8 item into the root input edge. */
   async feed(item: string): Promise<void> {
     this.requireAlive();
     const ok = await ensureNative().solutionFeed(this.handle, item);
-    if (!ok) throw SDKException.generationFailedWith('rac_solution_feed failed');
+    if (!ok) throw SDKException.processingFailed('rac_solution_feed failed');
   }
 
   /** Signal end-of-stream on the root input edge. */
   async closeInput(): Promise<void> {
     this.requireAlive();
     const ok = await ensureNative().solutionCloseInput(this.handle);
-    if (!ok) throw SDKException.generationFailedWith('rac_solution_close_input failed');
+    if (!ok) throw SDKException.processingFailed('rac_solution_close_input failed');
   }
 
   /** Cancel, join, and release native resources. Idempotent. */
@@ -100,8 +104,10 @@ export class SolutionHandle {
 
   private requireAlive(): void {
     if (!this.alive) {
-      throw SDKException.invalidInput(
-        'SolutionHandle has already been destroyed'
+      // Swift parity: using a destroyed handle throws .invalidState
+      // (RunAnywhere+Solutions.swift:99-104).
+      throw SDKException.invalidState(
+        'Solution handle has already been destroyed'
       );
     }
   }
@@ -139,12 +145,19 @@ export type SolutionRunArgs =
  * own the returned [SolutionHandle] — invoke `.destroy()` when finished.
  */
 async function run(args: SolutionRunArgs): Promise<SolutionHandle> {
+  // Swift parity: ensureReady() guards isInitialized
+  // (RunAnywhere+Solutions.swift:225-227).
+  requireInitialized();
   const native = ensureNative();
+  // Swift parity: RunAnywhere+Solutions.swift:228 gates on ensureServicesReady.
+  await ensureServicesReady();
 
   if (args.yaml !== undefined) {
     const h = await native.solutionCreateFromYaml(args.yaml);
     if (!h) {
-      throw SDKException.generationFailedWith(
+      // Swift parity: create failures throw .invalidConfiguration
+      // (RunAnywhere+Solutions.swift:210-219).
+      throw SDKException.invalidConfiguration(
         'rac_solution_create_from_yaml failed'
       );
     }
@@ -164,7 +177,9 @@ async function run(args: SolutionRunArgs): Promise<SolutionHandle> {
 
   const h = await native.solutionCreateFromProto(configBuffer);
   if (!h) {
-    throw SDKException.generationFailedWith(
+    // Swift parity: create failures throw .invalidConfiguration
+    // (RunAnywhere+Solutions.swift:178-187).
+    throw SDKException.invalidConfiguration(
       'rac_solution_create_from_proto failed'
     );
   }

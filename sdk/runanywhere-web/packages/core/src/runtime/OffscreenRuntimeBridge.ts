@@ -92,10 +92,8 @@ export type BridgeStreamRequest =
       optionsBytes: Uint8Array;
     }
   | {
-      kind: 'stream.vlm.process';
-      handle: number;
-      imageBytes: Uint8Array;
-      promptBytes: Uint8Array;
+      kind: 'stream.vlm.generate';
+      requestBytes: Uint8Array;
     };
 
 export interface StreamIteratorOptions<T> {
@@ -513,13 +511,11 @@ function toWorkerRequest(req: BridgeStreamRequest, requestId: string): WorkerReq
         text: req.text,
         optionsBytes: req.optionsBytes,
       };
-    case 'stream.vlm.process':
+    case 'stream.vlm.generate':
       return {
-        type: 'stream.vlm.process',
+        type: 'stream.vlm.generate',
         requestId,
-        handle: req.handle,
-        imageBytes: req.imageBytes,
-        promptBytes: req.promptBytes,
+        requestBytes: req.requestBytes,
       };
   }
 }

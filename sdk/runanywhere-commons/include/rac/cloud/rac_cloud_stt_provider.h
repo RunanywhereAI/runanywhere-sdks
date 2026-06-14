@@ -68,13 +68,9 @@ extern "C" {
  * @return RAC_SUCCESS when @p out_result_json was written; an error code
  *         otherwise (the engine treats a non-success as a transcribe failure).
  */
-typedef rac_result_t (*rac_cloud_stt_transcribe_fn_t)(
-    const char*    config_json,
-    const uint8_t* audio,
-    size_t         audio_len,
-    int32_t        audio_format,
-    char**         out_result_json,
-    void*          user_data);
+typedef rac_result_t (*rac_cloud_stt_transcribe_fn_t)(const char* config_json, const uint8_t* audio,
+                                                      size_t audio_len, int32_t audio_format,
+                                                      char** out_result_json, void* user_data);
 
 /**
  * @brief Register (or replace) a named cloud STT provider callback.
@@ -91,10 +87,9 @@ typedef rac_result_t (*rac_cloud_stt_transcribe_fn_t)(
  *         @p transcribe is NULL;
  *         RAC_ERROR_OUT_OF_MEMORY if the new snapshot cannot be allocated.
  */
-RAC_API rac_result_t rac_cloud_register_stt_provider(
-    const char*                   name,
-    rac_cloud_stt_transcribe_fn_t transcribe,
-    void*                         user_data);
+RAC_API rac_result_t rac_cloud_register_stt_provider(const char* name,
+                                                     rac_cloud_stt_transcribe_fn_t transcribe,
+                                                     void* user_data);
 
 /**
  * @brief Remove a named cloud STT provider callback.
@@ -118,13 +113,9 @@ RAC_API rac_bool_t rac_cloud_has_stt_provider(const char* name);
  * rac_cloud_stt_result_free. Returns RAC_ERROR_NOT_FOUND when @p name is not
  * registered (the engine reports an unknown-provider configuration error).
  */
-RAC_API rac_result_t rac_cloud_invoke_stt_provider(
-    const char*    name,
-    const char*    config_json,
-    const uint8_t* audio,
-    size_t         audio_len,
-    int32_t        audio_format,
-    char**         out_result_json);
+RAC_API rac_result_t rac_cloud_invoke_stt_provider(const char* name, const char* config_json,
+                                                   const uint8_t* audio, size_t audio_len,
+                                                   int32_t audio_format, char** out_result_json);
 
 /**
  * @brief Free a result string produced by rac_cloud_invoke_stt_provider.

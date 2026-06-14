@@ -413,6 +413,33 @@ class DartBridgeModelRegistry {
     }
   }
 
+  /// Register a multi-file model (VLM gguf+mmproj pairs, embedding
+  /// model+vocab sets) via `rac_register_multi_file_model_proto`.
+  ///
+  /// Mirrors Swift's `RunAnywhere.registerModel(multiFile:...)` — commons
+  /// builds the MultiFileArtifact ModelInfo and persists it with
+  /// merge-on-reseed semantics.
+  Future<model_pb.ModelInfo?> registerMultiFileModel(
+    model_pb.RegisterMultiFileModelRequest request,
+  ) async {
+    final fn = RacNative.bindings.rac_register_multi_file_model_proto;
+    if (fn == null) {
+      _logger.debug('rac_register_multi_file_model_proto unavailable');
+      return null;
+    }
+    try {
+      return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
+        request: request,
+        invoke: fn,
+        decode: model_pb.ModelInfo.fromBuffer,
+        symbol: 'rac_register_multi_file_model_proto',
+      );
+    } catch (e) {
+      _logger.debug('rac_register_multi_file_model_proto error: $e');
+      return null;
+    }
+  }
+
   /// Import a local model into the registry via
   /// `rac_model_registry_import_proto`.
   ///
@@ -556,6 +583,7 @@ class DartBridgeModelRegistry {
   /// model list should use [discoverDownloadedModels] — the Models capability
   /// does exactly that.
   Future<bool> refresh({
+    required bool rescanLocal,
     required bool includeRemoteCatalog,
     required bool pruneOrphans,
   }) async {
@@ -567,13 +595,19 @@ class DartBridgeModelRegistry {
       return false;
     }
     try {
+      // Full request mirrors Swift RunAnywhere+ModelRegistry.swift
+      // refreshModelRegistry: rescanLocal is forwarded and
+      // includeDownloadedState is always true so the refreshed registry
+      // carries downloaded-state reconciliation.
       final result =
           DartBridgeProtoUtils.callRequestWithHandle<
               model_pb.ModelRegistryRefreshResult>(
         handle: handle,
         request: model_pb.ModelRegistryRefreshRequest(
+          rescanLocal: rescanLocal,
           includeRemoteCatalog: includeRemoteCatalog,
           pruneOrphans: pruneOrphans,
+          includeDownloadedState: true,
         ),
         invoke: fn,
         decode: model_pb.ModelRegistryRefreshResult.fromBuffer,

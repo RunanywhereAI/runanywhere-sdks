@@ -6,7 +6,12 @@
  * native-handle-backed and flows through generated proto models.
  */
 
-import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
+import {
+  ProtoErrorCategory,
+  ProtoErrorCode,
+  ProtoErrorSeverity,
+  SDKException,
+} from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
@@ -22,15 +27,9 @@ import type {
   VoiceAgentResult,
 } from '@runanywhere/proto-ts/voice_agent_service';
 import {
-  AudioEncoding,
-  VoicePipelineComponent,
   type VoiceAgentComponentStates,
   type VoiceEvent,
 } from '@runanywhere/proto-ts/voice_events';
-// VoiceEventCategory/VoiceEventSeverity/ComponentLoadState were
-// consolidated into EventCategory/ErrorSeverity/ComponentLifecycleState.
-import { EventCategory, ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
-import { ErrorSeverity } from '@runanywhere/proto-ts/errors';
 import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule';
 
 const logger = new SDKLogger('VoiceAgent');
@@ -238,7 +237,32 @@ class NativeVoiceAgentHandleProvider implements VoiceAgentProvider {
   }
 
   async initializeVoiceAgentWithLoadedModels(ttsVoiceID?: string): Promise<void> {
-    await this.initializeVoiceAgent(defaultVoiceAgentComposeConfig(ttsVoiceID));
+    // Swift parity (RunAnywhere+VoiceAgent.swift:114-165): the C++ lifecycle
+    // service is the canonical source of truth for "is this modality loaded".
+    // Query it per category, throw modelNotLoaded listing the missing
+    // components, and pin the loaded model ids on the compose config.
+    const sttModelID = loadedModelID(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
+    const llmModelID = loadedModelID(ModelCategory.MODEL_CATEGORY_LANGUAGE);
+    const ttsModelID = loadedModelID(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
+
+    const missing: string[] = [];
+    if (!sttModelID) missing.push('STT');
+    if (!llmModelID) missing.push('LLM');
+    if (!ttsModelID) missing.push('TTS');
+    if (missing.length > 0) {
+      throw modelNotLoadedException(
+        `Cannot initialize voice agent: Models not loaded: ${missing.join(', ')}`,
+      );
+    }
+
+    // ttsVoiceID is the voice id *within* the loaded TTS model, NOT the model
+    // id — defaultVoiceAgentComposeConfig only sets it when supplied, matching
+    // Swift's `if let voiceID = ttsVoiceID, !voiceID.isEmpty`.
+    await this.initializeVoiceAgent({
+      ...defaultVoiceAgentComposeConfig(ttsVoiceID),
+      sttModelId: sttModelID,
+      llmModelId: llmModelID,
+    });
   }
 
   isVoiceAgentReady(): boolean {
@@ -246,15 +270,28 @@ class NativeVoiceAgentHandleProvider implements VoiceAgentProvider {
   }
 
   getVoiceAgentComponentStates(): VoiceAgentComponentStates {
-    return this.adapter.componentStates(this.handle)
-      ?? unavailableComponentStates('Native voice-agent component state is unavailable.');
+    const states = this.adapter.componentStates(this.handle);
+    if (!states) {
+      // Swift parity: CppBridge.VoiceAgent.componentStatesProto throws —
+      // no synthetic error-shaped result.
+      throw SDKException.backendNotAvailable(
+        'getVoiceAgentComponentStates',
+        'Native voice-agent component state is unavailable.',
+      );
+    }
+    return states;
   }
 
   async processVoiceTurn(audio: Float32Array | Uint8Array): Promise<VoiceAgentResult> {
     const result = this.adapter.processVoiceTurn(this.handle, toUint8Audio(audio));
-    return result ?? unavailableVoiceAgentResult(
-      'Native voice-agent processVoiceTurn returned no result.',
-    );
+    if (!result) {
+      // Swift parity: processVoiceTurnProto throws — no synthetic result.
+      throw SDKException.backendNotAvailable(
+        'processVoiceTurn',
+        'Native voice-agent processVoiceTurn returned no result.',
+      );
+    }
+    return result;
   }
 
   async voiceAgentTranscribe(): Promise<string> {
@@ -287,6 +324,41 @@ class NativeVoiceAgentHandleProvider implements VoiceAgentProvider {
   }
 }
 
+/**
+ * Model id currently loaded in the canonical C++ lifecycle for `category`, or
+ * '' when nothing is loaded. Web's equivalent of Swift's
+ * `loadedModelSnapshot(category:)` (RunAnywhere+ModelLifecycle.swift:55).
+ */
+function loadedModelID(category: ModelCategory): string {
+  const snapshot = WebModelLifecycle.currentModel({
+    category,
+    includeModelMetadata: false,
+  });
+  return snapshot?.found ? snapshot.modelId : '';
+}
+
+/**
+ * Swift parity: `SDKException(code: .modelNotLoaded, message: ..., category:
+ * .component)` (RunAnywhere+VoiceAgent.swift:142-147). The category is pinned
+ * to COMPONENT explicitly because the code-range table would derive MODEL.
+ */
+function modelNotLoadedException(message: string): SDKException {
+  return new SDKException({
+    category: ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+    code: ProtoErrorCode.ERROR_CODE_MODEL_NOT_LOADED,
+    cAbiCode: -ProtoErrorCode.ERROR_CODE_MODEL_NOT_LOADED,
+    message,
+    nestedMessage: undefined,
+    context: undefined,
+    timestampMs: Date.now(),
+    severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
+    component: 'voice-agent',
+    retryable: false,
+    remediationHint: '',
+    correlationId: '',
+  });
+}
+
 function defaultVoiceAgentComposeConfig(ttsVoiceID?: string): VoiceAgentComposeConfig {
   return {
     vadSampleRate: 16000,
@@ -309,67 +381,14 @@ function assertNativeHandle(handle: number, feature: string): number {
   return handle;
 }
 
-function unavailableComponentStates(reason: string): VoiceAgentComponentStates {
-  return {
-    sttState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
-    llmState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
-    ttsState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
-    vadState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
-    ready: false,
-    anyLoading: false,
-    wakewordState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
-    errorMessage: reason,
-  };
-}
-
-export function unavailableVoiceAgentResult(reason?: string): VoiceAgentResult {
-  const message = reason ?? getVoiceAgentAvailability().reason;
-  return {
-    speechDetected: false,
-    transcription: undefined,
-    assistantResponse: undefined,
-    thinkingContent: undefined,
-    synthesizedAudio: undefined,
-    finalState: unavailableComponentStates(message),
-    synthesizedAudioSampleRateHz: 0,
-    synthesizedAudioChannels: 0,
-    synthesizedAudioEncoding: AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
-    sessionId: '',
-    turnId: createId('voice-turn-unavailable'),
-    sttTimeMs: 0,
-    llmTimeMs: 0,
-    ttsTimeMs: 0,
-    totalTimeMs: 0,
-    errorMessage: message,
-    errorCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-  };
-}
-
-function unavailableVoiceEvent(reason?: string): VoiceEvent {
-  const message = reason ?? getVoiceAgentAvailability().reason;
-  return {
-    seq: 0,
-    timestampUs: nowUs(),
-    category: EventCategory.EVENT_CATEGORY_ERROR,
-    severity: ErrorSeverity.ERROR_SEVERITY_ERROR,
-    component: VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_AGENT,
-    error: {
-      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-      message,
-      component: 'voice-agent',
-      isRecoverable: false,
-      operation: 'streamVoiceAgent',
-      detailsJson: '',
-    },
-    sessionId: '',
-    turnId: '',
-    requestId: '',
-    metadata: {},
-  };
-}
-
-async function* unavailableVoiceEventStream(reason?: string): AsyncIterable<VoiceEvent> {
-  yield unavailableVoiceEvent(reason);
+/**
+ * Swift parity: `streamVoiceAgent()` finishes the stream silently when the
+ * agent is not ready (RunAnywhere+VoiceAgent.swift:213-225). The reason is
+ * logged for debuggability but never synthesized into the event stream.
+ */
+// eslint-disable-next-line require-yield -- intentionally yields nothing: the stream must finish empty (Swift parity)
+async function* emptyVoiceEventStream(reason: string): AsyncIterable<VoiceEvent> {
+  logger.warning(`streamVoiceAgent finished empty: ${reason}`);
 }
 
 function toUint8Audio(audio: Float32Array | Uint8Array): Uint8Array {
@@ -377,17 +396,6 @@ function toUint8Audio(audio: Float32Array | Uint8Array): Uint8Array {
   return new Uint8Array(
     audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength),
   );
-}
-
-function nowUs(): number {
-  return Math.floor(Date.now() * 1000);
-}
-
-function createId(prefix: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Math.random().toString(36).slice(2)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -424,6 +432,16 @@ export async function initializeVoiceAgentWithLoadedModels(
   ttsVoiceID?: string,
   ensureVAD = true,
 ): Promise<void> {
+  // Swift parity (RunAnywhere+VoiceAgent.swift:118-122): guard isInitialized
+  // first. The Web SDK exposes this via lifecycle-adapter presence — the same
+  // requireInitialized pattern Embeddings uses.
+  if (!WebModelLifecycle.supportsNativeLifecycle()) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED,
+      'SDK not initialized or no backend registered',
+      'initializeVoiceAgentWithLoadedModels',
+    );
+  }
   if (ensureVAD) {
     await ensureDefaultVAD();
   }
@@ -436,10 +454,9 @@ export async function isVoiceAgentReady(): Promise<boolean> {
 }
 
 export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponentStates> {
-  const provider = activeProvider();
-  return provider
-    ? Promise.resolve(provider.getVoiceAgentComponentStates())
-    : unavailableComponentStates(getVoiceAgentAvailability().reason);
+  // Swift parity (RunAnywhere+VoiceAgent.swift:177-185): throws when the SDK /
+  // voice agent is not initialized instead of returning an error-shaped state.
+  return requireProvider('getVoiceAgentComponentStates').getVoiceAgentComponentStates();
 }
 
 export async function areAllVoiceComponentsReady(): Promise<boolean> {
@@ -449,8 +466,12 @@ export async function areAllVoiceComponentsReady(): Promise<boolean> {
 export async function processVoiceTurn(
   audio: Float32Array | Uint8Array,
 ): Promise<VoiceAgentResult> {
+  // Swift parity (RunAnywhere+VoiceAgent.swift:188-196): throws
+  // `.notInitialized` ("Voice agent not ready") — no synthetic result.
   const provider = activeProvider();
-  if (!provider) return unavailableVoiceAgentResult();
+  if (!provider) {
+    throw SDKException.notInitialized('Voice agent not ready');
+  }
   return provider.processVoiceTurn(audio);
 }
 
@@ -484,22 +505,25 @@ export function streamVoiceAgent(
   },
   signal?: AbortSignal,
 ): AsyncIterable<VoiceEvent> {
+  // Swift parity (RunAnywhere+VoiceAgent.swift:208-238): when the SDK or the
+  // voice agent is not ready, the stream simply finishes empty — no synthetic
+  // error events on the iterator.
   const provider = activeProvider();
-  if (!provider) return unavailableVoiceEventStream();
+  if (!provider) return emptyVoiceEventStream('no voice-agent provider is registered');
   if (typeof provider.getVoiceAgentStream !== 'function') {
-    return unavailableVoiceEventStream(
-      'Voice-agent provider does not expose a generated proto event stream.',
+    return emptyVoiceEventStream(
+      'voice-agent provider does not expose a generated proto event stream',
     );
   }
   const src = provider.getVoiceAgentStream();
   if (src == null) {
-    return unavailableVoiceEventStream(
-      'Voice-agent provider has not constructed a stream source yet.',
+    return emptyVoiceEventStream(
+      'voice-agent provider has not constructed a stream source yet',
     );
   }
   if ('handle' in src && (!Number.isFinite(src.handle) || src.handle <= 0)) {
-    return unavailableVoiceEventStream(
-      'Voice-agent provider returned a missing native handle.',
+    return emptyVoiceEventStream(
+      'voice-agent provider returned a missing native handle',
     );
   }
   const adapter = 'transport' in src
@@ -540,20 +564,34 @@ async function* wrapWithSignal(
   }
 }
 
+/**
+ * Public `RunAnywhere.voiceAgent.*` namespace — Web-only extensions ONLY.
+ *
+ * The Swift source of truth (`RunAnywhere+VoiceAgent.swift`) has no
+ * `voiceAgent` namespace; its flat verbs (`initializeVoiceAgent`,
+ * `initializeVoiceAgentWithLoadedModels`, `ensureDefaultVAD`,
+ * `getVoiceAgentComponentStates`, `processVoiceTurn`, `streamVoiceAgent`,
+ * `cleanupVoiceAgent`, `defaultVADModelID`) live directly on the
+ * `RunAnywhere` facade (see RunAnywhere+FlatFacade.ts) and are the canonical
+ * cross-SDK surface. Every member below is a Web-platform extension that
+ * does not appear in Swift — they exist because Web voice agents are
+ * provider-backed (backend packages install providers at register() time,
+ * where Swift links CppBridge statically) and because providers may expose
+ * standalone sub-operations the native whole-turn handle does not.
+ */
 export const VoiceAgent = {
-  defaultVADModelID,
-  ensureDefaultVAD,
+  /** @webOnly Inspect provider/availability without throwing. */
   availability: getVoiceAgentAvailability,
+  /** @webOnly Convenience boolean for availability checks. */
   isAvailable: isVoiceAgentAvailable,
-  initialize: initializeVoiceAgent,
-  initializeWithLoadedModels: initializeVoiceAgentWithLoadedModels,
+  /** @webOnly Provider readiness probe (Swift reads CppBridge.VoiceAgent.isReady internally). */
   isReady: isVoiceAgentReady,
-  getComponentStates: getVoiceAgentComponentStates,
+  /** @webOnly Aggregate readiness over the component-state snapshot. */
   areAllComponentsReady: areAllVoiceComponentsReady,
-  processTurn: processVoiceTurn,
+  /** @webOnly Standalone STT sub-operation on custom providers. */
   transcribe: voiceAgentTranscribe,
+  /** @webOnly Standalone LLM sub-operation on custom providers. */
   generateResponse: voiceAgentGenerateResponse,
+  /** @webOnly Standalone TTS sub-operation on custom providers. */
   synthesizeSpeech: voiceAgentSynthesizeSpeech,
-  stream: streamVoiceAgent,
-  cleanup: cleanupVoiceAgent,
 };

@@ -28,6 +28,7 @@ import ai.runanywhere.proto.v1.ModelQuery as ProtoModelQuery
 import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest as ProtoModelRegistryRefreshRequest
 import ai.runanywhere.proto.v1.ModelRegistryRefreshResult as ProtoModelRegistryRefreshResult
 import ai.runanywhere.proto.v1.RegisterModelFromUrlRequest as ProtoRegisterModelFromUrlRequest
+import ai.runanywhere.proto.v1.RegisterMultiFileModelRequest as ProtoRegisterMultiFileModelRequest
 
 /**
  * Model registry bridge that provides direct access to the C++ model registry.
@@ -227,6 +228,25 @@ object CppBridgeModelRegistry {
             callProtoBytes("registerModelFromUrlProto") {
                 RunAnywhereBridge.racRegisterModelFromUrlProto(
                     ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
+                )
+            } ?: return null
+
+        return decodeProtoModel(bytes)
+    }
+
+    /**
+     * Canonical multi-file registration (VLM gguf+mmproj pairs, embedding
+     * model+vocab sets) via the `rac_register_multi_file_model_proto` C ABI.
+     * Mirrors Swift `CppBridge.ModelRegistry.registerMultiFile(_:)` — commons
+     * builds the MultiFileArtifact ModelInfo and persists it with
+     * merge-on-reseed semantics. Returns `null` when the native ABI is not
+     * yet bound.
+     */
+    fun registerMultiFileModel(request: ProtoRegisterMultiFileModelRequest): ProtoModelInfo? {
+        val bytes =
+            callProtoBytes("registerMultiFileModelProto") {
+                RunAnywhereBridge.racRegisterMultiFileModelProto(
+                    ProtoRegisterMultiFileModelRequest.ADAPTER.encode(request),
                 )
             } ?: return null
 

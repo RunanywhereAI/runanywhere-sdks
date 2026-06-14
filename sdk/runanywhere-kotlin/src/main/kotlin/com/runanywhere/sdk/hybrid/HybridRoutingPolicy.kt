@@ -24,6 +24,8 @@ package com.runanywhere.sdk.hybrid
  */
 typealias HybridRank = ai.runanywhere.proto.v1.HybridRank
 
+const val RAHybridSTTConfidenceThreshold: Float = 0.5f
+
 /**
  * A hard eligibility predicate. Every filter in a policy must pass for a
  * candidate to survive the filter phase (filters AND-compose). Concrete

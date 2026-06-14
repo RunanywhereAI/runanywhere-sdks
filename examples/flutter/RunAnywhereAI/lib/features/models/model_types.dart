@@ -13,6 +13,7 @@ enum ModelSelectionContext {
   tts,
   voice,
   vlm,
+  vad,
   ragEmbedding,
   ragLLM;
 
@@ -28,6 +29,8 @@ enum ModelSelectionContext {
         return 'Select Model';
       case ModelSelectionContext.vlm:
         return 'Select VLM Model';
+      case ModelSelectionContext.vad:
+        return 'Select VAD Model';
       case ModelSelectionContext.ragEmbedding:
         return 'Select Embedding Model';
       case ModelSelectionContext.ragLLM:
@@ -35,13 +38,14 @@ enum ModelSelectionContext {
     }
   }
 
+  /// Mirrors iOS `ModelSelectionSheet.swift` `relevantCategories`: the LLM
+  /// picker is language-only (multimodal models load through the VLM
+  /// lifecycle), and the voice picker covers exactly the assistant pipeline
+  /// components (language + STT + TTS).
   Set<ModelCategory> get relevantCategories {
     switch (this) {
       case ModelSelectionContext.llm:
-        return {
-          sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE,
-          sdk.ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        };
+        return {sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE};
       case ModelSelectionContext.stt:
         return {sdk.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION};
       case ModelSelectionContext.tts:
@@ -49,21 +53,52 @@ enum ModelSelectionContext {
       case ModelSelectionContext.voice:
         return {
           sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE,
-          sdk.ModelCategory.MODEL_CATEGORY_MULTIMODAL,
           sdk.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
           sdk.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-          sdk.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
         };
       case ModelSelectionContext.vlm:
         return {
           sdk.ModelCategory.MODEL_CATEGORY_VISION,
           sdk.ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         };
+      case ModelSelectionContext.vad:
+        return {sdk.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION};
       case ModelSelectionContext.ragEmbedding:
         return {sdk.ModelCategory.MODEL_CATEGORY_EMBEDDING};
       case ModelSelectionContext.ragLLM:
         return {sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE};
     }
+  }
+
+  /// Frameworks to include. `null` means all frameworks that have matching
+  /// models. Mirrors iOS `ModelSelectionSheet.swift` `allowedFrameworks`:
+  /// the RAG pipeline requires ONNX embeddings and a llama.cpp generator.
+  Set<LLMFramework>? get allowedFrameworks {
+    switch (this) {
+      case ModelSelectionContext.ragEmbedding:
+        return {sdk.InferenceFramework.INFERENCE_FRAMEWORK_ONNX};
+      case ModelSelectionContext.ragLLM:
+        return {sdk.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP};
+      default:
+        return null;
+    }
+  }
+
+  /// Single shared picker predicate: category match, framework allow-list,
+  /// and (RAG embedding only) supporting-file exclusion. iOS detects
+  /// supporting files by the `-vocab` / `-tokenizer` id suffix
+  /// (ModelSelectionSheet.swift:104-111) — mirror that exactly.
+  bool includes(ModelInfo model) {
+    if (!relevantCategories.contains(model.category)) return false;
+    final frameworks = allowedFrameworks;
+    if (frameworks != null && !frameworks.contains(model.framework)) {
+      return false;
+    }
+    if (this == ModelSelectionContext.ragEmbedding &&
+        (model.id.endsWith('-vocab') || model.id.endsWith('-tokenizer'))) {
+      return false;
+    }
+    return true;
   }
 }
 
@@ -138,8 +173,8 @@ extension ModelFormatDisplay on ModelFormat {
 extension ExampleModelInfoView on ModelInfo {
   int? get memoryRequired =>
       hasDownloadSizeBytes() && downloadSizeBytes.toInt() > 0
-          ? downloadSizeBytes.toInt()
-          : null;
+      ? downloadSizeBytes.toInt()
+      : null;
 
   List<LLMFramework> get compatibleFrameworks => [framework];
 

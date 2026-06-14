@@ -9,6 +9,7 @@
 
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import {
   StorageDeleteRequest,
   StorageDeleteResult as StorageDeleteResultCodec,
@@ -53,8 +54,10 @@ function decode<T>(
 
 /**
  * Get canonical generated storage info from native commons.
+ * Internal proto plumbing for [getStorageInfo] — Swift has no public
+ * `getStorageInfoProto` counterpart, so this stays module-private.
  */
-export async function getStorageInfoProto(
+async function getStorageInfoProto(
   request: StorageInfoRequest = {
     includeDevice: true,
     includeApp: true,
@@ -125,13 +128,16 @@ export async function getStorageInfo(): Promise<StorageInfo | null> {
 }
 
 /**
- * Clear cache
- * Delegates to C++ FileManagerBridge for file cache/temp clearing.
+ * Clear the SDK's Cache directory. Mirrors Swift `clearCache()` →
+ * `CppBridge.FileManager.clearCache()` (cache only — temp files are cleaned
+ * by [cleanTempFiles]).
  */
 export async function clearCache(): Promise<void> {
   // Clear file caches via native module (C++ handles directory clearing)
   if (isNativeModuleAvailable()) {
     try {
+      // Swift parity: RunAnywhere+Storage.swift:309 gates on ensureServicesReady.
+      await ensureServicesReady();
       const native = requireNativeModule();
       await native.clearCache();
     } catch (error) {
@@ -143,11 +149,41 @@ export async function clearCache(): Promise<void> {
 }
 
 /**
- * Clean temporary files.
- * Uses the currently exposed native cache cleanup hook until a temp-specific
- * Nitro method is available.
+ * Delete one downloaded model end-to-end: unload it if loaded, remove its
+ * files through the platform adapter, and clear its registry path so the
+ * entry returns to registered-not-downloaded (re-downloadable). Convenience
+ * over `deleteStorage` with the canonical flag set — mirrors Swift
+ * `RunAnywhere.deleteModel(_:)`.
+ */
+export async function deleteModel(
+  modelId: string
+): Promise<StorageDeleteResult> {
+  return deleteStorage(
+    StorageDeleteRequest.fromPartial({
+      modelIds: [modelId],
+      deleteFiles: true,
+      clearRegistryPaths: true,
+      unloadIfLoaded: true,
+      allowPlatformDelete: true,
+    })
+  );
+}
+
+/**
+ * Clear the SDK's Temp directory. Mirrors Swift `cleanTempFiles()` →
+ * `CppBridge.FileManager.clearTemp()`.
  */
 export async function cleanTempFiles(): Promise<boolean> {
-  await clearCache();
-  return true;
+  if (!isNativeModuleAvailable()) {
+    return false;
+  }
+  try {
+    // Swift parity: RunAnywhere+Storage.swift:321 gates on ensureServicesReady.
+    await ensureServicesReady();
+    const native = requireNativeModule();
+    return await native.cleanTempFiles();
+  } catch (error) {
+    logger.warning('Failed to clean temp files:', { error });
+    return false;
+  }
 }

@@ -85,8 +85,7 @@ void ensure_default_vad_loaded() {
             &current_out) == RAC_SUCCESS &&
         current_out.status == RAC_SUCCESS && current_out.data) {
         runanywhere::v1::CurrentModelResult current_result;
-        if (current_result.ParseFromArray(current_out.data,
-                                          static_cast<int>(current_out.size)) &&
+        if (current_result.ParseFromArray(current_out.data, static_cast<int>(current_out.size)) &&
             current_result.found() && !current_result.model_id().empty()) {
             rac_proto_buffer_free(&current_out);
             return;

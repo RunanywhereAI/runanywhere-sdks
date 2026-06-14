@@ -51,3 +51,43 @@ fun RunAnywhere.pcm16ToFloat32Samples(int16Bytes: ByteArray): FloatArray {
     val input = ByteBuffer.wrap(int16Bytes).order(ByteOrder.LITTLE_ENDIAN)
     return FloatArray(int16Count) { input.short.toFloat() / 32768.0f }
 }
+
+/**
+ * Wrap raw 16-bit mono PCM samples in a canonical 44-byte WAV (RIFF)
+ * container: `RIFF` + `fmt ` (16-byte PCM chunk, format tag 1, 1 channel)
+ * + `data`. Matches Swift `RunAnywhere.pcm16ToWav(_:sampleRate:)`.
+ *
+ * Use this when a consumer needs a self-describing audio container rather
+ * than headerless PCM — e.g. cloud STT providers that upload the bytes as
+ * an `audio/wav` file part. `HybridSTTRouter.transcribe` applies it
+ * automatically to raw PCM16 input.
+ *
+ * @param int16Bytes Raw Int16 mono PCM samples (little-endian, as captured
+ *   by `AudioRecord`). The sample bytes are copied verbatim after the header.
+ * @param sampleRate Capture sample rate in Hz (e.g. 16000).
+ * @return The same samples prefixed with a WAV header.
+ */
+fun RunAnywhere.pcm16ToWav(int16Bytes: ByteArray, sampleRate: Int): ByteArray {
+    val pcmFormatTag: Short = 1
+    val channels: Short = 1
+    val bitsPerSample: Short = 16
+    val blockAlign = (channels * bitsPerSample / 8).toShort()
+    val byteRate = sampleRate * blockAlign
+    val fmtChunkSize = 16
+    val wav = ByteBuffer.allocate(44 + int16Bytes.size).order(ByteOrder.LITTLE_ENDIAN)
+    wav.put("RIFF".toByteArray(Charsets.US_ASCII))
+    wav.putInt(36 + int16Bytes.size)
+    wav.put("WAVE".toByteArray(Charsets.US_ASCII))
+    wav.put("fmt ".toByteArray(Charsets.US_ASCII))
+    wav.putInt(fmtChunkSize)
+    wav.putShort(pcmFormatTag)
+    wav.putShort(channels)
+    wav.putInt(sampleRate)
+    wav.putInt(byteRate)
+    wav.putShort(blockAlign)
+    wav.putShort(bitsPerSample)
+    wav.put("data".toByteArray(Charsets.US_ASCII))
+    wav.putInt(int16Bytes.size)
+    wav.put(int16Bytes)
+    return wav.array()
+}

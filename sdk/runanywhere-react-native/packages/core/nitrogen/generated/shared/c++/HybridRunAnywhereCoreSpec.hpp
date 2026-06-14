@@ -19,7 +19,6 @@
 #include <string>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <functional>
-#include <optional>
 
 namespace margelo::nitro::runanywhere {
 
@@ -48,15 +47,16 @@ namespace margelo::nitro::runanywhere {
 
     public:
       // Properties
-      
+
 
     public:
       // Methods
       virtual std::shared_ptr<Promise<bool>> initialize(const std::string& configJson) = 0;
-      virtual std::shared_ptr<Promise<bool>> completeServicesInitialization() = 0;
-      virtual std::shared_ptr<Promise<bool>> retryHTTPSetupProto() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> completeServicesInitialization() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> retryHTTPSetupProto() = 0;
       virtual std::shared_ptr<Promise<void>> destroy() = 0;
       virtual std::shared_ptr<Promise<bool>> isInitialized() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> resultToProtoErrorProto(double code) = 0;
       virtual std::shared_ptr<Promise<double>> pluginLoaderApiVersion() = 0;
       virtual std::shared_ptr<Promise<double>> pluginLoaderRegisteredCount() = 0;
       virtual std::shared_ptr<Promise<std::string>> pluginLoaderRegisteredNames() = 0;
@@ -69,9 +69,13 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> isDeviceRegistered() = 0;
       virtual std::shared_ptr<Promise<std::string>> getDeviceId() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getAvailableModelsProto() = 0;
+      virtual std::string frameworkDisplayName(double frameworkProto) = 0;
+      virtual double modelCategoryDefaultFramework(double categoryProto) = 0;
+      virtual double inferModelFileRole(const std::string& filename, double modalityProto) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getModelInfoProto(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<bool>> registerModelProto(const std::shared_ptr<ArrayBuffer>& modelInfoBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> registerModelFromUrlProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> registerMultiFileModelProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> updateModelProto(const std::shared_ptr<ArrayBuffer>& modelInfoBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> removeModelProto(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> queryModelsProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
@@ -86,6 +90,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> setDownloadProgressCallbackProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* progressBytes */)>& onProgressBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> clearDownloadProgressCallbackProto() = 0;
       virtual std::shared_ptr<Promise<bool>> clearCache() = 0;
+      virtual std::shared_ptr<Promise<bool>> cleanTempFiles() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageInfoProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageAvailabilityProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageDeletePlanProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
@@ -111,6 +116,11 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> unloadSTTModel() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttTranscribeProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<void>> sttTranscribeStreamProto(const std::shared_ptr<ArrayBuffer>& requestBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
+      virtual std::shared_ptr<Promise<bool>> sttStreamLoadModel(const std::string& modelPath, const std::string& modelId, const std::string& modelName) = 0;
+      virtual std::shared_ptr<Promise<double>> sttStreamStart(const std::shared_ptr<ArrayBuffer>& optionsBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
+      virtual std::shared_ptr<Promise<void>> sttStreamFeed(double sessionId, const std::shared_ptr<ArrayBuffer>& audioBytes) = 0;
+      virtual std::shared_ptr<Promise<void>> sttStreamStop(double sessionId) = 0;
+      virtual std::shared_ptr<Promise<void>> sttStreamCancel(double sessionId) = 0;
       virtual std::shared_ptr<Promise<double>> hybridSttRouterCreate() = 0;
       virtual std::shared_ptr<Promise<void>> hybridSttRouterDestroy(double routerHandle) = 0;
       virtual std::shared_ptr<Promise<double>> hybridSttRouterCreateService(const std::string& engineHint, const std::string& modelIdOrPath, const std::string& configJson) = 0;
@@ -126,6 +136,8 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> hybridClearDeviceState() = 0;
       virtual std::shared_ptr<Promise<bool>> cloudRegister() = 0;
       virtual std::shared_ptr<Promise<bool>> cloudUnregister() = 0;
+      virtual std::shared_ptr<Promise<bool>> cloudRegisterSttProvider(const std::string& name, const std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<std::string>>>>(const std::string& /* configJson */, const std::shared_ptr<ArrayBuffer>& /* audioBytes */, double /* audioFormat */)>& onTranscribe) = 0;
+      virtual std::shared_ptr<Promise<void>> cloudUnregisterSttProvider(const std::string& name) = 0;
       virtual std::shared_ptr<Promise<bool>> cloudIsRegistered() = 0;
       virtual std::shared_ptr<Promise<bool>> isTTSModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadTTSModel() = 0;
@@ -173,9 +185,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragQueryProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragClearProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragStatsProto() = 0;
-      virtual std::shared_ptr<Promise<double>> embeddingsCreateProto(const std::string& modelId, const std::optional<std::string>& configJson) = 0;
-      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> embeddingsEmbedBatchProto(double handle, const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
-      virtual std::shared_ptr<Promise<void>> embeddingsDestroyProto(double handle) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> embeddingsEmbedBatchLifecycleProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraApplyProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraRemoveProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraListProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
@@ -186,6 +196,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogQueryProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogGetProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogMarkDownloadCompletedProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraAdapterImportProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<double>> solutionCreateFromProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
       virtual std::shared_ptr<Promise<double>> solutionCreateFromYaml(const std::string& yamlText) = 0;
       virtual std::shared_ptr<Promise<bool>> solutionStart(double handle) = 0;

@@ -130,10 +130,9 @@ void d7_emit_state(rac_voice_agent_handle_t handle, runanywhere::v1::PipelineSta
     const rac_audio_pipeline_state_t from = d7_proto_state_to_audio_state(previous);
     const rac_audio_pipeline_state_t to = d7_proto_state_to_audio_state(current);
     if (rac_audio_pipeline_is_valid_transition(from, to) != RAC_TRUE) {
-        RAC_LOG_WARNING(
-            "VoiceAgent",
-            "Invalid pipeline transition %s -> %s; emitting anyway for observability",
-            rac_audio_pipeline_state_name(from), rac_audio_pipeline_state_name(to));
+        RAC_LOG_WARNING("VoiceAgent",
+                        "Invalid pipeline transition %s -> %s; emitting anyway for observability",
+                        rac_audio_pipeline_state_name(from), rac_audio_pipeline_state_name(to));
     }
 
     runanywhere::v1::VoiceEvent event;

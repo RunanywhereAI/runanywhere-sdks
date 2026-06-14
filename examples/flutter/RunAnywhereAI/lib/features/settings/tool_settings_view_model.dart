@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:runanywhere/runanywhere.dart';
+import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // SAMPLE_HTTP_CARVE_OUT: this sample uses `package:http` only for external
@@ -32,20 +33,32 @@ class ToolSettingsViewModel extends ChangeNotifier {
 
   set toolCallingEnabled(bool value) {
     _toolCallingEnabled = value;
-    unawaited(_saveSettings());
+    unawaited(_saveSettingsAndSyncTools());
     notifyListeners();
   }
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    _toolCallingEnabled = prefs.getBool('tool_calling_enabled') ?? false;
-    await refreshRegisteredTools();
+    _toolCallingEnabled =
+        prefs.getBool(PreferenceKeys.toolCallingEnabled) ?? false;
+    if (_toolCallingEnabled) {
+      await registerDemoTools();
+    } else {
+      RunAnywhere.tools.clearTools();
+      await refreshRegisteredTools();
+    }
     notifyListeners();
   }
 
-  Future<void> _saveSettings() async {
+  Future<void> _saveSettingsAndSyncTools() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('tool_calling_enabled', _toolCallingEnabled);
+    await prefs.setBool(PreferenceKeys.toolCallingEnabled, _toolCallingEnabled);
+    if (_toolCallingEnabled) {
+      await registerDemoTools();
+    } else {
+      RunAnywhere.tools.clearTools();
+      await refreshRegisteredTools();
+    }
   }
 
   Future<void> refreshRegisteredTools() async {
@@ -110,16 +123,12 @@ class ToolSettingsViewModel extends ChangeNotifier {
   // MARK: - Tool Executors
 
   /// Weather tool executor - fetches real weather data from Open-Meteo
-  Future<Map<String, dynamic>> _fetchWeather(
-    Map<String, dynamic> args,
-  ) async {
+  Future<Map<String, dynamic>> _fetchWeather(Map<String, dynamic> args) async {
     final rawLocation = args['location'] as String?;
 
     // Require location argument - no hardcoded defaults
     if (rawLocation == null || rawLocation.isEmpty) {
-      return {
-        'error': 'Missing required argument: location',
-      };
+      return {'error': 'Missing required argument: location'};
     }
 
     // Clean up location string - Open-Meteo works better with just city names
@@ -179,10 +188,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
         'condition': _weatherCodeToCondition(weatherCode),
       };
     } catch (e) {
-      return {
-        'error': 'Weather fetch failed: $e',
-        'location': location,
-      };
+      return {'error': 'Weather fetch failed: $e', 'location': location};
     }
   }
 
@@ -287,17 +293,13 @@ class ToolSettingsViewModel extends ChangeNotifier {
   }
 
   /// Calculator tool executor
-  Future<Map<String, dynamic>> _calculate(
-    Map<String, dynamic> args,
-  ) async {
+  Future<Map<String, dynamic>> _calculate(Map<String, dynamic> args) async {
     // Try both 'expression' and 'input' keys - no hardcoded defaults
     final expression =
         args['expression'] as String? ?? args['input'] as String?;
 
     if (expression == null || expression.isEmpty) {
-      return {
-        'error': 'Missing required argument: expression',
-      };
+      return {'error': 'Missing required argument: expression'};
     }
 
     try {
@@ -311,10 +313,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
 
       final result = _evaluateExpression(cleanedExpression);
 
-      return {
-        'result': result,
-        'expression': expression,
-      };
+      return {'result': result, 'expression': expression};
     } catch (e) {
       return {
         'error': 'Could not evaluate expression: $expression',

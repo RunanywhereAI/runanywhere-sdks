@@ -236,10 +236,10 @@ rac_result_t rac_engine_manifest_validate_vtable(const rac_engine_manifest_t* ma
     /* Every non-null routable slot the vtable fills must be declared in the
      * manifest. Iterate the table directly so RERANK / reserved slots are
      * excluded by construction. */
-#define X(ENUM, FIELD, NAME)                          \
+#define X(ENUM, FIELD, NAME)                               \
     if (rac_engine_vtable_slot(vtable, ENUM) != nullptr && \
         !manifest_declares_primitive(manifest, ENUM)) {    \
-        return RAC_ERROR_INVALID_PARAMETER;           \
+        return RAC_ERROR_INVALID_PARAMETER;                \
     }
     RAC_PRIMITIVE_TABLE(X)
 #undef X

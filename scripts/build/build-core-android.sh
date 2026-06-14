@@ -193,9 +193,12 @@ for ABI in "${ABIS[@]}"; do
     echo "▶ ${ABI} via preset '${PRESET}'"
 
     cmake --preset "${PRESET}"
-    # Use CMake's generator-agnostic --parallel (Ninja rejects a bare `-j`,
+    # Use CMake's generator-agnostic --parallel, CAPPED (repo resource
+    # discipline: a bare --parallel spawns one heavy compiler per core and
+    # has OOM-crashed dev laptops). Override with RAC_BUILD_JOBS if needed.
+    # (Ninja rejects a bare `-j`,
     # while Make accepts it). Lets CMake pick a sensible default job count.
-    cmake --build --preset "${PRESET}" --parallel
+    cmake --build --preset "${PRESET}" --parallel "${RAC_BUILD_JOBS:-2}"
 
     BUILD_DIR="${REPO_ROOT}/build/${PRESET}"
     KOTLIN_DEST="${KOTLIN_JNI_DEST}/${ABI}"

@@ -15,6 +15,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -35,10 +36,11 @@
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include "foundation/rac_proto_marshal_internal.h"
-#include "infrastructure/events/sdk_event_publish.h"
 #include "rag.pb.h"
 #include "sdk_events.pb.h"
+
+#include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 #define LOG_TAG "RAG.ProtoABI"
@@ -79,8 +81,10 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
 }
 
 void publish_event(const runanywhere::v1::SDKEvent& event) {
-    // Route through the events layer so capability events reach the telemetry +
-    // log sinks per their destination bitmask, not just the public proto stream.
+    // Route through the destination router (sdk_event_publish) so the envelope's
+    // TELEMETRY destination bit reaches the telemetry manager. A direct
+    // rac_sdk_event_publish_proto call feeds only the PUBLIC stream, so these
+    // capability events would never be recorded as telemetry.
     (void)rac::events::publish_prebuilt(event);
 }
 
@@ -214,6 +218,54 @@ RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& p
     return bc;
 }
 
+bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
+                                std::string* out_message) {
+    const RAGBackendConfig defaults;
+
+    const int64_t top_k = proto.has_top_k() ? static_cast<int64_t>(proto.top_k())
+                                            : static_cast<int64_t>(defaults.top_k);
+    if (top_k < 1) {
+        if (out_message)
+            *out_message = "RAGConfiguration.top_k must be >= 1";
+        return false;
+    }
+
+    const float similarity_threshold = proto.has_similarity_threshold()
+                                           ? proto.similarity_threshold()
+                                           : defaults.similarity_threshold;
+    if (!std::isfinite(similarity_threshold) || similarity_threshold < 0.0f ||
+        similarity_threshold > 1.0f) {
+        if (out_message)
+            *out_message = "RAGConfiguration.similarity_threshold must be in 0.0...1.0";
+        return false;
+    }
+
+    const int64_t chunk_size = proto.has_chunk_size() ? static_cast<int64_t>(proto.chunk_size())
+                                                      : static_cast<int64_t>(defaults.chunk_size);
+    if (chunk_size < 1) {
+        if (out_message)
+            *out_message = "RAGConfiguration.chunk_size must be >= 1";
+        return false;
+    }
+
+    const int64_t chunk_overlap = proto.has_chunk_overlap()
+                                      ? static_cast<int64_t>(proto.chunk_overlap())
+                                      : static_cast<int64_t>(defaults.chunk_overlap);
+    if (chunk_overlap < 0) {
+        if (out_message)
+            *out_message = "RAGConfiguration.chunk_overlap must be >= 0";
+        return false;
+    }
+    if (chunk_overlap >= chunk_size) {
+        if (out_message) {
+            *out_message = "RAGConfiguration.chunk_overlap must be < chunk_size";
+        }
+        return false;
+    }
+
+    return true;
+}
+
 runanywhere::v1::RAGStatistics make_stats(RAGBackend& backend) {
     runanywhere::v1::RAGStatistics out;
     const int64_t chunks = static_cast<int64_t>(backend.document_count());
@@ -292,6 +344,13 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    std::string validation_message;
+    if (!validate_rag_configuration(proto, &validation_message)) {
+        publish_failure(RAC_ERROR_INVALID_ARGUMENT, "rag.sessionCreate",
+                        validation_message.c_str());
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
     // Reranking is part of the public RAGConfiguration surface (rag.proto:128,
     // rag.proto:130) but no rerank backend is wired up: rag_pipeline_graph
     // skips the rerank step (rag_pipeline_graph.h), and the rerank primitive +
@@ -299,9 +358,8 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     // the request would let callers ship "reranked" RAG that is plain RRF
     // fusion. Fail fast so misconfiguration surfaces at session-create instead
     // of looking exactly like a working baseline.
-    const bool rerank_requested =
-        proto.rerank_results() ||
-        (proto.has_reranker_model_id() && !proto.reranker_model_id().empty());
+    const bool rerank_requested = proto.rerank_results() || (proto.has_reranker_model_id() &&
+                                                             !proto.reranker_model_id().empty());
     if (rerank_requested) {
         const char* msg =
             "reranking is not yet implemented; unset rerank_results and reranker_model_id";
@@ -378,9 +436,8 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
                      backend_config.embedding_dimension);
             }
         }
-        session->backend =
-            std::make_unique<RAGBackend>(backend_config, llm_handle, embed_handle,
-                                         /*owns_services=*/true);
+        session->backend = std::make_unique<RAGBackend>(backend_config, llm_handle, embed_handle,
+                                                        /*owns_services=*/true);
         if (!session->backend->is_initialized()) {
             publish_failure(RAC_ERROR_INITIALIZATION_FAILED, "rag.sessionCreate",
                             "RAG pipeline failed to initialize");

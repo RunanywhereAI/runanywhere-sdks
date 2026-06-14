@@ -20,8 +20,14 @@ export const RAC_ERROR_NETWORK_UNAVAILABLE = -150 as const;
 /** `RAC_ERROR_NETWORK_ERROR` — transport-level failure (DNS, TLS, timeout). */
 export const RAC_ERROR_NETWORK_ERROR = -151 as const;
 
+/** `RAC_ERROR_OUT_OF_MEMORY` — heap allocation failed. */
+export const RAC_ERROR_OUT_OF_MEMORY = -221 as const;
+
 /** `RAC_ERROR_INVALID_ARGUMENT` — caller passed an unusable value. */
 export const RAC_ERROR_INVALID_ARGUMENT = -259 as const;
+
+/** `RAC_ERROR_NULL_POINTER` — required out-pointer was NULL. */
+export const RAC_ERROR_NULL_POINTER = -260 as const;
 
 /** `RAC_ERROR_CANCELLED` — operation aborted via a cancellation token. */
 export const RAC_ERROR_CANCELLED = -380 as const;

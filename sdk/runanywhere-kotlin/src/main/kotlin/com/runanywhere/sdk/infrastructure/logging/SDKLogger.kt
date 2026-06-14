@@ -3,6 +3,7 @@ package com.runanywhere.sdk.infrastructure.logging
 import ai.runanywhere.proto.v1.LogEntry
 import ai.runanywhere.proto.v1.LogLevel
 import ai.runanywhere.proto.v1.LoggingConfiguration
+import com.runanywhere.sdk.kotlin.BuildConfig
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.sync.Mutex
@@ -27,37 +28,31 @@ import kotlinx.coroutines.sync.withLock
 // production factories live here.
 
 internal object LoggingConfigurationPresets {
-    /** Development: debug logging + detailed source location. */
+    /** Development: console + debug level, Sentry on, no device metadata. */
     val development =
         LoggingConfiguration(
             enable_local_logging = true,
             min_log_level = LogLevel.LOG_LEVEL_DEBUG,
-            include_source_location = true,
-            enable_remote_logging = false,
-            enable_sentry_logging = false,
-            include_device_metadata = true,
+            include_device_metadata = false,
+            enable_sentry_logging = true,
         )
 
-    /** Staging: info level with source location for debugging. */
+    /** Staging: console + info level, device metadata on, Sentry off. */
     val staging =
         LoggingConfiguration(
             enable_local_logging = true,
             min_log_level = LogLevel.LOG_LEVEL_INFO,
-            include_source_location = true,
-            enable_remote_logging = false,
-            enable_sentry_logging = false,
             include_device_metadata = true,
+            enable_sentry_logging = false,
         )
 
-    /** Production: warning+ only; Sentry opt-in is controlled separately. */
+    /** Production: warning+ only, console off, device metadata on, Sentry off. */
     val production =
         LoggingConfiguration(
             enable_local_logging = false,
             min_log_level = LogLevel.LOG_LEVEL_WARNING,
-            include_source_location = false,
-            enable_remote_logging = false,
-            enable_sentry_logging = false,
             include_device_metadata = true,
+            enable_sentry_logging = false,
         )
 
     fun forEnvironment(environment: SDKEnvironment): LoggingConfiguration =
@@ -124,10 +119,18 @@ object Logging {
     // Configuration
 
     /**
-     * Configure the logging system.
+     * Configure the logging system. Sentry enable/disable transitions trigger
+     * the platform setup/teardown hooks, mirroring Swift `Logging.configure`.
      */
     fun configure(config: LoggingConfiguration) {
+        val oldConfig = _configuration
         _configuration = config
+
+        if (config.enable_sentry_logging && !oldConfig.enable_sentry_logging) {
+            sentrySetupHook?.invoke()
+        } else if (!config.enable_sentry_logging && oldConfig.enable_sentry_logging) {
+            sentryTeardownHook?.invoke()
+        }
     }
 
     /**
@@ -168,19 +171,9 @@ object Logging {
     /**
      * Set whether Sentry logging is enabled.
      * When enabled, warning+ logs are sent to Sentry for error tracking.
-     *
-     * Note: Call setupSentry() after enabling to initialize the Sentry SDK.
      */
     fun setSentryLoggingEnabled(enabled: Boolean) {
-        val oldConfig = _configuration
-        _configuration = _configuration.copy(enable_sentry_logging = enabled)
-
-        // Handle Sentry state changes via the platform-specific hook
-        if (enabled && !oldConfig.enable_sentry_logging) {
-            sentrySetupHook?.invoke()
-        } else if (!enabled && oldConfig.enable_sentry_logging) {
-            sentryTeardownHook?.invoke()
-        }
+        configure(_configuration.copy(enable_sentry_logging = enabled))
     }
 
     /**
@@ -247,13 +240,14 @@ object Logging {
         // Create log entry. Proto LogEntry uses scalar defaults ("" / 0) for
         // unset fields rather than nullables.
         val includeSource = config.include_source_location
+        val entryMetadata = enrichedMetadata(metadata, config.include_device_metadata)
         val entry =
             LogEntry(
                 timestamp_unix_ms = getCurrentTimeMillis(),
                 level = level,
                 category = category,
                 message = message,
-                metadata = sanitizeMetadata(metadata) ?: emptyMap(),
+                metadata = entryMetadata,
                 file_ = if (includeSource) file.orEmpty() else "",
                 line = if (includeSource) (line ?: 0) else 0,
                 function = if (includeSource) function.orEmpty() else "",
@@ -386,6 +380,10 @@ object Logging {
     // log_redact.cpp` (kSensitiveSubstrings) and Swift `SDKLogger.swift`.
     private val sensitivePatterns = listOf("key", "secret", "password", "token", "auth", "credential")
 
+    private const val DEVICE_MODEL_KEY = "device_model"
+    private const val OS_VERSION_KEY = "os_version"
+    private const val PLATFORM_KEY = "platform"
+
     /**
      * Determines whether a metadata key should be redacted. Delegates to the
      * canonical C++ policy via [shouldRedactPolicy] when set; otherwise falls
@@ -420,6 +418,37 @@ object Logging {
             }
         }
     }
+
+    private fun enrichedMetadata(
+        metadata: Map<String, Any?>?,
+        includeDeviceMetadata: Boolean,
+    ): Map<String, String> {
+        val sanitized = sanitizeMetadata(metadata).orEmpty()
+        if (!includeDeviceMetadata) return sanitized
+        return sanitized + deviceMetadata()
+    }
+
+    private fun deviceMetadata(): Map<String, String> =
+        mapOf(
+            DEVICE_MODEL_KEY to reflectedAndroidString("android.os.Build", "MODEL", "unknown"),
+            OS_VERSION_KEY to reflectedAndroidString("android.os.Build\$VERSION", "RELEASE", "unknown"),
+            PLATFORM_KEY to "android",
+        )
+
+    private fun reflectedAndroidString(
+        className: String,
+        fieldName: String,
+        fallback: String,
+    ): String =
+        try {
+            Class.forName(className).getField(fieldName).get(null) as? String ?: fallback
+        } catch (_: Throwable) {
+            when (fieldName) {
+                "MODEL" -> System.getProperty("os.name") ?: fallback
+                "RELEASE" -> System.getProperty("os.version") ?: fallback
+                else -> fallback
+            }
+        }
 }
 
 // SDK logger (convenience wrapper)
@@ -435,12 +464,14 @@ class SDKLogger(
 
     /**
      * Log a trace-level message (proto LOG_LEVEL_TRACE — the most verbose
-     * severity, below DEBUG).
+     * severity, below DEBUG). No-op in release builds of the SDK, gated the
+     * same way as [debug].
      */
     fun trace(
         message: String,
         metadata: Map<String, Any?>? = null,
     ) {
+        if (!BuildConfig.DEBUG) return
         Logging.log(
             level = LogLevel.LOG_LEVEL_TRACE,
             category = category,
@@ -450,12 +481,14 @@ class SDKLogger(
     }
 
     /**
-     * Log a debug-level message.
+     * Log a debug-level message. No-op in release builds of the SDK,
+     * mirroring Swift's `#if DEBUG` gate.
      */
     fun debug(
         message: String,
         metadata: Map<String, Any?>? = null,
     ) {
+        if (!BuildConfig.DEBUG) return
         Logging.log(
             level = LogLevel.LOG_LEVEL_DEBUG,
             category = category,

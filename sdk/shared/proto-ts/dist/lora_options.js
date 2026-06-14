@@ -5,7 +5,7 @@
 //   protoc               v7.35.0
 // source: lora_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LoRAState = exports.LoRARemoveRequest = exports.LoRAApplyResult = exports.LoRAApplyRequest = exports.LoraCompatibilityResult = exports.LoraAdapterDownloadCompletedResult = exports.LoraAdapterDownloadCompletedRequest = exports.LoraAdapterCatalogGetResult = exports.LoraAdapterCatalogGetRequest = exports.LoraAdapterCatalogListResult = exports.LoraAdapterCatalogListRequest = exports.LoraAdapterCatalogQuery = exports.LoraAdapterCatalogEntry_MetadataEntry = exports.LoraAdapterCatalogEntry = exports.LoRAAdapterInfo = exports.LoRAAdapterConfig_MetadataEntry = exports.LoRAAdapterConfig = exports.protobufPackage = void 0;
+exports.LoRAState = exports.LoRARemoveRequest = exports.LoRAApplyResult = exports.LoRAApplyRequest = exports.LoraCompatibilityResult = exports.LoraAdapterImportResult = exports.LoraAdapterImportRequest = exports.LoraAdapterDownloadCompletedResult = exports.LoraAdapterDownloadCompletedRequest = exports.LoraAdapterCatalogGetResult = exports.LoraAdapterCatalogGetRequest = exports.LoraAdapterCatalogListResult = exports.LoraAdapterCatalogListRequest = exports.LoraAdapterCatalogQuery = exports.LoraAdapterCatalogEntry_MetadataEntry = exports.LoraAdapterCatalogEntry = exports.LoRAAdapterInfo = exports.LoRAAdapterConfig_MetadataEntry = exports.LoRAAdapterConfig = exports.protobufPackage = void 0;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
@@ -1617,6 +1617,201 @@ exports.LoraAdapterDownloadCompletedResult = {
             : undefined;
         message.errorMessage = object.errorMessage ?? "";
         message.persisted = object.persisted ?? false;
+        return message;
+    },
+};
+function createBaseLoraAdapterImportRequest() {
+    return { sourcePath: "", filename: undefined };
+}
+exports.LoraAdapterImportRequest = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.sourcePath !== "") {
+            writer.uint32(10).string(message.sourcePath);
+        }
+        if (message.filename !== undefined) {
+            writer.uint32(18).string(message.filename);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoraAdapterImportRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.sourcePath = reader.string();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.filename = reader.string();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            sourcePath: isSet(object.sourcePath)
+                ? globalThis.String(object.sourcePath)
+                : isSet(object.source_path)
+                    ? globalThis.String(object.source_path)
+                    : "",
+            filename: isSet(object.filename) ? globalThis.String(object.filename) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.sourcePath !== "") {
+            obj.sourcePath = message.sourcePath;
+        }
+        if (message.filename !== undefined) {
+            obj.filename = message.filename;
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.LoraAdapterImportRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoraAdapterImportRequest();
+        message.sourcePath = object.sourcePath ?? "";
+        message.filename = object.filename ?? undefined;
+        return message;
+    },
+};
+function createBaseLoraAdapterImportResult() {
+    return { success: false, errorMessage: "", localPath: "", matched: false, entry: undefined };
+}
+exports.LoraAdapterImportResult = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.success !== false) {
+            writer.uint32(8).bool(message.success);
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(18).string(message.errorMessage);
+        }
+        if (message.localPath !== "") {
+            writer.uint32(26).string(message.localPath);
+        }
+        if (message.matched !== false) {
+            writer.uint32(32).bool(message.matched);
+        }
+        if (message.entry !== undefined) {
+            exports.LoraAdapterCatalogEntry.encode(message.entry, writer.uint32(42).fork()).join();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoraAdapterImportResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.success = reader.bool();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.localPath = reader.string();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.matched = reader.bool();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.entry = exports.LoraAdapterCatalogEntry.decode(reader, reader.uint32());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+            errorMessage: isSet(object.errorMessage)
+                ? globalThis.String(object.errorMessage)
+                : isSet(object.error_message)
+                    ? globalThis.String(object.error_message)
+                    : "",
+            localPath: isSet(object.localPath)
+                ? globalThis.String(object.localPath)
+                : isSet(object.local_path)
+                    ? globalThis.String(object.local_path)
+                    : "",
+            matched: isSet(object.matched) ? globalThis.Boolean(object.matched) : false,
+            entry: isSet(object.entry) ? exports.LoraAdapterCatalogEntry.fromJSON(object.entry) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.success !== false) {
+            obj.success = message.success;
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.localPath !== "") {
+            obj.localPath = message.localPath;
+        }
+        if (message.matched !== false) {
+            obj.matched = message.matched;
+        }
+        if (message.entry !== undefined) {
+            obj.entry = exports.LoraAdapterCatalogEntry.toJSON(message.entry);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.LoraAdapterImportResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoraAdapterImportResult();
+        message.success = object.success ?? false;
+        message.errorMessage = object.errorMessage ?? "";
+        message.localPath = object.localPath ?? "";
+        message.matched = object.matched ?? false;
+        message.entry = (object.entry !== undefined && object.entry !== null)
+            ? exports.LoraAdapterCatalogEntry.fromPartial(object.entry)
+            : undefined;
         return message;
     },
 };

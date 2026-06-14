@@ -9,6 +9,7 @@ library;
 
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -135,156 +136,131 @@ class DartBridgeLLM {
   // MARK: - Generation
 
   /// Generate text using the lifecycle-owned generated-proto LLM ABI.
-  LLMGenerationResult generateProto(LLMGenerateRequest request) {
-    // No `isLoaded` gate: the generated-proto ABI resolves the engine from the
-    // commons model lifecycle (acquire_lifecycle_llm), NOT from this bridge's
-    // own `_handle` (which the lifecycle load path never populates). Gating on
-    // `_handle`/isLoaded here is a phantom check that spuriously throws even
-    // when a model IS loaded via the lifecycle, diverging from Kotlin/Swift
-    // (which have no such gate). Commons returns a clear error if truly unloaded.
-    final fn = RacNative.bindings.rac_llm_generate_proto;
-    if (fn == null) {
+  ///
+  /// The blocking C call runs in a short-lived worker isolate
+  /// (`Isolate.run`) so the calling isolate — usually the Flutter UI
+  /// isolate — stays responsive for the whole generation. Mirrors Swift's
+  /// background `Task` and Kotlin's `Dispatchers.IO` placement of the same
+  /// single-call ABI.
+  ///
+  /// No `isLoaded` gate: the generated-proto ABI resolves the engine from the
+  /// commons model lifecycle (acquire_lifecycle_llm), NOT from this bridge's
+  /// own `_handle` (which the lifecycle load path never populates). Gating on
+  /// `_handle`/isLoaded here is a phantom check that spuriously throws even
+  /// when a model IS loaded via the lifecycle, diverging from Kotlin/Swift
+  /// (which have no such gate). Commons returns a clear error if truly unloaded.
+  Future<LLMGenerationResult> generateProto(LLMGenerateRequest request) async {
+    if (RacNative.bindings.rac_llm_generate_proto == null) {
       throw UnsupportedError('rac_llm_generate_proto is unavailable');
     }
 
-    return DartBridgeProtoUtils.callRequest<LLMGenerationResult>(
-      request: request,
-      invoke: fn,
-      decode: LLMGenerationResult.fromBuffer,
-      symbol: 'rac_llm_generate_proto',
-    );
+    final requestBytes = request.writeToBuffer();
+    final resultBytes =
+        await Isolate.run(() => _llmGenerateWorker(requestBytes));
+    return LLMGenerationResult.fromBuffer(resultBytes);
   }
 
-  /// Stream text generation using the lifecycle-owned generated-proto LLM ABI.
+  /// Stream text generation using the lifecycle-owned generated-proto LLM ABI,
+  /// with TRUE incremental token delivery (FLUTTER-IOS-006 resolved).
+  ///
+  /// Threading model: the blocking `rac_llm_generate_stream_proto` call runs
+  /// inside a short-lived worker isolate (`Isolate.run`), where a
+  /// worker-owned `NativeCallable.isolateLocal` fires synchronously per
+  /// token. The callback copies the proto bytes eagerly (commons serializes
+  /// into a `thread_local` scratch buffer that is reused on the next
+  /// emission — see FLUTTER-AND-PROTO-002 for why a deferred `.listener`
+  /// read corrupts) and sends the copy over a `SendPort`. The main isolate
+  /// decodes and emits each event as it arrives, so the calling isolate is
+  /// never blocked and tokens stream live instead of bursting after the
+  /// generation finishes. This is the Dart equivalent of Swift's
+  /// `Task.detached` + `AsyncStream` and Kotlin's `Dispatchers.IO` +
+  /// `callbackFlow` placement of the same single-call ABI.
+  ///
+  /// Cancellation: `onCancel` → `rac_llm_cancel_proto` sets the lifecycle
+  /// cancel flag checked per token; the engine aborts, the worker's blocking
+  /// call returns, and the trailing rc sentinel tears down the port. (With
+  /// the old main-isolate placement, cancel could not even run until the
+  /// generation finished — the isolate was blocked inside the FFI call.)
+  ///
+  /// No `isLoaded` gate (see generateProto): generation resolves via the
+  /// commons model lifecycle, not this bridge's `_handle`.
   Stream<LLMStreamEvent> generateStreamProto(LLMGenerateRequest request) {
-    // No `isLoaded` gate (see generateProto): generation resolves via the
-    // commons model lifecycle, not this bridge's `_handle`. The phantom gate
-    // here was the root cause of Flutter-only "No LLM model loaded" stream
-    // errors offline (the spurious throw then triggered a downstream cancel).
-    final fn = RacNative.bindings.rac_llm_generate_stream_proto;
-    if (fn == null) {
+    if (RacNative.bindings.rac_llm_generate_stream_proto == null) {
       return Stream<LLMStreamEvent>.error(
         UnsupportedError('rac_llm_generate_stream_proto is unavailable'),
       );
     }
 
     final controller = StreamController<LLMStreamEvent>(sync: false);
-    NativeCallable<RacLlmStreamProtoCallbackNative>? callback;
+    final receivePort = ReceivePort();
     var sawTerminalEvent = false;
+    var tornDown = false;
 
-    Future<void> run() async {
-      final bytes = request.writeToBuffer();
-      final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
+    void teardown() {
+      if (tornDown) return;
+      tornDown = true;
+      receivePort.close();
+    }
 
-      try {
-        // FLUTTER-IOS-006 / FLUTTER-AND-PROTO-002: use `isolateLocal` (not
-        // `.listener`) so the callback runs synchronously on the same
-        // thread that invoked `rac_llm_generate_stream_proto`. The commons
-        // producer (`dispatch_stream_event` in rac_llm_proto_service.cpp:353)
-        // serializes into a `thread_local std::vector<uint8_t> scratch` slot
-        // and immediately calls the callback with `scratch.data()`. With
-        // `.listener` mode the callback is queued onto the Dart isolate's
-        // event loop and runs ASYNCHRONOUSLY — by then a subsequent token
-        // emission has already resized/overwritten the `scratch` slot,
-        // leaving the captured pointer pointing at partially-overwritten
-        // bytes. The decode then fails with `Protocol message end-group tag
-        // did not match expected tag` (FLUTTER-IOS-006) or
-        // `InvalidProtocolBufferException: invalid tag (zero)`
-        // (FLUTTER-AND-PROTO-002).
-        //
-        // `isolateLocal` is safe here because:
-        //   1. `rac_llm_generate_stream_proto` runs synchronously on the
-        //      caller's thread (the Dart isolate).
-        //   2. The engine vtable's `generate_stream` (llamacpp, onnx, etc.)
-        //      iterates tokens on that same thread, invoking the proto
-        //      callback synchronously per token.
-        //   3. Therefore the callback always fires on the Dart isolate that
-        //      created it — the exact precondition `isolateLocal` requires.
-        callback = NativeCallable<RacLlmStreamProtoCallbackNative>.isolateLocal(
-          (Pointer<Uint8> bytesPtr, int bytesLen, Pointer<Void> _) {
-            if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
-              return;
-            }
-
-            try {
-              final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-              final event = LLMStreamEvent.fromBuffer(copy);
-              sawTerminalEvent = sawTerminalEvent || event.isFinal;
-              controller.add(event);
-              if (event.isFinal) {
-                unawaited(controller.close());
-              }
-            } catch (e, st) {
-              controller.addError(e, st);
-              unawaited(controller.close());
-            }
-          },
-        );
-
-        final rc = fn(
-          requestPtr,
-          bytes.length,
-          callback!.nativeFunction,
-          nullptr,
-        );
-        if (rc != RAC_SUCCESS && !controller.isClosed) {
+    receivePort.listen((Object? message) {
+      if (message is Uint8List) {
+        // One serialized LLMStreamEvent, already copied in the worker's
+        // synchronous callback, delivered over the port in emission order.
+        if (controller.isClosed) return;
+        try {
+          final event = LLMStreamEvent.fromBuffer(message);
+          sawTerminalEvent = sawTerminalEvent || event.isFinal;
+          controller.add(event);
+          if (event.isFinal) {
+            unawaited(controller.close());
+          }
+        } catch (e, st) {
+          controller.addError(e, st);
+          unawaited(controller.close());
+        }
+      } else if (message is int) {
+        // rc sentinel — always the LAST message (same port as the tokens, so
+        // FIFO ordering is guaranteed; the Isolate.run future has no such
+        // ordering relative to port messages). Early-return rcs (parse /
+        // no-model errors) produce no terminal event, so surface them.
+        if (message != RAC_SUCCESS &&
+            !sawTerminalEvent &&
+            !controller.isClosed) {
           controller.addError(
             StateError(
               'rac_llm_generate_stream_proto failed: '
-              '${RacResultCode.getMessage(rc)}',
+              '${RacResultCode.getMessage(message)}',
             ),
           );
-          await controller.close();
-        } else if (!sawTerminalEvent && !controller.isClosed) {
-          await controller.close();
         }
-      } catch (e, st) {
+        if (!controller.isClosed) {
+          unawaited(controller.close());
+        }
+        teardown();
+      }
+    });
+
+    final requestBytes = request.writeToBuffer();
+    final sendPort = receivePort.sendPort;
+    unawaited(
+      Isolate.run(() => _llmStreamWorker(requestBytes, sendPort))
+          .catchError((Object e, StackTrace st) {
+        // Worker isolate crashed (RemoteError) before the rc sentinel.
         if (!controller.isClosed) {
           controller.addError(e, st);
-          await controller.close();
+          unawaited(controller.close());
         }
-      } finally {
-        calloc.free(requestPtr);
-        // commons-127: safety here relies on Dart isolate single-threading
-        // plus the synchronous nature of `rac_llm_generate_stream_proto`
-        // (the single-call ABI used by this bridge). `fn(...)` only returns
-        // after the engine vtable's `generate_stream` has finished iterating
-        // tokens on this same isolate thread, so by the time we reach this
-        // `finally` the NativeCallable can no longer be invoked. The
-        // `rac_llm_proto_quiesce` call below is a NO-OP for this path
-        // (commons only increments the in-flight counter inside
-        // `dispatch_llm_stream_event`, which is the REGISTRY path used by
-        // `rac_llm_set_stream_proto_callback` — never invoked by Flutter)
-        // but we still issue it defensively so that if commons ever fans
-        // out a post-return emission on a worker through the single-call
-        // ABI, this teardown sequence does the right thing without further
-        // changes here. Pattern mirrors the voice-agent / STT / TTS / VAD /
-        // VLM streaming bridges.
-        RacNative.bindings.rac_llm_proto_quiesce?.call();
-        callback?.close();
-        callback = null;
-      }
-    }
+        teardown();
+        return RAC_SUCCESS;
+      }),
+    );
 
-    controller.onCancel = () {
-      // commons-127: cancel → quiesce → close. `rac_llm_cancel_proto`
-      // signals the engine to abort. Because the producing
-      // `rac_llm_generate_stream_proto` call runs synchronously on this
-      // Dart isolate thread, the NativeCallable cannot be re-entered once
-      // `run()` has returned — Dart isolate single-threading is what
-      // actually prevents the UAF here. `rac_llm_proto_quiesce` only spin-
-      // waits on commons' REGISTRY-path in-flight counter
-      // (`rac_llm_set_stream_proto_callback`), which Flutter never uses, so
-      // it is a NO-OP today. We still call it (best-effort, ignored if the
-      // symbol is absent) to future-proof this teardown the moment commons
-      // adds an async tail-emit on the single-call path.
-      cancelProto();
-      RacNative.bindings.rac_llm_proto_quiesce?.call();
-      callback?.close();
-      callback = null;
-    };
+    // Cancel sets the per-token lifecycle cancel flag; the worker's blocking
+    // call returns shortly after, emits a terminal "cancelled" event
+    // (dropped — the controller is closing) and the rc sentinel closes the
+    // port.
+    controller.onCancel = cancelProto;
 
-    unawaited(run());
     return controller.stream;
   }
 
@@ -322,5 +298,93 @@ class DartBridgeLLM {
         _logger.error('Failed to destroy LLM component: $e');
       }
     }
+  }
+}
+
+// MARK: - Worker-isolate entry points
+//
+// Top-level so `Isolate.run` closures capture only sendable values
+// (Uint8List / SendPort). `RacNative.bindings` is a per-isolate static —
+// the worker re-resolves the dylib symbols on first access (idempotent
+// `PlatformLoader.loadCommons()`; same per-isolate-lookup convention as the
+// HTTP adapter's `_sendBlocking`).
+//
+// Worker-isolate safety: the generation path's only Dart-bound callbacks are
+// SDK events and logging, both registered as `NativeCallable.listener`
+// (cross-isolate safe). The `Pointer.fromFunction` platform-adapter
+// trampolines (file/secure/memory) that SIGABRTed the earlier model-LOAD
+// `Isolate.run` wrap (see dart_bridge_model_lifecycle.dart) are never invoked
+// during generation. If a future commons change adds one to this path, fix
+// that callback to `.listener` — do not move the blocking call back onto the
+// main isolate.
+
+/// Blocking body of [DartBridgeLLM.generateStreamProto]. Runs the single-call
+/// streaming ABI on the worker isolate; the worker-owned `isolateLocal`
+/// callback fires synchronously per token (commons requires a synchronous
+/// same-thread callback because it passes a pointer into a `thread_local`
+/// scratch buffer), copies the bytes eagerly, and forwards the copy to the
+/// main isolate. The rc is sent LAST on the same port so it is FIFO-ordered
+/// after every token.
+int _llmStreamWorker(Uint8List requestBytes, SendPort port) {
+  final bindings = RacNative.bindings;
+  final fn = bindings.rac_llm_generate_stream_proto;
+  if (fn == null) {
+    throw UnsupportedError('rac_llm_generate_stream_proto is unavailable');
+  }
+
+  final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
+  NativeCallable<RacLlmStreamProtoCallbackNative>? callback;
+  try {
+    callback = NativeCallable<RacLlmStreamProtoCallbackNative>.isolateLocal(
+      (Pointer<Uint8> bytesPtr, int bytesLen, Pointer<Void> _) {
+        if (bytesPtr == nullptr || bytesLen <= 0) return;
+        // Copy INSIDE the synchronous callback — commons reuses the scratch
+        // buffer the moment we return. The copy is what crosses isolates.
+        port.send(Uint8List.fromList(bytesPtr.asTypedList(bytesLen)));
+      },
+    );
+
+    final rc = fn(
+      requestPtr,
+      requestBytes.length,
+      callback.nativeFunction,
+      nullptr,
+    );
+    port.send(rc);
+    return rc;
+  } finally {
+    // Defensive quiesce (no-op for the single-call ABI today), then close the
+    // callable on its owning isolate AFTER the blocking call has returned —
+    // no emission can occur past this point.
+    bindings.rac_llm_proto_quiesce?.call();
+    callback?.close();
+    calloc.free(requestPtr);
+  }
+}
+
+/// Blocking body of [DartBridgeLLM.generateProto]: plain request→response
+/// proto call, no callbacks. Returns the serialized LLMGenerationResult so
+/// the main isolate owns the decode.
+Uint8List _llmGenerateWorker(Uint8List requestBytes) {
+  final bindings = RacNative.bindings;
+  final fn = bindings.rac_llm_generate_proto;
+  if (fn == null) {
+    throw UnsupportedError('rac_llm_generate_proto is unavailable');
+  }
+
+  final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
+  final out = calloc<RacProtoBuffer>();
+  try {
+    bindings.rac_proto_buffer_init(out);
+    final code = fn(requestPtr, requestBytes.length, out);
+    DartBridgeProtoUtils.ensureSuccess(out, code, 'rac_llm_generate_proto');
+    if (out.ref.data == nullptr || out.ref.size == 0) {
+      return Uint8List(0);
+    }
+    return Uint8List.fromList(out.ref.data.asTypedList(out.ref.size));
+  } finally {
+    bindings.rac_proto_buffer_free(out);
+    calloc.free(out);
+    calloc.free(requestPtr);
   }
 }

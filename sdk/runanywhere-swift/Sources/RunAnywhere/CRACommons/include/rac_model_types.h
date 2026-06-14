@@ -20,9 +20,9 @@
 #include <stdint.h>
 
 #include "rac_error.h"
-#include "rac_types.h"
-#include "rac_proto_buffer.h"
 #include "rac_model_format_ids.h"
+#include "rac_proto_buffer.h"
+#include "rac_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,11 +37,11 @@ extern "C" {
  * Mirrors Swift's ArchiveType enum.
  */
 typedef enum rac_archive_type {
-    RAC_ARCHIVE_TYPE_NONE = -1,   /**< No archive - direct file */
-    RAC_ARCHIVE_TYPE_ZIP = 0,     /**< ZIP archive */
-    RAC_ARCHIVE_TYPE_TAR_BZ2 = 1, /**< tar.bz2 archive */
-    RAC_ARCHIVE_TYPE_TAR_GZ = 2,  /**< tar.gz archive */
-    RAC_ARCHIVE_TYPE_TAR_XZ = 3   /**< tar.xz archive */
+  RAC_ARCHIVE_TYPE_NONE = -1,   /**< No archive - direct file */
+  RAC_ARCHIVE_TYPE_ZIP = 0,     /**< ZIP archive */
+  RAC_ARCHIVE_TYPE_TAR_BZ2 = 1, /**< tar.bz2 archive */
+  RAC_ARCHIVE_TYPE_TAR_GZ = 2,  /**< tar.gz archive */
+  RAC_ARCHIVE_TYPE_TAR_XZ = 3   /**< tar.xz archive */
 } rac_archive_type_t;
 
 /**
@@ -49,11 +49,12 @@ typedef enum rac_archive_type {
  * Mirrors Swift's ArchiveStructure enum.
  */
 typedef enum rac_archive_structure {
-    RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED =
-        0, /**< Single model file at root or nested in one directory */
-    RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED = 1,  /**< Multiple files in a directory */
-    RAC_ARCHIVE_STRUCTURE_NESTED_DIRECTORY = 2, /**< Subdirectory structure */
-    RAC_ARCHIVE_STRUCTURE_UNKNOWN = 99          /**< Unknown - detected after extraction */
+  RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED =
+      0, /**< Single model file at root or nested in one directory */
+  RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED =
+      1, /**< Multiple files in a directory */
+  RAC_ARCHIVE_STRUCTURE_NESTED_DIRECTORY = 2, /**< Subdirectory structure */
+  RAC_ARCHIVE_STRUCTURE_UNKNOWN = 99 /**< Unknown - detected after extraction */
 } rac_archive_structure_t;
 
 // =============================================================================
@@ -65,16 +66,16 @@ typedef enum rac_archive_structure {
  * Mirrors Swift's ExpectedModelFiles struct.
  */
 typedef struct rac_expected_model_files {
-    /** File patterns that must be present (e.g., "*.onnx", "encoder*.onnx") */
-    const char** required_patterns;
-    size_t required_pattern_count;
+  /** File patterns that must be present (e.g., "*.onnx", "encoder*.onnx") */
+  const char **required_patterns;
+  size_t required_pattern_count;
 
-    /** File patterns that may be present but are optional */
-    const char** optional_patterns;
-    size_t optional_pattern_count;
+  /** File patterns that may be present but are optional */
+  const char **optional_patterns;
+  size_t optional_pattern_count;
 
-    /** Description of the model files for documentation */
-    const char* description;
+  /** Description of the model files for documentation */
+  const char *description;
 } rac_expected_model_files_t;
 
 /**
@@ -83,15 +84,15 @@ typedef struct rac_expected_model_files {
  * Values mirror runanywhere.v1.ModelFileRole.
  */
 typedef enum rac_model_file_role {
-    RAC_MODEL_FILE_ROLE_UNSPECIFIED = 0,
-    RAC_MODEL_FILE_ROLE_PRIMARY_MODEL = 1,
-    RAC_MODEL_FILE_ROLE_COMPANION = 2,
-    RAC_MODEL_FILE_ROLE_VISION_PROJECTOR = 3,
-    RAC_MODEL_FILE_ROLE_TOKENIZER = 4,
-    RAC_MODEL_FILE_ROLE_CONFIG = 5,
-    RAC_MODEL_FILE_ROLE_VOCABULARY = 6,
-    RAC_MODEL_FILE_ROLE_MERGES = 7,
-    RAC_MODEL_FILE_ROLE_LABELS = 8
+  RAC_MODEL_FILE_ROLE_UNSPECIFIED = 0,
+  RAC_MODEL_FILE_ROLE_PRIMARY_MODEL = 1,
+  RAC_MODEL_FILE_ROLE_COMPANION = 2,
+  RAC_MODEL_FILE_ROLE_VISION_PROJECTOR = 3,
+  RAC_MODEL_FILE_ROLE_TOKENIZER = 4,
+  RAC_MODEL_FILE_ROLE_CONFIG = 5,
+  RAC_MODEL_FILE_ROLE_VOCABULARY = 6,
+  RAC_MODEL_FILE_ROLE_MERGES = 7,
+  RAC_MODEL_FILE_ROLE_LABELS = 8
 } rac_model_file_role_t;
 
 /**
@@ -99,25 +100,37 @@ typedef enum rac_model_file_role {
  * Mirrors Swift's ModelFileDescriptor struct.
  */
 typedef struct rac_model_file_descriptor {
-    /** Relative path from base URL to this file */
-    const char* relative_path;
+  /** Relative path from base URL to this file */
+  const char *relative_path;
 
-    /** Destination path relative to model folder */
-    const char* destination_path;
+  /** Destination path relative to model folder */
+  const char *destination_path;
 
-    /** Whether this file is required (vs optional) */
-    rac_bool_t is_required;
+  /** Whether this file is required (vs optional) */
+  rac_bool_t is_required;
 
-    /** Semantic role for this file in the artifact */
-    rac_model_file_role_t role;
+  /** Semantic role for this file in the artifact */
+  rac_model_file_role_t role;
 
-    /**
-     * Absolute download URL for this file (can be NULL when the caller
-     * derives the URL by joining a base download URL with relative_path).
-     * Preserved through proto serialization so registry round-trips do not
-     * drop the URL set by SDK callers via registerMultiFileModel.
-     */
-    const char* url;
+  /**
+   * Absolute download URL for this file (can be NULL when the caller
+   * derives the URL by joining a base download URL with relative_path).
+   * Preserved through proto serialization so registry round-trips do not
+   * drop the URL set by SDK callers via registerMultiFileModel.
+   */
+  const char *url;
+
+  /**
+   * Exact expected size in bytes (0 = unknown). Preserved through registry
+   * round-trips so completeness validation can reject partial files.
+   */
+  int64_t size_bytes;
+
+  /**
+   * Lowercase hex SHA-256 for this file (can be NULL). Preserved through
+   * registry round-trips; recorded automatically for Hugging Face pulls.
+   */
+  const char *checksum_sha256;
 } rac_model_file_descriptor_t;
 
 // =============================================================================
@@ -129,11 +142,11 @@ typedef struct rac_model_file_descriptor {
  * Mirrors Swift's ModelArtifactType enum (simplified for C).
  */
 typedef enum rac_artifact_type_kind {
-    RAC_ARTIFACT_KIND_SINGLE_FILE = 0, /**< Single file download */
-    RAC_ARTIFACT_KIND_ARCHIVE = 1,     /**< Archive requiring extraction */
-    RAC_ARTIFACT_KIND_MULTI_FILE = 2,  /**< Multiple files */
-    RAC_ARTIFACT_KIND_CUSTOM = 3,      /**< Custom download strategy */
-    RAC_ARTIFACT_KIND_BUILT_IN = 4     /**< Built-in model (no download) */
+  RAC_ARTIFACT_KIND_SINGLE_FILE = 0, /**< Single file download */
+  RAC_ARTIFACT_KIND_ARCHIVE = 1,     /**< Archive requiring extraction */
+  RAC_ARTIFACT_KIND_MULTI_FILE = 2,  /**< Multiple files */
+  RAC_ARTIFACT_KIND_CUSTOM = 3,      /**< Custom download strategy */
+  RAC_ARTIFACT_KIND_BUILT_IN = 4     /**< Built-in model (no download) */
 } rac_artifact_type_kind_t;
 
 /**
@@ -141,24 +154,24 @@ typedef enum rac_artifact_type_kind {
  * Mirrors Swift's ModelArtifactType enum with associated values.
  */
 typedef struct rac_model_artifact_info {
-    /** The kind of artifact */
-    rac_artifact_type_kind_t kind;
+  /** The kind of artifact */
+  rac_artifact_type_kind_t kind;
 
-    /** For archive type: the archive format */
-    rac_archive_type_t archive_type;
+  /** For archive type: the archive format */
+  rac_archive_type_t archive_type;
 
-    /** For archive type: the internal structure */
-    rac_archive_structure_t archive_structure;
+  /** For archive type: the internal structure */
+  rac_archive_structure_t archive_structure;
 
-    /** Expected files after extraction (can be NULL) */
-    rac_expected_model_files_t* expected_files;
+  /** Expected files after extraction (can be NULL) */
+  rac_expected_model_files_t *expected_files;
 
-    /** For multi-file: descriptors array (can be NULL) */
-    rac_model_file_descriptor_t* file_descriptors;
-    size_t file_descriptor_count;
+  /** For multi-file: descriptors array (can be NULL) */
+  rac_model_file_descriptor_t *file_descriptors;
+  size_t file_descriptor_count;
 
-    /** For custom: strategy identifier */
-    const char* strategy_id;
+  /** For custom: strategy identifier */
+  const char *strategy_id;
 } rac_model_artifact_info_t;
 
 // =============================================================================
@@ -170,16 +183,19 @@ typedef struct rac_model_artifact_info {
  * Mirrors Swift's ModelCategory enum.
  */
 typedef enum rac_model_category {
-    RAC_MODEL_CATEGORY_LANGUAGE = 0,                 /**< Text-to-text models (LLMs) */
-    RAC_MODEL_CATEGORY_SPEECH_RECOGNITION = 1,       /**< Voice-to-text models (ASR/STT) */
-    RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS = 2,         /**< Text-to-voice models (TTS) */
-    RAC_MODEL_CATEGORY_VISION = 3,                   /**< Image understanding models */
-    RAC_MODEL_CATEGORY_IMAGE_GENERATION = 4,         /**< Text-to-image models */
-    RAC_MODEL_CATEGORY_MULTIMODAL = 5,               /**< Multi-modality models */
-    RAC_MODEL_CATEGORY_AUDIO = 6,                    /**< Audio processing (diarization, etc.) */
-    RAC_MODEL_CATEGORY_EMBEDDING = 7,                /**< Embedding models (RAG, semantic search) */
-    RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 8, /**< VAD models (Silero, etc.) */
-    RAC_MODEL_CATEGORY_UNKNOWN = 99                  /**< Unknown category */
+  RAC_MODEL_CATEGORY_LANGUAGE = 0, /**< Text-to-text models (LLMs) */
+  RAC_MODEL_CATEGORY_SPEECH_RECOGNITION =
+      1, /**< Voice-to-text models (ASR/STT) */
+  RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS = 2, /**< Text-to-voice models (TTS) */
+  RAC_MODEL_CATEGORY_VISION = 3,           /**< Image understanding models */
+  RAC_MODEL_CATEGORY_IMAGE_GENERATION = 4, /**< Text-to-image models */
+  RAC_MODEL_CATEGORY_MULTIMODAL = 5,       /**< Multi-modality models */
+  RAC_MODEL_CATEGORY_AUDIO = 6, /**< Audio processing (diarization, etc.) */
+  RAC_MODEL_CATEGORY_EMBEDDING =
+      7, /**< Embedding models (RAG, semantic search) */
+  RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION =
+      8,                          /**< VAD models (Silero, etc.) */
+  RAC_MODEL_CATEGORY_UNKNOWN = 99 /**< Unknown category */
 } rac_model_category_t;
 
 // =============================================================================
@@ -191,22 +207,30 @@ typedef enum rac_model_category {
  * Values mirror runanywhere.v1.ModelFormat and RAC_MODEL_FORMAT_ID_*.
  */
 typedef enum rac_model_format {
-    RAC_MODEL_FORMAT_UNSPECIFIED = RAC_MODEL_FORMAT_ID_UNSPECIFIED,
-    RAC_MODEL_FORMAT_GGUF = RAC_MODEL_FORMAT_ID_GGUF,               /**< GGUF format */
-    RAC_MODEL_FORMAT_GGML = RAC_MODEL_FORMAT_ID_GGML,               /**< GGML format */
-    RAC_MODEL_FORMAT_ONNX = RAC_MODEL_FORMAT_ID_ONNX,               /**< ONNX format */
-    RAC_MODEL_FORMAT_ORT = RAC_MODEL_FORMAT_ID_ORT,                 /**< ONNX Runtime format */
-    RAC_MODEL_FORMAT_BIN = RAC_MODEL_FORMAT_ID_BIN,                 /**< Binary format */
-    RAC_MODEL_FORMAT_COREML = RAC_MODEL_FORMAT_ID_COREML,           /**< Core ML compiled format */
-    RAC_MODEL_FORMAT_MLMODEL = RAC_MODEL_FORMAT_ID_MLMODEL,         /**< Core ML .mlmodel */
-    RAC_MODEL_FORMAT_MLPACKAGE = RAC_MODEL_FORMAT_ID_MLPACKAGE,     /**< Core ML .mlpackage */
-    RAC_MODEL_FORMAT_TFLITE = RAC_MODEL_FORMAT_ID_TFLITE,           /**< TensorFlow Lite */
-    RAC_MODEL_FORMAT_SAFETENSORS = RAC_MODEL_FORMAT_ID_SAFETENSORS, /**< Safetensors */
-    RAC_MODEL_FORMAT_QNN_CONTEXT = RAC_MODEL_FORMAT_ID_QNN_CONTEXT, /**< QNN context binary */
-    RAC_MODEL_FORMAT_ZIP = RAC_MODEL_FORMAT_ID_ZIP,                 /**< Archive wrapping a model */
-    RAC_MODEL_FORMAT_FOLDER = RAC_MODEL_FORMAT_ID_FOLDER,           /**< Folder-backed model */
-    RAC_MODEL_FORMAT_PROPRIETARY = RAC_MODEL_FORMAT_ID_PROPRIETARY, /**< Built-in system model */
-    RAC_MODEL_FORMAT_UNKNOWN = RAC_MODEL_FORMAT_ID_UNKNOWN          /**< Unknown format */
+  RAC_MODEL_FORMAT_UNSPECIFIED = RAC_MODEL_FORMAT_ID_UNSPECIFIED,
+  RAC_MODEL_FORMAT_GGUF = RAC_MODEL_FORMAT_ID_GGUF, /**< GGUF format */
+  RAC_MODEL_FORMAT_GGML = RAC_MODEL_FORMAT_ID_GGML, /**< GGML format */
+  RAC_MODEL_FORMAT_ONNX = RAC_MODEL_FORMAT_ID_ONNX, /**< ONNX format */
+  RAC_MODEL_FORMAT_ORT = RAC_MODEL_FORMAT_ID_ORT,   /**< ONNX Runtime format */
+  RAC_MODEL_FORMAT_BIN = RAC_MODEL_FORMAT_ID_BIN,   /**< Binary format */
+  RAC_MODEL_FORMAT_COREML =
+      RAC_MODEL_FORMAT_ID_COREML, /**< Core ML compiled format */
+  RAC_MODEL_FORMAT_MLMODEL =
+      RAC_MODEL_FORMAT_ID_MLMODEL, /**< Core ML .mlmodel */
+  RAC_MODEL_FORMAT_MLPACKAGE =
+      RAC_MODEL_FORMAT_ID_MLPACKAGE, /**< Core ML .mlpackage */
+  RAC_MODEL_FORMAT_TFLITE = RAC_MODEL_FORMAT_ID_TFLITE, /**< TensorFlow Lite */
+  RAC_MODEL_FORMAT_SAFETENSORS =
+      RAC_MODEL_FORMAT_ID_SAFETENSORS, /**< Safetensors */
+  RAC_MODEL_FORMAT_QNN_CONTEXT =
+      RAC_MODEL_FORMAT_ID_QNN_CONTEXT, /**< QNN context binary */
+  RAC_MODEL_FORMAT_ZIP =
+      RAC_MODEL_FORMAT_ID_ZIP, /**< Archive wrapping a model */
+  RAC_MODEL_FORMAT_FOLDER =
+      RAC_MODEL_FORMAT_ID_FOLDER, /**< Folder-backed model */
+  RAC_MODEL_FORMAT_PROPRIETARY =
+      RAC_MODEL_FORMAT_ID_PROPRIETARY, /**< Built-in system model */
+  RAC_MODEL_FORMAT_UNKNOWN = RAC_MODEL_FORMAT_ID_UNKNOWN /**< Unknown format */
 } rac_model_format_t;
 
 // =============================================================================
@@ -218,20 +242,23 @@ typedef enum rac_model_format {
  * Mirrors Swift's InferenceFramework enum.
  */
 typedef enum rac_inference_framework {
-    RAC_FRAMEWORK_ONNX = 0,              /**< ONNX Runtime */
-    RAC_FRAMEWORK_LLAMACPP = 1,          /**< llama.cpp */
-    RAC_FRAMEWORK_FOUNDATION_MODELS = 2, /**< Apple Foundation Models */
-    RAC_FRAMEWORK_SYSTEM_TTS = 3,        /**< System TTS */
-    RAC_FRAMEWORK_FLUID_AUDIO = 4,       /**< FluidAudio */
-    RAC_FRAMEWORK_BUILTIN = 5,           /**< Built-in (e.g., energy VAD) */
-    RAC_FRAMEWORK_NONE = 6,              /**< No framework needed */
-    RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
-    RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
-    // Value 9 (WHISPERKIT_COREML) intentionally retired — leave the gap to keep ABI stable.
-    RAC_FRAMEWORK_METALRT = 10,          /**< MetalRT (custom Metal GPU kernels, Apple only) */
-    RAC_FRAMEWORK_GENIE = 11,            /**< Qualcomm Genie (Hexagon NPU LLM) */
-    RAC_FRAMEWORK_SHERPA = 12,           /**< Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
-    RAC_FRAMEWORK_UNKNOWN = 99           /**< Unknown framework */
+  RAC_FRAMEWORK_ONNX = 0,              /**< ONNX Runtime */
+  RAC_FRAMEWORK_LLAMACPP = 1,          /**< llama.cpp */
+  RAC_FRAMEWORK_FOUNDATION_MODELS = 2, /**< Apple Foundation Models */
+  RAC_FRAMEWORK_SYSTEM_TTS = 3,        /**< System TTS */
+  RAC_FRAMEWORK_FLUID_AUDIO = 4,       /**< FluidAudio */
+  RAC_FRAMEWORK_BUILTIN = 5,           /**< Built-in (e.g., energy VAD) */
+  RAC_FRAMEWORK_NONE = 6,              /**< No framework needed */
+  RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
+  RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
+  // Value 9 (WHISPERKIT_COREML) intentionally retired — leave the gap to keep
+  // ABI stable.
+  RAC_FRAMEWORK_METALRT =
+      10, /**< MetalRT (custom Metal GPU kernels, Apple only) */
+  RAC_FRAMEWORK_GENIE = 11, /**< Qualcomm Genie (Hexagon NPU LLM) */
+  RAC_FRAMEWORK_SHERPA =
+      12, /**< Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
+  RAC_FRAMEWORK_UNKNOWN = 99 /**< Unknown framework */
 } rac_inference_framework_t;
 
 // =============================================================================
@@ -243,8 +270,8 @@ typedef enum rac_inference_framework {
  * Mirrors Swift's ModelSource enum.
  */
 typedef enum rac_model_source {
-    RAC_MODEL_SOURCE_REMOTE = 0, /**< Model from remote API/catalog */
-    RAC_MODEL_SOURCE_LOCAL = 1   /**< Model provided locally */
+  RAC_MODEL_SOURCE_REMOTE = 0, /**< Model from remote API/catalog */
+  RAC_MODEL_SOURCE_LOCAL = 1   /**< Model provided locally */
 } rac_model_source_t;
 
 // =============================================================================
@@ -256,66 +283,66 @@ typedef enum rac_model_source {
  * Mirrors Swift's ModelInfo struct.
  */
 typedef struct rac_model_info {
-    /** Unique model identifier */
-    char* id;
+  /** Unique model identifier */
+  char *id;
 
-    /** Human-readable model name */
-    char* name;
+  /** Human-readable model name */
+  char *name;
 
-    /** Model category */
-    rac_model_category_t category;
+  /** Model category */
+  rac_model_category_t category;
 
-    /** Model format */
-    rac_model_format_t format;
+  /** Model format */
+  rac_model_format_t format;
 
-    /** Inference framework */
-    rac_inference_framework_t framework;
+  /** Inference framework */
+  rac_inference_framework_t framework;
 
-    /** Download URL (can be NULL) */
-    char* download_url;
+  /** Download URL (can be NULL) */
+  char *download_url;
 
-    /** Local path (can be NULL) */
-    char* local_path;
+  /** Local path (can be NULL) */
+  char *local_path;
 
-    /** Artifact information */
-    rac_model_artifact_info_t artifact_info;
+  /** Artifact information */
+  rac_model_artifact_info_t artifact_info;
 
-    /** Download size in bytes (0 if unknown) */
-    int64_t download_size;
+  /** Download size in bytes (0 if unknown) */
+  int64_t download_size;
 
-    /** Memory required in bytes (0 if unknown) */
-    int64_t memory_required;
+  /** Memory required in bytes (0 if unknown) */
+  int64_t memory_required;
 
-    /** Context length (for language models, 0 if not applicable) */
-    int32_t context_length;
+  /** Context length (for language models, 0 if not applicable) */
+  int32_t context_length;
 
-    /** Whether model supports thinking/reasoning */
-    rac_bool_t supports_thinking;
+  /** Whether model supports thinking/reasoning */
+  rac_bool_t supports_thinking;
 
-    /** Whether model supports LoRA adapters */
-    rac_bool_t supports_lora;
+  /** Whether model supports LoRA adapters */
+  rac_bool_t supports_lora;
 
-    /** Tags (NULL-terminated array of strings, can be NULL) */
-    char** tags;
-    size_t tag_count;
+  /** Tags (NULL-terminated array of strings, can be NULL) */
+  char **tags;
+  size_t tag_count;
 
-    /** Description (can be NULL) */
-    char* description;
+  /** Description (can be NULL) */
+  char *description;
 
-    /** Model source */
-    rac_model_source_t source;
+  /** Model source */
+  rac_model_source_t source;
 
-    /** Created timestamp (Unix timestamp) */
-    int64_t created_at;
+  /** Created timestamp (Unix timestamp) */
+  int64_t created_at;
 
-    /** Updated timestamp (Unix timestamp) */
-    int64_t updated_at;
+  /** Updated timestamp (Unix timestamp) */
+  int64_t updated_at;
 
-    /** Last used timestamp (0 if never used) */
-    int64_t last_used;
+  /** Last used timestamp (0 if never used) */
+  int64_t last_used;
 
-    /** Usage count */
-    int32_t usage_count;
+  /** Usage count */
+  int32_t usage_count;
 } rac_model_info_t;
 
 // =============================================================================
@@ -329,7 +356,7 @@ typedef struct rac_model_info {
  * @param type Archive type
  * @return File extension string (e.g., "zip", "tar.bz2")
  */
-RAC_API const char* rac_archive_type_extension(rac_archive_type_t type);
+RAC_API const char *rac_archive_type_extension(rac_archive_type_t type);
 
 /**
  * @brief Detect archive type from URL path.
@@ -339,7 +366,8 @@ RAC_API const char* rac_archive_type_extension(rac_archive_type_t type);
  * @param out_type Output: Detected archive type
  * @return RAC_TRUE if archive detected, RAC_FALSE otherwise
  */
-RAC_API rac_bool_t rac_archive_type_from_path(const char* url_path, rac_archive_type_t* out_type);
+RAC_API rac_bool_t rac_archive_type_from_path(const char *url_path,
+                                              rac_archive_type_t *out_type);
 
 /**
  * @brief Check if model category requires context length.
@@ -348,7 +376,8 @@ RAC_API rac_bool_t rac_archive_type_from_path(const char* url_path, rac_archive_
  * @param category Model category
  * @return RAC_TRUE if requires context length
  */
-RAC_API rac_bool_t rac_model_category_requires_context_length(rac_model_category_t category);
+RAC_API rac_bool_t
+rac_model_category_requires_context_length(rac_model_category_t category);
 
 /**
  * @brief Check if model category supports thinking/reasoning.
@@ -357,7 +386,8 @@ RAC_API rac_bool_t rac_model_category_requires_context_length(rac_model_category
  * @param category Model category
  * @return RAC_TRUE if supports thinking
  */
-RAC_API rac_bool_t rac_model_category_supports_thinking(rac_model_category_t category);
+RAC_API rac_bool_t
+rac_model_category_supports_thinking(rac_model_category_t category);
 
 /**
  * @brief Get model category from framework.
@@ -366,7 +396,8 @@ RAC_API rac_bool_t rac_model_category_supports_thinking(rac_model_category_t cat
  * @param framework Inference framework
  * @return Model category
  */
-RAC_API rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t framework);
+RAC_API rac_model_category_t
+rac_model_category_from_framework(rac_inference_framework_t framework);
 
 /**
  * @brief Get the default inference framework for a model category.
@@ -379,8 +410,8 @@ RAC_API rac_model_category_t rac_model_category_from_framework(rac_inference_fra
  *         for speech recognition / synthesis / embedding / VAD, otherwise
  *         RAC_FRAMEWORK_UNKNOWN.
  */
-RAC_API rac_inference_framework_t rac_model_category_default_framework(
-    rac_model_category_t category);
+RAC_API rac_inference_framework_t
+rac_model_category_default_framework(rac_model_category_t category);
 
 /**
  * @brief Get supported formats for a framework.
@@ -391,9 +422,9 @@ RAC_API rac_inference_framework_t rac_model_category_default_framework(
  * @param out_count Output: Number of formats
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t framework,
-                                                         rac_model_format_t** out_formats,
-                                                         size_t* out_count);
+RAC_API rac_result_t rac_framework_get_supported_formats(
+    rac_inference_framework_t framework, rac_model_format_t **out_formats,
+    size_t *out_count);
 
 /**
  * @brief Check if framework supports a format.
@@ -403,8 +434,8 @@ RAC_API rac_result_t rac_framework_get_supported_formats(rac_inference_framework
  * @param format Model format
  * @return RAC_TRUE if supported
  */
-RAC_API rac_bool_t rac_framework_supports_format(rac_inference_framework_t framework,
-                                                 rac_model_format_t format);
+RAC_API rac_bool_t rac_framework_supports_format(
+    rac_inference_framework_t framework, rac_model_format_t format);
 
 /**
  * @brief Check if framework uses directory-based models.
@@ -413,7 +444,8 @@ RAC_API rac_bool_t rac_framework_supports_format(rac_inference_framework_t frame
  * @param framework Inference framework
  * @return RAC_TRUE if uses directory-based models
  */
-RAC_API rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t framework);
+RAC_API rac_bool_t
+rac_framework_uses_directory_based_models(rac_inference_framework_t framework);
 
 /**
  * @brief Check if framework supports LLM.
@@ -422,7 +454,8 @@ RAC_API rac_bool_t rac_framework_uses_directory_based_models(rac_inference_frame
  * @param framework Inference framework
  * @return RAC_TRUE if supports LLM
  */
-RAC_API rac_bool_t rac_framework_supports_llm(rac_inference_framework_t framework);
+RAC_API rac_bool_t
+rac_framework_supports_llm(rac_inference_framework_t framework);
 
 /**
  * @brief Check if framework supports STT.
@@ -431,7 +464,8 @@ RAC_API rac_bool_t rac_framework_supports_llm(rac_inference_framework_t framewor
  * @param framework Inference framework
  * @return RAC_TRUE if supports STT
  */
-RAC_API rac_bool_t rac_framework_supports_stt(rac_inference_framework_t framework);
+RAC_API rac_bool_t
+rac_framework_supports_stt(rac_inference_framework_t framework);
 
 /**
  * @brief Check if framework supports TTS.
@@ -440,7 +474,8 @@ RAC_API rac_bool_t rac_framework_supports_stt(rac_inference_framework_t framewor
  * @param framework Inference framework
  * @return RAC_TRUE if supports TTS
  */
-RAC_API rac_bool_t rac_framework_supports_tts(rac_inference_framework_t framework);
+RAC_API rac_bool_t
+rac_framework_supports_tts(rac_inference_framework_t framework);
 
 /**
  * @brief Get framework display name.
@@ -449,7 +484,8 @@ RAC_API rac_bool_t rac_framework_supports_tts(rac_inference_framework_t framewor
  * @param framework Inference framework
  * @return Display name string
  */
-RAC_API const char* rac_framework_display_name(rac_inference_framework_t framework);
+RAC_API const char *
+rac_framework_display_name(rac_inference_framework_t framework);
 
 /**
  * @brief Get framework analytics key.
@@ -458,18 +494,19 @@ RAC_API const char* rac_framework_display_name(rac_inference_framework_t framewo
  * @param framework Inference framework
  * @return Analytics key string (snake_case)
  */
-RAC_API const char* rac_framework_analytics_key(rac_inference_framework_t framework);
+RAC_API const char *
+rac_framework_analytics_key(rac_inference_framework_t framework);
 
 // =============================================================================
 // CANONICAL WIRE-STRING / DISPLAY / ANALYTICS ACCESSORS
 // =============================================================================
 //
 // Result-code-returning accessors that expose the canonical maps used by
-// platform SDKs. The Swift typealiases over RAModelFormat / RAInferenceFramework
-// previously hand-wrote ~400 LOC of switch tables to compute wireString,
-// displayName, and analyticsKey strings and to parse string inputs back into
-// enum values. These accessors centralize the source-of-truth in commons so
-// the per-SDK switch tables can be deleted.
+// platform SDKs. The Swift typealiases over RAModelFormat /
+// RAInferenceFramework previously hand-wrote ~400 LOC of switch tables to
+// compute wireString, displayName, and analyticsKey strings and to parse string
+// inputs back into enum values. These accessors centralize the source-of-truth
+// in commons so the per-SDK switch tables can be deleted.
 //
 // Wire strings are the proto enum names (matches what swift-protobuf produces
 // during JSON encoding): MODEL_FORMAT_GGUF, INFERENCE_FRAMEWORK_LLAMA_CPP, etc.
@@ -491,7 +528,8 @@ RAC_API const char* rac_framework_analytics_key(rac_inference_framework_t framew
  *            NOT free. Set to NULL on failure.
  * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_model_format_wire_string(rac_model_format_t f, const char** out);
+RAC_API rac_result_t rac_model_format_wire_string(rac_model_format_t f,
+                                                  const char **out);
 
 /**
  * @brief Canonical wire string for an inference framework.
@@ -505,8 +543,8 @@ RAC_API rac_result_t rac_model_format_wire_string(rac_model_format_t f, const ch
  *            NOT free. Set to NULL on failure.
  * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_inference_framework_wire_string(rac_inference_framework_t f,
-                                                         const char** out);
+RAC_API rac_result_t rac_inference_framework_wire_string(
+    rac_inference_framework_t f, const char **out);
 
 /**
  * @brief Human-readable display name for an inference framework.
@@ -521,8 +559,8 @@ RAC_API rac_result_t rac_inference_framework_wire_string(rac_inference_framework
  *            NOT free. Set to NULL on failure.
  * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_inference_framework_display_name(rac_inference_framework_t f,
-                                                          const char** out);
+RAC_API rac_result_t rac_inference_framework_display_name(
+    rac_inference_framework_t f, const char **out);
 
 /**
  * @brief Snake_case analytics key for an inference framework.
@@ -537,8 +575,8 @@ RAC_API rac_result_t rac_inference_framework_display_name(rac_inference_framewor
  *            NOT free. Set to NULL on failure.
  * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_inference_framework_analytics_key(rac_inference_framework_t f,
-                                                           const char** out);
+RAC_API rac_result_t rac_inference_framework_analytics_key(
+    rac_inference_framework_t f, const char **out);
 
 /**
  * @brief Parse an inference framework from a string.
@@ -556,8 +594,8 @@ RAC_API rac_result_t rac_inference_framework_analytics_key(rac_inference_framewo
  * @return RAC_SUCCESS on match, RAC_ERROR_NOT_FOUND if no known framework
  *         matches, RAC_ERROR_NULL_POINTER if either argument is NULL.
  */
-RAC_API rac_result_t rac_inference_framework_from_string(const char* s,
-                                                         rac_inference_framework_t* out);
+RAC_API rac_result_t rac_inference_framework_from_string(
+    const char *s, rac_inference_framework_t *out);
 
 /**
  * @brief Check if artifact requires extraction.
@@ -566,7 +604,8 @@ RAC_API rac_result_t rac_inference_framework_from_string(const char* s,
  * @param artifact Artifact info
  * @return RAC_TRUE if requires extraction
  */
-RAC_API rac_bool_t rac_artifact_requires_extraction(const rac_model_artifact_info_t* artifact);
+RAC_API rac_bool_t
+rac_artifact_requires_extraction(const rac_model_artifact_info_t *artifact);
 
 /**
  * @brief Check if artifact requires download.
@@ -575,7 +614,8 @@ RAC_API rac_bool_t rac_artifact_requires_extraction(const rac_model_artifact_inf
  * @param artifact Artifact info
  * @return RAC_TRUE if requires download
  */
-RAC_API rac_bool_t rac_artifact_requires_download(const rac_model_artifact_info_t* artifact);
+RAC_API rac_bool_t
+rac_artifact_requires_download(const rac_model_artifact_info_t *artifact);
 
 /**
  * @brief Infer artifact type from URL.
@@ -586,8 +626,9 @@ RAC_API rac_bool_t rac_artifact_requires_download(const rac_model_artifact_info_
  * @param out_artifact Output: Inferred artifact info
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_artifact_infer_from_url(const char* url, rac_model_format_t format,
-                                                 rac_model_artifact_info_t* out_artifact);
+RAC_API rac_result_t
+rac_artifact_infer_from_url(const char *url, rac_model_format_t format,
+                            rac_model_artifact_info_t *out_artifact);
 
 /**
  * @brief Check if model is downloaded and available.
@@ -596,7 +637,7 @@ RAC_API rac_result_t rac_artifact_infer_from_url(const char* url, rac_model_form
  * @param model Model info
  * @return RAC_TRUE if downloaded
  */
-RAC_API rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t* model);
+RAC_API rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t *model);
 
 // =============================================================================
 // FORMAT DETECTION - From RegistryService.swift
@@ -610,8 +651,8 @@ RAC_API rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t* model);
  * @param out_format Output: Detected format
  * @return RAC_TRUE if format detected, RAC_FALSE if unknown
  */
-RAC_API rac_bool_t rac_model_detect_format_from_extension(const char* extension,
-                                                          rac_model_format_t* out_format);
+RAC_API rac_bool_t rac_model_detect_format_from_extension(
+    const char *extension, rac_model_format_t *out_format);
 
 /**
  * @brief Detect framework from model format.
@@ -621,8 +662,8 @@ RAC_API rac_bool_t rac_model_detect_format_from_extension(const char* extension,
  * @param out_framework Output: Detected framework
  * @return RAC_TRUE if framework detected, RAC_FALSE if unknown
  */
-RAC_API rac_bool_t rac_model_detect_framework_from_format(rac_model_format_t format,
-                                                          rac_inference_framework_t* out_framework);
+RAC_API rac_bool_t rac_model_detect_framework_from_format(
+    rac_model_format_t format, rac_inference_framework_t *out_framework);
 
 /**
  * @brief Get file extension string for a model format.
@@ -631,7 +672,7 @@ RAC_API rac_bool_t rac_model_detect_framework_from_format(rac_model_format_t for
  * @param format Model format
  * @return Extension string (e.g., "onnx", "gguf") or NULL if unknown
  */
-RAC_API const char* rac_model_format_extension(rac_model_format_t format);
+RAC_API const char *rac_model_format_extension(rac_model_format_t format);
 
 /**
  * @brief Check whether a file extension identifies a model file for the
@@ -660,8 +701,9 @@ RAC_API const char* rac_model_format_extension(rac_model_format_t format);
  *                   the framework, RAC_FALSE otherwise.
  * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_model_format_for_framework(rac_inference_framework_t framework,
-                                                    const char* extension, rac_bool_t* out);
+RAC_API rac_result_t
+rac_model_format_for_framework(rac_inference_framework_t framework,
+                               const char *extension, rac_bool_t *out);
 
 // =============================================================================
 // MODEL ID/NAME GENERATION - From RegistryService.swift
@@ -675,7 +717,8 @@ RAC_API rac_result_t rac_model_format_for_framework(rac_inference_framework_t fr
  * @param out_id Output buffer for model ID
  * @param max_len Maximum length of output buffer
  */
-RAC_API void rac_model_generate_id(const char* url, char* out_id, size_t max_len);
+RAC_API void rac_model_generate_id(const char *url, char *out_id,
+                                   size_t max_len);
 
 /**
  * @brief Derive a canonical model id from a URL by extension-stripping.
@@ -698,7 +741,8 @@ RAC_API void rac_model_generate_id(const char* url, char* out_id, size_t max_len
  *
  * Caller-provided buffer (no malloc/free dance). Recommend at least 256 bytes.
  *
- * @param url       URL or filename (UTF-8). May be NULL → RAC_ERROR_NULL_POINTER.
+ * @param url       URL or filename (UTF-8). May be NULL →
+ * RAC_ERROR_NULL_POINTER.
  * @param out       Caller-provided output buffer. Always NUL-terminated on
  *                  success. Set to empty string on RAC_ERROR_BUFFER_TOO_SMALL
  *                  when @p out_size > 0.
@@ -711,7 +755,8 @@ RAC_API void rac_model_generate_id(const char* url, char* out_id, size_t max_len
  * @retval RAC_ERROR_BUFFER_TOO_SMALL @p out_size is 0 or insufficient for the
  *                                    derived id + NUL terminator.
  */
-RAC_API rac_result_t rac_model_id_from_url(const char* url, char* out, size_t out_size);
+RAC_API rac_result_t rac_model_id_from_url(const char *url, char *out,
+                                           size_t out_size);
 
 /**
  * @brief Generate human-readable model name from URL.
@@ -722,7 +767,8 @@ RAC_API rac_result_t rac_model_id_from_url(const char* url, char* out, size_t ou
  * @param out_name Output buffer for model name
  * @param max_len Maximum length of output buffer
  */
-RAC_API void rac_model_generate_name(const char* url, char* out_name, size_t max_len);
+RAC_API void rac_model_generate_name(const char *url, char *out_name,
+                                     size_t max_len);
 
 // =============================================================================
 // MODEL FILTERING - From RegistryService.swift
@@ -733,17 +779,18 @@ RAC_API void rac_model_generate_name(const char* url, char* out_name, size_t max
  * Mirrors Swift's ModelCriteria struct.
  */
 typedef struct rac_model_filter {
-    /** Filter by framework (RAC_FRAMEWORK_UNKNOWN = any) */
-    rac_inference_framework_t framework;
+  /** Filter by framework (RAC_FRAMEWORK_UNKNOWN = any) */
+  rac_inference_framework_t framework;
 
-    /** Filter by format (RAC_MODEL_FORMAT_UNSPECIFIED or RAC_MODEL_FORMAT_UNKNOWN = any) */
-    rac_model_format_t format;
+  /** Filter by format (RAC_MODEL_FORMAT_UNSPECIFIED or RAC_MODEL_FORMAT_UNKNOWN
+   * = any) */
+  rac_model_format_t format;
 
-    /** Maximum download size in bytes (0 = no limit) */
-    int64_t max_size;
+  /** Maximum download size in bytes (0 = no limit) */
+  int64_t max_size;
 
-    /** Search query for name/id/description (NULL = no search filter) */
-    const char* search_query;
+  /** Search query for name/id/description (NULL = no search filter) */
+  const char *search_query;
 } rac_model_filter_t;
 
 /**
@@ -757,9 +804,11 @@ typedef struct rac_model_filter {
  * @param out_capacity Maximum capacity of output array
  * @return Number of models that passed the filter (may exceed out_capacity)
  */
-RAC_API size_t rac_model_filter_models(const rac_model_info_t* models, size_t models_count,
-                                       const rac_model_filter_t* filter,
-                                       rac_model_info_t* out_models, size_t out_capacity);
+RAC_API size_t rac_model_filter_models(const rac_model_info_t *models,
+                                       size_t models_count,
+                                       const rac_model_filter_t *filter,
+                                       rac_model_info_t *out_models,
+                                       size_t out_capacity);
 
 /**
  * @brief Check if a model matches filter criteria.
@@ -769,8 +818,8 @@ RAC_API size_t rac_model_filter_models(const rac_model_info_t* models, size_t mo
  * @param filter Filter criteria
  * @return RAC_TRUE if model matches, RAC_FALSE otherwise
  */
-RAC_API rac_bool_t rac_model_matches_filter(const rac_model_info_t* model,
-                                            const rac_model_filter_t* filter);
+RAC_API rac_bool_t rac_model_matches_filter(const rac_model_info_t *model,
+                                            const rac_model_filter_t *filter);
 
 // =============================================================================
 // MEMORY MANAGEMENT
@@ -779,16 +828,17 @@ RAC_API rac_bool_t rac_model_matches_filter(const rac_model_info_t* model,
 /**
  * @brief Allocate expected model files structure.
  *
- * @return Allocated structure (must be freed with rac_expected_model_files_free)
+ * @return Allocated structure (must be freed with
+ * rac_expected_model_files_free)
  */
-RAC_API rac_expected_model_files_t* rac_expected_model_files_alloc(void);
+RAC_API rac_expected_model_files_t *rac_expected_model_files_alloc(void);
 
 /**
  * @brief Free expected model files structure.
  *
  * @param files Structure to free
  */
-RAC_API void rac_expected_model_files_free(rac_expected_model_files_t* files);
+RAC_API void rac_expected_model_files_free(rac_expected_model_files_t *files);
 
 /**
  * @brief Allocate model file descriptor array.
@@ -796,7 +846,8 @@ RAC_API void rac_expected_model_files_free(rac_expected_model_files_t* files);
  * @param count Number of descriptors
  * @return Allocated array (must be freed with rac_model_file_descriptors_free)
  */
-RAC_API rac_model_file_descriptor_t* rac_model_file_descriptors_alloc(size_t count);
+RAC_API rac_model_file_descriptor_t *
+rac_model_file_descriptors_alloc(size_t count);
 
 /**
  * @brief Free model file descriptor array.
@@ -804,22 +855,23 @@ RAC_API rac_model_file_descriptor_t* rac_model_file_descriptors_alloc(size_t cou
  * @param descriptors Array to free
  * @param count Number of descriptors
  */
-RAC_API void rac_model_file_descriptors_free(rac_model_file_descriptor_t* descriptors,
-                                             size_t count);
+RAC_API void
+rac_model_file_descriptors_free(rac_model_file_descriptor_t *descriptors,
+                                size_t count);
 
 /**
  * @brief Allocate model info structure.
  *
  * @return Allocated structure (must be freed with rac_model_info_free)
  */
-RAC_API rac_model_info_t* rac_model_info_alloc(void);
+RAC_API rac_model_info_t *rac_model_info_alloc(void);
 
 /**
  * @brief Free model info structure.
  *
  * @param model Model info to free
  */
-RAC_API void rac_model_info_free(rac_model_info_t* model);
+RAC_API void rac_model_info_free(rac_model_info_t *model);
 
 /**
  * @brief Free array of model info pointers.
@@ -827,7 +879,7 @@ RAC_API void rac_model_info_free(rac_model_info_t* model);
  * @param models Array of model info pointers
  * @param count Number of models
  */
-RAC_API void rac_model_info_array_free(rac_model_info_t** models, size_t count);
+RAC_API void rac_model_info_array_free(rac_model_info_t **models, size_t count);
 
 /**
  * @brief Deep copy model info structure.
@@ -835,7 +887,7 @@ RAC_API void rac_model_info_array_free(rac_model_info_t** models, size_t count);
  * @param model Model info to copy
  * @return Deep copy (must be freed with rac_model_info_free)
  */
-RAC_API rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model);
+RAC_API rac_model_info_t *rac_model_info_copy(const rac_model_info_t *model);
 
 // =============================================================================
 // CANONICAL RAModelInfo FACTORY
@@ -867,7 +919,8 @@ RAC_API rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model);
  * Defaults applied:
  *   - id: rac_model_generate_id() applied to the URL.
  *   - name: request.name when non-empty, else rac_model_generate_name(url).
- *   - format: detected from URL extension (rac_model_detect_format_from_extension).
+ *   - format: detected from URL extension
+ * (rac_model_detect_format_from_extension).
  *   - framework: request.framework when non-UNSPECIFIED, else
  *     rac_model_detect_framework_from_format(format).
  *   - category: request.category when non-UNSPECIFIED, else
@@ -893,9 +946,9 @@ RAC_API rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model);
  * @return RAC_SUCCESS on success, or a negative rac_result_t on encode/
  *         decode failure / NULL out pointer.
  */
-RAC_API rac_result_t rac_model_info_make_proto(const uint8_t* in_request_bytes,
+RAC_API rac_result_t rac_model_info_make_proto(const uint8_t *in_request_bytes,
                                                size_t in_request_size,
-                                               rac_proto_buffer_t* out_proto);
+                                               rac_proto_buffer_t *out_proto);
 
 /**
  * @brief Probe whether a path is a directory containing at least one entry.
@@ -914,7 +967,7 @@ RAC_API rac_result_t rac_model_info_make_proto(const uint8_t* in_request_bytes,
  * @param path Absolute directory path (UTF-8). NULL or empty → RAC_FALSE.
  * @return RAC_TRUE if path is a non-empty directory, RAC_FALSE otherwise.
  */
-RAC_API rac_bool_t rac_path_is_non_empty_directory(const char* path);
+RAC_API rac_bool_t rac_path_is_non_empty_directory(const char *path);
 
 // =============================================================================
 // CANONICAL ARTIFACT EXPECTED-FILES HELPER
@@ -930,8 +983,8 @@ RAC_API rac_bool_t rac_path_is_non_empty_directory(const char* path);
 //
 // Exposed as proto-byte ABI so platform SDKs can call it without rebuilding
 // the C-struct mirror of `rac_model_artifact_info_t` from a serialized
-// runanywhere.v1.ModelInfo. Output is the same `runanywhere.v1.ExpectedModelFiles`
-// shape every SDK already consumes.
+// runanywhere.v1.ModelInfo. Output is the same
+// `runanywhere.v1.ExpectedModelFiles` shape every SDK already consumes.
 
 // =============================================================================
 // PROTO ENUM ↔ C ENUM MAPPERS
@@ -973,8 +1026,8 @@ RAC_API rac_bool_t rac_path_is_non_empty_directory(const char* path);
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
  *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
-                                                        rac_inference_framework_t* out);
+RAC_API rac_result_t rac_inference_framework_from_proto(
+    int32_t proto_value, rac_inference_framework_t *out);
 
 /**
  * @brief Convert a `rac_inference_framework_t` value to the proto
@@ -985,8 +1038,8 @@ RAC_API rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the C value
  *         is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_inference_framework_to_proto(rac_inference_framework_t value,
-                                                      int32_t* out);
+RAC_API rac_result_t
+rac_inference_framework_to_proto(rac_inference_framework_t value, int32_t *out);
 
 /**
  * @brief Convert a proto `runanywhere.v1.ModelCategory` int32 value to a
@@ -998,7 +1051,8 @@ RAC_API rac_result_t rac_inference_framework_to_proto(rac_inference_framework_t 
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
  *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_model_category_from_proto(int32_t proto_value, rac_model_category_t* out);
+RAC_API rac_result_t rac_model_category_from_proto(int32_t proto_value,
+                                                   rac_model_category_t *out);
 
 /**
  * @brief Convert a `rac_model_category_t` value to the proto
@@ -1009,7 +1063,8 @@ RAC_API rac_result_t rac_model_category_from_proto(int32_t proto_value, rac_mode
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the C value
  *         is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_model_category_to_proto(rac_model_category_t value, int32_t* out);
+RAC_API rac_result_t rac_model_category_to_proto(rac_model_category_t value,
+                                                 int32_t *out);
 
 /**
  * @brief Convert a proto `runanywhere.v1.ModelFormat` int32 value to a
@@ -1025,7 +1080,8 @@ RAC_API rac_result_t rac_model_category_to_proto(rac_model_category_t value, int
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
  *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_model_format_from_proto(int32_t proto_value, rac_model_format_t* out);
+RAC_API rac_result_t rac_model_format_from_proto(int32_t proto_value,
+                                                 rac_model_format_t *out);
 
 /**
  * @brief Convert a `rac_model_format_t` value to the proto
@@ -1036,7 +1092,8 @@ RAC_API rac_result_t rac_model_format_from_proto(int32_t proto_value, rac_model_
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the C value
  *         is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_model_format_to_proto(rac_model_format_t value, int32_t* out);
+RAC_API rac_result_t rac_model_format_to_proto(rac_model_format_t value,
+                                               int32_t *out);
 
 /**
  * @brief Convert a proto `runanywhere.v1.ModelSource` int32 value to a
@@ -1053,7 +1110,8 @@ RAC_API rac_result_t rac_model_format_to_proto(rac_model_format_t value, int32_t
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
  *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_model_source_from_proto(int32_t proto_value, rac_model_source_t* out);
+RAC_API rac_result_t rac_model_source_from_proto(int32_t proto_value,
+                                                 rac_model_source_t *out);
 
 /**
  * @brief Convert a `rac_model_source_t` value to the proto
@@ -1064,7 +1122,8 @@ RAC_API rac_result_t rac_model_source_from_proto(int32_t proto_value, rac_model_
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the C value
  *         is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_model_source_to_proto(rac_model_source_t value, int32_t* out);
+RAC_API rac_result_t rac_model_source_to_proto(rac_model_source_t value,
+                                               int32_t *out);
 
 /**
  * @brief Convert a proto `runanywhere.v1.ArchiveType` int32 value to a
@@ -1080,7 +1139,8 @@ RAC_API rac_result_t rac_model_source_to_proto(rac_model_source_t value, int32_t
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
  *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_archive_type_from_proto(int32_t proto_value, rac_archive_type_t* out);
+RAC_API rac_result_t rac_archive_type_from_proto(int32_t proto_value,
+                                                 rac_archive_type_t *out);
 
 /**
  * @brief Convert a `rac_archive_type_t` value to the proto
@@ -1091,7 +1151,8 @@ RAC_API rac_result_t rac_archive_type_from_proto(int32_t proto_value, rac_archiv
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the C value
  *         is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_archive_type_to_proto(rac_archive_type_t value, int32_t* out);
+RAC_API rac_result_t rac_archive_type_to_proto(rac_archive_type_t value,
+                                               int32_t *out);
 
 /**
  * @brief Convert a proto `runanywhere.v1.ArchiveStructure` int32 value to a
@@ -1108,8 +1169,8 @@ RAC_API rac_result_t rac_archive_type_to_proto(rac_archive_type_t value, int32_t
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
  *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_archive_structure_from_proto(int32_t proto_value,
-                                                      rac_archive_structure_t* out);
+RAC_API rac_result_t rac_archive_structure_from_proto(
+    int32_t proto_value, rac_archive_structure_t *out);
 
 /**
  * @brief Convert a `rac_archive_structure_t` value to the proto
@@ -1120,7 +1181,8 @@ RAC_API rac_result_t rac_archive_structure_from_proto(int32_t proto_value,
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the C value
  *         is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_archive_structure_to_proto(rac_archive_structure_t value, int32_t* out);
+RAC_API rac_result_t
+rac_archive_structure_to_proto(rac_archive_structure_t value, int32_t *out);
 
 /**
  * @brief Compute the canonical ExpectedModelFiles manifest for a ModelInfo.
@@ -1158,9 +1220,9 @@ RAC_API rac_result_t rac_archive_structure_to_proto(rac_archive_structure_t valu
  * @return RAC_SUCCESS on success, or a negative rac_result_t on
  *         encode/decode/null-pointer failure.
  */
-RAC_API rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_model_bytes,
-                                                       size_t in_model_size,
-                                                       rac_proto_buffer_t* out_proto);
+RAC_API rac_result_t rac_artifact_expected_files_proto(
+    const uint8_t *in_model_bytes, size_t in_model_size,
+    rac_proto_buffer_t *out_proto);
 
 // =============================================================================
 // MODEL HEURISTICS — DERIVED FROM RAModelInfo
@@ -1169,8 +1231,9 @@ RAC_API rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_model_b
 // Commons-owned accessors that derive cross-SDK display state from a
 // serialized `runanywhere.v1.ModelInfo`. Centralizes the model-naming
 // heuristics that examples-flutter, examples-ios, examples-android, and
-// examples-react-native were each duplicating. Companion tool-call accessor lives in
-// `rac/features/llm/rac_tool_calling.h` (`rac_tool_call_format_from_model_info_proto`).
+// examples-react-native were each duplicating. Companion tool-call accessor
+// lives in `rac/features/llm/rac_tool_calling.h`
+// (`rac_tool_call_format_from_model_info_proto`).
 
 /**
  * @brief Estimate the parameter count (in billions) of a model from its
@@ -1192,9 +1255,9 @@ RAC_API rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_model_b
  *         out_parameter_count_b is NULL, RAC_ERROR_DECODING_ERROR when the
  *         supplied bytes do not parse as runanywhere.v1.ModelInfo.
  */
-RAC_API rac_result_t rac_model_info_parameter_count_b_proto(const uint8_t* model_info_proto_bytes,
-                                                            size_t size,
-                                                            float* out_parameter_count_b);
+RAC_API rac_result_t rac_model_info_parameter_count_b_proto(
+    const uint8_t *model_info_proto_bytes, size_t size,
+    float *out_parameter_count_b);
 
 /**
  * @brief Decide whether a model qualifies as "small" (≤500M params) for
@@ -1217,8 +1280,9 @@ RAC_API rac_result_t rac_model_info_parameter_count_b_proto(const uint8_t* model
  *         is NULL, RAC_ERROR_DECODING_ERROR when the supplied bytes do not
  *         parse as runanywhere.v1.ModelInfo.
  */
-RAC_API rac_result_t rac_model_info_is_small_model_proto(const uint8_t* model_info_proto_bytes,
-                                                         size_t size, rac_bool_t* out_is_small);
+RAC_API rac_result_t
+rac_model_info_is_small_model_proto(const uint8_t *model_info_proto_bytes,
+                                    size_t size, rac_bool_t *out_is_small);
 
 #ifdef __cplusplus
 }

@@ -53,6 +53,10 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         {&::_pbi::kDescriptorMethods, &::descriptor_table_lora_5foptions_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::LoraAdapterDownloadCompletedResult
         {&::_pbi::kDescriptorMethods, &::descriptor_table_lora_5foptions_2eproto, /* tracker*/ nullptr,},
+        // ::runanywhere::v1::LoraAdapterImportRequest
+        {&::_pbi::kDescriptorMethods, &::descriptor_table_lora_5foptions_2eproto, /* tracker*/ nullptr,},
+        // ::runanywhere::v1::LoraAdapterImportResult
+        {&::_pbi::kDescriptorMethods, &::descriptor_table_lora_5foptions_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::LoraCompatibilityResult
         {&::_pbi::kDescriptorMethods, &::descriptor_table_lora_5foptions_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::LoRAApplyRequest
@@ -202,7 +206,7 @@ constexpr auto LoraCompatibilityResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[12],
+      &file_reflection_data[14],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_lora_5foptions_2eproto,
@@ -249,6 +253,162 @@ const ::_pbi::ClassData* LoraCompatibilityResult_get_class_data() {
   return LoraCompatibilityResult_globals_.GetClassData();
 #else
   return LoraCompatibilityResult_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
+class LoraAdapterImportRequest::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<LoraAdapterImportRequest>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(LoraAdapterImportRequest, _impl_._has_bits_);
+};
+
+constexpr LoraAdapterImportRequest::ParseTableT_ LoraAdapterImportRequest::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(LoraAdapterImportRequest, _impl_._has_bits_),
+      0, // no _extensions_
+      2, 8,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967292,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      2,  // num_field_entries
+      0,  // num_aux_entries
+      offsetof(ParseTableT_, field_names),  // no aux_entries
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::LoraAdapterImportRequest>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      // optional string filename = 2;
+      {::_pbi::TcParser::FastUS1,
+       {18, 1, 0,
+        PROTOBUF_FIELD_OFFSET(LoraAdapterImportRequest, _impl_.filename_)}},
+      // string source_path = 1;
+      {::_pbi::TcParser::FastUS1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(LoraAdapterImportRequest, _impl_.source_path_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // string source_path = 1;
+      {PROTOBUF_FIELD_OFFSET(LoraAdapterImportRequest, _impl_.source_path_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional string filename = 2;
+      {PROTOBUF_FIELD_OFFSET(LoraAdapterImportRequest, _impl_.filename_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    }},
+    // no aux_entries
+    {{
+      "\47\13\10\0\0\0\0\0"
+      "runanywhere.v1.LoraAdapterImportRequest"
+      "source_path"
+      "filename"
+    }},
+  };
+}
+
+
+inline constexpr LoraAdapterImportRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        source_path_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        filename_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()) {}
+
+template <typename>
+constexpr LoraAdapterImportRequest::LoraAdapterImportRequest(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL LoraAdapterImportRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) LoraAdapterImportRequest(arena);
+}
+constexpr auto LoraAdapterImportRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(LoraAdapterImportRequest), alignof(LoraAdapterImportRequest));
+}
+constexpr auto LoraAdapterImportRequest::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &LoraAdapterImportRequest::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<LoraAdapterImportRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &LoraAdapterImportRequest::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<LoraAdapterImportRequest>(), &LoraAdapterImportRequest::ByteSizeLong,
+              &LoraAdapterImportRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(LoraAdapterImportRequest, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[12],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_lora_5foptions_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct LoraAdapterImportRequestGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr LoraAdapterImportRequestGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 LoraAdapterImportRequest_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(LoraAdapterImportRequest::InternalGenerateClassData_(
+            _default, &LoraAdapterImportRequest_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<LoraAdapterImportRequest>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~LoraAdapterImportRequestGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) LoraAdapterImportRequest _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<LoraAdapterImportRequest>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(LoraAdapterImportRequestGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST LoraAdapterImportRequestGlobalsTypeInternal LoraAdapterImportRequest_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* LoraAdapterImportRequest_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return LoraAdapterImportRequest_globals_.GetClassData();
+#else
+  return LoraAdapterImportRequest_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -1048,7 +1208,7 @@ constexpr auto LoRARemoveRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[15],
+      &file_reflection_data[17],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_lora_5foptions_2eproto,
@@ -2045,7 +2205,7 @@ constexpr auto LoRAState::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[16],
+      &file_reflection_data[18],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_lora_5foptions_2eproto,
@@ -2235,7 +2395,7 @@ constexpr auto LoRAApplyResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[14],
+      &file_reflection_data[16],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_lora_5foptions_2eproto,
@@ -2472,6 +2632,192 @@ const ::_pbi::ClassData* LoRAAdapterConfig_get_class_data() {
   return LoRAAdapterConfig_globals_.GetClassData();
 #else
   return LoRAAdapterConfig_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
+class LoraAdapterImportResult::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<LoraAdapterImportResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_._has_bits_);
+};
+
+constexpr LoraAdapterImportResult::ParseTableT_ LoraAdapterImportResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_._has_bits_),
+      0, // no _extensions_
+      5, 56,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967264,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      5,  // num_field_entries
+      1,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::LoraAdapterImportResult>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      // bool success = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(LoraAdapterImportResult, _impl_.success_), 3>(),
+       {8, 3, 0,
+        PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.success_)}},
+      // string error_message = 2;
+      {::_pbi::TcParser::FastUS1,
+       {18, 0, 0,
+        PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.error_message_)}},
+      // string local_path = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 1, 0,
+        PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.local_path_)}},
+      // bool matched = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(LoraAdapterImportResult, _impl_.matched_), 4>(),
+       {32, 4, 0,
+        PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.matched_)}},
+      // .runanywhere.v1.LoraAdapterCatalogEntry entry = 5;
+      {::_pbi::TcParser::FastMtS1,
+       {42, 2, 0,
+        PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.entry_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // bool success = 1;
+      {PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.success_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // string error_message = 2;
+      {PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.error_message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string local_path = 3;
+      {PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.local_path_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // bool matched = 4;
+      {PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.matched_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // .runanywhere.v1.LoraAdapterCatalogEntry entry = 5;
+      {PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.entry_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::LoraAdapterCatalogEntry>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::LoraAdapterCatalogEntry_globals_},
+        #endif
+    }},
+    {{
+      "\46\0\15\12\0\0\0\0"
+      "runanywhere.v1.LoraAdapterImportResult"
+      "error_message"
+      "local_path"
+    }},
+  };
+}
+
+
+inline constexpr LoraAdapterImportResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        error_message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        local_path_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        entry_{nullptr},
+        success_{false},
+        matched_{false} {}
+
+template <typename>
+constexpr LoraAdapterImportResult::LoraAdapterImportResult(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL LoraAdapterImportResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) LoraAdapterImportResult(arena);
+}
+constexpr auto LoraAdapterImportResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(LoraAdapterImportResult), alignof(LoraAdapterImportResult));
+}
+constexpr auto LoraAdapterImportResult::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &LoraAdapterImportResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<LoraAdapterImportResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &LoraAdapterImportResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<LoraAdapterImportResult>(), &LoraAdapterImportResult::ByteSizeLong,
+              &LoraAdapterImportResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[13],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_lora_5foptions_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct LoraAdapterImportResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr LoraAdapterImportResultGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 LoraAdapterImportResult_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(LoraAdapterImportResult::InternalGenerateClassData_(
+            _default, &LoraAdapterImportResult_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<LoraAdapterImportResult>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~LoraAdapterImportResultGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) LoraAdapterImportResult _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<LoraAdapterImportResult>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(LoraAdapterImportResultGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST LoraAdapterImportResultGlobalsTypeInternal LoraAdapterImportResult_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* LoraAdapterImportResult_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return LoraAdapterImportResult_globals_.GetClassData();
+#else
+  return LoraAdapterImportResult_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -3129,7 +3475,7 @@ constexpr auto LoRAApplyRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[13],
+      &file_reflection_data[15],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_lora_5foptions_2eproto,
@@ -3350,6 +3696,26 @@ const ::uint32_t
         0,
         3,
         0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterImportRequest, _impl_._has_bits_),
+        5, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterImportRequest, _impl_.source_path_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterImportRequest, _impl_.filename_),
+        0,
+        1,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterImportResult, _impl_._has_bits_),
+        8, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterImportResult, _impl_.success_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterImportResult, _impl_.error_message_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterImportResult, _impl_.local_path_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterImportResult, _impl_.matched_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraAdapterImportResult, _impl_.entry_),
+        3,
+        0,
+        1,
+        4,
+        2,
+        0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraCompatibilityResult, _impl_._has_bits_),
         8, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoraCompatibilityResult, _impl_.is_compatible_),
@@ -3424,11 +3790,13 @@ static const ::_pbi::MigrationSchema
         {123, sizeof(::runanywhere::v1::LoraAdapterCatalogGetResult)},
         {132, sizeof(::runanywhere::v1::LoraAdapterDownloadCompletedRequest)},
         {149, sizeof(::runanywhere::v1::LoraAdapterDownloadCompletedResult)},
-        {160, sizeof(::runanywhere::v1::LoraCompatibilityResult)},
-        {173, sizeof(::runanywhere::v1::LoRAApplyRequest)},
-        {182, sizeof(::runanywhere::v1::LoRAApplyResult)},
-        {195, sizeof(::runanywhere::v1::LoRARemoveRequest)},
-        {206, sizeof(::runanywhere::v1::LoRAState)},
+        {160, sizeof(::runanywhere::v1::LoraAdapterImportRequest)},
+        {167, sizeof(::runanywhere::v1::LoraAdapterImportResult)},
+        {180, sizeof(::runanywhere::v1::LoraCompatibilityResult)},
+        {193, sizeof(::runanywhere::v1::LoRAApplyRequest)},
+        {202, sizeof(::runanywhere::v1::LoRAApplyResult)},
+        {215, sizeof(::runanywhere::v1::LoRARemoveRequest)},
+        {226, sizeof(::runanywhere::v1::LoRAState)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -3444,6 +3812,8 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
         &::runanywhere::v1::LoraAdapterCatalogGetResult_globals_,
         &::runanywhere::v1::LoraAdapterDownloadCompletedRequest_globals_,
         &::runanywhere::v1::LoraAdapterDownloadCompletedResult_globals_,
+        &::runanywhere::v1::LoraAdapterImportRequest_globals_,
+        &::runanywhere::v1::LoraAdapterImportResult_globals_,
         &::runanywhere::v1::LoraCompatibilityResult_globals_,
         &::runanywhere::v1::LoRAApplyRequest_globals_,
         &::runanywhere::v1::LoRAApplyResult_globals_,
@@ -3508,66 +3878,73 @@ const char descriptor_table_protodef_lora_5foptions_2eproto[] ABSL_ATTRIBUTE_SEC
     "oraAdapterDownloadCompletedResult\022\017\n\007suc"
     "cess\030\001 \001(\010\0226\n\005entry\030\002 \001(\0132\'.runanywhere."
     "v1.LoraAdapterCatalogEntry\022\025\n\rerror_mess"
-    "age\030\003 \001(\t\022\021\n\tpersisted\030\004 \001(\010\"\276\001\n\027LoraCom"
-    "patibilityResult\022\025\n\ris_compatible\030\001 \001(\010\022"
-    "\032\n\rerror_message\030\002 \001(\tH\000\210\001\001\022 \n\023base_mode"
-    "l_required\030\003 \001(\tH\001\210\001\001\022\020\n\010warnings\030\004 \003(\t\022"
-    "\022\n\nerror_code\030\005 \001(\005B\020\n\016_error_messageB\026\n"
-    "\024_base_model_required\"u\n\020LoRAApplyReques"
-    "t\022\022\n\nrequest_id\030\001 \001(\t\0223\n\010adapters\030\002 \003(\0132"
-    "!.runanywhere.v1.LoRAAdapterConfig\022\030\n\020re"
-    "place_existing\030\003 \001(\010\"\253\001\n\017LoRAApplyResult"
-    "\022\022\n\nrequest_id\030\001 \001(\t\0221\n\010adapters\030\002 \003(\0132\037"
-    ".runanywhere.v1.LoRAAdapterInfo\022\017\n\007succe"
-    "ss\030\003 \001(\010\022\032\n\rerror_message\030\004 \001(\tH\000\210\001\001\022\022\n\n"
-    "error_code\030\005 \001(\005B\020\n\016_error_message\"f\n\021Lo"
-    "RARemoveRequest\022\022\n\nrequest_id\030\001 \001(\t\022\023\n\013a"
-    "dapter_ids\030\002 \003(\t\022\025\n\radapter_paths\030\003 \003(\t\022"
-    "\021\n\tclear_all\030\004 \001(\010\"\322\001\n\tLoRAState\0228\n\017load"
-    "ed_adapters\030\001 \003(\0132\037.runanywhere.v1.LoRAA"
-    "dapterInfo\022\033\n\023has_active_adapters\030\002 \001(\010\022"
-    "\032\n\rbase_model_id\030\003 \001(\tH\000\210\001\001\022\032\n\rerror_mes"
-    "sage\030\004 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\005 \001(\005B\020\n\016_"
-    "base_model_idB\020\n\016_error_message2\247\007\n\004LoRA"
-    "\022h\n\024RegisterCatalogEntry\022\'.runanywhere.v"
-    "1.LoraAdapterCatalogEntry\032\'.runanywhere."
-    "v1.LoraAdapterCatalogEntry\022j\n\013ListCatalo"
-    "g\022-.runanywhere.v1.LoraAdapterCatalogLis"
-    "tRequest\032,.runanywhere.v1.LoraAdapterCat"
-    "alogListResult\022e\n\014QueryCatalog\022\'.runanyw"
-    "here.v1.LoraAdapterCatalogQuery\032,.runany"
-    "where.v1.LoraAdapterCatalogListResult\022l\n"
-    "\017GetCatalogEntry\022,.runanywhere.v1.LoraAd"
-    "apterCatalogGetRequest\032+.runanywhere.v1."
-    "LoraAdapterCatalogGetResult\022\200\001\n\025MarkDown"
-    "loadCompleted\0223.runanywhere.v1.LoraAdapt"
-    "erDownloadCompletedRequest\0322.runanywhere"
-    ".v1.LoraAdapterDownloadCompletedResult\022J"
-    "\n\005Apply\022 .runanywhere.v1.LoRAApplyReques"
-    "t\032\037.runanywhere.v1.LoRAApplyResult\022F\n\006Re"
-    "move\022!.runanywhere.v1.LoRARemoveRequest\032"
-    "\031.runanywhere.v1.LoRAState\022`\n\022CheckCompa"
-    "tibility\022!.runanywhere.v1.LoRAAdapterCon"
-    "fig\032\'.runanywhere.v1.LoraCompatibilityRe"
-    "sult\022<\n\004List\022\031.runanywhere.v1.LoRAState\032"
-    "\031.runanywhere.v1.LoRAState\022=\n\005State\022\031.ru"
-    "nanywhere.v1.LoRAState\032\031.runanywhere.v1."
-    "LoRAStateB\213\001\n\027ai.runanywhere.proto.v1B\020L"
-    "oraOptionsProtoP\001Z<github.com/runanywher"
-    "e/runanywhere-sdks/idl/v1;runanywherev1\370"
-    "\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "age\030\003 \001(\t\022\021\n\tpersisted\030\004 \001(\010\"S\n\030LoraAdap"
+    "terImportRequest\022\023\n\013source_path\030\001 \001(\t\022\025\n"
+    "\010filename\030\002 \001(\tH\000\210\001\001B\013\n\t_filename\"\236\001\n\027Lo"
+    "raAdapterImportResult\022\017\n\007success\030\001 \001(\010\022\025"
+    "\n\rerror_message\030\002 \001(\t\022\022\n\nlocal_path\030\003 \001("
+    "\t\022\017\n\007matched\030\004 \001(\010\0226\n\005entry\030\005 \001(\0132\'.runa"
+    "nywhere.v1.LoraAdapterCatalogEntry\"\276\001\n\027L"
+    "oraCompatibilityResult\022\025\n\ris_compatible\030"
+    "\001 \001(\010\022\032\n\rerror_message\030\002 \001(\tH\000\210\001\001\022 \n\023bas"
+    "e_model_required\030\003 \001(\tH\001\210\001\001\022\020\n\010warnings\030"
+    "\004 \003(\t\022\022\n\nerror_code\030\005 \001(\005B\020\n\016_error_mess"
+    "ageB\026\n\024_base_model_required\"u\n\020LoRAApply"
+    "Request\022\022\n\nrequest_id\030\001 \001(\t\0223\n\010adapters\030"
+    "\002 \003(\0132!.runanywhere.v1.LoRAAdapterConfig"
+    "\022\030\n\020replace_existing\030\003 \001(\010\"\253\001\n\017LoRAApply"
+    "Result\022\022\n\nrequest_id\030\001 \001(\t\0221\n\010adapters\030\002"
+    " \003(\0132\037.runanywhere.v1.LoRAAdapterInfo\022\017\n"
+    "\007success\030\003 \001(\010\022\032\n\rerror_message\030\004 \001(\tH\000\210"
+    "\001\001\022\022\n\nerror_code\030\005 \001(\005B\020\n\016_error_message"
+    "\"f\n\021LoRARemoveRequest\022\022\n\nrequest_id\030\001 \001("
+    "\t\022\023\n\013adapter_ids\030\002 \003(\t\022\025\n\radapter_paths\030"
+    "\003 \003(\t\022\021\n\tclear_all\030\004 \001(\010\"\322\001\n\tLoRAState\0228"
+    "\n\017loaded_adapters\030\001 \003(\0132\037.runanywhere.v1"
+    ".LoRAAdapterInfo\022\033\n\023has_active_adapters\030"
+    "\002 \001(\010\022\032\n\rbase_model_id\030\003 \001(\tH\000\210\001\001\022\032\n\rerr"
+    "or_message\030\004 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\005 \001("
+    "\005B\020\n\016_base_model_idB\020\n\016_error_message2\247\007"
+    "\n\004LoRA\022h\n\024RegisterCatalogEntry\022\'.runanyw"
+    "here.v1.LoraAdapterCatalogEntry\032\'.runany"
+    "where.v1.LoraAdapterCatalogEntry\022j\n\013List"
+    "Catalog\022-.runanywhere.v1.LoraAdapterCata"
+    "logListRequest\032,.runanywhere.v1.LoraAdap"
+    "terCatalogListResult\022e\n\014QueryCatalog\022\'.r"
+    "unanywhere.v1.LoraAdapterCatalogQuery\032,."
+    "runanywhere.v1.LoraAdapterCatalogListRes"
+    "ult\022l\n\017GetCatalogEntry\022,.runanywhere.v1."
+    "LoraAdapterCatalogGetRequest\032+.runanywhe"
+    "re.v1.LoraAdapterCatalogGetResult\022\200\001\n\025Ma"
+    "rkDownloadCompleted\0223.runanywhere.v1.Lor"
+    "aAdapterDownloadCompletedRequest\0322.runan"
+    "ywhere.v1.LoraAdapterDownloadCompletedRe"
+    "sult\022J\n\005Apply\022 .runanywhere.v1.LoRAApply"
+    "Request\032\037.runanywhere.v1.LoRAApplyResult"
+    "\022F\n\006Remove\022!.runanywhere.v1.LoRARemoveRe"
+    "quest\032\031.runanywhere.v1.LoRAState\022`\n\022Chec"
+    "kCompatibility\022!.runanywhere.v1.LoRAAdap"
+    "terConfig\032\'.runanywhere.v1.LoraCompatibi"
+    "lityResult\022<\n\004List\022\031.runanywhere.v1.LoRA"
+    "State\032\031.runanywhere.v1.LoRAState\022=\n\005Stat"
+    "e\022\031.runanywhere.v1.LoRAState\032\031.runanywhe"
+    "re.v1.LoRAStateB\213\001\n\027ai.runanywhere.proto"
+    ".v1B\020LoraOptionsProtoP\001Z<github.com/runa"
+    "nywhere/runanywhere-sdks/idl/v1;runanywh"
+    "erev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006p"
+    "roto3"
 };
 static ::absl::once_flag descriptor_table_lora_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_lora_5foptions_2eproto = {
     false,
     false,
-    4159,
+    4405,
     descriptor_table_protodef_lora_5foptions_2eproto,
     "lora_options.proto",
     &descriptor_table_lora_5foptions_2eproto_once,
     nullptr,
     0,
-    17,
+    19,
     schemas,
     file_message_globals,
     TableStruct_lora_5foptions_2eproto::offsets,
@@ -7245,6 +7622,592 @@ void LoraAdapterDownloadCompletedResult::InternalSwap(LoraAdapterDownloadComplet
 }
 
 ::google::protobuf::Metadata LoraAdapterDownloadCompletedResult::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+LoraAdapterImportRequest::LoraAdapterImportRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, LoraAdapterImportRequest_get_class_data()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.LoraAdapterImportRequest)
+}
+PROTOBUF_NDEBUG_INLINE LoraAdapterImportRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::LoraAdapterImportRequest& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        source_path_(arena, from.source_path_),
+        filename_(arena, from.filename_) {}
+
+LoraAdapterImportRequest::LoraAdapterImportRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const LoraAdapterImportRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, LoraAdapterImportRequest_get_class_data()) {
+
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  LoraAdapterImportRequest* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.LoraAdapterImportRequest)
+}
+PROTOBUF_NDEBUG_INLINE LoraAdapterImportRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        source_path_(arena),
+        filename_(arena) {}
+
+inline void LoraAdapterImportRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+}
+LoraAdapterImportRequest::~LoraAdapterImportRequest() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.LoraAdapterImportRequest)
+  SharedDtor(*this);
+}
+inline void LoraAdapterImportRequest::SharedDtor(MessageLite& self) {
+  LoraAdapterImportRequest& this_ = static_cast<LoraAdapterImportRequest&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.source_path_.Destroy();
+  this_._impl_.filename_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull LoraAdapterImportRequest_class_data_ =
+        LoraAdapterImportRequest::InternalGenerateClassData_(LoraAdapterImportRequest_globals_._default);
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+LoraAdapterImportRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&LoraAdapterImportRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(LoraAdapterImportRequest_class_data_.tc_table);
+  return LoraAdapterImportRequest_class_data_.base();
+}
+#else
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+LoraAdapterImportRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&LoraAdapterImportRequest_globals_);
+  ::google::protobuf::internal::PrefetchToLocalCache(
+      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&LoraAdapterImportRequest_globals_));
+  return LoraAdapterImportRequest_globals_.GetClassData();
+}
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const LoraAdapterImportRequest::ParseTableT_
+    LoraAdapterImportRequest::_table_ =
+        LoraAdapterImportRequest::InternalGenerateParseTable_(LoraAdapterImportRequest_class_data_.base());
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_NOINLINE void LoraAdapterImportRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.LoraAdapterImportRequest)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.source_path_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.filename_.ClearNonDefaultToEmpty();
+    }
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL LoraAdapterImportRequest::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const LoraAdapterImportRequest& this_ = static_cast<const LoraAdapterImportRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL LoraAdapterImportRequest::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const LoraAdapterImportRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.LoraAdapterImportRequest)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string source_path = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_source_path().empty()) {
+      const ::std::string& _s = this_._internal_source_path();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.LoraAdapterImportRequest.source_path");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // optional string filename = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    const ::std::string& _s = this_._internal_filename();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.LoraAdapterImportRequest.filename");
+    target = stream->WriteStringMaybeAliased(2, _s, target);
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.LoraAdapterImportRequest)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t LoraAdapterImportRequest::ByteSizeLong(const MessageLite& base) {
+  const LoraAdapterImportRequest& this_ = static_cast<const LoraAdapterImportRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t LoraAdapterImportRequest::ByteSizeLong() const {
+  const LoraAdapterImportRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.LoraAdapterImportRequest)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    // string source_path = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_source_path().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_source_path());
+      }
+    }
+    // optional string filename = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_filename());
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void LoraAdapterImportRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                      const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this = static_cast<LoraAdapterImportRequest*>(&to_msg);
+  auto& from = static_cast<const LoraAdapterImportRequest&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.LoraAdapterImportRequest)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_source_path().empty()) {
+        _this->_internal_set_source_path(from._internal_source_path());
+      } else {
+        if (_this->_impl_.source_path_.IsDefault()) {
+          _this->_internal_set_source_path("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _this->_internal_set_filename(from._internal_filename());
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void LoraAdapterImportRequest::CopyFrom(const LoraAdapterImportRequest& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.LoraAdapterImportRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void LoraAdapterImportRequest::InternalSwap(LoraAdapterImportRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.source_path_, &other->_impl_.source_path_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.filename_, &other->_impl_.filename_, arena);
+}
+
+::google::protobuf::Metadata LoraAdapterImportRequest::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+LoraAdapterImportResult::LoraAdapterImportResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, LoraAdapterImportResult_get_class_data()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.LoraAdapterImportResult)
+}
+PROTOBUF_NDEBUG_INLINE LoraAdapterImportResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::LoraAdapterImportResult& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        error_message_(arena, from.error_message_),
+        local_path_(arena, from.local_path_) {}
+
+LoraAdapterImportResult::LoraAdapterImportResult(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const LoraAdapterImportResult& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, LoraAdapterImportResult_get_class_data()) {
+
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  LoraAdapterImportResult* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.entry_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.entry_)
+                : nullptr;
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, success_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, success_),
+           offsetof(Impl_, matched_) -
+               offsetof(Impl_, success_) +
+               sizeof(Impl_::matched_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.LoraAdapterImportResult)
+}
+PROTOBUF_NDEBUG_INLINE LoraAdapterImportResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        error_message_(arena),
+        local_path_(arena) {}
+
+inline void LoraAdapterImportResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, entry_),
+           0,
+           offsetof(Impl_, matched_) -
+               offsetof(Impl_, entry_) +
+               sizeof(Impl_::matched_));
+}
+LoraAdapterImportResult::~LoraAdapterImportResult() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.LoraAdapterImportResult)
+  SharedDtor(*this);
+}
+inline void LoraAdapterImportResult::SharedDtor(MessageLite& self) {
+  LoraAdapterImportResult& this_ = static_cast<LoraAdapterImportResult&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.error_message_.Destroy();
+  this_._impl_.local_path_.Destroy();
+  delete this_._impl_.entry_;
+  this_._impl_.~Impl_();
+}
+
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull LoraAdapterImportResult_class_data_ =
+        LoraAdapterImportResult::InternalGenerateClassData_(LoraAdapterImportResult_globals_._default);
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+LoraAdapterImportResult::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&LoraAdapterImportResult_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(LoraAdapterImportResult_class_data_.tc_table);
+  return LoraAdapterImportResult_class_data_.base();
+}
+#else
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+LoraAdapterImportResult::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&LoraAdapterImportResult_globals_);
+  ::google::protobuf::internal::PrefetchToLocalCache(
+      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&LoraAdapterImportResult_globals_));
+  return LoraAdapterImportResult_globals_.GetClassData();
+}
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const LoraAdapterImportResult::ParseTableT_
+    LoraAdapterImportResult::_table_ =
+        LoraAdapterImportResult::InternalGenerateParseTable_(LoraAdapterImportResult_class_data_.base());
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_NOINLINE void LoraAdapterImportResult::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.LoraAdapterImportResult)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.error_message_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.local_path_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      ABSL_DCHECK(_impl_.entry_ != nullptr);
+      _impl_.entry_->Clear();
+    }
+  }
+  ::memset(&_impl_.success_, 0, static_cast<::size_t>(
+      reinterpret_cast<char*>(&_impl_.matched_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.matched_));
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL LoraAdapterImportResult::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const LoraAdapterImportResult& this_ = static_cast<const LoraAdapterImportResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL LoraAdapterImportResult::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const LoraAdapterImportResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.LoraAdapterImportResult)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bool success = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_success() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          1, this_._internal_success(), target);
+    }
+  }
+
+  // string error_message = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_error_message().empty()) {
+      const ::std::string& _s = this_._internal_error_message();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.LoraAdapterImportResult.error_message");
+      target = stream->WriteStringMaybeAliased(2, _s, target);
+    }
+  }
+
+  // string local_path = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_local_path().empty()) {
+      const ::std::string& _s = this_._internal_local_path();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.LoraAdapterImportResult.local_path");
+      target = stream->WriteStringMaybeAliased(3, _s, target);
+    }
+  }
+
+  // bool matched = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_matched() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          4, this_._internal_matched(), target);
+    }
+  }
+
+  // .runanywhere.v1.LoraAdapterCatalogEntry entry = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        5, *this_._impl_.entry_, this_._impl_.entry_->GetCachedSize(), target,
+        stream);
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.LoraAdapterImportResult)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t LoraAdapterImportResult::ByteSizeLong(const MessageLite& base) {
+  const LoraAdapterImportResult& this_ = static_cast<const LoraAdapterImportResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t LoraAdapterImportResult::ByteSizeLong() const {
+  const LoraAdapterImportResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.LoraAdapterImportResult)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    // string error_message = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_error_message().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_error_message());
+      }
+    }
+    // string local_path = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_local_path().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_local_path());
+      }
+    }
+    // .runanywhere.v1.LoraAdapterCatalogEntry entry = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.entry_);
+    }
+    // bool success = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_success() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool matched = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_matched() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void LoraAdapterImportResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                      const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this = static_cast<LoraAdapterImportResult*>(&to_msg);
+  auto& from = static_cast<const LoraAdapterImportResult&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  ::google::protobuf::Arena* arena = _this->GetArena();
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.LoraAdapterImportResult)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_error_message().empty()) {
+        _this->_internal_set_error_message(from._internal_error_message());
+      } else {
+        if (_this->_impl_.error_message_.IsDefault()) {
+          _this->_internal_set_error_message("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_local_path().empty()) {
+        _this->_internal_set_local_path(from._internal_local_path());
+      } else {
+        if (_this->_impl_.local_path_.IsDefault()) {
+          _this->_internal_set_local_path("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      ABSL_DCHECK(from._impl_.entry_ != nullptr);
+      if (_this->_impl_.entry_ == nullptr) {
+        _this->_impl_.entry_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.entry_);
+      } else {
+        _this->_impl_.entry_->MergeFrom(*from._impl_.entry_);
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_success() != 0) {
+        _this->_impl_.success_ = from._impl_.success_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_matched() != 0) {
+        _this->_impl_.matched_ = from._impl_.matched_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void LoraAdapterImportResult::CopyFrom(const LoraAdapterImportResult& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.LoraAdapterImportResult)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void LoraAdapterImportResult::InternalSwap(LoraAdapterImportResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.local_path_, &other->_impl_.local_path_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.matched_)
+      + sizeof(LoraAdapterImportResult::_impl_.matched_)
+      - PROTOBUF_FIELD_OFFSET(LoraAdapterImportResult, _impl_.entry_)>(
+          reinterpret_cast<char*>(&_impl_.entry_),
+          reinterpret_cast<char*>(&other->_impl_.entry_));
+}
+
+::google::protobuf::Metadata LoraAdapterImportResult::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================

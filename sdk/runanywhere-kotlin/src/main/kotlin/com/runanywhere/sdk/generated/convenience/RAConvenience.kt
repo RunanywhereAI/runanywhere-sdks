@@ -280,10 +280,28 @@ public fun RAGConfiguration.Companion.defaults(): RAGConfiguration =
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
 public fun RAGConfiguration.validate() {
+    if (top_k != null && (top_k < 1)) {
+        throw SDKException.validationFailed(
+            fieldPath = "RAGConfiguration.top_k",
+            message = "top_k must be in >= 1 (got ${top_k})",
+        )
+    }
     if (similarity_threshold != null && (similarity_threshold < 0.0 || similarity_threshold > 1.0)) {
         throw SDKException.validationFailed(
             fieldPath = "RAGConfiguration.similarity_threshold",
             message = "similarity_threshold must be in 0.0...1.0 (got ${similarity_threshold})",
+        )
+    }
+    if (chunk_size != null && (chunk_size < 1)) {
+        throw SDKException.validationFailed(
+            fieldPath = "RAGConfiguration.chunk_size",
+            message = "chunk_size must be in >= 1 (got ${chunk_size})",
+        )
+    }
+    if (chunk_overlap != null && (chunk_overlap < 0)) {
+        throw SDKException.validationFailed(
+            fieldPath = "RAGConfiguration.chunk_overlap",
+            message = "chunk_overlap must be in >= 0 (got ${chunk_overlap})",
         )
     }
 }

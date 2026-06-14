@@ -548,6 +548,72 @@ public nonisolated struct RALoraAdapterDownloadCompletedResult: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
+/// Import of a user-picked local adapter file. Commons owns everything past
+/// the platform-readable source path: deterministic catalog matching (exact
+/// local-path match, else an unambiguous filename match), canonical placement
+/// under {Models}/{framework}/lora-adapter:{id}/, artifact registry record +
+/// manifest persistence, and catalog completion for matched entries.
+/// Platforms only resolve OS-specific access (security-scoped URLs, content
+/// URIs, Blob-to-FS staging) before calling.
+/// ---------------------------------------------------------------------------
+public nonisolated struct RALoraAdapterImportRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// platform-readable path of the picked file
+  public var sourcePath: String = String()
+
+  /// destination filename; default basename(source_path)
+  public var filename: String {
+    get {_filename ?? String()}
+    set {_filename = newValue}
+  }
+  /// Returns true if `filename` has been explicitly set.
+  public var hasFilename: Bool {self._filename != nil}
+  /// Clears the value of `filename`. Subsequent reads from it will return its default value.
+  public mutating func clearFilename() {self._filename = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _filename: String? = nil
+}
+
+public nonisolated struct RALoraAdapterImportResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var success: Bool = false
+
+  public var errorMessage: String = String()
+
+  /// stable SDK-owned path of the imported file
+  public var localPath: String = String()
+
+  /// a catalog entry matched and was completed
+  public var matched: Bool = false
+
+  /// updated catalog entry when matched
+  public var entry: RALoraAdapterCatalogEntry {
+    get {_entry ?? RALoraAdapterCatalogEntry()}
+    set {_entry = newValue}
+  }
+  /// Returns true if `entry` has been explicitly set.
+  public var hasEntry: Bool {self._entry != nil}
+  /// Clears the value of `entry`. Subsequent reads from it will return its default value.
+  public mutating func clearEntry() {self._entry = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _entry: RALoraAdapterCatalogEntry? = nil
+}
+
+/// ---------------------------------------------------------------------------
 /// Result of a LoRA compatibility pre-check.
 ///
 /// `base_model_required` is not present in any current SDK shape — it is
@@ -1334,6 +1400,99 @@ nonisolated extension RALoraAdapterDownloadCompletedResult: SwiftProtobuf.Messag
     if lhs._entry != rhs._entry {return false}
     if lhs.errorMessage != rhs.errorMessage {return false}
     if lhs.persisted != rhs.persisted {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RALoraAdapterImportRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LoraAdapterImportRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}source_path\0\u{1}filename\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.sourcePath) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._filename) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.sourcePath.isEmpty {
+      try visitor.visitSingularStringField(value: self.sourcePath, fieldNumber: 1)
+    }
+    try { if let v = self._filename {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RALoraAdapterImportRequest, rhs: RALoraAdapterImportRequest) -> Bool {
+    if lhs.sourcePath != rhs.sourcePath {return false}
+    if lhs._filename != rhs._filename {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RALoraAdapterImportResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LoraAdapterImportResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}error_message\0\u{3}local_path\0\u{1}matched\0\u{1}entry\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.success) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.localPath) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.matched) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._entry) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.success != false {
+      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 1)
+    }
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 2)
+    }
+    if !self.localPath.isEmpty {
+      try visitor.visitSingularStringField(value: self.localPath, fieldNumber: 3)
+    }
+    if self.matched != false {
+      try visitor.visitSingularBoolField(value: self.matched, fieldNumber: 4)
+    }
+    try { if let v = self._entry {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RALoraAdapterImportResult, rhs: RALoraAdapterImportResult) -> Bool {
+    if lhs.success != rhs.success {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.localPath != rhs.localPath {return false}
+    if lhs.matched != rhs.matched {return false}
+    if lhs._entry != rhs._entry {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

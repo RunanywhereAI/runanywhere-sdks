@@ -37,8 +37,10 @@ import {
   ModelSelectionContext,
 } from '../components/model/ModelSelectionSheet';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RunAnywhere } from '@runanywhere/core';
 import type { ModelInfo as SDKModelInfo } from '@runanywhere/proto-ts/model_types';
+import { GENERATION_SETTINGS_KEYS } from '../types/settings';
 import { RAGConfiguration } from '@runanywhere/proto-ts/rag';
 import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
 
@@ -218,7 +220,16 @@ export const RAGScreen: React.FC = () => {
       // Canonical query defaults (matches iOS, which queries with
       // RARAGQueryOptions.defaults(question:)) — commons stamps
       // maxTokens/temperature/topP and retrieval values when unset.
-      const result = await RunAnywhere.ragQuery(question);
+      // Thinking mode mirrors iOS RAGViewModel: suppress thinking output
+      // for thinking-capable models unless the user enabled it in Settings.
+      const thinkingStr = await AsyncStorage.getItem(
+        GENERATION_SETTINGS_KEYS.THINKING_MODE_ENABLED
+      );
+      const thinkingModeEnabled = thinkingStr === 'true';
+      const supportsThinking = selectedLLMModel?.supportsThinking ?? false;
+      const result = await RunAnywhere.ragQuery(question, {
+        disableThinking: supportsThinking && !thinkingModeEnabled,
+      });
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', text: result.answer },
@@ -237,7 +248,7 @@ export const RAGScreen: React.FC = () => {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
-  }, [currentQuestion, isDocumentLoaded]);
+  }, [currentQuestion, isDocumentLoaded, selectedLLMModel]);
 
   // MARK: - Model Selection Callbacks
 

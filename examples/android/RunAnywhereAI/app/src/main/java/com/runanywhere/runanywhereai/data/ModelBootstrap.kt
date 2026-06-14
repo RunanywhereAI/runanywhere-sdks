@@ -1,52 +1,23 @@
 package com.runanywhere.runanywhereai.data
 
-import ai.runanywhere.proto.v1.ModelListRequest
 import com.runanywhere.runanywhereai.util.RACLog
-import com.runanywhere.sdk.core.onnx.ONNX
-import com.runanywhere.sdk.features.TTS.System.SystemTTSModule
 import com.runanywhere.sdk.hybrid.Cloud
-import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.lora
 import com.runanywhere.sdk.public.extensions.refreshModelRegistry
 import kotlin.coroutines.cancellation.CancellationException
 
-// Seeds the native registry on launch (backends + curated catalog + LoRA). Without this the
-// model picker is empty: dev fetch returns nothing and rescan_local has no fs callbacks.
+// Seeds the native registry on launch (cloud backend + curated catalog + LoRA), then refreshes
+// it. Without this the model picker is empty: dev fetch returns nothing and rescan_local has no
+// fs callbacks. Core backends (LlamaCPP/ONNX) are registered earlier, in RunAnywhereApplication,
+// before RunAnywhere.initialize().
 object ModelBootstrap {
 
     suspend fun setupModels() {
-        registerCoreBackends()
         registerRemoteBackends()
         seedCatalog()
         seedLora()
-        relinkDownloads()
-    }
-
-    // The native registry is in-memory only; the SDK's own rescan runs during Phase 2,
-    // before this catalog exists, so it links nothing. Rescan again now that the seeded
-    // entries are present — otherwise downloaded models show as not-downloaded after restart.
-    private suspend fun relinkDownloads() {
-        try {
-            RunAnywhere.refreshModelRegistry(rescanLocal = true)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            RACLog.w("local rescan failed — downloaded models may need re-download", e)
-        }
-    }
-
-    private suspend fun registerCoreBackends() {
-        try {
-            LlamaCPP.register()
-            ONNX.register()
-            SystemTTSModule.register()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            RACLog.e("core backends failed", e)
-        }
+        RunAnywhere.refreshModelRegistry()
     }
 
     private fun registerRemoteBackends() {
@@ -57,26 +28,24 @@ object ModelBootstrap {
         }
     }
 
-    // Skip ids already in the registry — re-saving clobbers downloaded local_path / is_downloaded.
+    // Re-registered on every launch, mirroring iOS ModelCatalogBootstrap: the commons registry
+    // merges on re-save, preserving runtime fields (is_downloaded, per-file local paths,
+    // checksums), so catalog metadata fixes reach existing installs without losing downloads.
     private suspend fun seedCatalog() {
-        val known = existingIds()
         var ok = 0
-        var skip = 0
         var fail = 0
         for (model in ModelCatalog.models) {
-            if (model.id in known) {
-                skip++
-                continue
-            }
             try {
                 model.register()
                 ok++
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 fail++
                 RACLog.e("catalog: ${model.id} failed", e)
             }
         }
-        RACLog.i("catalog seeded: ok=$ok skipped=$skip failed=$fail")
+        RACLog.i("catalog seeded: ok=$ok failed=$fail")
     }
 
     private suspend fun seedLora() {
@@ -89,15 +58,5 @@ object ModelBootstrap {
                 RACLog.e("lora: ${adapter.id} failed", e)
             }
         }
-    }
-
-    private suspend fun existingIds(): Set<String> = try {
-        RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
-            .mapTo(mutableSetOf()) { it.id }
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        RACLog.w("registry snapshot failed", e)
-        emptySet()
     }
 }

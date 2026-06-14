@@ -81,6 +81,10 @@ extension LLMViewModel {
         request.systemPrompt = options.systemPrompt
         request.stopSequences = options.stopSequences
         request.streamingEnabled = options.streamingEnabled
+        // Canonical embedded options (request field 26): commons prefers these
+        // over the deprecated inline scalars and they carry the knobs the
+        // inline fields lack (disable_thinking, thinking_pattern, …).
+        request.options = options
         return request
     }
 

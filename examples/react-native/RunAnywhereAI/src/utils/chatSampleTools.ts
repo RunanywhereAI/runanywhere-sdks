@@ -38,7 +38,9 @@ export const registerDemoTools = async (): Promise<void> => {
         },
       ],
     }),
-    async (args: Record<string, ToolValue>): Promise<Record<string, ToolValue>> => {
+    async (
+      args: Record<string, ToolValue>
+    ): Promise<Record<string, ToolValue>> => {
       const location = args.location?.stringValue || 'San Francisco';
       try {
         // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
@@ -51,7 +53,9 @@ export const registerDemoTools = async (): Promise<void> => {
           location: { stringValue: location },
           temperature_c: { stringValue: current?.temp_C || 'N/A' },
           temperature_f: { stringValue: current?.temp_F || 'N/A' },
-          condition: { stringValue: current?.weatherDesc?.[0]?.value || 'Unknown' },
+          condition: {
+            stringValue: current?.weatherDesc?.[0]?.value || 'Unknown',
+          },
           humidity: { stringValue: current?.humidity || 'N/A' },
           wind_kph: { stringValue: current?.windspeedKmph || 'N/A' },
         };
@@ -74,7 +78,9 @@ export const registerDemoTools = async (): Promise<void> => {
         datetime: { stringValue: now.toLocaleString() },
         time: { stringValue: now.toLocaleTimeString() },
         timestamp: { stringValue: now.toISOString() },
-        timezone: { stringValue: Intl.DateTimeFormat().resolvedOptions().timeZone },
+        timezone: {
+          stringValue: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        },
       };
     }
   );
@@ -95,7 +101,9 @@ export const registerDemoTools = async (): Promise<void> => {
         },
       ],
     }),
-    async (args: Record<string, ToolValue>): Promise<Record<string, ToolValue>> => {
+    async (
+      args: Record<string, ToolValue>
+    ): Promise<Record<string, ToolValue>> => {
       const expression = args.expression?.stringValue || '0';
       try {
         const result = safeEvaluateExpression(expression);

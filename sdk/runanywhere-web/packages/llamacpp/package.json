@@ -61,7 +61,7 @@
     "@runanywhere/web": ">=0.19.13 <1"
   },
   "dependencies": {
-    "@runanywhere/proto-ts": "workspace:*"
+    "@runanywhere/proto-ts": "^0.19.13"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

@@ -45,12 +45,9 @@ jobs:
     # this build", which previously masked the Swift gRPC plugin install and
     # let downstream `protoc --grpc-swift_out=` discoveries silently fail.
     runs-on: macos-15
-    # Mint cache-miss path (first run after Mintfile bump) rebuilds
-    # SwiftLint + periphery + swift-format + swift-protobuf +
-    # protoc-gen-grpc-swift from source, which on a cold runner takes
-    # ~20 minutes on macos-15. Bump the timeout so the initial-warmup
-    # run can complete; subsequent runs hit the actions/cache restore
-    # path and finish in under 2 minutes.
+    # A cold runner (Homebrew cache miss) installs protobuf, swift-protobuf,
+    # and grpc-swift from scratch, which can take a while on macos-15.
+    # Subsequent runs hit the actions/cache restore path and finish fast.
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -63,31 +60,6 @@ jobs:
             /opt/homebrew
             ~/Library/Caches/Homebrew
           key: ${{ runner.os }}-brew-protoc-${{ hashFiles('scripts/setup/setup-toolchain.sh') }}
-
-      # Bootstrap the Mintfile so the Swift dev-tool versions pinned
-      # at the repo root (SwiftLint / Periphery / swift-format /
-      # swift-protobuf / grpc-swift) are the single source of truth across
-      # every CI workflow. The brew steps below intentionally remain — this
-      # repo currently relies on Homebrew's `protoc-gen-grpc-swift-2`
-      # binary which is not produced by the Mintfile-pinned grpc-swift 1.x
-      # checkout. Mint bootstrap is run with `--overwrite y` so a stale
-      # cache cannot stall the job. Once `scripts/setup/setup-toolchain.sh`
-      # migrates to mint-only, the brew installs can drop out.
-      - name: Cache Mint packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.mint
-          key: ${{ runner.os }}-mint-${{ hashFiles('Mintfile') }}
-          restore-keys: |
-            ${{ runner.os }}-mint-
-
-      - name: Install Mint and bootstrap Mintfile
-        run: |
-          brew install mint
-          mint bootstrap --overwrite y
-          # Smoke-check that the pinned versions resolved.
-          mint run swiftlint version
-          mint run swift-format --version
 
       - name: Install protoc + swift-protobuf (Homebrew)
         run: |

@@ -333,16 +333,15 @@ modalities:
           Doesn't fit invoke (which serialises a single Message request).
 
       - swift_name: processStream
-        c_symbol: rac_vlm_process_stream_proto
-        request: ~
-        response: RASDKEvent
+        c_symbol: rac_vlm_stream_proto
+        request: RAVLMGenerationRequest
+        response: RAVLMStreamEvent
         kind: custom
-        context: rac_handle_t
         custom_reason: |
-          Diverges from runRequestStream in three ways: (1) dual proto inputs
-          (image + options), (2) the per-chunk callback returns rac_bool_t to
-          signal continue/cancel, (3) the call also writes into a final
-          outBuffer alongside the streaming callbacks. Custom AsyncStream wiring.
+          Diverges from runRequestStream: the per-chunk callback returns
+          rac_bool_t to signal continue/cancel (the shared trampoline returns
+          Void). Typed VLMStreamEvent stream over the lifecycle-owned model —
+          no handle context, no outBuffer. Custom AsyncStream wiring.
 
       - swift_name: cancelLifecycle
         c_symbol: rac_vlm_cancel_lifecycle_proto
@@ -522,5 +521,12 @@ modalities:
         c_symbol: rac_lora_catalog_mark_download_completed_proto
         request: RALoraAdapterDownloadCompletedRequest
         response: RALoraAdapterDownloadCompletedResult
+        kind: invoke
+        context: rac_lora_registry_handle_t
+
+      - swift_name: importAdapter
+        c_symbol: rac_lora_adapter_import_proto
+        request: RALoraAdapterImportRequest
+        response: RALoraAdapterImportResult
         kind: invoke
         context: rac_lora_registry_handle_t

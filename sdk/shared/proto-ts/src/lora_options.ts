@@ -164,6 +164,35 @@ export interface LoraAdapterDownloadCompletedResult {
 
 /**
  * ---------------------------------------------------------------------------
+ * Import of a user-picked local adapter file. Commons owns everything past
+ * the platform-readable source path: deterministic catalog matching (exact
+ * local-path match, else an unambiguous filename match), canonical placement
+ * under {Models}/{framework}/lora-adapter:{id}/, artifact registry record +
+ * manifest persistence, and catalog completion for matched entries.
+ * Platforms only resolve OS-specific access (security-scoped URLs, content
+ * URIs, Blob-to-FS staging) before calling.
+ * ---------------------------------------------------------------------------
+ */
+export interface LoraAdapterImportRequest {
+  /** platform-readable path of the picked file */
+  sourcePath: string;
+  /** destination filename; default basename(source_path) */
+  filename?: string | undefined;
+}
+
+export interface LoraAdapterImportResult {
+  success: boolean;
+  errorMessage: string;
+  /** stable SDK-owned path of the imported file */
+  localPath: string;
+  /** a catalog entry matched and was completed */
+  matched: boolean;
+  /** updated catalog entry when matched */
+  entry?: LoraAdapterCatalogEntry | undefined;
+}
+
+/**
+ * ---------------------------------------------------------------------------
  * Result of a LoRA compatibility pre-check.
  *
  * `base_model_required` is not present in any current SDK shape — it is
@@ -1981,6 +2010,220 @@ export const LoraAdapterDownloadCompletedResult: MessageFns<LoraAdapterDownloadC
       : undefined;
     message.errorMessage = object.errorMessage ?? "";
     message.persisted = object.persisted ?? false;
+    return message;
+  },
+};
+
+function createBaseLoraAdapterImportRequest(): LoraAdapterImportRequest {
+  return { sourcePath: "", filename: undefined };
+}
+
+export const LoraAdapterImportRequest: MessageFns<LoraAdapterImportRequest> = {
+  encode(message: LoraAdapterImportRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sourcePath !== "") {
+      writer.uint32(10).string(message.sourcePath);
+    }
+    if (message.filename !== undefined) {
+      writer.uint32(18).string(message.filename);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LoraAdapterImportRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLoraAdapterImportRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sourcePath = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.filename = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LoraAdapterImportRequest {
+    return {
+      sourcePath: isSet(object.sourcePath)
+        ? globalThis.String(object.sourcePath)
+        : isSet(object.source_path)
+        ? globalThis.String(object.source_path)
+        : "",
+      filename: isSet(object.filename) ? globalThis.String(object.filename) : undefined,
+    };
+  },
+
+  toJSON(message: LoraAdapterImportRequest): unknown {
+    const obj: any = {};
+    if (message.sourcePath !== "") {
+      obj.sourcePath = message.sourcePath;
+    }
+    if (message.filename !== undefined) {
+      obj.filename = message.filename;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LoraAdapterImportRequest>, I>>(base?: I): LoraAdapterImportRequest {
+    return LoraAdapterImportRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LoraAdapterImportRequest>, I>>(object: I): LoraAdapterImportRequest {
+    const message = createBaseLoraAdapterImportRequest();
+    message.sourcePath = object.sourcePath ?? "";
+    message.filename = object.filename ?? undefined;
+    return message;
+  },
+};
+
+function createBaseLoraAdapterImportResult(): LoraAdapterImportResult {
+  return { success: false, errorMessage: "", localPath: "", matched: false, entry: undefined };
+}
+
+export const LoraAdapterImportResult: MessageFns<LoraAdapterImportResult> = {
+  encode(message: LoraAdapterImportResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(18).string(message.errorMessage);
+    }
+    if (message.localPath !== "") {
+      writer.uint32(26).string(message.localPath);
+    }
+    if (message.matched !== false) {
+      writer.uint32(32).bool(message.matched);
+    }
+    if (message.entry !== undefined) {
+      LoraAdapterCatalogEntry.encode(message.entry, writer.uint32(42).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LoraAdapterImportResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLoraAdapterImportResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.localPath = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.matched = reader.bool();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.entry = LoraAdapterCatalogEntry.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LoraAdapterImportResult {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      errorMessage: isSet(object.errorMessage)
+        ? globalThis.String(object.errorMessage)
+        : isSet(object.error_message)
+        ? globalThis.String(object.error_message)
+        : "",
+      localPath: isSet(object.localPath)
+        ? globalThis.String(object.localPath)
+        : isSet(object.local_path)
+        ? globalThis.String(object.local_path)
+        : "",
+      matched: isSet(object.matched) ? globalThis.Boolean(object.matched) : false,
+      entry: isSet(object.entry) ? LoraAdapterCatalogEntry.fromJSON(object.entry) : undefined,
+    };
+  },
+
+  toJSON(message: LoraAdapterImportResult): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.localPath !== "") {
+      obj.localPath = message.localPath;
+    }
+    if (message.matched !== false) {
+      obj.matched = message.matched;
+    }
+    if (message.entry !== undefined) {
+      obj.entry = LoraAdapterCatalogEntry.toJSON(message.entry);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LoraAdapterImportResult>, I>>(base?: I): LoraAdapterImportResult {
+    return LoraAdapterImportResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LoraAdapterImportResult>, I>>(object: I): LoraAdapterImportResult {
+    const message = createBaseLoraAdapterImportResult();
+    message.success = object.success ?? false;
+    message.errorMessage = object.errorMessage ?? "";
+    message.localPath = object.localPath ?? "";
+    message.matched = object.matched ?? false;
+    message.entry = (object.entry !== undefined && object.entry !== null)
+      ? LoraAdapterCatalogEntry.fromPartial(object.entry)
+      : undefined;
     return message;
   },
 };

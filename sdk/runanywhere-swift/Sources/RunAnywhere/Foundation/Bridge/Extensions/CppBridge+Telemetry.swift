@@ -140,7 +140,7 @@ extension CppBridge {
         /// router as the telemetry sink (`rac_events_set_telemetry_sink`).
         /// `fileprivate` because `ManagerHandle` is a private file-scoped type;
         /// `register()` lives in this same file.
-        fileprivate static var handle: ManagerHandle? {
+        fileprivate static var handle: ManagerHandle? { // swiftlint:disable:this strict_fileprivate
             manager.withLock { $0 }
         }
 
@@ -210,26 +210,23 @@ private func performTelemetryHTTP(path: String, json: String, requiresAuth: Bool
 extension CppBridge.Events {
     // MARK: - SDK Lifecycle Events
 
-    /// Emit SDK init started event via the canonical SDK event proto stream.
-    public static func emitSDKInitStarted() {
-        publishInitialization(stage: .started)
-    }
-
-    /// Emit SDK init completed event via the canonical SDK event proto stream.
-    public static func emitSDKInitCompleted(durationMs: Double) {
-        var properties: [String: String] = [:]
-        properties["duration_ms"] = String(durationMs)
-        publishInitialization(stage: .completed, properties: properties)
-    }
-
-    /// Emit SDK init failed event via the canonical SDK event proto stream.
-    public static func emitSDKInitFailed(error: SDKException) {
-        publishInitialization(stage: .failed, error: error.message)
-    }
+    // SDK init STARTED/COMPLETED/FAILED are published once by commons
+    // (rac_sdk_init_phase1_proto) — Swift no longer hand-emits them.
 
     /// Emit SDK models loaded event via the canonical SDK event proto stream.
     public static func emitSDKModelsLoaded(count: Int) {
         publishInitialization(stage: .servicesBootstrapped, properties: ["model_count": String(count)])
+    }
+
+    /// Emit SDK models loaded with model IDs for richer attribution.
+    public static func emitSDKModelsLoaded(modelIds: [String]) {
+        publishInitialization(
+            stage: .servicesBootstrapped,
+            properties: [
+                "model_count": String(modelIds.count),
+                "model_ids": modelIds.joined(separator: ",")
+            ]
+        )
     }
 
     private static func publishInitialization(

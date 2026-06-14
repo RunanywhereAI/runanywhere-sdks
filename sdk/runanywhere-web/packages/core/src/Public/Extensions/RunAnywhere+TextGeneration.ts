@@ -10,24 +10,34 @@
  */
 
 import type { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
-import type {
-  LLMGenerationOptions,
-  LLMGenerationResult,
+import {
+  LLMGenerationOptions as LLMGenerationOptionsMessage,
+  type LLMGenerationOptions,
+  type LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
 import type { ToolCall } from '@runanywhere/proto-ts/tool_calling';
 import {
   StructuredOutputMode,
+  StructuredOutputStreamEvent as StructuredOutputStreamEventMessage,
+  StructuredOutputStreamEventKind,
   type StructuredOutputOptions,
   type StructuredOutputResult,
+  type StructuredOutputStreamEvent,
 } from '@runanywhere/proto-ts/structured_output';
+import {
+  inferenceFrameworkToJSON,
+  ModelCategory,
+  type ModelInfo,
+} from '@runanywhere/proto-ts/model_types';
 import type { LLMStreamingResult } from '../../types/index';
 import { AsyncQueue } from '../../Foundation/AsyncQueue';
 import { SDKException } from '../../Foundation/SDKException';
 import { LLMProtoAdapter, StructuredOutputProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
 
 export type { LLMGenerationOptions, LLMGenerationResult };
 export type { LLMStreamingResult };
-export type { StructuredOutputResult };
+export type { StructuredOutputResult, StructuredOutputStreamEvent };
 
 export type TextGenerationOptions = Partial<LLMGenerationOptions> & {
   prompt: string;
@@ -47,6 +57,21 @@ export interface JSONSchemaDescriptor {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Structured-output mapping parity with Swift `toRALLMGenerateRequest`
+ * (RALLMTypes+CppBridge.swift:66-74): when `structuredOutput` is set, the
+ * request's `responseFormat` derives from its mode — `"json_object"` for
+ * `STRUCTURED_OUTPUT_MODE_JSON_OBJECT`, `"json_schema"` for every other mode.
+ */
+function structuredOutputResponseFormat(
+  structuredOutput: StructuredOutputOptions | undefined,
+): string {
+  if (structuredOutput == null) return '';
+  return structuredOutput.mode === StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_OBJECT
+    ? 'json_object'
+    : 'json_schema';
+}
+
 function buildLLMGenerateRequest(
   prompt: string,
   options: Partial<LLMGenerationOptions> = {},
@@ -54,13 +79,16 @@ function buildLLMGenerateRequest(
 ): LLMGenerateRequest {
   return {
     prompt,
-    maxTokens: options.maxTokens ?? 0,
-    temperature: options.temperature ?? 0,
-    topP: options.topP ?? 0,
+    // Defaults mirror Swift `RALLMGenerationOptions.defaults()`
+    // (RALLMTypes+CppBridge.swift:13-21): maxTokens 100, temperature 0.8,
+    // topP 1.0, topK 0, repetitionPenalty 1.0.
+    maxTokens: options.maxTokens ?? 100,
+    temperature: options.temperature ?? 0.8,
+    topP: options.topP ?? 1.0,
     topK: options.topK ?? 0,
     systemPrompt: options.systemPrompt ?? '',
     emitThoughts: options.thinkingPattern != null,
-    repetitionPenalty: options.repetitionPenalty ?? 0,
+    repetitionPenalty: options.repetitionPenalty ?? 1.0,
     stopSequences: options.stopSequences ?? [],
     streamingEnabled,
     preferredFramework: options.preferredFramework == null
@@ -77,12 +105,42 @@ function buildLLMGenerateRequest(
     frequencyPenalty: options.frequencyPenalty ?? 0,
     presencePenalty: options.presencePenalty ?? 0,
     minP: options.minP ?? 0,
-    grammar: options.grammar ?? '',
-    responseFormat: options.responseFormat ?? '',
+    // Swift parity (RALLMTypes+CppBridge.swift:66-74): grammar and
+    // responseFormat fall back to the structured-output configuration.
+    grammar: options.grammar ?? options.structuredOutput?.grammar ?? '',
+    responseFormat: options.responseFormat
+      ?? structuredOutputResponseFormat(options.structuredOutput),
     echoPrompt: options.echoPrompt ?? false,
     nThreads: options.nThreads ?? 0,
+    // Canonical knob channel (llm_service.proto field 26): the inline scalar
+    // fields above are DEPRECATED; advanced knobs (disableThinking,
+    // thinkingPattern, …) only reach commons through `options.*`.
+    options: LLMGenerationOptionsMessage.fromPartial(options),
     metadata: {},
   };
+}
+
+function isLLMGenerateRequest(
+  value: LLMGenerateRequest | TextGenerationOptions,
+): value is LLMGenerateRequest {
+  // `requestId` is a required proto field on LLMGenerateRequest and does not
+  // exist on LLMGenerationOptions, so its presence identifies the
+  // request-shaped overload argument.
+  return 'requestId' in value;
+}
+
+function normalizeLLMGenerateRequest(
+  requestOrOptions: LLMGenerateRequest | TextGenerationOptions,
+  streamingEnabled: boolean,
+): LLMGenerateRequest {
+  if (isLLMGenerateRequest(requestOrOptions)) {
+    // Proto-request overload — mirrors Swift `generate(_ request:)` /
+    // `generateStream(_ request:)` (RunAnywhere+TextGeneration.swift:43-87):
+    // bypass option-building and submit the request as-is, with only the
+    // streaming flag forced for the chosen entry point.
+    return { ...requestOrOptions, streamingEnabled };
+  }
+  return buildLLMGenerateRequest(requestOrOptions.prompt, requestOrOptions, streamingEnabled);
 }
 
 function structuredOutputOptionsFromSchema(
@@ -133,7 +191,8 @@ function streamingResultFromEvents(
               accumulatedToolCalls.push(event.toolCall);
             }
             if (event.errorMessage) {
-              throw SDKException.generationFailed(event.errorMessage);
+              // Swift taxonomy: failed operations throw `.processingFailed`.
+              throw SDKException.processingFailed(event.errorMessage);
             }
           }
           queue.complete();
@@ -225,29 +284,198 @@ function requireProtoLLM(verb: string): NonNullable<ReturnType<typeof LLMProtoAd
 }
 
 // ---------------------------------------------------------------------------
+// Core generation verbs
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate text through the generated-proto C++ LLM service ABI.
+ *
+ * The request overload mirrors Swift
+ * `RunAnywhere.generate(_ request: RALLMGenerateRequest)`
+ * (RunAnywhere+TextGeneration.swift:43-58); the options overload mirrors the
+ * prompt convenience entry point and assembles the request with the Swift
+ * defaults applied.
+ */
+async function generate(request: LLMGenerateRequest): Promise<LLMGenerationResult>;
+async function generate(options: TextGenerationOptions): Promise<LLMGenerationResult>;
+async function generate(
+  requestOrOptions: LLMGenerateRequest | TextGenerationOptions,
+): Promise<LLMGenerationResult> {
+  const adapter = requireProtoLLM('TextGeneration.generate');
+  const result = adapter.generate(normalizeLLMGenerateRequest(requestOrOptions, false));
+  if (!result) {
+    throw SDKException.backendNotAvailable(
+      'TextGeneration.generate',
+      'Native LLM proto path returned no result.',
+    );
+  }
+  return result;
+}
+
+/**
+ * Stream text generation through the generated-proto C++ LLM service ABI.
+ *
+ * The request overload mirrors Swift
+ * `RunAnywhere.generateStream(_ request: RALLMGenerateRequest)`
+ * (RunAnywhere+TextGeneration.swift:72-87).
+ */
+async function generateStream(request: LLMGenerateRequest): Promise<LLMStreamingResult>;
+async function generateStream(options: TextGenerationOptions): Promise<LLMStreamingResult>;
+async function generateStream(
+  requestOrOptions: LLMGenerateRequest | TextGenerationOptions,
+): Promise<LLMStreamingResult> {
+  const adapter = requireProtoLLM('TextGeneration.generateStream');
+  const events = adapter.generateStream(normalizeLLMGenerateRequest(requestOrOptions, true));
+  return streamingResultFromEvents(events, () => {
+    adapter.cancel();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// `aggregateStream` — fold a streaming handle into a final result
+// ---------------------------------------------------------------------------
+
+/**
+ * Fold an `LLMStreamingResult` into a canonical final `LLMGenerationResult`.
+ *
+ * Port of Swift `RunAnywhere.aggregateStream(prompt:events:onToken:)`
+ * (RunAnywhere+TextGeneration.swift:129-198): consumes the token stream —
+ * invoking `onToken` with the aggregated transcript so far — then awaits the
+ * terminal aggregate and applies the Swift fallback chain: `text` falls back
+ * to the concatenated tokens, `inputTokens` to the `max(1, prompt/4)`
+ * estimate, `totalTokens` to `inputTokens + tokensGenerated`, timing and
+ * throughput to local wall-clock measurements, while `promptEvalTimeMs` /
+ * `decodeTimeMs` carry the backend's terminal metrics (0 when absent).
+ * `modelUsed`/`framework` resolve from the currently-loaded language model
+ * (Swift `currentModel(_:)`; RN `modelInfoForCategory`).
+ */
+export async function aggregateStream(
+  prompt: string,
+  streaming: LLMStreamingResult,
+  onToken?: (transcript: string) => void | Promise<void>,
+): Promise<LLMGenerationResult> {
+  let fullResponse = '';
+  let tokenCount = 0;
+  let firstTokenAtMs: number | undefined;
+  const startedAtMs = performance.now();
+
+  for await (const token of streaming.stream) {
+    if (!token) continue;
+    if (firstTokenAtMs === undefined) firstTokenAtMs = performance.now();
+    fullResponse += token;
+    tokenCount += 1;
+    if (onToken) await onToken(fullResponse);
+  }
+
+  // Terminal aggregate — already prefers the backend's final-event metrics
+  // and falls back to the queue-tracked tokens (see finalLLMResult).
+  const result = await streaming.result;
+
+  const totalLatencyMs = performance.now() - startedAtMs;
+  const ttftMs = firstTokenAtMs === undefined ? undefined : firstTokenAtMs - startedAtMs;
+
+  // Swift resolves the loaded language model via `currentModel(_:)`
+  // (RunAnywhere+TextGeneration.swift:162-168).
+  let model: ModelInfo | null = null;
+  try {
+    model = WebModelLifecycle.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
+  } catch {
+    model = null;
+  }
+
+  // Swift parity (RunAnywhere+TextGeneration.swift:179-182): estimate
+  // inputTokens as max(1, prompt/4) when the backend did not report them and
+  // recompute totalTokens from that estimate when absent.
+  const inputTokens = result.inputTokens || Math.max(1, Math.floor(prompt.length / 4));
+  const tokensGenerated = result.tokensGenerated || tokenCount;
+  return {
+    ...result,
+    text: result.text || fullResponse,
+    inputTokens,
+    tokensGenerated,
+    responseTokens: tokensGenerated,
+    totalTokens: result.totalTokens || inputTokens + tokensGenerated,
+    modelUsed: model?.id ?? '',
+    framework: model ? inferenceFrameworkToJSON(model.framework) : '',
+    generationTimeMs: result.generationTimeMs || totalLatencyMs,
+    tokensPerSecond: result.tokensPerSecond
+      || (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0),
+    ttftMs: result.ttftMs ?? ttftMs,
+    promptEvalTimeMs: result.promptEvalTimeMs ?? 0,
+    decodeTimeMs: result.decodeTimeMs ?? 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // §3 `generateStructuredStream` — canonical flat verb
 // ---------------------------------------------------------------------------
 
 /**
  * Streaming structured output (§3 `generateStructuredStream`).
  *
- * Uses the generated-proto LLM request shape for generation, then routes
- * extraction and validation through the structured-output proto ABI.
+ * Mirrors Swift `RunAnywhere.generateStructuredStream(prompt:schema:options:)`
+ * (RunAnywhere+StructuredOutput.swift:58-134): generation runs through the
+ * real LLM streaming path with the structured-output options applied to the
+ * request; each non-empty token is emitted as a `.token`
+ * `StructuredOutputStreamEvent`, and once the producer finishes the
+ * accumulated text is parsed via `extractStructuredOutput` and emitted as the
+ * terminal `.completed` event carrying the validated `StructuredOutputResult`.
+ *
+ * In-flight failures (LLM driver errors, parse/validation errors) terminate
+ * the iterable with a throw, matching the cross-SDK contract (Swift
+ * `AsyncThrowingStream`, Kotlin `Flow` exception propagation).
+ *
+ * Cancellation parity: the native stream is cancelled only when the consumer
+ * abandons iteration while the producer is still live — mirroring Swift's
+ * `onTermination` switch (RunAnywhere+StructuredOutput.swift:113-132) that
+ * fires `cancelGeneration()` solely on `.cancelled`, never after producer
+ * completion.
  */
 export async function* generateStructuredStream(
   prompt: string,
   schema: JSONSchemaDescriptor,
   options?: Partial<LLMGenerationOptions>,
-): AsyncIterable<StructuredOutputResult> {
-  const result = await TextGeneration.generate({
+): AsyncIterable<StructuredOutputStreamEvent> {
+  const streaming = await generateStream({
     ...options,
     prompt,
-    jsonSchema: schema.jsonSchema,
+    structuredOutput: structuredOutputOptionsFromSchema(schema),
   });
-  yield extractStructuredOutput(
-    result.text || result.jsonOutput || result.structuredOutputValidation?.extractedJson || '',
-    schema,
-  );
+
+  let accumulated = '';
+  let seq = 0;
+  let nativeStreamDone = false;
+  try {
+    for await (const token of streaming.stream) {
+      if (!token) continue;
+      accumulated += token;
+      seq += 1;
+      yield StructuredOutputStreamEventMessage.fromPartial({
+        kind: StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
+        token,
+        seq,
+      });
+    }
+    nativeStreamDone = true;
+    // Surface in-flight generation failures as throws before parsing.
+    await streaming.result;
+    const result = extractStructuredOutput(accumulated, schema);
+    seq += 1;
+    yield StructuredOutputStreamEventMessage.fromPartial({
+      kind: StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
+      result,
+      seq,
+    });
+  } catch (error) {
+    // Producer self-terminated (stream/result/parse failure) — never fire
+    // the native cancel for it. Swallow the duplicate rejection carried by
+    // the terminal result promise before rethrowing the original error.
+    nativeStreamDone = true;
+    void streaming.result.catch(() => undefined);
+    throw error;
+  } finally {
+    if (!nativeStreamDone) streaming.cancel();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -293,25 +521,11 @@ export const TextGeneration = {
     return LLMProtoAdapter.tryDefault()?.supportsProtoLLM() ?? false;
   },
 
-  async generate(options: TextGenerationOptions): Promise<LLMGenerationResult> {
-    const adapter = requireProtoLLM('TextGeneration.generate');
-    const result = adapter.generate(buildLLMGenerateRequest(options.prompt, options, false));
-    if (!result) {
-      throw SDKException.backendNotAvailable(
-        'TextGeneration.generate',
-        'Native LLM proto path returned no result.',
-      );
-    }
-    return result;
-  },
+  generate,
 
-  async generateStream(options: TextGenerationOptions): Promise<LLMStreamingResult> {
-    const adapter = requireProtoLLM('TextGeneration.generateStream');
-    const events = adapter.generateStream(buildLLMGenerateRequest(options.prompt, options, true));
-    return streamingResultFromEvents(events, () => {
-      adapter.cancel();
-    });
-  },
+  generateStream,
+
+  aggregateStream,
 
   cancelGeneration(): void {
     LLMProtoAdapter.tryDefault()?.cancel();

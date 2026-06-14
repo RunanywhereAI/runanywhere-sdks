@@ -15,8 +15,8 @@
  *
  * Subscriber tracking still lives in a `Map<string, Set<Listener>>`
  * because we still need to know who to deliver to. What's gone is the
- * old "emit() iterates listeners directly" delivery loop — the proto
- * adapter is now the source of truth, and `emit()` publishes through
+ * old "publish() iterates listeners directly" delivery loop — the proto
+ * adapter is now the source of truth, and `publish()` routes through
  * it. Local fan-out is only used as a fallback (e.g. tests, or before
  * the WASM module registers).
  */
@@ -31,13 +31,16 @@ import {
   ModelEventKind,
   SDKEvent,
   VoiceEventKind,
+  type ComponentLifecycleEvent as ProtoComponentLifecycleEvent,
   type DownloadEvent as ProtoDownloadEvent,
   type GenerationEvent as ProtoGenerationEvent,
   type InitializationEvent as ProtoInitializationEvent,
   type ModelEvent as ProtoModelEvent,
+  type ModelRegistryEvent as ProtoModelRegistryEvent,
   type SDKEvent as ProtoSDKEvent,
   type VoiceLifecycleEvent as ProtoVoiceLifecycleEvent,
 } from '@runanywhere/proto-ts/sdk_events';
+import type { VoiceEvent as ProtoVoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import {
   SDKEventStreamAdapter,
   type SDKEventHandler,
@@ -132,16 +135,16 @@ export interface ProtoEventTransport {
 /**
  * EventBus - Central event system for the Web SDK.
  *
- * Public API surface (unchanged across the PR #494 T2.3 migration):
+ * Public API surface:
  *   • `EventBus.shared` singleton accessor
  *   • `on(type, listener)`   → returns unsubscribe
  *   • `onAny(listener)`      → wildcard, returns unsubscribe
  *   • `once(type, listener)` → fires once, returns unsubscribe
- *   • `emit(type, category, data?)`
+ *   • `publish(type, category, data?)` — Swift `EventBus.publish(_:)` name
  *   • `removeAll()` / static `reset()`
  *
  * Internally, the bus is wired to the canonical proto event stream.
- * Native events (from C++ commons) and JS-side `emit()` calls both flow
+ * Native events (from C++ commons) and JS-side `publish()` calls both flow
  * through the same translation pipeline, so subscribers see one
  * consistent stream regardless of origin.
  */
@@ -155,7 +158,8 @@ export class EventBus {
     return EventBus._instance;
   }
 
-  /** Reset singleton (for testing). */
+  /** Reset singleton (for testing). Web-only helper: Swift's process-lifetime
+   * `shared` never needs resetting. */
   static reset(): void {
     EventBus._instance?.dispose();
     EventBus._instance = null;
@@ -173,6 +177,10 @@ export class EventBus {
   // Kotlin `events(category)`, RN `eventsFor(category)` /
   // `on(category, handler)`, and Flutter `onCategory(category)`.
   private readonly categoryListeners = new Map<EventCategory, Set<EventListener<ProtoSDKEvent>>>();
+  // Raw proto-event listeners backing the typed oneof-payload accessors
+  // (`voiceEventPayloads`, ...). Mirrors Swift, where the payload publishers
+  // compactMap straight off the underlying subject (EventBus.swift:98-136).
+  private readonly protoListeners = new Set<EventListener<ProtoSDKEvent>>();
 
   private transport: ProtoEventTransport | null;
   private transportUnsubscribe: SDKEventUnsubscribe | null = null;
@@ -185,6 +193,40 @@ export class EventBus {
   constructor(transport: ProtoEventTransport | null = SDKEventStreamAdapter.tryDefault()) {
     this.transport = transport;
     this.attachTransport();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Native subscription lifecycle — mirrors Swift EventBus.swift:58-76.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Start the native SDK event subscription. Idempotent: calling twice is a
+   * no-op. Mirrors Swift `EventBus.start()` (EventBus.swift:58-65), invoked
+   * after the commons core is brought up so native lifecycle/model/error
+   * events flow into the bus.
+   *
+   * Subscribing before `start()` is safe, but events emitted before the
+   * native subscription is wired are not delivered. (On Web, `on()` /
+   * `publish()` also lazy-attach the transport, so explicit `start()` is
+   * only needed to force early wiring.)
+   */
+  start(): void {
+    this.ensureTransport();
+  }
+
+  /**
+   * Stop the native SDK event subscription. Idempotent: calling twice is a
+   * no-op. Mirrors Swift `EventBus.stop()` (EventBus.swift:70-76), invoked
+   * during shutdown before the WASM commons core is torn down so the
+   * unsubscribe call still has a working native ABI surface.
+   *
+   * The transport reference is kept so a later `start()` (or any lazy
+   * `on()` / `publish()`) can re-attach.
+   */
+  stop(): void {
+    if (!this.transportUnsubscribe) return;
+    this.transportUnsubscribe();
+    this.transportUnsubscribe = null;
   }
 
   /**
@@ -210,6 +252,8 @@ export class EventBus {
 
   /**
    * Subscribe to ALL events (wildcard). Returns an unsubscribe fn.
+   * Web-only JS-idiom helper: Swift covers this with the bare `events`
+   * Combine publisher.
    */
   onAny(listener: EventListener<SDKEventEnvelope>): Unsubscribe {
     this.ensureTransport();
@@ -258,30 +302,146 @@ export class EventBus {
    * behaviour of Swift's `AsyncStream` and Kotlin's `SharedFlow`.
    */
   eventsFor(category: EventCategory): AsyncIterable<ProtoSDKEvent> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const bus = this;
+    return EventBus.iterableFromSubscription((listener) => this.onCategory(category, listener));
+  }
+
+  /**
+   * Async iterable of every raw proto `SDKEvent`, unfiltered.
+   * Mirrors Swift's all-events publisher `EventBus.events`
+   * (EventBus.swift:36-38) — the substrate the model-lifecycle helpers
+   * (`EventBus+ModelLifecycle.ts`) decode from.
+   */
+  get protoEvents(): AsyncIterable<ProtoSDKEvent> {
+    return EventBus.iterableFromSubscription((listener) => this.onProtoEvent(listener));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Category convenience streams — mirror Swift EventBus.swift:141-173.
+  // ---------------------------------------------------------------------------
+
+  /** Get LLM events. Mirrors Swift `EventBus.llmEvents` (EventBus.swift:141-143). */
+  get llmEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_LLM);
+  }
+
+  /** Get STT events. Mirrors Swift `EventBus.sttEvents` (EventBus.swift:146-148). */
+  get sttEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_STT);
+  }
+
+  /** Get TTS events. Mirrors Swift `EventBus.ttsEvents` (EventBus.swift:151-153). */
+  get ttsEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_TTS);
+  }
+
+  /** Get model events. Mirrors Swift `EventBus.modelEvents` (EventBus.swift:156-158). */
+  get modelEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_MODEL);
+  }
+
+  /** Get error events. Mirrors Swift `EventBus.errorEvents` (EventBus.swift:161-163). */
+  get errorEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_ERROR);
+  }
+
+  /** Get SDK lifecycle events. Mirrors Swift `EventBus.sdkEvents` (EventBus.swift:166-168). */
+  get sdkEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_SDK);
+  }
+
+  /** Get RAG events. Mirrors Swift `EventBus.ragEvents` (EventBus.swift:171-173). */
+  get ragEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_RAG);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Typed oneof-payload accessors — mirror Swift EventBus.swift:106-136.
+  // Each filters on the populated SDKEvent oneof arm (NOT the category field)
+  // and yields the extracted payload, exactly like Swift's `eventsOfPayload`
+  // compactMap publishers.
+  // ---------------------------------------------------------------------------
+
+  /** Stream of `VoiceEvent` payloads (voice-agent pipeline events).
+   * Mirrors Swift `EventBus.voiceEventPayloads` (`.voicePipeline` arm). */
+  get voiceEventPayloads(): AsyncIterable<ProtoVoiceEvent> {
+    return this.eventsOfPayload((envelope) => envelope.voicePipeline);
+  }
+
+  /** Stream of `DownloadEvent` payloads (model download progress / lifecycle).
+   * Mirrors Swift `EventBus.downloadEventPayloads` (`.download` arm). */
+  get downloadEventPayloads(): AsyncIterable<ProtoDownloadEvent> {
+    return this.eventsOfPayload((envelope) => envelope.download);
+  }
+
+  /** Stream of `ComponentLifecycleEvent` payloads.
+   * Mirrors Swift `EventBus.componentLifecycleEventPayloads` (`.componentLifecycle` arm). */
+  get componentLifecycleEventPayloads(): AsyncIterable<ProtoComponentLifecycleEvent> {
+    return this.eventsOfPayload((envelope) => envelope.componentLifecycle);
+  }
+
+  /** Stream of `ModelRegistryEvent` payloads.
+   * Mirrors Swift `EventBus.modelRegistryEventPayloads` (`.modelRegistry` arm). */
+  get modelRegistryEventPayloads(): AsyncIterable<ProtoModelRegistryEvent> {
+    return this.eventsOfPayload((envelope) => envelope.modelRegistry);
+  }
+
+  /**
+   * Extract a specific payload type from the proto envelope stream.
+   * Mirrors Swift's private `eventsOfPayload(_:)` (EventBus.swift:98-104).
+   */
+  private eventsOfPayload<Payload>(
+    selector: (event: ProtoSDKEvent) => Payload | undefined,
+  ): AsyncIterable<Payload> {
+    return EventBus.iterableFromSubscription((listener) =>
+      this.onProtoEvent((event) => {
+        const payload = selector(event);
+        if (payload !== undefined) listener(payload);
+      }),
+    );
+  }
+
+  /** Subscribe to every raw proto `SDKEvent` from the transport. */
+  private onProtoEvent(listener: EventListener<ProtoSDKEvent>): Unsubscribe {
+    this.ensureTransport();
+    this.protoListeners.add(listener);
+    return () => {
+      this.protoListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Build an `AsyncIterable` over a push subscription.
+   *
+   * Multiple concurrent `next()` calls are safe: each call enqueues a waiter
+   * and is resolved in FIFO order when events arrive, matching the behaviour
+   * of Swift's `AsyncStream` and Kotlin's `SharedFlow`. The subscription is
+   * created per-iterator and released via `return()`.
+   */
+  private static iterableFromSubscription<T>(
+    subscribe: (listener: (value: T) => void) => Unsubscribe,
+  ): AsyncIterable<T> {
     return {
-      [Symbol.asyncIterator](): AsyncIterator<ProtoSDKEvent> {
-        const queue: ProtoSDKEvent[] = [];
-        const waiters: Array<(value: IteratorResult<ProtoSDKEvent>) => void> = [];
+      [Symbol.asyncIterator](): AsyncIterator<T> {
+        const queue: T[] = [];
+        const waiters: Array<(value: IteratorResult<T>) => void> = [];
         let closed = false;
 
-        const unsubscribe = bus.onCategory(category, (event) => {
+        const unsubscribe = subscribe((value) => {
           if (waiters.length > 0) {
-            waiters.shift()!({ value: event, done: false });
+            waiters.shift()!({ value, done: false });
           } else {
-            queue.push(event);
+            queue.push(value);
           }
         });
 
         return {
-          next(): Promise<IteratorResult<ProtoSDKEvent>> {
+          next(): Promise<IteratorResult<T>> {
             if (queue.length > 0) {
               return Promise.resolve({ value: queue.shift()!, done: false });
             }
             if (closed) {
               return Promise.resolve({
-                value: undefined as unknown as ProtoSDKEvent,
+                value: undefined as unknown as T,
                 done: true,
               });
             }
@@ -289,11 +449,11 @@ export class EventBus {
               waiters.push(resolve);
             });
           },
-          return(): Promise<IteratorResult<ProtoSDKEvent>> {
+          return(): Promise<IteratorResult<T>> {
             closed = true;
             unsubscribe();
-            const doneResult: IteratorResult<ProtoSDKEvent> = {
-              value: undefined as unknown as ProtoSDKEvent,
+            const doneResult: IteratorResult<T> = {
+              value: undefined as unknown as T,
               done: true,
             };
             for (const waiter of waiters.splice(0)) {
@@ -308,6 +468,7 @@ export class EventBus {
 
   /**
    * Subscribe to events once (auto-unsubscribe after first event).
+   * Web-only JS-idiom helper: Swift covers this with Combine's `.first()`.
    */
   once<K extends keyof SDKEventMap>(eventType: K, listener: EventListener<SDKEventMap[K]>): Unsubscribe {
     const unsubscribe = this.on(eventType, (event) => {
@@ -318,7 +479,8 @@ export class EventBus {
   }
 
   /**
-   * Emit an event.
+   * Publish an event to all subscribers. Mirrors Swift
+   * `EventBus.publish(_:)` (EventBus.swift:81-85).
    *
    * Tries the proto-backed transport first so the event flows through
    * the canonical pipeline (and is observed by analytics + native
@@ -326,7 +488,7 @@ export class EventBus {
    * the publish fails, falls back to direct local fan-out so JS-only
    * consumers still see the event.
    */
-  emit<K extends keyof SDKEventMap>(eventType: K, category: EventCategory, data?: SDKEventMap[K]): void {
+  publish<K extends keyof SDKEventMap>(eventType: K, category: EventCategory, data?: SDKEventMap[K]): void {
     this.ensureTransport();
     const key = eventType as string;
     const payload = (data ?? {}) as Record<string, unknown>;
@@ -348,11 +510,14 @@ export class EventBus {
 
   /**
    * Remove all listeners.
+   * Web-only JS-idiom helper: Swift subscriptions are released by cancelling
+   * the returned `AnyCancellable`s instead.
    */
   removeAll(): void {
     this.subscribers.clear();
     this.wildcardListeners.clear();
     this.categoryListeners.clear();
+    this.protoListeners.clear();
   }
 
   // ---------------------------------------------------------------------------
@@ -370,7 +535,7 @@ export class EventBus {
    * Lazy-attach: the singleton is constructed before any backend
    * package registers its WASM module, so the first `tryDefault()` is
    * usually null. Re-resolve from the default each time someone
-   * subscribes or emits, so we wire up as soon as the module appears.
+   * subscribes or publishes, so we wire up as soon as the module appears.
    */
   private ensureTransport(): void {
     if (this.transportUnsubscribe) return;
@@ -392,9 +557,10 @@ export class EventBus {
   }
 
   private onTransportEvent(event: ProtoSDKEvent): void {
-    // Always fan out to category subscribers first — they observe the
-    // raw proto regardless of whether the dotted-name translator
-    // recognizes the payload.
+    // Always fan out to raw-proto subscribers (typed payload accessors) and
+    // category subscribers first — they observe the raw proto regardless of
+    // whether the dotted-name translator recognizes the payload.
+    this.fireProto(event);
     this.fireCategory(event);
 
     const translated = translateProtoEvent(event);
@@ -415,6 +581,18 @@ export class EventBus {
       timestamp: event.timestampMs || Date.now(),
       data: translated.data,
     });
+  }
+
+  private fireProto(event: ProtoSDKEvent): void {
+    for (const listener of Array.from(this.protoListeners)) {
+      try {
+        listener(event);
+      } catch (error) {
+        logger.error(
+          `Proto listener error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
   }
 
   private fireCategory(event: ProtoSDKEvent): void {
@@ -670,7 +848,7 @@ function downloadEvent(type: string, data: Record<string, unknown>): TranslatedE
 // Reverse: dotted-event-name → proto SDKEvent
 // =============================================================================
 //
-// emit() goes through here. Only event-names with a clean proto representation
+// publish() goes through here. Only event-names with a clean proto representation
 // round-trip via the adapter. Anything not covered here falls through to local
 // fan-out — that's fine for Web-only events (e.g. storage.localDirectorySelected)
 // that don't yet have a canonical proto payload.

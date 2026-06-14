@@ -7,6 +7,7 @@
 
 import type { DeviceInfo } from '@runanywhere/proto-ts/device_info';
 import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDK_PLATFORM } from '../Foundation/Version';
 import type { AccelerationMode } from '../Foundation/WASMBridge';
 
 const logger = new SDKLogger('DeviceCapabilities');
@@ -106,7 +107,7 @@ export async function getDeviceInfo(): Promise<DeviceInfo> {
   return {
     deviceModel: 'Browser',
     deviceName: getBrowserName(caps.userAgent),
-    platform: 'web',
+    platform: SDK_PLATFORM,
     osVersion: getOSVersion(caps.userAgent),
     formFactor: 'desktop',
     architecture: 'wasm32',

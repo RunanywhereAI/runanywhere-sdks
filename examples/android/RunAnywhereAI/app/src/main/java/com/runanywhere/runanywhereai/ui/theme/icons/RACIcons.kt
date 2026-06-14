@@ -3,7 +3,7 @@ package com.runanywhere.runanywhereai.ui.theme.icons
 import androidx.compose.ui.graphics.vector.ImageVector
 
 // Tabler icons. Use like Material: RACIcons.Outline.Home / RACIcons.Filled.Settings.
-// Not every icon has a filled variant. Renamed from Tabler: Menu = menu-2, Close = x.
+// Not every icon has a filled variant. Renamed from Tabler: Menu = menu-2, Close = x, Stack = stack-2.
 object RACIcons {
 
     object Outline {
@@ -114,6 +114,24 @@ object RACIcons {
                 "M5 10a7 7 0 0 0 14 0",
                 "M8 21l8 0",
                 "M12 17l0 4",
+            )
+        }
+
+        val MicrophoneOff: ImageVector by lazy {
+            racOutlineIcon(
+                "MicrophoneOff",
+                "M3 3l18 18",
+                "M9 5a3 3 0 0 1 6 0v5a3 3 0 0 1 -.13 .874m-2 2a3 3 0 0 1 -3.87 -2.872v-1",
+                "M5 10a7 7 0 0 0 10.846 5.85m2 -2a6.967 6.967 0 0 0 1.152 -3.85",
+                "M8 21l8 0",
+                "M12 17l0 4",
+            )
+        }
+
+        val Activity: ImageVector by lazy {
+            racOutlineIcon(
+                "Activity",
+                "M3 12h4l3 8l4 -16l3 8h4",
             )
         }
 
@@ -259,6 +277,15 @@ object RACIcons {
             )
         }
 
+        val InfoCircle: ImageVector by lazy {
+            racOutlineIcon(
+                "InfoCircle",
+                "M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0",
+                "M12 9h.01",
+                "M11 12h1v4h1",
+            )
+        }
+
         val Pin: ImageVector by lazy {
             racOutlineIcon(
                 "Pin",
@@ -386,6 +413,15 @@ object RACIcons {
                 "M9 9l1 0",
                 "M9 13l6 0",
                 "M9 17l6 0",
+            )
+        }
+
+        val Stack: ImageVector by lazy {
+            racOutlineIcon(
+                "Stack",
+                "M12 4l-8 4l8 4l8 -4l-8 -4",
+                "M4 12l8 4l8 -4",
+                "M4 16l8 4l8 -4",
             )
         }
     }

@@ -213,11 +213,11 @@ describe('EventBus (proto-backed)', () => {
     expect(receivedAny[0]?.data).toMatchObject({ modelId: 'shared-model' });
   });
 
-  test('emit() round-trips through the transport so subscribers still fire', () => {
+  test('publish() round-trips through the transport so subscribers still fire', () => {
     const received: Array<Record<string, unknown>> = [];
     bus.on('model.loadCompleted', (data) => received.push(data));
 
-    bus.emit('model.loadCompleted', EventCategory.EVENT_CATEGORY_MODEL, { modelId: 'emitted' });
+    bus.publish('model.loadCompleted', EventCategory.EVENT_CATEGORY_MODEL, { modelId: 'emitted' });
 
     expect(transport.publishedEvents).toHaveLength(1);
     expect(transport.publishedEvents[0]?.model?.modelId).toBe('emitted');
@@ -225,11 +225,11 @@ describe('EventBus (proto-backed)', () => {
     expect(received[0]).toMatchObject({ modelId: 'emitted' });
   });
 
-  test('emit() falls back to local dispatch when the event has no proto encoding', () => {
+  test('publish() falls back to local dispatch when the event has no proto encoding', () => {
     const received: Array<Record<string, unknown>> = [];
     bus.on('storage.localDirectorySelected', (data) => received.push(data));
 
-    bus.emit('storage.localDirectorySelected', EventCategory.EVENT_CATEGORY_STORAGE, {
+    bus.publish('storage.localDirectorySelected', EventCategory.EVENT_CATEGORY_STORAGE, {
       directoryName: 'my-dir',
     });
 

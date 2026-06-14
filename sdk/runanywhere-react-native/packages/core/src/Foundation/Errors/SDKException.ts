@@ -68,6 +68,42 @@ export class SDKException extends Error {
   }
 
   /**
+   * Human-readable recovery hint for common error codes, or undefined.
+   * Mirrors Swift `SDKException.recoverySuggestion` (SDKException.swift:87).
+   */
+  get recoverySuggestion(): string | undefined {
+    switch (this.proto.code) {
+      case ErrorCodeProto.ERROR_CODE_NOT_INITIALIZED:
+        return 'Initialize the component before using it.';
+      case ErrorCodeProto.ERROR_CODE_MODEL_NOT_FOUND:
+        return 'Ensure the model is downloaded and the path is correct.';
+      case ErrorCodeProto.ERROR_CODE_NETWORK_UNAVAILABLE:
+        return 'Check your internet connection and try again.';
+      case ErrorCodeProto.ERROR_CODE_INSUFFICIENT_STORAGE:
+        return 'Free up storage space and try again.';
+      case ErrorCodeProto.ERROR_CODE_INSUFFICIENT_MEMORY:
+        return 'Close other applications to free up memory.';
+      case ErrorCodeProto.ERROR_CODE_MICROPHONE_PERMISSION_DENIED:
+        return 'Grant microphone permission in Settings.';
+      case ErrorCodeProto.ERROR_CODE_TIMEOUT:
+        return 'Try again or check your connection.';
+      case ErrorCodeProto.ERROR_CODE_INVALID_API_KEY:
+        return 'Verify your API key is correct.';
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Whether this error is expected/routine (user cancellation) and should
+   * not be logged as an error. Mirrors Swift `RAErrorCode.isExpected`
+   * (SDKException.swift:347-356).
+   */
+  get isExpected(): boolean {
+    return isExpectedErrorCode(this.proto.code);
+  }
+
+  /**
    * Build an SDKException from raw proto fields. Caller-friendly shorthand
    * mirrors the Kotlin / Swift extension-point factories — saves consumers
    * from constructing the wrapped proto manually.
@@ -283,6 +319,73 @@ export class SDKException extends Error {
     });
   }
 
+  /**
+   * Processing/lifecycle-verb failure. Mirrors Swift call sites that throw
+   * `SDKException(code: .processingFailed, ..., category: .internal)`
+   * (RunAnywhere+Solutions.swift, RunAnywhere+LoRA.swift,
+   * RunAnywhere+Embeddings.swift).
+   */
+  static processingFailed(details?: string, cause?: Error): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_PROCESSING_FAILED,
+      details ?? 'Processing failed',
+      {
+        category: ErrorCategoryProto.ERROR_CATEGORY_INTERNAL,
+        nestedMessage: cause?.message,
+      }
+    );
+  }
+
+  /**
+   * Invalid handle/object state (e.g. using a destroyed handle). Mirrors
+   * Swift `SDKException(code: .invalidState, ..., category: .internal)`
+   * (RunAnywhere+Solutions.swift:100-104).
+   */
+  static invalidState(details?: string): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_INVALID_STATE,
+      details ?? 'Invalid state',
+      { category: ErrorCategoryProto.ERROR_CATEGORY_INTERNAL }
+    );
+  }
+
+  /**
+   * A required native service/plugin is missing or failed to respond.
+   * Mirrors Swift `SDKException(code: .serviceNotAvailable, ...,
+   * category: .component)` (HybridSTTRouter.swift).
+   */
+  static serviceNotAvailable(details?: string): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_SERVICE_NOT_AVAILABLE,
+      details ?? 'Service not available',
+      { category: ErrorCategoryProto.ERROR_CATEGORY_COMPONENT }
+    );
+  }
+
+  /**
+   * Operation timed out. Mirrors Swift `SDKException.timeout(_:)`
+   * (SDKException.swift:235 — code .timeout, category .network).
+   */
+  static timeout(details?: string): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_TIMEOUT,
+      details ?? 'Operation timed out',
+      { category: ErrorCategoryProto.ERROR_CATEGORY_NETWORK }
+    );
+  }
+
+  /**
+   * Invalid configuration. Mirrors Swift `SDKException.invalidConfiguration(_:)`
+   * (SDKException.swift:183 — code .invalidConfiguration, category .configuration).
+   */
+  static invalidConfiguration(details?: string): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_INVALID_CONFIGURATION,
+      details ?? 'Invalid configuration',
+      { category: ErrorCategoryProto.ERROR_CATEGORY_CONFIGURATION }
+    );
+  }
+
   static componentNotReady(component?: string): SDKException {
     const message = component
       ? `${component} not ready`
@@ -375,4 +478,78 @@ function categoryForCode(code: ErrorCodeProto): ErrorCategoryProto {
   if (code >= 900 && code <= 999)
     return ErrorCategoryProto.ERROR_CATEGORY_INTERNAL;
   return ErrorCategoryProto.ERROR_CATEGORY_UNSPECIFIED;
+}
+
+// ============================================================================
+// Expected-error classification (Swift RAErrorCode.isExpected)
+// ============================================================================
+
+/**
+ * Whether an error code is expected/routine (user cancellation) and should
+ * not be logged at error level. Mirrors Swift `RAErrorCode.isExpected`
+ * (SDKException.swift:347-356).
+ */
+export function isExpectedErrorCode(code: ErrorCodeProto): boolean {
+  switch (code) {
+    case ErrorCodeProto.ERROR_CODE_CANCELLED:
+    case ErrorCodeProto.ERROR_CODE_STREAM_CANCELLED:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// ============================================================================
+// C ABI bridge (Swift RASDKError+Helpers.swift:52-95)
+// ============================================================================
+
+/**
+ * Build an `SDKException` from a `rac_result_t` via the canonical commons
+ * ABI `rac_result_to_proto_error` (single rac_result_t → proto-error
+ * translation shared by every SDK). Resolves `null` on `RAC_SUCCESS`.
+ *
+ * Async (unlike Swift) because the RN bridge crosses the JSI boundary.
+ */
+export async function sdkExceptionFromRcResult(
+  rcResult: number
+): Promise<SDKException | null> {
+  if (rcResult === 0) return null;
+  try {
+    // Lazy import to avoid a Foundation → native import cycle at module load.
+    const { requireNativeModule, isNativeModuleAvailable } = await import(
+      '../../native'
+    );
+    if (isNativeModuleAvailable()) {
+      const buffer = await requireNativeModule().resultToProtoErrorProto(
+        rcResult
+      );
+      if (buffer.byteLength > 0) {
+        const proto = SDKErrorProtoCtor.decode(new Uint8Array(buffer));
+        return new SDKException(proto);
+      }
+    }
+  } catch {
+    // Fall through to the local fallback below.
+  }
+  // Fallback mirror of Swift's "Unknown error code" path
+  // (RASDKError+Helpers.swift:60-66): abs(rc) is the proto code value.
+  const absCode = Math.abs(rcResult);
+  return SDKException.of(
+    absCode in ErrorCodeProto
+      ? (absCode as ErrorCodeProto)
+      : ErrorCodeProto.ERROR_CODE_UNKNOWN,
+    `Error code: ${rcResult}`,
+    { cAbiCode: rcResult }
+  );
+}
+
+/**
+ * Throw an `SDKException` if the `rac_result_t` indicates failure.
+ * Mirrors Swift `SDKException.throwIfError(_:)` (RASDKError+Helpers.swift:91).
+ */
+export async function throwIfRcError(rcResult: number): Promise<void> {
+  const exception = await sdkExceptionFromRcResult(rcResult);
+  if (exception) {
+    throw exception;
+  }
 }

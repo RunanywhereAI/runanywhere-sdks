@@ -2,48 +2,27 @@
  * AudioPlaybackManager.ts
  *
  * Internal audio playback used by `RunAnywhere.speak()` and
- * `RunAnywhere.stopSpeaking()`. Bridges the JS-only TTS PCM bytes through
- * platform audio (AVAudioPlayer on iOS, react-native-sound on Android).
+ * `RunAnywhere.stopSpeaking()`. Bridges the JS-only TTS PCM bytes through the
+ * SDK's own Nitro `AudioPlayback` HybridObject (AVAudioPlayer on iOS,
+ * AudioTrack on Android) — no host-app native module required.
  *
- * Mirrors `sdk/runanywhere-swift/Sources/RunAnywhere/Features/TTS/Services/AudioPlaybackManager.swift`,
- * scaled down to just the playback verbs needed by the TTS extension.
+ * Mirrors `sdk/runanywhere-swift/Sources/RunAnywhere/Features/TTS/Services/AudioPlaybackManager.swift`.
  */
 
-import { Platform, NativeModules } from 'react-native';
+import { AudioPlayback } from '../../Internal/Nitro/NitroAudioPlaybackSpec';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('AudioPlaybackManager');
-
-const NativeAudioModule = Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let Sound: any = null;
-
-function getSound() {
-  if (Platform.OS === 'ios') return null;
-  if (!Sound) {
-    try {
-      Sound = require('react-native-sound').default;
-      Sound.setCategory('Playback');
-    } catch {
-      logger.warning('react-native-sound not available');
-      return null;
-    }
-  }
-  return Sound;
-}
 
 type PlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'stopped' | 'error';
 
 export class AudioPlaybackManager {
   private state: PlaybackState = 'idle';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private currentSound: any = null;
 
   /**
    * Play raw PCM float32 audio (the format emitted by TTS) at the given
-   * sample rate. Encodes to a 16-bit WAV on disk so platform audio can
-   * decode it directly.
+   * sample rate. Encodes to an in-memory 16-bit WAV and hands the bytes to
+   * the native player directly.
    */
   async play(audioData: ArrayBuffer | string, sampleRate = 22050): Promise<void> {
     if (this.state === 'playing') {
@@ -54,11 +33,23 @@ export class AudioPlaybackManager {
     logger.info('Loading audio for playback...');
 
     try {
-      const base64 =
-        typeof audioData === 'string' ? audioData : arrayBufferToBase64(audioData);
-      const wavPath = await createWavFromPCMFloat32(base64, sampleRate);
-      await this.playFile(wavPath);
+      const pcmBytes =
+        typeof audioData === 'string'
+          ? base64ToArrayBuffer(audioData)
+          : audioData;
+      const wavBuffer = createWavFromPCMFloat32(pcmBytes, sampleRate);
+
+      this.state = 'playing';
+      // Resolves when playback finishes; rejects on failure/interruption.
+      await AudioPlayback.play(wavBuffer);
+      this.state = 'idle';
     } catch (error) {
+      // `stop()` may have run while we awaited — re-read the state without
+      // TS narrowing it to the pre-await value.
+      if ((this.state as PlaybackState) === 'stopped') {
+        // stop() interrupts the in-flight play() — not an error.
+        return;
+      }
       this.state = 'error';
       logger.error(
         `Playback failed: ${error instanceof Error ? error.message : String(error)}`
@@ -67,114 +58,78 @@ export class AudioPlaybackManager {
     }
   }
 
+  /** Play an audio file from disk. Resolves when playback finishes. */
   async playFile(filePath: string): Promise<void> {
     this.state = 'playing';
     logger.info(`Playing audio file: ${filePath}`);
 
-    if (Platform.OS === 'ios') {
-      await this.playFileIOS(filePath);
-    } else {
-      await this.playFileAndroid(filePath);
+    try {
+      await AudioPlayback.playFile(filePath);
+      this.state = 'idle';
+    } catch (error) {
+      // `stop()` may have run while we awaited — re-read the state without
+      // TS narrowing it to the pre-await value.
+      if ((this.state as PlaybackState) === 'stopped') {
+        return;
+      }
+      this.state = 'error';
+      throw error;
     }
   }
 
+  /** Stop current playback (rejects an in-flight play promise natively). */
   stop(): void {
     if (this.state === 'idle' || this.state === 'stopped') return;
 
     logger.info('Stopping playback');
     this.state = 'stopped';
-
-    if (Platform.OS === 'ios' && NativeAudioModule) {
-      NativeAudioModule.stopPlayback().catch(() => {});
-    } else if (this.currentSound) {
-      this.currentSound.stop();
-      this.currentSound.release();
-      this.currentSound = null;
+    try {
+      AudioPlayback.stop();
+    } catch (error) {
+      logger.warning(
+        `stop() failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
-  private async playFileIOS(filePath: string): Promise<void> {
-    if (!NativeAudioModule) {
-      throw new Error('NativeAudioModule not available');
-    }
-
-    return new Promise((resolve, reject) => {
-      NativeAudioModule.playAudio(filePath)
-        .then(() => {
-          const checkInterval = setInterval(async () => {
-            if (this.state !== 'playing') {
-              clearInterval(checkInterval);
-              resolve();
-              return;
-            }
-            try {
-              const status = await NativeAudioModule.getPlaybackStatus();
-              if (!status.isPlaying) {
-                clearInterval(checkInterval);
-                this.state = 'idle';
-                resolve();
-              }
-            } catch {
-              clearInterval(checkInterval);
-              this.state = 'idle';
-              resolve();
-            }
-          }, 100);
-        })
-        .catch((error: Error) => {
-          this.state = 'error';
-          reject(error);
-        });
-    });
+  /** Pause current playback (Swift AudioPlaybackManager.pause() parity). */
+  pause(): void {
+    if (this.state !== 'playing') return;
+    this.state = 'paused';
+    AudioPlayback.pause();
   }
 
-  private async playFileAndroid(filePath: string): Promise<void> {
-    const SoundClass = getSound();
-    if (!SoundClass) {
-      throw new Error('react-native-sound not available');
-    }
+  /** Resume paused playback (Swift AudioPlaybackManager.resume() parity). */
+  resume(): void {
+    if (this.state !== 'paused') return;
+    this.state = 'playing';
+    AudioPlayback.resume();
+  }
 
-    return new Promise((resolve, reject) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.currentSound = new SoundClass(filePath, '', (error: any) => {
-        if (error) {
-          this.state = 'error';
-          reject(error);
-          return;
-        }
+  /** Whether audio is currently playing. */
+  get isPlaying(): boolean {
+    return AudioPlayback.isPlaying;
+  }
 
-        this.currentSound.play((success: boolean) => {
-          if (this.currentSound) {
-            this.currentSound.release();
-            this.currentSound = null;
-          }
+  /** Current playback position in seconds. */
+  get currentTime(): number {
+    return AudioPlayback.currentTime;
+  }
 
-          if (success) {
-            this.state = 'idle';
-            resolve();
-          } else {
-            this.state = 'error';
-            reject(new Error('Playback failed'));
-          }
-        });
-      });
-    });
+  /** Total duration of the loaded audio in seconds. */
+  get duration(): number {
+    return AudioPlayback.duration;
   }
 }
 
-async function createWavFromPCMFloat32(
-  audioBase64: string,
+/**
+ * Encode raw float32 PCM samples into an in-memory 16-bit mono WAV buffer.
+ */
+function createWavFromPCMFloat32(
+  pcmFloat32: ArrayBuffer,
   sampleRate: number
-): Promise<string> {
-  const RNFS = require('react-native-fs');
-
-  const binaryString = atob(audioBase64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-
-  const floatView = new Float32Array(bytes.buffer);
+): ArrayBuffer {
+  const floatView = new Float32Array(pcmFloat32);
   const numSamples = floatView.length;
   const int16Samples = new Int16Array(numSamples);
   for (let i = 0; i < numSamples; i++) {
@@ -209,10 +164,7 @@ async function createWavFromPCMFloat32(
     wavBytes[44 + i] = int16Bytes[i]!;
   }
 
-  const fileName = `tts_${Date.now()}.wav`;
-  const filePath = `${RNFS.CachesDirectoryPath}/${fileName}`;
-  await RNFS.writeFile(filePath, arrayBufferToBase64(wavBuffer), 'base64');
-  return filePath;
+  return wavBuffer;
 }
 
 function writeString(view: DataView, offset: number, str: string): void {
@@ -221,11 +173,11 @@ function writeString(view: DataView, offset: number, str: string): void {
   }
 }
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]!);
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
   }
-  return btoa(binary);
+  return bytes.buffer;
 }

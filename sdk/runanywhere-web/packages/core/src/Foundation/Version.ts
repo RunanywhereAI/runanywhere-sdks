@@ -11,3 +11,12 @@
  * `scripts/release/sync-versions.sh <new_version>`.
  */
 export const SDK_VERSION = '0.19.13';
+
+/** SDK display name. Mirrors Swift `SDKConstants.name` (SDKConstants.swift:17). */
+export const SDK_NAME = 'RunAnywhere SDK';
+
+/**
+ * Platform identifier. Mirrors Swift `SDKConstants.platform`
+ * (SDKConstants.swift:20-30, "ios"/"macos"/...); the Web SDK reports `'web'`.
+ */
+export const SDK_PLATFORM = 'web';

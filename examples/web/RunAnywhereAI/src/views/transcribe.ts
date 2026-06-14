@@ -1,32 +1,29 @@
 /**
  * Transcribe Tab — V2 canonical proto-byte STT.
  *
- * Once `ONNX.register()` resolves, the public surface in `@runanywhere/web`
- * (`RunAnywhere.stt.*`) flows through the proto-byte
- * STT adapter into the WASM module. This view supports two input paths:
- *  1. Microphone capture via `AudioCapture` (push-to-talk style).
- *  2. File picker via `AudioFileLoader`.
+ * Mirrors iOS `STTViewModel` with a Batch / Live mode toggle (iOS parity:
+ * STTViewModel.swift:43-61 `selectedMode`):
  *
- * Both paths require a loaded STT model. When the WASM module isn't built
- * with `RAC_WASM_ONNX=ON` the STT adapter throws `BackendNotAvailable`; the
- * view surfaces the error inline rather than rendering a blank placeholder
- * once the ONNX backend has been registered.
+ *  - Batch (STTViewModel.swift:241-261): record, then one-shot
+ *    `RunAnywhere.transcribe(samples)`.
+ *  - Live (STTViewModel.swift:365-408): the SDK streaming session emits
+ *    partial hypotheses (`isFinal=false`) that preview the utterance and a
+ *    final result (`isFinal=true`) that replaces them.
+ *
+ * A file-upload affordance is kept as a justified web addition (browsers
+ * have first-class file pickers; decoding goes through `AudioFileLoader`).
  */
 
 import type { TabLifecycle } from '../app';
 import {
   ModelCategory,
   RunAnywhere,
-  isSDKException,
-  type STTOutput,
 } from '@runanywhere/web';
 import {
   AudioCapture,
   AudioFileLoader,
 } from '@runanywhere/web/browser';
-import { ONNX } from '@runanywhere/web-onnx';
 import {
-  ensureCatalogRegistered,
   findLoadedModelForCategory,
   onModelStateChange,
   openSheet,
@@ -38,18 +35,22 @@ const STT_PICKER_FILTER: readonly ModelCategory[] = [
   ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
 ];
 
+/** UI mode — mirrors iOS `STTMode` (STTViewModel.swift:442-462; hybrid is
+ * cloud-router-only and not exposed on web). */
+type STTMode = 'batch' | 'live';
+
 let container: HTMLElement;
 let unmounted = false;
 let audioCapture: AudioCapture | null = null;
 let isCapturing = false;
 let isProcessing = false;
-let lastResult: STTOutput | null = null;
+let selectedMode: STTMode = 'batch';
+let transcript = '';
 let unsubscribeState: (() => void) | null = null;
 
 export function initTranscribeTab(el: HTMLElement): TabLifecycle {
   container = el;
   unmounted = false;
-  ensureCatalogRegistered();
   renderTranscribe();
   unsubscribeState = onModelStateChange(() => {
     if (!unmounted) renderTranscribe();
@@ -58,11 +59,9 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
     // app.ts fires onDeactivate on every tab switch (not only on panel
     // teardown). Treat the flag as a "currently inactive" guard for
     // in-flight async renders and reset it on re-activation so a returning
-    // user doesn't see stale microphone / processing state or skipped
-    // post-ONNX-register re-renders.
+    // user doesn't see stale microphone / processing state.
     onActivate: () => {
       unmounted = false;
-      ensureCatalogRegistered();
       renderTranscribe();
     },
     onDeactivate: () => {
@@ -78,57 +77,37 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
   };
 }
 
-interface TranscribeStatus {
-  registered: boolean;
-  supportsProto: boolean;
-}
-
-function inspectStatus(): TranscribeStatus {
-  const registered = ONNX.isRegistered;
-  const supportsProto = RunAnywhere.stt.supportsProtoSTT();
-  return { registered, supportsProto };
-}
-
 function renderTranscribe(): void {
-  const status = inspectStatus();
-  const transcript = lastResult?.text ?? '';
-  const showLive = status.registered && status.supportsProto;
+  const supportsProto = RunAnywhere.stt.supportsProtoSTT();
   const loadedModel = findLoadedModelForCategory(
     ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
   );
   const modelLabel = loadedModel?.name ?? 'Select STT Model';
-  const canRunInference = showLive && Boolean(loadedModel);
+  const canRunInference = supportsProto && Boolean(loadedModel);
 
   container.innerHTML = `
     <div class="toolbar">
       <div class="toolbar-title">Transcribe</div>
       <div class="toolbar-actions">
         <button class="btn btn-secondary" id="transcribe-model-btn">${escapeHtml(modelLabel)}</button>
-        <button class="btn btn-secondary" id="onnx-register-btn">${
-          status.registered ? 'Re-register ONNX' : 'Register ONNX backend'
-        }</button>
       </div>
     </div>
     <div class="scroll-area">
-      <div class="docs-section">
-        <h3>Backend status</h3>
-        <ul class="feature-unavailable__list">
-          <li><code>ONNX.isRegistered</code>: <strong>${
-            status.registered ? 'yes' : 'no'
-          }</strong></li>
-          <li><code>RunAnywhere.stt.supportsProtoSTT()</code>: <strong>${
-            status.supportsProto ? 'yes' : 'no'
-          }</strong></li>
-          <li><code>STT model loaded</code>: <strong>${loadedModel ? escapeHtml(loadedModel.id) : 'no'}</strong></li>
-        </ul>
-        <div id="onnx-register-status" class="docs-status"></div>
-      </div>
-
-      ${showLive
+      ${supportsProto
         ? `
           <div class="docs-section">
+            <h3>Mode</h3>
+            <div class="toolbar-actions">
+              <button class="btn ${selectedMode === 'batch' ? 'btn-primary' : 'btn-secondary'}" id="mode-batch-btn" ${isCapturing || isProcessing ? 'disabled' : ''}>Batch</button>
+              <button class="btn ${selectedMode === 'live' ? 'btn-primary' : 'btn-secondary'}" id="mode-live-btn" ${isCapturing || isProcessing ? 'disabled' : ''}>Live</button>
+            </div>
+            <p class="text-secondary">${selectedMode === 'batch'
+              ? 'Record first, then transcribe.'
+              : 'Stream with live partial results — partials preview the utterance, the final result replaces them.'}</p>
+          </div>
+          <div class="docs-section">
             <h3>Microphone</h3>
-            <p class="text-secondary">Capture audio from your microphone, then transcribe it through <code>RunAnywhere.transcribe(...)</code>.</p>
+            <p class="text-secondary">Capture audio from your microphone, then transcribe it through <code>${selectedMode === 'live' ? 'RunAnywhere.transcribeStream(...)' : 'RunAnywhere.transcribe(...)'}</code>.</p>
             <div class="toolbar-actions">
               <button class="btn btn-primary" id="mic-toggle-btn" ${isProcessing || !canRunInference ? 'disabled' : ''}>
                 ${isCapturing ? 'Stop & transcribe' : 'Start recording'}
@@ -151,8 +130,8 @@ function renderTranscribe(): void {
           <div class="docs-section">
             <h3>Live transcription</h3>
             <p class="text-secondary">
-              Once the ONNX backend is registered against a WASM build that
-              includes <code>RAC_WASM_ONNX=ON</code>, this view dispatches
+              Once a speech-capable backend is registered against a WASM build
+              that includes <code>RAC_WASM_ONNX=ON</code>, this view dispatches
               transcription through <code>RunAnywhere.transcribe(audio, options)</code>.
             </p>
             <ul class="feature-unavailable__list">
@@ -163,10 +142,6 @@ function renderTranscribe(): void {
     </div>
   `;
 
-  container
-    .querySelector('#onnx-register-btn')!
-    .addEventListener('click', () => void registerOnnx());
-
   container.querySelector('#transcribe-model-btn')?.addEventListener('click', () => {
     openSheet({
       title: 'Select Transcription Model',
@@ -174,12 +149,20 @@ function renderTranscribe(): void {
     });
   });
 
-  if (showLive) {
+  if (supportsProto) {
+    container.querySelector('#mode-batch-btn')?.addEventListener('click', () => {
+      selectedMode = 'batch';
+      renderTranscribe();
+    });
+    container.querySelector('#mode-live-btn')?.addEventListener('click', () => {
+      selectedMode = 'live';
+      renderTranscribe();
+    });
     container.querySelector('#mic-toggle-btn')?.addEventListener('click', () => {
       void toggleMic();
     });
     container.querySelector('#clear-btn')?.addEventListener('click', () => {
-      lastResult = null;
+      transcript = '';
       renderTranscribe();
     });
     const fileInput = container.querySelector<HTMLInputElement>('#file-input');
@@ -187,20 +170,6 @@ function renderTranscribe(): void {
       const file = fileInput.files?.[0];
       if (file) void transcribeFile(file);
     });
-  }
-}
-
-async function registerOnnx(): Promise<void> {
-  const banner = container.querySelector<HTMLDivElement>('#onnx-register-status');
-  if (!banner) return;
-  banner.textContent = 'Registering ONNX backend...';
-  try {
-    await ONNX.register();
-    if (unmounted) return;
-    banner.textContent = 'ONNX backend registered.';
-    renderTranscribe();
-  } catch (err) {
-    banner.textContent = `Failed to register ONNX backend: ${formatErr(err)}`;
   }
 }
 
@@ -217,9 +186,10 @@ async function startMic(): Promise<void> {
   try {
     await audioCapture.start();
     isCapturing = true;
+    transcript = '';
     renderTranscribe();
   } catch (err) {
-    setStatus(`Microphone error: ${formatErr(err)}`);
+    setStatus(`Microphone error: ${formatError(err)}`);
   }
 }
 
@@ -233,7 +203,11 @@ async function stopMicAndTranscribe(): Promise<void> {
     renderTranscribe();
     return;
   }
-  await runTranscribe(samples);
+  if (selectedMode === 'live') {
+    await runTranscribeStream(samples);
+  } else {
+    await runTranscribe(samples);
+  }
 }
 
 async function transcribeFile(file: File): Promise<void> {
@@ -241,36 +215,99 @@ async function transcribeFile(file: File): Promise<void> {
   renderTranscribe();
   try {
     const decoded = await AudioFileLoader.toFloat32Array(file, 16000);
-    await runTranscribe(decoded.samples);
+    if (selectedMode === 'live') {
+      await runTranscribeStream(decoded.samples);
+    } else {
+      await runTranscribe(decoded.samples);
+    }
   } catch (err) {
-    setStatus(`Failed to decode file: ${formatErr(err)}`);
+    setStatus(`Failed to decode file: ${formatError(err)}`);
   } finally {
     isProcessing = false;
     renderTranscribe();
   }
 }
 
+/** Batch mode — one-shot transcription (iOS parity: STTViewModel.swift:252). */
 async function runTranscribe(samples: Float32Array): Promise<void> {
   isProcessing = true;
   renderTranscribe();
   setStatus(`Transcribing ${(samples.length / 16000).toFixed(2)}s of audio...`);
   try {
-    lastResult = await RunAnywhere.transcribe(samples);
+    const output = await RunAnywhere.transcribe(samples);
+    transcript = output.text;
     setStatus('Done.');
   } catch (err) {
-    setStatus(`Transcribe failed: ${formatErr(err)}`);
+    setStatus(`Transcribe failed: ${formatError(err)}`);
   } finally {
     isProcessing = false;
     renderTranscribe();
   }
 }
 
+/**
+ * Live mode — SDK streaming session emitting partial + final results (iOS
+ * parity: STTViewModel.swift:377 `RunAnywhere.transcribeStream`; partial
+ * folding mirrors STTViewModel.swift:387-408 — non-final partials preview
+ * the utterance, the final replaces them).
+ *
+ * The Web streaming verb is handle-scoped (`RunAnywhere.stt.create()` /
+ * `loadModel(handle, ...)` / `transcribeStream(handle, audio)`); the model
+ * path comes from the canonical lifecycle via `RunAnywhere.currentModel`.
+ */
+async function runTranscribeStream(samples: Float32Array): Promise<void> {
+  isProcessing = true;
+  renderTranscribe();
+  setStatus(`Streaming ${(samples.length / 16000).toFixed(2)}s of audio...`);
+
+  let handle: number | null = null;
+  try {
+    const current = RunAnywhere.currentModel({
+      category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+      includeModelMetadata: true,
+    });
+    const modelPath = current?.resolvedPath || current?.modelId;
+    if (!modelPath) {
+      setStatus('No STT model loaded.');
+      return;
+    }
+
+    handle = RunAnywhere.stt.create();
+    RunAnywhere.stt.loadModel(handle, modelPath, current?.modelId);
+
+    transcript = '';
+    for await (const partial of RunAnywhere.transcribeStream(handle, samples, undefined)) {
+      const text = partial.text.trim();
+      if (partial.isFinal) {
+        // Stream errors surface as a terminal partial carrying the failure
+        // text (iOS parity: STTViewModel.swift:391-396).
+        if (text.startsWith('STT stream failed')) {
+          setStatus(text);
+          return;
+        }
+        transcript = text;
+        updateOutput();
+      } else if (text) {
+        transcript = text;
+        updateOutput();
+      }
+    }
+    setStatus('Done.');
+  } catch (err) {
+    setStatus(`Transcribe failed: ${formatError(err)}`);
+  } finally {
+    if (handle != null) RunAnywhere.stt.destroy(handle);
+    isProcessing = false;
+    renderTranscribe();
+  }
+}
+
+function updateOutput(): void {
+  const pre = container.querySelector<HTMLPreElement>('#transcribe-output');
+  if (pre) pre.textContent = transcript || '(no transcript yet)';
+}
+
 function setStatus(text: string): void {
   const banner = container.querySelector<HTMLDivElement>('#transcribe-status');
   if (banner) banner.textContent = text;
-}
-
-function formatErr(err: unknown): string {
-  if (isSDKException(err)) return err.message;
-  return formatError(err);
 }

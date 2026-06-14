@@ -60,9 +60,9 @@ fun ConversationHistorySheet(
 
     LaunchedEffect(Unit) { ConversationRepository.refresh() }
 
-    val filtered = conversations.filter {
-        query.isBlank() || it.title.contains(query, ignoreCase = true) || it.preview.contains(query, ignoreCase = true)
-    }
+    // Mirrors iOS ConversationStore.searchConversations: matches conversation
+    // titles and full message text, not just the stored preview snippet.
+    val filtered = ConversationRepository.search(query)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -193,6 +193,17 @@ private fun ConversationRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                // Context around the matched message text, shown only while
+                // searching (mirrors iOS ConversationRow's matching preview).
+                conversation.matchPreview?.let { preview ->
+                    Text(
+                        text = preview,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Text(
                     text = relativeTime(conversation.updatedAt),
                     style = MaterialTheme.typography.bodySmall,

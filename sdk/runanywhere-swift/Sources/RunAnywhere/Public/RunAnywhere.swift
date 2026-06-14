@@ -174,15 +174,12 @@ public enum RunAnywhere {
         // are wired up.
         CppBridge.initialize(environment: params.environment)
 
+        // Lifecycle INITIALIZATION_STAGE_* events (incl. duration_ms) are
+        // published once by commons from rac_sdk_init_phase1_proto; Swift no
+        // longer hand-emits duplicates.
         let logger = SDKLogger(category: "RunAnywhere.Init")
-        CppBridge.Events.emitSDKInitStarted()
 
         do {
-            // Persist credentials (Apple-specific Keychain — must stay in Swift).
-            if params.environment != .development {
-                try KeychainManager.shared.storeSDKParams(params)
-            }
-
             // Configure C++ model-paths base directory before any
             // registerModel() calls so rac_model_registry_save() can
             // reconcile entries against on-disk folders inline.
@@ -216,7 +213,6 @@ public enum RunAnywhere {
 
             let initDurationMs = (CFAbsoluteTimeGetCurrent() - initStartTime) * 1000
             logger.info("Phase 1 complete in \(String(format: "%.1f", initDurationMs))ms (\(params.environment.description))")
-            CppBridge.Events.emitSDKInitCompleted(durationMs: initDurationMs)
 
             if startBackgroundServices {
                 logger.debug("Starting Phase 2 (services) in background...")
@@ -242,7 +238,6 @@ public enum RunAnywhere {
                 $0.httpSetupApplicable = true
                 $0.servicesInitTask = nil
             }
-            CppBridge.Events.emitSDKInitFailed(error: SDKException.from(error))
             throw error
         }
     }

@@ -30,6 +30,16 @@ class STTViewModel: VoiceComponentViewModelBase {
     @Published var isProcessing = false
     @Published var isTranscribing = false
     @Published var audioLevel: Float = 0.0
+    @Published var cloudProviderId = "ios-demo-cloud-stt"
+    @Published var cloudProvider = Cloud.defaultProvider
+    @Published var cloudModel = "saarika:v2.5"
+    @Published var cloudAPIKey = ""
+    @Published var cloudLanguageCode = "en-IN"
+    @Published var hybridPreferOnline = false
+    @Published var hybridRequireNetwork = true
+    @Published var hybridMinBattery: Double = 20
+    @Published var hybridConfidenceThreshold = Double(RAHybridSTTConfidenceThreshold)
+    @Published var hybridRouting: HybridRoutedMetadata?
     @Published var selectedMode: STTMode = .batch {
         didSet {
             // Stop any active recording/transcription when mode changes
@@ -61,6 +71,8 @@ class STTViewModel: VoiceComponentViewModelBase {
     private var liveAudioContinuation: AsyncStream<Data>.Continuation?
     private var liveStreamTask: Task<Void, Never>?
     private var committedTranscription = ""
+    private var hybridRouter: HybridSTTRouter?
+    private var hybridPairKey: String?
 
     // MARK: - Initialization State (for idempotency)
 
@@ -160,12 +172,18 @@ class STTViewModel: VoiceComponentViewModelBase {
     private func startRecording() async {
         logger.info("Starting recording in \(self.selectedMode.rawValue) mode")
         errorMessage = nil
+        hybridRouting = nil
         audioBuffer = Data()
         transcription = ""
         committedTranscription = ""
 
         guard selectedModelId != nil else {
             errorMessage = "No STT model loaded"
+            return
+        }
+
+        if selectedMode == .hybrid && !isHybridCloudConfigValid {
+            errorMessage = "Enter a cloud STT API key before using Hybrid mode"
             return
         }
 
@@ -205,8 +223,12 @@ class STTViewModel: VoiceComponentViewModelBase {
             liveAudioContinuation?.finish()
             liveAudioContinuation = nil
         } else if !audioBuffer.isEmpty {
-            // Batch: transcribe everything we recorded.
-            await performBatchTranscription()
+            if selectedMode == .hybrid {
+                await performHybridTranscription()
+            } else {
+                // Batch: transcribe everything we recorded.
+                await performBatchTranscription()
+            }
         }
 
         isRecording = false
@@ -236,6 +258,108 @@ class STTViewModel: VoiceComponentViewModelBase {
         }
 
         isTranscribing = false
+    }
+
+    /// Perform one request through the SDK hybrid STT router.
+    private func performHybridTranscription() async {
+        guard !audioBuffer.isEmpty else {
+            errorMessage = "No audio recorded"
+            return
+        }
+        guard let offlineModelId = selectedModelId else {
+            errorMessage = "No STT model loaded"
+            return
+        }
+
+        logger.info("Starting hybrid transcription of \(self.audioBuffer.count) bytes")
+        isTranscribing = true
+        transcription = ""
+        hybridRouting = nil
+
+        do {
+            let onlineModelId = try registerCloudProvider()
+            let router = try ensureHybridRouter(offlineModelId: offlineModelId, onlineModelId: onlineModelId)
+            var options = HybridTranscribeOptions()
+            options.sampleRate = 16_000
+            options.audioFormat = CloudAudioFormat.wav.nativeValue
+
+            let result = try router.transcribe(audioBuffer, options: options)
+            transcription = result.text
+            hybridRouting = result.routing
+            logger.info("Hybrid transcription complete: \(result.text)")
+        } catch {
+            logger.error("Hybrid transcription failed: \(error.localizedDescription)")
+            errorMessage = "Hybrid transcription failed: \(error.localizedDescription)"
+        }
+
+        isTranscribing = false
+    }
+
+    private var isHybridCloudConfigValid: Bool {
+        !cloudProviderId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !cloudProvider.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !cloudModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !cloudAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func registerCloudProvider() throws -> String {
+        let id = cloudProviderId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let provider = cloudProvider.trimmingCharacters(in: .whitespacesAndNewlines)
+        let model = cloudModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        let apiKey = cloudAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let language = cloudLanguageCode.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !id.isEmpty, !provider.isEmpty, !model.isEmpty, !apiKey.isEmpty else {
+            throw SDKException(
+                code: .invalidArgument,
+                message: "Cloud provider id, provider, model, and API key are required",
+                category: .validation
+            )
+        }
+
+        Cloud.register()
+        Cloud.register(
+            id: id,
+            provider: provider,
+            model: model,
+            apiKey: apiKey,
+            languageCode: language.isEmpty ? nil : language
+        )
+        return id
+    }
+
+    private func ensureHybridRouter(offlineModelId: String, onlineModelId: String) throws -> HybridSTTRouter {
+        let key = [
+            offlineModelId,
+            onlineModelId,
+            cloudProvider,
+            String(hybridPreferOnline),
+            String(hybridRequireNetwork),
+            String(Int(hybridMinBattery)),
+            String(hybridConfidenceThreshold),
+        ].joined(separator: "|")
+
+        if let router = hybridRouter, hybridPairKey == key {
+            return router
+        }
+
+        hybridRouter?.close()
+        let router = try HybridSTTRouter()
+        var filters: [HybridFilter] = []
+        if hybridRequireNetwork { filters.append(.network) }
+        filters.append(.battery(minPercent: Int32(hybridMinBattery)))
+        try router.setPair(
+            offline: .offlineSherpa(offlineModelId),
+            online: .onlineCloud(onlineModelId, provider: cloudProvider),
+            policy: HybridRoutingPolicy(
+                hardFilters: filters,
+                cascade: .confidence(threshold: Float(hybridConfidenceThreshold)),
+                rank: hybridPreferOnline ? .preferOnlineFirst : .preferLocalFirst
+            )
+        )
+        hybridRouter = router
+        hybridPairKey = key
+        return router
     }
 
     /// Start the SDK streaming transcription session for live mode.
@@ -303,6 +427,9 @@ class STTViewModel: VoiceComponentViewModelBase {
         liveAudioContinuation = nil
         liveStreamTask?.cancel()
         liveStreamTask = nil
+        hybridRouter?.close()
+        hybridRouter = nil
+        hybridPairKey = nil
 
         hasSubscribedToAudioLevel = false
         cleanupBase()
@@ -315,11 +442,13 @@ class STTViewModel: VoiceComponentViewModelBase {
 enum STTMode: String {
     case batch
     case live
+    case hybrid
 
     var icon: String {
         switch self {
         case .batch: return "square.stack.3d.up"
         case .live: return "waveform"
+        case .hybrid: return "cloud"
         }
     }
 
@@ -327,6 +456,7 @@ enum STTMode: String {
         switch self {
         case .batch: return "Record first, then transcribe"
         case .live: return "Stream with live partial results"
+        case .hybrid: return "On-device first with cloud fallback"
         }
     }
 }

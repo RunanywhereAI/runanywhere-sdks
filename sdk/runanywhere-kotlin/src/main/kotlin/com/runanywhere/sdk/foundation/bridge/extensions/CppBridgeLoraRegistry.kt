@@ -18,6 +18,8 @@ import ai.runanywhere.proto.v1.LoraAdapterCatalogListResult
 import ai.runanywhere.proto.v1.LoraAdapterCatalogQuery
 import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedRequest
 import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedResult
+import ai.runanywhere.proto.v1.LoraAdapterImportRequest
+import ai.runanywhere.proto.v1.LoraAdapterImportResult
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -124,5 +126,14 @@ object CppBridgeLoraRegistry {
                 LoraAdapterDownloadCompletedRequest.ADAPTER.encode(request),
             ),
             "racLoraCatalogMarkDownloadCompletedProto",
+        )
+
+    fun importAdapter(request: LoraAdapterImportRequest): LoraAdapterImportResult =
+        decodeOrThrow(
+            LoraAdapterImportResult.ADAPTER,
+            RunAnywhereBridge.racLoraAdapterImportProto(
+                LoraAdapterImportRequest.ADAPTER.encode(request),
+            ),
+            "racLoraAdapterImportProto",
         )
 }

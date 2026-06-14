@@ -15,6 +15,14 @@
       "kotlin": "HybridRunAnywhereDeviceInfo",
       "swift": "HybridRunAnywhereDeviceInfo"
     },
+    "AudioCapture": {
+      "kotlin": "HybridAudioCapture",
+      "swift": "HybridAudioCapture"
+    },
+    "AudioPlayback": {
+      "kotlin": "HybridAudioPlayback",
+      "swift": "HybridAudioPlayback"
+    },
     "LLM": {
       "cpp": "HybridLLM"
     },

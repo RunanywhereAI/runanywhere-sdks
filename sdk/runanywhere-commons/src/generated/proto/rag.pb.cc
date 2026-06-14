@@ -1096,7 +1096,7 @@ constexpr RAGConfiguration::ParseTableT_ RAGConfiguration::InternalGenerateParse
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGConfiguration, _impl_.embedding_dimension_), 7>(),
        {24, 7, 0,
         PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.embedding_dimension_)}},
-      // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
+      // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5", (.runanywhere.v1.rac_min) = 1];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGConfiguration, _impl_.top_k_), 8>(),
        {32, 8, 0,
         PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.top_k_)}},
@@ -1104,11 +1104,11 @@ constexpr RAGConfiguration::ParseTableT_ RAGConfiguration::InternalGenerateParse
       {::_pbi::TcParser::FastF32S1,
        {45, 9, 0,
         PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.similarity_threshold_)}},
-      // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
+      // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGConfiguration, _impl_.chunk_size_), 10>(),
        {48, 10, 0,
         PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.chunk_size_)}},
-      // optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
+      // optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64", (.runanywhere.v1.rac_min) = 0];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGConfiguration, _impl_.chunk_overlap_), 11>(),
        {56, 11, 0,
         PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.chunk_overlap_)}},
@@ -1153,13 +1153,13 @@ constexpr RAGConfiguration::ParseTableT_ RAGConfiguration::InternalGenerateParse
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.llm_model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // optional int32 embedding_dimension = 3;
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.embedding_dimension_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
+      // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5", (.runanywhere.v1.rac_min) = 1];
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.top_k_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.similarity_threshold_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
+      // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.chunk_size_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
+      // optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64", (.runanywhere.v1.rac_min) = 0];
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.chunk_overlap_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // optional int32 max_context_tokens = 8;
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.max_context_tokens_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
@@ -3266,123 +3266,123 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_rag_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\trag.proto\022\016runanywhere.v1\032\021rac_options"
-    ".proto\"\314\005\n\020RAGConfiguration\022\032\n\022embedding"
+    ".proto\"\330\005\n\020RAGConfiguration\022\032\n\022embedding"
     "_model_id\030\001 \001(\t\022\024\n\014llm_model_id\030\002 \001(\t\022 \n"
-    "\023embedding_dimension\030\003 \001(\005H\000\210\001\001\022\031\n\005top_k"
-    "\030\004 \001(\005B\005\212\265\030\0015H\001\210\001\001\022@\n\024similarity_thresho"
-    "ld\030\005 \001(\002B\035\212\265\030\0030.3\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?H"
-    "\002\210\001\001\022 \n\nchunk_size\030\006 \001(\005B\007\212\265\030\003512H\003\210\001\001\022\""
-    "\n\rchunk_overlap\030\007 \001(\005B\006\212\265\030\00264H\004\210\001\001\022\037\n\022ma"
-    "x_context_tokens\030\010 \001(\005H\005\210\001\001\022\034\n\017prompt_te"
-    "mplate\030\t \001(\tH\006\210\001\001\022\"\n\025embedding_config_js"
-    "on\030\n \001(\tH\007\210\001\001\022\034\n\017llm_config_json\030\013 \001(\tH\010"
-    "\210\001\001\022\027\n\nindex_path\030\014 \001(\tH\t\210\001\001\022\025\n\rpersist_"
-    "index\030\r \001(\010\022\026\n\016rerank_results\030\016 \001(\010\022\036\n\021r"
-    "eranker_model_id\030\017 \001(\tH\n\210\001\001B\026\n\024_embeddin"
-    "g_dimensionB\010\n\006_top_kB\027\n\025_similarity_thr"
-    "esholdB\r\n\013_chunk_sizeB\020\n\016_chunk_overlapB"
-    "\025\n\023_max_context_tokensB\022\n\020_prompt_templa"
-    "teB\030\n\026_embedding_config_jsonB\022\n\020_llm_con"
-    "fig_jsonB\r\n\013_index_pathB\024\n\022_reranker_mod"
-    "el_id\"\276\002\n\013RAGDocument\022\n\n\002id\030\001 \001(\t\022\014\n\004tex"
-    "t\030\002 \001(\t\022;\n\010metadata\030\004 \003(\0132).runanywhere."
-    "v1.RAGDocument.MetadataEntry\022\027\n\nsource_u"
-    "ri\030\005 \001(\tH\000\210\001\001\022\033\n\016adapter_handle\030\006 \001(\tH\001\210"
-    "\001\001\022\027\n\nmedia_type\030\007 \001(\tH\002\210\001\001\022\022\n\nsize_byte"
-    "s\030\010 \001(\003\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n"
-    "\005value\030\002 \001(\t:\0028\001B\r\n\013_source_uriB\021\n\017_adap"
-    "ter_handleB\r\n\013_media_typeJ\004\010\003\020\004R\rmetadat"
-    "a_json\"\343\001\n\020RAGIngestRequest\022\022\n\nrequest_i"
-    "d\030\001 \001(\t\022.\n\tdocuments\030\002 \003(\0132\033.runanywhere"
-    ".v1.RAGDocument\022\030\n\020replace_existing\030\003 \001("
-    "\010\022@\n\010metadata\030\004 \003(\0132..runanywhere.v1.RAG"
-    "IngestRequest.MetadataEntry\032/\n\rMetadataE"
-    "ntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\224\002\n"
-    "\017RAGQueryOptions\022\020\n\010question\030\001 \001(\t\022\032\n\rsy"
-    "stem_prompt\030\002 \001(\tH\000\210\001\001\022\033\n\nmax_tokens\030\003 \001"
-    "(\005B\007\212\265\030\003512\022\034\n\013temperature\030\004 \001(\002B\007\212\265\030\0030."
-    "7\022\026\n\005top_p\030\005 \001(\002B\007\212\265\030\0031.0\022\r\n\005top_k\030\006 \001(\005"
-    "\022\027\n\017retrieval_top_k\030\007 \001(\005\022\034\n\024similarity_"
-    "threshold\030\010 \001(\002\022\016\n\006stream\030\t \001(\010\022\030\n\020disab"
-    "le_thinking\030\n \001(\010B\020\n\016_system_prompt\"\332\001\n\017"
-    "RAGQueryRequest\022\022\n\nrequest_id\030\001 \001(\t\0225\n\007o"
-    "ptions\030\002 \001(\0132\037.runanywhere.v1.RAGQueryOp"
-    "tionsH\000\210\001\001\022\?\n\010metadata\030\003 \003(\0132-.runanywhe"
-    "re.v1.RAGQueryRequest.MetadataEntry\032/\n\rM"
-    "etadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t"
-    ":\0028\001B\n\n\010_options\"\321\002\n\017RAGSearchResult\022\020\n\010"
-    "chunk_id\030\001 \001(\t\022\014\n\004text\030\002 \001(\t\022\030\n\020similari"
-    "ty_score\030\003 \001(\002\022\034\n\017source_document\030\004 \001(\tH"
-    "\000\210\001\001\022\?\n\010metadata\030\005 \003(\0132-.runanywhere.v1."
-    "RAGSearchResult.MetadataEntry\022\014\n\004rank\030\007 "
-    "\001(\005\022\024\n\014start_offset\030\010 \001(\005\022\022\n\nend_offset\030"
-    "\t \001(\005\022\023\n\013token_count\030\n \001(\005\032/\n\rMetadataEn"
-    "try\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\022\n\020_"
-    "source_documentJ\004\010\006\020\007R\rmetadata_json\"\214\003\n"
-    "\tRAGResult\022\016\n\006answer\030\001 \001(\t\0229\n\020retrieved_"
-    "chunks\030\002 \003(\0132\037.runanywhere.v1.RAGSearchR"
-    "esult\022\024\n\014context_used\030\003 \001(\t\022\031\n\021retrieval"
-    "_time_ms\030\004 \001(\003\022\032\n\022generation_time_ms\030\005 \001"
-    "(\003\022\025\n\rtotal_time_ms\030\006 \001(\003\022\025\n\rprompt_toke"
-    "ns\030\007 \001(\005\022\031\n\021completion_tokens\030\010 \001(\005\022\024\n\014t"
-    "otal_tokens\030\t \001(\005\022\032\n\rerror_message\030\n \001(\t"
-    "H\000\210\001\001\022\022\n\nerror_code\030\013 \001(\005\022\022\n\nrequest_id\030"
-    "\014 \001(\t\022\035\n\020thinking_content\030\r \001(\tH\001\210\001\001B\020\n\016"
-    "_error_messageB\023\n\021_thinking_content\"\332\002\n\r"
-    "RAGStatistics\022\031\n\021indexed_documents\030\001 \001(\003"
-    "\022\026\n\016indexed_chunks\030\002 \001(\003\022\034\n\024total_tokens"
-    "_indexed\030\003 \001(\003\022\027\n\017last_updated_ms\030\004 \001(\003\022"
-    "\027\n\nindex_path\030\005 \001(\tH\000\210\001\001\022\027\n\nstats_json\030\006"
-    " \001(\tH\001\210\001\001\022\037\n\027vector_store_size_bytes\030\007 \001"
-    "(\003\022\025\n\ris_persistent\030\010 \001(\010\022\025\n\rlast_query_"
-    "ms\030\t \001(\003\022\032\n\rerror_message\030\n \001(\tH\002\210\001\001\022\022\n\n"
-    "error_code\030\013 \001(\005B\r\n\013_index_pathB\r\n\013_stat"
-    "s_jsonB\020\n\016_error_message\"\343\001\n\017RAGIngestRe"
-    "sult\022\022\n\nrequest_id\030\001 \001(\t\022\032\n\022documents_in"
-    "gested\030\002 \001(\003\022\027\n\017chunks_ingested\030\003 \001(\003\0226\n"
-    "\nstatistics\030\004 \001(\0132\035.runanywhere.v1.RAGSt"
-    "atisticsH\000\210\001\001\022\032\n\rerror_message\030\005 \001(\tH\001\210\001"
-    "\001\022\022\n\nerror_code\030\006 \001(\005B\r\n\013_statisticsB\020\n\016"
-    "_error_message\"\304\002\n\016RAGStreamEvent\022\013\n\003seq"
-    "\030\001 \001(\004\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nrequest_"
-    "id\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162\".runanywhere.v1."
-    "RAGStreamEventKind\0223\n\005chunk\030\005 \001(\0132\037.runa"
-    "nywhere.v1.RAGSearchResultH\000\210\001\001\022\r\n\005token"
-    "\030\006 \001(\t\022.\n\006result\030\007 \001(\0132\031.runanywhere.v1."
-    "RAGResultH\001\210\001\001\022\032\n\rerror_message\030\010 \001(\tH\002\210"
-    "\001\001\022\022\n\nerror_code\030\t \001(\005B\010\n\006_chunkB\t\n\007_res"
-    "ultB\020\n\016_error_message\"\214\002\n\017RAGServiceStat"
-    "e\022\020\n\010is_ready\030\001 \001(\010\0226\n\nstatistics\030\002 \001(\0132"
-    "\035.runanywhere.v1.RAGStatisticsH\000\210\001\001\022\023\n\013i"
-    "s_indexing\030\003 \001(\010\022\023\n\013is_querying\030\004 \001(\010\022\036\n"
-    "\021active_request_id\030\005 \001(\tH\001\210\001\001\022\032\n\rerror_m"
-    "essage\030\006 \001(\tH\002\210\001\001\022\022\n\nerror_code\030\007 \001(\005B\r\n"
-    "\013_statisticsB\024\n\022_active_request_idB\020\n\016_e"
-    "rror_message*\243\002\n\022RAGStreamEventKind\022%\n!R"
-    "AG_STREAM_EVENT_KIND_UNSPECIFIED\020\000\022+\n\'RA"
-    "G_STREAM_EVENT_KIND_RETRIEVAL_STARTED\020\001\022"
-    ")\n%RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED"
-    "\020\002\022\'\n#RAG_STREAM_EVENT_KIND_CONTEXT_READ"
-    "Y\020\003\022\037\n\033RAG_STREAM_EVENT_KIND_TOKEN\020\004\022#\n\037"
-    "RAG_STREAM_EVENT_KIND_COMPLETED\020\005\022\037\n\033RAG"
-    "_STREAM_EVENT_KIND_ERROR\020\0062\213\004\n\003RAG\022K\n\006Cr"
-    "eate\022 .runanywhere.v1.RAGConfiguration\032\037"
-    ".runanywhere.v1.RAGServiceState\022K\n\006Inges"
-    "t\022 .runanywhere.v1.RAGIngestRequest\032\037.ru"
-    "nanywhere.v1.RAGIngestResult\022C\n\005Query\022\037."
-    "runanywhere.v1.RAGQueryRequest\032\031.runanyw"
-    "here.v1.RAGResult\022D\n\006Search\022\037.runanywher"
-    "e.v1.RAGQueryRequest\032\031.runanywhere.v1.RA"
-    "GResult\022G\n\005Stats\022\037.runanywhere.v1.RAGSer"
-    "viceState\032\035.runanywhere.v1.RAGStatistics"
-    "\022I\n\005Clear\022\037.runanywhere.v1.RAGServiceSta"
-    "te\032\037.runanywhere.v1.RAGServiceState\022K\n\006S"
-    "tream\022\037.runanywhere.v1.RAGQueryRequest\032\036"
-    ".runanywhere.v1.RAGStreamEvent0\001B\203\001\n\027ai."
-    "runanywhere.proto.v1B\010RagProtoP\001Z<github"
-    ".com/runanywhere/runanywhere-sdks/idl/v1"
-    ";runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V"
-    "1\272\002\002RAb\006proto3"
+    "\023embedding_dimension\030\003 \001(\005H\000\210\001\001\022\035\n\005top_k"
+    "\030\004 \001(\005B\t\212\265\030\0015\240\265\030\001H\001\210\001\001\022@\n\024similarity_thr"
+    "eshold\030\005 \001(\002B\035\212\265\030\0030.3\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000"
+    "\000\360\?H\002\210\001\001\022$\n\nchunk_size\030\006 \001(\005B\013\212\265\030\003512\240\265\030"
+    "\001H\003\210\001\001\022&\n\rchunk_overlap\030\007 \001(\005B\n\212\265\030\00264\240\265\030"
+    "\000H\004\210\001\001\022\037\n\022max_context_tokens\030\010 \001(\005H\005\210\001\001\022"
+    "\034\n\017prompt_template\030\t \001(\tH\006\210\001\001\022\"\n\025embeddi"
+    "ng_config_json\030\n \001(\tH\007\210\001\001\022\034\n\017llm_config_"
+    "json\030\013 \001(\tH\010\210\001\001\022\027\n\nindex_path\030\014 \001(\tH\t\210\001\001"
+    "\022\025\n\rpersist_index\030\r \001(\010\022\026\n\016rerank_result"
+    "s\030\016 \001(\010\022\036\n\021reranker_model_id\030\017 \001(\tH\n\210\001\001B"
+    "\026\n\024_embedding_dimensionB\010\n\006_top_kB\027\n\025_si"
+    "milarity_thresholdB\r\n\013_chunk_sizeB\020\n\016_ch"
+    "unk_overlapB\025\n\023_max_context_tokensB\022\n\020_p"
+    "rompt_templateB\030\n\026_embedding_config_json"
+    "B\022\n\020_llm_config_jsonB\r\n\013_index_pathB\024\n\022_"
+    "reranker_model_id\"\276\002\n\013RAGDocument\022\n\n\002id\030"
+    "\001 \001(\t\022\014\n\004text\030\002 \001(\t\022;\n\010metadata\030\004 \003(\0132)."
+    "runanywhere.v1.RAGDocument.MetadataEntry"
+    "\022\027\n\nsource_uri\030\005 \001(\tH\000\210\001\001\022\033\n\016adapter_han"
+    "dle\030\006 \001(\tH\001\210\001\001\022\027\n\nmedia_type\030\007 \001(\tH\002\210\001\001\022"
+    "\022\n\nsize_bytes\030\010 \001(\003\032/\n\rMetadataEntry\022\013\n\003"
+    "key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\r\n\013_source_"
+    "uriB\021\n\017_adapter_handleB\r\n\013_media_typeJ\004\010"
+    "\003\020\004R\rmetadata_json\"\343\001\n\020RAGIngestRequest\022"
+    "\022\n\nrequest_id\030\001 \001(\t\022.\n\tdocuments\030\002 \003(\0132\033"
+    ".runanywhere.v1.RAGDocument\022\030\n\020replace_e"
+    "xisting\030\003 \001(\010\022@\n\010metadata\030\004 \003(\0132..runany"
+    "where.v1.RAGIngestRequest.MetadataEntry\032"
+    "/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002"
+    " \001(\t:\0028\001\"\224\002\n\017RAGQueryOptions\022\020\n\010question"
+    "\030\001 \001(\t\022\032\n\rsystem_prompt\030\002 \001(\tH\000\210\001\001\022\033\n\nma"
+    "x_tokens\030\003 \001(\005B\007\212\265\030\003512\022\034\n\013temperature\030\004"
+    " \001(\002B\007\212\265\030\0030.7\022\026\n\005top_p\030\005 \001(\002B\007\212\265\030\0031.0\022\r\n"
+    "\005top_k\030\006 \001(\005\022\027\n\017retrieval_top_k\030\007 \001(\005\022\034\n"
+    "\024similarity_threshold\030\010 \001(\002\022\016\n\006stream\030\t "
+    "\001(\010\022\030\n\020disable_thinking\030\n \001(\010B\020\n\016_system"
+    "_prompt\"\332\001\n\017RAGQueryRequest\022\022\n\nrequest_i"
+    "d\030\001 \001(\t\0225\n\007options\030\002 \001(\0132\037.runanywhere.v"
+    "1.RAGQueryOptionsH\000\210\001\001\022\?\n\010metadata\030\003 \003(\013"
+    "2-.runanywhere.v1.RAGQueryRequest.Metada"
+    "taEntry\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n"
+    "\005value\030\002 \001(\t:\0028\001B\n\n\010_options\"\321\002\n\017RAGSear"
+    "chResult\022\020\n\010chunk_id\030\001 \001(\t\022\014\n\004text\030\002 \001(\t"
+    "\022\030\n\020similarity_score\030\003 \001(\002\022\034\n\017source_doc"
+    "ument\030\004 \001(\tH\000\210\001\001\022\?\n\010metadata\030\005 \003(\0132-.run"
+    "anywhere.v1.RAGSearchResult.MetadataEntr"
+    "y\022\014\n\004rank\030\007 \001(\005\022\024\n\014start_offset\030\010 \001(\005\022\022\n"
+    "\nend_offset\030\t \001(\005\022\023\n\013token_count\030\n \001(\005\032/"
+    "\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 "
+    "\001(\t:\0028\001B\022\n\020_source_documentJ\004\010\006\020\007R\rmetad"
+    "ata_json\"\214\003\n\tRAGResult\022\016\n\006answer\030\001 \001(\t\0229"
+    "\n\020retrieved_chunks\030\002 \003(\0132\037.runanywhere.v"
+    "1.RAGSearchResult\022\024\n\014context_used\030\003 \001(\t\022"
+    "\031\n\021retrieval_time_ms\030\004 \001(\003\022\032\n\022generation"
+    "_time_ms\030\005 \001(\003\022\025\n\rtotal_time_ms\030\006 \001(\003\022\025\n"
+    "\rprompt_tokens\030\007 \001(\005\022\031\n\021completion_token"
+    "s\030\010 \001(\005\022\024\n\014total_tokens\030\t \001(\005\022\032\n\rerror_m"
+    "essage\030\n \001(\tH\000\210\001\001\022\022\n\nerror_code\030\013 \001(\005\022\022\n"
+    "\nrequest_id\030\014 \001(\t\022\035\n\020thinking_content\030\r "
+    "\001(\tH\001\210\001\001B\020\n\016_error_messageB\023\n\021_thinking_"
+    "content\"\332\002\n\rRAGStatistics\022\031\n\021indexed_doc"
+    "uments\030\001 \001(\003\022\026\n\016indexed_chunks\030\002 \001(\003\022\034\n\024"
+    "total_tokens_indexed\030\003 \001(\003\022\027\n\017last_updat"
+    "ed_ms\030\004 \001(\003\022\027\n\nindex_path\030\005 \001(\tH\000\210\001\001\022\027\n\n"
+    "stats_json\030\006 \001(\tH\001\210\001\001\022\037\n\027vector_store_si"
+    "ze_bytes\030\007 \001(\003\022\025\n\ris_persistent\030\010 \001(\010\022\025\n"
+    "\rlast_query_ms\030\t \001(\003\022\032\n\rerror_message\030\n "
+    "\001(\tH\002\210\001\001\022\022\n\nerror_code\030\013 \001(\005B\r\n\013_index_p"
+    "athB\r\n\013_stats_jsonB\020\n\016_error_message\"\343\001\n"
+    "\017RAGIngestResult\022\022\n\nrequest_id\030\001 \001(\t\022\032\n\022"
+    "documents_ingested\030\002 \001(\003\022\027\n\017chunks_inges"
+    "ted\030\003 \001(\003\0226\n\nstatistics\030\004 \001(\0132\035.runanywh"
+    "ere.v1.RAGStatisticsH\000\210\001\001\022\032\n\rerror_messa"
+    "ge\030\005 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\006 \001(\005B\r\n\013_st"
+    "atisticsB\020\n\016_error_message\"\304\002\n\016RAGStream"
+    "Event\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us\030\002 \001(\003"
+    "\022\022\n\nrequest_id\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162\".run"
+    "anywhere.v1.RAGStreamEventKind\0223\n\005chunk\030"
+    "\005 \001(\0132\037.runanywhere.v1.RAGSearchResultH\000"
+    "\210\001\001\022\r\n\005token\030\006 \001(\t\022.\n\006result\030\007 \001(\0132\031.run"
+    "anywhere.v1.RAGResultH\001\210\001\001\022\032\n\rerror_mess"
+    "age\030\010 \001(\tH\002\210\001\001\022\022\n\nerror_code\030\t \001(\005B\010\n\006_c"
+    "hunkB\t\n\007_resultB\020\n\016_error_message\"\214\002\n\017RA"
+    "GServiceState\022\020\n\010is_ready\030\001 \001(\010\0226\n\nstati"
+    "stics\030\002 \001(\0132\035.runanywhere.v1.RAGStatisti"
+    "csH\000\210\001\001\022\023\n\013is_indexing\030\003 \001(\010\022\023\n\013is_query"
+    "ing\030\004 \001(\010\022\036\n\021active_request_id\030\005 \001(\tH\001\210\001"
+    "\001\022\032\n\rerror_message\030\006 \001(\tH\002\210\001\001\022\022\n\nerror_c"
+    "ode\030\007 \001(\005B\r\n\013_statisticsB\024\n\022_active_requ"
+    "est_idB\020\n\016_error_message*\243\002\n\022RAGStreamEv"
+    "entKind\022%\n!RAG_STREAM_EVENT_KIND_UNSPECI"
+    "FIED\020\000\022+\n\'RAG_STREAM_EVENT_KIND_RETRIEVA"
+    "L_STARTED\020\001\022)\n%RAG_STREAM_EVENT_KIND_CHU"
+    "NK_RETRIEVED\020\002\022\'\n#RAG_STREAM_EVENT_KIND_"
+    "CONTEXT_READY\020\003\022\037\n\033RAG_STREAM_EVENT_KIND"
+    "_TOKEN\020\004\022#\n\037RAG_STREAM_EVENT_KIND_COMPLE"
+    "TED\020\005\022\037\n\033RAG_STREAM_EVENT_KIND_ERROR\020\0062\213"
+    "\004\n\003RAG\022K\n\006Create\022 .runanywhere.v1.RAGCon"
+    "figuration\032\037.runanywhere.v1.RAGServiceSt"
+    "ate\022K\n\006Ingest\022 .runanywhere.v1.RAGIngest"
+    "Request\032\037.runanywhere.v1.RAGIngestResult"
+    "\022C\n\005Query\022\037.runanywhere.v1.RAGQueryReque"
+    "st\032\031.runanywhere.v1.RAGResult\022D\n\006Search\022"
+    "\037.runanywhere.v1.RAGQueryRequest\032\031.runan"
+    "ywhere.v1.RAGResult\022G\n\005Stats\022\037.runanywhe"
+    "re.v1.RAGServiceState\032\035.runanywhere.v1.R"
+    "AGStatistics\022I\n\005Clear\022\037.runanywhere.v1.R"
+    "AGServiceState\032\037.runanywhere.v1.RAGServi"
+    "ceState\022K\n\006Stream\022\037.runanywhere.v1.RAGQu"
+    "eryRequest\032\036.runanywhere.v1.RAGStreamEve"
+    "nt0\001B\203\001\n\027ai.runanywhere.proto.v1B\010RagPro"
+    "toP\001Z<github.com/runanywhere/runanywhere"
+    "-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016R"
+    "unanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_rag_2eproto_deps[1] = {
@@ -3392,7 +3392,7 @@ static ::absl::once_flag descriptor_table_rag_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_rag_2eproto = {
     false,
     false,
-    4694,
+    4706,
     descriptor_table_protodef_rag_2eproto,
     "rag.proto",
     &descriptor_table_rag_2eproto_once,
@@ -3618,7 +3618,7 @@ PROTOBUF_NOINLINE void RAGConfiguration::Clear() {
             stream, this_._internal_embedding_dimension(), target);
   }
 
-  // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
+  // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5", (.runanywhere.v1.rac_min) = 1];
   if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     target =
         ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
@@ -3632,14 +3632,14 @@ PROTOBUF_NOINLINE void RAGConfiguration::Clear() {
         5, this_._internal_similarity_threshold(), target);
   }
 
-  // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
+  // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
   if (CheckHasBit(cached_has_bits, 0x00000400U)) {
     target =
         ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
             stream, this_._internal_chunk_size(), target);
   }
 
-  // optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
+  // optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64", (.runanywhere.v1.rac_min) = 0];
   if (CheckHasBit(cached_has_bits, 0x00000800U)) {
     target =
         ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<7>(
@@ -3784,17 +3784,17 @@ PROTOBUF_NOINLINE void RAGConfiguration::Clear() {
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x00007d00U)) {
-    // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
+    // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5", (.runanywhere.v1.rac_min) = 1];
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
           this_._internal_top_k());
     }
-    // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
+    // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
     if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
           this_._internal_chunk_size());
     }
-    // optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
+    // optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64", (.runanywhere.v1.rac_min) = 0];
     if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
           this_._internal_chunk_overlap());

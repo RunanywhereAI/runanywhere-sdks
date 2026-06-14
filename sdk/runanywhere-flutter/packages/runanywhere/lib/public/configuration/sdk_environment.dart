@@ -1,3 +1,4 @@
+import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart'
@@ -8,6 +9,27 @@ export 'package:runanywhere/generated/model_types.pbenum.dart'
     show SDKEnvironment;
 
 extension SDKEnvironmentExtension on SDKEnvironment {
+  /// C `rac_environment_t` value (RAC_ENV_DEVELOPMENT/STAGING/PRODUCTION).
+  /// Mirrors Swift `cEnvironment` (SDKEnvironment.swift:52-59): unknown
+  /// values map to RAC_ENV_DEVELOPMENT.
+  int get _cEnvironment {
+    switch (this) {
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
+        return 0; // RAC_ENV_DEVELOPMENT
+      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
+        return 1; // RAC_ENV_STAGING
+      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
+        return 2; // RAC_ENV_PRODUCTION
+      default:
+        return 0; // RAC_ENV_DEVELOPMENT
+    }
+  }
+
+  /// Invoke a `rac_env_*` predicate; falls back to [fallback] when the
+  /// commons binary predates the export.
+  bool _envPredicate(bool Function(int)? fn, {required bool fallback}) =>
+      fn == null ? fallback : fn(_cEnvironment);
+
   String get description {
     switch (this) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
@@ -21,17 +43,25 @@ extension SDKEnvironmentExtension on SDKEnvironment {
     }
   }
 
-  bool get isProduction => this == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
+  /// Check if this is a production environment (uses C++). Mirrors Swift
+  /// `isProduction` (SDKEnvironment.swift:73).
+  bool get isProduction => _envPredicate(
+        RacNative.bindings.rac_env_is_production,
+        fallback: this == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+      );
 
-  bool get isTesting =>
-      this == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ||
-      this == SDKEnvironment.SDK_ENVIRONMENT_STAGING;
+  /// Check if this is a testing environment (uses C++).
+  bool get isTesting => _envPredicate(
+        RacNative.bindings.rac_env_is_testing,
+        fallback: this == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ||
+            this == SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+      );
 
-  // UNSPECIFIED falls through as `true` — fail-closed: an unrecognized
-  // environment is treated as requiring auth/backend so a malformed init
-  // envelope cannot silently downgrade to development.
-  bool get requiresBackendURL =>
-      this != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+  /// Check if this environment requires a valid backend URL (uses C++).
+  bool get requiresBackendURL => _envPredicate(
+        RacNative.bindings.rac_env_requires_backend_url,
+        fallback: this != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+      );
 
   bool get isCompatibleWithCurrentBuild {
     switch (this) {
@@ -72,16 +102,24 @@ extension SDKEnvironmentExtension on SDKEnvironment {
     }
   }
 
-  bool get shouldSendTelemetry =>
-      this == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
+  /// Should send telemetry data (production only) — uses C++. Mirrors Swift
+  /// `shouldSendTelemetry` (SDKEnvironment.swift:121).
+  bool get shouldSendTelemetry => _envPredicate(
+        RacNative.bindings.rac_env_should_send_telemetry,
+        fallback: this == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+      );
 
-  bool get useMockData => this == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+  /// Should sync with backend (non-development) — uses C++.
+  bool get shouldSyncWithBackend => _envPredicate(
+        RacNative.bindings.rac_env_should_sync_with_backend,
+        fallback: this != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+      );
 
-  bool get shouldSyncWithBackend =>
-      this != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-
-  bool get requiresAuthentication =>
-      this != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+  /// Requires API authentication (non-development) — uses C++.
+  bool get requiresAuthentication => _envPredicate(
+        RacNative.bindings.rac_env_requires_auth,
+        fallback: this != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+      );
 }
 
 class SupabaseConfig {
@@ -136,7 +174,7 @@ class SDKInitParams {
   }) {
     // Fail-closed on UNSPECIFIED / UNRECOGNIZED: refuse to silently coerce
     // an unknown wire-decoded enum value into DEVELOPMENT (which would
-    // disable auth, backend sync, and switch to mock data).
+    // disable auth and backend sync).
     if (environment == SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED ||
         !SDKEnvironment.values.contains(environment)) {
       throw SDKException.invalidConfiguration(

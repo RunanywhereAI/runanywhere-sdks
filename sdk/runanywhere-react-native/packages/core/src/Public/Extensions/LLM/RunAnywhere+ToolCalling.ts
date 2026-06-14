@@ -24,7 +24,10 @@ import {
   type ToolValueArray,
   type ToolValueObject,
 } from '@runanywhere/proto-ts/tool_calling';
+import type { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.ToolCalling');
@@ -248,6 +251,22 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
  */
 export interface GenerateWithToolsOptions {
   signal?: AbortSignal;
+  /**
+   * LLM generation options channel — Swift parity
+   * (`generateWithTools(prompt:options:toolOptions:...)`): tool options that
+   * are unset fall back to these, and `topP` comes from here exclusively.
+   * Defaults mirror Swift `RALLMGenerationOptions.defaults()`
+   * (maxTokens 100, temperature 0.8, topP 1.0).
+   */
+  llmOptions?: Partial<
+    Pick<LLMGenerationOptions, 'maxTokens' | 'temperature' | 'topP' | 'systemPrompt'>
+  >;
+  /**
+   * Swift parity: when omitted the proto field stays UNSET so commons applies
+   * its documented default (true). Hosts that delegate validation to their
+   * executor pass `false`.
+   */
+  validateCalls?: boolean;
 }
 
 /**
@@ -264,9 +283,13 @@ export async function generateWithTools(
   options?: Partial<ToolCallingOptions>,
   extra?: GenerateWithToolsOptions
 ): Promise<ToolCallingResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+ToolCalling.swift:258-260).
+  requireInitialized();
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
+  // Swift parity: RunAnywhere+ToolCalling.swift:261 gates on ensureServicesReady.
+  await ensureServicesReady();
 
   const native = requireNativeModule();
   const bridge = native as unknown as {
@@ -293,17 +316,27 @@ export async function generateWithTools(
 
   const tools = options?.tools ?? (await getRegisteredTools());
   const formatHint = (options?.formatHint || 'default').toLowerCase();
+  // Field fallbacks mirror Swift makeRunLoopRequest
+  // (RunAnywhere+ToolCalling.swift:491-536): tool options take precedence,
+  // unset values fall back to the LLM options channel, whose defaults are
+  // Swift's RALLMGenerationOptions.defaults().
+  const llm = extra?.llmOptions;
+  const toolMaxTokens = options?.maxTokens;
   const request = ToolCallingSessionCreateRequest.fromPartial({
     prompt,
-    maxTokens: options?.maxTokens ?? 1024,
-    temperature: options?.temperature ?? 0.7,
-    topP: 1.0,
-    systemPrompt: options?.systemPrompt ?? '',
+    maxTokens:
+      toolMaxTokens !== undefined && toolMaxTokens > 0
+        ? toolMaxTokens
+        : (llm?.maxTokens ?? 100),
+    temperature: options?.temperature ?? llm?.temperature ?? 0.8,
+    topP: llm?.topP ?? 1.0,
+    systemPrompt: options?.systemPrompt || llm?.systemPrompt || '',
     tools,
     formatHint,
     maxIterations: options?.maxIterations ?? options?.maxToolCalls ?? 5,
     keepToolsAvailable: options?.keepToolsAvailable ?? false,
-    validateCalls: true,
+    // Leave unset unless the caller chose — commons defaults to true.
+    validateCalls: extra?.validateCalls,
     // Thread the OpenAI-style tool_choice /
     // forced_tool_name knobs into the canonical request envelope (idl
     // fields 7/8). Commons build_options_snapshot copies them onto every

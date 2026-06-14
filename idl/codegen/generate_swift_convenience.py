@@ -201,12 +201,48 @@ def _emit_message_defaults_factory(
 def _emit_message_validate(
     proto_msg_name: str,
     msg_desc: descriptor_pb2.DescriptorProto,
+    enum_case_map: dict[str, str],
 ) -> str | None:
     """Emit `public func validate() throws` when at least one field carries
     `rac_required`, `rac_min`, `rac_max`, `rac_min_float`, or
     `rac_max_float`. Returns None when no relevant annotations are
     present."""
     checks: list[str] = []
+    emitted_effective_values: set[str] = set()
+
+    def _value_expression(field: descriptor_pb2.FieldDescriptorProto, swift_field: str) -> str:
+        """Return the Swift expression that should be validated.
+
+        SwiftProtobuf stores optional scalar fields as their zero value until
+        the generated `has<Field>` bit is set. For fields with a rac_default,
+        validate the effective default when unset so Swift matches Kotlin's
+        nullable optional semantics and commons-side default stamping.
+        """
+        if not field.proto3_optional:
+            return swift_field
+
+        default_str = get_string_option(field.options, RAC_DEFAULT_FIELD_NUM)
+        if default_str is None:
+            return swift_field
+
+        literal = to_default_literal(field, default_str, enum_case_map, SWIFT_PROFILE)
+        if literal is None:
+            return swift_field
+
+        effective_name = f"effective{swift_field[0].upper()}{swift_field[1:]}"
+        if effective_name not in emitted_effective_values:
+            has_field = f"has{swift_field[0].upper()}{swift_field[1:]}"
+            checks.append(f"        let {effective_name} = {has_field} ? {swift_field} : {literal}")
+            emitted_effective_values.add(effective_name)
+        return effective_name
+
+    def _optional_presence_guard(field: descriptor_pb2.FieldDescriptorProto, swift_field: str) -> str | None:
+        if not field.proto3_optional:
+            return None
+        if get_string_option(field.options, RAC_DEFAULT_FIELD_NUM) is not None:
+            return None
+        return f"has{swift_field[0].upper()}{swift_field[1:]}"
+
     for field in msg_desc.field:
         if not field.HasField("options"):
             continue
@@ -246,12 +282,16 @@ def _emit_message_validate(
         min_int = get_int32_option(field.options, RAC_MIN_FIELD_NUM)
         max_int = get_int32_option(field.options, RAC_MAX_FIELD_NUM)
         if (min_int is not None or max_int is not None) and field.type in INTEGER_TYPES:
+            value_expr = _value_expression(field, swift_field)
+            presence_guard = _optional_presence_guard(field, swift_field)
             parts: list[str] = []
             if min_int is not None:
-                parts.append(f"{swift_field} < {min_int}")
+                parts.append(f"{value_expr} < {min_int}")
             if max_int is not None:
-                parts.append(f"{swift_field} > {max_int}")
+                parts.append(f"{value_expr} > {max_int}")
             cond = " || ".join(parts)
+            if presence_guard is not None:
+                cond = f"{presence_guard} && ({cond})"
             if min_int is not None and max_int is not None:
                 range_desc = f"{min_int}...{max_int}"
             elif min_int is not None:
@@ -260,19 +300,23 @@ def _emit_message_validate(
                 range_desc = f"<= {max_int}"
             checks.append(f"        if {cond} {{")
             checks.extend(_throw(
-                f'"{field.name} must be in {range_desc} (got \\({swift_field}))"'
+                f'"{field.name} must be in {range_desc} (got \\({value_expr}))"'
             ))
             checks.append(f"        }}")
 
         min_f = get_double_option(field.options, RAC_MIN_FLOAT_FIELD_NUM)
         max_f = get_double_option(field.options, RAC_MAX_FLOAT_FIELD_NUM)
         if (min_f is not None or max_f is not None) and field.type in FLOAT_TYPES:
+            value_expr = _value_expression(field, swift_field)
+            presence_guard = _optional_presence_guard(field, swift_field)
             parts = []
             if min_f is not None:
-                parts.append(f"{swift_field} < {min_f}")
+                parts.append(f"{value_expr} < {min_f}")
             if max_f is not None:
-                parts.append(f"{swift_field} > {max_f}")
+                parts.append(f"{value_expr} > {max_f}")
             cond = " || ".join(parts)
+            if presence_guard is not None:
+                cond = f"{presence_guard} && ({cond})"
             if min_f is not None and max_f is not None:
                 range_desc = f"{min_f}...{max_f}"
             elif min_f is not None:
@@ -281,7 +325,7 @@ def _emit_message_validate(
                 range_desc = f"<= {max_f}"
             checks.append(f"        if {cond} {{")
             checks.extend(_throw(
-                f'"{field.name} must be in {range_desc} (got \\({swift_field}))"'
+                f'"{field.name} must be in {range_desc} (got \\({value_expr}))"'
             ))
             checks.append(f"        }}")
 
@@ -355,7 +399,7 @@ def main() -> int:
                 blocks.append(defaults_block)
                 annotated_message_defaults_count += 1
 
-            validate_block = _emit_message_validate(proto_msg_name, msg_desc)
+            validate_block = _emit_message_validate(proto_msg_name, msg_desc, enum_case_map)
             if validate_block is not None:
                 blocks.append(validate_block)
                 annotated_message_validate_count += 1

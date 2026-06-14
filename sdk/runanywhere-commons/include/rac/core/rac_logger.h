@@ -233,7 +233,6 @@ RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
 // struct construction, and vsnprintf formatting for filtered messages.
 // rac_logger_get_min_level() is an atomic read (no mutex).
 
-
 #define RAC_LOG_DEBUG(category, ...)                                       \
     do {                                                                   \
         if (RAC_LOG_DEBUG >= rac_logger_get_min_level()) {                 \
@@ -265,7 +264,6 @@ RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
             rac_logger_logf(RAC_LOG_ERROR, category, &_meta, __VA_ARGS__); \
         }                                                                  \
     } while (0)
-
 
 // --- Error logging with code ---
 
@@ -318,6 +316,5 @@ RAC_API rac_result_t rac_log_metadata_should_redact(const char* key, rac_bool_t*
 #ifdef __cplusplus
 }
 #endif
-
 
 #endif /* RAC_LOGGER_H */

@@ -12,13 +12,13 @@
  * example app and external consumers never have to touch raw exports.
  */
 
-import { AudioFormat, ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import {
-  STTLanguage,
   type STTOptions,
   type STTOutput,
   type STTPartialResult,
 } from '@runanywhere/proto-ts/stt_options';
+import { sTTOptionsDefaults } from '@runanywhere/proto-ts/convenience/stt_options_convenience';
 import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
@@ -32,10 +32,6 @@ import {
 } from '../../runtime/SpeechBackendExports';
 import { STTProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
-import {
-  getSpeechProvider,
-  hasSpeechProviderSTT,
-} from './SpeechProvider';
 
 export type { STTOptions, STTOutput, STTPartialResult };
 
@@ -77,24 +73,12 @@ function requireSTTModule(feature: string): STTComponentModule {
   return module;
 }
 
+// Proto-rac_default-derived defaults — byte-identical to Swift's RASTTOptions.defaults().
 function defaultSTTOptions(overrides?: Partial<STTOptions>): STTOptions {
   return {
-    language: STTLanguage.STT_LANGUAGE_AUTO,
-    enablePunctuation: true,
-    enableDiarization: false,
-    maxSpeakers: 0,
-    vocabularyList: [],
-    enableWordTimestamps: false,
-    beamSize: 0,
-    languageCode: undefined,
-    detectLanguage: true,
-    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: 16000,
-    maxAlternatives: 0,
-    chunkDurationMs: 0,
-    endpointSilenceMs: 0,
+    ...sTTOptionsDefaults(),
     ...(overrides ?? {}),
-  } as STTOptions;
+  };
 }
 
 /**
@@ -116,45 +100,6 @@ function encodeAudioToPcm16(samples: Float32Array): Uint8Array {
 function coerceAudio(audio: Uint8Array | Float32Array): Uint8Array {
   if (audio instanceof Float32Array) return encodeAudioToPcm16(audio);
   return audio;
-}
-
-/**
- * Decode a Uint8Array of little-endian PCM16 audio into normalized Float32
- * samples in the range [-1, 1]. Used by the SpeechProvider path which expects
- * Float32 samples — never reinterpret the underlying buffer as Float32 because
- * the byte offset/length need not be 4-aligned and the bytes are not IEEE754.
- */
-function decodePcm16ToFloat32(audio: Uint8Array): Float32Array {
-  const usableBytes = audio.byteLength - (audio.byteLength % 2);
-  const sampleCount = usableBytes / 2;
-  const out = new Float32Array(sampleCount);
-  const view = new DataView(audio.buffer, audio.byteOffset, usableBytes);
-  for (let i = 0; i < sampleCount; i += 1) {
-    out[i] = view.getInt16(i * 2, true) / 0x8000;
-  }
-  return out;
-}
-
-/**
- * Convert a public-API audio buffer into the Float32 sample format expected by
- * SpeechProvider implementations. Float32Array passes through unchanged; the
- * Uint8Array branch interprets bytes according to options.audioFormat (PCM16
- * is the documented default for STT).
- */
-function audioToFloat32Samples(
-  audio: Uint8Array | Float32Array,
-  options: TranscribeOptions | undefined,
-): Float32Array {
-  if (audio instanceof Float32Array) return audio;
-  const format = options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM;
-  if (format !== AudioFormat.AUDIO_FORMAT_PCM) {
-    throw SDKException.backendNotAvailable(
-      'RunAnywhere.stt.transcribeAuto',
-      `SpeechProvider path only supports PCM16 Uint8Array input; got audioFormat=${format}. ` +
-        `Pass a Float32Array of normalized samples or use the proto-byte adapter path.`,
-    );
-  }
-  return decodePcm16ToFloat32(audio);
 }
 
 /**
@@ -187,10 +132,7 @@ function callCreate(module: STTComponentModule): number {
     }
     const handle = bridge.readU32(outPtr);
     if (!handle) {
-      throw SDKException.componentNotReady(
-        'stt',
-        'rac_stt_component_create returned null handle',
-      );
+      throw SDKException.processingFailed('rac_stt_component_create returned null handle');
     }
     return handle;
   } finally {
@@ -367,38 +309,10 @@ export async function transcribe(
     }
   }
 
-  // Provider-first dispatch: when a SpeechProvider is registered (e.g.
-  // standalone Sherpa via @runanywhere/web-onnx) and supports STT, route
-  // through it. Falls back to the proto-byte adapter otherwise.
-  if (hasSpeechProviderSTT()) {
-    const provider = getSpeechProvider()!;
-    if (modelPath && (typeof provider.isSTTLoaded !== 'function' || !provider.isSTTLoaded())) {
-      if (typeof provider.loadSTT !== 'function') {
-        throw SDKException.backendNotAvailable(
-          'RunAnywhere.stt.transcribeAuto',
-          `SpeechProvider "${provider.id}" does not implement loadSTT.`,
-        );
-      }
-      await provider.loadSTT({ id: modelId ?? modelPath, path: modelPath, name: modelName });
-    }
-    if (typeof provider.transcribe !== 'function') {
-      throw SDKException.backendNotAvailable(
-        'RunAnywhere.stt.transcribeAuto',
-        `SpeechProvider "${provider.id}" does not implement transcribe.`,
-      );
-    }
-    const samples = audioToFloat32Samples(audio, options);
-    return provider.transcribe({
-      audio: samples,
-      sampleRate: options?.sampleRate ?? 16000,
-      options,
-    });
-  }
-
   const module = requireSTTModule('RunAnywhere.stt.transcribeAuto');
   if (!modelPath) {
-    throw SDKException.componentNotReady(
-      'stt',
+    // Swift parity: RunAnywhere+STT.swift:30 throws `.notInitialized` ("STT model not loaded").
+    throw SDKException.notInitialized(
       'No STT model is loaded. Call RunAnywhere.modelLifecycle.loadModel(...) before RunAnywhere.stt.transcribeAuto().',
     );
   }

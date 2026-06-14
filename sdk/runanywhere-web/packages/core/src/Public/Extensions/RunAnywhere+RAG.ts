@@ -17,7 +17,13 @@ import type {
   RAGSearchResult,
   RAGStatistics,
 } from '@runanywhere/proto-ts/rag';
-import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
+import {
+  rAGConfigurationDefaults,
+  rAGQueryOptionsDefaults,
+} from '@runanywhere/proto-ts/convenience/rag_convenience';
+import { ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import { ModelRegistry } from './RunAnywhere+ModelRegistry';
 
 const logger = new SDKLogger('RAG');
 const NATIVE_RAG_PERSISTENCE_UNAVAILABLE =
@@ -43,6 +49,10 @@ export interface RAGProvider {
   ragCreatePipeline(config: RAGConfiguration): Promise<void>;
   ragDestroyPipeline(): Promise<void>;
   ragIngest(text: string, metadataJson?: string): Promise<void>;
+  /** Ingest a generated-proto document. Optional — providers without
+   * document-level ingest fall back to `ragIngest(text, metadataJson)`.
+   * Mirrors Swift `ragIngest(_ document:)` (RunAnywhere+RAG.swift:92). */
+  ragIngestDocument?(document: RAGDocument): Promise<RAGStatistics>;
   ragAddDocumentsBatch?(documents: Array<{ text: string; metadataJson?: string }>): Promise<void>;
   ragQuery(question: string, options?: RAGQueryOverrides): Promise<RAGResult>;
   ragClearDocuments(): Promise<void>;
@@ -212,14 +222,21 @@ class NativeRAGSessionProvider implements RAGProvider {
   }
 
   async ragIngest(text: string, metadataJson?: string): Promise<void> {
+    // Mirrors Swift's text overload delegating to the document overload
+    // (RunAnywhere+RAG.swift:86-88).
+    await this.ragIngestDocument(makeRAGDocument(text, metadataJson));
+  }
+
+  async ragIngestDocument(document: RAGDocument): Promise<RAGStatistics> {
     const session = await this.ensureSession();
-    const stats = this.adapter.ingest(session, makeRAGDocument(text, metadataJson));
+    const stats = this.adapter.ingest(session, document);
     if (!stats) {
       throw SDKException.backendNotAvailable(
         'RAG.ingest',
         'Native RAG ingest returned no statistics.',
       );
     }
+    return stats;
   }
 
   async ragAddDocumentsBatch(documents: Array<{ text: string; metadataJson?: string }>): Promise<void> {
@@ -233,17 +250,23 @@ class NativeRAGSessionProvider implements RAGProvider {
     options: RAGQueryOverrides = {},
   ): Promise<RAGResult> {
     const session = await this.ensureSession();
+    // Swift parity: RAG verbs throw on misconfiguration/failure — no
+    // synthetic error-shaped results.
     if (!this.config.llmModelId.trim()) {
-      return unavailableRAGResult(
-        question,
-        'Native Web RAG query requires RAGConfiguration.llmModelId. A session without an LLM model id can ingest but cannot generate answers.',
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_INVALID_INPUT,
+        'Native Web RAG query requires RAGConfiguration.llmModelId',
+        'A session without an LLM model id can ingest but cannot generate answers.',
       );
     }
     const result = this.adapter.query(session, makeRAGQuery(question, this.config, options));
-    return result ?? unavailableRAGResult(
-      question,
-      'Native RAG query returned no result.',
-    );
+    if (!result) {
+      throw SDKException.backendNotAvailable(
+        'RAG.query',
+        'Native RAG query returned no result.',
+      );
+    }
+    return result;
   }
 
   async ragClearDocuments(): Promise<void> {
@@ -258,7 +281,8 @@ class NativeRAGSessionProvider implements RAGProvider {
   }
 
   async ragGetDocumentCount(): Promise<number> {
-    return (await this.statistics()).indexedDocuments;
+    // Swift parity: RunAnywhere+RAG.swift reports indexedChunks.
+    return (await this.statistics()).indexedChunks;
   }
 
   async ragGetStatistics(): Promise<RAGStatistics> {
@@ -282,15 +306,24 @@ class NativeRAGSessionProvider implements RAGProvider {
   }
 
   private async statistics(): Promise<RAGStatistics> {
+    // Swift parity: failures throw — no synthetic error-shaped statistics.
     if (this.session == null) {
       if (this.config.persistIndex) {
-        return unavailableRAGStatistics(NATIVE_RAG_PERSISTENCE_UNAVAILABLE);
+        throw SDKException.backendNotAvailable(
+          'RAG.statistics',
+          NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
+        );
       }
       return emptyRAGStatistics(this.config);
     }
-    return this.adapter.statistics(this.session) ?? unavailableRAGStatistics(
-      'Native RAG statistics returned no result.',
-    );
+    const stats = this.adapter.statistics(this.session);
+    if (!stats) {
+      throw SDKException.backendNotAvailable(
+        'RAG.statistics',
+        'Native RAG statistics returned no result.',
+      );
+    }
+    return stats;
   }
 }
 
@@ -341,17 +374,23 @@ function makeRAGQuery(
   config: RAGConfiguration,
   options: RAGQueryOverrides,
 ): RAGQueryOptions {
+  // Seed with the proto-generated canonical defaults (maxTokens 512 /
+  // temperature 0.7 / topP 1.0 from idl/rag.proto rac_default) so Web matches
+  // Swift's `RARAGQueryOptions.defaults(question:)` (RAGProto+Helpers.swift:72).
+  //
   // Per rag.proto: `retrievalTopK = 0` and `similarityThreshold = 0` mean
   // "use the RAGConfiguration default" so falling back to 0 when neither the
   // per-query override nor the pipeline config supplies a value is the
   // correct way to defer to commons.
+  const defaults = rAGQueryOptionsDefaults();
   return {
+    ...defaults,
     question,
     systemPrompt: options.systemPrompt,
-    maxTokens: options.maxTokens ?? 512,
-    temperature: options.temperature ?? 0.4,
-    topP: options.topP ?? 1,
-    topK: options.topK ?? 0,
+    maxTokens: options.maxTokens ?? defaults.maxTokens,
+    temperature: options.temperature ?? defaults.temperature,
+    topP: options.topP ?? defaults.topP,
+    topK: options.topK ?? defaults.topK,
     retrievalTopK: options.retrievalTopK ?? config.topK ?? 0,
     similarityThreshold: options.similarityThreshold ?? config.similarityThreshold ?? 0,
     stream: options.stream ?? false,
@@ -380,6 +419,13 @@ interface ParsedMetadata {
   mediaType?: string;
   sizeBytes: number;
   metadata: Record<string, string>;
+}
+
+function createId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Math.random().toString(36).slice(2)}`;
 }
 
 function parseMetadata(metadataJson?: string): ParsedMetadata {
@@ -430,43 +476,101 @@ function emptyRAGStatistics(config: RAGConfiguration): RAGStatistics {
   };
 }
 
-export function unavailableRAGStatistics(reason?: string): RAGStatistics {
-  return {
-    ...emptyRAGStatistics(createDefaultRAGConfiguration()),
-    errorMessage: reason ?? getRAGAvailability().reason,
-    errorCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-  };
-}
-
-export function unavailableRAGResult(question = '', reason?: string): RAGResult {
-  return {
-    answer: '',
-    retrievedChunks: [],
-    contextUsed: '',
-    retrievalTimeMs: 0,
-    generationTimeMs: 0,
-    totalTimeMs: 0,
-    promptTokens: 0,
-    completionTokens: 0,
-    totalTokens: 0,
-    errorMessage: reason ?? getRAGAvailability().reason,
-    errorCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-    requestId: createId(question ? 'rag-query-unavailable' : 'rag-unavailable'),
-  };
-}
-
-function createId(prefix: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Math.random().toString(36).slice(2)}`;
-}
-
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function ragCreatePipeline(config: RAGConfiguration): Promise<void> {
+/**
+ * Load one RAG artifact model through the commons lifecycle and surface a
+ * Swift-shaped failure. Mirrors the private `loadRAGArtifactModel`
+ * (RunAnywhere+RAG.swift:202-224): category falls back when the registry
+ * entry leaves it unspecified, and failures throw
+ * `"{label} model '{id}': {message}"` with MODEL_LOAD_FAILED.
+ */
+async function loadRagArtifactModel(
+  modelId: string,
+  fallbackCategory: ModelCategory,
+  errorLabel: string,
+): Promise<string> {
+  const model = ModelRegistry.getModel(modelId);
+  const category =
+    model && model.category !== ModelCategory.MODEL_CATEGORY_UNSPECIFIED
+      ? model.category
+      : fallbackCategory;
+  const result = await WebModelLifecycle.loadModelAsync({
+    modelId,
+    category,
+    ...(model?.framework !== undefined ? { framework: model.framework } : {}),
+    forceReload: false,
+    validateAvailability: false,
+  });
+  if (!result?.success) {
+    const message = result?.errorMessage
+      || `${errorLabel} model lifecycle artifact resolution failed`;
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
+      `${errorLabel} model '${modelId}': ${message}`,
+    );
+  }
+  return result.modelId || modelId;
+}
+
+/**
+ * Build a generated RAG configuration from registry models by using commons
+ * lifecycle resolution for the embedding and LLM artifacts, then stamping the
+ * lifecycle-resolved model ids onto the base configuration. Mirrors Swift
+ * `ragResolvedConfiguration(embeddingModel:llmModel:baseConfiguration:)`
+ * (RunAnywhere+RAG.swift:19-35 + RAGProto+Helpers.swift
+ * `resolvingLifecycleArtifacts`).
+ */
+export async function ragResolvedConfiguration(
+  embeddingModelId: string,
+  llmModelId: string,
+  baseConfiguration?: Partial<RAGConfiguration>,
+): Promise<RAGConfiguration> {
+  const embedding = await loadRagArtifactModel(
+    embeddingModelId,
+    ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    'Embedding',
+  );
+  const llm = await loadRagArtifactModel(
+    llmModelId,
+    ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    'LLM',
+  );
+  return createDefaultRAGConfiguration({
+    ...baseConfiguration,
+    embeddingModelId: embedding,
+    llmModelId: llm,
+  });
+}
+
+export async function ragCreatePipeline(config: RAGConfiguration): Promise<void>;
+/**
+ * Bootstrap overload: create the RAG pipeline from two registry model ids.
+ * Mirrors Swift `ragCreatePipeline(embeddingModel:llmModel:baseConfiguration:)`
+ * (RunAnywhere+RAG.swift:39-50): the configuration comes from
+ * [ragResolvedConfiguration], so both artifacts are loaded through the
+ * commons lifecycle (with lifecycle-resolved model ids) before the native
+ * session create runs.
+ */
+export async function ragCreatePipeline(
+  embeddingModelId: string,
+  llmModelId: string,
+  baseConfiguration?: Partial<RAGConfiguration>,
+): Promise<void>;
+export async function ragCreatePipeline(
+  configOrEmbeddingModelId: RAGConfiguration | string,
+  llmModelId?: string,
+  baseConfiguration?: Partial<RAGConfiguration>,
+): Promise<void> {
+  const config = typeof configOrEmbeddingModelId === 'string'
+    ? await ragResolvedConfiguration(
+      configOrEmbeddingModelId,
+      llmModelId ?? '',
+      baseConfiguration,
+    )
+    : configOrEmbeddingModelId;
   const provider = activeProvider();
   if (provider) {
     await provider.ragCreatePipeline(config);
@@ -497,8 +601,33 @@ export async function ragDestroyPipeline(): Promise<void> {
   logger.info('RAG pipeline destroyed');
 }
 
-export async function ragIngest(text: string, metadataJson?: string): Promise<void> {
-  await requireProvider('RAG.ingest').ragIngest(text, metadataJson);
+export async function ragIngest(text: string, metadataJson?: string): Promise<void>;
+/**
+ * Ingest a generated-proto document. Mirrors Swift's discardable-result
+ * document overload (RunAnywhere+RAG.swift:91-100).
+ */
+export async function ragIngest(document: RAGDocument): Promise<RAGStatistics>;
+export async function ragIngest(
+  textOrDocument: string | RAGDocument,
+  metadataJson?: string,
+): Promise<void | RAGStatistics> {
+  if (typeof textOrDocument === 'string') {
+    await requireProvider('RAG.ingest').ragIngest(textOrDocument, metadataJson);
+    return;
+  }
+  return ragIngestDocument(textOrDocument);
+}
+
+export async function ragIngestDocument(document: RAGDocument): Promise<RAGStatistics> {
+  const p = requireProvider('RAG.ingest');
+  if (p.ragIngestDocument) return p.ragIngestDocument(document);
+  // Provider without document-level ingest: fall back to the text path and
+  // report the post-ingest statistics snapshot.
+  const metadataJson = document.metadata && Object.keys(document.metadata).length > 0
+    ? JSON.stringify(document.metadata)
+    : undefined;
+  await p.ragIngest(document.text, metadataJson);
+  return ragGetStatistics();
 }
 
 export async function ragAddDocumentsBatch(
@@ -520,15 +649,63 @@ export async function ragGetDocumentCount(): Promise<number> {
 export async function ragQuery(
   question: string,
   options?: RAGQueryOverrides,
+): Promise<RAGResult>;
+/**
+ * Full-options overload: query with a complete generated `RAGQueryOptions`
+ * (question rides inside the options). Mirrors Swift
+ * `ragQuery(_ options:)` (RunAnywhere+RAG.swift:190); the
+ * question+optional-options variant (RunAnywhere+RAG.swift:181) maps onto
+ * the `(question, overrides)` overload above.
+ */
+export async function ragQuery(options: RAGQueryOptions): Promise<RAGResult>;
+export async function ragQuery(
+  questionOrOptions: string | RAGQueryOptions,
+  options?: RAGQueryOverrides,
 ): Promise<RAGResult> {
-  const provider = activeProvider();
-  if (!provider) return unavailableRAGResult(question);
-  return provider.ragQuery(question, options);
+  // Swift parity (RunAnywhere+RAG.swift:190-196): throws `.notInitialized`
+  // instead of returning a synthetic error-shaped result.
+  if (typeof questionOrOptions === 'string') {
+    return requireProvider('RAG.query').ragQuery(questionOrOptions, options);
+  }
+  const { question, ...overrides } = questionOrOptions;
+  return requireProvider('RAG.query').ragQuery(question, overrides);
+}
+
+// ---------------------------------------------------------------------------
+// RAG proto helpers — Swift parity: RAGProto+Helpers.swift
+// ---------------------------------------------------------------------------
+
+/**
+ * Generated defaults with a required question string. Question is excluded
+ * from the proto annotation because it has no semantic default
+ * (caller-supplied). Swift parity: `RARAGQueryOptions.defaults(question:)`
+ * (RAGProto+Helpers.swift:72).
+ */
+export function ragQueryOptionsWithQuestion(question: string): RAGQueryOptions {
+  return { ...rAGQueryOptionsDefaults(), question };
+}
+
+/**
+ * Total end-to-end query time in seconds (from `totalTimeMs`).
+ * Swift parity: `RARAGResult.totalTime` (RAGProto+Helpers.swift:82).
+ */
+export function ragResultTotalTime(result: RAGResult): number {
+  return result.totalTimeMs / 1000;
+}
+
+/**
+ * Last index update as a `Date`, or null when the index has never been
+ * updated. Swift parity: `RARAGStatistics.lastUpdated` (RAGProto+Helpers.swift:88).
+ */
+export function ragStatisticsLastUpdated(statistics: RAGStatistics): Date | null {
+  if (statistics.lastUpdatedMs <= 0) return null;
+  return new Date(statistics.lastUpdatedMs);
 }
 
 export async function ragGetStatistics(): Promise<RAGStatistics> {
-  const p = activeProvider();
-  if (!p) return unavailableRAGStatistics();
+  // Swift parity (RunAnywhere+RAG.swift:142-150): throws `.notInitialized`
+  // instead of returning a synthetic error-shaped result.
+  const p = requireProvider('RAG.getStatistics');
   if (p.ragGetStatistics) return p.ragGetStatistics();
   const indexedDocuments = await p.ragGetDocumentCount();
   return {
@@ -650,21 +827,18 @@ export async function ragEnsureReady(
 }
 
 /**
- * Public `RunAnywhere.rag.*` namespace. Members marked `@webOnly` are
- * Web-platform extensions that do not appear in the Swift source-of-truth
- * (`RunAnywhere+RAG.swift`). They live here until either the cross-SDK
- * spec adopts them (Kotlin / Flutter / RN / Swift) or the consumer surface
- * migrates to the Swift-aligned subset.
+ * Public `RunAnywhere.rag.*` namespace — Web-only extensions ONLY.
  *
- * Swift-aligned surface (cross-SDK canonical):
- *   - `createPipeline`     ↔ `ragCreatePipeline`
- *   - `destroyPipeline`    ↔ `ragDestroyPipeline`
- *   - `ingest`             ↔ `ragIngest`
- *   - `addDocumentsBatch`  ↔ `ragAddDocumentsBatch`
- *   - `query`              ↔ `ragQuery`
- *   - `clearDocuments`     ↔ `ragClearDocuments`
- *   - `getDocumentCount`   ↔ `ragGetDocumentCount`
- *   - `getStatistics`      ↔ `ragGetStatistics`
+ * The Swift source of truth (`RunAnywhere+RAG.swift`) has no `rag` namespace;
+ * its flat verbs (`ragCreatePipeline`, `ragDestroyPipeline`, `ragIngest`,
+ * `ragAddDocumentsBatch`, `ragQuery`, `ragClearDocuments`,
+ * `ragGetDocumentCount`, `ragGetStatistics`) live directly on the
+ * `RunAnywhere` facade (see RunAnywhere+FlatFacade.ts) and are the canonical
+ * cross-SDK surface. Every member below is a Web-platform extension that does
+ * not appear in Swift — provider registration is the Web plugin pattern
+ * (backend packages install providers at register() time, where Swift links
+ * CppBridge statically), and availability probing exists because Web WASM
+ * backends register asynchronously after `initialize()`.
  */
 export const RAG = {
   /** @webOnly Provider wiring entry point. Backend packages call this during register(). */
@@ -681,16 +855,8 @@ export const RAG = {
   capabilities: ragGetCapabilities,
   /** @webOnly Build a default `RAGConfiguration` with sensible field defaults. */
   defaultConfiguration: createDefaultRAGConfiguration,
-  createPipeline: ragCreatePipeline,
-  destroyPipeline: ragDestroyPipeline,
   /** @webOnly Idempotent "create-if-missing" bootstrap used by Web example apps. */
   ensureReady: ragEnsureReady,
-  ingest: ragIngest,
-  addDocumentsBatch: ragAddDocumentsBatch,
-  query: ragQuery,
-  clearDocuments: ragClearDocuments,
-  getDocumentCount: ragGetDocumentCount,
-  getStatistics: ragGetStatistics,
   /** @webOnly Document-level listing — pending the cross-SDK native list API. */
   listDocuments: ragListDocuments,
   /** @webOnly Document-level removal — pending the cross-SDK native remove API. */

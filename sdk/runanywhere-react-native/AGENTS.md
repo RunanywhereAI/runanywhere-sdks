@@ -88,7 +88,7 @@ Layer 2: Nitro Bridge (JSI — no serialization)
 
 Layer 3: C++ Bridge Code (packages/core/cpp/)
   HybridRunAnywhereCore.cpp + extension files (+AuthDevice, +Download, +Events, +Http, +Registry, +SecureStorage, +Solutions, +Storage, +Telemetry, +Tools, +Voice)
-  cpp/bridges/ — AuthBridge, CompatibilityBridge, DeviceBridge, DownloadBridge, EventBridge, FileManagerBridge, HTTPBridge
+  cpp/bridges/ — AuthBridge, DeviceBridge, ExternalConfigGuard, FileManagerBridge, HTTPBridge, InitBridge, ModelRegistryBridge, PlatformDownloadBridge, StorageBridge, TelemetryBridge
 
 Layer 4: Platform Native Code
   iOS: PlatformAdapterBridge.m (C ABI → Swift), URLSessionHttpTransport.mm, KeychainManager.swift, AudioDecoder.m, SDKLogger.swift

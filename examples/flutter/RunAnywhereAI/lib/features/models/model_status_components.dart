@@ -40,8 +40,8 @@ class ModelStatusBanner extends StatelessWidget {
       child: isLoading
           ? _buildLoadingState(context)
           : (framework != null && modelName != null)
-              ? _buildLoadedState(context)
-              : _buildNoModelState(context),
+          ? _buildLoadedState(context)
+          : _buildNoModelState(context),
     );
   }
 
@@ -59,9 +59,9 @@ class ModelStatusBanner extends StatelessWidget {
         const SizedBox(width: AppSpacing.smallMedium),
         Text(
           'Loading model...',
-          style: AppTypography.subheadline(context).copyWith(
-            color: AppColors.textSecondary(context),
-          ),
+          style: AppTypography.subheadline(
+            context,
+          ).copyWith(color: AppColors.textSecondary(context)),
         ),
       ],
     );
@@ -82,9 +82,9 @@ class ModelStatusBanner extends StatelessWidget {
             children: [
               Text(
                 framework!.displayName,
-                style: AppTypography.caption2(context).copyWith(
-                  color: AppColors.textSecondary(context),
-                ),
+                style: AppTypography.caption2(
+                  context,
+                ).copyWith(color: AppColors.textSecondary(context)),
               ),
               Text(
                 modelName!,
@@ -104,10 +104,7 @@ class ModelStatusBanner extends StatelessWidget {
             ),
             minimumSize: Size.zero,
           ),
-          child: Text(
-            'Change',
-            style: AppTypography.captionMedium(context),
-          ),
+          child: Text('Change', style: AppTypography.captionMedium(context)),
         ),
       ],
     );
@@ -125,9 +122,9 @@ class ModelStatusBanner extends StatelessWidget {
         Expanded(
           child: Text(
             'No model selected',
-            style: AppTypography.subheadline(context).copyWith(
-              color: AppColors.textSecondary(context),
-            ),
+            style: AppTypography.subheadline(
+              context,
+            ).copyWith(color: AppColors.textSecondary(context)),
           ),
         ),
         FilledButton.icon(
@@ -207,18 +204,15 @@ class ModelRequiredOverlay extends StatelessWidget {
               color: AppColors.textSecondary(context).withValues(alpha: 0.5),
             ),
             const SizedBox(height: AppSpacing.xLarge),
-            Text(
-              _modalityTitle,
-              style: AppTypography.title2Semibold(context),
-            ),
+            Text(_modalityTitle, style: AppTypography.title2Semibold(context)),
             const SizedBox(height: AppSpacing.smallMedium),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Text(
                 _modalityDescription,
-                style: AppTypography.body(context).copyWith(
-                  color: AppColors.textSecondary(context),
-                ),
+                style: AppTypography.body(
+                  context,
+                ).copyWith(color: AppColors.textSecondary(context)),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -252,6 +246,8 @@ class ModelRequiredOverlay extends StatelessWidget {
         return Icons.mic;
       case ModelSelectionContext.vlm:
         return Icons.center_focus_strong;
+      case ModelSelectionContext.vad:
+        return Icons.multitrack_audio;
       case ModelSelectionContext.ragEmbedding:
         return Icons.data_object;
       case ModelSelectionContext.ragLLM:
@@ -271,6 +267,8 @@ class ModelRequiredOverlay extends StatelessWidget {
         return 'Voice Assistant';
       case ModelSelectionContext.vlm:
         return 'Vision Language Model';
+      case ModelSelectionContext.vad:
+        return 'Voice Activity Detection';
       case ModelSelectionContext.ragEmbedding:
         return 'Document RAG';
       case ModelSelectionContext.ragLLM:
@@ -296,6 +294,8 @@ class ModelRequiredOverlay extends StatelessWidget {
         return 'Voice assistant requires multiple models. Let\'s set them up together.';
       case ModelSelectionContext.vlm:
         return 'Select a vision-language model to analyze images. Point your camera or pick a photo to get AI descriptions.';
+      case ModelSelectionContext.vad:
+        return 'Select a voice activity detection model to stream speech activity from the microphone.';
       case ModelSelectionContext.ragEmbedding:
         return 'Select an embedding model to encode document chunks for retrieval.';
       case ModelSelectionContext.ragLLM:
@@ -310,10 +310,7 @@ class ModelRequiredOverlay extends StatelessWidget {
 class AudioLevelIndicator extends StatelessWidget {
   final double level; // 0.0 to 1.0
 
-  const AudioLevelIndicator({
-    super.key,
-    required this.level,
-  });
+  const AudioLevelIndicator({super.key, required this.level});
 
   @override
   Widget build(BuildContext context) {
@@ -382,10 +379,7 @@ class RecordingStatusBadge extends StatelessWidget {
       leading = SizedBox(
         width: 12,
         height: 12,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: textColor,
-        ),
+        child: CircularProgressIndicator(strokeWidth: 2, color: textColor),
       );
     }
 
@@ -405,10 +399,9 @@ class RecordingStatusBadge extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             text,
-            style: AppTypography.caption2(context).copyWith(
-              color: textColor,
-              fontWeight: FontWeight.bold,
-            ),
+            style: AppTypography.caption2(
+              context,
+            ).copyWith(color: textColor, fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -422,10 +415,7 @@ class RecordingStatusBadge extends StatelessWidget {
 class TypingIndicatorView extends StatefulWidget {
   final String? statusText;
 
-  const TypingIndicatorView({
-    super.key,
-    this.statusText,
-  });
+  const TypingIndicatorView({super.key, this.statusText});
 
   @override
   State<TypingIndicatorView> createState() => _TypingIndicatorViewState();
@@ -472,10 +462,7 @@ class _TypingIndicatorViewState extends State<TypingIndicatorView>
                 offset: const Offset(0, 2),
               ),
             ],
-            border: Border.all(
-              color: AppColors.borderMedium,
-              width: 1,
-            ),
+            border: Border.all(color: AppColors.borderMedium, width: 1),
           ),
           child: AnimatedBuilder(
             animation: _controller,
@@ -509,9 +496,9 @@ class _TypingIndicatorViewState extends State<TypingIndicatorView>
         const SizedBox(width: AppSpacing.mediumLarge),
         Text(
           widget.statusText ?? 'AI is thinking...',
-          style: AppTypography.caption(context).copyWith(
-            color: AppColors.textSecondary(context),
-          ),
+          style: AppTypography.caption(
+            context,
+          ).copyWith(color: AppColors.textSecondary(context)),
         ),
         const SizedBox(width: AppSpacing.padding60),
       ],
@@ -575,9 +562,9 @@ class CompactModelIndicator extends StatelessWidget {
               const SizedBox(width: AppSpacing.xSmall),
               Text(
                 modelName ?? framework!.displayName,
-                style: AppTypography.caption(context).copyWith(
-                  color: AppColors.primaryBlue,
-                ),
+                style: AppTypography.caption(
+                  context,
+                ).copyWith(color: AppColors.primaryBlue),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -590,9 +577,9 @@ class CompactModelIndicator extends StatelessWidget {
               const SizedBox(width: AppSpacing.xSmall),
               Text(
                 'Select Model',
-                style: AppTypography.caption(context).copyWith(
-                  color: AppColors.statusOrange,
-                ),
+                style: AppTypography.caption(
+                  context,
+                ).copyWith(color: AppColors.statusOrange),
               ),
             ],
           ],
@@ -662,11 +649,7 @@ class VoicePipelineSetupView extends StatelessWidget {
       children: [
         // Header
         const SizedBox(height: AppSpacing.xLarge),
-        const Icon(
-          Icons.mic,
-          size: 48,
-          color: AppColors.primaryBlue,
-        ),
+        const Icon(Icons.mic, size: 48, color: AppColors.primaryBlue),
         const SizedBox(height: AppSpacing.smallMedium),
         Text(
           'Voice Assistant Setup',
@@ -675,9 +658,9 @@ class VoicePipelineSetupView extends StatelessWidget {
         const SizedBox(height: AppSpacing.xSmall),
         Text(
           'Voice requires 3 models to work together',
-          style: AppTypography.subheadline(context).copyWith(
-            color: AppColors.textSecondary(context),
-          ),
+          style: AppTypography.subheadline(
+            context,
+          ).copyWith(color: AppColors.textSecondary(context)),
         ),
 
         const SizedBox(height: AppSpacing.xLarge),
@@ -750,9 +733,9 @@ class VoicePipelineSetupView extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: AppSpacing.mediumLarge),
             child: Text(
               'Select all 3 models to continue',
-              style: AppTypography.caption(context).copyWith(
-                color: AppColors.textSecondary(context),
-              ),
+              style: AppTypography.caption(
+                context,
+              ).copyWith(color: AppColors.textSecondary(context)),
             ),
           )
         else if (!allModelsLoaded)
@@ -760,9 +743,9 @@ class VoicePipelineSetupView extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: AppSpacing.mediumLarge),
             child: Text(
               'Waiting for models to load...',
-              style: AppTypography.caption(context).copyWith(
-                color: AppColors.statusOrange,
-              ),
+              style: AppTypography.caption(
+                context,
+              ).copyWith(color: AppColors.statusOrange),
             ),
           )
         else
@@ -770,9 +753,9 @@ class VoicePipelineSetupView extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: AppSpacing.mediumLarge),
             child: Text(
               'All models loaded and ready!',
-              style: AppTypography.caption(context).copyWith(
-                color: AppColors.statusGreen,
-              ),
+              style: AppTypography.caption(
+                context,
+              ).copyWith(color: AppColors.statusGreen),
             ),
           ),
       ],
@@ -819,10 +802,7 @@ class ModelSetupCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.backgroundGray6(context),
           borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusCard),
-          border: Border.all(
-            color: _borderColor,
-            width: 2,
-          ),
+          border: Border.all(color: _borderColor, width: 2),
         ),
         child: Row(
           children: [
@@ -843,22 +823,19 @@ class ModelSetupCard extends StatelessWidget {
                       ),
                     )
                   : isLoaded
-                      ? const Icon(
-                          Icons.check_circle,
-                          size: 20,
-                          color: Colors.white,
-                        )
-                      : isConfigured
-                          ? const Icon(
-                              Icons.check,
-                              size: 16,
-                              color: Colors.white,
-                            )
-                          : Text(
-                              '$step',
-                              style: AppTypography.subheadlineSemibold(context)
-                                  .copyWith(color: AppColors.statusGray),
-                            ),
+                  ? const Icon(
+                      Icons.check_circle,
+                      size: 20,
+                      color: Colors.white,
+                    )
+                  : isConfigured
+                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  : Text(
+                      '$step',
+                      style: AppTypography.subheadlineSemibold(
+                        context,
+                      ).copyWith(color: AppColors.statusGray),
+                    ),
             ),
             const SizedBox(width: AppSpacing.large),
 
@@ -884,9 +861,9 @@ class ModelSetupCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             '${selectedFramework!.displayName} • $selectedModel',
-                            style: AppTypography.caption(context).copyWith(
-                              color: AppColors.textSecondary(context),
-                            ),
+                            style: AppTypography.caption(
+                              context,
+                            ).copyWith(color: AppColors.textSecondary(context)),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -900,18 +877,18 @@ class ModelSetupCard extends StatelessWidget {
                         else if (isLoading)
                           Text(
                             'Loading...',
-                            style: AppTypography.caption2(context).copyWith(
-                              color: AppColors.statusOrange,
-                            ),
+                            style: AppTypography.caption2(
+                              context,
+                            ).copyWith(color: AppColors.statusOrange),
                           ),
                       ],
                     )
                   else
                     Text(
                       subtitle,
-                      style: AppTypography.caption(context).copyWith(
-                        color: AppColors.textSecondary(context),
-                      ),
+                      style: AppTypography.caption(
+                        context,
+                      ).copyWith(color: AppColors.textSecondary(context)),
                     ),
                 ],
               ),
@@ -936,18 +913,18 @@ class ModelSetupCard extends StatelessWidget {
                   const SizedBox(width: AppSpacing.xSmall),
                   Text(
                     'Loaded',
-                    style: AppTypography.caption(context).copyWith(
-                      color: AppColors.statusGreen,
-                    ),
+                    style: AppTypography.caption(
+                      context,
+                    ).copyWith(color: AppColors.statusGreen),
                   ),
                 ],
               )
             else if (isConfigured)
               Text(
                 'Change',
-                style: AppTypography.caption(context).copyWith(
-                  color: AppColors.primaryBlue,
-                ),
+                style: AppTypography.caption(
+                  context,
+                ).copyWith(color: AppColors.primaryBlue),
               )
             else
               Row(
@@ -955,9 +932,9 @@ class ModelSetupCard extends StatelessWidget {
                 children: [
                   Text(
                     'Select',
-                    style: AppTypography.captionMedium(context).copyWith(
-                      color: AppColors.primaryBlue,
-                    ),
+                    style: AppTypography.captionMedium(
+                      context,
+                    ).copyWith(color: AppColors.primaryBlue),
                   ),
                   const Icon(
                     Icons.chevron_right,

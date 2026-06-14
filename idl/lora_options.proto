@@ -203,6 +203,28 @@ message LoraAdapterDownloadCompletedResult {
 }
 
 // ---------------------------------------------------------------------------
+// Import of a user-picked local adapter file. Commons owns everything past
+// the platform-readable source path: deterministic catalog matching (exact
+// local-path match, else an unambiguous filename match), canonical placement
+// under {Models}/{framework}/lora-adapter:{id}/, artifact registry record +
+// manifest persistence, and catalog completion for matched entries.
+// Platforms only resolve OS-specific access (security-scoped URLs, content
+// URIs, Blob-to-FS staging) before calling.
+// ---------------------------------------------------------------------------
+message LoraAdapterImportRequest {
+    string source_path = 1;        // platform-readable path of the picked file
+    optional string filename = 2;  // destination filename; default basename(source_path)
+}
+
+message LoraAdapterImportResult {
+    bool success = 1;
+    string error_message = 2;
+    string local_path = 3;              // stable SDK-owned path of the imported file
+    bool matched = 4;                   // a catalog entry matched and was completed
+    LoraAdapterCatalogEntry entry = 5;  // updated catalog entry when matched
+}
+
+// ---------------------------------------------------------------------------
 // Result of a LoRA compatibility pre-check.
 //
 // `base_model_required` is not present in any current SDK shape — it is

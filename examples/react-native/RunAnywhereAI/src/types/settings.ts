@@ -81,7 +81,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   routingPolicy: RoutingPolicy.ROUTING_POLICY_UNSPECIFIED,
   generation: {
     temperature: 0.7,
-    maxTokens: 10000,
+    maxTokens: 1000,
   },
   isApiKeyConfigured: false,
   debugMode: false,
@@ -144,4 +144,12 @@ export const GENERATION_SETTINGS_KEYS = {
   TEMPERATURE: 'defaultTemperature',
   MAX_TOKENS: 'defaultMaxTokens',
   SYSTEM_PROMPT: 'defaultSystemPrompt',
+  THINKING_MODE_ENABLED: 'thinkingModeEnabled',
+} as const;
+
+export const APP_STORAGE_KEYS = {
+  API_KEY: 'runanywhere_api_key',
+  BASE_URL: 'runanywhere_base_url',
+  DEVICE_REGISTERED: 'com.runanywhere.sdk.deviceRegistered',
+  TOOL_CALLING_ENABLED: 'toolCallingEnabled',
 } as const;

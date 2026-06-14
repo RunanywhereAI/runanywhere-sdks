@@ -208,6 +208,26 @@ using STTLifecycleStreamProtoFn = rac_result_t (*)(
     size_t,
     STTPartialProtoCallbackFn,
     void*);
+// Session streaming ABI (rac_stt_stream.h) — set/unset callback on the
+// component handle, start/feed/stop/cancel a session, quiesce in-flight
+// callback dispatches before freeing user_data.
+using STTStreamSetProtoCallbackFn = rac_result_t (*)(
+    rac_handle_t,
+    STTPartialProtoCallbackFn,
+    void*);
+using STTStreamUnsetProtoCallbackFn = rac_result_t (*)(
+    rac_handle_t);
+using STTStreamStartProtoFn = rac_result_t (*)(
+    rac_handle_t,
+    const uint8_t*,
+    size_t,
+    uint64_t*);
+using STTStreamFeedAudioProtoFn = rac_result_t (*)(
+    uint64_t,
+    const uint8_t*,
+    size_t);
+using STTStreamFinishProtoFn = rac_result_t (*)(
+    uint64_t);
 
 using TTSVoiceProtoCallbackFn = void (*)(
     const uint8_t*,
@@ -343,23 +363,29 @@ using ToolRunLoopWithHandleAndCbProtoFn = rac_result_t (*)(
     rac_proto_buffer_t*);
 using ToolRunLoopCancelProtoFn = rac_result_t (*)(uint64_t);
 
-using EmbeddingsCreateFn = rac_result_t (*)(
-    const char*,
-    rac_handle_t*);
-using EmbeddingsCreateWithConfigFn = rac_result_t (*)(
-    const char*,
-    const char*,
-    rac_handle_t*);
-using EmbeddingsInitializeFn = rac_result_t (*)(
-    rac_handle_t,
-    const char*);
-using EmbeddingsEmbedBatchProtoFn = rac_result_t (*)(
-    rac_handle_t,
+using EmbeddingsEmbedBatchLifecycleProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t,
     rac_proto_buffer_t*);
-using EmbeddingsDestroyFn = void (*)(
-    rac_handle_t);
+
+using InferenceFrameworkFromProtoFn = rac_result_t (*)(
+    int32_t,
+    rac_inference_framework_t*);
+using InferenceFrameworkToProtoFn = rac_result_t (*)(
+    rac_inference_framework_t,
+    int32_t*);
+using InferenceFrameworkDisplayNameFn = rac_result_t (*)(
+    rac_inference_framework_t,
+    const char**);
+using ModelCategoryFromProtoFn = rac_result_t (*)(
+    int32_t,
+    rac_model_category_t*);
+using ModelCategoryDefaultFrameworkFn = rac_inference_framework_t (*)(
+    rac_model_category_t);
+using InferModelFileRoleFn = rac_result_t (*)(
+    const char*,
+    int32_t,
+    int32_t*);
 
 using LoRARequestProtoFn = rac_result_t (*)(
     const uint8_t*,

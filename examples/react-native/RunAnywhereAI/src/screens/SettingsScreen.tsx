@@ -38,6 +38,9 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { SettingsStackParamList } from '../types';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -48,6 +51,7 @@ import {
   RoutingPolicyDisplayNames,
   SETTINGS_CONSTRAINTS,
   GENERATION_SETTINGS_KEYS,
+  APP_STORAGE_KEYS,
 } from '../types/settings';
 import {
   getFrameworkDisplayName,
@@ -63,26 +67,20 @@ import {
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
-import { StorageDeleteRequest } from '@runanywhere/proto-ts/storage_types';
 import {
   isModelLoadedForCategory,
   unloadModelsForCategory,
 } from '../utils/runAnywhereLifecycle';
 
 // Canonical SDK methods (Swift parity).
-const downloadModelHelper = RunAnywhere.downloadModel;
+const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
 const listModels = async (): Promise<ModelInfo[]> =>
   (await RunAnywhere.listModels()).models?.models ?? [];
 const listDownloadedModels = async (): Promise<ModelInfo[]> =>
   (await RunAnywhere.downloadedModels()).models?.models ?? [];
 
 // Storage keys for API configuration
-const STORAGE_KEYS = {
-  API_KEY: '@runanywhere_api_key',
-  BASE_URL: '@runanywhere_base_url',
-  DEVICE_REGISTERED: '@runanywhere_device_registered',
-  TOOL_CALLING_ENABLED: '@runanywhere_tool_calling_enabled',
-};
+const STORAGE_KEYS = APP_STORAGE_KEYS;
 
 function hasUsableBackendConfig(options: {
   apiKey?: string | null;
@@ -155,6 +153,8 @@ const formatBytes = (bytes: number): string => {
 export const SettingsScreen: React.FC = () => {
   // Safe area insets for header status bar handling
   const insets = useSafeAreaInsets();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<SettingsStackParamList>>();
 
   // Settings state
   // NOTE: several state hooks below are intentionally retained for upcoming
@@ -164,8 +164,9 @@ export const SettingsScreen: React.FC = () => {
     RoutingPolicy.ROUTING_POLICY_UNSPECIFIED
   );
   const [temperature, setTemperature] = useState(0.7);
-  const [maxTokens, setMaxTokens] = useState(10000);
+  const [maxTokens, setMaxTokens] = useState(1000);
   const [systemPrompt, setSystemPrompt] = useState('');
+  const [thinkingModeEnabled, setThinkingModeEnabled] = useState(false);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false); // API Configuration state
 
   const [apiKey, setApiKey] = useState('');
@@ -257,17 +258,22 @@ export const SettingsScreen: React.FC = () => {
       const sysStr = await AsyncStorage.getItem(
         GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT
       );
+      const thinkingStr = await AsyncStorage.getItem(
+        GENERATION_SETTINGS_KEYS.THINKING_MODE_ENABLED
+      );
 
       const loadedTemperature = tempStr !== null ? parseFloat(tempStr) : 0.7;
       setTemperature(loadedTemperature);
       if (maxStr) setMaxTokens(parseInt(maxStr, 10));
       if (sysStr) setSystemPrompt(sysStr);
+      setThinkingModeEnabled(thinkingStr === 'true');
 
       // eslint-disable-next-line no-console -- demo settings diagnostic
       console.log('[Settings] Loaded generation settings:', {
         temperature: loadedTemperature,
         maxTokens,
         systemPrompt: systemPrompt ? 'set' : 'empty',
+        thinkingModeEnabled: thinkingStr === 'true',
       });
     } catch (error) {
       console.error('[Settings] Failed to load generation settings:', error);
@@ -290,6 +296,10 @@ export const SettingsScreen: React.FC = () => {
         GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT,
         systemPrompt
       );
+      await AsyncStorage.setItem(
+        GENERATION_SETTINGS_KEYS.THINKING_MODE_ENABLED,
+        thinkingModeEnabled ? 'true' : 'false'
+      );
 
       // eslint-disable-next-line no-console -- demo settings diagnostic
       console.log('[Settings] Saved generation settings:', {
@@ -298,6 +308,7 @@ export const SettingsScreen: React.FC = () => {
         systemPrompt: systemPrompt
           ? `set(${systemPrompt.length} chars)`
           : 'empty',
+        thinkingModeEnabled,
       });
 
       Alert.alert('Saved', 'Generation settings have been saved successfully.');
@@ -345,20 +356,15 @@ export const SettingsScreen: React.FC = () => {
         STORAGE_KEYS.TOOL_CALLING_ENABLED,
         enabled ? 'true' : 'false'
       );
+      if (enabled) {
+        await registerSharedDemoTools();
+      } else {
+        await RunAnywhere.clearTools();
+      }
+      await refreshRegisteredTools();
     } catch (error) {
       console.error('[Settings] Failed to save tool calling setting:', error);
     }
-  }; /**
-   * Register demo tools (weather, time, calculator)
-   */
-
-  const registerDemoTools = async () => {
-    await registerSharedDemoTools();
-    await refreshRegisteredTools();
-    Alert.alert(
-      'Demo Tools Added',
-      '3 demo tools have been registered: get_weather, get_current_time, calculate'
-    );
   }; /**
    * Clear all registered tools
    */
@@ -605,7 +611,7 @@ export const SettingsScreen: React.FC = () => {
 
       try {
         // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
-        const dlIter = downloadModelHelper(model.id)[Symbol.asyncIterator]();
+        const dlIter = downloadModelStreamHelper(model)[Symbol.asyncIterator]();
         downloadIteratorsRef.current[model.id] = dlIter;
         let dlResult = await dlIter.next();
         while (!dlResult.done) {
@@ -664,15 +670,7 @@ export const SettingsScreen: React.FC = () => {
             style: 'destructive',
             onPress: async () => {
               try {
-                const result = await RunAnywhere.deleteStorage(
-                  StorageDeleteRequest.fromPartial({
-                    modelIds: [model.id],
-                    deleteFiles: true,
-                    clearRegistryPaths: true,
-                    unloadIfLoaded: true,
-                    allowPlatformDelete: true,
-                  })
-                );
+                const result = await RunAnywhere.deleteModel(model.id);
                 if (!result.success) {
                   throw new Error(
                     result.errorMessage || 'Storage delete failed'
@@ -941,6 +939,28 @@ export const SettingsScreen: React.FC = () => {
             SETTINGS_CONSTRAINTS.maxTokens.step,
             (v) => v.toLocaleString()
           )}
+          <View style={styles.toolSettingRow}>
+            <View style={styles.toolSettingInfo}>
+              <Text style={styles.toolSettingLabel}>Thinking Mode</Text>
+              <Text style={styles.toolSettingDescription}>
+                Model will use its default thinking/reasoning mode.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                thinkingModeEnabled && styles.toggleButtonActive,
+              ]}
+              onPress={() => setThinkingModeEnabled(!thinkingModeEnabled)}
+            >
+              <View
+                style={[
+                  styles.toggleKnob,
+                  thinkingModeEnabled && styles.toggleKnobActive,
+                ]}
+              />
+            </TouchableOpacity>
+          </View>
           {/* System Prompt Input */}
           <View style={styles.systemPromptContainer}>
             <Text style={styles.systemPromptLabel}>System Prompt</Text>
@@ -1078,25 +1098,6 @@ export const SettingsScreen: React.FC = () => {
                   {registeredTools.length === 1 ? 'tool' : 'tools'}             
                 </Text>
               </View>
-              {/* Demo Tools Button */}
-              {registeredTools.length === 0 && (
-                <>
-                  <View style={styles.apiConfigDivider} />
-                  <TouchableOpacity
-                    style={styles.demoToolsButton}
-                    onPress={registerDemoTools}
-                  >
-                    <Icon
-                      name="add-circle-outline"
-                      size={20}
-                      color={Colors.primaryBlue}
-                    />
-                    <Text style={styles.demoToolsButtonText}>
-                      Add Demo Tools
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              )}
               {/* Registered Tools List */}
               {registeredTools.length > 0 && (
                 <>
@@ -1153,6 +1154,31 @@ export const SettingsScreen: React.FC = () => {
                         Tools allow the LLM to call external APIs and functions
             to get real-time data.          {' '}
           </Text>
+        </View>
+        {/* Performance - Matches iOS CombinedSettingsView "Performance" section */}
+        {renderSectionHeader('Performance')}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => navigation.navigate('Benchmarks')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingRowLeft}>
+              <Icon
+                name="speedometer-outline"
+                size={20}
+                color={Colors.primaryBlue}
+              />
+              <Text style={styles.settingLabel}>Benchmarks</Text>
+            </View>
+            <View style={styles.settingRowRight}>
+              <Icon
+                name="chevron-forward"
+                size={18}
+                color={Colors.textTertiary}
+              />
+            </View>
+          </TouchableOpacity>
         </View>
         {/* Storage Overview - Matches iOS CombinedSettingsView */}
         {renderSectionHeader('Storage Overview')}
@@ -1956,18 +1982,6 @@ const styles = StyleSheet.create({
   },
   toggleKnobActive: {
     alignSelf: 'flex-end',
-  },
-  demoToolsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.small,
-    padding: Padding.padding16,
-  },
-  demoToolsButtonText: {
-    ...Typography.body,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
   },
   toolRow: {
     flexDirection: 'row',

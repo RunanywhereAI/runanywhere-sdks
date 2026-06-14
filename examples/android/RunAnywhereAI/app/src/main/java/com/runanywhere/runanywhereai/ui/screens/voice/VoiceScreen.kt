@@ -61,7 +61,7 @@ fun VoiceScreen() {
     val sttVm: ModelSelectionViewModel =
         viewModel(key = "voice-stt", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.STT))
     val ttsVm: ModelSelectionViewModel =
-        viewModel(key = "voice-tts", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.VOICE_TTS))
+        viewModel(key = "voice-tts", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.TTS))
     var sheet by remember { mutableStateOf<ModelSelectionViewModel?>(null) }
     val listState = rememberLazyListState()
 
@@ -75,6 +75,9 @@ fun VoiceScreen() {
     ) { granted -> if (granted) voiceVm.toggle() }
 
     fun onMic() {
+        // While STARTING (composing the agent) ignore taps so an impatient
+        // second tap can't cancel the session before it begins listening.
+        if (voiceVm.state == VoiceState.STARTING) return
         if (voiceVm.state != VoiceState.IDLE) {
             voiceVm.toggle()
             return
@@ -150,7 +153,11 @@ fun VoiceScreen() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            MicButton(state = voiceVm.state, enabled = ready || voiceVm.state != VoiceState.IDLE, onClick = ::onMic)
+            MicButton(
+                state = voiceVm.state,
+                enabled = voiceVm.state != VoiceState.STARTING && (ready || voiceVm.state != VoiceState.IDLE),
+                onClick = ::onMic,
+            )
             if (voiceVm.turns.isNotEmpty()) {
                 IconButton(onClick = voiceVm::clear) {
                     Icon(RACIcons.Outline.Trash, contentDescription = "Clear", modifier = Modifier.size(dimens.iconSm))
@@ -166,7 +173,8 @@ fun VoiceScreen() {
 
 private fun statusText(state: VoiceState, ready: Boolean): String = when (state) {
     VoiceState.IDLE -> if (ready) "Tap to talk" else "Setup required"
-    VoiceState.LISTENING -> "Listening… tap to send"
+    VoiceState.STARTING -> "Starting…"
+    VoiceState.LISTENING -> "Listening… speak, then pause — tap to stop"
     VoiceState.TRANSCRIBING -> "Transcribing…"
     VoiceState.THINKING -> "Thinking…"
     VoiceState.SPEAKING -> "Speaking…"
@@ -250,7 +258,11 @@ private fun MicButton(state: VoiceState, enabled: Boolean, onClick: () -> Unit) 
         state != VoiceState.IDLE -> MaterialTheme.colorScheme.secondary
         else -> MaterialTheme.colorScheme.primary
     }
-    val icon = if (state == VoiceState.IDLE) RACIcons.Outline.Microphone else RACIcons.Outline.PlayerStop
+    val icon = if (state == VoiceState.IDLE || state == VoiceState.STARTING) {
+        RACIcons.Outline.Microphone
+    } else {
+        RACIcons.Outline.PlayerStop
+    }
     Box(
         modifier = Modifier
             .size(88.dp)

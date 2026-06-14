@@ -43,6 +43,15 @@ export interface InitializationState {
   hasCompletedHTTPSetup: boolean;
 
   /**
+   * Whether HTTP setup is applicable at all for this configuration. When
+   * commons reports `http_applicable=false` (dev mode / no usable external
+   * config), public API calls must NOT keep retrying HTTP setup.
+   * Equivalent to iOS: httpSetupApplicable (RunAnywhere.swift `SDKState`,
+   * sourced from `RASdkInitResult.http_applicable`).
+   */
+  httpSetupApplicable: boolean;
+
+  /**
    * Current SDK environment
    */
   environment: SDKEnvironment | null;
@@ -82,6 +91,7 @@ export function createInitialState(): InitializationState {
     isCoreInitialized: false,
     hasCompletedServicesInit: false,
     hasCompletedHTTPSetup: false,
+    httpSetupApplicable: true,
     environment: null,
     initParams: null,
     backendType: null,
@@ -130,32 +140,41 @@ export function markServicesInitializing(
  * `http_configured` field on the Phase 2 result envelope. Phase 2 is allowed
  * to "complete" in offline mode (`hasCompletedServicesInit=true`,
  * `hasCompletedHTTPSetup=false`); the next public API call is expected to
- * call `markHTTPSetupCompleted` once `rac_sdk_retry_http_proto` succeeds.
+ * call `markHTTPSetupResult` once `rac_sdk_retry_http_proto` succeeds.
+ *
+ * `httpApplicable` mirrors Swift's `httpSetupApplicable` and reflects the
+ * `http_applicable` field on the same envelope; `false` stops further retries.
  */
 export function markServicesInitialized(
   state: InitializationState,
-  httpConfigured: boolean = false
+  httpConfigured: boolean = false,
+  httpApplicable: boolean = true
 ): InitializationState {
   return {
     ...state,
     phase: InitializationPhase.FullyInitialized,
     hasCompletedServicesInit: true,
     hasCompletedHTTPSetup: httpConfigured,
+    httpSetupApplicable: httpApplicable,
     servicesInitTimestamp: Date.now(),
   };
 }
 
 /**
- * Update state to mark HTTP/auth setup as complete after a successful retry
- * (offline init recovery path). Mirrors Swift `RunAnywhere.swift`'s
- * `hasCompletedHTTPSetup = true` in `retryHTTPSetup()`.
+ * Record the outcome of an HTTP/auth setup retry (offline init recovery
+ * path). Mirrors Swift `RunAnywhere.swift` `retryHTTPSetup()`, which updates
+ * both `hasCompletedHTTPSetup` and `httpSetupApplicable` from the retry
+ * proto result.
  */
-export function markHTTPSetupCompleted(
-  state: InitializationState
+export function markHTTPSetupResult(
+  state: InitializationState,
+  httpConfigured: boolean,
+  httpApplicable: boolean = true
 ): InitializationState {
   return {
     ...state,
-    hasCompletedHTTPSetup: true,
+    hasCompletedHTTPSetup: httpConfigured || state.hasCompletedHTTPSetup,
+    httpSetupApplicable: httpApplicable,
   };
 }
 

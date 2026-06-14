@@ -67,13 +67,23 @@ object OkHttpHttpTransport {
     /** Chunk size used for streaming body delivery (32 KB matches Okio's default). */
     private const val STREAM_CHUNK_SIZE = 32 * 1024
 
-    /** Default OkHttp client. Lazily built on first use. Mirrors Swift's `sharedSession`. */
+    /**
+     * Default OkHttp client backing the buffered `request_send` path.
+     * Lazily built on first use. Mirrors Swift's `sharedSession`
+     * (`timeoutIntervalForRequest = 60`, `timeoutIntervalForResource = 600`):
+     * the 60s read timeout is the per-read inactivity bound and the 600s
+     * call timeout caps the whole transfer. URLSession has no separate
+     * connect knob, so the 30s connect timeout is kept as a sane OkHttp
+     * default. Per-request `timeoutMs` values layer a tighter `callTimeout`
+     * via [resolveClient].
+     */
     private val defaultClient: OkHttpClient by lazy {
         OkHttpClient
             .Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
+            .callTimeout(600, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
@@ -83,9 +93,11 @@ object OkHttpHttpTransport {
      * Dedicated streaming OkHttp client. Mirrors the Swift adapter's per-call
      * streaming session built with `timeoutIntervalForResource = 24 * 60 * 60`.
      * A multi-GB GGUF download over a slow cellular link can legitimately run
-     * for hours, so the read timeout is bumped from the default 120s to 24h.
-     * Connect / write timeouts retain the default's tighter bounds because
-     * those phases still complete in seconds even on slow links.
+     * for hours, so the read timeout is bumped from the buffered client's 60s
+     * to 24h, and the call timeout is reset to 0 (unlimited) so the buffered
+     * path's 600s overall cap is not inherited via `.newBuilder()`. Connect /
+     * write timeouts retain the default's tighter bounds because those phases
+     * still complete in seconds even on slow links.
      *
      * Built off of [defaultClient] (or a host-installed override) via
      * `.newBuilder()` so any custom interceptors / cert pinners installed by
@@ -99,6 +111,7 @@ object OkHttpHttpTransport {
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(24, TimeUnit.HOURS)
                 .writeTimeout(60, TimeUnit.SECONDS)
+                .callTimeout(0, TimeUnit.MILLISECONDS)
                 .build()
         }
 
@@ -446,7 +459,8 @@ object OkHttpHttpTransport {
             val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte)
             // Streaming downloads use the dedicated streaming client with a
             // 24-hour read timeout (multi-GB GGUFs over slow links can take
-            // hours); the default 120s would abort them mid-transfer.
+            // hours); the buffered client's 60s read / 600s call timeouts
+            // would abort them mid-transfer.
             val clientForCall = resolveStreamingClient(timeoutMs)
 
             val call = clientForCall.newCall(request)

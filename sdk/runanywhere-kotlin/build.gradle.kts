@@ -145,6 +145,10 @@ android {
     namespace = "com.runanywhere.sdk.kotlin"
     compileSdk = 37
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         minSdk = 24
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

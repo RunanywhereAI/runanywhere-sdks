@@ -25,6 +25,7 @@ package com.runanywhere.sdk.public.extensions.LLM
 import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.ToolValueJSON
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 // PROTO TYPEALIASES (RA-prefixed, mirroring Swift)
@@ -264,24 +265,30 @@ fun RAToolValue.toJSONString(pretty: Boolean = false): String? {
 
 /**
  * Parse a JSON object string into a `[String: RAToolValue]` map via
- * `rac_tool_value_from_json_proto`. Returns an empty map on any parse failure
- * or for non-object roots, matching the existing Kotlin contract (Swift throws
- * here; Kotlin's two call sites already treat an empty map as a failure).
+ * `rac_tool_value_from_json_proto`. Mirrors Swift: malformed JSON and
+ * non-object roots throw so callers surface a failed tool result instead of
+ * executing the tool with silently-empty arguments.
  */
 fun ai.runanywhere.proto.v1.ToolValue.Companion.parseObjectJSON(
     json: String,
 ): Map<String, RAToolValue> {
-    if (json.isBlank()) return emptyMap()
+    if (json.isBlank()) {
+        throw SDKException.invalidArgument("Tool arguments JSON must be a non-empty object")
+    }
     val wrapper = ToolValueJSON(json = json)
     val valueBytes =
         RunAnywhereBridge.racToolValueFromJsonProto(ToolValueJSON.ADAPTER.encode(wrapper))
-            ?: return emptyMap()
-    return runCatching {
-        RAToolValue.ADAPTER
-            .decode(valueBytes)
-            .object_value
-            ?.fields ?: emptyMap()
-    }.getOrDefault(emptyMap())
+            ?: throw SDKException.invalidArgument("Malformed tool arguments JSON")
+    val decoded =
+        runCatching {
+            RAToolValue.ADAPTER.decode(valueBytes)
+        }.getOrElse { error ->
+            throw SDKException.invalidArgument("Failed to decode tool arguments JSON", error)
+        }
+    return decoded
+        .object_value
+        ?.fields
+        ?: throw SDKException.invalidArgument("Tool arguments JSON root must be an object")
 }
 
 /**

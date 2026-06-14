@@ -373,9 +373,9 @@ const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive) RAC_PLUGIN
  *
  * Thread-safe.
  */
-const rac_engine_vtable_t* rac_plugin_find_for_engine(rac_primitive_t primitive,
-                                                      const char* engine_name)
-    RAC_PLUGIN_REGISTRY_NOEXCEPT;
+const rac_engine_vtable_t*
+rac_plugin_find_for_engine(rac_primitive_t primitive,
+                           const char* engine_name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Iterate all plugins registered for `primitive`, in descending

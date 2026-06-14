@@ -44,10 +44,62 @@ export function pcm16ToFloat32Samples(int16Bytes: ArrayBuffer): Float32Array {
 }
 
 /**
+ * Wrap raw 16-bit mono PCM samples in a canonical 44-byte WAV (RIFF)
+ * container: `RIFF` + `fmt ` (16-byte PCM chunk, format tag 1, 1 channel) +
+ * `data`. Matches iOS: `RAAudioConvert.pcm16ToWav(_:sampleRate:)`.
+ *
+ * Use this when a consumer needs a self-describing audio container rather
+ * than headerless PCM — e.g. cloud STT providers that upload the bytes as an
+ * `audio/wav` file part.
+ *
+ * @param int16Bytes Raw Int16 mono PCM samples (little-endian). The sample
+ *   bytes are copied verbatim after the header.
+ * @param sampleRate Capture sample rate in Hz (e.g. 16000).
+ * @returns The same samples prefixed with a WAV header.
+ */
+export function pcm16ToWav(
+  int16Bytes: ArrayBuffer,
+  sampleRate: number
+): ArrayBuffer {
+  const pcmFormatTag = 1;
+  const channels = 1;
+  const bitsPerSample = 16;
+  const blockAlign = (channels * bitsPerSample) / 8;
+  const byteRate = sampleRate * blockAlign;
+  const fmtChunkSize = 16;
+  const dataLength = int16Bytes.byteLength;
+
+  const wav = new ArrayBuffer(44 + dataLength);
+  const view = new DataView(wav);
+  const writeAscii = (offset: number, text: string) => {
+    for (let i = 0; i < text.length; i++) {
+      view.setUint8(offset + i, text.charCodeAt(i));
+    }
+  };
+
+  writeAscii(0, 'RIFF');
+  view.setUint32(4, 36 + dataLength, true);
+  writeAscii(8, 'WAVE');
+  writeAscii(12, 'fmt ');
+  view.setUint32(16, fmtChunkSize, true);
+  view.setUint16(20, pcmFormatTag, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeAscii(36, 'data');
+  view.setUint32(40, dataLength, true);
+  new Uint8Array(wav, 44).set(new Uint8Array(int16Bytes));
+  return wav;
+}
+
+/**
  * Namespace bundle so the helpers can be attached to the public `RunAnywhere`
  * object (`RunAnywhere.pcm16ToFloat32(...)`) the same way other extensions are.
  */
 export const AudioConvert = {
   pcm16ToFloat32,
   pcm16ToFloat32Samples,
+  pcm16ToWav,
 };

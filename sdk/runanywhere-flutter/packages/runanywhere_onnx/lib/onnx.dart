@@ -29,11 +29,7 @@ library;
 
 import 'dart:async';
 
-import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show InferenceFramework;
-import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere_onnx/native/onnx_bindings.dart';
 
@@ -43,14 +39,8 @@ import 'package:runanywhere_onnx/native/onnx_bindings.dart';
 /// capabilities using ONNX Runtime with models like Whisper, Piper, and Silero.
 ///
 /// Matches Swift `ONNX` enum from ONNXRuntime/ONNX.swift.
-class Onnx implements RunAnywhereModule {
-  // ============================================================================
-  // Singleton Pattern (matches Swift enum pattern)
-  // ============================================================================
-
-  static final Onnx _instance = Onnx._internal();
-  static Onnx get module => _instance;
-  Onnx._internal();
+class Onnx {
+  Onnx._();
 
   // ============================================================================
   // Module Info (matches Swift exactly)
@@ -61,30 +51,6 @@ class Onnx implements RunAnywhereModule {
 
   /// ONNX Runtime library version (underlying C library)
   static const String onnxRuntimeVersion = '1.23.2';
-
-  // ============================================================================
-  // RunAnywhereModule Conformance (matches Swift exactly)
-  // ============================================================================
-
-  @override
-  String get moduleId => 'onnx';
-
-  @override
-  String get moduleName => 'ONNX Runtime';
-
-  @override
-  Set<SDKComponent> get capabilities => {
-        SDKComponent.SDK_COMPONENT_STT,
-        SDKComponent.SDK_COMPONENT_TTS,
-        SDKComponent.SDK_COMPONENT_VAD,
-      };
-
-  @override
-  int get defaultPriority => 100;
-
-  @override
-  InferenceFramework get inferenceFramework =>
-      InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
 
   // ============================================================================
   // Registration State

@@ -41,12 +41,15 @@ import com.runanywhere.sdk.public.types.RAModelInfo
 @Composable
 fun ChatTopBar(
     model: RAModelInfo?,
+    conversationModelName: String?,
     generating: Boolean,
     loraActive: Boolean,
+    hasMessages: Boolean,
     onModelClick: () -> Unit,
     onNewChat: () -> Unit,
     onHistory: () -> Unit,
     onLora: () -> Unit,
+    onDetails: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     TopAppBar(
@@ -54,7 +57,14 @@ fun ChatTopBar(
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
-        title = { ModelCard(model = model, generating = generating, onClick = onModelClick) },
+        title = {
+            ModelCard(
+                model = model,
+                fallbackModelName = conversationModelName,
+                generating = generating,
+                onClick = onModelClick,
+            )
+        },
         actions = {
             if (model?.supports_lora == true) {
                 IconButton(onClick = onLora) {
@@ -64,6 +74,11 @@ fun ChatTopBar(
                         tint = if (loraActive) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                     )
                 }
+            }
+            // Mirrors iOS ChatInterfaceView's info button (disabled until the
+            // chat has messages) that opens the analytics sheet.
+            IconButton(onClick = onDetails, enabled = hasMessages) {
+                Icon(RACIcons.Outline.InfoCircle, contentDescription = "Chat analytics")
             }
             IconButton(onClick = onHistory) {
                 Icon(RACIcons.Outline.History, contentDescription = "History")
@@ -76,12 +91,20 @@ fun ChatTopBar(
 }
 
 @Composable
-private fun ModelCard(model: RAModelInfo?, generating: Boolean, onClick: () -> Unit) {
+private fun ModelCard(
+    model: RAModelInfo?,
+    fallbackModelName: String?,
+    generating: Boolean,
+    onClick: () -> Unit,
+) {
     val dimens = LocalDimens.current
     val brand = model?.brand()
+    // Mirrors iOS loadConversation restore: with no model loaded, the
+    // conversation's recorded model is shown as a preselection (not loaded).
     val statusText = when {
         generating -> "Generating…"
         model != null -> "Ready"
+        fallbackModelName != null -> "Not loaded"
         else -> "Tap to choose"
     }
     val dotColor = when {
@@ -116,7 +139,7 @@ private fun ModelCard(model: RAModelInfo?, generating: Boolean, onClick: () -> U
 
             Column(modifier = Modifier.padding(end = dimens.spacingSm)) {
                 Text(
-                    text = model?.name ?: "Select Model",
+                    text = model?.name ?: fallbackModelName ?: "Select Model",
                     overflow = TextOverflow.Ellipsis,
                     maxLines = 1,
                     style = MaterialTheme.typography.titleMedium,

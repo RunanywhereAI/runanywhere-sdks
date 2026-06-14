@@ -21,10 +21,10 @@
 #define ALOGD(...) fprintf(stderr, __VA_ARGS__)
 #endif
 
-#include "rac/core/rac_core.h"
-#include "rac/core/rac_logger.h"
 #include "../common/rac_service_factory_internal.h"
 #include "features/llm/llm_thinking_directive_internal.h"
+#include "rac/core/rac_core.h"
+#include "rac/core/rac_logger.h"
 
 static const char* LOG_CAT = "LLM.Service";
 
@@ -53,14 +53,14 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     RAC_LOG_INFO(LOG_CAT, "Creating LLM service for: %s", model_id);
 
     rac::features::ResolvedModelReference model_ref;
-    rac_result_t result = rac::features::resolve_model_reference(
-        model_id,
-        {.log_cat = LOG_CAT,
-         .default_framework = RAC_FRAMEWORK_LLAMACPP,
-         .allow_null_model_id = false,
-         .lookup_last_path_component = true,
-         .prefer_input_path_when_contains = ".gguf"},
-        &model_ref);
+    rac_result_t result =
+        rac::features::resolve_model_reference(model_id,
+                                               {.log_cat = LOG_CAT,
+                                                .default_framework = RAC_FRAMEWORK_LLAMACPP,
+                                                .allow_null_model_id = false,
+                                                .lookup_last_path_component = true,
+                                                .prefer_input_path_when_contains = ".gguf"},
+                                               &model_ref);
     if (result != RAC_SUCCESS) {
         return result;
     }

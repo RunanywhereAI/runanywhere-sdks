@@ -29,7 +29,6 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeState
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
@@ -39,6 +38,7 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
 import com.runanywhere.sdk.public.events.EventBus
+import java.net.URL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -283,6 +283,20 @@ object RunAnywhere {
     }
 
     /**
+     * Initialize the RunAnywhere SDK using a typed [URL] for the backend base URL.
+     *
+     * Mirrors Swift's URL-typed overload while preserving the string-backed
+     * [SDKInitParams] contract used by the Android bridge.
+     */
+    fun initialize(
+        apiKey: String,
+        baseURL: URL,
+        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+    ) {
+        initialize(apiKey = apiKey, baseURL = baseURL.toString(), environment = environment)
+    }
+
+    /**
      * Initialize the RunAnywhere SDK with an Android [Context] (Android-specific
      * convenience overload). Absorbs the previously example-side
      * `AndroidPlatformContext.initialize(context)` call so callers do not need
@@ -309,6 +323,19 @@ object RunAnywhere {
         apiKey: String? = null,
         baseURL: String? = null,
         environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+    ) {
+        AndroidPlatformContext.initialize(context)
+        initialize(apiKey = apiKey, baseURL = baseURL, environment = environment)
+    }
+
+    /**
+     * Android [Context] convenience paired with the URL-typed backend overload.
+     */
+    fun initialize(
+        context: Context,
+        apiKey: String,
+        baseURL: URL,
+        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
     ) {
         AndroidPlatformContext.initialize(context)
         initialize(apiKey = apiKey, baseURL = baseURL, environment = environment)
@@ -373,6 +400,16 @@ object RunAnywhere {
                     )
                 logger.debug("SDK config initialized: linkedModels=${phase1Result.linked_models_count}")
 
+                // SDK config (rac_sdk_init). Idempotent state re-init is
+                // harmless; this call also wires up version/platform metadata
+                // that the Phase 1 proto does not touch.
+                CppBridgeState.initialize(
+                    environment = params.environment,
+                    apiKey = params.apiKey,
+                    baseURL = params.baseURL,
+                    deviceId = CppBridgeDevice.getDeviceIdCallback(),
+                )
+
                 _isInitialized = true
 
                 val initDurationMs = System.currentTimeMillis() - initStartTime
@@ -399,7 +436,7 @@ object RunAnywhere {
                 }
             } catch (error: Throwable) {
                 logger.error("Initialization failed: ${error.message}")
-                CppBridgeTelemetry.emitSDKInitFailed(SDKException.from(error))
+                CppBridgeSDKEvents.emitSDKInitFailed(SDKException.from(error))
                 // Roll back state on failure so a corrected retry can succeed.
                 _initParams = null
                 _currentEnvironment = null
@@ -618,8 +655,10 @@ object RunAnywhere {
             servicesInitJob?.cancel()
             servicesInitJob = null
 
-            // Shutdown CppBridge
+            // Shutdown CppBridge, then clear persisted C++ state + auth.
+            // Mirrors Swift reset(): CppBridge.shutdown() → CppBridge.State.shutdown().
             shutdownPlatformBridge()
+            CppBridgeState.shutdown()
 
             _isInitialized = false
             _areServicesReady = false

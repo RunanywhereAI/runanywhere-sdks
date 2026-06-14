@@ -11,12 +11,11 @@
 #include <cstring>
 #include <limits>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <nlohmann/json.hpp>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
@@ -87,8 +86,7 @@ static bool is_cache_valid() {
 // false) rejects a malformed body; the proto fetch path tries the binary
 // ModelInfoList / RefreshResult decoders before this JSON fallback runs.
 // ---------------------------------------------------------------------------
-static std::string json_first_string(const json& obj,
-                                     std::initializer_list<const char*> keys) {
+static std::string json_first_string(const json& obj, std::initializer_list<const char*> keys) {
     for (const char* key : keys) {
         const auto it = obj.find(key);
         if (it == obj.end() || it->is_null())
@@ -264,7 +262,6 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
     }
     return models;
 }
-
 
 // Copy models array for output
 static rac_result_t copy_models_to_output(const std::vector<rac_model_info_t*>& models,
@@ -910,7 +907,6 @@ static rac_result_t update_assignment_cache_from_proto_locked(const std::vector<
     return RAC_SUCCESS;
 }
 
-
 static bool parse_int_token(const std::string& token, int64_t* out) {
     if (!out || token.empty()) {
         return false;
@@ -1190,7 +1186,6 @@ static bool parse_assignment_json_models(const char* data, size_t len,
     }
     return true;
 }
-
 
 static rac_result_t parse_assignment_response_models(const char* data, size_t len,
                                                      std::vector<ModelInfo>* out_models,
