@@ -287,8 +287,8 @@ object CppBridgeDevConfig {
 object CppBridgeEndpoints {
     /** Fallback constants used when the native binding is unreachable.
      *  Mirror the canonical values in `rac_endpoints.h`. */
-    private const val FALLBACK_DEV_DEVICE_REGISTRATION: String = "/rest/v1/devices"
-    private const val FALLBACK_PROD_DEVICE_REGISTRATION: String = "/api/v1/devices"
+    private const val FALLBACK_DEV_DEVICE_REGISTRATION: String = "/rest/v1/sdk_devices"
+    private const val FALLBACK_PROD_DEVICE_REGISTRATION: String = "/api/v1/devices/register"
     private const val FALLBACK_MODEL_ASSIGNMENTS: String = "/api/v1/models/assignments"
 
     /** SDK authenticate endpoint. Mirrors Swift's `Endpoints.authenticate`. */
