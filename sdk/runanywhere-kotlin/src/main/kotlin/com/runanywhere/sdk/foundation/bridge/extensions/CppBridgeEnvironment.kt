@@ -289,7 +289,7 @@ object CppBridgeEndpoints {
      *  Mirror the canonical values in `rac_endpoints.h`. */
     private const val FALLBACK_DEV_DEVICE_REGISTRATION: String = "/rest/v1/sdk_devices"
     private const val FALLBACK_PROD_DEVICE_REGISTRATION: String = "/api/v1/devices/register"
-    private const val FALLBACK_MODEL_ASSIGNMENTS: String = "/api/v1/models/assignments"
+    private const val FALLBACK_MODEL_ASSIGNMENTS: String = "/api/v1/model-assignments/for-sdk"
 
     /** SDK authenticate endpoint. Mirrors Swift's `Endpoints.authenticate`. */
     val AUTHENTICATE: String?
