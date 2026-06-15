@@ -925,9 +925,13 @@ rac_result_t rac_diffusion_generate_proto(rac_handle_t handle, const uint8_t* op
     } else {
         rc = copy_proto(proto, out_result);
     }
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
-                       "diffusion.generate", 1.0f, nullptr,
-                       static_cast<double>(result.generation_time_ms), model_id);
+    if (rc == RAC_SUCCESS) {
+        publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
+                           "diffusion.generate", 1.0f, nullptr,
+                           static_cast<double>(result.generation_time_ms), model_id);
+    } else {
+        publish_failure(rc, "diffusion.generate", rac_error_message(rc));
+    }
     rac_diffusion_result_free(&result);
     free_options(&options);
     return rc;
@@ -984,9 +988,13 @@ rac_result_t rac_diffusion_generate_with_progress_proto(
     } else {
         rc = copy_proto(proto, out_result);
     }
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
-                       "diffusion.generate", 1.0f, nullptr,
-                       static_cast<double>(result.generation_time_ms), model_id);
+    if (rc == RAC_SUCCESS) {
+        publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
+                           "diffusion.generate", 1.0f, nullptr,
+                           static_cast<double>(result.generation_time_ms), model_id);
+    } else {
+        publish_failure(rc, "diffusion.generate", rac_error_message(rc));
+    }
     rac_diffusion_result_free(&result);
     free_options(&options);
     return rc;

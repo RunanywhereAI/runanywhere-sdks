@@ -660,6 +660,12 @@ rac_result_t rac_stt_stream_cancel_proto(uint64_t session_id) {
 
     rac_handle_t component_handle = nullptr;
     rac_handle_t backend_stream_handle = nullptr;
+    std::string request_id;
+    std::string language;
+    int32_t sample_rate = 0;
+    int64_t started_at_ms = 0;
+    uint64_t chunks_fed = 0;
+    uint64_t audio_bytes = 0;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
@@ -669,11 +675,47 @@ rac_result_t rac_stt_stream_cancel_proto(uint64_t session_id) {
         component_handle = it->second.handle;
         backend_stream_handle = it->second.backend_stream_handle;
         it->second.backend_stream_handle = nullptr;
+        request_id = it->second.request_id;
+        language = it->second.language;
+        sample_rate = it->second.sample_rate;
+        started_at_ms = it->second.started_at_ms;
+        chunks_fed = it->second.chunks_fed;
+        audio_bytes = it->second.audio_bytes;
         g_sessions().erase(it);
     }
     if (component_handle && backend_stream_handle) {
         (void)rac_stt_component_stream_destroy(component_handle, backend_stream_handle);
     }
+
+#if defined(RAC_HAVE_PROTOBUF)
+    // ONE telemetry summary per streaming session — mirror stop_proto, but mark
+    // the session FAILED. The Kotlin streaming path calls cancel (not stop) on
+    // cancellation/feed errors, so this is the only summary those sessions get.
+    if (chunks_fed > 0) {
+        const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                   std::chrono::system_clock::now().time_since_epoch())
+                                   .count();
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED);
+        if (const char* model_id = rac_stt_component_get_model_id(component_handle)) {
+            voice.set_model_id(model_id);
+        }
+        voice.set_is_streaming(true);
+        voice.set_audio_size_bytes(static_cast<int32_t>(audio_bytes));
+        if (started_at_ms > 0 && now_ms > started_at_ms) {
+            voice.set_duration_ms(now_ms - started_at_ms);
+        }
+        if (!language.empty()) {
+            voice.set_language(language);
+        }
+        if (sample_rate > 0) {
+            voice.set_sample_rate(sample_rate);
+        }
+        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                          runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
+                                          request_id.c_str());
+    }
+#endif
     return RAC_SUCCESS;
 }
 

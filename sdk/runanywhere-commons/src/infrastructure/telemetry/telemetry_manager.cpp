@@ -1063,6 +1063,9 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
         by_modality[modality].push_back(event);
     }
 
+    // Modalities whose batch failed to serialize — their events are re-queued
+    // below (retry on next flush) instead of being dropped.
+    std::map<std::string, bool> failed_modalities;
     for (const auto& pair : by_modality) {
         const std::string& modality = pair.first;
         const auto& modality_events = pair.second;
@@ -1078,9 +1081,10 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
         rac_result_t result =
             rac_telemetry_manager_batch_to_json(&batch, manager->environment, &json, &json_len);
         if (result != RAC_SUCCESS || !json) {
-            RAC_LOG_WARNING("Telemetry", "Dropping telemetry batch: JSON build failed (rc=%d, "
+            RAC_LOG_WARNING("Telemetry", "Re-queuing telemetry batch: JSON build failed (rc=%d, "
                             "modality=%s, %zu events)",
                             (int)result, modality.c_str(), modality_events.size());
+            failed_modalities[modality] = true;
             continue;
         }
 
@@ -1090,9 +1094,23 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
         free(json);
     }
 
-    // Free duplicated strings in events
-    for (auto& event : events) {
-        free_payload_strings(event);
+    // Free events that were sent; re-queue events whose batch failed to
+    // serialize so a transient failure retries on the next flush instead of
+    // silently dropping them.
+    if (failed_modalities.empty()) {
+        for (auto& event : events) {
+            free_payload_strings(event);
+        }
+    } else {
+        std::lock_guard<std::mutex> lock(manager->queue_mutex);
+        for (auto& event : events) {
+            const std::string modality = event.modality ? event.modality : "system";
+            if (failed_modalities.count(modality) > 0) {
+                manager->queue.push_back(event);  // shallow copy keeps owned strings
+            } else {
+                free_payload_strings(event);
+            }
+        }
     }
 
     return RAC_SUCCESS;
