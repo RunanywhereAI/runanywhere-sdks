@@ -229,6 +229,10 @@ void rac_telemetry_manager_destroy(rac_telemetry_manager_t* manager) {
     // Anything still queued (e.g. flush deferred pre-auth) is freed, not sent
     {
         std::lock_guard<std::mutex> lock(manager->queue_mutex);
+        if (!manager->queue.empty()) {
+            RAC_LOG_WARNING("Telemetry", "Dropping %zu unsent telemetry event(s) on destroy",
+                            manager->queue.size());
+        }
         for (auto& event : manager->queue) {
             free_payload_strings(event);
         }

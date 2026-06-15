@@ -29,6 +29,7 @@ import java.io.ByteArrayOutputStream
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.sqrt
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
@@ -52,7 +53,11 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
     private val playback = AudioPlaybackManager()
 
     suspend fun run() {
-        val chunks = Channel<ByteArray>(Channel.UNLIMITED)
+        val chunks =
+            Channel<ByteArray>(
+                capacity = MIC_CHANNEL_CAPACITY,
+                onBufferOverflow = BufferOverflow.DROP_OLDEST,
+            )
         capture.startRecording { chunk -> chunks.trySend(chunk) }
         logger.info("Voice-agent mic capture started")
         try {
@@ -174,6 +179,9 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
+            // Never swallow JVM Errors (OOM, StackOverflow, …) — rethrow so they
+            // propagate; only a recoverable exception counts as a failed turn.
+            if (e is Error) throw e
             logger.error("Voice turn threw: ${e.message}")
         }
 
@@ -264,6 +272,14 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
     private companion object {
         const val SAMPLE_RATE_HZ = 16_000
         const val BYTES_PER_SAMPLE = 2
+
+        /**
+         * Bounded mic ingress buffer. The capture callback trySends while the
+         * consumer pauses for the duration of each turn, so an unbounded channel
+         * could grow without limit on long turns. DROP_OLDEST bounds memory;
+         * chunks captured mid-turn are discarded anyway (no barge-in).
+         */
+        const val MIC_CHANNEL_CAPACITY = 128
 
         /** Absolute floor for the adaptive speech threshold (normalized RMS). */
         const val SPEECH_RMS_THRESHOLD = 0.015

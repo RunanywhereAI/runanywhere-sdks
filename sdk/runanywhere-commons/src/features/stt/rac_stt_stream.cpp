@@ -401,8 +401,10 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     if (first_chunk) {
         runanywhere::v1::VoiceLifecycleEvent voice;
         voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_TRANSCRIPTION_STARTED);
-        if (const char* model_id = rac_stt_component_get_model_id(component_handle)) {
-            voice.set_model_id(model_id);
+        if (component_handle) {
+            if (const char* model_id = rac_stt_component_get_model_id(component_handle)) {
+                voice.set_model_id(model_id);
+            }
         }
         voice.set_is_streaming(true);
         if (!language_buffer.empty()) {
@@ -630,8 +632,10 @@ rac_result_t rac_stt_stream_stop_proto(uint64_t session_id) {
                                    .count();
         runanywhere::v1::VoiceLifecycleEvent voice;
         voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED);
-        if (const char* model_id = rac_stt_component_get_model_id(component_handle)) {
-            voice.set_model_id(model_id);
+        if (component_handle) {
+            if (const char* model_id = rac_stt_component_get_model_id(component_handle)) {
+                voice.set_model_id(model_id);
+            }
         }
         voice.set_is_streaming(true);
         voice.set_audio_size_bytes(static_cast<int32_t>(audio_bytes));
@@ -697,8 +701,10 @@ rac_result_t rac_stt_stream_cancel_proto(uint64_t session_id) {
                                    .count();
         runanywhere::v1::VoiceLifecycleEvent voice;
         voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED);
-        if (const char* model_id = rac_stt_component_get_model_id(component_handle)) {
-            voice.set_model_id(model_id);
+        if (component_handle) {
+            if (const char* model_id = rac_stt_component_get_model_id(component_handle)) {
+                voice.set_model_id(model_id);
+            }
         }
         voice.set_is_streaming(true);
         voice.set_audio_size_bytes(static_cast<int32_t>(audio_bytes));

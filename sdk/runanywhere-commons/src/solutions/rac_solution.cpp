@@ -12,6 +12,7 @@
 #include <string>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 #include "rac/solutions/config_loader.hpp"
 #include "rac/solutions/operator_registry.hpp"
@@ -36,8 +37,15 @@ SolutionRunner* as_runner(rac_solution_handle_t h) {
 void ensure_engine_backed_operators_registered() {
     static std::once_flag once;
     std::call_once(once, [] {
-        rac::solutions::register_engine_backed_operators(
+        const std::size_t registered = rac::solutions::register_engine_backed_operators(
             rac::solutions::OperatorRegistry::instance());
+        if (registered == 0) {
+            RAC_LOG_WARNING("Solutions",
+                            "register_engine_backed_operators registered 0 operators; "
+                            "engine-backed solution steps will fail to build");
+        } else {
+            RAC_LOG_DEBUG("Solutions", "Registered %zu engine-backed operators", registered);
+        }
     });
 }
 

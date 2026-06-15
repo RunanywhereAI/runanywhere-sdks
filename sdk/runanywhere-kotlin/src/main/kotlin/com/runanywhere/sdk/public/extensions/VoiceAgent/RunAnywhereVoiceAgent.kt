@@ -254,6 +254,13 @@ suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult
  * Setup failures (SDK not initialized, services not ready, handle or mic
  * acquisition) propagate to the collector so callers can surface them —
  * they are not swallowed silently.
+ *
+ * Behavior change: earlier builds returned a silent/empty flow when a setup
+ * step failed; collectors now observe the exception instead. Wrap collection
+ * in try/catch (or `Flow.catch`) to handle it.
+ *
+ * @throws SDKException when the SDK is not initialized, or voice-agent
+ *   services/handle cannot be acquired (delivered to the flow collector).
  */
 fun RunAnywhere.streamVoiceAgent(): Flow<VoiceEvent> =
     flow {
