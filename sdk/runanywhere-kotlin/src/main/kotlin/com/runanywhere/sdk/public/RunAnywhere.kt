@@ -38,6 +38,7 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
 import com.runanywhere.sdk.public.events.EventBus
+import java.net.URL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,7 +46,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.net.URL
+import kotlinx.coroutines.withContext
 
 /**
  * The RunAnywhere SDK - Single entry point for on-device AI
@@ -110,6 +111,18 @@ object RunAnywhere {
      */
     @Volatile
     private var _httpSetupApplicable: Boolean = true
+
+    /**
+     * Monotonic timestamp of the last HTTP/auth retry attempted by
+     * [ensureServicesReady]. Debounces the recovery path so a backend that
+     * never converges does not add a network round-trip to every API call.
+     * 0 = never attempted (retry immediately).
+     */
+    @Volatile
+    private var lastHttpRetryAtNs: Long = 0L
+
+    /** Minimum interval between HTTP/auth retries from [ensureServicesReady]. */
+    private const val HTTP_RETRY_MIN_INTERVAL_NS: Long = 30_000_000_000L // 30s
 
     private val lock = Any()
     private val servicesMutex = Mutex()
@@ -431,6 +444,7 @@ object RunAnywhere {
                 _areServicesReady = false
                 _hasCompletedHTTPSetup = false
                 _httpSetupApplicable = true
+                lastHttpRetryAtNs = 0L
                 servicesInitJob = null
                 CppBridgeState.reset()
                 throw error
@@ -564,8 +578,20 @@ object RunAnywhere {
             // can succeed once connectivity returns. When HTTP is not applicable
             // (local-only / no external config), skip: retrying would re-run the
             // whole Phase 2 bootstrap on every API call and never converge.
+            //
+            // The retry is a synchronous network round-trip through commons.
+            // Hop to IO — public API entries are routinely called from the
+            // main thread, and an unreachable backend would otherwise freeze
+            // the UI for a connect-timeout on every call. Debounced so the
+            // never-converging case does not add a network round-trip to
+            // every API call.
             if (!_hasCompletedHTTPSetup && _httpSetupApplicable) {
-                retryHTTPSetup()
+                val nowNs = System.nanoTime()
+                val lastNs = lastHttpRetryAtNs
+                if (lastNs == 0L || nowNs - lastNs >= HTTP_RETRY_MIN_INTERVAL_NS) {
+                    lastHttpRetryAtNs = nowNs
+                    withContext(Dispatchers.IO) { retryHTTPSetup() }
+                }
             }
             return
         }
@@ -638,6 +664,7 @@ object RunAnywhere {
             _areServicesReady = false
             _hasCompletedHTTPSetup = false
             _httpSetupApplicable = true
+            lastHttpRetryAtNs = 0L
             _currentEnvironment = null
             _initParams = null
         }

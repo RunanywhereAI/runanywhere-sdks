@@ -42,8 +42,9 @@ typedef struct rac_telemetry_payload {
     int64_t timestamp_ms;    // Unix timestamp in milliseconds
     int64_t created_at_ms;   // When payload was created
 
-    // Event classification
-    const char* modality;  // "llm", "stt", "tts", "model", "system"
+    // Event classification — one V2 backend endpoint per value:
+    // "llm", "stt", "tts", "vlm", "rag", "imagegen", "system", "model".
+    const char* modality;
 
     // Device identification
     const char* device_id;   // Persistent device UUID
@@ -100,9 +101,28 @@ typedef struct rac_telemetry_payload {
     // Model lifecycle fields
     int64_t model_size_bytes;
     const char* archive_type;
+    double progress;          // Download/extract progress 0..100 (model modality)
+    rac_bool_t has_progress;  // Whether progress field is set
+
+    // VLM-specific fields (VLM also carries the LLM token fields above)
+    int32_t image_count;
+
+    // RAG-specific fields
+    int32_t retrieved_docs_count;
+
+    // Embeddings-specific fields (embedding_model is read from model_id)
+    int32_t input_count;       // texts embedded in the op
+    int32_t vectors_produced;  // vectors returned
+
+    // Voice-agent per-turn pipeline fields (from MetricsEvent)
+    double voice_stt_ms;
+    double voice_llm_ms;
+    double voice_tts_ms;
+    double voice_total_ms;
 
     // VAD fields
     double speech_duration_ms;
+    double silence_duration_ms;
 
     // SDK lifecycle fields
     int32_t count;
@@ -132,16 +152,16 @@ RAC_API void rac_telemetry_payload_free(rac_telemetry_payload_t* payload);
 /**
  * @brief Batch telemetry request for API
  *
- * Supports both V1 and V2 storage paths:
- * - V1 (legacy): modality = NULL → stores in sdk_telemetry_events table
- * - V2 (normalized): modality = "llm"/"stt"/"tts"/"model" → normalized tables
+ * One batch per modality. The modality is encoded in the endpoint path
+ * (/api/v2/sdk/telemetry/{modality}), not in the body — the backend batch
+ * schema is extra="forbid".
  */
 typedef struct rac_telemetry_batch_request {
     rac_telemetry_payload_t* events;
     size_t events_count;
     const char* device_id;
     int64_t timestamp_ms;
-    const char* modality;  // NULL for V1, "llm"/"stt"/"tts"/"model" for V2
+    const char* modality;  // V2 modality segment: "llm"/"stt"/"tts"/"vlm"/etc.
 } rac_telemetry_batch_request_t;
 
 /**

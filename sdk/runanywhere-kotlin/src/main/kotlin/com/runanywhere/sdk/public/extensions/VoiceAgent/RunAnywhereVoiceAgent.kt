@@ -20,6 +20,7 @@ import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import ai.runanywhere.proto.v1.VoiceEvent
 import com.runanywhere.sdk.adapters.VoiceAgentStreamAdapter
+import com.runanywhere.sdk.features.VoiceAgent.Services.VoiceAgentMicDriver
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -27,10 +28,12 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
 import com.runanywhere.sdk.public.types.RAVoiceAgentComposeConfig
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 
 /**
  * Canonical alias: the proto `VoiceAgentComponentStates` is the `ComponentStates`
@@ -241,24 +244,35 @@ suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult
  * Open a stream of canonical [VoiceEvent] proto events for the active
  * voice agent.
  *
- * Mirrors Swift `streamVoiceAgent()`: when the SDK is not initialized, or
- * when service readiness / handle creation fails, the returned flow
- * finishes silently without emitting. Cancelling the collector tears down
- * the underlying C callback via [VoiceAgentStreamAdapter].
+ * The C ABI owns no microphone (rac_voice_agent.h audio-ingress contract):
+ * subscribing to the handle callback alone is dead air. While the returned
+ * flow is collected, a [VoiceAgentMicDriver] captures mic audio, segments
+ * utterances, and drives per-utterance turns whose VoiceEvents fan out to
+ * this same handle callback. Cancelling the collector stops capture and
+ * tears down the underlying C callback via [VoiceAgentStreamAdapter].
+ *
+ * Setup failures (SDK not initialized, services not ready, handle or mic
+ * acquisition) propagate to the collector so callers can surface them —
+ * they are not swallowed silently.
+ *
+ * Behavior change: earlier builds returned a silent/empty flow when a setup
+ * step failed; collectors now observe the exception instead. Wrap collection
+ * in try/catch (or `Flow.catch`) to handle it.
+ *
+ * @throws SDKException when the SDK is not initialized, or voice-agent
+ *   services/handle cannot be acquired (delivered to the flow collector).
  */
 fun RunAnywhere.streamVoiceAgent(): Flow<VoiceEvent> =
     flow {
-        if (!isInitialized) return@flow
-
-        val handle =
+        if (!isInitialized) throw notInitializedException()
+        ensureServicesReady()
+        val handle = CppBridgeVoiceAgent.getHandle()
+        coroutineScope {
+            val driver = launch(Dispatchers.IO) { VoiceAgentMicDriver(handle).run() }
             try {
-                ensureServicesReady()
-                CppBridgeVoiceAgent.getHandle()
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Throwable) {
-                return@flow
+                emitAll(VoiceAgentStreamAdapter(handle).stream())
+            } finally {
+                driver.cancel()
             }
-
-        emitAll(VoiceAgentStreamAdapter(handle).stream())
+        }
     }

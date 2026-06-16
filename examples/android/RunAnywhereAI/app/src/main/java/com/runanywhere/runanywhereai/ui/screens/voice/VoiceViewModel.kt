@@ -17,7 +17,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
-enum class VoiceState { IDLE, LISTENING, TRANSCRIBING, THINKING, SPEAKING }
+enum class VoiceState { IDLE, STARTING, LISTENING, TRANSCRIBING, THINKING, SPEAKING }
 
 data class VoiceTurn(val text: String, val isUser: Boolean)
 
@@ -40,10 +40,11 @@ class VoiceViewModel : ViewModel() {
     }
 
     private fun startConversation() {
+        job?.cancel()
         error = null
         job = viewModelScope.launch {
             try {
-                state = VoiceState.TRANSCRIBING
+                state = VoiceState.STARTING
                 RunAnywhere.initializeVoiceAgentWithLoadedModels()
                 state = VoiceState.LISTENING
                 RunAnywhere.streamVoiceAgent().collect(::handleEvent)

@@ -42,6 +42,7 @@
 #include "vlm_options.pb.h"
 
 #include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 static const char* LOG_CAT = "VLM.Component";
@@ -979,16 +980,17 @@ void populate_envelope(runanywhere::v1::SDKEvent* event, runanywhere::v1::ErrorS
 }
 
 void publish_event(const runanywhere::v1::SDKEvent& event) {
-    const size_t size = event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
-    }
+    // Route through the destination router (sdk_event_publish) so the envelope's
+    // TELEMETRY destination bit reaches the telemetry manager. A direct
+    // rac_sdk_event_publish_proto call feeds only the PUBLIC stream, so these
+    // capability events would never be recorded as telemetry.
+    (void)rac::events::publish_prebuilt(event);
 }
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         float progress, int64_t input_count, int64_t output_count,
-                        const char* error) {
+                        const char* error, double duration_ms = 0.0,
+                        const char* model_id = nullptr) {
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, (error != nullptr && error[0] != '\0')
                                   ? runanywhere::v1::ERROR_SEVERITY_ERROR
@@ -996,6 +998,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
+    if (model_id != nullptr && model_id[0] != '\0') {
+        cap->set_model_id(model_id);
+    }
     if (operation) {
         event.set_operation_id(operation);
         cap->set_operation(operation);
@@ -1005,6 +1010,11 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     cap->set_output_count(output_count);
     if (error)
         cap->set_error(error);
+    // CapabilityOperationEvent has no duration field; telemetry reads it from
+    // the envelope properties map (see telemetry_manager kCapability extraction).
+    if (duration_ms > 0.0) {
+        (*event.mutable_properties())["duration_ms"] = std::to_string(duration_ms);
+    }
     publish_event(event);
 }
 
@@ -1339,7 +1349,8 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_pro
     }
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED, "vlm.process",
-                       0.0f, 1, 0, nullptr);
+                       0.0f, 1, 0, nullptr, 0.0,
+                       have_lifecycle ? lifecycle_ref.model_id : nullptr);
 
     rac_vlm_result_t result = {};
     if (have_lifecycle) {
@@ -1370,7 +1381,9 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_pro
         rc = copy_proto(proto, out_result);
     }
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                       "vlm.process", 1.0f, 1, proto.completion_tokens(), nullptr);
+                       "vlm.process", 1.0f, 1, proto.completion_tokens(), nullptr,
+                       static_cast<double>(proto.processing_time_ms()),
+                       have_lifecycle ? lifecycle_ref.model_id : nullptr);
     rac_vlm_result_free(&result);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
@@ -1481,7 +1494,7 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
 
     rac::vlm::clear_lifecycle_vlm_cancel(&ref);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED, "vlm.generate",
-                       0.0f, 1, 0, nullptr);
+                       0.0f, 1, 0, nullptr, 0.0, ref.model_id);
 
     rac_vlm_result_t raw = {};
     rc = (ref.ops && ref.ops->process) ? ref.ops->process(ref.impl, &image, prompt, &options, &raw)
@@ -1503,7 +1516,8 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
         rc = copy_proto(result, out_result);
     }
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                       "vlm.generate", 1.0f, 1, result.completion_tokens(), nullptr);
+                       "vlm.generate", 1.0f, 1, result.completion_tokens(), nullptr,
+                       static_cast<double>(result.processing_time_ms()), ref.model_id);
     rac_vlm_result_free(&raw);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
@@ -1569,7 +1583,7 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
 
     rac::vlm::clear_lifecycle_vlm_cancel(&ref);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED, "vlm.stream",
-                       0.0f, 1, 0, nullptr);
+                       0.0f, 1, 0, nullptr, 0.0, ref.model_id);
 
     GeneratedStreamCtx ctx;
     ctx.callback = callback;
@@ -1605,7 +1619,8 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
         dispatch_vlm_terminal_once(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED, &result,
                                    nullptr, 0);
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                           "vlm.stream", 1.0f, 1, ctx.token_count, nullptr);
+                           "vlm.stream", 1.0f, 1, ctx.token_count, nullptr,
+                           static_cast<double>(elapsed_ms), ref.model_id);
     }
 
     free_vlm_image(&image);

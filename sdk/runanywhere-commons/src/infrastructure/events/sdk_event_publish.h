@@ -52,6 +52,20 @@ rac_result_t publish(runanywhere::v1::SDKEvent& event, runanywhere::v1::SDKCompo
                      runanywhere::v1::EventCategory category);
 
 // ---------------------------------------------------------------------------
+// Publish an already-fully-populated SDKEvent. Unlike publish() above this does
+// NOT stamp envelope metadata — the caller owns id/timestamp/component/category/
+// destination. It serializes the event once, feeds the PUBLIC sink when the
+// PUBLIC destination bit is set, then routes to the TELEMETRY + LOG sinks per
+// the destination bitmask (same dual-sink path as publish()).
+//
+// This is the funnel feature modules use for proto events they build by hand
+// (LLM generation, VLM/RAG capability ops). Going through here is what gets the
+// event to the telemetry sink — calling rac_sdk_event_publish_proto directly
+// feeds the PUBLIC sink only and silently drops telemetry.
+// ---------------------------------------------------------------------------
+rac_result_t publish_prebuilt(const runanywhere::v1::SDKEvent& event);
+
+// ---------------------------------------------------------------------------
 // Typed overloads — one per SDKEvent oneof arm. Each moves the strongly-typed
 // per-component payload into the matching oneof arm, then stamps + publishes
 // via the core overload above. This is the canonical "publish(component,

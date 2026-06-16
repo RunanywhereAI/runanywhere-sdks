@@ -257,6 +257,7 @@ bool try_reconcile_model_local_path_locked(rac_model_registry_handle_t handle,
     }
     const char* base = rac_model_paths_get_base_dir();
     if (!base || *base == '\0') {
+        RAC_LOG_WARNING("ModelRegistry", "Reconcile miss '%s': base_dir not configured", model->id);
         return false;
     }
     const std::filesystem::path folder = canonical_model_folder_for(model->id, model->framework);

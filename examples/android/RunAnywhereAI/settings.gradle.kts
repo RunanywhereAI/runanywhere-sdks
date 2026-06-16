@@ -17,8 +17,10 @@ plugins {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        mavenLocal() // RunAnywhere SDK published locally via publishToMavenLocal
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") } // SDK transitive deps: android-vad, PRDownloader
     }
 }
 

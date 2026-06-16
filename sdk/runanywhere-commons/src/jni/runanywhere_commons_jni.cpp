@@ -1521,6 +1521,19 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
                                              : nullptr;
     g_c_adapter.user_data = nullptr;
 
+    // Install the populated struct as the commons-wide platform adapter
+    // (mirrors Swift's CppBridge.PlatformAdapter.register()). Without this,
+    // rac_get_platform_adapter() stays NULL for the whole process — the
+    // legacy racInit() was the only caller and the Kotlin SDK's phase1-proto
+    // init flow never invokes it — so every adapter-dependent commons path
+    // (RAC_LOG forwarding to logcat, registry filesystem reconcile,
+    // is_downloaded directory probes) silently no-ops.
+    const rac_result_t adapter_rc = rac_set_platform_adapter(&g_c_adapter);
+    if (adapter_rc != RAC_SUCCESS) {
+        LOGe("racSetPlatformAdapter: rac_set_platform_adapter failed: %d", (int)adapter_rc);
+        return adapter_rc;
+    }
+
     LOGi("racSetPlatformAdapter: adapter set successfully");
     return RAC_SUCCESS;
 }
@@ -2339,37 +2352,61 @@ static void jni_device_get_info(rac_device_registration_info_t* out_info, void* 
         try {
             auto j = nlohmann::json::parse(json_str);
 
+            // `j.value(key, def)` throws type_error if the key is present but
+            // null (Kotlin emits null for absent optionals such as battery_state).
+            // An unguarded throw here aborts the whole block, leaving the integer
+            // fields below at 0 and tripping the backend's `total_memory > 0` /
+            // `core_count > 0` checks. Read each field by type so a single
+            // null/wrong-type value falls back to its default instead.
+            auto str_field = [&j](const char* key) -> std::string {
+                auto it = j.find(key);
+                return (it != j.end() && it->is_string()) ? it->get<std::string>()
+                                                          : std::string("");
+            };
+            auto i64_field = [&j](const char* key) -> int64_t {
+                auto it = j.find(key);
+                return (it != j.end() && it->is_number()) ? it->get<int64_t>() : (int64_t)0;
+            };
+            auto i32_field = [&j](const char* key) -> int32_t {
+                auto it = j.find(key);
+                return (it != j.end() && it->is_number()) ? it->get<int32_t>() : (int32_t)0;
+            };
+            auto bool_field = [&j](const char* key) -> bool {
+                auto it = j.find(key);
+                return (it != j.end() && it->is_boolean()) ? it->get<bool>() : false;
+            };
+
             // Extract all string fields from Kotlin's getDeviceInfoCallback() JSON
-            g_device_info_strings.device_id = j.value("device_id", std::string(""));
-            g_device_info_strings.device_model = j.value("device_model", std::string(""));
-            g_device_info_strings.device_name = j.value("device_name", std::string(""));
-            g_device_info_strings.platform = j.value("platform", std::string(""));
-            g_device_info_strings.os_version = j.value("os_version", std::string(""));
-            g_device_info_strings.form_factor = j.value("form_factor", std::string(""));
-            g_device_info_strings.architecture = j.value("architecture", std::string(""));
-            g_device_info_strings.chip_name = j.value("chip_name", std::string(""));
-            g_device_info_strings.gpu_family = j.value("gpu_family", std::string(""));
-            g_device_info_strings.battery_state = j.value("battery_state", std::string(""));
-            g_device_info_strings.device_fingerprint =
-                j.value("device_fingerprint", std::string(""));
-            g_device_info_strings.manufacturer = j.value("manufacturer", std::string(""));
+            g_device_info_strings.device_id = str_field("device_id");
+            g_device_info_strings.device_model = str_field("device_model");
+            g_device_info_strings.device_name = str_field("device_name");
+            g_device_info_strings.platform = str_field("platform");
+            g_device_info_strings.os_version = str_field("os_version");
+            g_device_info_strings.form_factor = str_field("form_factor");
+            g_device_info_strings.architecture = str_field("architecture");
+            g_device_info_strings.chip_name = str_field("chip_name");
+            g_device_info_strings.gpu_family = str_field("gpu_family");
+            g_device_info_strings.battery_state = str_field("battery_state");
+            g_device_info_strings.device_fingerprint = str_field("device_fingerprint");
+            g_device_info_strings.manufacturer = str_field("manufacturer");
 
             // Extract integer fields
-            out_info->total_memory = j.value("total_memory", (int64_t)0);
-            out_info->available_memory = j.value("available_memory", (int64_t)0);
-            out_info->neural_engine_cores = j.value("neural_engine_cores", (int32_t)0);
-            out_info->core_count = j.value("core_count", (int32_t)0);
-            out_info->performance_cores = j.value("performance_cores", (int32_t)0);
-            out_info->efficiency_cores = j.value("efficiency_cores", (int32_t)0);
+            out_info->total_memory = i64_field("total_memory");
+            out_info->available_memory = i64_field("available_memory");
+            out_info->neural_engine_cores = i32_field("neural_engine_cores");
+            out_info->core_count = i32_field("core_count");
+            out_info->performance_cores = i32_field("performance_cores");
+            out_info->efficiency_cores = i32_field("efficiency_cores");
 
             // Extract boolean fields
-            out_info->has_neural_engine =
-                j.value("has_neural_engine", false) ? RAC_TRUE : RAC_FALSE;
-            out_info->is_low_power_mode =
-                j.value("is_low_power_mode", false) ? RAC_TRUE : RAC_FALSE;
+            out_info->has_neural_engine = bool_field("has_neural_engine") ? RAC_TRUE : RAC_FALSE;
+            out_info->is_low_power_mode = bool_field("is_low_power_mode") ? RAC_TRUE : RAC_FALSE;
 
             // Extract float field for battery
-            out_info->battery_level = j.value("battery_level", 0.0f);
+            auto battery_it = j.find("battery_level");
+            out_info->battery_level =
+                (battery_it != j.end() && battery_it->is_number()) ? battery_it->get<float>()
+                                                                   : 0.0f;
         } catch (const nlohmann::json::exception& e) {
             LOGe("Failed to parse device info JSON: %s", e.what());
         }
@@ -7285,15 +7322,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointDeviceRegist
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointTelemetry(JNIEnv* env,
-                                                                              jclass clazz,
-                                                                              jint envValue) {
-    (void)clazz;
-    const char* path = rac_endpoint_telemetry(static_cast<rac_environment_t>(envValue));
-    return path != nullptr ? env->NewStringUTF(path) : nullptr;
-}
-
-JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointModelAssignments(JNIEnv* env,
                                                                                      jclass clazz) {
     (void)clazz;
@@ -7634,9 +7662,13 @@ void rac_jni_erase_vad_listeners(JNIEnv* env, uintptr_t handle_key) {
 // XCFramework (RABackendLlamaCPP, RABackendONNX).
 // =============================================================================
 
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformRegisterSystemTts(
-    JNIEnv* env, jclass clazz) {
+// NOTE: this and racPlatformUnregister live AFTER the file's `extern "C"` block
+// (closed at the platform-TTS section), so they must declare C linkage
+// individually — otherwise the C++ compiler mangles the JNI export name and the
+// runtime fails with "No implementation found for ...racPlatformRegisterSystemTts".
+extern "C" JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformRegisterSystemTts(JNIEnv* env,
+                                                                                     jclass clazz) {
     (void)env;
     (void)clazz;
 
@@ -7667,7 +7699,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformRegisterSyst
     return static_cast<jint>(result);
 }
 
-JNIEXPORT jint JNICALL
+extern "C" JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformUnregister(JNIEnv* env,
                                                                                jclass clazz) {
     (void)env;

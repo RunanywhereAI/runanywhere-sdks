@@ -80,6 +80,11 @@ rac_result_t publish(runanywhere::v1::SDKEvent& event, runanywhere::v1::SDKCompo
         event.set_source("cpp");
     }
 
+    // Envelope is stamped; emit through the shared serialize + dual-sink path.
+    return publish_prebuilt(event);
+}
+
+rac_result_t publish_prebuilt(const runanywhere::v1::SDKEvent& event) {
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
     if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
@@ -89,15 +94,14 @@ rac_result_t publish(runanywhere::v1::SDKEvent& event, runanywhere::v1::SDKCompo
     const int32_t dest = static_cast<int32_t>(event.destination());
 
     // PUBLIC sink: the canonical app-facing proto stream. Fed whenever the
-    // PUBLIC bit is set (which ALL also satisfies). UNSPECIFIED was normalized
-    // to ALL above, so this also covers the default.
+    // PUBLIC bit is set (which ALL also satisfies).
     rac_result_t result = RAC_SUCCESS;
     if (dest & static_cast<int32_t>(runanywhere::v1::EVENT_DESTINATION_PUBLIC)) {
-        result = rac_sdk_event_publish_proto(bytes.data(), bytes.size());
+        result = rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
     }
 
     // TELEMETRY + LOG sinks.
-    route(event, bytes.data(), bytes.size());
+    route(event, bytes.empty() ? nullptr : bytes.data(), bytes.size());
 
     return result;
 }

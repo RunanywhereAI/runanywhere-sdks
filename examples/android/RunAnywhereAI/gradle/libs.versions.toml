@@ -6,10 +6,10 @@
 [versions]
 # Build & language
 agp = "9.2.1"
-kotlin = "2.3.21"
+kotlin = "2.4.0"
 
 # AndroidX core
-coreKtx = "1.18.0"
+coreKtx = "1.19.0"
 activityCompose = "1.13.0"
 lifecycleRuntimeKtx = "2.10.0"
 
@@ -22,6 +22,11 @@ composeBom = "2026.05.01"
 # Navigation & serialization
 navigationCompose = "2.9.8"
 kotlinxSerializationJson = "1.11.0"
+
+# Coroutines — must match the version the RunAnywhere SDK AAR is compiled against
+# (sdk/runanywhere-kotlin coroutines = 1.11.0); a lower transitive version is
+# missing SendChannel.close$default / Job.cancel$default at runtime.
+coroutines = "1.11.0"
 
 # Testing
 junit = "4.13.2"
@@ -61,6 +66,9 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 # Navigation & serialization
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+
+# Coroutines
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 
 # Proto3
 proto-wire-runtime = { group = "com.squareup.wire", name = "wire-runtime", version.ref = "wire" }

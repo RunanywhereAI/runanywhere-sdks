@@ -38,6 +38,7 @@
 #include "sdk_events.pb.h"
 
 #include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 static const char* LOG_CAT = "Embeddings.Component";
@@ -366,16 +367,16 @@ rac_result_t check_model_id(const std::string& requested, const char* loaded, co
 }
 
 void publish_event(const runanywhere::v1::SDKEvent& event) {
-    const size_t size = event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
-    }
+    // Route through the destination router (sdk_event_publish) so the envelope's
+    // TELEMETRY destination bit reaches the telemetry manager. A direct
+    // rac_sdk_event_publish_proto call feeds only the PUBLIC stream, so these
+    // capability events would never be recorded as telemetry.
+    (void)rac::events::publish_prebuilt(event);
 }
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         float progress, int64_t input_count, int64_t output_count,
-                        const char* error) {
+                        const char* error, double duration_ms = 0.0) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -398,6 +399,11 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     cap->set_output_count(output_count);
     if (error)
         cap->set_error(error);
+    // CapabilityOperationEvent has no duration field; telemetry reads it from
+    // the envelope properties map (see telemetry_manager kCapability extraction).
+    if (duration_ms > 0.0) {
+        (*event.mutable_properties())["duration_ms"] = std::to_string(duration_ms);
+    }
     publish_event(event);
 }
 
@@ -509,7 +515,8 @@ rac_result_t rac_embeddings_embed_batch_proto(rac_handle_t handle,
     rc = copy_proto(proto, out_result);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED,
                        "embeddings.embedBatch", 1.0f, static_cast<int64_t>(texts.size()),
-                       proto.vectors_size(), nullptr);
+                       proto.vectors_size(), nullptr,
+                       static_cast<double>(result.processing_time_ms));
     rac_embeddings_result_free(&result);
     return rc;
 #endif

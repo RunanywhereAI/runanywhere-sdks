@@ -16,6 +16,7 @@ import com.runanywhere.sdk.hybrid.AndroidDeviceStateProvider
 import com.runanywhere.sdk.hybrid.HybridDeviceState
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.setDebugMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -70,7 +71,15 @@ class RunAnywhereApplication : Application() {
         // and fail with -422 "No provider could handle the request" (same ordering as iOS).
         LlamaCPP.register()
         ONNX.register()
-        RunAnywhere.initialize(environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT)
+        RunAnywhere.initialize(
+            apiKey = BuildConfig.RUNANYWHERE_API_KEY,
+            baseURL = BuildConfig.RUNANYWHERE_BASE_URL,
+            environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+        )
+        // Production env disables SDK console logging entirely; without this
+        // debug builds emit zero SDK logs to logcat, which makes on-device
+        // issues (voice/STT/VLM) undiagnosable.
+        if (BuildConfig.DEBUG) RunAnywhere.setDebugMode(true)
         HybridDeviceState.setProvider(AndroidDeviceStateProvider(applicationContext))
         ModelBootstrap.setupModels()
         CloudProviderRepository.registerAll()

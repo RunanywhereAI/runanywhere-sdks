@@ -368,7 +368,13 @@ cd examples/android/RunAnywhereAI/
 ./scripts/verify.sh            # Full build gate
 ```
 
-Consumes the SDK as prebuilt AARs in `examples/android/RunAnywhereAI/libs/`. Stage them with `./scripts/stage-sdk-aars.sh [debug|release]` (from the example dir), which builds the SDK in `sdk/runanywhere-kotlin/` and copies the AARs over.
+Consumes the SDK + engine modules (`runanywhere-sdk` / `runanywhere-llamacpp` / `runanywhere-onnx`) from Maven Local by coordinate, so their POMs supply transitive runtime deps. Discrete steps:
+- `./run sdk commons build-android` — build the commons `.so` for all Android ABIs.
+- `./run example android stage` — publish SDK + engine modules to `~/.m2` (`publishToMavenLocal`, `useLocalNatives=true` so the local commons natives are embedded).
+- `./run example android build` — `assembleDebug`.
+- `./run example android install` — install the built APK + launch.
+
+Re-run `build-android` + `stage` after any change to C++ commons or the Kotlin SDK.
 
 ### Flutter Example
 

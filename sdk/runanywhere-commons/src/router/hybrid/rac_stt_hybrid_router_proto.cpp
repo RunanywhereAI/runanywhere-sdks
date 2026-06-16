@@ -71,12 +71,17 @@ void rac_stt_hybrid_router_proto_buffer_free(uint8_t* response_bytes) {
 
 #include "hybrid_router.pb.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
 
+#include "sdk_events.pb.h"
+
+#include "infrastructure/events/sdk_event_publish.h"
 #include "rac/core/rac_audio_utils.h"
+#include "rac/core/rac_error.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/router/hybrid/rac_hybrid_device_state.h"
@@ -86,6 +91,44 @@ void rac_stt_hybrid_router_proto_buffer_free(uint8_t* response_bytes) {
 namespace v1 = ::runanywhere::v1;
 
 namespace {
+
+// Emit one STT telemetry event for a hybrid transcribe. The router invokes the
+// engine vtable directly (no lifecycle-proto path), so without this the hybrid
+// STT path produces no telemetry. Routes through the events layer → "stt"
+// modality. model_id carries the backend that actually served the request
+// (on-device id or cloud id), so cloud-vs-local is visible. The dedicated
+// routed_backend/was_fallback columns need a VoiceLifecycleEvent proto field to
+// populate end-to-end (deferred — would require regenerating bindings).
+void emit_hybrid_stt_telemetry(const rac_stt_result_t& result,
+                               const rac_hybrid_routed_metadata_t& meta, rac_result_t rc,
+                               const char* language, int32_t sample_rate) {
+    const bool ok = (rc == RAC_SUCCESS);
+    v1::VoiceLifecycleEvent voice;
+    voice.set_kind(ok ? v1::VOICE_EVENT_KIND_STT_COMPLETED : v1::VOICE_EVENT_KIND_STT_FAILED);
+    if (meta.chosen_model_id[0] != '\0') {
+        voice.set_model_id(meta.chosen_model_id);
+    }
+    if (ok && result.text != nullptr && result.text[0] != '\0') {
+        voice.set_text(result.text);
+    }
+    if (!std::isnan(meta.confidence) && meta.confidence > 0.0f) {
+        voice.set_confidence(meta.confidence);
+    }
+    if (result.processing_time_ms > 0) {
+        voice.set_duration_ms(static_cast<int64_t>(result.processing_time_ms));
+    }
+    if (language != nullptr && language[0] != '\0') {
+        voice.set_language(language);
+    }
+    if (sample_rate > 0) {
+        voice.set_sample_rate(sample_rate);
+    }
+    if (!ok) {
+        voice.set_error(rac_error_message(rc));
+    }
+    rac::events::publish_with_session(v1::SDK_COMPONENT_STT, v1::EVENT_CATEGORY_STT,
+                                      std::move(voice), nullptr);
+}
 
 void parse_descriptor(const uint8_t* bytes, size_t size, rac_hybrid_model_descriptor_t& out) {
     std::memset(&out, 0, sizeof(out));
@@ -351,8 +394,11 @@ rac_result_t rac_stt_hybrid_router_transcribe_proto(rac_handle_t handle,
         handle, &ctx, audio_data, audio_size, &options, &result, &meta);
     rac_free(owned_wav);
 
-    const rac_result_t encode_rc =
-        build_response_bytes(result, meta, transcribe_rc, out_response_bytes, out_response_size);
+    // Hybrid STT bypasses the lifecycle-proto path, so emit telemetry here.
+    emit_hybrid_stt_telemetry(result, meta, transcribe_rc, options.language, options.sample_rate);
+
+    const rac_result_t encode_rc = build_response_bytes(
+        result, meta, transcribe_rc, out_response_bytes, out_response_size);
     rac_stt_result_free(&result);
     if (encode_rc != RAC_SUCCESS) {
         return encode_rc;

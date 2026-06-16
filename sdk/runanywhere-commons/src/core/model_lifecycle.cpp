@@ -403,6 +403,25 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         }
     }
 
+    // A model with no local artifact cannot be loaded. Without this guard the
+    // resolver falls back to the bare model id (resolved_path_for_model) and
+    // the backend receives e.g. "silero-vad" as a file path, failing deep in
+    // the engine with a confusing message. Built-ins pass
+    // (model_artifact_present treats them as always available).
+    if (!detail::model_artifact_present(model)) {
+        const ModelCategory fail_category = detail::preferred_category_for(request, model);
+        const InferenceFramework fail_framework = detail::preferred_framework_for(request, model);
+        ModelLoadResult result = detail::make_load_result(
+            false, request.model_id(), fail_category, fail_framework, "", {}, 0,
+            "model is not downloaded — download it first or set validate_availability");
+        detail::publish_component_event(detail::component_for_category(fail_category),
+                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
+                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
+                                        request.model_id(), &result, nullptr,
+                                        result.error_message().c_str());
+        return detail::copy_proto(result, out_result);
+    }
+
     const ModelCategory category = detail::preferred_category_for(request, model);
     const InferenceFramework framework = detail::preferred_framework_for(request, model);
     const SDKComponent component = detail::component_for_category(category);

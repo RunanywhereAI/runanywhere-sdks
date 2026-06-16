@@ -31,6 +31,7 @@
 #include "sdk_events.pb.h"
 
 #include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 extern "C" rac_result_t rac_lora_registry_register_catalog_entry_proto(
@@ -203,11 +204,9 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
 }
 
 void publish_event(const runanywhere::v1::SDKEvent& event) {
-    const size_t size = event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
-    }
+    // Route through the events layer so LoRA telemetry reaches the telemetry +
+    // log sinks per the destination bitmask, not just the public proto stream.
+    (void)rac::events::publish_prebuilt(event);
 }
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,

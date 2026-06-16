@@ -42,6 +42,7 @@
 #include "sdk_events.pb.h"
 
 #include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 // =============================================================================
@@ -759,14 +760,16 @@ bool serialize_proto(const google::protobuf::MessageLite& message, std::vector<u
 }
 
 void publish_event(const runanywhere::v1::SDKEvent& event) {
-    std::vector<uint8_t> bytes;
-    if (serialize_proto(event, &bytes)) {
-        (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
-    }
+    // Route through the destination router (sdk_event_publish) so the envelope's
+    // TELEMETRY destination bit reaches the telemetry manager. A direct
+    // rac_sdk_event_publish_proto call feeds only the PUBLIC stream, so these
+    // capability events would never be recorded as telemetry.
+    (void)rac::events::publish_prebuilt(event);
 }
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
-                        float progress, const char* error) {
+                        float progress, const char* error, double duration_ms = 0.0,
+                        const char* model_id = nullptr) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -779,6 +782,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
+    if (model_id != nullptr && model_id[0] != '\0') {
+        cap->set_model_id(model_id);
+    }
     if (operation) {
         event.set_operation_id(operation);
         cap->set_operation(operation);
@@ -786,6 +792,11 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     cap->set_progress(progress);
     if (error)
         cap->set_error(error);
+    // CapabilityOperationEvent has no duration field; telemetry reads it from
+    // the envelope properties map (see telemetry_manager kCapability extraction).
+    if (duration_ms > 0.0) {
+        (*event.mutable_properties())["duration_ms"] = std::to_string(duration_ms);
+    }
     publish_event(event);
 }
 
@@ -896,8 +907,9 @@ rac_result_t rac_diffusion_generate_proto(rac_handle_t handle, const uint8_t* op
         return rc;
     }
 
+    const char* model_id = rac_diffusion_component_get_model_id(handle);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED,
-                       "diffusion.generate", 0.0f, nullptr);
+                       "diffusion.generate", 0.0f, nullptr, 0.0, model_id);
     rac_diffusion_result_t result = {};
     rc = rac_diffusion_generate(handle, &options, &result);
     if (rc != RAC_SUCCESS) {
@@ -913,8 +925,13 @@ rac_result_t rac_diffusion_generate_proto(rac_handle_t handle, const uint8_t* op
     } else {
         rc = copy_proto(proto, out_result);
     }
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
-                       "diffusion.generate", 1.0f, nullptr);
+    if (rc == RAC_SUCCESS) {
+        publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
+                           "diffusion.generate", 1.0f, nullptr,
+                           static_cast<double>(result.generation_time_ms), model_id);
+    } else {
+        publish_failure(rc, "diffusion.generate", rac_error_message(rc));
+    }
     rac_diffusion_result_free(&result);
     free_options(&options);
     return rc;
@@ -950,8 +967,9 @@ rac_result_t rac_diffusion_generate_with_progress_proto(
         return rc;
     }
 
+    const char* model_id = rac_diffusion_component_get_model_id(handle);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED,
-                       "diffusion.generate", 0.0f, nullptr);
+                       "diffusion.generate", 0.0f, nullptr, 0.0, model_id);
     ProgressCtx ctx;
     ctx.callback = progress_callback;
     ctx.user_data = user_data;
@@ -970,8 +988,13 @@ rac_result_t rac_diffusion_generate_with_progress_proto(
     } else {
         rc = copy_proto(proto, out_result);
     }
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
-                       "diffusion.generate", 1.0f, nullptr);
+    if (rc == RAC_SUCCESS) {
+        publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
+                           "diffusion.generate", 1.0f, nullptr,
+                           static_cast<double>(result.generation_time_ms), model_id);
+    } else {
+        publish_failure(rc, "diffusion.generate", rac_error_message(rc));
+    }
     rac_diffusion_result_free(&result);
     free_options(&options);
     return rc;

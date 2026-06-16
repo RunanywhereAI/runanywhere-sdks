@@ -182,6 +182,10 @@ suspend fun RunAnywhere.speak(
         try {
             ttsAudioPlayback.play(wavData)
             ttsLogger.debug("Audio playback completed")
+        } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+            // Caller cancelled (navigation, new speak request) — propagate
+            // instead of reporting a playback failure.
+            throw e
         } catch (e: Exception) {
             ttsLogger.error("Audio playback failed: ${e.message}", throwable = e)
             throw if (e is SDKException) e else SDKException.tts("Failed to play audio: ${e.message}")

@@ -21,17 +21,6 @@ const char* rac_endpoint_device_registration(rac_environment_t env) {
     }
 }
 
-const char* rac_endpoint_telemetry(rac_environment_t env) {
-    switch (env) {
-        case RAC_ENV_DEVELOPMENT:
-            return RAC_ENDPOINT_DEV_TELEMETRY;
-        case RAC_ENV_STAGING:
-        case RAC_ENV_PRODUCTION:
-        default:
-            return RAC_ENDPOINT_TELEMETRY;
-    }
-}
-
 const char* rac_endpoint_model_assignments(void) {
     return "/api/v1/model-assignments/for-sdk";
 }
