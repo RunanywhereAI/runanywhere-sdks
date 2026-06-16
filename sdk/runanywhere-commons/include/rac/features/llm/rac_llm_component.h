@@ -281,6 +281,89 @@ rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle, const char
                                                  char** out_error);
 
 // =============================================================================
+// ADAPTIVE CONTEXT API - KV Cache Prefix-Caching for Multi-Turn Sessions
+// =============================================================================
+
+/**
+ * @brief Inject a system prompt into the KV cache at position 0
+ *
+ * Clears existing KV cache, then seeds it with the given system prompt.
+ * Call once at session start to avoid re-tokenizing the prompt every turn.
+ *
+ * Optional — returns RAC_ERROR_NOT_SUPPORTED if the active backend does not
+ * implement adaptive context (e.g., only LlamaCPP supports it today).
+ *
+ * @param handle Component handle
+ * @param prompt System prompt text (must be non-NULL)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_component_inject_system_prompt(rac_handle_t handle, const char* prompt);
+
+/**
+ * @brief Append text to the KV cache after current content
+ *
+ * Does not clear existing KV state — accumulates context incrementally.
+ * Use after inject_system_prompt to append user turns, assistant responses,
+ * or RAG chunks without re-processing the entire conversation.
+ *
+ * @warning Callers MUST call rac_llm_component_clear_context() at session
+ *          boundaries (user switch, session end, memory pressure) to prevent
+ *          unbounded KV cache growth that will lead to OS-level OOM termination.
+ *
+ * Optional — returns RAC_ERROR_NOT_SUPPORTED if the active backend does not
+ * implement adaptive context.
+ *
+ * @param handle Component handle
+ * @param text Text to append (must be non-NULL)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_component_append_context(rac_handle_t handle, const char* text);
+
+/**
+ * @brief Generate a response from accumulated KV cache state
+ *
+ * Unlike rac_llm_component_generate(), this does NOT clear the KV cache first.
+ * Use after inject_system_prompt + append_context to generate from accumulated
+ * state, preserving the KV cache for subsequent turns.
+ *
+ * @warning This call is BLOCKING (non-streaming). It will monopolize the calling
+ *          thread for the entire decode duration (potentially several seconds on
+ *          mobile hardware). On platforms with cooperative thread pools (e.g.,
+ *          Swift async/await), callers MUST offload this to a non-cooperative
+ *          thread or accept that overlapping generation requests may deadlock.
+ *          A streaming variant (generate_stream_from_context) is planned as a
+ *          follow-up.
+ *
+ * Optional — returns RAC_ERROR_NOT_SUPPORTED if the active backend does not
+ * implement adaptive context.
+ *
+ * @param handle Component handle
+ * @param query Query/suffix text to append before generation (must be non-NULL)
+ * @param options Generation options (can be NULL for defaults)
+ * @param out_result Output: Generation result (caller must free with rac_llm_result_free)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_component_generate_from_context(rac_handle_t handle, const char* query,
+                                                              const rac_llm_options_t* options,
+                                                              rac_llm_result_t* out_result);
+
+/**
+ * @brief Clear all KV cache state
+ *
+ * Resets the LLM's context for a fresh adaptive query cycle. Call at session
+ * boundaries, on user switch, or when memory pressure is detected to prevent
+ * unbounded KV cache growth.
+ *
+ * Optional — returns RAC_ERROR_NOT_SUPPORTED if the active backend does not
+ * implement adaptive context. Returns RAC_SUCCESS if no model is loaded
+ * (no context to clear).
+ *
+ * @param handle Component handle
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_component_clear_context(rac_handle_t handle);
+
+// =============================================================================
 // DESTRUCTION
 // =============================================================================
 
