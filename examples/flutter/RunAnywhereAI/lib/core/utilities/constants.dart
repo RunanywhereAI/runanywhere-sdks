@@ -2,6 +2,23 @@
 //
 // Application-wide constant values.
 
+/// Default backend config, supplied at build time via --dart-define so no
+/// secret is committed (mirrors the Android example's gitignored
+/// local.properties → BuildConfig.RUNANYWHERE_API_KEY / _BASE_URL). Empty when
+/// not provided, in which case the app falls back to the SDK's dev defaults.
+///
+///   flutter run \
+///     --dart-define=RUNANYWHERE_API_KEY=runa_prod_... \
+///     --dart-define=RUNANYWHERE_BASE_URL=https://...up.railway.app
+class DefaultConfig {
+  DefaultConfig._();
+
+  static const String runanywhereApiKey =
+      String.fromEnvironment('RUNANYWHERE_API_KEY');
+  static const String runanywhereBaseUrl =
+      String.fromEnvironment('RUNANYWHERE_BASE_URL');
+}
+
 /// Keychain keys for secure storage
 class KeychainKeys {
   KeychainKeys._();

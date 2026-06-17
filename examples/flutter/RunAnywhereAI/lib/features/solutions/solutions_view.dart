@@ -30,16 +30,16 @@ class _SolutionsViewState extends State<SolutionsView> {
   Future<void> _runSolution(String name, String yaml) async {
     if (_isRunning) return;
     setState(() => _isRunning = true);
-    _append('→ $name: creating solution from YAML…');
+    _append('$name: creating solution from YAML…');
     try {
       final handle = await RunAnywhere.solutions.run(yaml: yaml);
-      _append('✓ $name: handle created. Calling start()…');
+      _append('$name: handle created. Calling start()…');
       handle.start();
-      _append('✓ $name: started. Tearing down (demo).');
+      _append('$name: started. Tearing down (demo).');
       handle.destroy();
-      _append('✓ $name: destroyed.');
+      _append('$name: destroyed.');
     } catch (e) {
-      _append('✗ $name: $e');
+      _append('$name: $e');
     } finally {
       if (mounted) {
         setState(() => _isRunning = false);

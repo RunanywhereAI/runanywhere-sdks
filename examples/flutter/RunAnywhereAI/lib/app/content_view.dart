@@ -20,19 +20,41 @@ class ContentView extends StatefulWidget {
 class _ContentViewState extends State<ContentView> {
   int _selectedTab = 0;
 
-  // Tab pages matching iOS structure.
-  final List<Widget> _pages = const [
-    ChatInterfaceView(), // Tab 0: Chat (LLM)
-    VisionHubView(), // Tab 1: Vision (VLM)
-    VoiceAssistantView(), // Tab 2: Voice Assistant (STT + LLM + TTS)
-    MoreView(), // Tab 3: More hub
-    CombinedSettingsView(), // Tab 4: Settings
-  ];
+  // Tabs are built lazily on first visit and kept alive afterwards. A hidden
+  // tab's initState / view-model work (animations, event-bus subscriptions,
+  // periodic refreshes) must not run until the user selects that tab.
+  // IndexedStack still preserves each tab's state once it has been built.
+  final Set<int> _visitedTabs = {0};
+
+  Widget _buildTab(int index) {
+    switch (index) {
+      case 0:
+        return const ChatInterfaceView(); // Chat (LLM)
+      case 1:
+        return const VisionHubView(); // Vision (VLM)
+      case 2:
+        return const VoiceAssistantView(); // Voice Assistant (STT + LLM + TTS)
+      case 3:
+        return const MoreView(); // More hub
+      case 4:
+        return const CombinedSettingsView(); // Settings
+      default:
+        return const SizedBox.shrink();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _selectedTab, children: _pages),
+      body: IndexedStack(
+        index: _selectedTab,
+        children: List.generate(
+          5,
+          (index) => _visitedTabs.contains(index)
+              ? _buildTab(index)
+              : const SizedBox.shrink(),
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
         // B-FL-14-002: explicit height + vertical padding so the
@@ -43,6 +65,7 @@ class _ContentViewState extends State<ContentView> {
         onDestinationSelected: (index) {
           setState(() {
             _selectedTab = index;
+            _visitedTabs.add(index);
           });
         },
         destinations: const [

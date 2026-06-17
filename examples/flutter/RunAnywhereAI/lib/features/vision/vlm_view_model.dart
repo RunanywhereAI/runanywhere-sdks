@@ -10,8 +10,8 @@ import 'package:runanywhere_ai/core/services/permission_service.dart';
 /// Mirrors iOS VLMViewModel.swift exactly:
 /// - Camera management (authorization, initialization, disposal)
 /// - Model status tracking (loaded state, model name)
-/// - Single capture mode (camera frame → description)
-/// - Gallery photo mode (picked image → detailed description)
+/// - Single capture mode (camera frame description)
+/// - Gallery photo mode (picked image detailed description)
 /// - Auto-streaming mode (live 2.5s interval captures)
 /// - Token-by-token streaming display
 /// - Error handling and cancellation
@@ -53,7 +53,7 @@ class VLMViewModel extends ChangeNotifier {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        debugPrint('❌ No cameras available');
+        debugPrint('No cameras available');
         return;
       }
 
@@ -75,9 +75,9 @@ class VLMViewModel extends ChangeNotifier {
       _isCameraInitialized = true;
       notifyListeners();
 
-      debugPrint('✅ Camera initialized: ${camera.lensDirection}');
+      debugPrint('Camera initialized: ${camera.lensDirection}');
     } catch (e) {
-      debugPrint('❌ Camera initialization failed: $e');
+      debugPrint('Camera initialization failed: $e');
       _error = 'Failed to initialize camera: $e';
       notifyListeners();
     }
@@ -116,14 +116,14 @@ class VLMViewModel extends ChangeNotifier {
   Future<void> onModelSelected(
       String modelId, String modelName, BuildContext context) async {
     try {
-      debugPrint('🎯 Loading VLM model: $modelId');
+      debugPrint('Loading VLM model: $modelId');
       await sdk.RunAnywhere.vlm.load(modelId);
       _isModelLoaded = true;
       _loadedModelName = modelName;
       notifyListeners();
-      debugPrint('✅ VLM model loaded: $modelName');
+      debugPrint('VLM model loaded: $modelName');
     } catch (e) {
-      debugPrint('❌ Failed to load VLM model: $e');
+      debugPrint('Failed to load VLM model: $e');
       _error = 'Failed to load model: $e';
       notifyListeners();
       if (context.mounted) {
@@ -176,10 +176,10 @@ class VLMViewModel extends ChangeNotifier {
       }
 
       debugPrint(
-          '✅ Single capture complete: ${_currentDescription.length} chars');
+          'Single capture complete: ${_currentDescription.length} chars');
       debugPrint('VLM streaming completed');
     } catch (e) {
-      debugPrint('❌ Single capture error: $e');
+      debugPrint('Single capture error: $e');
       _error = e.toString();
       notifyListeners();
     } finally {
@@ -218,10 +218,10 @@ class VLMViewModel extends ChangeNotifier {
       }
 
       debugPrint(
-          '✅ Gallery photo described: ${_currentDescription.length} chars');
+          'Gallery photo described: ${_currentDescription.length} chars');
       debugPrint('VLM streaming completed');
     } catch (e) {
-      debugPrint('❌ Gallery photo error: $e');
+      debugPrint('Gallery photo error: $e');
       _error = e.toString();
       notifyListeners();
     } finally {
@@ -254,7 +254,7 @@ class VLMViewModel extends ChangeNotifier {
       }
     });
     debugPrint(
-        '🔴 Auto-streaming started (${autoStreamInterval.inMilliseconds}ms interval)');
+        'Auto-streaming started (${autoStreamInterval.inMilliseconds}ms interval)');
   }
 
   /// Stop auto-streaming
@@ -263,7 +263,7 @@ class VLMViewModel extends ChangeNotifier {
     _autoStreamTimer = null;
     _isAutoStreamingEnabled = false;
     notifyListeners();
-    debugPrint('⏹️ Auto-streaming stopped');
+    debugPrint('Auto-streaming stopped');
   }
 
   /// Describe current frame for auto-stream (live mode)
@@ -306,11 +306,11 @@ class VLMViewModel extends ChangeNotifier {
       }
 
       debugPrint(
-          '🔴 Auto-stream capture complete: ${newDescription.length} chars');
+          'Auto-stream capture complete: ${newDescription.length} chars');
       debugPrint('VLM streaming completed');
     } catch (e) {
       // Only log errors in auto-stream mode (per iOS pattern)
-      debugPrint('⚠️ Auto-stream error (non-critical): $e');
+      debugPrint('Auto-stream error (non-critical): $e');
       // Don't set _error in auto-stream mode
     } finally {
       _isProcessing = false;
@@ -323,7 +323,7 @@ class VLMViewModel extends ChangeNotifier {
   /// Cancel ongoing VLM generation
   Future<void> cancelGeneration() async {
     unawaited(sdk.RunAnywhere.vlm.cancelVLMGeneration());
-    debugPrint('🛑 VLM generation cancelled');
+    debugPrint('VLM generation cancelled');
   }
 
   // MARK: - Cleanup

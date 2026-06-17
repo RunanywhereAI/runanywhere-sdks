@@ -4,9 +4,9 @@ import 'package:runanywhere_ai/features/benchmarks/benchmark_types.dart';
 
 /// Benchmarks LLM generation with short/medium/long token counts.
 ///
-/// Mirrors iOS `LLMBenchmarkProvider.swift`: load → warmup → streamed
+/// Mirrors iOS `LLMBenchmarkProvider.swift`: load warmup streamed
 /// generation aggregated into TTFT / tokens-per-second / prefill / decode
-/// throughput → unload.
+/// throughput unload.
 class LLMBenchmarkProvider implements BenchmarkScenarioProvider {
   @override
   BenchmarkCategory get category => BenchmarkCategory.llm;

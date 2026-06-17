@@ -2,6 +2,7 @@
 //
 // Coordinates document extraction, SDK pipeline lifecycle, and query state.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -96,6 +97,9 @@ class RAGViewModel extends ChangeNotifier {
       _llmSupportsThinking = llmModel.supportsThinking;
     } catch (e) {
       _error = e.toString();
+      // Tear down any partially-created pipeline so a failed ingest doesn't
+      // leave an orphaned C++ pipeline session behind.
+      await RunAnywhere.rag.destroyPipeline();
     } finally {
       _isLoadingDocument = false;
       notifyListeners();
@@ -169,5 +173,13 @@ class RAGViewModel extends ChangeNotifier {
     _lastResult = null;
     _llmSupportsThinking = false;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    // Destroy the C++ RAG pipeline so it isn't leaked when the screen is popped
+    // without an explicit clearDocument(). dispose() is sync, so fire-and-forget.
+    unawaited(RunAnywhere.rag.destroyPipeline());
+    super.dispose();
   }
 }

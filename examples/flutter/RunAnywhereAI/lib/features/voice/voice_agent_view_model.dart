@@ -187,6 +187,20 @@ class VoiceAgentViewModel extends ChangeNotifier {
       debugPrint('Voice cleanup: $e');
     }
 
+    // Commit any assistant response that finished generating but hadn't yet
+    // reached PIPELINE_STATE_SPEAKING (where it is normally committed), so a
+    // stop in that window doesn't silently drop the turn. Safe from double-add:
+    // the subscription is already cancelled, and a committed turn leaves
+    // assistantResponse empty.
+    if (assistantResponse.isNotEmpty) {
+      conversation.add(
+        ConversationTurn(
+          role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
+          text: assistantResponse,
+        ),
+      );
+    }
+
     sessionState = UiVoiceSessionState.disconnected;
     currentTranscript = '';
     assistantResponse = '';

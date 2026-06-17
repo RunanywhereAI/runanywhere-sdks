@@ -15,7 +15,6 @@ import 'dart:convert';
 import 'dart:ffi' show nullptr;
 
 import 'package:ffi/ffi.dart' show Utf8Pointer;
-import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:protobuf/protobuf.dart'
     show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
@@ -31,7 +30,6 @@ import 'package:runanywhere/generated/tool_calling.pb.dart'
         ToolCallingSessionCreateRequest,
         ToolCallingSessionEvent,
         ToolCallingSessionEvent_Kind,
-        ToolCallingSessionStepWithResultRequest,
         ToolChoiceMode,
         ToolDefinition,
         ToolResult,
@@ -263,8 +261,12 @@ class RunAnywhereTools {
     final session = DartBridgeToolCalling.shared.createSession(request);
     // Publish the active session handle so consumers can
     // call `RunAnywhereTools.shared.cancelGeneration()` to interrupt the
-    // in-flight loop (mirrors RunAnywhereLLM.cancelGeneration).
-    _activeSessionHandle = session.sessionHandle;
+    // in-flight loop (mirrors RunAnywhereLLM.cancelGeneration). The native
+    // session id resolves a turn after create starts (it now runs off the UI
+    // isolate), so publish it once known.
+    unawaited(session.sessionId
+        .then((id) => _activeSessionHandle = id)
+        .catchError((Object _) => _activeSessionHandle));
     final collectedCalls = <ToolCall>[];
     final collectedResults = <ToolResult>[];
     final completer = Completer<ToolCallingResult>();
@@ -291,26 +293,23 @@ class RunAnywhereTools {
               await sub.cancel();
               return;
             }
+            // Forward the result to the session worker, which fills in its own
+            // session id and runs the next turn off the UI isolate; the turn's
+            // events arrive back on this stream.
             try {
               final result = await execute(call);
               collectedResults.add(result);
-              DartBridgeToolCalling.shared.sessionStepWithResult(
-                ToolCallingSessionStepWithResultRequest(
-                  sessionHandle: _toFixnum(session.sessionHandle),
-                  toolCallId: call.id,
-                  resultJson: result.resultJson,
-                  error: result.error,
-                ),
+              session.stepWithResult(
+                toolCallId: call.id,
+                resultJson: result.resultJson,
+                error: result.error,
               );
             } catch (e) {
               _logger.error('Tool executor threw: $e');
-              DartBridgeToolCalling.shared.sessionStepWithResult(
-                ToolCallingSessionStepWithResultRequest(
-                  sessionHandle: _toFixnum(session.sessionHandle),
-                  toolCallId: call.id,
-                  resultJson: '',
-                  error: e.toString(),
-                ),
+              session.stepWithResult(
+                toolCallId: call.id,
+                resultJson: '',
+                error: e.toString(),
               );
             }
             break;
@@ -347,7 +346,7 @@ class RunAnywhereTools {
       // Clear the published handle BEFORE close — once close
       // returns, any pending cancelGeneration() call would race a freshly
       // started session.
-      if (_activeSessionHandle == session.sessionHandle) {
+      if (_activeSessionHandle == session.resolvedSessionId) {
         _activeSessionHandle = 0;
       }
       await session.close();
@@ -403,8 +402,6 @@ class RunAnywhereTools {
         formatHint: 'default',
       );
 }
-
-Int64 _toFixnum(int value) => Int64(value);
 
 /// Run-loop knobs derived from [ToolCallingOptions]. Mirrors Swift's
 /// `RAToolCallingOptions` extension (ToolCallingTypes.swift:157-171).

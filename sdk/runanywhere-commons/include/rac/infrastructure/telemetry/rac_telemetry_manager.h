@@ -19,6 +19,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
 
@@ -136,6 +137,42 @@ RAC_API rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* 
  * Sends all queued events to the backend.
  */
 RAC_API rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager);
+
+// =============================================================================
+// ISOLATE-SAFE HTTP DELIVERY (poll-queue)
+// =============================================================================
+
+/**
+ * @brief Wake-up callback signalling that HTTP request(s) are queued.
+ *
+ * Carries no request data, so it is safe to invoke from any thread/isolate
+ * (Dart FFI synchronous callbacks are isolate-bound; this lets Flutter register
+ * a cross-isolate `NativeCallable.listener`). On wake-up the platform drains the
+ * queue via rac_telemetry_manager_poll_http_request(). SDKs that can invoke a
+ * data-carrying callback from any thread (JNI, C function pointer) keep using
+ * rac_telemetry_manager_set_http_callback() instead.
+ */
+typedef void (*rac_telemetry_http_wakeup_callback_t)(void* user_data);
+
+/**
+ * @brief Register the wake-up callback (selects poll-queue HTTP delivery).
+ *
+ * When set, flush enqueues each request and invokes [callback] instead of the
+ * data-carrying rac_telemetry_http_callback_t.
+ */
+RAC_API void rac_telemetry_manager_set_http_wakeup(rac_telemetry_manager_t* manager,
+                                                   rac_telemetry_http_wakeup_callback_t callback,
+                                                   void* user_data);
+
+/**
+ * @brief Pop the next queued HTTP request into [out] (owned; free with
+ * rac_proto_buffer_free).
+ *
+ * Framing: [u8 requires_auth][u32 LE endpoint_len][endpoint utf8][json utf8].
+ * Returns RAC_ERROR_NOT_FOUND when the queue is empty.
+ */
+RAC_API rac_result_t rac_telemetry_manager_poll_http_request(rac_telemetry_manager_t* manager,
+                                                             rac_proto_buffer_t* out);
 
 // =============================================================================
 // JSON SERIALIZATION

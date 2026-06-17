@@ -6,6 +6,7 @@ library;
 
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -112,6 +113,11 @@ class DartBridgeSTT {
   // MARK: - Transcription
 
   /// Transcribe audio through the lifecycle-owned generated-proto STT ABI.
+  ///
+  /// Synchronous variant retained for the unit-test harness (which drives it
+  /// with [setTranscribeLifecycleProtoForTesting]). Production callers use
+  /// [transcribeLifecycleProtoAsync], which runs the blocking native call off
+  /// the UI isolate.
   STTOutput transcribeLifecycleProto(STTTranscriptionRequest request) {
     _validateLifecycleRequest(request);
 
@@ -133,6 +139,36 @@ class DartBridgeSTT {
       decode: STTOutput.fromBuffer,
       symbol: 'rac_stt_transcribe_lifecycle_proto',
     );
+  }
+
+  /// Transcribe audio through the lifecycle-owned generated-proto STT ABI,
+  /// running the blocking native call in a short-lived worker isolate
+  /// (`Isolate.run`) so the calling isolate — usually the Flutter UI isolate —
+  /// stays responsive for the whole transcription. Whisper decode of a batch
+  /// buffer is a long synchronous block; on the UI isolate it freezes frames.
+  /// Mirrors `dart_bridge_llm.dart`'s `generateProto`: this ABI is
+  /// lifecycle-owned (no Dart-held handle), so the worker re-resolves the
+  /// engine via the commons model lifecycle — nothing isolate-bound crosses.
+  Future<STTOutput> transcribeLifecycleProtoAsync(
+    STTTranscriptionRequest request,
+  ) async {
+    _validateLifecycleRequest(request);
+
+    final override = _transcribeLifecycleProtoForTesting;
+    if (override != null) {
+      return override(request);
+    }
+
+    if (RacNative.bindings.rac_stt_transcribe_lifecycle_proto == null) {
+      throw UnsupportedError(
+        'rac_stt_transcribe_lifecycle_proto is unavailable',
+      );
+    }
+
+    final requestBytes = request.writeToBuffer();
+    final resultBytes =
+        await Isolate.run(() => _sttTranscribeWorker(requestBytes));
+    return STTOutput.fromBuffer(resultBytes);
   }
 
   /// Transcribe audio with serialized runanywhere.v1.STTOptions.
@@ -441,5 +477,40 @@ class DartBridgeSTT {
           'STTTranscriptionRequest.audio.audio_data is required',
         );
     }
+  }
+}
+
+/// Blocking body of [DartBridgeSTT.transcribeLifecycleProtoAsync]: a plain
+/// request→response proto call with no callbacks. Top-level so the
+/// `Isolate.run` closure captures only its sendable `Uint8List` argument.
+/// `RacNative.bindings` is a per-isolate static — the worker re-resolves the
+/// dylib symbols on first access (idempotent `PlatformLoader.loadCommons()`,
+/// same convention as the LLM/VLM workers). Returns the serialized STTOutput
+/// so the main isolate owns the decode.
+Uint8List _sttTranscribeWorker(Uint8List requestBytes) {
+  final bindings = RacNative.bindings;
+  final fn = bindings.rac_stt_transcribe_lifecycle_proto;
+  if (fn == null) {
+    throw UnsupportedError('rac_stt_transcribe_lifecycle_proto is unavailable');
+  }
+
+  final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
+  final out = calloc<RacProtoBuffer>();
+  try {
+    bindings.rac_proto_buffer_init(out);
+    final code = fn(requestPtr, requestBytes.length, out);
+    DartBridgeProtoUtils.ensureSuccess(
+      out,
+      code,
+      'rac_stt_transcribe_lifecycle_proto',
+    );
+    if (out.ref.data == nullptr || out.ref.size == 0) {
+      return Uint8List(0);
+    }
+    return Uint8List.fromList(out.ref.data.asTypedList(out.ref.size));
+  } finally {
+    bindings.rac_proto_buffer_free(out);
+    calloc.free(out);
+    calloc.free(requestPtr);
   }
 }

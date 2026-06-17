@@ -160,7 +160,7 @@ class RunAnywhereTTS {
       options: opts,
       metadata: <String, String>{'voice_id': voiceId}.entries,
     );
-    return DartBridgeTTS.shared.synthesizeLifecycleProto(request);
+    return DartBridgeTTS.shared.synthesizeLifecycleProtoAsync(request);
   }
 
   /// Stream generated [TTSOutput] chunks as they are produced.

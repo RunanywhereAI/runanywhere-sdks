@@ -53,14 +53,14 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
       await _registerBackends();
 
-      final customApiKey = await KeychainHelper.loadString(KeychainKeys.apiKey);
-      final customBaseURL = await KeychainHelper.loadString(
-        KeychainKeys.baseURL,
-      );
+      final customApiKey =
+          await KeychainHelper.loadString(KeychainKeys.apiKey) ??
+          DefaultConfig.runanywhereApiKey;
+      final customBaseURL =
+          await KeychainHelper.loadString(KeychainKeys.baseURL) ??
+          DefaultConfig.runanywhereBaseUrl;
       final hasCustomConfig =
-          customApiKey != null &&
           customApiKey.isNotEmpty &&
-          customBaseURL != null &&
           customBaseURL.isNotEmpty &&
           !_looksLikePlaceholder(customApiKey) &&
           !_looksLikePlaceholder(customBaseURL);
@@ -73,9 +73,12 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         await RunAnywhere.initialize(
           apiKey: customApiKey,
           baseURL: normalizedURL,
-          environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+          // Staging (not Production) so the custom base URL is honored AND
+          // local logging stays on — Production sets enableLocalLogging:false,
+          // hiding all SDK/telemetry logs. Development would ignore baseURL.
+          environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
         );
-        debugPrint('✅ SDK initialized with CUSTOM configuration (production)');
+        debugPrint('✅ SDK initialized with CUSTOM configuration (staging)');
       } else {
         await RunAnywhere.initialize();
         debugPrint('✅ SDK initialized in DEVELOPMENT mode');

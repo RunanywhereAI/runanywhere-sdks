@@ -54,13 +54,13 @@ class ModelListViewModel extends ChangeNotifier {
       _availableModels = sdkModels;
 
       debugPrint(
-          '✅ Loaded ${_availableModels.length} models from SDK registry');
+          'Loaded ${_availableModels.length} models from SDK registry');
       for (final model in _availableModels) {
         debugPrint(
             '  - ${model.name} (${model.category.displayName}) [${model.preferredFramework.displayName}] ready: ${model.isReadyOnDevice}');
       }
     } catch (e) {
-      debugPrint('❌ Failed to load models from SDK: $e');
+      debugPrint('Failed to load models from SDK: $e');
       _errorMessage = 'Failed to load models: $e';
       _availableModels = [];
     }
@@ -81,10 +81,10 @@ class ModelListViewModel extends ChangeNotifier {
       }
       _availableFrameworks = frameworks.toList();
       debugPrint(
-          '✅ Available frameworks: ${_availableFrameworks.map((f) => f.displayName).join(", ")}');
+          'Available frameworks: ${_availableFrameworks.map((f) => f.displayName).join(", ")}');
       notifyListeners();
     } catch (e) {
-      debugPrint('❌ Failed to load frameworks: $e');
+      debugPrint('Failed to load frameworks: $e');
       _availableFrameworks = [];
       notifyListeners();
     }
@@ -107,7 +107,7 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       await loadModel(model);
       setCurrentModel(model);
-      debugPrint('✅ Model ${model.name} selected and loaded');
+      debugPrint('Model ${model.name} selected and loaded');
     } catch (e) {
       _errorMessage = 'Failed to load model: $e';
       notifyListeners();
@@ -121,7 +121,7 @@ class ModelListViewModel extends ChangeNotifier {
     void Function(double) progressHandler,
   ) async {
     if (_downloadingModels.contains(model.id)) {
-      debugPrint('⚠️ Model ${model.id} is already downloading');
+      debugPrint('Model ${model.id} is already downloading');
       return;
     }
 
@@ -130,7 +130,7 @@ class ModelListViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('📥 Starting download for model: ${model.name}');
+      debugPrint('Starting download for model: ${model.name}');
 
       await for (final progress in sdk.RunAnywhere.downloads.start(model.id)) {
         final totalBytes = progress.totalBytes.toInt();
@@ -144,7 +144,7 @@ class ModelListViewModel extends ChangeNotifier {
 
         // Check if completed or failed
         if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
-          debugPrint('✅ Download completed for model: ${model.name}');
+          debugPrint('Download completed for model: ${model.name}');
           break;
         } else if (progress.stage ==
                 sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
@@ -156,9 +156,9 @@ class ModelListViewModel extends ChangeNotifier {
       // Update model with local path after download
       await loadModelsFromRegistry();
 
-      debugPrint('✅ Model ${model.name} download complete');
+      debugPrint('Model ${model.name} download complete');
     } catch (e) {
-      debugPrint('❌ Failed to download model ${model.id}: $e');
+      debugPrint('Failed to download model ${model.id}: $e');
       _errorMessage = 'Download failed: $e';
     } finally {
       _downloadingModels.remove(model.id);
@@ -170,16 +170,16 @@ class ModelListViewModel extends ChangeNotifier {
   /// Delete a downloaded model using SDK
   Future<void> deleteModel(ModelInfo model) async {
     try {
-      debugPrint('🗑️ Deleting model: ${model.name}');
+      debugPrint('Deleting model: ${model.name}');
 
       await sdk.RunAnywhere.deleteModel(model.id);
 
       // Refresh models from registry
       await loadModelsFromRegistry();
 
-      debugPrint('✅ Model ${model.name} deleted successfully');
+      debugPrint('Model ${model.name} deleted successfully');
     } catch (e) {
-      debugPrint('❌ Failed to delete model: $e');
+      debugPrint('Failed to delete model: $e');
       _errorMessage = 'Failed to delete model: $e';
       notifyListeners();
     }
@@ -208,12 +208,12 @@ class ModelListViewModel extends ChangeNotifier {
       };
 
       if (alreadyLoadedId == model.id) {
-        debugPrint('♻️ Model ${model.name} already loaded — skipping reload');
+        debugPrint('Model ${model.name} already loaded — skipping reload');
         _currentModel = model;
         return;
       }
 
-      debugPrint('⏳ Loading model: ${model.name}');
+      debugPrint('Loading model: ${model.name}');
 
       switch (model.category) {
         case ModelCategory.MODEL_CATEGORY_LANGUAGE:
@@ -239,9 +239,9 @@ class ModelListViewModel extends ChangeNotifier {
       }
 
       _currentModel = model;
-      debugPrint('✅ Model ${model.name} loaded successfully');
+      debugPrint('Model ${model.name} loaded successfully');
     } catch (e) {
-      debugPrint('❌ Failed to load model ${model.id}: $e');
+      debugPrint('Failed to load model ${model.id}: $e');
       _errorMessage = 'Failed to load model: $e';
       rethrow;
     } finally {

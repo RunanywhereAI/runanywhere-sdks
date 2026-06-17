@@ -243,7 +243,7 @@ class DartBridgeLLM {
     final requestBytes = request.writeToBuffer();
     final sendPort = receivePort.sendPort;
     unawaited(
-      Isolate.run(() => _llmStreamWorker(requestBytes, sendPort))
+      _runLlmStreamWorker(requestBytes, sendPort)
           .catchError((Object e, StackTrace st) {
         // Worker isolate crashed (RemoteError) before the rc sentinel.
         if (!controller.isClosed) {
@@ -317,6 +317,15 @@ class DartBridgeLLM {
 // during generation. If a future commons change adds one to this path, fix
 // that callback to `.listener` — do not move the blocking call back onto the
 // main isolate.
+
+/// Runs [_llmStreamWorker] in a worker isolate. Hoisted to top level so the
+/// `Isolate.run` closure captures ONLY its two sendable parameters
+/// (`Uint8List` + `SendPort`). Inlined in [DartBridgeLLM.generateStreamProto],
+/// the closure captured that method's whole local context — including the
+/// unsendable `ReceivePort`/`StreamController` — which fails the isolate spawn
+/// with "object is unsendable".
+Future<int> _runLlmStreamWorker(Uint8List requestBytes, SendPort port) =>
+    Isolate.run(() => _llmStreamWorker(requestBytes, port));
 
 /// Blocking body of [DartBridgeLLM.generateStreamProto]. Runs the single-call
 /// streaming ABI on the worker isolate; the worker-owned `isolateLocal`

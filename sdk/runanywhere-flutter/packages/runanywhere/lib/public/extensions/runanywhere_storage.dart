@@ -70,8 +70,12 @@ class RunAnywhereStorage {
     }
     if (memoryRequirement != null) {
       request.memoryRequiredBytes = Int64(memoryRequirement);
-      request.downloadSizeBytes = Int64(memoryRequirement);
     }
+    // Intentionally NOT setting downloadSizeBytes from memoryRequirement: that
+    // value gates the post-finalize download-size check, and the RAM estimate
+    // is usually a round placeholder (e.g. 500 MB for a real 397 MB file),
+    // which leaves is_downloaded=false forever. Leaving it unset lets commons
+    // validate against the actual transfer — matches Kotlin's catalog.
 
     final model = await DartBridgeModelRegistry.instance.registerModelFromUrl(
       request,
@@ -203,8 +207,10 @@ class RunAnywhereStorage {
     );
     if (memoryRequirement != null) {
       request.memoryRequiredBytes = Int64(memoryRequirement);
-      request.downloadSizeBytes = Int64(memoryRequirement);
     }
+    // See registerModel: downloadSizeBytes is intentionally left unset so the
+    // post-finalize size guard validates against the actual transfer rather
+    // than the RAM-estimate placeholder.
     final resolvedContextLength =
         contextLength ?? (modality.requiresContextLength ? 2048 : null);
     if (resolvedContextLength != null) {

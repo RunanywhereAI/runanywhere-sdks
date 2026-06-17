@@ -4,9 +4,9 @@ import 'package:runanywhere_ai/features/benchmarks/benchmark_types.dart';
 
 /// Benchmarks TTS synthesis with short and medium text inputs.
 ///
-/// Mirrors iOS `TTSBenchmarkProvider.swift`: load voice → synthesize (not
-/// speak — no playback) → report latency, produced audio duration, and
-/// character throughput → unload.
+/// Mirrors iOS `TTSBenchmarkProvider.swift`: load voice synthesize (not
+/// speak — no playback) report latency, produced audio duration, and
+/// character throughput unload.
 class TTSBenchmarkProvider implements BenchmarkScenarioProvider {
   @override
   BenchmarkCategory get category => BenchmarkCategory.tts;

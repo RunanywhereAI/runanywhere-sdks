@@ -421,7 +421,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
 
       // Call the callback - this is where the actual model loading happens
       // The callback knows the correct context and how to load the model
-      debugPrint('🎯 Model selected: ${model.id}, calling callback to load');
+      debugPrint('Model selected: ${model.id}, calling callback to load');
       await widget.onModelSelected(model);
 
       if (mounted) {
@@ -435,7 +435,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
         });
       }
     } catch (e) {
-      debugPrint('❌ Failed to load model: $e');
+      debugPrint('Failed to load model: $e');
       setState(() {
         _isLoadingModel = false;
         _loadingProgress = '';

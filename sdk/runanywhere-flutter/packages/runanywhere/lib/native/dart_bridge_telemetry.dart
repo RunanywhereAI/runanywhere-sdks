@@ -5,12 +5,11 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
-import 'dart:typed_data';
-
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 
 import 'package:runanywhere/adapters/http_client_adapter.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -42,11 +41,8 @@ class DartBridgeTelemetry {
   static bool _isInitialized = false;
   // ignore: unused_field
   static SDKEnvironment? _environment;
-  static String? _baseURL;
-  static String? _accessToken;
   static Pointer<Void>? _managerPtr;
-  static Pointer<NativeFunction<RacTelemetryHttpCallbackNative>>?
-      _httpCallbackPtr;
+  static NativeCallable<Void Function(Pointer<Void>)>? _httpWakeup;
 
   // ============================================================================
   // Lifecycle
@@ -82,29 +78,27 @@ class DartBridgeTelemetry {
     required SDKEnvironment environment,
     required String deviceId,
     String? baseURL,
-    String? accessToken,
   }) async {
     if (_isInitialized) {
       _logger.debug('Telemetry already initialized');
       return;
     }
 
-    // Bail out if the example app forwarded an unfilled
-    // .env / dart-define placeholder. We don't want to POST telemetry
-    // to a literal "YOUR_SUPABASE_PROJECT_URL" string.
-    if (!DartBridgeDevConfig.isUsableCredential(baseURL) ||
-        !DartBridgeDevConfig.isUsableCredential(accessToken)) {
+    // Only the baseURL must be real here. The auth token is not available
+    // until Phase 2 auth completes (this runs before it) and is applied at
+    // send time — Kotlin parity: CppBridgeTelemetry.initialize has no token
+    // gate. Gating on accessToken skipped telemetry permanently because it is
+    // always null at init, so the manager and C++ sink were never created.
+    if (!DartBridgeDevConfig.isUsableCredential(baseURL)) {
       _logger.warning(
-        'Telemetry skipped — baseURL/accessToken looks like a placeholder. '
-        'Set real values via dart-define or runtime config.',
+        'Telemetry skipped — baseURL looks like a placeholder. '
+        'Set a real base URL via dart-define or runtime config.',
       );
       _isInitialized = true; // Suppress retry.
       return;
     }
 
     _environment = environment;
-    _baseURL = baseURL;
-    _accessToken = accessToken;
 
     try {
       final lib = PlatformLoader.loadCommons();
@@ -188,6 +182,10 @@ class DartBridgeTelemetry {
       // into a manager we are about to destroy.
       _setTelemetrySink(nullptr);
 
+      // Close the cross-isolate wake-up callable.
+      _httpWakeup?.close();
+      _httpWakeup = null;
+
       final destroy = lib.lookupFunction<Void Function(Pointer<Void>),
           void Function(Pointer<Void>)>('rac_telemetry_manager_destroy');
 
@@ -216,11 +214,6 @@ class DartBridgeTelemetry {
     }
   }
 
-  /// Update access token
-  static void setAccessToken(String? token) {
-    _accessToken = token;
-  }
-
   // ============================================================================
   // HTTP Callback Registration
   // ============================================================================
@@ -230,23 +223,72 @@ class DartBridgeTelemetry {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final setCallback = lib.lookupFunction<
-          Void Function(
-              Pointer<Void>,
-              Pointer<NativeFunction<RacTelemetryHttpCallbackNative>>,
-              Pointer<Void>),
+      final setWakeup = lib.lookupFunction<
+          Void Function(Pointer<Void>,
+              Pointer<NativeFunction<Void Function(Pointer<Void>)>>, Pointer<Void>),
           void Function(
               Pointer<Void>,
-              Pointer<NativeFunction<RacTelemetryHttpCallbackNative>>,
-              Pointer<Void>)>('rac_telemetry_manager_set_http_callback');
+              Pointer<NativeFunction<Void Function(Pointer<Void>)>>,
+              Pointer<Void>)>('rac_telemetry_manager_set_http_wakeup');
 
-      _httpCallbackPtr = Pointer.fromFunction<RacTelemetryHttpCallbackNative>(
-          _telemetryHttpCallback);
-
-      setCallback(_managerPtr!, _httpCallbackPtr!, nullptr);
-      _logger.debug('Telemetry HTTP callback registered');
+      // NativeCallable.listener is cross-isolate-safe: commons may signal this
+      // from the LLM worker isolate during a generation-completion flush, and
+      // Dart dispatches it back to this (main) isolate. The wake-up carries no
+      // request data, so it avoids the "native callback from a different
+      // isolate" abort a data-carrying Pointer.fromFunction hit. On wake-up we
+      // drain commons' owned request queue via rac_telemetry_manager_poll_*.
+      final wakeup =
+          NativeCallable<Void Function(Pointer<Void>)>.listener(_telemetryHttpWakeup);
+      _httpWakeup = wakeup;
+      setWakeup(_managerPtr!, wakeup.nativeFunction, nullptr);
+      _logger.debug('Telemetry HTTP wake-up registered');
     } catch (e) {
-      _logger.debug('Failed to register HTTP callback: $e');
+      _logger.debug('Failed to register HTTP wake-up: $e');
+    }
+  }
+
+  /// Drain commons' queued telemetry HTTP requests (signalled by the wake-up).
+  /// Each request is an owned buffer framed as
+  /// [u8 requiresAuth][u32 LE endpointLen][endpoint][json].
+  static void drainHttpQueue() {
+    final managerPtr = _managerPtr;
+    if (managerPtr == null) return;
+
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final pollFn = lib.lookupFunction<
+          Int32 Function(Pointer<Void>, Pointer<RacProtoBuffer>),
+          int Function(Pointer<Void>, Pointer<RacProtoBuffer>)>(
+        'rac_telemetry_manager_poll_http_request',
+      );
+      final bindings = RacNative.bindings;
+
+      // Bounded so a misbehaving producer can't spin forever; the loop also
+      // exits as soon as poll reports an empty queue (rc != 0).
+      for (var i = 0; i < 256; i++) {
+        final out = calloc<RacProtoBuffer>();
+        try {
+          bindings.rac_proto_buffer_init(out);
+          final code = pollFn(managerPtr, out);
+          // RAC_SUCCESS == 0; anything else (e.g. RAC_ERROR_NOT_FOUND) = drained.
+          if (code != 0 || out.ref.data == nullptr || out.ref.size < 5) {
+            return;
+          }
+          final bytes =
+              out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+          final requiresAuth = bytes[0] != 0;
+          final endpointLen =
+              bytes[1] | (bytes[2] << 8) | (bytes[3] << 16) | (bytes[4] << 24);
+          final endpoint = utf8.decode(bytes.sublist(5, 5 + endpointLen));
+          final body = utf8.decode(bytes.sublist(5 + endpointLen));
+          unawaited(_sendTelemetryHttp(endpoint, body, requiresAuth));
+        } finally {
+          bindings.rac_proto_buffer_free(out);
+          calloc.free(out);
+        }
+      }
+    } catch (e) {
+      _logger.debug('Telemetry HTTP queue drain error: $e');
     }
   }
 
@@ -289,53 +331,34 @@ class DartBridgeTelemetry {
 }
 
 // =============================================================================
-// HTTP Callback Function
+// HTTP Wake-up Function
 // =============================================================================
 
-/// HTTP callback invoked by C++ when telemetry needs to be sent
-void _telemetryHttpCallback(
-  Pointer<Void> userData,
-  Pointer<Utf8> endpoint,
-  Pointer<Utf8> jsonBody,
-  int jsonLength,
-  int requiresAuth,
-) {
-  if (endpoint == nullptr || jsonBody == nullptr) return;
-
-  try {
-    final endpointStr = endpoint.toDartString();
-    final bodyStr = jsonBody.toDartString();
-    final needsAuth = requiresAuth != 0;
-
-    // Fire and forget HTTP call
-    unawaited(_sendTelemetryHttp(endpointStr, bodyStr, needsAuth));
-  } catch (e) {
-    SDKLogger('DartBridge.Telemetry').error('HTTP callback error: $e');
-  }
+/// Wake-up from commons (may be signalled from any isolate, e.g. the LLM
+/// streaming worker isolate). Registered as a `NativeCallable.listener` so the
+/// drain runs on this (main) isolate regardless of the caller. No request data
+/// is passed here — it is pulled from commons' owned queue in [drainHttpQueue].
+void _telemetryHttpWakeup(Pointer<Void> userData) {
+  DartBridgeTelemetry.drainHttpQueue();
 }
 
-/// Send telemetry via HTTP
+/// Send telemetry via HTTP.
+///
+/// Routes through the adapter's authenticated [HTTPClientAdapter.send] so the
+/// request carries the resolved SDK access token (with 401-refresh) and the
+/// canonical SDK headers. The backend telemetry endpoints require a valid
+/// bearer token (`validate_sdk_bearer_token`); the previous `rawRequest` path
+/// only attached `_accessToken`, which is never populated here, so every
+/// telemetry POST was unauthenticated. Kotlin parity: telemetry goes through
+/// the token-managed adapter, not a hand-built request.
 Future<void> _sendTelemetryHttp(
     String endpoint, String body, bool requiresAuth) async {
   try {
-    final baseURL =
-        DartBridgeTelemetry._baseURL ?? 'https://api.runanywhere.ai';
-    final url = '$baseURL$endpoint';
-
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
-
-    if (requiresAuth && DartBridgeTelemetry._accessToken != null) {
-      headers['Authorization'] = 'Bearer ${DartBridgeTelemetry._accessToken}';
-    }
-
-    final response = await HTTPClientAdapter.shared.rawRequest(
+    final response = await HTTPClientAdapter.shared.send(
       method: 'POST',
-      url: url,
-      headers: headers,
-      body: Uint8List.fromList(utf8.encode(body)),
+      path: endpoint,
+      body: body,
+      requiresAuth: requiresAuth,
     );
 
     _notifyHttpComplete(
@@ -378,10 +401,3 @@ void _notifyHttpComplete(bool success, String? responseJson, String? error) {
   }
 }
 
-// =============================================================================
-// FFI Types
-// =============================================================================
-
-/// HTTP callback type: void (*callback)(void*, const char*, const char*, size_t, rac_bool_t)
-typedef RacTelemetryHttpCallbackNative = Void Function(
-    Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>, IntPtr, Int32);

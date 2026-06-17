@@ -17,10 +17,10 @@ abstract final class ModelCatalogBootstrap {
 
   static Future<void> registerAll() async {
     if (_modulesRegistered) {
-      debugPrint('📦 Catalog already registered — skipping');
+      debugPrint('Catalog already registered — skipping');
       return;
     }
-    debugPrint('📦 Registering modules with their models...');
+    debugPrint('Registering modules with their models...');
 
     // --- LLM models (LlamaCpp backend) ------------------------------------
     await _registerLLM(
@@ -141,7 +141,7 @@ abstract final class ModelCatalogBootstrap {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 2000000000,
     );
-    debugPrint('✅ LLM models registered');
+    debugPrint('LLM models registered');
 
     // --- VLM models (multi-modal, multi-file) -----------------------------
     await _registerArchive(
@@ -193,7 +193,7 @@ abstract final class ModelCatalogBootstrap {
       modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
       memoryRequirement: 600000000,
     );
-    debugPrint('✅ VLM models registered');
+    debugPrint('VLM models registered');
 
     // --- STT models (Sherpa-ONNX) -----------------------------------------
     await _registerArchive(
@@ -246,7 +246,7 @@ abstract final class ModelCatalogBootstrap {
       // guard on a valid ~2.3 MB download.
       memoryRequirement: 2327524,
     );
-    debugPrint('✅ Sherpa STT/TTS + Silero VAD models registered');
+    debugPrint('Sherpa STT/TTS + Silero VAD models registered');
 
     // --- ONNX Embedding (RAG) ---------------------------------------------
     // MiniLM needs model.onnx + vocab.txt in the same folder for the C++
@@ -270,14 +270,14 @@ abstract final class ModelCatalogBootstrap {
       modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
       memoryRequirement: 25500000,
     );
-    debugPrint('✅ ONNX Embedding models registered');
+    debugPrint('ONNX Embedding models registered');
 
     // --- LoRA adapters ------------------------------------------------------
     // Mirrors iOS `registerLoraAdapters` / Android `ModelBootstrap.seedLora`.
     await _registerLoraAdapters();
-    debugPrint('✅ LoRA adapters registered');
+    debugPrint('LoRA adapters registered');
 
-    debugPrint('🎉 All modules and models registered');
+    debugPrint('All modules and models registered');
     _modulesRegistered = true;
   }
 
@@ -300,7 +300,7 @@ abstract final class ModelCatalogBootstrap {
     try {
       await RunAnywhere.lora.registerArtifact(adapter);
     } catch (e) {
-      debugPrint('⚠️ Failed to register LoRA adapter: $e');
+      debugPrint('Failed to register LoRA adapter: $e');
     }
   }
 
@@ -329,7 +329,7 @@ abstract final class ModelCatalogBootstrap {
         supportsLora: supportsLora,
       );
     } catch (e) {
-      debugPrint('⚠️ Failed to register model $id: $e');
+      debugPrint('Failed to register model $id: $e');
     }
   }
 
@@ -355,7 +355,7 @@ abstract final class ModelCatalogBootstrap {
         memoryRequirement: memoryRequirement,
       );
     } catch (e) {
-      debugPrint('⚠️ Failed to register archive model $id: $e');
+      debugPrint('Failed to register archive model $id: $e');
     }
   }
 
@@ -392,7 +392,7 @@ abstract final class ModelCatalogBootstrap {
         memoryRequirement: memoryRequirement,
       );
     } catch (e) {
-      debugPrint('⚠️ Failed to register multi-file model $id: $e');
+      debugPrint('Failed to register multi-file model $id: $e');
     }
   }
 }

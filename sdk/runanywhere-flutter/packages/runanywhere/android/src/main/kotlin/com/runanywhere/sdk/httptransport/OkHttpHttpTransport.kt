@@ -25,6 +25,7 @@
 
 package com.runanywhere.sdk.httptransport
 
+import android.os.Looper
 import android.util.Log
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import okhttp3.Call
@@ -36,7 +37,11 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.time.Duration
+import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -234,6 +239,34 @@ object OkHttpHttpTransport {
     // ---------------------------------------------------------------------
 
     /**
+     * Dedicated daemon IO pool used to keep blocking requests off the main
+     * thread (see [runOffMainThread]).
+     */
+    private val ioExecutor: ExecutorService = Executors.newCachedThreadPool { r ->
+        Thread(r, "rac-http-io").apply { isDaemon = true }
+    }
+
+    /**
+     * Run a blocking network [block] off the Android main thread. The C ABI is
+     * synchronous — the caller blocks for the result either way — but this
+     * transport is invoked on Flutter's main isolate thread (unlike the Kotlin
+     * SDK's Dispatchers.IO caller), so executing the socket I/O inline triggers
+     * NetworkOnMainThreadException. Hop to the IO pool and block for the result;
+     * when already off the main thread the work runs inline (no extra hop).
+     */
+    private fun <T> runOffMainThread(block: () -> T): T {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            return block()
+        }
+        val future = ioExecutor.submit(Callable { block() })
+        return try {
+            future.get()
+        } catch (e: ExecutionException) {
+            throw e.cause ?: e
+        }
+    }
+
+    /**
      * `request_send` vtable slot — blocking single-shot request. Invoked
      * from JNI via `CallStaticObjectMethod`. Returns a [HttpResponse].
      */
@@ -246,18 +279,20 @@ object OkHttpHttpTransport {
         timeoutMs: Long,
     ): HttpResponse {
         return try {
-            val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte = 0L)
-            val clientForCall = resolveClient(timeoutMs)
+            runOffMainThread {
+                val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte = 0L)
+                val clientForCall = resolveClient(timeoutMs)
 
-            clientForCall.newCall(request).execute().use { resp ->
-                val headerPairs = flattenHeaders(resp.headers)
-                val responseBody = resp.body?.bytes() ?: ByteArray(0)
-                HttpResponse(
-                    statusCode = resp.code,
-                    headers = headerPairs,
-                    bodyBytes = responseBody,
-                    errorMessage = null,
-                )
+                clientForCall.newCall(request).execute().use { resp ->
+                    val headerPairs = flattenHeaders(resp.headers)
+                    val responseBody = resp.body?.bytes() ?: ByteArray(0)
+                    HttpResponse(
+                        statusCode = resp.code,
+                        headers = headerPairs,
+                        bodyBytes = responseBody,
+                        errorMessage = null,
+                    )
+                }
             }
         } catch (e: Throwable) {
             HttpResponse(

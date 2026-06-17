@@ -80,7 +80,7 @@ class RunAnywhereEmbeddings {
       );
     }
     lifecycleRequest.modelId = modelId;
-    return DartBridgeEmbeddings.shared.embedBatch(lifecycleRequest);
+    return DartBridgeEmbeddings.shared.embedBatchAsync(lifecycleRequest);
   }
 
   Future<void> unload() async {

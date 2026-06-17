@@ -64,9 +64,12 @@ class _VLMCameraViewState extends State<VLMCameraView> {
 
   @override
   void dispose() {
+    // Remove the listener BEFORE stopAutoStreaming(): it calls notifyListeners(),
+    // which would otherwise fire _onViewModelChanged → setState() on this
+    // already-unmounting element (the defunct-element assertion crash).
+    _viewModel.removeListener(_onViewModelChanged);
     _viewModel.stopAutoStreaming();
     _viewModel.disposeCamera();
-    _viewModel.removeListener(_onViewModelChanged);
     _viewModel.dispose();
     super.dispose();
   }

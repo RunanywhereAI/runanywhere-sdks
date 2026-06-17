@@ -6,8 +6,10 @@
  */
 
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <map>
 #include <mutex>
 #include <random>
@@ -41,6 +43,19 @@ struct rac_telemetry_manager {
     // HTTP callback
     rac_telemetry_http_callback_t http_callback;
     void* http_user_data;
+
+    // Isolate-safe HTTP delivery (poll-queue). When http_wakeup is set, flush
+    // enqueues each request here and signals http_wakeup instead of invoking
+    // http_callback directly — see rac_telemetry_manager_poll_http_request.
+    struct PendingHttpRequest {
+        std::string endpoint;
+        std::string json;
+        bool requires_auth;
+    };
+    std::deque<PendingHttpRequest> http_queue;
+    std::mutex http_queue_mutex;
+    rac_telemetry_http_wakeup_callback_t http_wakeup = nullptr;
+    void* http_wakeup_user_data = nullptr;
 
     // Event queue
     std::vector<rac_telemetry_payload_t> queue;
@@ -262,6 +277,47 @@ void rac_telemetry_manager_set_http_callback(rac_telemetry_manager_t* manager,
     manager->http_user_data = user_data;
 }
 
+void rac_telemetry_manager_set_http_wakeup(rac_telemetry_manager_t* manager,
+                                           rac_telemetry_http_wakeup_callback_t callback,
+                                           void* user_data) {
+    if (!manager)
+        return;
+
+    manager->http_wakeup = callback;
+    manager->http_wakeup_user_data = user_data;
+}
+
+rac_result_t rac_telemetry_manager_poll_http_request(rac_telemetry_manager_t* manager,
+                                                     rac_proto_buffer_t* out) {
+    if (!manager || !out) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    rac_telemetry_manager::PendingHttpRequest req;
+    {
+        std::lock_guard<std::mutex> lock(manager->http_queue_mutex);
+        if (manager->http_queue.empty()) {
+            return RAC_ERROR_NOT_FOUND;
+        }
+        req = std::move(manager->http_queue.front());
+        manager->http_queue.pop_front();
+    }
+
+    // Framing: [u8 requires_auth][u32 LE endpoint_len][endpoint utf8][json utf8].
+    const uint32_t endpoint_len = static_cast<uint32_t>(req.endpoint.size());
+    std::vector<uint8_t> framed;
+    framed.reserve(5 + req.endpoint.size() + req.json.size());
+    framed.push_back(req.requires_auth ? 1u : 0u);
+    framed.push_back(static_cast<uint8_t>(endpoint_len & 0xFFu));
+    framed.push_back(static_cast<uint8_t>((endpoint_len >> 8) & 0xFFu));
+    framed.push_back(static_cast<uint8_t>((endpoint_len >> 16) & 0xFFu));
+    framed.push_back(static_cast<uint8_t>((endpoint_len >> 24) & 0xFFu));
+    framed.insert(framed.end(), req.endpoint.begin(), req.endpoint.end());
+    framed.insert(framed.end(), req.json.begin(), req.json.end());
+
+    return rac_proto_buffer_copy(framed.data(), framed.size(), out);
+}
+
 // =============================================================================
 // EVENT TRACKING
 // =============================================================================
@@ -307,8 +363,8 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
     RAC_LOG_DEBUG("Telemetry", "Telemetry event queued: %s", payload->event_type);
 
     // Auto-flush logic
-    if (!manager->http_callback) {
-        RAC_LOG_DEBUG("Telemetry", "HTTP callback not set, skipping auto-flush");
+    if (!manager->http_callback && !manager->http_wakeup) {
+        RAC_LOG_DEBUG("Telemetry", "HTTP delivery not set, skipping auto-flush");
         return RAC_SUCCESS;
     }
 
@@ -993,7 +1049,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
     rac_result_t result = rac_telemetry_manager_track(manager, &payload);
 
     if (result == RAC_SUCCESS && manager->environment != RAC_ENV_DEVELOPMENT && is_completion &&
-        manager->http_callback) {
+        (manager->http_callback || manager->http_wakeup)) {
         RAC_LOG_DEBUG("Telemetry", "Completion event detected, triggering immediate flush");
         rac_telemetry_manager_flush(manager);
     }
@@ -1019,8 +1075,8 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    if (!manager->http_callback) {
-        RAC_LOG_DEBUG("Telemetry", "No HTTP callback registered, cannot flush telemetry");
+    if (!manager->http_callback && !manager->http_wakeup) {
+        RAC_LOG_DEBUG("Telemetry", "No HTTP delivery registered, cannot flush telemetry");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
@@ -1094,7 +1150,19 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
 
         const std::string endpoint = std::string(RAC_ENDPOINT_TELEMETRY_V2_PREFIX) + modality;
         RAC_LOG_DEBUG("Telemetry", "POST %s (%zu bytes): %.500s", endpoint.c_str(), json_len, json);
-        manager->http_callback(manager->http_user_data, endpoint.c_str(), json, json_len, RAC_TRUE);
+        if (manager->http_wakeup) {
+            // Isolate-safe path: enqueue an owned copy and signal the platform to
+            // drain it from its own thread/isolate (see poll_http_request). Used
+            // by Flutter, whose Dart FFI data callbacks are isolate-bound.
+            {
+                std::lock_guard<std::mutex> lock(manager->http_queue_mutex);
+                manager->http_queue.push_back({endpoint, std::string(json, json_len), true});
+            }
+            manager->http_wakeup(manager->http_wakeup_user_data);
+        } else if (manager->http_callback) {
+            manager->http_callback(manager->http_user_data, endpoint.c_str(), json, json_len,
+                                   RAC_TRUE);
+        }
         free(json);
     }
 
