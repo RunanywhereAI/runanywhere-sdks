@@ -248,13 +248,22 @@ public final class Logging: @unchecked Sendable {
             output += " | \(metaStr)"
         }
 
-        // Always print when local logging is enabled (controlled by configuration)
-        // The enableLocalLogging flag already controls whether this method is called
-        // swiftlint:disable:next no_print_statements
-        print(output)
+        // Route through os.Logger so the system log privacy controls apply.
+        // Message is already sanitized by sanitizeMessage(); mark .public so it
+        // appears in release Console.app captures without double-redaction.
+        let osLog = Logger(subsystem: Self.logSubsystem, category: entry.category)
+        switch entry.level {
+        case .debug:   osLog.debug("\(output, privacy: .public)")
+        case .info:    osLog.info("\(output, privacy: .public)")
+        case .warning: osLog.warning("\(output, privacy: .public)")
+        case .error:   osLog.error("\(output, privacy: .public)")
+        case .fault:   osLog.fault("\(output, privacy: .public)")
+        }
     }
 
-    // MARK: - Metadata Sanitization
+    // MARK: - Sanitization
+
+    private static let logSubsystem = "com.runanywhere.sdk"
 
     /// Determines if a metadata key should be redacted by delegating to the
     /// canonical C++ policy (`rac_log_metadata_should_redact`). Keeps Swift
@@ -263,6 +272,47 @@ public final class Logging: @unchecked Sendable {
         var out: rac_bool_t = 0
         let rc = key.withCString { rac_log_metadata_should_redact($0, &out) }
         return rc == RAC_SUCCESS && out != 0
+    }
+
+    /// Redacts credential values embedded directly in a log message string.
+    ///
+    /// Two patterns are applied in sequence:
+    /// - `key=value` / `key: value` — explicit `=` or `:` separators only, preventing
+    ///   false positives on phrases like "token count: 5" or "password required".
+    /// - `Bearer <token>` — HTTP Authorization scheme (space-separated, 8+ char value).
+    ///   `basic` is intentionally excluded as it appears too often in ordinary prose.
+    private static let sensitiveMessagePatterns: [(NSRegularExpression, String)] = {
+        let specs: [(String, String)] = [
+            // Bearer scheme FIRST: must run before the key=value pattern so that
+            // "Authorization: Bearer <token>" has its token captured here before
+            // the next pattern can consume "Bearer" as the credential value.
+            // Minimum 8 chars to avoid matching short English words.
+            (#"(?i)(bearer)(\s+)([A-Za-z0-9+/=._\-]{8,})"#,
+             "$1$2[REDACTED]"),
+            // Group 1: keyword  Group 2: separator (= or : only)  Group 3: value
+            // "authorization" is safe to include here because the Bearer token has
+            // already been redacted by the pattern above.
+            (#"(?i)(api[_\-]?key|apikey|secret|password|token|auth[_\-]?key|authorization|credential)(\s*[=:]\s*)(\S+)"#,
+             "$1$2[REDACTED]"),
+        ]
+        return specs.map { (patternString, template) in
+            do {
+                return (try NSRegularExpression(pattern: patternString, options: []), template)
+            } catch {
+                preconditionFailure("Invalid sanitization regex '\(patternString)': \(error)")
+            }
+        }
+    }()
+
+    private func sanitizeMessage(_ message: String) -> String {
+        var result = message
+        for (pattern, template) in Self.sensitiveMessagePatterns {
+            let range = NSRange(result.startIndex..., in: result)
+            result = pattern.stringByReplacingMatches(
+                in: result, options: [], range: range, withTemplate: template
+            )
+        }
+        return result
     }
 
     private func sanitizeMetadata(_ metadata: [String: Any]?) -> [String: Any]? { // swiftlint:disable:this prefer_concrete_types avoid_any_type
