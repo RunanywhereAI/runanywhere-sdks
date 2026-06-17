@@ -20,9 +20,50 @@ ONNX_RUNTIME_VERSION="${ONNX_RUNTIME_VERSION:-${ONNX_VERSION_LINUX}}"
 SRC_DIR="${ONNX_RUNTIME_SRC_DIR:-${WASM_DIR}/third_party/onnxruntime}"
 DEST_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm"
 BUILD_CONFIG="${ONNX_RUNTIME_BUILD_CONFIG:-Release}"
-ORT_BUILD_DIR="${SRC_DIR}/build/MacOS/${BUILD_CONFIG}"
+case "$(uname -s)" in
+  Darwin) _ORT_OS_DIR="MacOS" ;;
+  *)      _ORT_OS_DIR="Linux" ;;
+esac
+ORT_BUILD_DIR="${SRC_DIR}/build/${_ORT_OS_DIR}/${BUILD_CONFIG}"
 
 mkdir -p "$(dirname "${SRC_DIR}")" "${DEST_DIR}/lib" "${DEST_DIR}/include"
+
+# --- Prebuilt WASM bundle (download-first; mirrors the Android prebuilt .so) ---
+# The matched ORT+sherpa WASM static libs are published on the sherpa-onnx-rac
+# release. Download + extract instead of the ~30-60 min from-source build.
+# Force a source build with RAC_WASM_BUILD_FROM_SOURCE=1; override the source
+# repo/tag with RAC_WASM_PREBUILT_REPO / RAC_WASM_PREBUILT_TAG.
+if [ "${RAC_WASM_BUILD_FROM_SOURCE:-0}" != "1" ]; then
+  if [ -f "${DEST_DIR}/lib/libonnxruntime.a" ]; then
+    echo "ONNX Runtime WASM already vendored: ${DEST_DIR}/lib/libonnxruntime.a"
+    exit 0
+  fi
+  _RAC_TP="${REPO_ROOT}/sdk/runanywhere-commons/third_party"
+  _RAC_REPO="${RAC_WASM_PREBUILT_REPO:-${SHERPA_ONNX_REPO_ANDROID:-Siddhesh2377/sherpa-onnx-rac}}"
+  _RAC_TAG="${RAC_WASM_PREBUILT_TAG:-v${SHERPA_ONNX_VERSION_LINUX}}"
+  _RAC_TARBALL="sherpa-onnx-${_RAC_TAG}-wasm.tar.bz2"
+  _RAC_URL="https://github.com/${_RAC_REPO}/releases/download/${_RAC_TAG}/${_RAC_TARBALL}"
+  _RAC_CACHE="${WASM_DIR}/third_party/${_RAC_TARBALL}"
+  if [ ! -f "${_RAC_CACHE}" ]; then
+    echo "Downloading prebuilt WASM bundle: ${_RAC_URL}"
+    if curl -fL --retry 3 -o "${_RAC_CACHE}.part" "${_RAC_URL}"; then
+      mv "${_RAC_CACHE}.part" "${_RAC_CACHE}"
+    else
+      echo "Prebuilt download failed; falling back to from-source build."
+      rm -f "${_RAC_CACHE}.part"
+    fi
+  fi
+  if [ -f "${_RAC_CACHE}" ]; then
+    mkdir -p "${_RAC_TP}"
+    tar -xjf "${_RAC_CACHE}" -C "${_RAC_TP}" onnxruntime-wasm sherpa-onnx-wasm
+    if [ -f "${DEST_DIR}/lib/libonnxruntime.a" ]; then
+      echo "Vendored ONNX Runtime WASM from prebuilt bundle: ${DEST_DIR}/lib/libonnxruntime.a"
+      exit 0
+    fi
+    echo "Prebuilt extract did not produce libonnxruntime.a; falling back to from-source build."
+  fi
+fi
+# --- from-source build (reached if RAC_WASM_BUILD_FROM_SOURCE=1 or download failed) ---
 
 if [ ! -d "${SRC_DIR}/.git" ]; then
   rm -rf "${SRC_DIR}"
@@ -66,6 +107,7 @@ set +e
   --enable_wasm_simd \
   --skip_tests \
   --disable_rtti \
+  --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-12}" \
   --cmake_extra_defines CMAKE_POLICY_VERSION_MINIMUM=3.5
 BUILD_RC=$?
 set -e
