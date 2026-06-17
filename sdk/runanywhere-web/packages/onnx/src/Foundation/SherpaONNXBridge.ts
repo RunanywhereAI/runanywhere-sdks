@@ -35,6 +35,7 @@ import {
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
   SDKException,
   SDKLogger,
+  TelemetryBridge,
   completeDeferredServicesInitialization,
   completeNativePhase1ForModule,
   missingSpeechBackendExports,
@@ -176,6 +177,7 @@ export class SherpaONNXBridge {
     if (!this._module || (!this._onnxBackendRegistered && !this._sherpaBackendRegistered)) {
       this._loaded = false;
       if (this._bridgeOwnedInit && this._module) {
+        TelemetryBridge.uninstall(this._module);
         try {
           this._module._rac_shutdown?.();
         } catch (err) {
@@ -226,6 +228,9 @@ export class SherpaONNXBridge {
     this._loaded = false;
 
     if (this._bridgeOwnedInit) {
+      if (this._module) {
+        TelemetryBridge.uninstall(this._module);
+      }
       try {
         this._module._rac_shutdown?.();
       } catch (err) {

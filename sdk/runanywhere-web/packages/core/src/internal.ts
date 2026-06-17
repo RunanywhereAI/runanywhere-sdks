@@ -115,6 +115,8 @@ export type {
 } from './Adapters/HTTPAdapter';
 export { FetchHttpTransport } from './Adapters/FetchHttpTransport';
 export type { FetchHttpTransportModule } from './Adapters/FetchHttpTransport';
+export { TelemetryBridge } from './Adapters/TelemetryBridge';
+export type { TelemetryInstallParams } from './Adapters/TelemetryBridge';
 
 export { ModelRegistryAdapter } from './Adapters/ModelRegistryAdapter';
 export type {

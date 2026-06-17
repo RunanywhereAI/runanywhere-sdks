@@ -265,7 +265,15 @@ export class FetchHttpTransport {
         }
       }
       if (req.timeoutMs > 0) {
-        xhr.timeout = req.timeoutMs;
+        // A synchronous XHR in a document forbids setting `timeout`
+        // (InvalidAccessError) — the same class of restriction already handled
+        // for `responseType` above. The browser applies its own network
+        // timeout, so swallow the throw instead of failing the whole request.
+        try {
+          xhr.timeout = req.timeoutMs;
+        } catch {
+          /* sync XHR from a document: timeout not settable; ignored. */
+        }
       }
 
       const t0 =
@@ -366,9 +374,14 @@ export class FetchHttpTransport {
         }
       }
       if (req.timeoutMs > 0) {
-        // XHR timeout is only honoured for async requests per spec; the
-        // field is still set for observability.
-        xhr.timeout = req.timeoutMs;
+        // XHR timeout is only honoured for async requests per spec; setting it
+        // on a synchronous XHR in a document throws InvalidAccessError, so guard
+        // it the same way `responseType` is guarded above.
+        try {
+          xhr.timeout = req.timeoutMs;
+        } catch {
+          /* sync XHR from a document: timeout not settable; ignored. */
+        }
       }
 
       const t0 =

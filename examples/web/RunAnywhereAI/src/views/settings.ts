@@ -72,7 +72,11 @@ export function getGenerationSettings(): GenerationSettings {
 export function getStoredApiKey(): string | null {
   loadSettings();
   const value = settings.apiKey.trim();
-  return value.length > 0 ? value : null;
+  if (value.length > 0) return value;
+  // Fallback to a gitignored .env.local (VITE_RUNANYWHERE_API_KEY) so the app
+  // can boot pre-authenticated for local testing without typing in Settings.
+  const envValue = import.meta.env.VITE_RUNANYWHERE_API_KEY?.trim();
+  return envValue && envValue.length > 0 ? envValue : null;
 }
 
 /**
@@ -82,7 +86,8 @@ export function getStoredApiKey(): string | null {
  */
 export function getStoredBaseURL(): string | null {
   loadSettings();
-  const trimmed = settings.baseURL.trim();
+  const trimmed = settings.baseURL.trim()
+    || (import.meta.env.VITE_RUNANYWHERE_BASE_URL?.trim() ?? '');
   if (trimmed.length === 0) return null;
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed;

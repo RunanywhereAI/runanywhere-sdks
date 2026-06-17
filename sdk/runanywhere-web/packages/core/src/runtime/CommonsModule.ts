@@ -27,6 +27,7 @@ import { SDKLogger } from '../Foundation/SDKLogger';
 import { ProtoErrorCode, SDKException } from '../Foundation/SDKException';
 import { PlatformAdapter, type PlatformAdapterModule } from './PlatformAdapter';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter';
+import { TelemetryBridge } from '../Adapters/TelemetryBridge';
 import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
 import {
   getModuleForCapability,
@@ -154,6 +155,11 @@ export class CommonsModule {
   }
 
   private _teardown(): void {
+    if (this._module) {
+      // Detach the telemetry sink + destroy the manager before rac_shutdown
+      // tears down this module's commons.
+      TelemetryBridge.uninstall(this._module);
+    }
     if (this._module && this._loaded) {
       try {
         this._module._rac_shutdown?.();

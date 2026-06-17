@@ -895,6 +895,15 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_auth_is_authenticated"
     "_rac_auth_get_user_id"
     "_rac_auth_get_organization_id"
+    # Access token (JWT) accessor — lets the TS TelemetryBridge attach the
+    # Authorization: Bearer header for staging/production telemetry POSTs.
+    "_rac_auth_get_access_token"
+    # Session accessors + setter — the TS TelemetryBridge replays the core
+    # module's JWT session into the backend WASM modules (llamacpp/onnx) so
+    # their commons authenticates and per-module telemetry flush stops deferring.
+    "_rac_auth_get_refresh_token"
+    "_rac_auth_get_token_expires_at"
+    "_rac_auth_handle_authenticate_response"
     "_rac_state_is_device_registered"
 
     # Telemetry

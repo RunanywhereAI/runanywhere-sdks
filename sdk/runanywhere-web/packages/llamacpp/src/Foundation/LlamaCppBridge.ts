@@ -23,6 +23,7 @@ import {
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
   SDKException,
   SDKLogger,
+  TelemetryBridge,
   registerWasmModule,
   unregisterWasmModule,
   type AccelerationMode,
@@ -206,6 +207,9 @@ export class LlamaCppBridge {
   }
 
   private _teardown(): void {
+    if (this._module) {
+      TelemetryBridge.uninstall(this._module);
+    }
     if (this._module && this._loaded) {
       try {
         this._module._rac_shutdown?.();

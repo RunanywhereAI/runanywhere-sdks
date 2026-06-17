@@ -153,7 +153,7 @@ function getBrowserName(ua: string): string {
   return 'Unknown Browser';
 }
 
-function getOSVersion(ua: string): string {
+export function getOSVersion(ua: string): string {
   if (ua.includes('Windows')) return 'Windows';
   if (ua.includes('Mac OS X')) return 'macOS';
   if (ua.includes('Linux')) return 'Linux';

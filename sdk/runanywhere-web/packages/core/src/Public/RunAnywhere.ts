@@ -47,6 +47,8 @@ import { SDKLogger } from '../Foundation/SDKLogger';
 import { requestPersistentStorage } from '../Infrastructure/BrowserStorage';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { OPFSBridge } from '../Infrastructure/OPFSBridge';
+import { getOSVersion } from '../Infrastructure/DeviceCapabilities';
+import { TelemetryBridge } from '../Adapters/TelemetryBridge';
 import {
   frameworkOPFSDir,
   primaryFilenameFromModel,
@@ -294,6 +296,23 @@ function throwIfSdkInitFailed(result: ProtoSdkInitResult | null, phase: string):
 }
 
 export function completeNativePhase1ForModule(module: EmscriptenRunanywhereModule): void {
+  const environment = _initOptions?.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+
+  // Wire the C++ telemetry manager + event sink for THIS module. The Web SDK
+  // loads three independent WASM modules (core / llamacpp / onnx), each with
+  // its own commons event router and telemetry sink, so telemetry is wired per
+  // module — ahead of the global phase1-proto once-guard below, which only lets
+  // the first-loaded module run rac_sdk_init_phase1_proto. install() is
+  // idempotent per module.
+  TelemetryBridge.install(module, {
+    environment,
+    baseUrl: _initOptions?.baseURL ?? '',
+    deviceId: ensureDeviceId(),
+    deviceModel: 'Browser',
+    osVersion: getOSVersion(typeof navigator !== 'undefined' ? navigator.userAgent : ''),
+    sdkVersion: SDK_VERSION,
+  });
+
   if (_hasCompletedNativePhase1) return;
   const sdkModule = module as SdkInitModule;
   if (typeof sdkModule._rac_sdk_init_phase1_proto !== 'function') {
@@ -303,7 +322,6 @@ export function completeNativePhase1ForModule(module: EmscriptenRunanywhereModul
     return;
   }
 
-  const environment = _initOptions?.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
   const bytes = SdkInitPhase1Request.encode({
     environment: mapSdkInitEnvironment(environment),
     apiKey: _initOptions?.apiKey ?? '',
@@ -676,6 +694,9 @@ async function retryHTTPSetup(): Promise<void> {
       logger.debug(`HTTP/Auth retry warning: ${result.warning}`);
     }
     if (_hasCompletedHTTPSetup) {
+      // Auth succeeded late (offline init then online retry) — propagate the
+      // core session into backend modules for their telemetry flush.
+      TelemetryBridge.syncAuthToBackendModules();
       logger.info('HTTP/Auth setup succeeded on retry');
     }
     return;
@@ -972,6 +993,10 @@ export const RunAnywhere = {
         _hasCompletedServicesInit = true;
         _hasCompletedHTTPSetup = httpConfigured;
         if (httpConfigured) {
+          // Core just authenticated — replay its JWT session into the backend
+          // WASM modules so their LLM/VLM/STT/TTS/VAD telemetry stops deferring
+          // on the per-module auth gate.
+          TelemetryBridge.syncAuthToBackendModules();
           logger.debug('Services initialization complete (Phase 2)');
         } else {
           logger.debug('Services initialization complete (Phase 2, HTTP/auth deferred — will retry on next online call)');
@@ -1736,6 +1761,13 @@ export const RunAnywhere = {
 
   async shutdown(): Promise<void> {
     logger.info('Shutting down RunAnywhere Web SDK...');
+
+    // Detach + destroy each module's telemetry manager before the registry is
+    // cleared (a final flush runs inside uninstall). Idempotent with the
+    // per-module teardown in CommonsModule / the backend bridges.
+    for (const m of getAllRegisteredModules()) {
+      TelemetryBridge.uninstall(m);
+    }
 
     // Clear every WASM adapter singleton that `setRunanywhereModule()`
     // installed (DownloadAdapter, ModelLifecycleAdapter,
