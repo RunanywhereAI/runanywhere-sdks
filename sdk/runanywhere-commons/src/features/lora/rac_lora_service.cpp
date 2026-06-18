@@ -210,7 +210,7 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 }
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
-                        const char* error) {
+                        const char* error, const char* model_id = nullptr) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -224,6 +224,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_LLM);
+    if (model_id != nullptr && model_id[0] != '\0') {
+        cap->set_model_id(model_id);  // base model — telemetry "base_model_id"
+    }
     if (operation) {
         event.set_operation_id(operation);
         cap->set_operation(operation);
@@ -519,7 +522,7 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
         auto* info = result.add_adapters();
         *info = applied_info;
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED,
-                           "lora.apply", nullptr);
+                           "lora.apply", nullptr, base_model_id.c_str());
     }
 
     result.set_success(true);

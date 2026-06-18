@@ -277,14 +277,19 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_int("max_tokens", payload->max_tokens);
         json.add_int("image_count", payload->image_count);
     } else if (strcmp(modality, "rag") == 0) {
-        // Only retrieved_docs_count has a data source today; the other RAG fields
-        // (query_token_count, embedding_model, top_k, …) are optional and omitted.
+        // retrieved_docs_count / top_k / retrieval_time_ms have sources today
+        // (top_k + retrieval_time via the properties carrier). query_token_count
+        // / embedding_model / reranker_used / context_tokens still need carriers.
         json.add_int("retrieved_docs_count", payload->retrieved_docs_count);
+        json.add_int("top_k", payload->top_k);
+        json.add_double("retrieval_time_ms", payload->retrieval_time_ms);
     } else if (strcmp(modality, "embeddings") == 0) {
-        // input_count / vectors_produced / embedding_model have sources today;
-        // embedding_dimension / total_tokens / batch_size need a proto carrier.
+        // input_count / vectors_produced / embedding_model / embedding_dimension
+        // have sources today (dimension via the properties carrier).
+        // total_tokens / batch_size still need a carrier.
         json.add_int("input_count", payload->input_count);
         json.add_int("vectors_produced", payload->vectors_produced);
+        json.add_int("embedding_dimension", payload->embedding_dimension);
         json.add_string("embedding_model", payload->model_id);
     } else if (strcmp(modality, "voice") == 0) {
         // Per-turn voice-agent pipeline summary (from MetricsEvent).

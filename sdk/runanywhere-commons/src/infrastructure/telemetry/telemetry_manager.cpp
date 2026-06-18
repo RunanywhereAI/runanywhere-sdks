@@ -964,15 +964,32 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     payload.output_tokens = static_cast<int32_t>(c.output_count());
                     payload.total_tokens = payload.input_tokens + payload.output_tokens;
                     break;
-                case runanywhere::v1::SDK_COMPONENT_RAG:
+                case runanywhere::v1::SDK_COMPONENT_RAG: {
                     payload.retrieved_docs_count = static_cast<int32_t>(c.output_count());
+                    // top_k / retrieval_time_ms ride the properties carrier.
+                    auto tk_it = ev.properties().find("top_k");
+                    if (tk_it != ev.properties().end()) {
+                        payload.top_k = static_cast<int32_t>(std::atoi(tk_it->second.c_str()));
+                    }
+                    auto rt_it = ev.properties().find("retrieval_time_ms");
+                    if (rt_it != ev.properties().end()) {
+                        payload.retrieval_time_ms = std::atof(rt_it->second.c_str());
+                    }
                     break;
-                case runanywhere::v1::SDK_COMPONENT_EMBEDDINGS:
+                }
+                case runanywhere::v1::SDK_COMPONENT_EMBEDDINGS: {
                     // input_count = texts embedded, output_count = vectors produced.
                     // embedding_model is read from model_id (set above) in the JSON.
                     payload.input_count = static_cast<int32_t>(c.input_count());
                     payload.vectors_produced = static_cast<int32_t>(c.output_count());
+                    // embedding_dimension rides the properties carrier (no proto field).
+                    auto dim_it = ev.properties().find("embedding_dimension");
+                    if (dim_it != ev.properties().end()) {
+                        payload.embedding_dimension =
+                            static_cast<int32_t>(std::atoi(dim_it->second.c_str()));
+                    }
                     break;
+                }
                 default:
                     break;
             }

@@ -111,8 +111,13 @@ typedef struct rac_telemetry_payload {
     int32_t retrieved_docs_count;
 
     // Embeddings-specific fields (embedding_model is read from model_id)
-    int32_t input_count;       // texts embedded in the op
-    int32_t vectors_produced;  // vectors returned
+    int32_t input_count;        // texts embedded in the op
+    int32_t vectors_produced;   // vectors returned
+    int32_t embedding_dimension;  // vector dimension (via properties carrier)
+
+    // RAG-specific extras (via properties carrier; retrieved_docs_count above)
+    int32_t top_k;
+    double retrieval_time_ms;
 
     // Voice-agent per-turn pipeline fields (from MetricsEvent)
     double voice_stt_ms;
