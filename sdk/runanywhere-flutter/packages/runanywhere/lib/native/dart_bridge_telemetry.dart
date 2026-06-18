@@ -107,7 +107,15 @@ class DartBridgeTelemetry {
       final deviceModel = await _getDeviceModel();
       final osVersion = Platform.operatingSystemVersion;
       const sdkVersion = '0.19.13';
-      const platform = 'flutter';
+      // platform is the OS family (matches iOS "ios"/"macos", Kotlin "android",
+      // and the backend telemetry_events.platform contract), NOT the binding.
+      final platform = Platform.isAndroid
+          ? 'android'
+          : Platform.isIOS
+              ? 'ios'
+              : Platform.isMacOS
+                  ? 'macos'
+                  : 'flutter';
 
       // Create telemetry manager
       final createManager = lib.lookupFunction<

@@ -533,8 +533,15 @@ void _getDeviceInfoCallback(
     _cachedDeviceInfoPtrs.add(appIdPtr);
     outInfo.ref.appIdentifier = appIdPtr;
 
-    // Platform
-    final platformPtr = 'flutter'.toNativeUtf8();
+    // Platform = OS family (matches iOS/Kotlin + backend contract), not binding.
+    final platformName = Platform.isAndroid
+        ? 'android'
+        : Platform.isIOS
+            ? 'ios'
+            : Platform.isMacOS
+                ? 'macos'
+                : 'flutter';
+    final platformPtr = platformName.toNativeUtf8();
     _cachedDeviceInfoPtrs.add(platformPtr);
     outInfo.ref.platform = platformPtr;
   } catch (e) {

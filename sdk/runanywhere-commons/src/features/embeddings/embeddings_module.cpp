@@ -636,6 +636,14 @@ rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_p
                                           "EmbeddingsRequest.texts is required");
     }
 
+    // Telemetry: the lifecycle embed path is the one platform SDKs call, so it
+    // must publish the embeddings capability events (the component-handle path's
+    // publishes never fire for them). input_count = texts; output_count =
+    // vectors produced (extracted into the embeddings V2 row).
+    const int64_t embed_start_ms = now_ms();
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED,
+                       "embeddings.embed", 0.0f, static_cast<int64_t>(texts.size()), 0, nullptr);
+
     rac_embeddings_options_t options = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
     if (request.has_options() &&
         !rac::foundation::rac_embeddings_options_from_proto(request.options(), &options)) {
@@ -654,6 +662,7 @@ rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_p
     rac_embeddings_result_t raw = {};
     rc = rac_embeddings_embed_batch(&service, c_texts.data(), c_texts.size(), &options, &raw);
     if (rc != RAC_SUCCESS) {
+        publish_failure(rc, "embeddings.embed", rac_error_message(rc));
         rac::lifecycle::release_lifecycle_embeddings(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
@@ -671,6 +680,10 @@ rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_p
     }
     result.set_model_id(ref.model_id ? ref.model_id : "");
     result.set_request_id(request.request_id());
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED,
+                       "embeddings.embed", 1.0f, static_cast<int64_t>(texts.size()),
+                       static_cast<int64_t>(result.vectors_size()), nullptr,
+                       static_cast<double>(now_ms() - embed_start_ms));
     rc = copy_proto(result, out_result);
     rac_embeddings_result_free(&raw);
     rac::lifecycle::release_lifecycle_embeddings(&ref);
