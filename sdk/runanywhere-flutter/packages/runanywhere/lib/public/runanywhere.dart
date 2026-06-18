@@ -484,6 +484,16 @@ abstract final class RunAnywhere {
 
       final phase1DeviceId = await DartBridgeDevice.instance.getDeviceId();
 
+      // Attach the telemetry sink BEFORE DartBridge.initialize below: commons
+      // emits INITIALIZATION_STAGE_STARTED/COMPLETED ("system" modality) during
+      // Phase-1 core init, so the sink must already be registered or those
+      // events hit a null sink and are dropped (the manager queues them; Phase 2
+      // owns the flush). Without this, the "system" telemetry table never fills.
+      DartBridgeTelemetry.attachSinkPhase1(
+        environment: params.environment,
+        deviceId: phase1DeviceId,
+      );
+
       // --- Phase 1: Core init (sync after Flutter async device-id lookup) ---
       // Phase-1 failures (invalid env, library load) propagate to the
       // caller via the surrounding try / rethrow.

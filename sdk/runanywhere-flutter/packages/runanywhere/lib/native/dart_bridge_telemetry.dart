@@ -73,7 +73,75 @@ class DartBridgeTelemetry {
     }
   }
 
-  /// Initialize telemetry manager with device info (full async init)
+  /// Create the telemetry manager and attach it as the C++ event router's
+  /// telemetry sink, in Phase 1 — BEFORE commons emits the
+  /// INITIALIZATION_STAGE_STARTED/COMPLETED events from rac_sdk_init_phase1_proto.
+  /// Without this the "system" modality never lands: those init events fire
+  /// during Phase-1 core init, and if the sink is only attached in Phase 2 they
+  /// hit a null sink and are dropped. The manager queues events immediately;
+  /// the actual flush still waits for Phase 2 (HTTP layer configured). Device
+  /// info (async model lookup) is filled in later by [initialize].
+  static void attachSinkPhase1({
+    required SDKEnvironment environment,
+    required String deviceId,
+  }) {
+    if (_managerPtr != null) return;
+    _environment = environment;
+    try {
+      _createManagerAndAttach(PlatformLoader.loadCommons(), environment, deviceId);
+      _logger.debug('Telemetry sink attached in Phase 1');
+    } catch (e) {
+      _logger.debug('Phase-1 telemetry attach failed: $e');
+    }
+  }
+
+  /// Create the manager (env/device/platform/sdk), register the HTTP wake-up,
+  /// and attach the telemetry sink. Shared by [attachSinkPhase1] (Phase 1) and
+  /// the [initialize] fallback (when Phase-1 attach didn't run). Does NOT set
+  /// device info or mark initialized.
+  static void _createManagerAndAttach(
+      DynamicLibrary lib, SDKEnvironment environment, String deviceId) {
+    const sdkVersion = '0.19.13';
+    // platform is the OS family (matches iOS "ios"/"macos", Kotlin "android",
+    // and the backend telemetry_events.platform contract), NOT the binding.
+    final platform = Platform.isAndroid
+        ? 'android'
+        : Platform.isIOS
+            ? 'ios'
+            : Platform.isMacOS
+                ? 'macos'
+                : 'flutter';
+
+    final createManager = lib.lookupFunction<
+        Pointer<Void> Function(Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
+        Pointer<Void> Function(int, Pointer<Utf8>, Pointer<Utf8>,
+            Pointer<Utf8>)>('rac_telemetry_manager_create');
+
+    final deviceIdPtr = deviceId.toNativeUtf8();
+    final platformPtr = platform.toNativeUtf8();
+    final sdkVersionPtr = sdkVersion.toNativeUtf8();
+    try {
+      final ptr = createManager(
+          _environmentToInt(environment), deviceIdPtr, platformPtr, sdkVersionPtr);
+      if (ptr == nullptr) {
+        _logger.warning('Failed to create telemetry manager');
+        return;
+      }
+      _managerPtr = ptr;
+      // Register the HTTP wake-up + attach the sink so the router feeds events
+      // into the manager (queued until Phase-2 flush).
+      _registerHttpCallback();
+      _setTelemetrySink(ptr);
+    } finally {
+      calloc.free(deviceIdPtr);
+      calloc.free(platformPtr);
+      calloc.free(sdkVersionPtr);
+    }
+  }
+
+  /// Complete telemetry init (Phase 2): fill in device info. Reuses the manager
+  /// created in Phase 1 via [attachSinkPhase1]; only creates one here as a
+  /// fallback (gated on a real baseURL) if Phase-1 attach never ran.
   static Future<void> initialize({
     required SDKEnvironment environment,
     required String deviceId,
@@ -83,94 +151,47 @@ class DartBridgeTelemetry {
       _logger.debug('Telemetry already initialized');
       return;
     }
-
-    // Only the baseURL must be real here. The auth token is not available
-    // until Phase 2 auth completes (this runs before it) and is applied at
-    // send time — Kotlin parity: CppBridgeTelemetry.initialize has no token
-    // gate. Gating on accessToken skipped telemetry permanently because it is
-    // always null at init, so the manager and C++ sink were never created.
-    if (!DartBridgeDevConfig.isUsableCredential(baseURL)) {
-      _logger.warning(
-        'Telemetry skipped — baseURL looks like a placeholder. '
-        'Set a real base URL via dart-define or runtime config.',
-      );
-      _isInitialized = true; // Suppress retry.
-      return;
-    }
-
     _environment = environment;
 
     try {
       final lib = PlatformLoader.loadCommons();
 
-      // Get device info
-      final deviceModel = await _getDeviceModel();
-      final osVersion = Platform.operatingSystemVersion;
-      const sdkVersion = '0.19.13';
-      // platform is the OS family (matches iOS "ios"/"macos", Kotlin "android",
-      // and the backend telemetry_events.platform contract), NOT the binding.
-      final platform = Platform.isAndroid
-          ? 'android'
-          : Platform.isIOS
-              ? 'ios'
-              : Platform.isMacOS
-                  ? 'macos'
-                  : 'flutter';
-
-      // Create telemetry manager
-      final createManager = lib.lookupFunction<
-          Pointer<Void> Function(
-              Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-          Pointer<Void> Function(int, Pointer<Utf8>, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_telemetry_manager_create');
-
-      final envValue = _environmentToInt(environment);
-      final deviceIdPtr = deviceId.toNativeUtf8();
-      final platformPtr = platform.toNativeUtf8();
-      final sdkVersionPtr = sdkVersion.toNativeUtf8();
-
-      try {
-        _managerPtr =
-            createManager(envValue, deviceIdPtr, platformPtr, sdkVersionPtr);
-
-        if (_managerPtr == nullptr ||
-            _managerPtr == Pointer<Void>.fromAddress(0)) {
-          _logger.warning('Failed to create telemetry manager');
+      if (_managerPtr == null) {
+        // Fallback: Phase-1 attach didn't run. The auth token isn't available
+        // yet (applied at send time — Kotlin parity); only the baseURL must be
+        // real, else creating a manager that can never flush is wasteful.
+        if (!DartBridgeDevConfig.isUsableCredential(baseURL)) {
+          _logger.warning(
+            'Telemetry skipped — baseURL looks like a placeholder. '
+            'Set a real base URL via dart-define or runtime config.',
+          );
+          _isInitialized = true; // Suppress retry.
           return;
         }
-
-        // Set device info
-        final setDeviceInfo = lib.lookupFunction<
-            Void Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>),
-            void Function(Pointer<Void>, Pointer<Utf8>,
-                Pointer<Utf8>)>('rac_telemetry_manager_set_device_info');
-
-        final deviceModelPtr = deviceModel.toNativeUtf8();
-        final osVersionPtr = osVersion.toNativeUtf8();
-
-        setDeviceInfo(_managerPtr!, deviceModelPtr, osVersionPtr);
-
-        calloc.free(deviceModelPtr);
-        calloc.free(osVersionPtr);
-
-        // Register HTTP callback
-        _registerHttpCallback();
-
-        // Attach this manager as the C++ event router's telemetry sink. The
-        // router (`rac::events::route`) forwards every event whose destination
-        // carries the TELEMETRY bit into the manager via
-        // `rac_telemetry_manager_track_proto` and does the per-event translation
-        // internally — Dart no longer forwards per-event analytics. Mirrors
-        // Swift's `rac_events_set_telemetry_sink(mgr.ptr)`.
-        _setTelemetrySink(_managerPtr!);
-
-        _isInitialized = true;
-        _logger.debug('Telemetry manager initialized');
-      } finally {
-        calloc.free(deviceIdPtr);
-        calloc.free(platformPtr);
-        calloc.free(sdkVersionPtr);
+        _createManagerAndAttach(lib, environment, deviceId);
       }
+
+      if (_managerPtr == null || _managerPtr == nullptr) {
+        _isInitialized = true;
+        return;
+      }
+
+      // Device info — the model lookup is async, so it only happens here in
+      // Phase 2 (the Phase-1 attach creates the manager without it).
+      final deviceModel = await _getDeviceModel();
+      final osVersion = Platform.operatingSystemVersion;
+      final setDeviceInfo = lib.lookupFunction<
+          Void Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>),
+          void Function(Pointer<Void>, Pointer<Utf8>,
+              Pointer<Utf8>)>('rac_telemetry_manager_set_device_info');
+      final deviceModelPtr = deviceModel.toNativeUtf8();
+      final osVersionPtr = osVersion.toNativeUtf8();
+      setDeviceInfo(_managerPtr!, deviceModelPtr, osVersionPtr);
+      calloc.free(deviceModelPtr);
+      calloc.free(osVersionPtr);
+
+      _isInitialized = true;
+      _logger.debug('Telemetry manager initialized');
     } catch (e, stack) {
       _logger.debug('Telemetry initialization error: $e', metadata: {
         'stack': stack.toString(),
