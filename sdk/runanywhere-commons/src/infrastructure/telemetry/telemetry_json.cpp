@@ -263,8 +263,10 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_string("voice", payload->voice);
         json.add_double("output_duration_ms", payload->output_duration_ms);
     } else if (strcmp(modality, "vlm") == 0) {
-        // VLM = LLM token fields PLUS vision fields. Only image_count has a data
-        // source today; the other vision fields are optional and omitted.
+        // VLM = LLM token fields PLUS vision fields. The token fields are now
+        // populated via the properties carrier (input/total tokens, tps, ttft,
+        // generation_time). The vision-specific fields (vision_tokens,
+        // vision_encode_time_ms, image_resolution) still need carriers.
         json.add_int("input_tokens", payload->input_tokens);
         json.add_int("output_tokens", payload->output_tokens);
         json.add_int("total_tokens", payload->total_tokens);
@@ -302,8 +304,11 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_double("silence_duration_ms", payload->silence_duration_ms);
         json.add_int("sample_rate", payload->sample_rate);
     } else if (strcmp(modality, "lora") == 0) {
-        // operation is encoded in event_type; base model rides on model_id.
+        // operation is encoded in event_type; base model rides on model_id;
+        // adapter_id via the properties carrier. adapter_size_bytes still needs
+        // a source (would require stat-ing the adapter file).
         json.add_string("base_model_id", payload->model_id);
+        json.add_string("adapter_id", payload->adapter_id);
     } else if (strcmp(modality, "imagegen") == 0) {
         // Diffusion capability events carry only progress, which the imagegen
         // schema does not accept — emit base fields only until diffusion supplies

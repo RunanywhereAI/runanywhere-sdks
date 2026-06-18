@@ -210,7 +210,8 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 }
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
-                        const char* error, const char* model_id = nullptr) {
+                        const char* error, const char* model_id = nullptr,
+                        const char* adapter_id = nullptr) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -233,6 +234,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     }
     if (error)
         cap->set_error(error);
+    if (adapter_id != nullptr && adapter_id[0] != '\0') {
+        (*event.mutable_properties())["adapter_id"] = adapter_id;
+    }
     publish_event(event);
 }
 
@@ -522,7 +526,8 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
         auto* info = result.add_adapters();
         *info = applied_info;
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED,
-                           "lora.apply", nullptr, base_model_id.c_str());
+                           "lora.apply", nullptr, base_model_id.c_str(),
+                           config.adapter_id().c_str());
     }
 
     result.set_success(true);

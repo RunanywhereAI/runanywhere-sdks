@@ -130,6 +130,7 @@ void free_payload_strings(rac_telemetry_payload_t& event) {
     free((void*)event.language);
     free((void*)event.voice);
     free((void*)event.archive_type);
+    free((void*)event.adapter_id);
 }
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -347,6 +348,7 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
     copy.language = dup_string(payload->language);
     copy.voice = dup_string(payload->voice);
     copy.archive_type = dup_string(payload->archive_type);
+    copy.adapter_id = dup_string(payload->adapter_id);
 
     {
         std::lock_guard<std::mutex> lock(manager->queue_mutex);
@@ -952,18 +954,46 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             switch (c.kind()) {
                 case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED:
                 case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED:
-                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED:
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED: {
                     payload.modality = "lora";
+                    // adapter_id rides the properties carrier; points into `ev`,
+                    // dup'd when the payload is queued (rac_telemetry_manager_track).
+                    auto ad_it = ev.properties().find("adapter_id");
+                    if (ad_it != ev.properties().end()) {
+                        payload.adapter_id = ad_it->second.c_str();
+                    }
                     break;
+                }
                 default:
                     break;
             }
             switch (ev.component()) {
-                case runanywhere::v1::SDK_COMPONENT_VLM:
+                case runanywhere::v1::SDK_COMPONENT_VLM: {
                     payload.image_count = static_cast<int32_t>(c.input_count());
                     payload.output_tokens = static_cast<int32_t>(c.output_count());
-                    payload.total_tokens = payload.input_tokens + payload.output_tokens;
+                    // LLM-style token metrics ride the properties carrier; the VLM
+                    // V2 row carries them alongside image_count.
+                    auto in_it = ev.properties().find("input_tokens");
+                    if (in_it != ev.properties().end()) {
+                        payload.input_tokens = static_cast<int32_t>(std::atoi(in_it->second.c_str()));
+                    }
+                    auto tot_it = ev.properties().find("total_tokens");
+                    payload.total_tokens =
+                        tot_it != ev.properties().end()
+                            ? static_cast<int32_t>(std::atoi(tot_it->second.c_str()))
+                            : payload.input_tokens + payload.output_tokens;
+                    auto tps_it = ev.properties().find("tokens_per_second");
+                    if (tps_it != ev.properties().end()) {
+                        payload.tokens_per_second = std::atof(tps_it->second.c_str());
+                    }
+                    auto ttft_it = ev.properties().find("time_to_first_token_ms");
+                    if (ttft_it != ev.properties().end()) {
+                        payload.time_to_first_token_ms = std::atof(ttft_it->second.c_str());
+                    }
+                    // generation_time ≈ processing_time (set from duration_ms above).
+                    payload.generation_time_ms = payload.processing_time_ms;
                     break;
+                }
                 case runanywhere::v1::SDK_COMPONENT_RAG: {
                     payload.retrieved_docs_count = static_cast<int32_t>(c.output_count());
                     // top_k / retrieval_time_ms ride the properties carrier.

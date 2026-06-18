@@ -119,6 +119,10 @@ typedef struct rac_telemetry_payload {
     int32_t top_k;
     double retrieval_time_ms;
 
+    // LoRA-specific field (operation rides event_type; base model on model_id).
+    // String → must be dup'd/freed in track + payload_free.
+    const char* adapter_id;
+
     // Voice-agent per-turn pipeline fields (from MetricsEvent)
     double voice_stt_ms;
     double voice_llm_ms;

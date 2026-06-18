@@ -990,7 +990,9 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         float progress, int64_t input_count, int64_t output_count,
                         const char* error, double duration_ms = 0.0,
-                        const char* model_id = nullptr) {
+                        const char* model_id = nullptr, int64_t input_tokens = 0,
+                        int64_t total_tokens = 0, double tokens_per_second = 0.0,
+                        double ttft_ms = 0.0) {
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, (error != nullptr && error[0] != '\0')
                                   ? runanywhere::v1::ERROR_SEVERITY_ERROR
@@ -1014,6 +1016,20 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     // the envelope properties map (see telemetry_manager kCapability extraction).
     if (duration_ms > 0.0) {
         (*event.mutable_properties())["duration_ms"] = std::to_string(duration_ms);
+    }
+    // VLM token metrics ride the properties carrier (the VLM V2 row carries the
+    // LLM-style token fields; output_tokens comes from output_count above).
+    if (input_tokens > 0) {
+        (*event.mutable_properties())["input_tokens"] = std::to_string(input_tokens);
+    }
+    if (total_tokens > 0) {
+        (*event.mutable_properties())["total_tokens"] = std::to_string(total_tokens);
+    }
+    if (tokens_per_second > 0.0) {
+        (*event.mutable_properties())["tokens_per_second"] = std::to_string(tokens_per_second);
+    }
+    if (ttft_ms > 0.0) {
+        (*event.mutable_properties())["time_to_first_token_ms"] = std::to_string(ttft_ms);
     }
     publish_event(event);
 }
@@ -1517,7 +1533,10 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     }
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
                        "vlm.generate", 1.0f, 1, result.completion_tokens(), nullptr,
-                       static_cast<double>(result.processing_time_ms()), ref.model_id);
+                       static_cast<double>(result.processing_time_ms()), ref.model_id,
+                       result.prompt_tokens(), result.total_tokens(),
+                       static_cast<double>(result.tokens_per_second()),
+                       static_cast<double>(result.time_to_first_token_ms()));
     rac_vlm_result_free(&raw);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
@@ -1620,7 +1639,9 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
                                    nullptr, 0);
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
                            "vlm.stream", 1.0f, 1, ctx.token_count, nullptr,
-                           static_cast<double>(elapsed_ms), ref.model_id);
+                           static_cast<double>(elapsed_ms), ref.model_id, result.prompt_tokens(),
+                           result.total_tokens(), static_cast<double>(result.tokens_per_second()),
+                           static_cast<double>(result.time_to_first_token_ms()));
     }
 
     free_vlm_image(&image);
