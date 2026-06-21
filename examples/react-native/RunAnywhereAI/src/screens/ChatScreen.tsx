@@ -40,10 +40,10 @@ import {
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, IconSize } from '../theme/spacing';
-import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
+import { ModelRequiredOverlay } from '../components/common';
+import { ChatHeader } from '../features/chat/components/ChatHeader';
 import {
   MessageBubble,
-  TypingIndicator,
   ChatInput,
   ToolCallingBadge,
   LoRASheet,
@@ -276,10 +276,10 @@ export const ChatScreen: React.FC = () => {
    * Handle model selected from the sheet
    */
   const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
-    // Close the modal first to prevent UI issues
-    setShowModelSelection(false);
-    // Then load the model
+    // The sheet shows its own Loading spinner during the await; once the model
+    // is loaded we close it so the user lands directly in the chat.
     await loadModel(model);
+    setShowModelSelection(false);
   }, []);
 
   /**
@@ -430,6 +430,7 @@ export const ChatScreen: React.FC = () => {
         role: MessageRole.Assistant,
         content: '',
         timestamp: new Date(),
+        isStreaming: true,
         modelInfo: {
           modelId: currentModel?.id || 'unknown',
           modelName: currentModel?.name || 'Unknown Model',
@@ -520,6 +521,7 @@ export const ChatScreen: React.FC = () => {
                 role: MessageRole.Assistant,
                 content: accumulatedText,
                 timestamp: new Date(),
+                isStreaming: true,
                 modelInfo: {
                   modelId: currentModel?.id || 'unknown',
                   modelName: currentModel?.name || 'Unknown Model',
@@ -698,165 +700,92 @@ export const ChatScreen: React.FC = () => {
    * Render header with actions
    */
   const renderHeader = () => (
-    <View
-      style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}
-    >
-      {/* Conversations list button */}
-      <TouchableOpacity
-        style={styles.headerButton}
-        onPress={() => setShowConversationList(true)}
-      >
-        <Icon name="list" size={22} color={Colors.primaryBlue} />
-      </TouchableOpacity>
-
-      {/* Title with conversation count */}
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>Chat</Text>
-        {conversations.length > 1 && (
-          <Text style={styles.conversationCount}>
-            {conversations.length} conversations
-          </Text>
-        )}
-      </View>
-
-      <View style={styles.headerActions}>
-        {/* New chat button */}
-        <TouchableOpacity style={styles.headerButton} onPress={handleNewChat}>
-          <Icon name="add" size={24} color={Colors.primaryBlue} />
-        </TouchableOpacity>
-
-        {/* Info button for chat analytics */}
-        <TouchableOpacity
-          style={[
-            styles.headerButton,
-            messages.length === 0 && styles.headerButtonDisabled,
-          ]}
-          onPress={handleShowAnalytics}
-          disabled={messages.length === 0}
-        >
-          <Icon
-            name="information-circle-outline"
-            size={22}
-            color={
-              messages.length > 0 ? Colors.primaryBlue : Colors.textTertiary
-            }
-          />
-        </TouchableOpacity>
-      </View>
-    </View>
+    <ChatHeader
+      modelName={currentModel?.name}
+      ready={!!currentModel}
+      generating={isLoading}
+      hasMessages={messages.length > 0}
+      onModelPress={handleSelectModel}
+      onAnalytics={handleShowAnalytics}
+      onHistory={() => setShowConversationList(true)}
+      onNewChat={handleNewChat}
+    />
   );
 
-  // Show model required overlay if no model
-  if (!currentModel && !isModelLoading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        {renderHeader()}
-        <ModelRequiredOverlay
-          modality="llm"
-          onSelectModel={handleSelectModel}
-        />
-
-        {/* Conversation List Modal */}
-        <Modal
-          visible={showConversationList}
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setShowConversationList(false)}
-        >
-          <ConversationListScreen
-            onClose={() => setShowConversationList(false)}
-            onSelectConversation={handleSelectConversation}
-          />
-        </Modal>
-
-        {/* Model Selection Sheet */}
-        <ModelSelectionSheet
-          visible={showModelSelection}
-          context={ModelSelectionContext.LLM}
-          onClose={() => setShowModelSelection(false)}
-          onModelSelected={handleModelSelected}
-        />
-      </SafeAreaView>
-    );
-  }
+  const showOverlay = !currentModel && !isModelLoading;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {renderHeader()}
 
-      {/* Model Status Banner */}
-      <ModelStatusBanner
-        modelName={currentModel?.name}
-        framework={currentModel?.preferredFramework}
-        isLoading={isModelLoading}
-        onSelectModel={handleSelectModel}
-      />
-
-      {/* Messages List */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={[
-          styles.messagesList,
-          messages.length === 0 && styles.emptyList,
-        ]}
-        ListEmptyComponent={renderEmptyState}
-        showsVerticalScrollIndicator={false}
-      />
-
-      {/* Typing Indicator */}
-      {isLoading && <TypingIndicator />}
-
-      {/* Tool Calling Badge (shows when tools are enabled) */}
-      {currentModel && registeredToolCount > 0 && (
-        <ToolCallingBadge toolCount={registeredToolCount} />
-      )}
-
-      {/* LoRA pill (mirrors iOS ChatMessageListView's LoRA row above input) */}
-      {currentModel && (
-        <View style={styles.loraRow}>
-          <TouchableOpacity
-            style={[
-              styles.loraPill,
-              loraAdapterCount > 0 && styles.loraPillActive,
+      {showOverlay ? (
+        <ModelRequiredOverlay modality="llm" onSelectModel={handleSelectModel} />
+      ) : (
+        <>
+          {/* Messages List */}
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={[
+              styles.messagesList,
+              messages.length === 0 && styles.emptyList,
             ]}
-            onPress={() => setShowLoRASheet(true)}
-          >
-            <Icon
-              name="sparkles"
-              size={14}
-              color={
-                loraAdapterCount > 0 ? Colors.textWhite : Colors.primaryPurple
-              }
-            />
-            <Text
-              style={[
-                styles.loraPillText,
-                loraAdapterCount > 0 && styles.loraPillTextActive,
-              ]}
-            >
-              {loraAdapterCount > 0 ? `LoRA x${loraAdapterCount}` : '+ LoRA'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+            ListEmptyComponent={renderEmptyState}
+            showsVerticalScrollIndicator={false}
+          />
 
-      {/* Input Area */}
-      <ChatInput
-        value={inputText}
-        onChangeText={setInputText}
-        onSend={handleSend}
-        onStop={handleStopGeneration}
-        disabled={!currentModel || !currentConversation}
-        isLoading={isLoading}
-        placeholder={
-          currentModel
-            ? 'Type a message...'
-            : 'Select a model to start chatting'
-        }
-      />
+          {/* Tool Calling Badge (shows when tools are enabled) */}
+          {currentModel && registeredToolCount > 0 && (
+            <ToolCallingBadge toolCount={registeredToolCount} />
+          )}
+
+          {/* LoRA pill (mirrors iOS ChatMessageListView's LoRA row above input) */}
+          {currentModel && (
+            <View style={styles.loraRow}>
+              <TouchableOpacity
+                style={[
+                  styles.loraPill,
+                  loraAdapterCount > 0 && styles.loraPillActive,
+                ]}
+                onPress={() => setShowLoRASheet(true)}
+              >
+                <Icon
+                  name="sparkles"
+                  size={14}
+                  color={
+                    loraAdapterCount > 0 ? Colors.textWhite : Colors.primaryPurple
+                  }
+                />
+                <Text
+                  style={[
+                    styles.loraPillText,
+                    loraAdapterCount > 0 && styles.loraPillTextActive,
+                  ]}
+                >
+                  {loraAdapterCount > 0 ? `LoRA x${loraAdapterCount}` : '+ LoRA'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Input Area */}
+          <ChatInput
+            value={inputText}
+            onChangeText={setInputText}
+            onSend={handleSend}
+            onStop={handleStopGeneration}
+            disabled={!currentModel || !currentConversation}
+            isLoading={isLoading}
+            placeholder={
+              currentModel
+                ? 'Type a message...'
+                : 'Select a model to start chatting'
+            }
+          />
+        </>
+      )}
 
       {/* Analytics Modal */}
       <Modal
@@ -871,37 +800,26 @@ export const ChatScreen: React.FC = () => {
         />
       </Modal>
 
-      {/* LoRA Adapter Management Modal */}
-      <Modal
+      {/* LoRA Adapter Management Sheet */}
+      <LoRASheet
         visible={showLoRASheet}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowLoRASheet(false)}
-      >
-        <LoRASheet
-          modelId={currentModel?.id ?? null}
-          onClose={() => setShowLoRASheet(false)}
-          onAdaptersChanged={(adapters) => setLoraAdapterCount(adapters.length)}
-        />
-      </Modal>
+        modelId={currentModel?.id ?? null}
+        onClose={() => setShowLoRASheet(false)}
+        onAdaptersChanged={(adapters) => setLoraAdapterCount(adapters.length)}
+      />
 
-      {/* Conversation List Modal */}
-      <Modal
+      {/* Conversation history sheet */}
+      <ConversationListScreen
         visible={showConversationList}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowConversationList(false)}
-      >
-        <ConversationListScreen
-          onClose={() => setShowConversationList(false)}
-          onSelectConversation={handleSelectConversation}
-        />
-      </Modal>
+        onClose={() => setShowConversationList(false)}
+        onSelectConversation={handleSelectConversation}
+      />
 
       {/* Model Selection Sheet */}
       <ModelSelectionSheet
         visible={showModelSelection}
         context={ModelSelectionContext.LLM}
+        activeModelId={currentModel?.id ?? null}
         onClose={() => setShowModelSelection(false)}
         onModelSelected={handleModelSelected}
       />

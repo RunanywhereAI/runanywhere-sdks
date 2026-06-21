@@ -17,44 +17,7 @@ export * from './voice';
 // Settings types
 export * from './settings';
 
-// Navigation types - matching Swift sample app (ContentView.swift)
-// Tab 0: Chat
-// Tab 1: Vision
-// Tab 2: Voice
-// Tab 3: More
-// Tab 4: Settings
-export type RootTabParamList = {
-  Chat: undefined;
-  Vision: undefined;
-  Voice: undefined;
-  More: undefined;
-  Settings: undefined;
-};
-
-/** Vision tab stack: hub list -> VLM */
-export type VisionStackParamList = {
-  VisionHub: undefined;
-  VLM: undefined;
-};
-
-export type MoreStackParamList = {
-  MoreHome: undefined;
-  STT: undefined;
-  TTS: undefined;
-  RAG: undefined;
-  VAD: undefined;
-  Storage: undefined;
-  Solutions: undefined;
-};
-
-/**
- * Settings tab stack: settings home -> Benchmarks
- * (mirrors iOS CombinedSettingsView -> BenchmarkDashboardView)
- */
-export type SettingsStackParamList = {
-  SettingsHome: undefined;
-  Benchmarks: undefined;
-};
+// Navigation param lists live in src/navigation/navigation.types.ts (single graph).
 
 // Common utility types
 export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;

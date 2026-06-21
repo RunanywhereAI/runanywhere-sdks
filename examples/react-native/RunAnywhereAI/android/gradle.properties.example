@@ -11,10 +11,6 @@ android.enableJetifier=false
 # Set to true to use locally built native libraries
 # Set to false to download from GitHub releases
 runanywhere.useLocalNatives=true
-# Closed-source Genie/QNN Android prebuilts are excluded by default until a
-# 16 KB ELF-aligned package is available. Re-enable with this property plus
-# RUNANYWHERE_ENABLE_GENIE=1 for React Native autolinking.
-runanywhere.enableGenie=false
 
 # Gradle JVM Settings
 # Increase memory for React Native builds

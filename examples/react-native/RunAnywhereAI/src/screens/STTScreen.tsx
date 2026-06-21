@@ -1,25 +1,3 @@
-/**
- * STTScreen - Tab 1: Speech-to-Text
- *
- * Provides on-device speech recognition with real-time transcription.
- * Matches iOS SpeechToTextView architecture and patterns.
- *
- * Features:
- * - Batch mode: Record first, then transcribe
- * - Live mode: Real-time transcription (streaming)
- * - Model selection sheet
- * - Audio level visualization
- * - Model status banner
- *
- * Architecture:
- * - Uses the SDK's AudioCaptureManager (16kHz mono Int16 PCM chunks)
- * - Model loading via RunAnywhere.loadModel(ModelLoadRequest)
- * - Transcription via RunAnywhere.transcribe() with proto-canonical STT options
- * - Supports ONNX-based Whisper models
- *
- * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/SpeechToTextView.swift
- */
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
@@ -32,25 +10,19 @@ import {
   Animated,
   PermissionsAndroid,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius, ButtonHeight } from '../theme/spacing';
-import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
+import { Icon, useTheme } from '../theme/system';
+import { ModelRequiredOverlay } from '../components/common';
 import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
 import { STTMode } from '../types/voice';
 
-// Import RunAnywhere SDK (Multi-Package Architecture)
 import {
   RunAnywhere,
   AudioCaptureManager,
@@ -69,11 +41,10 @@ import {
 } from '@runanywhere/proto-ts/stt_options';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 
-/** SDK capture emits 16kHz mono Int16 PCM. */
 const CAPTURE_SAMPLE_RATE = 16000;
 const CAPTURE_BYTES_PER_MS = (CAPTURE_SAMPLE_RATE * 2) / 1000;
+const BAR_COUNT = 12;
 
-/** Wrap raw 16kHz mono Int16 PCM bytes in a WAV container. */
 function wrapPcm16InWav(pcmChunks: Uint8Array[]): Uint8Array {
   const dataSize = pcmChunks.reduce((sum, chunk) => sum + chunk.length, 0);
   const wav = new Uint8Array(44 + dataSize);
@@ -89,13 +60,13 @@ function wrapPcm16InWav(pcmChunks: Uint8Array[]): Uint8Array {
   view.setUint32(4, 36 + dataSize, true);
   writeString(8, 'WAVE');
   writeString(12, 'fmt ');
-  view.setUint32(16, 16, true); // PCM fmt chunk size
-  view.setUint16(20, 1, true); // PCM
-  view.setUint16(22, 1, true); // mono
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
   view.setUint32(24, CAPTURE_SAMPLE_RATE, true);
-  view.setUint32(28, CAPTURE_SAMPLE_RATE * 2, true); // byte rate
-  view.setUint16(32, 2, true); // block align
-  view.setUint16(34, 16, true); // bits per sample
+  view.setUint32(28, CAPTURE_SAMPLE_RATE * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
   writeString(36, 'data');
   view.setUint32(40, dataSize, true);
 
@@ -115,18 +86,19 @@ async function transcribePcmChunks(pcmChunks: Uint8Array[]) {
   });
 }
 
-// Canonical SDK methods (Swift parity).
 const listModels = async (): Promise<SDKModelInfo[]> =>
   (await RunAnywhere.listModels()).models?.models ?? [];
 const loadModelWithRequest = RunAnywhere.loadModel;
 
 export const STTScreen: React.FC = () => {
-  // State
+  const { colors, typography, dimens } = useTheme();
+  const insets = useSafeAreaInsets();
+
   const [mode, setMode] = useState<STTMode>(STTMode.Batch);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [partialTranscript, setPartialTranscript] = useState(''); // For live mode - current chunk
+  const [partialTranscript, setPartialTranscript] = useState('');
   const [confidence, setConfidence] = useState<number | null>(null);
   const [currentModel, setCurrentModel] = useState<SDKModelInfo | null>(null);
   const [isModelLoading, setIsModelLoading] = useState(false);
@@ -135,10 +107,6 @@ export const STTScreen: React.FC = () => {
   const [audioLevel, setAudioLevel] = useState(0);
   const [showModelSelection, setShowModelSelection] = useState(false);
 
-  // Safe area insets for header status bar handling
-  const insets = useSafeAreaInsets();
-
-  // SDK audio capture manager (one per screen instance)
   const captureManagerRef = useRef<AudioCaptureManager | null>(null);
   const getCaptureManager = (): AudioCaptureManager => {
     if (!captureManagerRef.current) {
@@ -147,36 +115,21 @@ export const STTScreen: React.FC = () => {
     return captureManagerRef.current;
   };
 
-  // Accumulated 16kHz mono Int16 PCM chunks for the in-flight recording
   const pcmChunksRef = useRef<Uint8Array[]>([]);
   const pcmBytesRef = useRef(0);
-
-  // Live mode accumulated transcript ref
   const accumulatedTranscriptRef = useRef('');
-
-  // Live mode streaming refs
   const liveAudioStreamRef = useRef<PushableAudioStream | null>(null);
   const liveTranscriptionTaskRef = useRef<Promise<void> | null>(null);
   const isLiveRecordingRef = useRef(false);
 
-  // Animation for recording indicator
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Start pulse animation when recording
   useEffect(() => {
     if (isRecording) {
       const pulse = Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.3,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
+          Animated.timing(pulseAnim, { toValue: 1.3, duration: 500, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
         ])
       );
       pulse.start();
@@ -186,112 +139,51 @@ export const STTScreen: React.FC = () => {
     }
   }, [isRecording, pulseAnim]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Stop live recording if active
       isLiveRecordingRef.current = false;
       liveAudioStreamRef.current?.close();
       liveAudioStreamRef.current = null;
-      // Stop the SDK capture manager
-      try {
-        captureManagerRef.current?.stopRecording();
-      } catch {
-        // Ignore — capture may never have started
-      }
+      try { captureManagerRef.current?.stopRecording(); } catch {}
       pcmChunksRef.current = [];
       pcmBytesRef.current = 0;
     };
   }, []);
 
-  /**
-   * Load available models and check for loaded model
-   * Called on mount and when screen comes into focus
-   */
   const loadModels = useCallback(async () => {
     try {
-      // Get available STT models from catalog
       const allModels = await listModels();
-      // Filter by category (speech-recognition) matching SDK's ModelCategory
       const sttModels = allModels.filter(
-        (m: SDKModelInfo) =>
-          m.category === ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+        (m: SDKModelInfo) => m.category === ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
       );
       setAvailableModels(sttModels);
-
-      // Log downloaded status for debugging
-      const downloadedModels = sttModels.filter((m) => m.isDownloaded);
-      console.warn(
-        '[STTScreen] Available STT models:',
-        sttModels.map((m) => `${m.id} (downloaded: ${m.isDownloaded})`)
-      );
-      console.warn(
-        '[STTScreen] Downloaded STT models:',
-        downloadedModels.map((m) => m.id)
-      );
-
-      // Ask the SDK for the loaded STT model directly.
       if (!currentModel) {
-        const loaded = await RunAnywhere.modelInfoForCategory(
-          ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-        );
-        if (loaded) {
-          setCurrentModel(loaded);
-          console.warn('[STTScreen] Loaded STT model:', loaded.name);
-        }
+        const loaded = await RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
+        if (loaded) setCurrentModel(loaded);
       }
     } catch (error) {
       console.warn('[STTScreen] Error loading models:', error);
     }
   }, [currentModel]);
 
-  // Refresh models when screen comes into focus
-  // This ensures we pick up any models downloaded in the Settings tab
   useFocusEffect(
-    useCallback(() => {
-      console.warn('[STTScreen] Screen focused - refreshing models');
-      loadModels();
-    }, [loadModels])
+    useCallback(() => { loadModels(); }, [loadModels])
   );
 
-  /**
-   * Handle model selection - opens model selection sheet
-   */
-  const handleSelectModel = useCallback(() => {
-    setShowModelSelection(true);
-  }, []);
+  const handleSelectModel = useCallback(() => { setShowModelSelection(true); }, []);
 
-  /**
-   * Handle model selected from the sheet
-   */
   const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
-    // Close the modal first to prevent UI issues
     setShowModelSelection(false);
-    // Then load the model
     await loadModel(model);
   }, []);
 
-  /**
-   * Load a model from its info via the canonical lifecycle ABI.
-   *
-   * Path-first loading was removed in V2 — model ID is the canonical handle
-   * and the native registry resolves the artifact path internally.
-   */
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      console.warn(
-        `[STTScreen] Loading model: ${model.id} (registry will resolve path)`
-      );
-
       if (!model.isDownloaded && !model.localPath) {
-        Alert.alert(
-          'Error',
-          'Model has not been downloaded. Open the model picker to download it first.'
-        );
+        Alert.alert('Error', 'Model has not been downloaded. Open the model picker to download it first.');
         return;
       }
-
       const result = await loadModelWithRequest(
         ModelLoadRequest.fromPartial({
           modelId: model.id,
@@ -300,44 +192,23 @@ export const STTScreen: React.FC = () => {
           validateAvailability: true,
         })
       );
-
       if (result.success) {
-        const isLoaded = await isModelLoadedForCategory(
-          ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-        );
+        const isLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
         if (isLoaded) {
-          const loaded = await RunAnywhere.modelInfoForCategory(
-            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-          );
+          const loaded = await RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
           setCurrentModel(loaded ?? model);
-          console.warn(
-            `[STTScreen] Model ${model.name} loaded successfully, currentModel set`
-          );
-        } else {
-          console.warn(
-            '[STTScreen] Model reported success but lifecycle currentModel() returned no STT model'
-          );
         }
       } else {
-        const error =
-          result.errorMessage ||
-          'Native model lifecycle returned an unsuccessful load result';
-        Alert.alert(
-          'Error',
-          `Failed to load model: ${error || 'Unknown error'}`
-        );
+        const error = result.errorMessage || 'Native model lifecycle returned an unsuccessful load result';
+        Alert.alert('Error', `Failed to load model: ${error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('[STTScreen] Error loading model:', error);
       Alert.alert('Error', `Failed to load model: ${error}`);
     } finally {
       setIsModelLoading(false);
     }
   };
 
-  /**
-   * Format duration in MM:SS
-   */
   const formatDuration = (ms: number): string => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -345,66 +216,38 @@ export const STTScreen: React.FC = () => {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  /**
-   * Request microphone permission
-   */
   const requestMicrophonePermission = async (): Promise<boolean> => {
     try {
       if (Platform.OS === 'ios') {
         const status = await check(PERMISSIONS.IOS.MICROPHONE);
-        console.warn('[STTScreen] iOS microphone permission status:', status);
-
-        if (status === RESULTS.GRANTED) {
-          return true;
-        }
-
+        if (status === RESULTS.GRANTED) return true;
         if (status === RESULTS.DENIED) {
           const result = await request(PERMISSIONS.IOS.MICROPHONE);
-          console.warn(
-            '[STTScreen] iOS microphone permission request result:',
-            result
-          );
           return result === RESULTS.GRANTED;
         }
-
         if (status === RESULTS.BLOCKED) {
-          Alert.alert(
-            'Microphone Permission Required',
-            'Please enable microphone access in Settings to use speech-to-text.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Open Settings', onPress: () => Linking.openSettings() },
-            ]
-          );
+          Alert.alert('Microphone Permission Required', 'Please enable microphone access in Settings.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]);
           return false;
         }
-
         return false;
       } else {
-        // Android
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          {
-            title: 'Microphone Permission',
-            message:
-              'RunAnywhereAI needs access to your microphone for speech-to-text.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
-        );
+        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, {
+          title: 'Microphone Permission',
+          message: 'RunAnywhereAI needs access to your microphone for speech-to-text.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        });
         return granted === PermissionsAndroid.RESULTS.GRANTED;
       }
     } catch (error) {
-      console.error('[STTScreen] Permission request error:', error);
       return false;
     }
   };
 
-  /**
-   * Begin SDK microphone capture, accumulating PCM chunks in memory.
-   * Audio level + recording duration come straight from the capture stream.
-   */
   const beginCapture = async (onChunk?: (chunk: Uint8Array) => void) => {
     const capture = getCaptureManager();
     pcmChunksRef.current = [];
@@ -421,9 +264,6 @@ export const STTScreen: React.FC = () => {
     });
   };
 
-  /**
-   * Drain the accumulated PCM chunks (resets the buffer).
-   */
   const drainCapturedChunks = (): Uint8Array[] => {
     const chunks = pcmChunksRef.current;
     pcmChunksRef.current = [];
@@ -431,64 +271,33 @@ export const STTScreen: React.FC = () => {
     return chunks;
   };
 
-  /**
-   * Start recording audio (batch mode)
-   */
   const startRecording = async () => {
     try {
-      console.warn('[STTScreen] Starting recording...');
-
-      // Request microphone permission first
       const hasPermission = await requestMicrophonePermission();
-      if (!hasPermission) {
-        console.warn('[STTScreen] Microphone permission denied');
-        return;
-      }
-
-      console.warn('[STTScreen] Starting SDK audio capture...');
+      if (!hasPermission) return;
       await beginCapture();
-
       setIsRecording(true);
       setTranscript('');
       setConfidence(null);
     } catch (error) {
-      console.error('[STTScreen] Error starting recording:', error);
       Alert.alert('Recording Error', `Failed to start recording: ${error}`);
     }
   };
 
-  /**
-   * Stop recording and transcribe the in-memory PCM buffer.
-   */
   const stopRecordingAndTranscribe = async () => {
     try {
-      console.warn('[STTScreen] Stopping recording...');
-
       getCaptureManager().stopRecording();
       setIsRecording(false);
       setIsProcessing(true);
 
       const chunks = drainCapturedChunks();
       const totalBytes = chunks.reduce((sum, c) => sum + c.length, 0);
-      console.warn('[STTScreen] Recording size:', totalBytes, 'bytes');
+      if (totalBytes < 1000) throw new Error('Recording too short');
 
-      if (totalBytes < 1000) {
-        throw new Error('Recording too short');
-      }
+      const isLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
+      if (!isLoaded) throw new Error('STT model not loaded');
 
-      // Check if model is loaded
-      const isLoaded = await isModelLoadedForCategory(
-        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-      );
-      if (!isLoaded) {
-        throw new Error('STT model not loaded');
-      }
-
-      console.warn('[STTScreen] Starting transcription...');
       const result = await transcribePcmChunks(chunks);
-
-      console.warn('[STTScreen] Transcription result:', result);
-
       if (result.text) {
         setTranscript(result.text);
         setConfidence(result.confidence);
@@ -496,9 +305,7 @@ export const STTScreen: React.FC = () => {
         setTranscript('(No speech detected)');
       }
     } catch (error: unknown) {
-      console.error('[STTScreen] Transcription error:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       Alert.alert('Transcription Error', errorMessage);
       setTranscript('');
     } finally {
@@ -508,28 +315,14 @@ export const STTScreen: React.FC = () => {
     }
   };
 
-  /**
-   * Start live transcription mode
-   */
   const startLiveTranscription = async () => {
     try {
-      console.warn('[STTScreen] Starting live transcription stream...');
-
       const hasPermission = await requestMicrophonePermission();
-      if (!hasPermission) {
-        console.warn('[STTScreen] Microphone permission denied');
-        return;
-      }
+      if (!hasPermission) return;
 
-      const isLoaded = await isModelLoadedForCategory(
-        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-      );
-      if (!isLoaded) {
-        Alert.alert('Model Not Loaded', 'Please load an STT model first.');
-        return;
-      }
+      const isLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
+      if (!isLoaded) { Alert.alert('Model Not Loaded', 'Please load an STT model first.'); return; }
 
-      // Reset state
       accumulatedTranscriptRef.current = '';
       setTranscript('');
       setPartialTranscript('Listening...');
@@ -545,25 +338,16 @@ export const STTScreen: React.FC = () => {
         sampleRate: CAPTURE_SAMPLE_RATE,
       });
       liveTranscriptionTaskRef.current = consumeLiveTranscription(partials);
-
       await beginCapture((chunk) => audioStream.push(chunk));
       setIsRecording(true);
-
-      console.warn('[STTScreen] Live transcription started');
     } catch (error) {
-      console.error('[STTScreen] Error starting live transcription:', error);
-      Alert.alert(
-        'Recording Error',
-        `Failed to start live transcription: ${error}`
-      );
+      Alert.alert('Recording Error', `Failed to start live transcription: ${error}`);
       isLiveRecordingRef.current = false;
       liveAudioStreamRef.current?.close();
     }
   };
 
-  const consumeLiveTranscription = async (
-    partials: AsyncIterable<STTPartialResult>
-  ) => {
+  const consumeLiveTranscription = async (partials: AsyncIterable<STTPartialResult>) => {
     const iterator = partials[Symbol.asyncIterator]();
     try {
       let step = await iterator.next();
@@ -590,28 +374,16 @@ export const STTScreen: React.FC = () => {
     }
   };
 
-  /**
-   * Stop live transcription and transcribe any remaining audio.
-   */
   const stopLiveTranscription = async () => {
-    console.warn('[STTScreen] Stopping live transcription...');
     isLiveRecordingRef.current = false;
-
     try {
       setIsProcessing(true);
       setPartialTranscript('Finalizing...');
-
       getCaptureManager().stopRecording();
       liveAudioStreamRef.current?.close();
       await liveTranscriptionTaskRef.current;
       liveAudioStreamRef.current = null;
       liveTranscriptionTaskRef.current = null;
-
-      console.warn('[STTScreen] Live transcription stopped');
-      console.warn(
-        '[STTScreen] Final transcript:',
-        accumulatedTranscriptRef.current
-      );
     } catch (error) {
       console.error('[STTScreen] Error stopping live transcription:', error);
     } finally {
@@ -623,35 +395,18 @@ export const STTScreen: React.FC = () => {
     }
   };
 
-  /**
-   * Toggle recording
-   */
   const handleToggleRecording = useCallback(async () => {
     if (isRecording) {
-      // Stop recording based on mode
-      if (mode === STTMode.Live) {
-        await stopLiveTranscription();
-      } else {
-        await stopRecordingAndTranscribe();
-      }
+      if (mode === STTMode.Live) await stopLiveTranscription();
+      else await stopRecordingAndTranscribe();
     } else {
-      if (!currentModel) {
-        Alert.alert('Model Required', 'Please select an STT model first.');
-        return;
-      }
-      // Start recording based on mode
-      if (mode === STTMode.Live) {
-        await startLiveTranscription();
-      } else {
-        await startRecording();
-      }
+      if (!currentModel) { Alert.alert('Model Required', 'Please select an STT model first.'); return; }
+      if (mode === STTMode.Live) await startLiveTranscription();
+      else await startRecording();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, currentModel, mode]);
 
-  /**
-   * Clear transcript
-   */
   const handleClear = useCallback(() => {
     setTranscript('');
     setPartialTranscript('');
@@ -659,463 +414,334 @@ export const STTScreen: React.FC = () => {
     accumulatedTranscriptRef.current = '';
   }, []);
 
-  /**
-   * Render mode selector
-   */
-  const renderModeSelector = () => (
-    <View style={styles.modeSelector}>
-      <TouchableOpacity
-        style={[
-          styles.modeButton,
-          mode === STTMode.Batch && styles.modeButtonActive,
-        ]}
-        onPress={() => setMode(STTMode.Batch)}
-        activeOpacity={0.7}
-      >
-        <Text
-          style={[
-            styles.modeButtonText,
-            mode === STTMode.Batch && styles.modeButtonTextActive,
-          ]}
-        >
-          Batch
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[
-          styles.modeButton,
-          mode === STTMode.Live && styles.modeButtonActive,
-        ]}
-        onPress={() => setMode(STTMode.Live)}
-        activeOpacity={0.7}
-      >
-        <Text
-          style={[
-            styles.modeButtonText,
-            mode === STTMode.Live && styles.modeButtonTextActive,
-          ]}
-        >
-          Live
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+  const busy = isRecording || isProcessing;
+  const recordButtonColor = !currentModel
+    ? colors.surfaceContainerHighest
+    : isRecording
+    ? colors.error
+    : colors.primary;
 
-  /**
-   * Render mode description
-   */
-  const renderModeDescription = () => (
-    <View style={styles.modeDescription}>
-      <Icon
-        name={
-          mode === STTMode.Batch ? 'document-text-outline' : 'pulse-outline'
-        }
-        size={20}
-        color={Colors.primaryBlue}
-      />
-      <Text style={styles.modeDescriptionText}>
-        {mode === STTMode.Batch
-          ? 'Record audio, then transcribe all at once for best accuracy.'
-          : 'Transcribes every few seconds while you speak.'}
-      </Text>
-    </View>
-  );
+  const modeDescriptionText =
+    mode === STTMode.Batch
+      ? 'Tap record, speak, then tap again to transcribe — all on-device.'
+      : 'Live mode transcribes each phrase as you pause. Tap to start.';
 
-  /**
-   * Render header
-   */
-  const renderHeader = () => (
-    <View
-      style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}
-    >
-      <Text style={styles.title}>Speech to Text</Text>
-      {transcript && (
-        <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-          <Icon name="close-circle" size={22} color={Colors.textSecondary} />
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-
-  /**
-   * Render audio level indicator
-   */
-  const renderAudioLevel = () => {
-    if (!isRecording) return null;
-
-    return (
-      <View style={styles.audioLevelContainer}>
-        <View style={styles.audioLevelTrack}>
-          <View
-            style={[
-              styles.audioLevelFill,
-              { width: `${Math.min(100, audioLevel * 100)}%` },
-            ]}
-          />
-        </View>
-        <Text style={styles.recordingTime}>
-          {formatDuration(recordingDuration)}
-        </Text>
-      </View>
-    );
-  };
-
-  // Show model required overlay if no model
   if (!currentModel && !isModelLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        {renderHeader()}
-        <ModelRequiredOverlay
-          modality="stt"
-          onSelectModel={handleSelectModel}
-        />
-        {/* Model Selection Sheet */}
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.topBar, { paddingTop: insets.top + dimens.spacing.sm }]}>
+          <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '700' }]}>
+            Speech to Text
+          </Text>
+        </View>
+        <ModelRequiredOverlay modality="stt" onSelectModel={handleSelectModel} />
         <ModelSelectionSheet
           visible={showModelSelection}
           context={ModelSelectionContext.STT}
           onClose={() => setShowModelSelection(false)}
           onModelSelected={handleModelSelected}
         />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {renderHeader()}
-
-      {/* Model Status Banner */}
-      <ModelStatusBanner
-        modelName={currentModel?.name}
-        framework={currentModel?.preferredFramework}
-        isLoading={isModelLoading}
-        onSelectModel={handleSelectModel}
-        placeholder="Select a speech model"
-      />
-
-      {/* Mode Selector */}
-      {renderModeSelector()}
-
-      {/* Mode Description */}
-      {renderModeDescription()}
-
-      {/* Audio Level Indicator */}
-      {renderAudioLevel()}
-
-      {/* Transcription Area */}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        style={styles.transcriptContainer}
-        contentContainerStyle={styles.transcriptContent}
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + dimens.spacing.lg, paddingHorizontal: dimens.screenPadding },
+        ]}
+        showsVerticalScrollIndicator={false}
       >
-        {transcript || partialTranscript ? (
-          <>
-            <Text style={styles.transcriptText}>
-              {transcript}
-              {partialTranscript ? (
-                <Text style={styles.partialTranscript}>
-                  {' '}
-                  {partialTranscript}
-                </Text>
-              ) : null}
+        {/* Header */}
+        <View style={[styles.headerSection, { gap: dimens.spacing.sm }]}>
+          <View style={[styles.iconCircle, { backgroundColor: colors.primaryContainer }]}>
+            <Icon name="transcribe" size={dimens.icon.lg} color={colors.onPrimaryContainer} />
+          </View>
+          <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '700' }]}>
+            Speech to Text
+          </Text>
+          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, textAlign: 'center' }]}>
+            {modeDescriptionText}
+          </Text>
+        </View>
+
+        {/* Mode Selector */}
+        <View style={[styles.modeContainer, { backgroundColor: colors.surfaceContainerHigh, marginTop: dimens.spacing.lg }]}>
+          <View style={styles.modePad}>
+            {([STTMode.Batch, STTMode.Live] as STTMode[]).map((option) => {
+              const selected = option === mode;
+              return (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.modeTab,
+                    { backgroundColor: selected ? colors.primary : 'transparent' },
+                  ]}
+                  onPress={() => !busy && !selected && setMode(option)}
+                  activeOpacity={0.8}
+                  disabled={busy}
+                >
+                  <Text
+                    style={[
+                      typography.labelLarge,
+                      { color: selected ? colors.onPrimary : colors.onSurfaceVariant, fontWeight: '600' },
+                    ]}
+                  >
+                    {option === STTMode.Batch ? 'Batch' : 'Live'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Model Card */}
+        <TouchableOpacity
+          style={[styles.modelCard, { backgroundColor: colors.surfaceContainerHigh, marginTop: dimens.spacing.lg }]}
+          onPress={handleSelectModel}
+          activeOpacity={0.7}
+        >
+          <Icon name="transcribe" size={dimens.icon.md} color={colors.primary} />
+          <View style={styles.modelCardText}>
+            <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>Model</Text>
+            <Text style={[typography.bodyLarge, { color: colors.onSurface }]} numberOfLines={1}>
+              {isModelLoading ? 'Loading…' : (currentModel?.name ?? 'Select a model')}
             </Text>
-            {confidence !== null && !isRecording && (
-              <View style={styles.confidenceContainer}>
-                <Text style={styles.confidenceLabel}>Confidence:</Text>
-                <Text style={styles.confidenceValue}>
+          </View>
+          <Icon name="chevronRight" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
+        </TouchableOpacity>
+
+        {/* Record Button */}
+        <View style={[styles.recordSection, { marginTop: dimens.spacing.xl }]}>
+          <TouchableOpacity
+            style={[styles.recordButton, { backgroundColor: recordButtonColor }]}
+            onPress={handleToggleRecording}
+            disabled={isProcessing || !currentModel}
+            activeOpacity={0.85}
+          >
+            <Icon
+              name={isRecording ? 'stop' : 'voice'}
+              size={40}
+              color={colors.onPrimary}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Status Line */}
+        <View style={[styles.statusLine, { marginTop: dimens.spacing.md }]}>
+          {isRecording ? (
+            <View style={[styles.statusCenter, { gap: dimens.spacing.sm }]}>
+              <LevelBars audioLevel={audioLevel} colors={colors} dimens={dimens} />
+              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
+                {mode === STTMode.Live ? 'Listening — pause to transcribe' : 'Recording…'}
+              </Text>
+              <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+                {formatDuration(recordingDuration)}
+              </Text>
+            </View>
+          ) : isProcessing ? (
+            <View style={[styles.statusRow, { gap: dimens.spacing.sm }]}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
+                Transcribing…
+              </Text>
+            </View>
+          ) : (
+            <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
+              {currentModel ? 'Tap to record' : 'Select a model to begin'}
+            </Text>
+          )}
+        </View>
+
+        {/* Transcript Card */}
+        {(transcript.length > 0 || partialTranscript.length > 0) && (
+          <View style={[styles.labeledSection, { marginTop: dimens.spacing.lg, gap: dimens.spacing.sm }]}>
+            <View style={styles.labelRow}>
+              <Text style={[typography.titleSmall, { color: colors.onSurfaceVariant }]}>Transcript</Text>
+              {transcript.length > 0 && (
+                <TouchableOpacity onPress={handleClear} hitSlop={8}>
+                  <Icon name="close" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh }]}>
+              <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>
+                {transcript}
+                {partialTranscript ? (
+                  <Text style={{ color: colors.onSurfaceVariant, fontStyle: 'italic' }}>
+                    {transcript ? ' ' : ''}{partialTranscript}
+                  </Text>
+                ) : null}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* No speech card — show after a completed transcription with empty result */}
+        {transcript === '' && !isRecording && !isProcessing && confidence !== null && (
+          <View style={[styles.labeledSection, { marginTop: dimens.spacing.lg, gap: dimens.spacing.sm }]}>
+            <Text style={[typography.titleSmall, { color: colors.onSurfaceVariant }]}>Transcript</Text>
+            <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh }]}>
+              <Text style={[typography.bodyLarge, { color: colors.onSurfaceVariant }]}>No speech recognized.</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Audio Stats */}
+        {confidence !== null && !isRecording && !isProcessing && (
+          <View style={[styles.labeledSection, { marginTop: dimens.spacing.lg, gap: dimens.spacing.sm }]}>
+            <Text style={[typography.titleSmall, { color: colors.onSurfaceVariant }]}>Audio stats</Text>
+            <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh }]}>
+              <View style={styles.statRow}>
+                <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>Confidence</Text>
+                <Text style={[typography.bodyMedium, { color: colors.onSurface, fontWeight: '600', fontVariant: ['tabular-nums'] }]}>
                   {Math.round(confidence * 100)}%
                 </Text>
               </View>
-            )}
-            {isRecording && mode === STTMode.Live && (
-              <View style={styles.liveIndicator}>
-                <Animated.View
-                  style={[
-                    styles.liveDot,
-                    { transform: [{ scale: pulseAnim }] },
-                  ]}
-                />
-                <Text style={styles.liveText}>Live transcribing...</Text>
-              </View>
-            )}
-          </>
-        ) : isProcessing ? (
-          <View style={styles.processingContainer}>
-            <Icon
-              name="hourglass-outline"
-              size={24}
-              color={Colors.textSecondary}
-            />
-            <Text style={styles.processingText}>Transcribing audio...</Text>
-          </View>
-        ) : isRecording ? (
-          <View style={styles.recordingContainer}>
-            <Animated.View
-              style={[
-                styles.recordingIndicator,
-                { transform: [{ scale: pulseAnim }] },
-              ]}
-            />
-            <Text style={styles.recordingText}>
-              {mode === STTMode.Live ? 'Live transcribing...' : 'Listening...'}
-            </Text>
-            <Text style={styles.recordingHint}>
-              {mode === STTMode.Live
-                ? 'Text will appear as you speak'
-                : 'Tap the button when done speaking'}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <Icon name="mic-outline" size={40} color={Colors.textTertiary} />
-            <Text style={styles.emptyText}>Tap the microphone to start</Text>
+            </View>
           </View>
         )}
+
+        <View style={{ height: insets.bottom + dimens.spacing.xl }} />
       </ScrollView>
 
-      {/* Record Button */}
-      <View style={styles.controlsContainer}>
-        <TouchableOpacity
-          style={[
-            styles.recordButton,
-            isRecording && styles.recordButtonActive,
-          ]}
-          onPress={handleToggleRecording}
-          disabled={isProcessing}
-          activeOpacity={0.8}
-        >
-          <Icon
-            name={isRecording ? 'stop' : 'mic'}
-            size={32}
-            color={Colors.textWhite}
-          />
-        </TouchableOpacity>
-        <Text style={styles.recordButtonLabel}>
-          {isRecording ? 'Tap to stop' : 'Tap to record'}
-        </Text>
-      </View>
-
-      {/* Model Selection Sheet */}
       <ModelSelectionSheet
         visible={showModelSelection}
         context={ModelSelectionContext.STT}
         onClose={() => setShowModelSelection(false)}
         onModelSelected={handleModelSelected}
       />
-    </SafeAreaView>
+    </View>
+  );
+};
+
+interface LevelBarsProps {
+  audioLevel: number;
+  colors: ReturnType<typeof useTheme>['colors'];
+  dimens: ReturnType<typeof useTheme>['dimens'];
+}
+
+const LevelBars: React.FC<LevelBarsProps> = ({ audioLevel, colors, dimens }) => {
+  const active = Math.floor(audioLevel * BAR_COUNT);
+  return (
+    <View style={[styles.levelBars, { gap: dimens.spacing.xs }]}>
+      {Array.from({ length: BAR_COUNT }, (_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.levelBar,
+            {
+              height: 8 + i * 2,
+              borderRadius: dimens.radius.full,
+              backgroundColor: i < active ? colors.success : colors.surfaceContainerHighest,
+            },
+          ]}
+        />
+      ))}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
   },
-  header: {
+  scroll: {
+    flex: 1,
+  },
+  content: {
+    alignItems: 'center',
+  },
+  topBar: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  headerSection: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeContainer: {
+    width: '100%',
+    borderRadius: 999,
+  },
+  modePad: {
+    flexDirection: 'row',
+    padding: 4,
+  },
+  modeTab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modelCard: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    borderRadius: 20,
+  },
+  modelCardText: {
+    flex: 1,
+    gap: 2,
+  },
+  recordSection: {
+    alignItems: 'center',
+  },
+  recordButton: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusLine: {
+    width: '100%',
+    alignItems: 'center',
+    minHeight: 40,
+  },
+  statusCenter: {
+    alignItems: 'center',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  levelBars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  levelBar: {
+    width: 5,
+  },
+  labeledSection: {
+    width: '100%',
+  },
+  labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Padding.padding16,
-    paddingTop: 0,
-    paddingBottom: Padding.padding12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
   },
-  title: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
+  card: {
+    borderRadius: 20,
+    padding: 16,
   },
-  clearButton: {
-    padding: Spacing.small,
-  },
-  modeSelector: {
+  statRow: {
     flexDirection: 'row',
-    marginHorizontal: Padding.padding16,
-    marginTop: Spacing.medium,
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.regular,
-    padding: Spacing.xSmall,
-  },
-  modeButton: {
-    flex: 1,
-    paddingVertical: Spacing.smallMedium,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderRadius: BorderRadius.small,
-  },
-  modeButtonActive: {
-    backgroundColor: Colors.backgroundPrimary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  modeButtonText: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-  },
-  modeButtonTextActive: {
-    color: Colors.textPrimary,
-    fontWeight: '600',
-  },
-  modeDescription: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.smallMedium,
-    marginHorizontal: Padding.padding16,
-    marginTop: Spacing.medium,
-    padding: Padding.padding12,
-    backgroundColor: Colors.badgeBlue,
-    borderRadius: BorderRadius.regular,
-  },
-  modeDescriptionText: {
-    ...Typography.footnote,
-    color: Colors.primaryBlue,
-    flex: 1,
-  },
-  audioLevelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: Padding.padding16,
-    marginTop: Spacing.medium,
-    gap: Spacing.medium,
-  },
-  audioLevelTrack: {
-    flex: 1,
-    height: 4,
-    backgroundColor: Colors.backgroundGray5,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  audioLevelFill: {
-    height: '100%',
-    backgroundColor: Colors.primaryGreen,
-  },
-  recordingTime: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    minWidth: 40,
-    textAlign: 'right',
-  },
-  transcriptContainer: {
-    flex: 1,
-    marginHorizontal: Padding.padding16,
-    marginTop: Spacing.large,
-  },
-  transcriptContent: {
-    flex: 1,
-  },
-  transcriptText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    lineHeight: 26,
-  },
-  partialTranscript: {
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  liveIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-    marginTop: Spacing.medium,
-    paddingTop: Spacing.medium,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primaryRed,
-  },
-  liveText: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-  },
-  confidenceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-    marginTop: Spacing.medium,
-    paddingTop: Spacing.medium,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-  },
-  confidenceLabel: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-  },
-  confidenceValue: {
-    ...Typography.footnote,
-    color: Colors.primaryGreen,
-    fontWeight: '600',
-  },
-  processingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.medium,
-  },
-  processingText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  recordingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.medium,
-  },
-  recordingIndicator: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.primaryRed,
-  },
-  recordingText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
-  recordingHint: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.medium,
-  },
-  emptyText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  controlsContainer: {
-    alignItems: 'center',
-    paddingVertical: Padding.padding20,
-    paddingBottom: Padding.padding40,
-  },
-  recordButton: {
-    width: ButtonHeight.large,
-    height: ButtonHeight.large,
-    borderRadius: ButtonHeight.large / 2,
-    backgroundColor: Colors.primaryBlue,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: Colors.primaryBlue,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  recordButtonActive: {
-    backgroundColor: Colors.primaryRed,
-    shadowColor: Colors.primaryRed,
-  },
-  recordButtonLabel: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    marginTop: Spacing.smallMedium,
   },
 });
 

@@ -14,6 +14,20 @@ const bufbuildWireCjs = path.join(
   'dist/cjs/wire/binary-encoding.js'
 );
 
+const defaultConfig = getDefaultConfig(__dirname);
+// Allow Metro to resolve .mjs/.cjs entry points (default sourceExts omit them).
+defaultConfig.resolver.sourceExts.push('mjs', 'cjs');
+
+// Don't crawl/watch native build output. The Android `.cxx`/`build` dirs churn
+// during gradle builds (CMake TryCompile temp dirs created+deleted), which makes
+// Metro's fallback file watcher crash with ENOENT. Excluding them keeps Metro
+// stable whether or not watchman is installed.
+defaultConfig.resolver.blockList = [
+  /.*\/android\/\.cxx\/.*/,
+  /.*\/android\/build\/.*/,
+  /.*\/ios\/build\/.*/,
+];
+
 /**
  * Metro configuration
  * https://reactnative.dev/docs/metro
@@ -67,4 +81,4 @@ const config = {
   },
 };
 
-module.exports = mergeConfig(getDefaultConfig(__dirname), config);
+module.exports = mergeConfig(defaultConfig, config);

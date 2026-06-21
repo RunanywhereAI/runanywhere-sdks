@@ -1,149 +1,126 @@
-/**
- * VisionHubScreen - Vision tab hub
- *
- * Lists Vision features: Vision Chat (VLM). Image generation is Swift sample app only.
- *
- * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Vision/VisionHubView.swift
- */
-
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius } from '../theme/spacing';
-import type { VisionStackParamList } from '../types';
+import { Icon, useTheme } from '../theme/system';
+import { ROUTES } from '../navigation/routes';
+import type { RootStackParamList } from '../navigation/navigation.types';
 
-type NavigationProp = NativeStackNavigationProp<
-  VisionStackParamList,
-  'VisionHub'
->;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const VisionHubScreen: React.FC = () => {
+  const { colors, typography, dimens } = useTheme();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NavigationProp>();
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Vision</Text>
-        <Text style={styles.subtitle}>Vision-language (VLM)</Text>
-      </View>
-      <View style={styles.list}>
-        <TouchableOpacity
-          style={styles.row}
-          onPress={() => navigation.navigate('VLM')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.iconWrap}>
-            <Icon name="camera-outline" size={24} color={Colors.primaryBlue} />
-          </View>
-          <View style={styles.rowContent}>
-            <Text style={styles.rowTitle}>Vision Chat (VLM)</Text>
-            <Text style={styles.rowSubtitle}>
-              Describe images with a vision-language model
-            </Text>
-          </View>
-          <Icon name="chevron-forward" size={20} color={Colors.textSecondary} />
-        </TouchableOpacity>
+    <ScrollView
+      style={[styles.root, { backgroundColor: colors.background }]}
+      contentContainerStyle={[
+        styles.content,
+        {
+          paddingTop: insets.top + dimens.spacing.lg,
+          paddingBottom: insets.bottom + dimens.spacing.xl,
+          paddingHorizontal: dimens.screenPadding,
+        },
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={[typography.headlineMedium, { color: colors.onBackground, marginBottom: dimens.spacing.xs }]}>
+        Vision
+      </Text>
+      <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginBottom: dimens.spacing.xl }]}>
+        Vision-language models that understand images
+      </Text>
 
-        {/* Image Generation - Coming Soon */}
-        <View style={[styles.row, styles.rowDisabled]}>
-          <View style={[styles.iconWrap, styles.iconWrapDisabled]}>
-            <Icon
-              name="sparkles-outline"
-              size={24}
-              color={Colors.textTertiary}
-            />
-          </View>
-          <View style={styles.rowContent}>
-            <Text style={[styles.rowTitle, styles.textDisabled]}>
-              Image Generation
-            </Text>
-            <Text style={[styles.rowSubtitle, styles.textDisabled]}>
-              Generate images from text descriptions
-            </Text>
-          </View>
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonText}>Coming Soon</Text>
-          </View>
+      {/* Vision Chat (VLM) */}
+      <TouchableOpacity
+        style={[styles.card, { backgroundColor: colors.surfaceContainerHigh }]}
+        onPress={() => navigation.navigate(ROUTES.Vlm)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.iconTile, { backgroundColor: colors.primaryContainer }]}>
+          <Icon name="vision" size={dimens.icon.md} color={colors.primary} />
+        </View>
+        <View style={styles.cardText}>
+          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+            Vision model
+          </Text>
+          <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>
+            Vision Chat (VLM)
+          </Text>
+          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginTop: 2 }]}>
+            Describe images with a vision-language model
+          </Text>
+        </View>
+        <Icon name="chevronRight" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
+      </TouchableOpacity>
+
+      {/* Image Generation — coming soon */}
+      <View
+        style={[
+          styles.card,
+          styles.cardDisabled,
+          { backgroundColor: colors.surfaceContainerHigh },
+        ]}
+      >
+        <View style={[styles.iconTile, { backgroundColor: colors.surfaceVariant }]}>
+          <Icon name="sparkles" size={dimens.icon.md} color={colors.onSurfaceVariant} />
+        </View>
+        <View style={styles.cardText}>
+          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+            Diffusion model
+          </Text>
+          <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>
+            Image Generation
+          </Text>
+          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, marginTop: 2 }]}>
+            Generate images from text descriptions
+          </Text>
+        </View>
+        <View style={[styles.badge, { backgroundColor: colors.surfaceVariant }]}>
+          <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>
+            Coming Soon
+          </Text>
         </View>
       </View>
-    </SafeAreaView>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
   },
-  header: {
-    paddingHorizontal: Padding.padding16,
-    paddingTop: Spacing.large,
-    paddingBottom: Spacing.medium,
+  content: {
+    flexGrow: 1,
+    gap: 12,
   },
-  title: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-  },
-  subtitle: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xSmall,
-  },
-  list: {
-    paddingHorizontal: Padding.padding16,
-  },
-  row: {
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.large,
-    padding: Spacing.mediumLarge,
-    marginBottom: Spacing.smallMedium,
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
   },
-  iconWrap: {
+  cardDisabled: {
+    opacity: 0.55,
+  },
+  iconTile: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.badgeBlue,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: Spacing.mediumLarge,
   },
-  rowContent: {
+  cardText: {
     flex: 1,
   },
-  rowTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-  },
-  rowSubtitle: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  rowDisabled: {
-    opacity: 0.5,
-  },
-  iconWrapDisabled: {
-    backgroundColor: Colors.backgroundGray5,
-  },
-  textDisabled: {
-    color: Colors.textTertiary,
-  },
-  comingSoonBadge: {
-    backgroundColor: Colors.badgeGray,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.small,
-  },
-  comingSoonText: {
-    ...Typography.caption2,
-    color: Colors.textSecondary,
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
 });
 

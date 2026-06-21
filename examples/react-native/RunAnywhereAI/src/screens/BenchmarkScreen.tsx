@@ -1,7 +1,7 @@
 /**
  * BenchmarkScreen - on-device performance benchmarks.
  *
- * RN MVP mirror of iOS `BenchmarkDashboardView` + `BenchmarkRunner`:
+ * RN mirror of Android BenchmarkDashboardScreen + BenchmarkDetailScreen:
  * runs (category x model x scenario) work items sequentially over downloaded
  * models and reports load time plus per-category key metrics. Scenario specs
  * mirror the iOS providers (LLMBenchmarkProvider / STTBenchmarkProvider /
@@ -20,8 +20,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Icon from 'react-native-vector-icons/Ionicons';
 import { RunAnywhere } from '@runanywhere/core';
 import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import {
@@ -32,9 +32,7 @@ import {
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import { STTLanguage } from '@runanywhere/proto-ts/stt_options';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import { Icon, useTheme } from '../theme/system';
 import {
   silentAudioWav,
   sineWaveAudioWav,
@@ -79,7 +77,6 @@ interface WorkItem {
 // Scenario execution — mirrors the iOS benchmark providers.
 // ---------------------------------------------------------------------------
 
-// Prompts copied verbatim from iOS LLMBenchmarkProvider.swift.
 const LLM_SYSTEM_PROMPT =
   'You are a helpful assistant. Always give extremely detailed, ' +
   'thorough responses. Never stop early. Use the full response length available ' +
@@ -108,7 +105,6 @@ async function loadBenchmarkModel(
   return Date.now() - loadStart;
 }
 
-/** Mirrors iOS LLMBenchmarkProvider.execute. */
 async function runLLMScenario(
   model: SDKModelInfo,
   maxTokens: number
@@ -119,7 +115,6 @@ async function runLLMScenario(
     ModelCategory.MODEL_CATEGORY_LANGUAGE
   );
   try {
-    // Warmup
     const warmupEvents = RunAnywhere.generateStream(
       'Hello',
       LLMGenerationOptions.fromPartial({ maxTokens: 5, temperature: 0 })
@@ -128,7 +123,6 @@ async function runLLMScenario(
       if (event.isFinal) break;
     }
 
-    // Benchmark
     const benchStart = Date.now();
     const events = RunAnywhere.generateStream(
       LLM_PROMPT,
@@ -160,7 +154,6 @@ async function runLLMScenario(
   }
 }
 
-/** Mirrors iOS STTBenchmarkProvider.execute. */
 async function runSTTScenario(
   model: SDKModelInfo,
   type: 'silent' | 'sine'
@@ -195,7 +188,6 @@ async function runSTTScenario(
   }
 }
 
-// Texts copied verbatim from iOS TTSBenchmarkProvider.swift.
 const TTS_TEXTS: Record<'short' | 'medium', string> = {
   short: 'Hello, this is a test.',
   medium:
@@ -203,7 +195,6 @@ const TTS_TEXTS: Record<'short' | 'medium', string> = {
     'generate speech from text with remarkable quality and natural intonation.',
 };
 
-/** Mirrors iOS TTSBenchmarkProvider.execute. */
 async function runTTSScenario(
   model: SDKModelInfo,
   length: 'short' | 'medium'
@@ -230,7 +221,6 @@ async function runTTSScenario(
   }
 }
 
-/** Scenario lists mirror the iOS providers. */
 function scenariosForCategory(category: BenchmarkCategory): Array<{
   name: string;
   run: (model: SDKModelInfo) => Promise<{
@@ -258,41 +248,43 @@ function scenariosForCategory(category: BenchmarkCategory): Array<{
   }
 }
 
+function formatTimestamp(ms: number): string {
+  const d = new Date(ms);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+    ', ' +
+    d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 export const BenchmarkScreen: React.FC = () => {
-  const [selectedCategories, setSelectedCategories] = useState<
-    Set<BenchmarkCategory>
-  >(new Set(ALL_CATEGORIES));
-  const [modelsByCategory, setModelsByCategory] = useState<
-    Record<BenchmarkCategory, SDKModelInfo[]>
-  >({ LLM: [], STT: [], TTS: [] });
-  const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(
-    new Set()
+  const { colors, typography, dimens } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const [selectedCategories, setSelectedCategories] = useState<Set<BenchmarkCategory>>(
+    new Set(ALL_CATEGORIES)
   );
+  const [modelsByCategory, setModelsByCategory] = useState<Record<BenchmarkCategory, SDKModelInfo[]>>(
+    { LLM: [], STT: [], TTS: [] }
+  );
+  const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<BenchmarkResultEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
-  const [progressText, setProgressText] = useState<string | null>(null);
+  const [progressCurrent, setProgressCurrent] = useState(0);
+  const [progressTotal, setProgressTotal] = useState(0);
+  const [progressLabel, setProgressLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
   const cancelRef = useRef(false);
 
-  /**
-   * Preflight: downloaded (on-disk) models grouped by category — mirrors
-   * iOS BenchmarkRunner.preflight / downloadedModels(for:in:).
-   */
   const refreshModels = useCallback(async () => {
     setError(null);
     try {
       await RunAnywhere.refreshModelRegistry();
       const listResult = await RunAnywhere.listModels();
       const allModels = listResult.models?.models ?? [];
-      const grouped: Record<BenchmarkCategory, SDKModelInfo[]> = {
-        LLM: [],
-        STT: [],
-        TTS: [],
-      };
+      const grouped: Record<BenchmarkCategory, SDKModelInfo[]> = { LLM: [], STT: [], TTS: [] };
       for (const category of ALL_CATEGORIES) {
         grouped[category] = allModels.filter(
           (model) =>
@@ -301,12 +293,9 @@ export const BenchmarkScreen: React.FC = () => {
         );
       }
       setModelsByCategory(grouped);
-      // Default-select every downloaded model.
       setSelectedModelIds(
         new Set(
-          ALL_CATEGORIES.flatMap((category) =>
-            grouped[category].map((model) => model.id)
-          )
+          ALL_CATEGORIES.flatMap((category) => grouped[category].map((model) => model.id))
         )
       );
     } catch (err) {
@@ -321,7 +310,7 @@ export const BenchmarkScreen: React.FC = () => {
         setResults(JSON.parse(raw) as BenchmarkResultEntry[]);
       }
     } catch {
-      // History is best-effort; a corrupt entry should not break the screen.
+      // History is best-effort.
     }
   }, []);
 
@@ -363,7 +352,6 @@ export const BenchmarkScreen: React.FC = () => {
     });
   }, []);
 
-  /** Expand (category x model x scenario) — mirrors iOS buildWorkItems. */
   const buildWorkItems = useCallback((): WorkItem[] => {
     const items: WorkItem[] = [];
     for (const category of ALL_CATEGORIES) {
@@ -373,12 +361,7 @@ export const BenchmarkScreen: React.FC = () => {
       );
       for (const model of models) {
         for (const scenario of scenariosForCategory(category)) {
-          items.push({
-            category,
-            model,
-            scenario: scenario.name,
-            run: scenario.run,
-          });
+          items.push({ category, model, scenario: scenario.name, run: scenario.run });
         }
       }
     }
@@ -388,22 +371,20 @@ export const BenchmarkScreen: React.FC = () => {
   const handleRun = useCallback(async () => {
     const workItems = buildWorkItems();
     if (workItems.length === 0) {
-      setError(
-        'No benchmarks to run. Download models first, then select at least one.'
-      );
+      setError('No benchmarks to run. Download models first, then select at least one.');
       return;
     }
     setIsRunning(true);
     setError(null);
     cancelRef.current = false;
+    setProgressTotal(workItems.length);
 
     const newResults: BenchmarkResultEntry[] = [];
     for (let i = 0; i < workItems.length; i++) {
       if (cancelRef.current) break;
       const item = workItems[i];
-      setProgressText(
-        `${i + 1}/${workItems.length} — ${item.scenario} · ${item.model.name}`
-      );
+      setProgressCurrent(i + 1);
+      setProgressLabel(`${item.category} · ${item.scenario} · ${item.model.name}`);
       const base = {
         id: `${Date.now()}-${i}`,
         category: item.category,
@@ -424,43 +405,98 @@ export const BenchmarkScreen: React.FC = () => {
       }
     }
 
-    setProgressText(null);
     setIsRunning(false);
+    setProgressCurrent(0);
+    setProgressTotal(0);
+    setProgressLabel('');
     await persistResults([...newResults, ...results]);
   }, [buildWorkItems, persistResults, results]);
 
   const handleCancel = useCallback(() => {
     cancelRef.current = true;
-    setProgressText('Cancelling after current scenario…');
+    setProgressLabel('Cancelling after current scenario…');
   }, []);
 
   const handleClearResults = useCallback(async () => {
     await persistResults([]);
   }, [persistResults]);
 
+  const selectedCount = selectedCategories.size;
+  const progressFraction = progressTotal > 0 ? progressCurrent / progressTotal : 0;
+
+  // Group results by category for display (mirrors KT detail screen).
+  const resultsByCategory = ALL_CATEGORIES.reduce<Record<BenchmarkCategory, BenchmarkResultEntry[]>>(
+    (acc, cat) => {
+      acc[cat] = results.filter((r) => r.category === cat);
+      return acc;
+    },
+    { LLM: [], STT: [], TTS: [] }
+  );
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: insets.top + dimens.spacing.md, paddingBottom: insets.bottom + 24 },
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Error banner */}
       {error && (
-        <View style={styles.errorBox}>
-          <Icon name="alert-circle" size={16} color={Colors.primaryRed} />
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={[styles.errorBanner, { backgroundColor: colors.errorContainer }]}>
+          <Icon name="info" size={dimens.icon.sm} color={colors.onErrorContainer} />
+          <Text style={[typography.bodySmall, { color: colors.onErrorContainer, flex: 1 }]}>
+            {error}
+          </Text>
         </View>
       )}
 
-      {/* Category chips */}
-      <Text style={styles.sectionHeader}>CATEGORIES</Text>
+      {/* Device card */}
+      <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh }]}>
+        <View style={[styles.iconTile, { backgroundColor: colors.surfaceVariant }]}>
+          <Icon name="cpu" size={dimens.icon.md} color={colors.primary} />
+        </View>
+        <View style={styles.cardText}>
+          <Text style={[typography.bodyLarge, styles.bold, { color: colors.onSurface }]} numberOfLines={1}>
+            On-Device Benchmark
+          </Text>
+          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+            {ALL_CATEGORIES.flatMap((c) => modelsByCategory[c]).length} model{ALL_CATEGORIES.flatMap((c) => modelsByCategory[c]).length !== 1 ? 's' : ''} available
+          </Text>
+        </View>
+      </View>
+
+      {/* Categories section */}
+      <Text style={[typography.titleSmall, styles.sectionLabel, { color: colors.onSurfaceVariant }]}>
+        Categories
+      </Text>
       <View style={styles.chipRow}>
         {ALL_CATEGORIES.map((category) => {
           const selected = selectedCategories.has(category);
           return (
             <TouchableOpacity
               key={category}
-              style={[styles.chip, selected && styles.chipSelected]}
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor: selected ? colors.secondaryContainer : colors.surfaceContainerHigh,
+                  borderColor: selected ? colors.secondary : colors.outline,
+                },
+              ]}
               onPress={() => toggleCategory(category)}
               disabled={isRunning}
+              activeOpacity={0.7}
             >
+              {selected && (
+                <Icon name="check" size={14} color={colors.onSecondaryContainer} />
+              )}
               <Text
-                style={[styles.chipText, selected && styles.chipTextSelected]}
+                style={[
+                  typography.labelLarge,
+                  styles.bold,
+                  { color: selected ? colors.onSecondaryContainer : colors.onSurfaceVariant },
+                ]}
               >
                 {category}
               </Text>
@@ -469,87 +505,215 @@ export const BenchmarkScreen: React.FC = () => {
         })}
       </View>
 
-      {/* Downloaded models per selected category */}
-      {ALL_CATEGORIES.filter((category) =>
-        selectedCategories.has(category)
-      ).map((category) => (
-        <View key={category} style={styles.modelSection}>
-          <Text style={styles.sectionHeader}>{category} MODELS</Text>
+      {/* Models per selected category */}
+      {ALL_CATEGORIES.filter((cat) => selectedCategories.has(cat)).map((category) => (
+        <View key={category} style={styles.section}>
+          <Text style={[typography.titleSmall, styles.sectionLabel, { color: colors.onSurfaceVariant }]}>
+            {category} Models
+          </Text>
           {modelsByCategory[category].length === 0 ? (
-            <Text style={styles.emptyText}>
-              No downloaded {category} models. Download from Settings → Model
-              Catalog first.
+            <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
+              No downloaded {category} models. Download from Settings → Model Catalog first.
             </Text>
           ) : (
-            modelsByCategory[category].map((model) => {
-              const selected = selectedModelIds.has(model.id);
-              return (
-                <TouchableOpacity
-                  key={model.id}
-                  style={styles.modelRow}
-                  onPress={() => toggleModel(model.id)}
-                  disabled={isRunning}
-                >
-                  <Icon
-                    name={selected ? 'checkbox' : 'square-outline'}
-                    size={20}
-                    color={selected ? Colors.primaryBlue : Colors.textTertiary}
-                  />
-                  <Text style={styles.modelName}>{model.name}</Text>
-                </TouchableOpacity>
-              );
-            })
+            <View style={[styles.listCard, { backgroundColor: colors.surfaceContainerHigh }]}>
+              {modelsByCategory[category].map((model, i) => {
+                const selected = selectedModelIds.has(model.id);
+                return (
+                  <View key={model.id}>
+                    {i > 0 && (
+                      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+                    )}
+                    <TouchableOpacity
+                      style={styles.modelRow}
+                      onPress={() => toggleModel(model.id)}
+                      disabled={isRunning}
+                      activeOpacity={0.7}
+                    >
+                      <View
+                        style={[
+                          styles.checkbox,
+                          {
+                            backgroundColor: selected ? colors.primary : 'transparent',
+                            borderColor: selected ? colors.primary : colors.outline,
+                          },
+                        ]}
+                      >
+                        {selected && (
+                          <Icon name="check" size={12} color={colors.onPrimary} />
+                        )}
+                      </View>
+                      <Text
+                        style={[typography.bodyLarge, { color: colors.onSurface, flex: 1 }]}
+                        numberOfLines={1}
+                      >
+                        {model.name}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
           )}
         </View>
       ))}
 
-      {/* Run / cancel */}
+      {/* Run / Running card */}
       {isRunning ? (
-        <View style={styles.runArea}>
-          <ActivityIndicator size="small" color={Colors.primaryBlue} />
-          {progressText && (
-            <Text style={styles.progressText}>{progressText}</Text>
+        <View style={[styles.runningCard, { backgroundColor: colors.surfaceContainerHigh }]}>
+          <View style={styles.runningHeader}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[typography.bodyLarge, { color: colors.onSurface, flex: 1 }]}>
+              {progressTotal > 0 ? `Running ${progressCurrent} / ${progressTotal}` : 'Running…'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.cancelPill, { borderColor: colors.outline }]}
+              onPress={handleCancel}
+              activeOpacity={0.7}
+            >
+              <Icon name="stop" size={14} color={colors.onSurface} />
+              <Text style={[typography.labelLarge, styles.bold, { color: colors.onSurface }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {progressTotal > 0 && (
+            <View style={[styles.progressTrack, { backgroundColor: colors.surfaceContainerLowest }]}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { backgroundColor: colors.primary, width: `${Math.round(progressFraction * 100)}%` },
+                ]}
+              />
+            </View>
           )}
-          <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
+          {progressLabel.length > 0 && (
+            <Text
+              style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}
+              numberOfLines={1}
+            >
+              {progressLabel}
+            </Text>
+          )}
         </View>
       ) : (
-        <TouchableOpacity style={styles.runButton} onPress={handleRun}>
-          <Icon name="speedometer-outline" size={18} color={Colors.textWhite} />
-          <Text style={styles.runButtonText}>Run Benchmarks</Text>
+        <TouchableOpacity
+          style={[
+            styles.runButton,
+            { backgroundColor: selectedCount > 0 ? colors.primary : colors.surfaceContainerHigh },
+          ]}
+          onPress={handleRun}
+          activeOpacity={0.8}
+          disabled={selectedCount === 0}
+        >
+          <Icon
+            name="benchmarks"
+            size={dimens.icon.sm}
+            color={selectedCount > 0 ? colors.onPrimary : colors.onSurfaceVariant}
+          />
+          <Text
+            style={[
+              typography.titleSmall,
+              styles.bold,
+              { color: selectedCount > 0 ? colors.onPrimary : colors.onSurfaceVariant },
+            ]}
+          >
+            Run selected ({selectedCount})
+          </Text>
         </TouchableOpacity>
       )}
 
-      {/* Results */}
-      {results.length > 0 && (
-        <View style={styles.modelSection}>
-          <View style={styles.resultsHeaderRow}>
-            <Text style={styles.sectionHeader}>RESULTS</Text>
-            <TouchableOpacity onPress={handleClearResults} disabled={isRunning}>
-              <Text style={styles.clearText}>Clear All</Text>
+      {/* History */}
+      {results.length > 0 ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[typography.titleSmall, styles.sectionLabel, { color: colors.onSurfaceVariant }]}>
+              History
+            </Text>
+            <TouchableOpacity onPress={handleClearResults} disabled={isRunning} hitSlop={8}>
+              <Text style={[typography.labelLarge, styles.bold, { color: colors.error }]}>
+                Clear all
+              </Text>
             </TouchableOpacity>
           </View>
-          {results.map((entry) => (
-            <View key={entry.id} style={styles.resultCard}>
-              <View style={styles.resultTitleRow}>
-                <Text style={styles.resultScenario}>
-                  {entry.category} · {entry.scenario}
+
+          {ALL_CATEGORIES.map((cat) => {
+            const catResults = resultsByCategory[cat];
+            if (catResults.length === 0) return null;
+            return (
+              <View key={cat} style={styles.section}>
+                <Text style={[typography.titleSmall, styles.sectionLabel, { color: colors.onSurfaceVariant }]}>
+                  {cat}
                 </Text>
-                <Text style={styles.resultModel} numberOfLines={1}>
-                  {entry.modelName}
-                </Text>
+                {catResults.map((entry) => (
+                  <View
+                    key={entry.id}
+                    style={[styles.resultCard, { backgroundColor: colors.surfaceContainerHigh }]}
+                  >
+                    {/* Header row: success/fail icon + scenario + model */}
+                    <View style={styles.resultHeaderRow}>
+                      <Icon
+                        name={entry.errorMessage ? 'close' : 'check'}
+                        size={dimens.icon.sm}
+                        color={entry.errorMessage ? colors.error : colors.success}
+                      />
+                      <View style={styles.resultTitleBlock}>
+                        <Text
+                          style={[typography.bodyLarge, { color: colors.onSurface }]}
+                          numberOfLines={1}
+                        >
+                          {entry.scenario}
+                        </Text>
+                        <Text
+                          style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}
+                          numberOfLines={1}
+                        >
+                          {entry.modelName} · {formatTimestamp(entry.timestampMs)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Metric rows */}
+                    {entry.errorMessage ? (
+                      <Text style={[typography.bodySmall, { color: colors.error, marginTop: 6 }]}>
+                        {entry.errorMessage}
+                      </Text>
+                    ) : (
+                      <View style={styles.metricGrid}>
+                        <View style={styles.metricCell}>
+                          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+                            Load time
+                          </Text>
+                          <Text style={[typography.metric, styles.bold, { color: colors.onSurface }]}>
+                            {entry.loadTimeMs.toFixed(0)} ms
+                          </Text>
+                        </View>
+                        <View style={[styles.metricCellDivider, { backgroundColor: colors.outlineVariant }]} />
+                        <View style={styles.metricCell}>
+                          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+                            Result
+                          </Text>
+                          <Text
+                            style={[typography.bodySmall, styles.bold, { color: colors.onSurface }]}
+                            numberOfLines={2}
+                          >
+                            {entry.metricSummary}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                ))}
               </View>
-              {entry.errorMessage ? (
-                <Text style={styles.resultError}>{entry.errorMessage}</Text>
-              ) : (
-                <Text style={styles.resultMetrics}>
-                  Load {entry.loadTimeMs.toFixed(0)} ms · {entry.metricSummary}
-                </Text>
-              )}
-            </View>
-          ))}
+            );
+          })}
         </View>
+      ) : (
+        !isRunning && (
+          <Text style={[typography.bodyMedium, styles.emptyHistory, { color: colors.onSurfaceVariant }]}>
+            No runs yet. Pick categories and run a benchmark across your downloaded models.
+          </Text>
+        )
       )}
     </ScrollView>
   );
@@ -558,141 +722,154 @@ export const BenchmarkScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
   },
   content: {
-    padding: Padding.padding16,
+    paddingHorizontal: 16,
+    gap: 12,
   },
-  errorBox: {
+  bold: {
+    fontWeight: '700',
+  },
+  errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.small,
-    backgroundColor: Colors.badgeRed,
-    borderRadius: BorderRadius.medium,
-    padding: Padding.padding12,
-    marginBottom: Spacing.medium,
+    gap: 8,
+    borderRadius: 12,
+    padding: 12,
   },
-  errorText: {
-    ...Typography.caption,
-    color: Colors.primaryRed,
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 20,
+    padding: 16,
+  },
+  iconTile: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardText: {
     flex: 1,
+    gap: 2,
   },
-  sectionHeader: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.small,
+  sectionLabel: {
+    marginBottom: 4,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  section: {
+    gap: 8,
   },
   chipRow: {
     flexDirection: 'row',
-    gap: Spacing.small,
-    marginBottom: Spacing.large,
+    gap: 8,
+    flexWrap: 'wrap',
   },
-  chip: {
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderWidth: 1,
-    borderColor: Colors.primaryBlue,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  listCard: {
     borderRadius: 16,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: 6,
+    overflow: 'hidden',
   },
-  chipSelected: {
-    backgroundColor: Colors.primaryBlue,
-  },
-  chipText: {
-    ...Typography.caption,
-    color: Colors.primaryBlue,
-  },
-  chipTextSelected: {
-    color: Colors.textWhite,
-  },
-  modelSection: {
-    marginBottom: Spacing.large,
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 48,
   },
   modelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.small,
-    paddingVertical: Padding.padding8,
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
-  modelName: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  emptyText: {
-    ...Typography.caption,
-    color: Colors.textTertiary,
-  },
-  runArea: {
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
     alignItems: 'center',
-    gap: Spacing.small,
-    marginVertical: Spacing.medium,
+    justifyContent: 'center',
   },
-  progressText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    textAlign: 'center',
+  runningCard: {
+    borderRadius: 20,
+    padding: 16,
+    gap: 10,
   },
-  cancelButton: {
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding8,
+  runningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  cancelButtonText: {
-    ...Typography.subheadline,
-    color: Colors.primaryRed,
+  cancelPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  progressTrack: {
+    height: 4,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 4,
+    borderRadius: 999,
   },
   runButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.small,
-    backgroundColor: Colors.primaryBlue,
-    borderRadius: BorderRadius.medium,
-    paddingVertical: Padding.padding12,
-    marginVertical: Spacing.medium,
-  },
-  runButtonText: {
-    ...Typography.headline,
-    color: Colors.textWhite,
-  },
-  resultsHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  clearText: {
-    ...Typography.caption,
-    color: Colors.primaryRed,
+    gap: 8,
+    borderRadius: 999,
+    paddingVertical: 14,
   },
   resultCard: {
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.medium,
-    padding: Padding.padding12,
-    marginBottom: Spacing.small,
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
   },
-  resultTitleRow: {
+  resultHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.small,
+    alignItems: 'flex-start',
+    gap: 10,
   },
-  resultScenario: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
+  resultTitleBlock: {
+    flex: 1,
+    gap: 2,
   },
-  resultModel: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    flexShrink: 1,
+  metricGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'stretch',
   },
-  resultMetrics: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: 4,
+  metricCell: {
+    flex: 1,
+    gap: 2,
   },
-  resultError: {
-    ...Typography.caption,
-    color: Colors.primaryRed,
-    marginTop: 4,
+  metricCellDivider: {
+    width: StyleSheet.hairlineWidth,
+  },
+  emptyHistory: {
+    textAlign: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
   },
 });
 

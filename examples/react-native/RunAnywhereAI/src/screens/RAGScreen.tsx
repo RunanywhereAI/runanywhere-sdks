@@ -22,16 +22,15 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, {
+  useAnimatedKeyboard,
+  useAnimatedStyle,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeModules } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
 import { pick as documentPick } from '@react-native-documents/picker';
-import { Colors } from '../theme/colors';
-import { Typography, FontWeight } from '../theme/typography';
-import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import { Icon, useTheme } from '../theme/system';
 import {
   ModelSelectionSheet,
   ModelSelectionContext,
@@ -55,10 +54,6 @@ interface ChatMessage {
 
 const { DocumentService: NativeDocumentService } = NativeModules;
 
-/**
- * Extract text from a document using native PDFKit (for PDF) or string parsing.
- * Mirrors iOS DocumentService.swift - handles PDF, JSON, and plain text.
- */
 async function extractTextFromFile(filePath: string): Promise<string> {
   if (NativeDocumentService?.extractText) {
     return NativeDocumentService.extractText(filePath);
@@ -69,6 +64,21 @@ async function extractTextFromFile(filePath: string): Promise<string> {
 // MARK: - Component
 
 export const RAGScreen: React.FC = () => {
+  const { colors, typography, dimens } = useTheme();
+  const insets = useSafeAreaInsets();
+  const keyboard = useAnimatedKeyboard();
+
+  // IME padding: the activity is adjustResize under edge-to-edge, but the window
+  // isn't lifted for us, so lift the content by the keyboard height (minus the
+  // bottom inset reanimated already includes). Rests on the bottom safe-area
+  // inset / screen padding when the keyboard is closed.
+  const keyboardStyle = useAnimatedStyle(() => ({
+    paddingBottom:
+      keyboard.height.value > 0
+        ? Math.max(keyboard.height.value - insets.bottom, dimens.spacing.sm)
+        : Math.max(insets.bottom, dimens.screenPadding),
+  }));
+
   // Nitro state
   const [isNitroReady, setIsNitroReady] = useState(false);
   const [nitroError, setNitroError] = useState<string | null>(null);
@@ -83,9 +93,11 @@ export const RAGScreen: React.FC = () => {
   const [showingLLMPicker, setShowingLLMPicker] = useState(false);
 
   // Document state
-  const [documentName, setDocumentName] = useState<string | null>(null);
-  const [isDocumentLoaded, setIsDocumentLoaded] = useState(false);
+  const [documents, setDocuments] = useState<string[]>([]);
   const [isLoadingDocument, setIsLoadingDocument] = useState(false);
+
+  // Setup card collapse
+  const [setupExpanded, setSetupExpanded] = useState(true);
 
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -95,16 +107,23 @@ export const RAGScreen: React.FC = () => {
 
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // D-6: RAG lifecycle is model-id-driven; commons resolves id → path.
-  // We just need both models selected (id present).
   const areModelsReady =
     selectedEmbeddingModel?.id != null &&
     selectedEmbeddingModel.id.length > 0 &&
     selectedLLMModel?.id != null &&
     selectedLLMModel.id.length > 0;
 
+  const hasDocuments = documents.length > 0;
+  const collapsible = areModelsReady && hasDocuments;
+  const showFullSetup = setupExpanded || !collapsible;
+
   const canAskQuestion =
-    isDocumentLoaded && !isQuerying && currentQuestion.trim().length > 0;
+    hasDocuments && !isQuerying && currentQuestion.trim().length > 0;
+
+  // Auto-collapse once ready
+  useEffect(() => {
+    if (areModelsReady && hasDocuments) setSetupExpanded(false);
+  }, [areModelsReady, hasDocuments]);
 
   // MARK: - Initialization
 
@@ -126,18 +145,17 @@ export const RAGScreen: React.FC = () => {
   // Cleanup pipeline on unmount
   useEffect(() => {
     return () => {
-      if (isDocumentLoaded) {
+      if (hasDocuments) {
         RunAnywhere.ragDestroyPipeline().catch(console.error);
       }
     };
-  }, [isDocumentLoaded]);
+  }, [hasDocuments]);
 
   // MARK: - Document Loading
 
   const handleSelectDocument = useCallback(async () => {
     if (!areModelsReady || !isNitroReady) return;
 
-    // D-6: RAG accepts model IDs; commons resolves them to artifact paths.
     const embeddingModelId = selectedEmbeddingModel?.id;
     const llmModelId = selectedLLMModel?.id;
     if (!embeddingModelId || !llmModelId) return;
@@ -153,36 +171,27 @@ export const RAGScreen: React.FC = () => {
       setIsLoadingDocument(true);
       setError(null);
 
-      // Extract text from the picked file
       const text = await extractTextFromFile(fileUri);
 
-      // Build RAG configuration using model IDs. commons (via D-6) owns
-      // id → path resolution inside rac_rag_session_create_proto.
-      // Canonical defaults do the right thing (matches iOS DocumentRAG):
-      // commons derives the embedding dimension from the loaded embedding
-      // model, and the retrieval/chunking values come from idl/rag.proto
-      // rac_default annotations.
       const config = RAGConfiguration.fromPartial({
         ...rAGConfigurationDefaults(),
         embeddingModelId,
         llmModelId,
       });
 
-      // Create pipeline and ingest document (same as iOS loadDocument)
       await RunAnywhere.ragCreatePipeline(config);
       await RunAnywhere.ragIngest(text);
 
-      setDocumentName(result.name || 'Document');
-      setIsDocumentLoaded(true);
+      const name = result.name || 'Document';
+      setDocuments((prev) => [...prev, name]);
     } catch (err: unknown) {
-      // Document picker reports user cancellation via a stable error code.
       if (
         typeof err === 'object' &&
         err !== null &&
         'code' in err &&
         (err as { code?: unknown }).code === 'OPERATION_CANCELED'
       ) {
-        return; // User cancelled
+        return;
       }
       const msg =
         err instanceof Error ? err.message : 'Failed to load document';
@@ -193,23 +202,20 @@ export const RAGScreen: React.FC = () => {
     }
   }, [areModelsReady, isNitroReady, selectedEmbeddingModel, selectedLLMModel]);
 
-  const handleChangeDocument = useCallback(async () => {
+  const handleClearAll = useCallback(async () => {
     await RunAnywhere.ragDestroyPipeline();
-    setDocumentName(null);
-    setIsDocumentLoaded(false);
+    setDocuments([]);
     setMessages([]);
     setError(null);
     setCurrentQuestion('');
-
-    // Re-open document picker
-    handleSelectDocument();
-  }, [handleSelectDocument]);
+    setSetupExpanded(true);
+  }, []);
 
   // MARK: - Q&A
 
   const handleAskQuestion = useCallback(async () => {
     const question = currentQuestion.trim();
-    if (!question || !isDocumentLoaded) return;
+    if (!question || !hasDocuments) return;
 
     setMessages((prev) => [...prev, { role: 'user', text: question }]);
     setCurrentQuestion('');
@@ -217,11 +223,6 @@ export const RAGScreen: React.FC = () => {
     setError(null);
 
     try {
-      // Canonical query defaults (matches iOS, which queries with
-      // RARAGQueryOptions.defaults(question:)) — commons stamps
-      // maxTokens/temperature/topP and retrieval values when unset.
-      // Thinking mode mirrors iOS RAGViewModel: suppress thinking output
-      // for thinking-capable models unless the user enabled it in Settings.
       const thinkingStr = await AsyncStorage.getItem(
         GENERATION_SETTINGS_KEYS.THINKING_MODE_ENABLED
       );
@@ -248,7 +249,7 @@ export const RAGScreen: React.FC = () => {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
-  }, [currentQuestion, isDocumentLoaded, selectedLLMModel]);
+  }, [currentQuestion, hasDocuments, selectedLLMModel]);
 
   // MARK: - Model Selection Callbacks
 
@@ -265,286 +266,350 @@ export const RAGScreen: React.FC = () => {
     setShowingLLMPicker(false);
   }, []);
 
-  // MARK: - Error state for NitroModules
+  // MARK: - Error / Loading state for NitroModules
 
   if (nitroError) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Document Q&A</Text>
-        </View>
+      <View style={[styles.fill, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <View style={styles.centered}>
-          <Icon
-            name="alert-circle-outline"
-            size={64}
-            color={Colors.primaryRed}
-          />
-          <Text style={styles.errorTitle}>NitroModules Error</Text>
-          <Text style={styles.errorHintText}>{nitroError}</Text>
+          <Icon name="info" size={48} color={colors.error} />
+          <Text style={[typography.titleMedium, { color: colors.error, marginTop: dimens.spacing.md }]}>
+            NitroModules Error
+          </Text>
+          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: dimens.spacing.sm, textAlign: 'center' }]}>
+            {nitroError}
+          </Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!isNitroReady) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Document Q&A</Text>
-        </View>
+      <View style={[styles.fill, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={Colors.primaryBlue} />
-          <Text style={styles.loadingText}>Initializing...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: dimens.spacing.md }]}>
+            Initializing…
+          </Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   // MARK: - Render
 
+  const addLabel = documents.length === 0 ? 'Add document' : 'Add another';
+
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.flex1}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <View style={[styles.fill, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <Animated.View
+        style={[
+          styles.fill,
+          {
+            paddingHorizontal: dimens.screenPadding,
+            paddingTop: dimens.screenPadding,
+            gap: dimens.spacing.md,
+          },
+          keyboardStyle,
+        ]}
       >
-        {/* Model Setup Section */}
-        <View style={styles.modelSection}>
-          <TouchableOpacity
-            style={styles.modelRow}
-            onPress={() => setShowingEmbeddingPicker(true)}
-          >
-            <Icon name="cube-outline" size={20} color={Colors.textSecondary} />
-            <Text style={styles.modelLabel}>Embedding Model</Text>
-            <View style={styles.modelRowRight}>
-              {selectedEmbeddingModel ? (
-                <>
-                  <Text style={styles.modelName} numberOfLines={1}>
-                    {selectedEmbeddingModel.name}
-                  </Text>
-                  <Icon
-                    name="checkmark-circle"
-                    size={16}
-                    color={Colors.primaryGreen}
-                  />
-                </>
-              ) : (
-                <>
-                  <Text style={styles.modelPlaceholder}>Not selected</Text>
-                  <Icon
-                    name="chevron-forward"
-                    size={16}
-                    color={Colors.textTertiary}
-                  />
-                </>
-              )}
-            </View>
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.modelRow}
-            onPress={() => setShowingLLMPicker(true)}
-          >
-            <Icon
-              name="chatbubble-ellipses-outline"
-              size={20}
-              color={Colors.textSecondary}
-            />
-            <Text style={styles.modelLabel}>LLM Model</Text>
-            <View style={styles.modelRowRight}>
-              {selectedLLMModel ? (
+          {/* Setup card / compact bar */}
+          {showFullSetup ? (
+            <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh, borderRadius: dimens.radius.lg }]}>
+              {/* Collapse header (only when collapsible) */}
+              {collapsible && (
                 <>
-                  <Text style={styles.modelName} numberOfLines={1}>
-                    {selectedLLMModel.name}
-                  </Text>
-                  <Icon
-                    name="checkmark-circle"
-                    size={16}
-                    color={Colors.primaryGreen}
-                  />
-                </>
-              ) : (
-                <>
-                  <Text style={styles.modelPlaceholder}>Not selected</Text>
-                  <Icon
-                    name="chevron-forward"
-                    size={16}
-                    color={Colors.textTertiary}
-                  />
-                </>
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Document Status Bar */}
-        <View style={styles.documentBar}>
-          {isLoadingDocument ? (
-            <View style={styles.documentBarInner}>
-              <ActivityIndicator size="small" color={Colors.textSecondary} />
-              <Text style={styles.documentBarText}>Loading document...</Text>
-            </View>
-          ) : isDocumentLoaded && documentName ? (
-            <View style={styles.documentBarInner}>
-              <Icon
-                name="checkmark-circle"
-                size={20}
-                color={Colors.primaryGreen}
-              />
-              <Text style={styles.documentName} numberOfLines={1}>
-                {documentName}
-              </Text>
-              <TouchableOpacity onPress={handleChangeDocument}>
-                <Text style={styles.changeButton}>Change</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[
-                styles.selectDocButton,
-                !areModelsReady && styles.selectDocButtonDisabled,
-              ]}
-              onPress={handleSelectDocument}
-              disabled={!areModelsReady}
-            >
-              <Icon name="document-text-outline" size={20} color="#fff" />
-              <Text style={styles.selectDocButtonText}>Select Document</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Error Banner */}
-        {error && (
-          <View style={styles.errorBanner}>
-            <Icon name="alert-circle" size={16} color={Colors.primaryRed} />
-            <Text style={styles.errorBannerText} numberOfLines={2}>
-              {error}
-            </Text>
-            <TouchableOpacity onPress={() => setError(null)}>
-              <Icon name="close" size={16} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Messages Area */}
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.messagesArea}
-          contentContainerStyle={styles.messagesContent}
-        >
-          {messages.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Icon
-                name="document-text-outline"
-                size={48}
-                color={Colors.textTertiary}
-              />
-              {isDocumentLoaded ? (
-                <>
-                  <Text style={styles.emptyTitle}>Document loaded</Text>
-                  <Text style={styles.emptySubtitle}>
-                    Ask a question below to get started
-                  </Text>
-                </>
-              ) : !areModelsReady ? (
-                <>
-                  <Text style={styles.emptyTitle}>
-                    Select models to get started
-                  </Text>
-                  <Text style={styles.emptySubtitle}>
-                    Choose an embedding model and an LLM model above, then pick
-                    a document
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.emptyTitle}>No document selected</Text>
-                  <Text style={styles.emptySubtitle}>
-                    Pick a PDF, JSON, or text document to start asking questions
-                  </Text>
-                </>
-              )}
-            </View>
-          ) : (
-            <>
-              {messages.map((msg, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.messageBubbleRow,
-                    msg.role === 'user'
-                      ? styles.messageBubbleRowUser
-                      : styles.messageBubbleRowAssistant,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.messageBubble,
-                      msg.role === 'user'
-                        ? styles.messageBubbleUser
-                        : styles.messageBubbleAssistant,
-                    ]}
+                  <TouchableOpacity
+                    style={[styles.collapseHeader, { paddingHorizontal: dimens.spacing.lg, paddingVertical: dimens.spacing.sm }]}
+                    onPress={() => setSetupExpanded(false)}
+                    activeOpacity={0.7}
                   >
+                    <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, flex: 1 }]}>
+                      Setup
+                    </Text>
+                    <Icon name="chevronDown" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
+                  </TouchableOpacity>
+                  <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+                </>
+              )}
+
+              {/* Embedding model row */}
+              <TouchableOpacity
+                style={[styles.setupRow, { paddingHorizontal: dimens.spacing.lg, paddingVertical: dimens.spacing.md }]}
+                onPress={() => setShowingEmbeddingPicker(true)}
+                activeOpacity={0.7}
+              >
+                <Icon
+                  name="storage"
+                  size={dimens.icon.md}
+                  color={selectedEmbeddingModel ? colors.primary : colors.onSurfaceVariant}
+                />
+                <View style={styles.setupRowText}>
+                  <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+                    Embedding model
+                  </Text>
+                  <Text
+                    style={[typography.bodyLarge, { color: colors.onSurface }]}
+                    numberOfLines={1}
+                  >
+                    {selectedEmbeddingModel?.name ?? 'Tap to select'}
+                  </Text>
+                </View>
+                <Icon name="chevronRight" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
+              </TouchableOpacity>
+
+              <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+
+              {/* LLM model row */}
+              <TouchableOpacity
+                style={[styles.setupRow, { paddingHorizontal: dimens.spacing.lg, paddingVertical: dimens.spacing.md }]}
+                onPress={() => setShowingLLMPicker(true)}
+                activeOpacity={0.7}
+              >
+                <Icon
+                  name="chat"
+                  size={dimens.icon.md}
+                  color={selectedLLMModel ? colors.primary : colors.onSurfaceVariant}
+                />
+                <View style={styles.setupRowText}>
+                  <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+                    Language model
+                  </Text>
+                  <Text
+                    style={[typography.bodyLarge, { color: colors.onSurface }]}
+                    numberOfLines={1}
+                  >
+                    {selectedLLMModel?.name ?? 'Tap to select'}
+                  </Text>
+                </View>
+                <Icon name="chevronRight" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
+              </TouchableOpacity>
+
+              <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+
+              {/* Documents section */}
+              <View style={{ padding: dimens.spacing.lg, gap: dimens.spacing.sm }}>
+                <View style={styles.docsHeader}>
+                  <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, flex: 1 }]}>
+                    {documents.length === 0
+                      ? 'Documents'
+                      : `${documents.length} document${documents.length === 1 ? '' : 's'}`}
+                  </Text>
+                  {documents.length > 0 && (
+                    <TouchableOpacity onPress={handleClearAll} hitSlop={8}>
+                      <Text style={[typography.labelMedium, { color: colors.primary }]}>Clear</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {documents.map((name, i) => (
+                  <View key={i} style={[styles.docRow, { gap: dimens.spacing.sm }]}>
+                    <Icon name="storage" size={dimens.icon.sm} color={colors.primary} />
                     <Text
-                      style={[
-                        styles.messageBubbleText,
-                        msg.role === 'user' && styles.messageBubbleTextUser,
-                      ]}
+                      style={[typography.bodyMedium, { color: colors.onSurface, flex: 1 }]}
+                      numberOfLines={1}
                     >
-                      {msg.text}
+                      {name}
                     </Text>
                   </View>
-                </View>
-              ))}
-              {isQuerying && (
-                <View style={styles.queryingRow}>
-                  <ActivityIndicator
-                    size="small"
-                    color={Colors.textSecondary}
-                  />
-                  <Text style={styles.queryingText}>Searching document...</Text>
-                </View>
-              )}
-            </>
-          )}
-        </ScrollView>
+                ))}
 
-        {/* Input Bar */}
-        <View style={styles.inputBar}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Ask a question..."
-            placeholderTextColor={Colors.textSecondary}
-            value={currentQuestion}
-            onChangeText={setCurrentQuestion}
-            editable={isDocumentLoaded && !isQuerying}
-            returnKeyType="send"
-            onSubmitEditing={handleAskQuestion}
-            multiline
-          />
-          {isQuerying ? (
-            <ActivityIndicator
-              size="small"
-              color={Colors.textSecondary}
-              style={styles.sendButton}
-            />
+                {/* Add document button */}
+                <TouchableOpacity
+                  style={[
+                    styles.addDocButton,
+                    {
+                      backgroundColor: colors.surfaceContainerHighest,
+                      borderRadius: dimens.radius.md,
+                      padding: dimens.spacing.md,
+                      opacity: areModelsReady && !isLoadingDocument ? 1 : 0.5,
+                    },
+                  ]}
+                  onPress={handleSelectDocument}
+                  disabled={!areModelsReady || isLoadingDocument}
+                  activeOpacity={0.7}
+                >
+                  {isLoadingDocument ? (
+                    <>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={[typography.bodyMedium, { color: colors.onSurface, marginLeft: dimens.spacing.sm }]}>
+                        Reading…
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Icon
+                        name="plus"
+                        size={dimens.icon.sm}
+                        color={areModelsReady ? colors.primary : colors.onSurfaceVariant}
+                      />
+                      <Text
+                        style={[
+                          typography.bodyMedium,
+                          { color: areModelsReady ? colors.primary : colors.onSurfaceVariant, marginLeft: dimens.spacing.sm },
+                        ]}
+                      >
+                        {areModelsReady ? addLabel : 'Pick models first'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
           ) : (
+            /* Compact bar */
             <TouchableOpacity
-              style={styles.sendButton}
-              onPress={handleAskQuestion}
-              disabled={!canAskQuestion}
+              style={[
+                styles.compactBar,
+                {
+                  backgroundColor: colors.surfaceContainerHigh,
+                  borderRadius: dimens.radius.lg,
+                  paddingHorizontal: dimens.spacing.lg,
+                  paddingVertical: dimens.spacing.md,
+                },
+              ]}
+              onPress={() => setSetupExpanded(true)}
+              activeOpacity={0.7}
             >
-              <Icon
-                name="arrow-up-circle"
-                size={32}
-                color={
-                  canAskQuestion ? Colors.primaryBlue : Colors.textTertiary
-                }
-              />
+              <Icon name="storage" size={dimens.icon.sm} color={colors.primary} />
+              <Text
+                style={[typography.bodyMedium, { color: colors.onSurface, flex: 1 }]}
+                numberOfLines={1}
+              >
+                {documents.length} document{documents.length === 1 ? '' : 's'}
+              </Text>
+              {isLoadingDocument ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <TouchableOpacity onPress={handleSelectDocument} hitSlop={8}>
+                  <Icon name="plus" size={dimens.icon.md} color={colors.primary} />
+                </TouchableOpacity>
+              )}
+              <Icon name="chevronDown" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
           )}
-        </View>
-      </KeyboardAvoidingView>
+
+          {/* Error text */}
+          {error && (
+            <Text style={[typography.bodySmall, { color: colors.error }]}>
+              {error}
+            </Text>
+          )}
+
+          {/* Conversation pane */}
+          <View style={styles.fill}>
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.fill}
+              contentContainerStyle={[styles.messagesContent, { gap: dimens.spacing.md }]}
+            >
+              {messages.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Icon name="rag" size={dimens.icon.lg} color={colors.primary} />
+                  <Text
+                    style={[typography.bodyLarge, { color: colors.onSurfaceVariant, textAlign: 'center', marginTop: dimens.spacing.md }]}
+                  >
+                    {!areModelsReady
+                      ? 'Pick an embedding model and an LLM to begin'
+                      : !hasDocuments
+                      ? 'Add a document, then ask a question about it'
+                      : 'Ask a question about your documents'}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {messages.map((msg, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.bubbleRow,
+                        msg.role === 'user' ? styles.bubbleRowUser : styles.bubbleRowAssistant,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.bubble,
+                          {
+                            backgroundColor:
+                              msg.role === 'user' ? colors.primary : colors.surfaceContainerHigh,
+                            borderRadius: dimens.radius.md,
+                            paddingHorizontal: dimens.spacing.md,
+                            paddingVertical: dimens.spacing.sm,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            typography.bodyLarge,
+                            { color: msg.role === 'user' ? colors.onPrimary : colors.onSurface },
+                          ]}
+                        >
+                          {msg.text}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                  {isQuerying && (
+                    <View style={[styles.queryingRow, { gap: dimens.spacing.sm }]}>
+                      <ActivityIndicator size="small" color={colors.onSurfaceVariant} />
+                      <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
+                        Searching your documents…
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </ScrollView>
+          </View>
+
+          {/* Input bar */}
+          <View style={styles.inputBar}>
+            <View
+              style={[
+                styles.inputWrapper,
+                { backgroundColor: colors.surfaceContainerHigh },
+              ]}
+            >
+              <TextInput
+                style={[
+                  styles.textInput,
+                  typography.bodyLarge,
+                  { color: colors.onSurface },
+                ]}
+                placeholder="Ask about your documents"
+                placeholderTextColor={colors.onSurfaceVariant}
+                value={currentQuestion}
+                onChangeText={setCurrentQuestion}
+                editable={hasDocuments && !isQuerying}
+                returnKeyType="send"
+                onSubmitEditing={handleAskQuestion}
+                multiline
+                maxLength={2000}
+              />
+            </View>
+            <TouchableOpacity
+              onPress={handleAskQuestion}
+              disabled={!canAskQuestion}
+              activeOpacity={0.8}
+              style={[
+                styles.sendButton,
+                {
+                  backgroundColor: canAskQuestion
+                    ? colors.primary
+                    : colors.surfaceVariant,
+                },
+              ]}
+            >
+              <Icon
+                name="send"
+                size={20}
+                color={canAskQuestion ? colors.onPrimary : colors.onSurfaceVariant}
+              />
+            </TouchableOpacity>
+          </View>
+      </Animated.View>
 
       {/* Model Selection Sheets */}
       <ModelSelectionSheet
@@ -559,244 +624,108 @@ export const RAGScreen: React.FC = () => {
         onModelSelected={handleLLMModelSelected}
         onClose={() => setShowingLLMPicker(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
 // MARK: - Styles
 
 const styles = StyleSheet.create({
-  container: {
+  fill: {
     flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-  },
-  flex1: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.borderLight,
-  },
-  title: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: Padding.padding20,
+    padding: 24,
   },
-  loadingText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.medium,
+  card: {
+    overflow: 'hidden',
   },
-  errorTitle: {
-    ...Typography.headline,
-    color: Colors.primaryRed,
-    marginTop: Spacing.medium,
-  },
-  errorHintText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.small,
-    textAlign: 'center',
-  },
-
-  // Model Setup Section
-  modelSection: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.borderLight,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-  },
-  modelRow: {
+  collapseHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.smallMedium,
-    gap: Spacing.mediumLarge,
   },
-  modelLabel: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
+  divider: {
+    height: StyleSheet.hairlineWidth,
   },
-  modelRowRight: {
+  setupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  setupRowText: {
     flex: 1,
+    gap: 2,
+  },
+  docsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: Spacing.xSmall,
   },
-  modelName: {
-    ...Typography.subheadline,
-    fontWeight: FontWeight.medium,
-    color: Colors.textPrimary,
-    maxWidth: 180,
-  },
-  modelPlaceholder: {
-    ...Typography.subheadline,
-    color: Colors.primaryBlue,
-  },
-
-  // Document Status Bar
-  documentBar: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.borderLight,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    alignItems: 'center',
-  },
-  documentBarInner: {
+  docRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.mediumLarge,
-    width: '100%',
   },
-  documentBarText: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-  },
-  documentName: {
-    ...Typography.subheadline,
-    fontWeight: FontWeight.medium,
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  changeButton: {
-    ...Typography.caption,
-    color: Colors.primaryBlue,
-  },
-  selectDocButton: {
+  addDocButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryBlue,
-    paddingHorizontal: Padding.padding24,
-    paddingVertical: Padding.padding12,
-    borderRadius: BorderRadius.large,
-    gap: Spacing.small,
   },
-  selectDocButtonDisabled: {
-    backgroundColor: Colors.textTertiary,
-  },
-  selectDocButtonText: {
-    ...Typography.headline,
-    color: '#fff',
-  },
-
-  // Error Banner
-  errorBanner: {
+  compactBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: `${Colors.primaryRed}15`,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Spacing.smallMedium,
-    gap: Spacing.small,
-  },
-  errorBannerText: {
-    ...Typography.caption,
-    color: Colors.primaryRed,
-    flex: 1,
-  },
-
-  // Messages Area
-  messagesArea: {
-    flex: 1,
-    backgroundColor: Colors.backgroundSecondary,
+    gap: 12,
   },
   messagesContent: {
-    padding: Padding.padding16,
     flexGrow: 1,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: Padding.padding60,
-    gap: Spacing.smallMedium,
+    paddingVertical: 48,
+    paddingHorizontal: 32,
   },
-  emptyTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-    marginTop: Spacing.medium,
+  bubbleRow: {
+    flexDirection: 'row',
   },
-  emptySubtitle: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    paddingHorizontal: Padding.padding40,
+  bubbleRowUser: {
+    justifyContent: 'flex-end',
   },
-
-  // Message Bubbles
-  messageBubbleRow: {
-    marginBottom: Spacing.mediumLarge,
+  bubbleRowAssistant: {
+    justifyContent: 'flex-start',
   },
-  messageBubbleRowUser: {
-    alignItems: 'flex-end',
-  },
-  messageBubbleRowAssistant: {
-    alignItems: 'flex-start',
-  },
-  messageBubble: {
+  bubble: {
     maxWidth: '80%',
-    paddingHorizontal: Padding.padding14,
-    paddingVertical: Spacing.smallMedium,
-    borderRadius: BorderRadius.large,
-  },
-  messageBubbleUser: {
-    backgroundColor: Colors.primaryBlue,
-    borderBottomRightRadius: 4,
-  },
-  messageBubbleAssistant: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderBottomLeftRadius: 4,
-  },
-  messageBubbleText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    lineHeight: 22,
-  },
-  messageBubbleTextUser: {
-    color: '#fff',
   },
   queryingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.small,
-    paddingVertical: Spacing.small,
   },
-  queryingText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-
-  // Input Bar
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: Colors.backgroundPrimary,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.borderLight,
-    paddingHorizontal: Padding.padding12,
-    paddingVertical: Spacing.smallMedium,
-    gap: Spacing.small,
+    gap: 8,
+  },
+  inputWrapper: {
+    flex: 1,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
   },
   textInput: {
-    flex: 1,
-    ...Typography.body,
-    color: Colors.textPrimary,
-    minHeight: 36,
-    maxHeight: 100,
-    paddingHorizontal: Padding.padding12,
-    paddingVertical: Spacing.small,
+    minHeight: 32,
+    maxHeight: 120,
+    paddingTop: 6,
+    paddingBottom: 6,
   },
   sendButton: {
-    paddingBottom: 2,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

@@ -15,7 +15,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -23,7 +22,7 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { BottomSheet, BottomSheetScrollView } from '../ui/BottomSheet';
 import { RunAnywhere } from '@runanywhere/core';
 import {
   LoRAAdapterConfig,
@@ -39,11 +38,14 @@ import { Typography } from '../../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../../theme/spacing';
 
 interface LoRASheetProps {
+  visible: boolean;
   modelId: string | null;
   onClose: () => void;
   /** Lets the parent (ChatScreen badge) track the loaded-adapter count. */
   onAdaptersChanged?: (adapters: LoRAAdapterInfo[]) => void;
 }
+
+const LORA_SNAP_POINTS = ['75%'];
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
@@ -57,6 +59,7 @@ function lastPathComponent(path: string): string {
 }
 
 export const LoRASheet: React.FC<LoRASheetProps> = ({
+  visible,
   modelId,
   onClose,
   onAdaptersChanged,
@@ -190,15 +193,16 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      snapPoints={LORA_SNAP_POINTS}
+    >
+      <View style={styles.sheetHeader}>
         <Text style={styles.title}>LoRA Adapters</Text>
-        <TouchableOpacity onPress={onClose} style={styles.doneButton}>
-          <Text style={styles.doneText}>Done</Text>
-        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <BottomSheetScrollView contentContainerStyle={styles.content}>
         {error && (
           <View style={styles.errorBox}>
             <Icon name="alert-circle" size={16} color={Colors.primaryRed} />
@@ -347,12 +351,18 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
             </Text>
           </View>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </BottomSheetScrollView>
+    </BottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
+  sheetHeader: {
+    paddingHorizontal: Padding.padding16,
+    paddingTop: Spacing.small,
+    paddingBottom: Spacing.medium,
+    alignItems: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: Colors.backgroundPrimary,

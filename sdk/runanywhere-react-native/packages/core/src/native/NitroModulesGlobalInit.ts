@@ -71,12 +71,21 @@ export async function initializeNitroModulesGlobally(): Promise<NitroProxy> {
 }
 
 /**
- * Get the NitroModules proxy synchronously (only after initialization).
- * For guaranteed initialization, use initializeNitroModulesGlobally() first.
+ * Get the NitroModules proxy synchronously.
  *
- * @returns NitroModules proxy or null if not yet initialized
+ * Falls back to the static `react-native-nitro-modules` import (and caches it)
+ * when `initializeNitroModulesGlobally()` has not run yet. The proxy is the
+ * synchronous import object — the same value the async initializer assigns — so
+ * this fallback is equivalent and idempotent. Without it, callers that run
+ * before `RunAnywhere.initialize()` (e.g. backend `register()` during app
+ * bootstrap) incorrectly see "native module not available".
+ *
+ * @returns NitroModules proxy, or null only if the import itself is unavailable
  */
 export function getNitroModulesProxySync(): NitroProxy | null {
+  if (_nitroModulesProxy === null && NitroModulesNamed) {
+    _nitroModulesProxy = NitroModulesNamed as unknown as NitroProxy;
+  }
   return _nitroModulesProxy;
 }
 

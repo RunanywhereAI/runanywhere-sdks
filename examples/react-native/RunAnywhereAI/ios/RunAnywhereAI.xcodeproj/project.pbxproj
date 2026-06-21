@@ -16,6 +16,12 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		CCDD001122334455 /* DocumentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDD001122334456 /* DocumentService.swift */; };
 		CCDD001122334457 /* DocumentService.m in Sources */ = {isa = PBXBuildFile; fileRef = CCDD001122334458 /* DocumentService.m */; };
+		36293524965A46A4B5A96AA5 /* Figtree.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8BF95992387943D3A4344FFE /* Figtree.ttf */; };
+		2E85DD22A18E406887A7C196 /* Figtree.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8BF95992387943D3A4344FFE /* Figtree.ttf */; };
+		5387F1DFAAC3441BA3D3240C /* Figtree-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */; };
+		31FE98DC2C9C407FB812B3C9 /* Figtree-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */; };
+		B0629D4718BB4063BAA49E2D /* MapleMono.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */; };
+		A081B5C032C04D09B5E70F0F /* MapleMono.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,6 +55,9 @@
 		CCDD001122334458 /* DocumentService.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = DocumentService.m; path = RunAnywhereAI/DocumentService.m; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FF375136ECCEFB06442E8E31 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = RunAnywhereAI/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		8BF95992387943D3A4344FFE /* Figtree.ttf */ = {isa = PBXFileReference; name = "Figtree.ttf"; path = "../assets/fonts/Figtree.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */ = {isa = PBXFileReference; name = "Figtree-Italic.ttf"; path = "../assets/fonts/Figtree-Italic.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */ = {isa = PBXFileReference; name = "MapleMono.ttf"; path = "../assets/fonts/MapleMono.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -130,6 +139,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				70589C1467784F73A9BA4885 /* Resources */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -155,6 +165,17 @@
 			);
 			path = Pods;
 			sourceTree = "<group>";
+		};
+		70589C1467784F73A9BA4885 /* Resources */ = {
+			isa = "PBXGroup";
+			children = (
+				8BF95992387943D3A4344FFE /* Figtree.ttf */,
+				C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */,
+				2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+			path = "";
 		};
 /* End PBXGroup section */
 
@@ -242,6 +263,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2E85DD22A18E406887A7C196 /* Figtree.ttf in Resources */,
+				31FE98DC2C9C407FB812B3C9 /* Figtree-Italic.ttf in Resources */,
+				A081B5C032C04D09B5E70F0F /* MapleMono.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -252,6 +276,9 @@
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				0006D45B6AD5438EA3B175BC /* PrivacyInfo.xcprivacy in Resources */,
+				36293524965A46A4B5A96AA5 /* Figtree.ttf in Resources */,
+				5387F1DFAAC3441BA3D3240C /* Figtree-Italic.ttf in Resources */,
+				B0629D4718BB4063BAA49E2D /* MapleMono.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
