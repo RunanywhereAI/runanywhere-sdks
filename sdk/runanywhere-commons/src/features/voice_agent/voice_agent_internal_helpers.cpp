@@ -182,6 +182,72 @@ void publish_voice_pipeline_sdk_event(const runanywhere::v1::VoiceEvent& voice_e
     (void)rac::events::publish_prebuilt(sdk_event);
 }
 
+void publish_voice_turn_metrics(double stt_ms, double llm_ms, double tts_ms, double end_to_end_ms,
+                                int64_t tokens_generated, const char* session_id,
+                                const char* model_id, const char* framework,
+                                int32_t transcript_chars, int32_t response_chars,
+                                rac_result_t error_code, const char* error_message) {
+    const bool failed = (error_code != RAC_SUCCESS);
+    runanywhere::v1::SDKEvent sdk_event;
+    sdk_event.set_timestamp_ms(rac_get_current_time_ms());
+    sdk_event.set_id(event_id("voice"));
+    sdk_event.set_category(failed ? runanywhere::v1::EVENT_CATEGORY_ERROR
+                                  : runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
+    sdk_event.set_component(runanywhere::v1::SDK_COMPONENT_VOICE_AGENT);
+    sdk_event.set_severity(failed ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                                  : runanywhere::v1::ERROR_SEVERITY_INFO);
+    sdk_event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    sdk_event.set_source("cpp");
+    sdk_event.set_operation_id("voice_agent.turn");
+    // Common columns. session_id is a native envelope field; the MetricsEvent
+    // proto has no model/framework/char fields, so those ride the properties
+    // carrier (read back in the telemetry kMetrics extraction).
+    if (session_id != nullptr && session_id[0] != '\0') {
+        sdk_event.set_session_id(session_id);
+    }
+    if (model_id != nullptr && model_id[0] != '\0') {
+        (*sdk_event.mutable_properties())["model_id"] = model_id;
+    }
+    if (framework != nullptr && framework[0] != '\0') {
+        (*sdk_event.mutable_properties())["framework"] = framework;
+    }
+    if (transcript_chars > 0) {
+        (*sdk_event.mutable_properties())["transcript_chars"] = std::to_string(transcript_chars);
+    }
+    if (response_chars > 0) {
+        (*sdk_event.mutable_properties())["response_chars"] = std::to_string(response_chars);
+    }
+
+    auto* vp = sdk_event.mutable_voice_pipeline();
+    vp->set_timestamp_us(rac_get_current_time_ms() * 1000);
+    vp->set_severity(failed ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                            : runanywhere::v1::ERROR_SEVERITY_INFO);
+    vp->set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
+    auto* metrics = vp->mutable_metrics();
+    if (stt_ms > 0.0)
+        metrics->set_stt_final_ms(stt_ms);
+    if (llm_ms > 0.0)
+        metrics->set_llm_total_ms(llm_ms);
+    if (tts_ms > 0.0)
+        metrics->set_tts_total_ms(tts_ms);
+    if (end_to_end_ms > 0.0)
+        metrics->set_end_to_end_ms(end_to_end_ms);
+    if (tokens_generated > 0)
+        metrics->set_tokens_generated(tokens_generated);
+
+    // On failure set the envelope SDKError so the telemetry extractor marks the
+    // row Failed with the message/code (c_abi_code preferred for error_code).
+    if (failed) {
+        auto* err = sdk_event.mutable_error();
+        err->set_c_abi_code(static_cast<int32_t>(error_code));
+        err->set_message(error_message != nullptr && error_message[0] != '\0' ? error_message
+                                                                              : "voice turn failed");
+        err->set_component("voice");
+        err->set_severity(runanywhere::v1::ERROR_SEVERITY_ERROR);
+    }
+    (void)rac::events::publish_prebuilt(sdk_event);
+}
+
 void emit_generated_voice_event(rac_voice_agent_handle_t handle,
                                 const runanywhere::v1::VoiceEvent& event,
                                 runanywhere::v1::ErrorSeverity sdk_severity) {

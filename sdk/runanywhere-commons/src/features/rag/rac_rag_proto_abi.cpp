@@ -92,7 +92,7 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
                         float progress, int64_t input_count, int64_t output_count,
                         const char* error, double duration_ms = 0.0,
                         const char* model_id = nullptr, int64_t top_k = 0,
-                        double retrieval_time_ms = 0.0) {
+                        double retrieval_time_ms = 0.0, const char* embedding_model = nullptr) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -127,6 +127,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     }
     if (retrieval_time_ms > 0.0) {
         (*event.mutable_properties())["retrieval_time_ms"] = std::to_string(retrieval_time_ms);
+    }
+    if (embedding_model != nullptr && embedding_model[0] != '\0') {
+        (*event.mutable_properties())["embedding_model"] = embedding_model;
     }
     publish_event(event);
 }
@@ -540,6 +543,7 @@ rac_result_t rac_rag_ingest_proto(rac_handle_t session, const uint8_t* document_
             .count();
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED,
                        "rag.ingest", 1.0f, 1, stats.indexed_chunks(), nullptr, ingest_ms,
+                       s->embedding_model_id.c_str(), /*top_k=*/0, /*retrieval_time_ms=*/0.0,
                        s->embedding_model_id.c_str());
     return rc;
 #endif
@@ -675,7 +679,7 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
                        "rag.query", 1.0f, 1, proto.retrieved_chunks_size(), nullptr, total_ms,
                        s->llm_model_id.empty() ? s->embedding_model_id.c_str()
                                                : s->llm_model_id.c_str(),
-                       query_proto.top_k(), retrieval_ms);
+                       query_proto.top_k(), retrieval_ms, s->embedding_model_id.c_str());
     rac_llm_result_free(&llm_result);
     return rc;
 #endif

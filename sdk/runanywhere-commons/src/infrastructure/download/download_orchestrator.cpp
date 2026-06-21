@@ -71,6 +71,7 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
+#include "rac/infrastructure/events/rac_sdk_emit.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -292,6 +293,8 @@ struct proto_download_task {
     int64_t last_partial_bytes = 0;
     int64_t last_deleted_bytes = 0;
     int64_t started_at_unix_ms = 0;
+    bool download_telemetry_started = false;  // model.download.started emitted once
+    bool download_telemetry_finished = false;  // terminal model.download.* emitted once
     // Framework + archive structure preserved from the registry at task
     // creation so the worker can (a) extract into the canonical per-model
     // folder and (b) resolve the post-extraction nested subdirectory for
@@ -786,11 +789,51 @@ void mark_task_stopped(const std::shared_ptr<proto_download_task>& task) {
     if (!task) {
         return;
     }
+    // Snapshot the terminal state under the lock; emit telemetry after releasing
+    // it (the emit feeds the event bus / telemetry sink, never the task mutex).
+    rav1::DownloadState final_state = rav1::DOWNLOAD_STATE_UNSPECIFIED;
+    std::string model_id;
+    std::string error_message;
+    int64_t bytes = 0;
+    double duration_ms = 0.0;
+    bool emit_terminal = false;
     {
         std::lock_guard<std::mutex> lock(task->mutex);
         task->running = false;
+        final_state = task->progress.state();
+        if (!task->download_telemetry_finished &&
+            (final_state == rav1::DOWNLOAD_STATE_COMPLETED ||
+             final_state == rav1::DOWNLOAD_STATE_FAILED ||
+             final_state == rav1::DOWNLOAD_STATE_CANCELLED)) {
+            task->download_telemetry_finished = true;
+            emit_terminal = true;
+            model_id = task->model_id;
+            error_message = task->progress.error_message();
+            bytes = task->progress.bytes_downloaded();
+            if (task->started_at_unix_ms > 0) {
+                duration_ms = static_cast<double>(now_unix_ms() - task->started_at_unix_ms);
+            }
+        }
     }
     task->cv.notify_all();
+    if (emit_terminal) {
+        switch (final_state) {
+            case rav1::DOWNLOAD_STATE_COMPLETED:
+                rac::events::emit_model_download_completed(model_id.c_str(), bytes, duration_ms,
+                                                           nullptr);
+                break;
+            case rav1::DOWNLOAD_STATE_FAILED:
+                rac::events::emit_model_download_failed(
+                    model_id.c_str(), RAC_ERROR_DOWNLOAD_FAILED,
+                    error_message.empty() ? "download failed" : error_message.c_str());
+                break;
+            case rav1::DOWNLOAD_STATE_CANCELLED:
+                rac::events::emit_model_download_cancelled(model_id.c_str());
+                break;
+            default:
+                break;
+        }
+    }
 }
 
 void set_task_progress(const std::shared_ptr<proto_download_task>& task, rav1::DownloadState state,
@@ -1190,9 +1233,20 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
         return;
     }
 
+    std::string started_model_id;
+    int64_t started_total_bytes = 0;
     {
         std::lock_guard<std::mutex> lock(task->mutex);
         task->running = true;
+        if (!task->download_telemetry_started) {
+            task->download_telemetry_started = true;
+            started_model_id = task->model_id;
+            started_total_bytes = task->progress.total_bytes();
+        }
+    }
+    if (!started_model_id.empty()) {
+        rac::events::emit_model_download_started(started_model_id.c_str(), started_total_bytes,
+                                                 nullptr);
     }
 
     const int64_t total_expected = plan_total_expected(task->files);

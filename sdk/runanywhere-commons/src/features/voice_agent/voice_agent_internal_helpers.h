@@ -109,6 +109,18 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
 void emit_component_failure(rac_voice_agent_handle_t handle, const char* component,
                             rac_result_t code, const char* message);
 
+// Publish a per-turn MetricsEvent (kMetrics) so the turn is recorded to
+// telemetry under the "voice" modality. telemetry_records() only records
+// voice-pipeline events whose payload is kMetrics, so turn lifecycle events
+// alone never reach telemetry — this is the row the dashboard shows. On
+// failure (error_code != RAC_SUCCESS) the envelope SDKError is set so the row
+// is marked Failed with the message/code. Pass 0 for any unmeasured stage.
+void publish_voice_turn_metrics(double stt_ms, double llm_ms, double tts_ms, double end_to_end_ms,
+                                int64_t tokens_generated, const char* session_id,
+                                const char* model_id, const char* framework,
+                                int32_t transcript_chars, int32_t response_chars,
+                                rac_result_t error_code, const char* error_message);
+
 // Translate a proto `VoiceAgentComposeConfig` into the C ABI
 // `rac_voice_agent_config_t`. The returned config aliases string pointers
 // in `proto`; caller must keep `proto` alive across the use.

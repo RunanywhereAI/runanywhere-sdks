@@ -16,6 +16,7 @@
  *     global SDKEvent publisher.
  */
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -320,10 +321,47 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    // Per-turn telemetry: publish a MetricsEvent on every exit (success or any
+    // failure) so the turn lands under the "voice" modality. This path uses
+    // early `return rc` at each stage, so an RAII guard is the clean way to
+    // cover all exits. Declared BEFORE the lock so it destructs (and publishes)
+    // AFTER the handle mutex is released. `armed` gates it to turns that
+    // actually started (not the pre-flight config rejections above).
+    struct TurnMetricsGuard {
+        std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        double stt_ms = 0.0;
+        double llm_ms = 0.0;
+        double tts_ms = 0.0;
+        int64_t tokens = 0;
+        std::string session_id;
+        std::string model_id;
+        std::string framework;
+        int32_t transcript_chars = 0;
+        int32_t response_chars = 0;
+        rac_result_t error_code = RAC_SUCCESS;
+        std::string error_message;
+        bool armed = false;
+        ~TurnMetricsGuard() {
+            if (!armed)
+                return;
+            const double e2e_ms = std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - start)
+                                      .count();
+            rac::voice_agent::detail::publish_voice_turn_metrics(
+                stt_ms, llm_ms, tts_ms, e2e_ms, tokens,
+                session_id.empty() ? nullptr : session_id.c_str(),
+                model_id.empty() ? nullptr : model_id.c_str(),
+                framework.empty() ? nullptr : framework.c_str(), transcript_chars, response_chars,
+                error_code, error_message.empty() ? nullptr : error_message.c_str());
+        }
+    } turn_metrics;
+    turn_metrics.session_id = session_id;
+
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     emit_component_states(handle);
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_STARTED);
+    turn_metrics.armed = true;
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_IDLE,
                   runanywhere::v1::PIPELINE_STATE_LISTENING, session_id, turn_id, request_id,
                   event_callback, user_data);
@@ -377,6 +415,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
 
     rac_stt_result_t stt = {};
     rac_result_t rc;
+    const auto t_stt = std::chrono::steady_clock::now();
     if (have_lifecycle_stt) {
         rac_stt_service_t stt_service{stt_ref.ops, stt_ref.impl, stt_ref.model_id};
         rc = rac_stt_transcribe(&stt_service, audio.data(), audio.size(), nullptr, &stt);
@@ -384,10 +423,14 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         rc = rac_stt_component_transcribe(handle->stt_handle, audio.data(), audio.size(), nullptr,
                                           &stt);
     }
+    turn_metrics.stt_ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_stt).count();
     if (rc != RAC_SUCCESS) {
         if (have_lifecycle_stt) {
             rac::lifecycle::release_lifecycle_stt(&stt_ref);
         }
+        turn_metrics.error_code = rc;
+        turn_metrics.error_message = "STT transcription failed";
         d7_emit_error(handle, rc, "stt", "STT transcription failed", session_id, turn_id,
                       request_id, event_callback, user_data);
         emit_component_failure(handle, "stt", rc, "STT transcription failed");
@@ -398,6 +441,8 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         if (have_lifecycle_stt) {
             rac::lifecycle::release_lifecycle_stt(&stt_ref);
         }
+        turn_metrics.error_code = RAC_ERROR_INVALID_STATE;
+        turn_metrics.error_message = "STT transcription was empty";
         d7_emit_error(handle, RAC_ERROR_INVALID_STATE, "stt", "STT transcription was empty",
                       session_id, turn_id, request_id, event_callback, user_data);
         emit_component_failure(handle, "stt", RAC_ERROR_INVALID_STATE,
@@ -413,6 +458,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                     /*is_speech=*/false, session_id, turn_id, request_id, event_callback,
                     user_data);
     }
+    turn_metrics.transcript_chars = stt.text ? static_cast<int32_t>(std::strlen(stt.text)) : 0;
     d7_emit_user_said(handle, stt.text,
                       request.session_config().has_language_code()
                           ? request.session_config().language_code()
@@ -425,13 +471,23 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
 
     rac::llm::LifecycleLlmRef llm_ref{};
     const bool have_lifecycle_llm = rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
+    if (have_lifecycle_llm) {
+        if (llm_ref.model_id != nullptr)
+            turn_metrics.model_id = llm_ref.model_id;
+        if (llm_ref.framework_name != nullptr)
+            turn_metrics.framework = llm_ref.framework_name;
+    }
     rac_llm_result_t llm = {};
+    const auto t_llm = std::chrono::steady_clock::now();
     if (have_lifecycle_llm) {
         rac_llm_service_t llm_service{llm_ref.ops, llm_ref.impl, llm_ref.model_id};
         rc = rac_llm_generate(&llm_service, stt.text, nullptr, &llm);
     } else {
         rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
     }
+    turn_metrics.llm_ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_llm).count();
+    turn_metrics.tokens = llm.completion_tokens;
     if (rc != RAC_SUCCESS) {
         if (have_lifecycle_llm) {
             rac::llm::release_lifecycle_llm(&llm_ref);
@@ -440,11 +496,14 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         if (have_lifecycle_stt) {
             rac::lifecycle::release_lifecycle_stt(&stt_ref);
         }
+        turn_metrics.error_code = rc;
+        turn_metrics.error_message = "LLM generation failed";
         d7_emit_error(handle, rc, "llm", "LLM generation failed", session_id, turn_id, request_id,
                       event_callback, user_data);
         emit_component_failure(handle, "llm", rc, "LLM generation failed");
         return rc;
     }
+    turn_metrics.response_chars = llm.text ? static_cast<int32_t>(std::strlen(llm.text)) : 0;
     d7_emit_assistant_token(handle, llm.text, true, session_id, turn_id, request_id, event_callback,
                             user_data);
 
@@ -455,12 +514,15 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     rac::lifecycle::LifecycleTtsRef tts_ref{};
     const bool have_lifecycle_tts = rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
     rac_tts_result_t tts = {};
+    const auto t_tts = std::chrono::steady_clock::now();
     if (have_lifecycle_tts) {
         rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
         rc = rac_tts_synthesize(&tts_service, llm.text, nullptr, &tts);
     } else {
         rc = rac_tts_component_synthesize(handle->tts_handle, llm.text, nullptr, &tts);
     }
+    turn_metrics.tts_ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_tts).count();
     if (rc != RAC_SUCCESS) {
         if (have_lifecycle_tts) {
             rac::lifecycle::release_lifecycle_tts(&tts_ref);
@@ -473,6 +535,8 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         if (have_lifecycle_stt) {
             rac::lifecycle::release_lifecycle_stt(&stt_ref);
         }
+        turn_metrics.error_code = rc;
+        turn_metrics.error_message = "TTS synthesis failed";
         d7_emit_error(handle, rc, "tts", "TTS synthesis failed", session_id, turn_id, request_id,
                       event_callback, user_data);
         emit_component_failure(handle, "tts", rc, "TTS synthesis failed");

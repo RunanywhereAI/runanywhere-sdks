@@ -1293,13 +1293,24 @@ rac_result_t publish_sdk_event(const SDKEvent& event) {
 
 void publish_generation_event(GenerationEventKind kind, const char* prompt, const char* token,
                               const char* response, const char* error, const char* model_id,
-                              int32_t token_count, int64_t latency_ms, int32_t input_tokens = 0) {
+                              int32_t token_count, int64_t latency_ms, int32_t input_tokens = 0,
+                              const char* framework_name = nullptr,
+                              double tokens_per_second = 0.0, double ttft_ms = 0.0,
+                              float temperature = -1.0f, int32_t max_tokens = 0,
+                              int32_t context_length = 0, bool is_streaming = false) {
     SDKEvent event;
     const bool failed = kind == runanywhere::v1::GENERATION_EVENT_KIND_FAILED;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_LLM,
                             failed ? runanywhere::v1::ERROR_SEVERITY_ERROR
                                    : runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_operation_id("llm.generate");
+    // This proto-path emitter has no framework proto field wired; carry the
+    // lifecycle ref's framework_name on the properties map (the kGeneration
+    // telemetry extraction normalizes it via clean_framework). Without this,
+    // LLM rows show no framework.
+    if (framework_name != nullptr && framework_name[0] != '\0') {
+        (*event.mutable_properties())["framework"] = framework_name;
+    }
     auto* generation = event.mutable_generation();
     generation->set_kind(kind);
     if ((prompt != nullptr) && prompt[0] != '\0') {
@@ -1327,7 +1338,41 @@ void publish_generation_event(GenerationEventKind kind, const char* prompt, cons
     if (input_tokens > 0) {
         generation->set_input_tokens(input_tokens);
     }
+    // Completion metrics (proto-path parity with the component path's
+    // emit_llm_generation_completed). All use existing GenerationEvent proto
+    // fields; the kGeneration telemetry extraction already reads them.
+    if (tokens_per_second > 0.0) {
+        generation->set_tokens_per_second(tokens_per_second);
+    }
+    if (ttft_ms > 0.0) {
+        generation->set_time_to_first_token_ms(static_cast<int64_t>(ttft_ms));
+    }
+    // temperature 0.0 is a valid (greedy) setting, so the sentinel for "unset"
+    // is a negative default — emit any non-negative value.
+    if (temperature >= 0.0f) {
+        generation->set_temperature(temperature);
+    }
+    if (max_tokens > 0) {
+        generation->set_max_tokens(max_tokens);
+    }
+    if (context_length > 0) {
+        generation->set_context_length(context_length);
+    }
+    generation->set_is_streaming(is_streaming);
     (void)publish_sdk_event(event);
+}
+
+// Best-effort context-length lookup for the handle-less proto path (the
+// component path reads it from config; here we query the engine ops vtable).
+int32_t lifecycle_context_length(const rac::llm::LifecycleLlmRef& ref) {
+    if (ref.ops == nullptr || ref.ops->get_info == nullptr) {
+        return 0;
+    }
+    rac_llm_info_t info{};
+    if (ref.ops->get_info(ref.impl, &info) != RAC_SUCCESS) {
+        return 0;
+    }
+    return info.context_length;
 }
 
 SDKEvent make_cancellation_event(CancellationEventKind kind, const char* reason,
@@ -1855,8 +1900,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STARTED,
-                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
-                             0);
+                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0, 0,
+                             0, ref.framework_name);
 
     const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
@@ -1881,7 +1926,7 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     if (rc != RAC_SUCCESS) {
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_FAILED,
                                  request.prompt().c_str(), nullptr, nullptr, rac_error_message(rc),
-                                 ref.model_id, 0, elapsed);
+                                 ref.model_id, 0, elapsed, 0, ref.framework_name);
         rac::llm::release_lifecycle_llm(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
@@ -1906,7 +1951,11 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     publish_generation_event(
         runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED, request.prompt().c_str(), nullptr,
         response, nullptr, ref.model_id, raw.completion_tokens,
-        raw.total_time_ms > 0 ? raw.total_time_ms : elapsed, raw.prompt_tokens);
+        raw.total_time_ms > 0 ? raw.total_time_ms : elapsed,
+        raw.prompt_tokens > 0 ? raw.prompt_tokens : estimate_tokens(request.prompt().c_str()),
+        ref.framework_name, static_cast<double>(raw.tokens_per_second),
+        static_cast<double>(raw.time_to_first_token_ms), options.temperature, options.max_tokens,
+        lifecycle_context_length(ref), /*is_streaming=*/false);
 
     rac_llm_result_free(&raw);
     rac::llm::release_lifecycle_llm(&ref);
@@ -1953,8 +2002,8 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STARTED,
-                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
-                             0);
+                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0, 0,
+                             0, ref.framework_name);
 
     const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
@@ -2000,14 +2049,15 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
         dispatch_terminal_once(&ctx, "cancelled", nullptr);
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_CANCELLED,
                                  request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
-                                 nullptr, ref.model_id, ctx.token_count, now_ms() - ctx.started_ms);
+                                 nullptr, ref.model_id, ctx.token_count, now_ms() - ctx.started_ms,
+                                 0, ref.framework_name);
         rc = RAC_SUCCESS;
     } else if (rc != RAC_SUCCESS) {
         dispatch_terminal_once(&ctx, "error", rac_error_message(rc));
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_FAILED,
                                  request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
                                  rac_error_message(rc), ref.model_id, ctx.token_count,
-                                 now_ms() - ctx.started_ms);
+                                 now_ms() - ctx.started_ms, 0, ref.framework_name);
     } else {
         // Mirror the OpenAI-style finish_reason
         // contract from llm_component.cpp:867-884 and rac_llm_generate_proto's
@@ -2020,9 +2070,19 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
         const char* finish_reason =
             (options.max_tokens > 0 && ctx.token_count >= options.max_tokens) ? "length" : "stop";
         dispatch_terminal_once(&ctx, finish_reason, nullptr);
-        publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED,
-                                 request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
-                                 nullptr, ref.model_id, ctx.token_count, now_ms() - ctx.started_ms);
+        const int64_t stream_elapsed = now_ms() - ctx.started_ms;
+        publish_generation_event(
+            runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED, request.prompt().c_str(),
+            nullptr, ctx.response_text.c_str(), nullptr, ref.model_id, ctx.token_count,
+            stream_elapsed, ctx.prompt_tokens, ref.framework_name,
+            (ctx.token_count > 0 && stream_elapsed > 0)
+                ? ctx.token_count * 1000.0 / static_cast<double>(stream_elapsed)
+                : 0.0,
+            ctx.first_token_ms > ctx.started_ms
+                ? static_cast<double>(ctx.first_token_ms - ctx.started_ms)
+                : 0.0,
+            options.temperature, options.max_tokens, lifecycle_context_length(ref),
+            /*is_streaming=*/true);
     }
 
     rac::llm::release_lifecycle_llm(&ref);

@@ -106,6 +106,9 @@ typedef struct rac_telemetry_payload {
 
     // VLM-specific fields (VLM also carries the LLM token fields above)
     int32_t image_count;
+    int32_t vision_tokens;          // image/vision tokens (via properties carrier)
+    double vision_encode_time_ms;   // vision encode time (via properties carrier)
+    const char* image_resolution;   // "WxH" (via properties carrier; string → dup'd/freed)
 
     // RAG-specific fields
     int32_t retrieved_docs_count;
@@ -118,10 +121,26 @@ typedef struct rac_telemetry_payload {
     // RAG-specific extras (via properties carrier; retrieved_docs_count above)
     int32_t top_k;
     double retrieval_time_ms;
+    const char* embedding_model;  // RAG embedding model (string → dup'd/freed)
 
-    // LoRA-specific field (operation rides event_type; base model on model_id).
-    // String → must be dup'd/freed in track + payload_free.
+    // LoRA-specific fields. Strings → must be dup'd/freed in track + payload_free.
     const char* adapter_id;
+    const char* operation;  // attach/detach/failed (derived from capability kind)
+    int64_t adapter_size_bytes;  // adapter file size in bytes (via properties carrier)
+
+    // ImageGen / diffusion fields (all via properties carrier). Strings (scheduler,
+    // output_format) → must be dup'd/freed in track + payload_free.
+    int32_t imagegen_prompt_length;
+    int32_t imagegen_negative_prompt_length;
+    int32_t image_width;
+    int32_t image_height;
+    int32_t num_images;
+    int32_t num_inference_steps;
+    double guidance_scale;
+    int64_t seed;
+    int64_t output_size_bytes;
+    const char* scheduler;
+    const char* output_format;
 
     // Voice-agent per-turn pipeline fields (from MetricsEvent)
     double voice_stt_ms;
@@ -129,9 +148,14 @@ typedef struct rac_telemetry_payload {
     double voice_tts_ms;
     double voice_total_ms;
 
-    // VAD fields
+    // VAD fields (silence_duration_ms + segment_count via properties carrier)
     double speech_duration_ms;
     double silence_duration_ms;
+    int32_t segment_count;
+
+    // Voice-agent per-turn fields (via properties carrier; voice_* timing above)
+    int32_t transcript_chars;
+    int32_t response_chars;
 
     // SDK lifecycle fields
     int32_t count;
