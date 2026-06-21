@@ -128,6 +128,10 @@ jobs:
           path: |
             sdk/runanywhere-commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip
             sdk/runanywhere-commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256
+            sdk/runanywhere-commons/dist/RABackendLLAMACPP-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip
+            sdk/runanywhere-commons/dist/RABackendLLAMACPP-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256
+            sdk/runanywhere-commons/dist/RABackendONNX-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip
+            sdk/runanywhere-commons/dist/RABackendONNX-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -782,6 +786,8 @@ jobs:
           }
           assert_present "iOS XCFramework zip"      "RACommons-ios-v*.zip"
           assert_present "Android per-ABI zip"      "RACommons-android-*-v*.zip"
+          assert_present "Android LlamaCPP backend zip" "RABackendLLAMACPP-android-*-v*.zip"
+          assert_present "Android ONNX backend zip" "RABackendONNX-android-*-v*.zip"
           assert_present "Web WASM tar"             "RACommons-web-v*.tar.gz"
           assert_present "rcli macOS tarball"       "rcli-macos-arm64-v*.tar.gz"
           assert_present "rcli Linux tarball"       "rcli-linux-x86_64-v*.tar.gz"
