@@ -24,6 +24,9 @@ interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   isLoading?: boolean;
+  /** When provided, renders a tool-calling toggle button at the start of the bar. */
+  toolsEnabled?: boolean;
+  onToggleTools?: () => void;
 }
 
 const MIN_HEIGHT = 24;
@@ -37,6 +40,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   disabled = false,
   placeholder = 'Type a message…',
   isLoading = false,
+  toolsEnabled = false,
+  onToggleTools,
 }) => {
   const { colors, typography } = useTheme();
   const insets = useSafeAreaInsets();
@@ -81,25 +86,48 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         animatedStyle,
       ]}
     >
-      <View
-        style={[styles.field, { backgroundColor: colors.surfaceContainerHigh }]}
-      >
-        <TextInput
-          style={[
-            styles.input,
-            typography.bodyLarge,
-            { color: colors.onSurface, height: inputHeight },
-          ]}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={colors.onSurfaceVariant}
-          multiline
-          editable={!disabled}
-          onContentSizeChange={handleContentSizeChange}
-          returnKeyType="default"
-          submitBehavior="newline"
-        />
+      <View style={styles.row}>
+        {onToggleTools && (
+          <TouchableOpacity
+            style={[
+              styles.tool,
+              {
+                backgroundColor: toolsEnabled
+                  ? colors.primaryContainer
+                  : colors.surfaceContainerHigh,
+              },
+            ]}
+            onPress={onToggleTools}
+            activeOpacity={0.8}
+            accessibilityLabel={toolsEnabled ? 'Disable tools' : 'Enable tools'}
+          >
+            <Icon
+              name="tool"
+              size={20}
+              color={toolsEnabled ? colors.primary : colors.onSurfaceVariant}
+            />
+          </TouchableOpacity>
+        )}
+        <View
+          style={[styles.field, { backgroundColor: colors.surfaceContainerHigh }]}
+        >
+          <TextInput
+            style={[
+              styles.input,
+              typography.bodyLarge,
+              { color: colors.onSurface, height: inputHeight },
+            ]}
+            value={value}
+            onChangeText={onChangeText}
+            placeholder={placeholder}
+            placeholderTextColor={colors.onSurfaceVariant}
+            multiline
+            editable={!disabled}
+            onContentSizeChange={handleContentSizeChange}
+            returnKeyType="default"
+            submitBehavior="newline"
+          />
+        </View>
 
         <TouchableOpacity
           style={[
@@ -135,25 +163,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 10,
   },
-  field: {
+  row: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 8,
-    borderRadius: 24,
-    paddingLeft: 16,
-    paddingRight: 6,
-    paddingVertical: 6,
+  },
+  tool: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  field: {
+    flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+    borderRadius: 22,
+    paddingHorizontal: 16,
   },
   input: {
-    flex: 1,
     paddingTop: 8,
     paddingBottom: 8,
     maxHeight: MAX_HEIGHT,
   },
   action: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -42,6 +42,7 @@ import { Typography } from '../theme/typography';
 import { Spacing, Padding, IconSize } from '../theme/spacing';
 import { ModelRequiredOverlay } from '../components/common';
 import { ChatHeader } from '../features/chat/components/ChatHeader';
+import { PromptSuggestions } from '../features/chat/components/PromptSuggestions';
 import {
   MessageBubble,
   ChatInput,
@@ -136,6 +137,7 @@ export const ChatScreen: React.FC = () => {
   const [showModelSelection, setShowModelSelection] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [registeredToolCount, setRegisteredToolCount] = useState(0);
+  const [toolsEnabled, setToolsEnabled] = useState(false);
   // LoRA adapter management (mirrors iOS LLMViewModel.loraAdapters).
   const [showLoRASheet, setShowLoRASheet] = useState(false);
   const [loraAdapterCount, setLoraAdapterCount] = useState(0);
@@ -346,26 +348,49 @@ export const ChatScreen: React.FC = () => {
     }
   };
 
+  // Tool-calling toggle (mirrors Android viewModel.toolsEnabled). Persisted so
+  // it survives navigation; the input bar's tool button flips it.
+  useEffect(() => {
+    AsyncStorage.getItem(APP_STORAGE_KEYS.TOOL_CALLING_ENABLED).then((v) =>
+      setToolsEnabled(v === 'true')
+    );
+  }, []);
+
+  const handleToggleTools = useCallback(() => {
+    setToolsEnabled((prev) => {
+      const next = !prev;
+      void AsyncStorage.setItem(
+        APP_STORAGE_KEYS.TOOL_CALLING_ENABLED,
+        next ? 'true' : 'false'
+      );
+      return next;
+    });
+  }, []);
+
   /**
    * Send a message and stream the response token-by-token.
    * Uses RunAnywhere.generateStream() for real-time streaming UI.
    *
    * generateWithTools() is still available on RunAnywhere for callers
-   * that genuinely need the batch tool-calling form.
+   * that genuinely need the batch tool-calling form. An optional prompt
+   * override lets prompt-suggestion pills send their text directly.
    */
-  const handleSend = useCallback(async () => {
-    if (isLoading || !inputText.trim() || !currentConversation) return;
+  const handleSend = useCallback(async (promptOverride?: string) => {
+    const text = (
+      typeof promptOverride === 'string' ? promptOverride : inputText
+    ).trim();
+    if (isLoading || !text || !currentConversation) return;
 
     const userMessage: Message = {
       id: generateId(),
       role: MessageRole.User,
-      content: inputText.trim(),
+      content: text,
       timestamp: new Date(),
     };
 
     // Add user message to conversation
     await addMessage(userMessage, currentConversation.id);
-    const prompt = inputText.trim();
+    const prompt = text;
     setInputText('');
     setIsLoading(true);
 
@@ -389,10 +414,7 @@ export const ChatScreen: React.FC = () => {
       );
 
       const registeredTools = await RunAnywhere.getRegisteredTools();
-      const toolCallingEnabled =
-        (await AsyncStorage.getItem(APP_STORAGE_KEYS.TOOL_CALLING_ENABLED)) ===
-        'true';
-      const shouldUseTools = toolCallingEnabled && registeredTools.length > 0;
+      const shouldUseTools = toolsEnabled && registeredTools.length > 0;
       const supportsThinking = currentModel?.supportsThinking ?? false;
       const wasThinkingMode = supportsThinking && options.thinkingModeEnabled;
       const disableThinking = supportsThinking && !options.thinkingModeEnabled;
@@ -625,6 +647,7 @@ export const ChatScreen: React.FC = () => {
     inputText,
     currentConversation,
     currentModel,
+    toolsEnabled,
     addMessage,
     updateMessage,
     updateConversation,
@@ -725,6 +748,7 @@ export const ChatScreen: React.FC = () => {
           {/* Messages List */}
           <FlatList
             ref={flatListRef}
+            style={styles.list}
             data={messages}
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
@@ -770,6 +794,15 @@ export const ChatScreen: React.FC = () => {
             </View>
           )}
 
+          {/* Example prompts (mode follows tool/LoRA state), shown on an empty chat */}
+          {currentModel && messages.length === 0 && (
+            <PromptSuggestions
+              toolsEnabled={toolsEnabled}
+              loraActive={loraAdapterCount > 0}
+              onSelect={(p) => void handleSend(p)}
+            />
+          )}
+
           {/* Input Area */}
           <ChatInput
             value={inputText}
@@ -778,6 +811,8 @@ export const ChatScreen: React.FC = () => {
             onStop={handleStopGeneration}
             disabled={!currentModel || !currentConversation}
             isLoading={isLoading}
+            toolsEnabled={toolsEnabled}
+            onToggleTools={currentModel ? handleToggleTools : undefined}
             placeholder={
               currentModel
                 ? 'Type a message...'
@@ -865,11 +900,14 @@ const styles = StyleSheet.create({
   headerButtonDisabled: {
     opacity: 0.5,
   },
+  list: {
+    flex: 1,
+  },
   messagesList: {
     paddingVertical: Spacing.medium,
   },
   emptyList: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
   },
   emptyState: {
@@ -899,7 +937,8 @@ const styles = StyleSheet.create({
   loraRow: {
     flexDirection: 'row',
     paddingHorizontal: Padding.padding16,
-    paddingBottom: Spacing.small,
+    paddingTop: 2,
+    paddingBottom: 6,
   },
   loraPill: {
     flexDirection: 'row',
