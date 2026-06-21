@@ -165,15 +165,28 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Model ids that have at least one compatible LoRA adapter in the catalog,
+  // so their rows can show a "LoRA" tag. listCatalog is a catalog op (no loaded
+  // model required), so it's safe to call here.
+  const [loraModelIds, setLoraModelIds] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [allModels, storageInfo] = await Promise.all([
+      const [allModels, storageInfo, loraCatalog] = await Promise.all([
         listModels(),
         RunAnywhere.getStorageInfo().catch(() => null),
+        RunAnywhere.lora.listCatalog().catch(() => null),
       ]);
       setStorage(storageInfo);
+
+      if (loraCatalog?.success) {
+        const ids = new Set<string>();
+        for (const entry of loraCatalog.entries) {
+          entry.compatibleModels.forEach((id) => ids.add(id));
+        }
+        setLoraModelIds(ids);
+      }
 
       const categoryFilter = getCategoryForContext(context);
       const allowedFrameworks = getAllowedFrameworksForContext(context);
@@ -291,16 +304,42 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           <Icon name="cpu" size={20} color={colors.onSurfaceVariant} />
         </View>
         <View style={styles.rowText}>
-          <Text
-            style={[
-              typography.titleMedium,
-              styles.bold,
-              { color: colors.onSurface },
-            ]}
-            numberOfLines={1}
-          >
-            {model.name}
-          </Text>
+          <View style={styles.nameRow}>
+            <Text
+              style={[
+                typography.titleMedium,
+                styles.bold,
+                styles.nameText,
+                { color: colors.onSurface },
+              ]}
+              numberOfLines={1}
+            >
+              {model.name}
+            </Text>
+            {loraModelIds.has(model.id) && (
+              <View
+                style={[
+                  styles.loraTag,
+                  { backgroundColor: colors.tertiaryContainer },
+                ]}
+              >
+                <Icon
+                  name="sparkles"
+                  size={11}
+                  color={colors.onTertiaryContainer}
+                />
+                <Text
+                  style={[
+                    typography.labelSmall,
+                    styles.bold,
+                    { color: colors.onTertiaryContainer },
+                  ]}
+                >
+                  LoRA
+                </Text>
+              </View>
+            )}
+          </View>
           <Text
             style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}
             numberOfLines={1}
@@ -608,6 +647,22 @@ const styles = StyleSheet.create({
   rowText: {
     flex: 1,
     gap: 2,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  nameText: {
+    flexShrink: 1,
+  },
+  loraTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
   },
   track: {
     height: 3,

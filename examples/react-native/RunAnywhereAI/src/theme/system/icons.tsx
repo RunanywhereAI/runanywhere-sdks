@@ -38,6 +38,11 @@ import {
   Cloud,
   Square,
   MicOff,
+  Wrench,
+  Clock,
+  Battery,
+  Calculator,
+  Zap,
 } from 'lucide-react-native';
 
 const ICONS = {
@@ -72,6 +77,11 @@ const ICONS = {
   cloud: Cloud,
   stop: Square,
   micOff: MicOff,
+  tool: Wrench,
+  clock: Clock,
+  battery: Battery,
+  calculator: Calculator,
+  bolt: Zap,
 } as const;
 
 export type IconName = keyof typeof ICONS;

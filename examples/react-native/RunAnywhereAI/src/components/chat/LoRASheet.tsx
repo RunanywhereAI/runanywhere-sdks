@@ -95,27 +95,35 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
   /** Mirrors iOS refreshAvailableAdapters + refreshLoraAdapters. */
   const refresh = useCallback(async () => {
     setError(null);
+    // LoRA `list()` is a loaded-service operation: it requires an LLM model to
+    // be loaded. Calling it with no model fails with "LoRA service is not
+    // loaded" and emits a spurious lora.failed/-230 telemetry event. Guard both
+    // catalog + list on modelId so we never touch the service before a load.
+    if (!modelId) {
+      setAvailableAdapters([]);
+      updateLoaded([]);
+      return;
+    }
     try {
-      if (modelId) {
-        const result = await RunAnywhere.lora.queryCatalog(
-          LoraAdapterCatalogQuery.fromPartial({ modelId })
-        );
-        if (!result.success) {
-          throw new Error(result.errorMessage || 'LoRA catalog query failed');
-        }
-        setAvailableAdapters(result.entries);
-      } else {
-        setAvailableAdapters([]);
+      const result = await RunAnywhere.lora.queryCatalog(
+        LoraAdapterCatalogQuery.fromPartial({ modelId })
+      );
+      if (!result.success) {
+        throw new Error(result.errorMessage || 'LoRA catalog query failed');
       }
+      setAvailableAdapters(result.entries);
       handleLoraState(await RunAnywhere.lora.list());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [modelId, handleLoraState]);
+  }, [modelId, handleLoraState, updateLoaded]);
 
+  // Only refresh once the user actually opens the sheet — the sheet is mounted
+  // (hidden) on the chat screen at startup, so an unconditional mount-refresh
+  // would hit the LoRA service before any model is loaded.
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (visible) refresh();
+  }, [visible, refresh]);
 
   /** Mirrors iOS downloadAndLoadAdapter -> loadLoraAdapter. */
   const handleDownloadAndApply = useCallback(
