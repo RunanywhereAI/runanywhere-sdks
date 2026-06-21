@@ -390,10 +390,24 @@ Future<void> _sendTelemetryHttp(
       requiresAuth: requiresAuth,
     );
 
+    if (response.isSuccess) {
+      DartBridgeTelemetry._logger
+          .info('Telemetry POST $endpoint -> ${response.statusCode} OK');
+    } else {
+      // Surface the real reason — commons only logs the error string, and a
+      // non-2xx carries its detail in the body (e.g. a 422 extra="forbid"
+      // field, a 404 missing endpoint). Truncated to keep logs readable.
+      final detail = response.body;
+      DartBridgeTelemetry._logger.warning(
+        'Telemetry POST $endpoint -> ${response.statusCode}: '
+        '${detail.length > 400 ? detail.substring(0, 400) : detail}',
+      );
+    }
+
     _notifyHttpComplete(
       response.isSuccess,
       response.body,
-      null,
+      response.isSuccess ? null : 'HTTP ${response.statusCode}',
     );
   } catch (e) {
     _notifyHttpComplete(false, null, e.toString());
