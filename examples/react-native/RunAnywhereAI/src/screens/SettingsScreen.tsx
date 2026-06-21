@@ -1,26 +1,3 @@
-/**
- * SettingsScreen - Tab 4: Settings & Storage
- *
- * Provides SDK configuration, model management, and storage overview.
- * Matches iOS CombinedSettingsView architecture and patterns.
- *
- * Features:
- * - Generation settings (temperature, max tokens)
- * - API configuration
- * - Storage overview (total usage, available space, models storage)
- * - Downloaded models list with delete functionality
- * - Storage management (clear cache, clean temp files)
- * - SDK info (version, capabilities, loaded models)
- *
- * Architecture:
- * - Fetches SDK state via RunAnywhere methods
- * - Shows available vs downloaded models
- * - Manages model downloads and deletions
- * - Displays backend info and capabilities
- *
- * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Settings/CombinedSettingsView.swift
- */
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
@@ -31,19 +8,16 @@ import {
   Alert,
   TextInput,
   Modal,
+  Switch,
+  ActivityIndicator,
+  type DimensionValue,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Icon from 'react-native-vector-icons/Ionicons';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { SettingsStackParamList } from '../types';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import { ROUTES } from '../navigation/routes';
+import type { RootStackParamList } from '../navigation/navigation.types';
 import type { StorageInfo } from '../types/settings';
 import {
   RoutingPolicy,
@@ -59,8 +33,8 @@ import {
   getPrimaryFramework,
 } from '../utils/modelDisplay';
 import { registerDemoTools as registerSharedDemoTools } from '../utils/chatSampleTools';
+import { Icon, useTheme } from '../theme/system';
 
-// Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere } from '@runanywhere/core';
 import {
   ModelCategory,
@@ -72,14 +46,12 @@ import {
   unloadModelsForCategory,
 } from '../utils/runAnywhereLifecycle';
 
-// Canonical SDK methods (Swift parity).
 const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
 const listModels = async (): Promise<ModelInfo[]> =>
   (await RunAnywhere.listModels()).models?.models ?? [];
 const listDownloadedModels = async (): Promise<ModelInfo[]> =>
   (await RunAnywhere.downloadedModels()).models?.models ?? [];
 
-// Storage keys for API configuration
 const STORAGE_KEYS = APP_STORAGE_KEYS;
 
 function hasUsableBackendConfig(options: {
@@ -92,9 +64,6 @@ function hasUsableBackendConfig(options: {
   return baseURL.startsWith('http://') || baseURL.startsWith('https://');
 }
 
-/**
- * Get stored API key (for use at app launch)
- */
 export const getStoredApiKey = async (): Promise<string | null> => {
   try {
     return await AsyncStorage.getItem(STORAGE_KEYS.API_KEY);
@@ -103,10 +72,6 @@ export const getStoredApiKey = async (): Promise<string | null> => {
   }
 };
 
-/**
- * Get stored base URL (for use at app launch)
- * Automatically adds https:// if no scheme is present
- */
 export const getStoredBaseURL = async (): Promise<string | null> => {
   try {
     const value = await AsyncStorage.getItem(STORAGE_KEYS.BASE_URL);
@@ -121,16 +86,12 @@ export const getStoredBaseURL = async (): Promise<string | null> => {
   }
 };
 
-/**
- * Check if custom configuration is set
- */
 export const hasCustomConfiguration = async (): Promise<boolean> => {
   const apiKey = await getStoredApiKey();
   const baseURL = await getStoredBaseURL();
   return hasUsableBackendConfig({ apiKey, baseURL });
 };
 
-// Default storage info
 const DEFAULT_STORAGE_INFO: StorageInfo = {
   totalStorage: 256 * 1024 * 1024 * 1024,
   appStorage: 0,
@@ -139,9 +100,6 @@ const DEFAULT_STORAGE_INFO: StorageInfo = {
   freeSpace: 100 * 1024 * 1024 * 1024,
 };
 
-/**
- * Format bytes to human readable
- */
 const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B';
   const k = 1024;
@@ -150,16 +108,269 @@ const formatBytes = (bytes: number): string => {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 };
 
-export const SettingsScreen: React.FC = () => {
-  // Safe area insets for header status bar handling
-  const insets = useSafeAreaInsets();
-  const navigation =
-    useNavigation<NativeStackNavigationProp<SettingsStackParamList>>();
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
-  // Settings state
-  // NOTE: several state hooks below are intentionally retained for upcoming
-  // settings UI (routing policy, capability flags, etc.). Prefixed with `_`
-  // to silence unused-vars warnings until the UI consumes them.
+interface SectionProps {
+  title: string;
+  children: React.ReactNode;
+}
+
+const Section: React.FC<SectionProps> = ({ title, children }) => {
+  const { colors, typography, dimens } = useTheme();
+  return (
+    <View style={{ gap: dimens.spacing.sm }}>
+      <Text
+        style={[
+          typography.titleSmall,
+          { color: colors.onSurfaceVariant, paddingHorizontal: dimens.screenPadding },
+        ]}
+      >
+        {title}
+      </Text>
+      <View
+        style={[
+          styles.sectionCard,
+          {
+            backgroundColor: colors.surfaceContainerHigh,
+            borderRadius: dimens.radius.lg,
+            marginHorizontal: dimens.screenPadding,
+            padding: dimens.spacing.lg,
+            gap: dimens.spacing.md,
+          },
+        ]}
+      >
+        {children}
+      </View>
+    </View>
+  );
+};
+
+interface SliderRowProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  formatValue: (v: number) => string;
+  onChange: (v: number) => void;
+}
+
+const SliderRow: React.FC<SliderRowProps> = ({
+  label,
+  value,
+  min,
+  max,
+  step,
+  formatValue,
+  onChange,
+}) => {
+  const { colors, typography, dimens } = useTheme();
+  const fillPct = `${Math.round(
+    ((value - min) / (max - min)) * 100
+  )}%` as DimensionValue;
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={styles.row}>
+        <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>{label}</Text>
+        <Text style={[typography.metric, { color: colors.onSurfaceVariant }]}>
+          {formatValue(value)}
+        </Text>
+      </View>
+      <View style={styles.sliderRow}>
+        <TouchableOpacity
+          hitSlop={8}
+          onPress={() => onChange(Math.max(min, Math.round((value - step) * 100) / 100))}
+          style={[styles.sliderBtn, { backgroundColor: colors.surfaceContainerHighest }]}
+        >
+          <Text style={[typography.labelLarge, { color: colors.primary }]}>−</Text>
+        </TouchableOpacity>
+        <View style={[styles.sliderTrack, { backgroundColor: colors.surfaceContainerHighest }]}>
+          <View style={[styles.sliderFill, { width: fillPct, backgroundColor: colors.primary }]} />
+        </View>
+        <TouchableOpacity
+          hitSlop={8}
+          onPress={() => onChange(Math.min(max, Math.round((value + step) * 100) / 100))}
+          style={[styles.sliderBtn, { backgroundColor: colors.surfaceContainerHighest }]}
+        >
+          <Text style={[typography.labelLarge, { color: colors.primary }]}>+</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+interface ToggleRowProps {
+  label: string;
+  description: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}
+
+const ToggleRow: React.FC<ToggleRowProps> = ({ label, description, value, onChange }) => {
+  const { colors, typography } = useTheme();
+  return (
+    <View style={[styles.row, { alignItems: 'center' }]}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>{label}</Text>
+        <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>{description}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: colors.surfaceContainerHighest, true: colors.primary }}
+        thumbColor={colors.onPrimary}
+      />
+    </View>
+  );
+};
+
+interface InfoRowProps {
+  label: string;
+  value: string;
+}
+
+const InfoRow: React.FC<InfoRowProps> = ({ label, value }) => {
+  const { colors, typography } = useTheme();
+  return (
+    <View style={styles.row}>
+      <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>{label}</Text>
+      <Text style={[typography.metric, { color: colors.onSurfaceVariant }]}>{value}</Text>
+    </View>
+  );
+};
+
+interface DownloadedModelRowProps {
+  model: ModelInfo;
+  busy: boolean;
+  onDelete: () => void;
+}
+
+const DownloadedModelRow: React.FC<DownloadedModelRowProps> = ({ model, busy, onDelete }) => {
+  const { colors, typography, dimens } = useTheme();
+  const sizeBytes = getModelDownloadSizeBytes(model);
+  return (
+    <View
+      style={[
+        styles.modelCard,
+        {
+          backgroundColor: colors.surface,
+          borderRadius: dimens.radius.md,
+        },
+      ]}
+    >
+      <View style={[styles.modelCardInner, { paddingHorizontal: dimens.spacing.md, paddingVertical: dimens.spacing.sm }]}>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={[typography.bodyMedium, { color: colors.onSurface }]}
+            numberOfLines={1}
+          >
+            {model.name}
+          </Text>
+          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+            {formatBytes(sizeBytes)}
+          </Text>
+        </View>
+        {busy ? (
+          <ActivityIndicator
+            size="small"
+            color={colors.primary}
+            style={{ marginHorizontal: dimens.spacing.md }}
+          />
+        ) : (
+          <TouchableOpacity onPress={onDelete} hitSlop={8} style={{ padding: dimens.spacing.sm }}>
+            <Icon name="trash" size={dimens.icon.sm} color={colors.error} />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+};
+
+interface CatalogModelRowProps {
+  model: ModelInfo;
+  isDownloaded: boolean;
+  isDownloading: boolean;
+  downloadProgress: number;
+  onAction: () => void;
+}
+
+const CatalogModelRow: React.FC<CatalogModelRowProps> = ({
+  model,
+  isDownloaded,
+  isDownloading,
+  downloadProgress,
+  onAction,
+}) => {
+  const { colors, typography, dimens } = useTheme();
+  const frameworkName = getFrameworkDisplayName(getPrimaryFramework(model));
+  const sizeBytes = getModelDownloadSizeBytes(model);
+
+  return (
+    <View style={[styles.row, { alignItems: 'center', gap: dimens.spacing.sm }]}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={[typography.bodyMedium, { color: colors.onSurface, fontWeight: '600' }]} numberOfLines={1}>
+          {model.name}
+        </Text>
+        {!!model.metadata?.description && (
+          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]} numberOfLines={2}>
+            {model.metadata.description}
+          </Text>
+        )}
+        <View style={{ flexDirection: 'row', gap: dimens.spacing.sm, marginTop: 2 }}>
+          <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>
+            {formatBytes(sizeBytes)}
+          </Text>
+          {!!frameworkName && (
+            <Text style={[typography.labelSmall, { color: colors.onSurfaceVariant }]}>
+              {frameworkName}
+            </Text>
+          )}
+        </View>
+        {isDownloading && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: dimens.spacing.sm, marginTop: 4 }}>
+            <View style={[styles.sliderTrack, { flex: 1, backgroundColor: colors.surfaceContainerHighest }]}>
+              <View
+                style={[
+                  styles.sliderFill,
+                  {
+                    width: `${(downloadProgress * 100).toFixed(
+                      0
+                    )}%` as DimensionValue,
+                    backgroundColor: colors.primary,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[typography.labelSmall, { color: colors.primary, minWidth: 36 }]}>
+              {(downloadProgress * 100).toFixed(0)}%
+            </Text>
+          </View>
+        )}
+      </View>
+      <TouchableOpacity onPress={onAction} hitSlop={8}>
+        {isDownloaded ? (
+          <Icon name="check" size={dimens.icon.md} color={colors.success} />
+        ) : isDownloading ? (
+          <Icon name="close" size={dimens.icon.md} color={colors.error} />
+        ) : (
+          <Icon name="download" size={dimens.icon.md} color={colors.primary} />
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Main screen
+// ---------------------------------------------------------------------------
+
+export const SettingsScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { colors, typography, dimens } = useTheme();
+
   const [_routingPolicy, setRoutingPolicy] = useState<RoutingPolicy>(
     RoutingPolicy.ROUTING_POLICY_UNSPECIFIED
   );
@@ -167,40 +378,28 @@ export const SettingsScreen: React.FC = () => {
   const [maxTokens, setMaxTokens] = useState(1000);
   const [systemPrompt, setSystemPrompt] = useState('');
   const [thinkingModeEnabled, setThinkingModeEnabled] = useState(false);
-  const [apiKeyConfigured, setApiKeyConfigured] = useState(false); // API Configuration state
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
 
   const [apiKey, setApiKey] = useState('');
   const [baseURL, setBaseURL] = useState('');
   const [isBaseURLConfigured, setIsBaseURLConfigured] = useState(false);
   const [showApiConfigModal, setShowApiConfigModal] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // Storage state
+  const [showPassword, setShowPassword] = useState(false);
 
-  const [storageInfo, setStorageInfo] =
-    useState<StorageInfo>(DEFAULT_STORAGE_INFO);
+  const [storageInfo, setStorageInfo] = useState<StorageInfo>(DEFAULT_STORAGE_INFO);
   const [_isRefreshing, setIsRefreshing] = useState(false);
-  const [sdkVersion, setSdkVersion] = useState('0.1.0'); // SDK State
-
-  // Model catalog state
+  const [sdkVersion, setSdkVersion] = useState('0.1.0');
 
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
-  const [downloadingModels, setDownloadingModels] = useState<
-    Record<string, number>
-  >({});
-  const [downloadedModels, setDownloadedModels] = useState<ModelInfo[]>([]); // Tool calling state
-  const downloadIteratorsRef = useRef<
-    Record<string, AsyncIterator<DownloadProgress>>
-  >({});
+  const [downloadingModels, setDownloadingModels] = useState<Record<string, number>>({});
+  const [downloadedModels, setDownloadedModels] = useState<ModelInfo[]>([]);
+  const downloadIteratorsRef = useRef<Record<string, AsyncIterator<DownloadProgress>>>({});
 
   const [toolCallingEnabled, setToolCallingEnabled] = useState(false);
   const [registeredTools, setRegisteredTools] = useState<
-    Array<{
-      name: string;
-      description: string;
-      parameters: Array<{ name: string }>;
-    }>
-  >([]); // Capability names mapping
+    Array<{ name: string; description: string; parameters: Array<{ name: string }> }>
+  >([]);
 
-  // Kept for reference; not yet rendered in the capabilities grid below.
   const _capabilityNames: Record<number, string> = {
     0: 'STT (Speech-to-Text)',
     1: 'TTS (Text-to-Speech)',
@@ -208,7 +407,7 @@ export const SettingsScreen: React.FC = () => {
     3: 'Embeddings',
     4: 'VAD (Voice Activity)',
     5: 'Diarization',
-  }; // Load data on mount
+  };
 
   useEffect(() => {
     loadData();
@@ -218,8 +417,6 @@ export const SettingsScreen: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cancel any in-progress downloads when the screen unmounts to avoid
-  // draining native callbacks and bandwidth with no UI handle to track them.
   useEffect(() => {
     return () => {
       for (const iter of Object.values(downloadIteratorsRef.current)) {
@@ -227,15 +424,12 @@ export const SettingsScreen: React.FC = () => {
       }
       downloadIteratorsRef.current = {};
     };
-  }, []); /**
-   * Load API configuration from AsyncStorage
-   */
+  }, []);
 
   const loadApiConfiguration = async () => {
     try {
       const storedApiKey = await AsyncStorage.getItem(STORAGE_KEYS.API_KEY);
       const storedBaseURL = await AsyncStorage.getItem(STORAGE_KEYS.BASE_URL);
-
       setApiKey(storedApiKey || '');
       setBaseURL(storedBaseURL || '');
       setApiKeyConfigured(!!storedApiKey && storedApiKey !== '');
@@ -243,32 +437,20 @@ export const SettingsScreen: React.FC = () => {
     } catch (error) {
       console.error('[Settings] Failed to load API configuration:', error);
     }
-  }; /**
-   * Load generation settings from AsyncStorage
-   */
+  };
 
   const loadGenerationSettings = async () => {
     try {
-      const tempStr = await AsyncStorage.getItem(
-        GENERATION_SETTINGS_KEYS.TEMPERATURE
-      );
-      const maxStr = await AsyncStorage.getItem(
-        GENERATION_SETTINGS_KEYS.MAX_TOKENS
-      );
-      const sysStr = await AsyncStorage.getItem(
-        GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT
-      );
-      const thinkingStr = await AsyncStorage.getItem(
-        GENERATION_SETTINGS_KEYS.THINKING_MODE_ENABLED
-      );
-
+      const tempStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.TEMPERATURE);
+      const maxStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.MAX_TOKENS);
+      const sysStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT);
+      const thinkingStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.THINKING_MODE_ENABLED);
       const loadedTemperature = tempStr !== null ? parseFloat(tempStr) : 0.7;
       setTemperature(loadedTemperature);
       if (maxStr) setMaxTokens(parseInt(maxStr, 10));
       if (sysStr) setSystemPrompt(sysStr);
       setThinkingModeEnabled(thinkingStr === 'true');
-
-      // eslint-disable-next-line no-console -- demo settings diagnostic
+      // eslint-disable-next-line no-console
       console.log('[Settings] Loaded generation settings:', {
         temperature: loadedTemperature,
         maxTokens,
@@ -278,63 +460,41 @@ export const SettingsScreen: React.FC = () => {
     } catch (error) {
       console.error('[Settings] Failed to load generation settings:', error);
     }
-  }; /**
-   * Save generation settings to AsyncStorage
-   */
+  };
 
   const saveGenerationSettings = async () => {
     try {
-      await AsyncStorage.setItem(
-        GENERATION_SETTINGS_KEYS.TEMPERATURE,
-        temperature.toString()
-      );
-      await AsyncStorage.setItem(
-        GENERATION_SETTINGS_KEYS.MAX_TOKENS,
-        maxTokens.toString()
-      );
-      await AsyncStorage.setItem(
-        GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT,
-        systemPrompt
-      );
+      await AsyncStorage.setItem(GENERATION_SETTINGS_KEYS.TEMPERATURE, temperature.toString());
+      await AsyncStorage.setItem(GENERATION_SETTINGS_KEYS.MAX_TOKENS, maxTokens.toString());
+      await AsyncStorage.setItem(GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT, systemPrompt);
       await AsyncStorage.setItem(
         GENERATION_SETTINGS_KEYS.THINKING_MODE_ENABLED,
         thinkingModeEnabled ? 'true' : 'false'
       );
-
-      // eslint-disable-next-line no-console -- demo settings diagnostic
+      // eslint-disable-next-line no-console
       console.log('[Settings] Saved generation settings:', {
         temperature,
         maxTokens,
-        systemPrompt: systemPrompt
-          ? `set(${systemPrompt.length} chars)`
-          : 'empty',
+        systemPrompt: systemPrompt ? `set(${systemPrompt.length} chars)` : 'empty',
         thinkingModeEnabled,
       });
-
       Alert.alert('Saved', 'Generation settings have been saved successfully.');
     } catch (error) {
       console.error('[Settings] Failed to save generation settings:', error);
       Alert.alert('Error', `Failed to save settings: ${error}`);
     }
-  }; /**
-   * Load tool calling settings from AsyncStorage
-   */
+  };
 
   const loadToolCallingSettings = async () => {
     try {
-      const enabled = await AsyncStorage.getItem(
-        STORAGE_KEYS.TOOL_CALLING_ENABLED
-      );
+      const enabled = await AsyncStorage.getItem(STORAGE_KEYS.TOOL_CALLING_ENABLED);
       setToolCallingEnabled(enabled === 'true');
-      // void: deliberate fire-and-forget refresh; we don't block load on it.
       // eslint-disable-next-line no-void
       void refreshRegisteredTools();
     } catch (error) {
       console.error('[Settings] Failed to load tool calling settings:', error);
     }
-  }; /**
-   * Refresh the list of registered tools from SDK
-   */
+  };
 
   const refreshRegisteredTools = async () => {
     const tools = await RunAnywhere.getRegisteredTools();
@@ -345,17 +505,12 @@ export const SettingsScreen: React.FC = () => {
         parameters: t.parameters || [],
       }))
     );
-  }; /**
-   * Toggle tool calling enabled state
-   */
+  };
 
   const handleToggleToolCalling = async (enabled: boolean) => {
     setToolCallingEnabled(enabled);
     try {
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.TOOL_CALLING_ENABLED,
-        enabled ? 'true' : 'false'
-      );
+      await AsyncStorage.setItem(STORAGE_KEYS.TOOL_CALLING_ENABLED, enabled ? 'true' : 'false');
       if (enabled) {
         await registerSharedDemoTools();
       } else {
@@ -365,56 +520,41 @@ export const SettingsScreen: React.FC = () => {
     } catch (error) {
       console.error('[Settings] Failed to save tool calling setting:', error);
     }
-  }; /**
-   * Clear all registered tools
-   */
+  };
 
   const clearAllTools = () => {
-    Alert.alert(
-      'Clear All Tools',
-      'Are you sure you want to remove all registered tools?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: () => {
-            // void: Alert.onPress is sync; wrap async work in fire-and-forget IIFE.
-            // eslint-disable-next-line no-void
-            void (async () => {
-              await RunAnywhere.clearTools();
-              await refreshRegisteredTools();
-            })();
-          },
+    Alert.alert('Clear All Tools', 'Are you sure you want to remove all registered tools?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: () => {
+          // eslint-disable-next-line no-void
+          void (async () => {
+            await RunAnywhere.clearTools();
+            await refreshRegisteredTools();
+          })();
         },
-      ]
-    );
-  }; /**
-   * Normalize base URL by adding https:// if no scheme is present
-   */
+      },
+    ]);
+  };
 
   const normalizeBaseURL = (url: string): string => {
     const trimmed = url.trim();
     if (!trimmed) return trimmed;
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed;
-    }
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
     return `https://${trimmed}`;
-  }; /**
-   * Save API configuration to AsyncStorage
-   */
+  };
 
   const saveApiConfiguration = async () => {
     try {
       const normalizedURL = normalizeBaseURL(baseURL);
       await AsyncStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
       await AsyncStorage.setItem(STORAGE_KEYS.BASE_URL, normalizedURL);
-
       setBaseURL(normalizedURL);
       setApiKeyConfigured(!!apiKey);
       setIsBaseURLConfigured(!!normalizedURL);
       setShowApiConfigModal(false);
-
       Alert.alert(
         'Restart Required',
         'API configuration has been updated. Please restart the app for changes to take effect.',
@@ -423,9 +563,7 @@ export const SettingsScreen: React.FC = () => {
     } catch (error) {
       Alert.alert('Error', `Failed to save API configuration: ${error}`);
     }
-  }; /**
-   * Clear API configuration from AsyncStorage
-   */
+  };
 
   const clearApiConfiguration = async () => {
     try {
@@ -434,12 +572,10 @@ export const SettingsScreen: React.FC = () => {
         STORAGE_KEYS.BASE_URL,
         STORAGE_KEYS.DEVICE_REGISTERED,
       ]);
-
       setApiKey('');
       setBaseURL('');
       setApiKeyConfigured(false);
       setIsBaseURLConfigured(false);
-
       Alert.alert(
         'Restart Required',
         'API configuration has been cleared. Please restart the app for changes to take effect.',
@@ -453,61 +589,36 @@ export const SettingsScreen: React.FC = () => {
   const loadData = async () => {
     setIsRefreshing(true);
     try {
-      // Get SDK version
       const version = RunAnywhere.version;
-      setSdkVersion(version); // Check if SDK is initialized first
-
+      setSdkVersion(version);
       const isInit = await RunAnywhere.isInitialized;
-      // eslint-disable-next-line no-console -- demo settings diagnostic
-      console.log('[Settings] SDK isInitialized:', isInit); // Get backend info for storage data
-
+      // eslint-disable-next-line no-console
+      console.log('[Settings] SDK isInitialized:', isInit);
       const backendInfo = {
         environment: RunAnywhere.environment,
         servicesReady: RunAnywhere.areServicesReady,
       };
-      // eslint-disable-next-line no-console -- demo settings diagnostic
-      console.log('[Settings] Backend info:', backendInfo); // Override name with actual init status
-
-      const sttLoaded = await isModelLoadedForCategory(
-        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-      );
-      const ttsLoaded = await isModelLoadedForCategory(
-        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-      );
-      const textLoaded = await isModelLoadedForCategory(
-        ModelCategory.MODEL_CATEGORY_LANGUAGE
-      );
-      const vadLoaded = await isModelLoadedForCategory(
-        ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-      );
-
-      console.warn(
-        '[Settings] Models loaded - STT:',
-        sttLoaded,
-        'TTS:',
-        ttsLoaded,
-        'Text:',
-        textLoaded,
-        'VAD:',
-        vadLoaded
-      ); // Get available models from catalog
-
+      // eslint-disable-next-line no-console
+      console.log('[Settings] Backend info:', backendInfo);
+      const sttLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
+      const ttsLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
+      const textLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
+      const vadLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION);
+      console.warn('[Settings] Models loaded - STT:', sttLoaded, 'TTS:', ttsLoaded, 'Text:', textLoaded, 'VAD:', vadLoaded);
       try {
         const available = await listModels();
         console.warn('[Settings] Available models:', available);
         setAvailableModels(available);
       } catch (err) {
         console.warn('[Settings] Failed to get available models:', err);
-      } // Get downloaded models
-
+      }
       try {
         const downloaded = await listDownloadedModels();
         console.warn('[Settings] Downloaded models:', downloaded);
         setDownloadedModels(downloaded);
       } catch (err) {
         console.warn('[Settings] Failed to get downloaded models:', err);
-      } // Get storage info using new SDK API
-
+      }
       try {
         const storage = await RunAnywhere.getStorageInfo();
         console.warn('[Settings] Storage info:', storage);
@@ -528,38 +639,27 @@ export const SettingsScreen: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }; /**
-   * Handle routing policy change
-   */
+  };
 
-  // Kept for upcoming routing-policy UI; not rendered yet in the settings screen.
   const _handleRoutingPolicyChange = useCallback(() => {
     Alert.alert(
       'Routing Policy',
       'Choose how requests are routed',
       ROUTING_POLICY_OPTIONS.map((policy) => ({
         text: RoutingPolicyDisplayNames[policy],
-        onPress: () => {
-          setRoutingPolicy(policy);
-        },
+        onPress: () => { setRoutingPolicy(policy); },
       }))
     );
-  }, []); /**
-   * Handle API key configuration - open modal
-   */
+  }, []);
 
   const handleConfigureApiKey = useCallback(() => {
     setShowApiConfigModal(true);
-  }, []); /**
-   * Cancel API configuration modal
-   */
+  }, []);
 
   const handleCancelApiConfig = useCallback(() => {
-    loadApiConfiguration(); // Reset to stored values
+    loadApiConfiguration();
     setShowApiConfigModal(false);
-  }, []); /**
-   * Handle clear cache
-   */
+  }, []);
 
   const handleClearCache = useCallback(() => {
     Alert.alert(
@@ -572,7 +672,6 @@ export const SettingsScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Clear SDK cache using new Storage API
               await RunAnywhere.clearCache();
               await RunAnywhere.cleanTempFiles();
               Alert.alert('Success', 'Cache cleared successfully');
@@ -585,14 +684,11 @@ export const SettingsScreen: React.FC = () => {
         },
       ]
     );
-  }, []); /**
-   * Handle model download
-   */
+  }, []);
 
   const handleDownloadModel = useCallback(
     async (model: ModelInfo) => {
       if (downloadingModels[model.id] !== undefined) {
-        // Already downloading, cancel it
         try {
           await downloadIteratorsRef.current[model.id]?.return?.();
           delete downloadIteratorsRef.current[model.id];
@@ -605,36 +701,26 @@ export const SettingsScreen: React.FC = () => {
           console.error('Failed to cancel download:', err);
         }
         return;
-      } // Start download with progress tracking
-
+      }
       setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
-
       try {
-        // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
         const dlIter = downloadModelStreamHelper(model)[Symbol.asyncIterator]();
         downloadIteratorsRef.current[model.id] = dlIter;
         let dlResult = await dlIter.next();
         while (!dlResult.done) {
           const progress = dlResult.value;
-          console.warn(
-            `[Settings] Download progress for ${model.id}: ${((progress.stageProgress ?? 0) * 100).toFixed(1)}%`
-          );
-          setDownloadingModels((prev) => ({
-            ...prev,
-            [model.id]: progress.stageProgress ?? 0,
-          }));
+          console.warn(`[Settings] Download progress for ${model.id}: ${((progress.stageProgress ?? 0) * 100).toFixed(1)}%`);
+          setDownloadingModels((prev) => ({ ...prev, [model.id]: progress.stageProgress ?? 0 }));
           dlResult = await dlIter.next();
-        } // Download complete
-
+        }
         setDownloadingModels((prev) => {
           const updated = { ...prev };
           delete updated[model.id];
           return updated;
         });
         delete downloadIteratorsRef.current[model.id];
-
         Alert.alert('Success', `${model.name} downloaded successfully!`);
-        loadData(); // Refresh to show downloaded model
+        loadData();
       } catch (err) {
         setDownloadingModels((prev) => {
           const updated = { ...prev };
@@ -642,24 +728,16 @@ export const SettingsScreen: React.FC = () => {
           return updated;
         });
         delete downloadIteratorsRef.current[model.id];
-        Alert.alert(
-          'Download Failed',
-          `Failed to download ${model.name}: ${err}`
-        );
+        Alert.alert('Download Failed', `Failed to download ${model.name}: ${err}`);
       }
     },
     [downloadingModels]
-  ); /**
-   * Handle delete downloaded model
-   */
+  );
 
   const handleDeleteDownloadedModel = useCallback(
     async (model: ModelInfo) => {
       const downloadedModel = downloadedModels.find((m) => m.id === model.id);
-      // Prefer the downloaded model's size (reported by the SDK after download)
-      // over the catalog's expected downloadSize.
       const freedSize = getModelDownloadSizeBytes(downloadedModel ?? model);
-
       Alert.alert(
         'Delete Model',
         `Are you sure you want to delete ${model.name}? This will free up ${formatBytes(freedSize)}.`,
@@ -671,13 +749,9 @@ export const SettingsScreen: React.FC = () => {
             onPress: async () => {
               try {
                 const result = await RunAnywhere.deleteModel(model.id);
-                if (!result.success) {
-                  throw new Error(
-                    result.errorMessage || 'Storage delete failed'
-                  );
-                }
+                if (!result.success) throw new Error(result.errorMessage || 'Storage delete failed');
                 Alert.alert('Deleted', `${model.name} has been deleted.`);
-                loadData(); // Refresh list
+                loadData();
               } catch (err) {
                 Alert.alert('Error', `Failed to delete: ${err}`);
               }
@@ -687,9 +761,7 @@ export const SettingsScreen: React.FC = () => {
       );
     },
     [downloadedModels]
-  ); /**
-   * Handle clear all data
-   */
+  );
 
   const handleClearAllData = useCallback(() => {
     Alert.alert(
@@ -702,16 +774,9 @@ export const SettingsScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Unload all models
-              await unloadModelsForCategory(
-                ModelCategory.MODEL_CATEGORY_LANGUAGE
-              );
-              await unloadModelsForCategory(
-                ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-              );
-              await unloadModelsForCategory(
-                ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-              );
+              await unloadModelsForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
+              await unloadModelsForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
+              await unloadModelsForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
               await RunAnywhere.reset();
               Alert.alert('Success', 'All data cleared');
             } catch (error) {
@@ -722,427 +787,241 @@ export const SettingsScreen: React.FC = () => {
         },
       ]
     );
-  }, []); /**
-   * Render section header
-   */
+  }, []);
 
-  const renderSectionHeader = (title: string) => (
-    <Text style={styles.sectionHeader}>{title}</Text>
-  ); /**
-   * Render setting row
-   */
-
-  // Reusable row renderer kept for future settings UI; currently not invoked.
-  const _renderSettingRow = (
-    icon: string,
-    title: string,
-    value: string,
-    onPress?: () => void,
-    showChevron: boolean = true
-  ) => (
-    <TouchableOpacity
-      style={styles.settingRow}
-      onPress={onPress}
-      disabled={!onPress}
-      activeOpacity={0.7}
-    >
-      <View style={styles.settingRowLeft}>
-        <Icon name={icon} size={20} color={Colors.primaryBlue} />
-        <Text style={styles.settingLabel}>{title}</Text>
-      </View>
-      <View style={styles.settingRowRight}>
-        <Text style={styles.settingValue}>{value}</Text>
-        {showChevron && onPress && (
-          <Icon name="chevron-forward" size={18} color={Colors.textTertiary} />
-        )}
-      </View>
-    </TouchableOpacity>
-  ); /**
-   * Render slider setting
-   */
-
-  const renderSliderSetting = (
-    title: string,
-    value: number,
-    onChange: (value: number) => void,
-    min: number,
-    max: number,
-    step: number,
-    formatValue: (v: number) => string
-  ) => (
-    <View style={styles.sliderSetting}>
-      <View style={styles.sliderHeader}>
-        <Text style={styles.settingLabel}>{title}</Text>
-        <Text style={styles.sliderValue}>{formatValue(value)}</Text>
-      </View>
-      <View style={styles.sliderControls}>
-        <TouchableOpacity
-          style={styles.sliderButton}
-          onPress={() => onChange(Math.max(min, value - step))}
-        >
-          <Icon name="remove" size={20} color={Colors.primaryBlue} />
-        </TouchableOpacity>
-        <View style={styles.sliderTrack}>
-          <View
-            style={[
-              styles.sliderFill,
-              { width: `${((value - min) / (max - min)) * 100}%` },
-            ]}
-          />
-        </View>
-        <TouchableOpacity
-          style={styles.sliderButton}
-          onPress={() => onChange(Math.min(max, value + step))}
-        >
-          <Icon name="add" size={20} color={Colors.primaryBlue} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  ); /**
-   * Render storage bar
-   * Matches iOS: shows app storage usage relative to device free space
-   */
-
-  const renderStorageBar = () => {
-    // Show app storage as portion of (app storage + free space)
-    const totalAvailable = storageInfo.appStorage + storageInfo.freeSpace;
-    const usedPercent =
-      totalAvailable > 0 ? (storageInfo.appStorage / totalAvailable) * 100 : 0;
-    return (
-      <View style={styles.storageBar}>
-        <View style={styles.storageBarTrack}>
-          <View
-            style={[
-              styles.storageBarFill,
-              { width: `${Math.min(usedPercent, 100)}%` },
-            ]}
-          />
-        </View>
-        <Text style={styles.storageText}>
-                    {formatBytes(storageInfo.appStorage)} of          {' '}
-          {formatBytes(storageInfo.freeSpace)} available        {' '}
-        </Text>
-      </View>
-    );
-  }; /**
-   * Render catalog model row
-   */
-
-  const renderCatalogModelRow = (model: ModelInfo) => {
-    const isDownloading = downloadingModels[model.id] !== undefined;
-    const downloadProgress = downloadingModels[model.id] || 0;
-    const isDownloaded = downloadedModels.some((m) => m.id === model.id);
-    const frameworkName = getFrameworkDisplayName(getPrimaryFramework(model));
-
-    const downloadedModel = downloadedModels.find((m) => m.id === model.id);
-    const modelSize = getModelDownloadSizeBytes(downloadedModel ?? model);
-    return (
-      <View key={model.id} style={styles.catalogModelRow}>
-        <View style={styles.catalogModelInfo}>
-          <View style={styles.catalogModelHeader}>
-            <Text style={styles.catalogModelName}>{model.name}</Text>
-            <View style={styles.catalogModelBadge}>
-              <Text style={styles.catalogModelBadgeText}>{model.category}</Text>
-            </View>
-          </View>
-          {model.metadata?.description && (
-            <Text style={styles.catalogModelDescription} numberOfLines={2}>
-                            {model.metadata.description}           {' '}
-            </Text>
-          )}
-          <View style={styles.catalogModelMeta}>
-            <Text style={styles.catalogModelSize}>
-                            {formatBytes(modelSize)}           {' '}
-            </Text>
-            <Text style={styles.catalogModelFormat}>{frameworkName}</Text>
-          </View>
-          {isDownloading && (
-            <View style={styles.downloadProgressContainer}>
-              <View style={styles.downloadProgressTrack}>
-                <View
-                  style={[
-                    styles.downloadProgressFill,
-                    { width: `${downloadProgress * 100}%` },
-                  ]}
-                />
-              </View>
-              <Text style={styles.downloadProgressText}>
-                                {(downloadProgress * 100).toFixed(0)}%          
-              </Text>
-            </View>
-          )}
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.catalogModelButton,
-            isDownloaded && styles.catalogModelButtonDownloaded,
-            isDownloading && styles.catalogModelButtonDownloading,
-          ]}
-          onPress={() =>
-            isDownloaded
-              ? handleDeleteDownloadedModel(model)
-              : handleDownloadModel(model)
-          }
-        >
-          <Icon
-            name={
-              isDownloaded
-                ? 'checkmark-circle'
-                : isDownloading
-                  ? 'close-circle'
-                  : 'cloud-download-outline'
-            }
-            size={24}
-            color={
-              isDownloaded
-                ? Colors.primaryGreen
-                : isDownloading
-                  ? Colors.primaryOrange
-                  : Colors.primaryBlue
-            }
-          />
-        </TouchableOpacity>
-      </View>
-    );
-  };
+  // Storage summary text — matches Android "Models X · Y free"
+  const storageSummary = `Models ${formatBytes(storageInfo.modelsStorage)}  ·  ${formatBytes(storageInfo.freeSpace)} free`;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View
-        style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}
-      >
-        <Text style={styles.title}>Settings</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={loadData}>
-          <Icon name="refresh" size={22} color={Colors.primaryBlue} />
-        </TouchableOpacity>
+      <View style={[styles.header, { paddingTop: insets.top + dimens.spacing.sm }]}>
+        <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '700' }]}>
+          Settings
+        </Text>
       </View>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Generation Settings - Matches iOS CombinedSettingsView order */}
-        {renderSectionHeader('Generation Settings')}
-        <View style={styles.section}>
-          {renderSliderSetting(
-            'Temperature',
-            temperature,
-            setTemperature,
-            SETTINGS_CONSTRAINTS.temperature.min,
-            SETTINGS_CONSTRAINTS.temperature.max,
-            SETTINGS_CONSTRAINTS.temperature.step,
-            (v) => v.toFixed(1)
-          )}
-          {renderSliderSetting(
-            'Max Tokens',
-            maxTokens,
-            setMaxTokens,
-            SETTINGS_CONSTRAINTS.maxTokens.min,
-            SETTINGS_CONSTRAINTS.maxTokens.max,
-            SETTINGS_CONSTRAINTS.maxTokens.step,
-            (v) => v.toLocaleString()
-          )}
-          <View style={styles.toolSettingRow}>
-            <View style={styles.toolSettingInfo}>
-              <Text style={styles.toolSettingLabel}>Thinking Mode</Text>
-              <Text style={styles.toolSettingDescription}>
-                Model will use its default thinking/reasoning mode.
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[
-                styles.toggleButton,
-                thinkingModeEnabled && styles.toggleButtonActive,
-              ]}
-              onPress={() => setThinkingModeEnabled(!thinkingModeEnabled)}
-            >
-              <View
-                style={[
-                  styles.toggleKnob,
-                  thinkingModeEnabled && styles.toggleKnobActive,
-                ]}
-              />
-            </TouchableOpacity>
-          </View>
-          {/* System Prompt Input */}
-          <View style={styles.systemPromptContainer}>
-            <Text style={styles.systemPromptLabel}>System Prompt</Text>
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + dimens.spacing.xl },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Generation */}
+        <Section title="Generation">
+          <SliderRow
+            label="Temperature"
+            value={temperature}
+            min={SETTINGS_CONSTRAINTS.temperature.min}
+            max={SETTINGS_CONSTRAINTS.temperature.max}
+            step={SETTINGS_CONSTRAINTS.temperature.step}
+            formatValue={(v) => v.toFixed(1)}
+            onChange={setTemperature}
+          />
+          <SliderRow
+            label="Max tokens"
+            value={maxTokens}
+            min={SETTINGS_CONSTRAINTS.maxTokens.min}
+            max={SETTINGS_CONSTRAINTS.maxTokens.max}
+            step={SETTINGS_CONSTRAINTS.maxTokens.step}
+            formatValue={(v) => v.toLocaleString()}
+            onChange={(v) => setMaxTokens(Math.round(v))}
+          />
+          <View style={{ gap: dimens.spacing.xs }}>
+            <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>System prompt</Text>
             <TextInput
-              style={styles.systemPromptInput}
+              style={[
+                styles.textArea,
+                {
+                  backgroundColor: colors.surfaceContainerHighest,
+                  borderColor: colors.outline,
+                  color: colors.onSurface,
+                  borderRadius: dimens.radius.sm,
+                },
+                typography.bodyMedium,
+              ]}
               value={systemPrompt}
               onChangeText={setSystemPrompt}
-              placeholder="Enter system prompt (optional)"
-              placeholderTextColor={Colors.textTertiary}
+              placeholder="Optional — sets the assistant's behavior"
+              placeholderTextColor={colors.onSurfaceVariant}
               multiline
               numberOfLines={3}
               textAlignVertical="top"
             />
           </View>
-          {/* Save Settings Button */}
+          <ToggleRow
+            label="Streaming"
+            description="Show the reply token-by-token"
+            value={thinkingModeEnabled}
+            onChange={setThinkingModeEnabled}
+          />
           <TouchableOpacity
-            style={styles.saveSettingsButton}
+            style={[styles.saveBtn, { backgroundColor: colors.primary, borderRadius: dimens.radius.sm }]}
             onPress={saveGenerationSettings}
           >
-            <Icon
-              name="checkmark-circle-outline"
-              size={20}
-              color={Colors.textWhite}
-            />
-            <Text style={styles.saveSettingsButtonText}>Save Settings</Text>
+            <Icon name="check" size={dimens.icon.sm} color={colors.onPrimary} />
+            <Text style={[typography.labelLarge, { color: colors.onPrimary }]}>Save Settings</Text>
           </TouchableOpacity>
-        </View>
-        {/* API Configuration (Testing) */}
-        {renderSectionHeader('API Configuration (Testing)')}
-        <View style={styles.section}>
-          <View style={styles.apiConfigRow}>
-            <Text style={styles.apiConfigLabel}>API Key</Text>
+        </Section>
+
+        {/* Storage */}
+        <Section title="Storage">
+          <Text style={[typography.metric, { color: colors.onSurfaceVariant }]}>
+            {storageSummary}
+          </Text>
+          {downloadedModels.length === 0 ? (
+            <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
+              No downloaded models
+            </Text>
+          ) : (
+            downloadedModels.map((model) => (
+              <DownloadedModelRow
+                key={model.id}
+                model={model}
+                busy={downloadingModels[model.id] !== undefined}
+                onDelete={() => handleDeleteDownloadedModel(model)}
+              />
+            ))
+          )}
+          <View style={{ flexDirection: 'row', gap: dimens.spacing.sm }}>
+            <TouchableOpacity onPress={handleClearCache}>
+              <Text style={[typography.labelLarge, { color: colors.primary }]}>Clear cache</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleClearAllData}>
+              <Text style={[typography.labelLarge, { color: colors.error }]}>Clear all data</Text>
+            </TouchableOpacity>
+          </View>
+        </Section>
+
+        {/* API Configuration */}
+        <Section title="API Configuration">
+          <View style={styles.row}>
+            <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>API Key</Text>
             <Text
               style={[
-                styles.apiConfigValue,
-                {
-                  color: apiKeyConfigured
-                    ? Colors.primaryGreen
-                    : Colors.primaryOrange,
-                },
+                typography.metric,
+                { color: apiKeyConfigured ? colors.success : colors.error },
               ]}
             >
-                            {apiKeyConfigured ? 'Configured' : 'Not Set'}       
+              {apiKeyConfigured ? 'Configured' : 'Not Set'}
             </Text>
           </View>
-          <View style={styles.apiConfigDivider} />
-          <View style={styles.apiConfigRow}>
-            <Text style={styles.apiConfigLabel}>Base URL</Text>
+          <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+          <View style={styles.row}>
+            <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>Base URL</Text>
             <Text
               style={[
-                styles.apiConfigValue,
-                {
-                  color: isBaseURLConfigured
-                    ? Colors.primaryGreen
-                    : Colors.primaryOrange,
-                },
+                typography.metric,
+                { color: isBaseURLConfigured ? colors.success : colors.error },
               ]}
             >
-                            {isBaseURLConfigured ? 'Configured' : 'Not Set'}   
+              {isBaseURLConfigured ? 'Configured' : 'Not Set'}
             </Text>
           </View>
-          <View style={styles.apiConfigDivider} />
-          <View style={styles.apiConfigButtons}>
+          <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+          <View style={{ flexDirection: 'row', gap: dimens.spacing.sm }}>
             <TouchableOpacity
-              style={styles.apiConfigButton}
+              style={[
+                styles.outlineBtn,
+                { borderColor: colors.primary, borderRadius: dimens.radius.sm },
+              ]}
               onPress={handleConfigureApiKey}
             >
-              <Text style={styles.apiConfigButtonText}>Configure</Text>
+              <Text style={[typography.labelLarge, { color: colors.primary }]}>Configure</Text>
             </TouchableOpacity>
             {apiKeyConfigured && isBaseURLConfigured && (
               <TouchableOpacity
-                style={[styles.apiConfigButton, styles.apiConfigButtonClear]}
+                style={[
+                  styles.outlineBtn,
+                  { borderColor: colors.error, borderRadius: dimens.radius.sm },
+                ]}
                 onPress={clearApiConfiguration}
               >
-                <Text
-                  style={[
-                    styles.apiConfigButtonText,
-                    styles.apiConfigButtonTextClear,
-                  ]}
-                >
-                  Clear
-                </Text>
+                <Text style={[typography.labelLarge, { color: colors.error }]}>Clear</Text>
               </TouchableOpacity>
             )}
           </View>
-          <Text style={styles.apiConfigHint}>
-                        Configure custom API key and base URL for testing.
-            Requires app restart.          {' '}
+          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+            Configure custom API key and base URL for testing. Requires app restart.
           </Text>
-        </View>
-        {/* Tool Settings - Matches iOS ToolSettingsView */}
-        {renderSectionHeader('Tool Settings')}
-        <View style={styles.section}>
-          {/* Enable Tool Calling Toggle */}
-          <View style={styles.toolSettingRow}>
-            <View style={styles.toolSettingInfo}>
-              <Text style={styles.toolSettingLabel}>Enable Tool Calling</Text>
-              <Text style={styles.toolSettingDescription}>
-                                Allow LLMs to call tools (APIs, functions)      
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[
-                styles.toggleButton,
-                toolCallingEnabled && styles.toggleButtonActive,
-              ]}
-              onPress={() => handleToggleToolCalling(!toolCallingEnabled)}
-            >
-              <View
-                style={[
-                  styles.toggleKnob,
-                  toolCallingEnabled && styles.toggleKnobActive,
-                ]}
-              />
-            </TouchableOpacity>
-          </View>
+        </Section>
+
+        {/* Tool Settings */}
+        <Section title="Tool Settings">
+          <ToggleRow
+            label="Enable Tool Calling"
+            description="Allow LLMs to call tools (APIs, functions)"
+            value={toolCallingEnabled}
+            onChange={handleToggleToolCalling}
+          />
           {toolCallingEnabled && (
             <>
-              <View style={styles.apiConfigDivider} />
-              {/* Registered Tools Count */}
-              <View style={styles.toolSettingRow}>
-                <Text style={styles.toolSettingLabel}>Registered Tools</Text>
+              <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+              <View style={styles.row}>
+                <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>
+                  Registered Tools
+                </Text>
                 <Text
                   style={[
-                    styles.toolSettingValue,
-                    {
-                      color:
-                        registeredTools.length > 0
-                          ? Colors.primaryGreen
-                          : Colors.textSecondary,
-                    },
+                    typography.metric,
+                    { color: registeredTools.length > 0 ? colors.success : colors.onSurfaceVariant },
                   ]}
                 >
-                                    {registeredTools.length}{' '}
-                  {registeredTools.length === 1 ? 'tool' : 'tools'}             
+                  {registeredTools.length} {registeredTools.length === 1 ? 'tool' : 'tools'}
                 </Text>
               </View>
-              {/* Registered Tools List */}
               {registeredTools.length > 0 && (
                 <>
-                  <View style={styles.apiConfigDivider} />
-                  {registeredTools.map((tool, index) => (
-                    <View key={tool.name} style={styles.toolRow}>
-                      <Icon
-                        name="construct-outline"
-                        size={18}
-                        color={Colors.primaryBlue}
-                      />
-                      <View style={styles.toolInfo}>
-                        <Text style={styles.toolName}>{tool.name}</Text>
-                        <Text style={styles.toolDescription} numberOfLines={2}>
-                          {tool.description}
+                  <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+                  {registeredTools.map((tool) => (
+                    <View
+                      key={tool.name}
+                      style={[
+                        styles.toolCard,
+                        {
+                          backgroundColor: colors.surfaceContainerHighest,
+                          borderRadius: dimens.radius.sm,
+                          padding: dimens.spacing.md,
+                          gap: dimens.spacing.xs,
+                        },
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: dimens.spacing.sm }}>
+                        <Icon name="sliders" size={dimens.icon.sm} color={colors.primary} />
+                        <Text style={[typography.bodyMedium, { color: colors.onSurface, fontWeight: '600' }]}>
+                          {tool.name}
                         </Text>
-                        {tool.parameters.length > 0 && (
-                          <View style={styles.toolParams}>
-                            {tool.parameters.map((p) => (
-                              <View key={p.name} style={styles.toolParamChip}>
-                                <Text style={styles.toolParamText}>
-                                  {p.name}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                        )}
                       </View>
-                      {index < registeredTools.length - 1 && (
-                        <View style={styles.apiConfigDivider} />
+                      <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]} numberOfLines={2}>
+                        {tool.description}
+                      </Text>
+                      {tool.parameters.length > 0 && (
+                        <View style={styles.chipRow}>
+                          {tool.parameters.map((p) => (
+                            <View
+                              key={p.name}
+                              style={[
+                                styles.chip,
+                                { backgroundColor: colors.secondaryContainer, borderRadius: dimens.radius.full },
+                              ]}
+                            >
+                              <Text
+                                style={[typography.labelSmall, { color: colors.onSecondaryContainer }]}
+                              >
+                                {p.name}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
                       )}
                     </View>
                   ))}
-                  {/* Clear All Tools Button */}
-                  <View style={styles.apiConfigDivider} />
-                  <TouchableOpacity
-                    style={styles.clearToolsButton}
-                    onPress={clearAllTools}
-                  >
-                    <Icon
-                      name="trash-outline"
-                      size={18}
-                      color={Colors.statusRed}
-                    />
-                    <Text style={styles.clearToolsButtonText}>
+                  <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+                  <TouchableOpacity style={styles.centerRow} onPress={clearAllTools}>
+                    <Icon name="trash" size={dimens.icon.sm} color={colors.error} />
+                    <Text style={[typography.labelLarge, { color: colors.error }]}>
                       Clear All Tools
                     </Text>
                   </TouchableOpacity>
@@ -1150,197 +1029,201 @@ export const SettingsScreen: React.FC = () => {
               )}
             </>
           )}
-          <Text style={styles.apiConfigHint}>
-                        Tools allow the LLM to call external APIs and functions
-            to get real-time data.          {' '}
+          <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+            Tools allow the LLM to call external APIs and functions to get real-time data.
           </Text>
-        </View>
-        {/* Performance - Matches iOS CombinedSettingsView "Performance" section */}
-        {renderSectionHeader('Performance')}
-        <View style={styles.section}>
+        </Section>
+
+        {/* Performance */}
+        <Section title="Performance">
           <TouchableOpacity
-            style={styles.settingRow}
-            onPress={() => navigation.navigate('Benchmarks')}
+            style={[styles.row, { alignItems: 'center' }]}
+            onPress={() => navigation.navigate(ROUTES.Benchmarks)}
             activeOpacity={0.7}
           >
-            <View style={styles.settingRowLeft}>
-              <Icon
-                name="speedometer-outline"
-                size={20}
-                color={Colors.primaryBlue}
-              />
-              <Text style={styles.settingLabel}>Benchmarks</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: dimens.spacing.sm, flex: 1 }}>
+              <Icon name="benchmarks" size={dimens.icon.sm} color={colors.onSurface} />
+              <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>Benchmarks</Text>
             </View>
-            <View style={styles.settingRowRight}>
-              <Icon
-                name="chevron-forward"
-                size={18}
-                color={Colors.textTertiary}
-              />
-            </View>
+            <Icon name="chevronRight" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
-        </View>
-        {/* Storage Overview - Matches iOS CombinedSettingsView */}
-        {renderSectionHeader('Storage Overview')}
-        <View style={styles.section}>
-          {renderStorageBar()}
-          <View style={styles.storageDetails}>
-            {/* Total Storage - App's total storage usage */}
-            <View style={styles.storageDetailRow}>
-              <Text style={styles.storageDetailLabel}>Total Storage</Text>
-              <Text style={styles.storageDetailValue}>
-                                {formatBytes(storageInfo.appStorage)}           
-              </Text>
-            </View>
-            {/* Models Storage - Downloaded models size */}
-            <View style={styles.storageDetailRow}>
-              <Text style={styles.storageDetailLabel}>Models</Text>
-              <Text style={styles.storageDetailValue}>
-                                {formatBytes(storageInfo.modelsStorage)}       
-              </Text>
-            </View>
-            {/* Cache Size */}
-            <View style={styles.storageDetailRow}>
-              <Text style={styles.storageDetailLabel}>Cache</Text>
-              <Text style={styles.storageDetailValue}>
-                                {formatBytes(storageInfo.cacheSize)}           
-              </Text>
-            </View>
-            {/* Available - Device free space */}
-            <View style={styles.storageDetailRow}>
-              <Text style={styles.storageDetailLabel}>Available</Text>
-              <Text style={styles.storageDetailValue}>
-                                {formatBytes(storageInfo.freeSpace)}           
-              </Text>
-            </View>
-          </View>
-        </View>
+        </Section>
+
         {/* Model Catalog */}
-        {renderSectionHeader('Model Catalog')}
-        <View style={styles.section}>
+        <Section title="Model Catalog">
           {availableModels.length === 0 ? (
-            <Text style={styles.emptyText}>Loading models...</Text>
-          ) : (
-            availableModels.map(renderCatalogModelRow)
-          )}
-        </View>
-        {/* Storage Management */}
-        {renderSectionHeader('Storage Management')}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.dangerButton}
-            onPress={handleClearCache}
-          >
-            <Icon name="trash-outline" size={20} color={Colors.primaryOrange} />
-            <Text style={styles.dangerButtonText}>Clear Cache</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.dangerButton, styles.dangerButtonRed]}
-            onPress={handleClearAllData}
-          >
-            <Icon name="warning-outline" size={20} color={Colors.primaryRed} />
-            <Text style={[styles.dangerButtonText, styles.dangerButtonTextRed]}>
-                            Clear All Data            {' '}
+            <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
+              Loading models…
             </Text>
+          ) : (
+            availableModels.map((model, i) => (
+              <React.Fragment key={model.id}>
+                {i > 0 && (
+                  <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+                )}
+                <CatalogModelRow
+                  model={model}
+                  isDownloaded={downloadedModels.some((m) => m.id === model.id)}
+                  isDownloading={downloadingModels[model.id] !== undefined}
+                  downloadProgress={downloadingModels[model.id] ?? 0}
+                  onAction={() =>
+                    downloadedModels.some((m) => m.id === model.id)
+                      ? handleDeleteDownloadedModel(model)
+                      : handleDownloadModel(model)
+                  }
+                />
+              </React.Fragment>
+            ))
+          )}
+        </Section>
+
+        {/* About */}
+        <Section title="About">
+          <InfoRow label="SDK version" value={`v${sdkVersion}`} />
+          <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+          <TouchableOpacity
+            onPress={() => {
+              /* open docs URL */
+            }}
+          >
+            <Text style={[typography.bodyLarge, { color: colors.primary }]}>Documentation</Text>
           </TouchableOpacity>
-        </View>
-        {/* Version Info */}
-        <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>RunAnywhere AI</Text>
-          <Text style={styles.versionSubtext}>SDK v{sdkVersion}</Text>
-        </View>
+        </Section>
       </ScrollView>
+
       {/* API Configuration Modal */}
       <Modal
         visible={showApiConfigModal}
         animationType="slide"
-        transparent={true}
+        transparent
         onRequestClose={handleCancelApiConfig}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>API Configuration</Text>
-            {/* API Key Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>API Key</Text>
-              <View style={styles.passwordInputContainer}>
+          <View
+            style={[
+              styles.modalContent,
+              {
+                backgroundColor: colors.surfaceContainerHigh,
+                borderRadius: dimens.radius.lg,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                typography.titleMedium,
+                { color: colors.onSurface, textAlign: 'center', marginBottom: dimens.spacing.lg },
+              ]}
+            >
+              API Configuration
+            </Text>
+
+            <View style={{ gap: dimens.spacing.xs, marginBottom: dimens.spacing.lg }}>
+              <Text style={[typography.labelLarge, { color: colors.onSurfaceVariant }]}>API Key</Text>
+              <View
+                style={[
+                  styles.inputRow,
+                  {
+                    backgroundColor: colors.surfaceContainerHighest,
+                    borderColor: colors.outline,
+                    borderRadius: dimens.radius.sm,
+                  },
+                ]}
+              >
                 <TextInput
-                  style={styles.passwordInput}
+                  style={[styles.inputFlex, typography.bodyMedium, { color: colors.onSurface }]}
                   value={apiKey}
                   onChangeText={setApiKey}
                   placeholder="Enter your API key"
-                  placeholderTextColor={Colors.textTertiary}
+                  placeholderTextColor={colors.onSurfaceVariant}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
                 <TouchableOpacity
-                  style={styles.passwordToggle}
+                  style={{ padding: dimens.spacing.md }}
                   onPress={() => setShowPassword(!showPassword)}
                 >
                   <Icon
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={20}
-                    color={Colors.textSecondary}
+                    name={showPassword ? 'close' : 'info'}
+                    size={dimens.icon.sm}
+                    color={colors.onSurfaceVariant}
                   />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.inputHint}>
-                                Your API key for authenticating with the backend
+              <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+                Your API key for authenticating with the backend
               </Text>
             </View>
-            {/* Base URL Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Base URL</Text>
+
+            <View style={{ gap: dimens.spacing.xs, marginBottom: dimens.spacing.lg }}>
+              <Text style={[typography.labelLarge, { color: colors.onSurfaceVariant }]}>Base URL</Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.inputField,
+                  typography.bodyMedium,
+                  {
+                    color: colors.onSurface,
+                    backgroundColor: colors.surfaceContainerHighest,
+                    borderColor: colors.outline,
+                    borderRadius: dimens.radius.sm,
+                  },
+                ]}
                 value={baseURL}
                 onChangeText={setBaseURL}
                 placeholder="https://api.example.com"
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor={colors.onSurfaceVariant}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
               />
-              <Text style={styles.inputHint}>
-                                The backend API URL (https:// added
-                automatically if missing)              {' '}
+              <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+                The backend API URL (https:// added automatically if missing)
               </Text>
             </View>
-            {/* Warning */}
-            <View style={styles.warningBox}>
-              <Icon
-                name="warning-outline"
-                size={20}
-                color={Colors.primaryOrange}
-              />
-              <Text style={styles.warningText}>
-                                After saving, you must restart the app for
-                changes to take effect. The SDK will reinitialize with your
-                custom configuration.              {' '}
+
+            <View
+              style={[
+                styles.warningBox,
+                {
+                  backgroundColor: colors.errorContainer,
+                  borderRadius: dimens.radius.sm,
+                  padding: dimens.spacing.md,
+                  marginBottom: dimens.spacing.lg,
+                },
+              ]}
+            >
+              <Icon name="info" size={dimens.icon.sm} color={colors.onErrorContainer} />
+              <Text style={[typography.bodySmall, { color: colors.onErrorContainer, flex: 1 }]}>
+                After saving, you must restart the app for changes to take effect.
               </Text>
             </View>
-            {/* Buttons */}
-            <View style={styles.modalButtons}>
+
+            <View style={[styles.modalBtns, { gap: dimens.spacing.sm }]}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
+                style={[
+                  styles.modalBtn,
+                  { borderRadius: dimens.radius.sm, backgroundColor: colors.surfaceContainerHighest },
+                ]}
                 onPress={handleCancelApiConfig}
               >
-                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                <Text style={[typography.labelLarge, { color: colors.onSurface }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
-                  styles.modalButton,
-                  styles.modalButtonSave,
-                  (!apiKey || !baseURL) && styles.modalButtonDisabled,
+                  styles.modalBtn,
+                  {
+                    borderRadius: dimens.radius.sm,
+                    backgroundColor: !apiKey || !baseURL ? colors.surfaceContainerHighest : colors.primary,
+                    flex: 1,
+                  },
                 ]}
                 onPress={saveApiConfiguration}
                 disabled={!apiKey || !baseURL}
               >
                 <Text
                   style={[
-                    styles.modalButtonTextSave,
-                    (!apiKey || !baseURL) && styles.modalButtonTextDisabled,
+                    typography.labelLarge,
+                    { color: !apiKey || !baseURL ? colors.onSurfaceVariant : colors.onPrimary },
                   ]}
                 >
                   Save
@@ -1350,686 +1233,135 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: Colors.backgroundGrouped,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Padding.padding16,
-    paddingTop: 0,
-    paddingBottom: Padding.padding12,
-    backgroundColor: Colors.backgroundPrimary,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
-  title: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
+  scrollContent: {
+    gap: 16,
+    paddingTop: 8,
   },
-  refreshButton: {
-    padding: Spacing.small,
-  },
-  content: {
-    flex: 1,
-  },
-  sectionHeader: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    marginTop: Spacing.xLarge,
-    marginBottom: Spacing.small,
-    marginHorizontal: Padding.padding16,
-  },
-  section: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderRadius: BorderRadius.medium,
-    marginHorizontal: Padding.padding16,
+  sectionCard: {
     overflow: 'hidden',
   },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Padding.padding16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  settingRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.medium,
-  },
-  settingRowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-  },
-  settingLabel: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
-  settingValue: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  sliderSetting: {
-    padding: Padding.padding16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  sliderHeader: {
+  row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.medium,
   },
-  sliderValue: {
-    ...Typography.body,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
+  divider: {
+    height: StyleSheet.hairlineWidth,
   },
-  sliderControls: {
+  sliderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.medium,
+    gap: 8,
   },
-  sliderButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.backgroundSecondary,
+  sliderBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sliderTrack: {
     flex: 1,
     height: 6,
-    backgroundColor: Colors.backgroundGray5,
     borderRadius: 3,
+    overflow: 'hidden',
   },
   sliderFill: {
     height: '100%',
-    backgroundColor: Colors.primaryBlue,
     borderRadius: 3,
   },
-  storageBar: {
-    padding: Padding.padding16,
-  },
-  storageBarTrack: {
-    height: 8,
-    backgroundColor: Colors.backgroundGray5,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  storageBarFill: {
-    height: '100%',
-    backgroundColor: Colors.primaryBlue,
-    borderRadius: 4,
-  },
-  storageText: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    marginTop: Spacing.small,
-    textAlign: 'center',
-  },
-  storageDetails: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    padding: Padding.padding16,
-    gap: Spacing.small,
-  },
-  storageDetailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  storageDetailLabel: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-  },
-  storageDetailValue: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-  },
-  modelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Padding.padding16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  modelInfo: {
-    flex: 1,
-  },
-  modelName: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
-  modelMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-    marginTop: Spacing.xSmall,
-  },
-  frameworkBadge: {
-    backgroundColor: Colors.badgeBlue,
-    paddingHorizontal: Spacing.small,
-    paddingVertical: Spacing.xxSmall,
-    borderRadius: BorderRadius.small,
-  },
-  frameworkBadgeText: {
-    ...Typography.caption2,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
-  },
-  modelSize: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-  deleteButton: {
-    padding: Spacing.small,
-  },
-  emptyText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    padding: Padding.padding24,
-  },
-  dangerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.smallMedium,
-    padding: Padding.padding16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  dangerButtonRed: {
-    borderBottomWidth: 0,
-  },
-  dangerButtonText: {
-    ...Typography.body,
-    color: Colors.primaryOrange,
-  },
-  dangerButtonTextRed: {
-    color: Colors.primaryRed,
-  },
-  versionContainer: {
-    alignItems: 'center',
-    padding: Padding.padding24,
-    marginTop: Spacing.large,
-    marginBottom: Spacing.xxxLarge,
-  },
-  versionText: {
-    ...Typography.footnote,
-    color: Colors.textTertiary,
-  },
-  versionSubtext: {
-    ...Typography.caption,
-    color: Colors.textTertiary,
-    marginTop: Spacing.xSmall,
-  }, // SDK Status styles
-  statusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Padding.padding16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  statusLabel: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
-  statusValue: {
-    ...Typography.body,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
-  },
-  capabilitiesContainer: {
-    padding: Padding.padding16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  capabilitiesLabel: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.small,
-  },
-  capabilitiesList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.small,
-  },
-  capabilityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xSmall,
-    backgroundColor: Colors.badgeGreen,
-    paddingHorizontal: Spacing.smallMedium,
-    paddingVertical: Spacing.xSmall,
-    borderRadius: BorderRadius.small,
-  },
-  capabilityText: {
-    ...Typography.caption,
-    color: Colors.primaryGreen,
-    fontWeight: '600',
-  },
-  noCapabilities: {
-    ...Typography.body,
-    color: Colors.textTertiary,
-    fontStyle: 'italic',
-  },
-  modelStatusContainer: {
-    padding: Padding.padding16,
-  },
-  modelStatusGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.small,
-    marginTop: Spacing.small,
-  },
-  modelStatusItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xSmall,
-    backgroundColor: Colors.backgroundSecondary,
-    paddingHorizontal: Spacing.medium,
-    paddingVertical: Spacing.small,
-    borderRadius: BorderRadius.small,
-  },
-  modelStatusItemLoaded: {
-    backgroundColor: Colors.badgeGreen,
-  },
-  modelStatusText: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  }, // Model catalog styles
-  catalogModelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Padding.padding16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  catalogModelInfo: {
-    flex: 1,
-    marginRight: Spacing.medium,
-  },
-  catalogModelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-    marginBottom: Spacing.xSmall,
-  },
-  catalogModelName: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-  },
-  catalogModelBadge: {
-    backgroundColor: Colors.badgeBlue,
-    paddingHorizontal: Spacing.small,
-    paddingVertical: Spacing.xxSmall,
-    borderRadius: BorderRadius.small,
-  },
-  catalogModelBadgeText: {
-    ...Typography.caption2,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  catalogModelDescription: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xSmall,
-  },
-  catalogModelMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-  },
-  catalogModelSize: {
-    ...Typography.caption,
-    color: Colors.textTertiary,
-  },
-  catalogModelFormat: {
-    ...Typography.caption,
-    color: Colors.textTertiary,
-  },
-  catalogModelButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.backgroundSecondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  catalogModelButtonDownloaded: {
-    backgroundColor: Colors.badgeGreen,
-  },
-  catalogModelButtonDownloading: {
-    backgroundColor: Colors.badgeOrange,
-  },
-  downloadProgressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-    marginTop: Spacing.small,
-  },
-  downloadProgressTrack: {
-    flex: 1,
-    height: 4,
-    backgroundColor: Colors.backgroundGray5,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  downloadProgressFill: {
-    height: '100%',
-    backgroundColor: Colors.primaryBlue,
-    borderRadius: 2,
-  },
-  downloadProgressText: {
-    ...Typography.caption,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
-    minWidth: 40,
-    textAlign: 'right',
-  }, // API Configuration styles
-  apiConfigRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Padding.padding16,
-  },
-  apiConfigLabel: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
-  apiConfigValue: {
-    ...Typography.body,
-    fontWeight: '500',
-  },
-  apiConfigDivider: {
-    height: 1,
-    backgroundColor: Colors.borderLight,
-    marginHorizontal: Padding.padding16,
-  },
-  apiConfigButtons: {
-    flexDirection: 'row',
-    padding: Padding.padding16,
-    gap: Spacing.small,
-  },
-  apiConfigButton: {
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Spacing.small,
-    borderRadius: BorderRadius.small,
+  textArea: {
     borderWidth: 1,
-    borderColor: Colors.primaryBlue,
+    padding: 12,
+    minHeight: 72,
   },
-  apiConfigButtonClear: {
-    borderColor: Colors.primaryRed,
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  apiConfigButtonText: {
-    ...Typography.subheadline,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
+  outlineBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
   },
-  apiConfigButtonTextClear: {
-    color: Colors.primaryRed,
+  centerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
-  apiConfigHint: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    paddingHorizontal: Padding.padding16,
-    paddingBottom: Padding.padding16,
-  }, // Modal styles
+  modelCard: {
+    overflow: 'hidden',
+  },
+  modelCardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  toolCard: {},
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  chip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: Padding.padding24,
+    padding: 24,
   },
   modalContent: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderRadius: BorderRadius.large,
-    padding: Padding.padding24,
     width: '100%',
     maxWidth: 400,
+    padding: 24,
   },
-  modalTitle: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.large,
-    textAlign: 'center',
-  },
-  inputGroup: {
-    marginBottom: Spacing.large,
-  },
-  inputLabel: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.small,
-  },
-  input: {
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.small,
-    padding: Padding.padding12,
-    ...Typography.body,
-    color: Colors.textPrimary,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  passwordInputContainer: {
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.small,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
   },
-  passwordInput: {
+  inputFlex: {
     flex: 1,
-    padding: Padding.padding12,
-    ...Typography.body,
-    color: Colors.textPrimary,
+    padding: 12,
   },
-  passwordToggle: {
-    padding: Padding.padding12,
-  },
-  inputHint: {
-    ...Typography.caption,
-    color: Colors.textTertiary,
-    marginTop: Spacing.xSmall,
+  inputField: {
+    borderWidth: 1,
+    padding: 12,
   },
   warningBox: {
     flexDirection: 'row',
-    backgroundColor: Colors.badgeOrange,
-    borderRadius: BorderRadius.small,
-    padding: Padding.padding12,
-    gap: Spacing.small,
-    marginBottom: Spacing.large,
+    gap: 8,
+    alignItems: 'flex-start',
   },
-  warningText: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    flex: 1,
-  },
-  modalButtons: {
+  modalBtns: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: Spacing.medium,
   },
-  modalButton: {
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Spacing.smallMedium,
-    borderRadius: BorderRadius.small,
+  modalBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: 'center',
     minWidth: 80,
-    alignItems: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: 'transparent',
-  },
-  modalButtonSave: {
-    backgroundColor: Colors.primaryBlue,
-  },
-  modalButtonDisabled: {
-    backgroundColor: Colors.backgroundGray5,
-  },
-  modalButtonTextCancel: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  modalButtonTextSave: {
-    ...Typography.body,
-    color: Colors.textWhite,
-    fontWeight: '600',
-  },
-  modalButtonTextDisabled: {
-    color: Colors.textTertiary,
-  }, // System Prompt styles
-  systemPromptContainer: {
-    padding: Padding.padding16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  systemPromptLabel: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.small,
-  },
-  systemPromptInput: {
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.small,
-    padding: Padding.padding12,
-    ...Typography.body,
-    color: Colors.textPrimary,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    minHeight: 80,
-  },
-  saveSettingsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.small,
-    backgroundColor: Colors.primaryBlue,
-    padding: Padding.padding16,
-    margin: Padding.padding16,
-    borderRadius: BorderRadius.small,
-  },
-  saveSettingsButtonText: {
-    ...Typography.body,
-    color: Colors.textWhite,
-    fontWeight: '600',
-  }, // Tool Settings styles
-  toolSettingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Padding.padding16,
-  },
-  toolSettingInfo: {
-    flex: 1,
-    marginRight: Spacing.medium,
-  },
-  toolSettingLabel: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontWeight: '500',
-  },
-  toolSettingDescription: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xxSmall,
-  },
-  toolSettingValue: {
-    ...Typography.body,
-    fontWeight: '600',
-  },
-  toggleButton: {
-    width: 51,
-    height: 31,
-    borderRadius: 15.5,
-    backgroundColor: Colors.backgroundGray5,
-    padding: 2,
-    justifyContent: 'center',
-  },
-  toggleButtonActive: {
-    backgroundColor: Colors.primaryBlue,
-  },
-  toggleKnob: {
-    width: 27,
-    height: 27,
-    borderRadius: 13.5,
-    backgroundColor: Colors.textWhite,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  toggleKnobActive: {
-    alignSelf: 'flex-end',
-  },
-  toolRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: Padding.padding16,
-    gap: Spacing.medium,
-  },
-  toolInfo: {
-    flex: 1,
-  },
-  toolName: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-  },
-  toolDescription: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xxSmall,
-  },
-  toolParams: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.xSmall,
-    marginTop: Spacing.small,
-  },
-  toolParamChip: {
-    backgroundColor: Colors.badgeBlue,
-    paddingHorizontal: Spacing.small,
-    paddingVertical: Spacing.xxSmall,
-    borderRadius: BorderRadius.small,
-  },
-  toolParamText: {
-    ...Typography.caption2,
-    color: Colors.primaryBlue,
-    fontWeight: '500',
-  },
-  clearToolsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.small,
-    padding: Padding.padding16,
-  },
-  clearToolsButtonText: {
-    ...Typography.body,
-    color: Colors.statusRed,
-    fontWeight: '600',
   },
 });
 

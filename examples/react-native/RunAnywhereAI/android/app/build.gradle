@@ -28,7 +28,6 @@ def packageNameMap = [
     "core"    : "core",
     "llamacpp": "llamacpp",
     "onnx"    : "onnx",
-    "genie"   : "genie",
 ]
 
 task syncSdkNativeLibs {
@@ -103,7 +102,6 @@ def enableProguardInReleaseBuilds = false
  * The preferred build flavor of JavaScriptCore (JSC)
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
-def enableRunAnywhereGenie = (project.findProperty("runanywhere.enableGenie") ?: "false").toString().toBoolean()
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -166,15 +164,11 @@ android {
             "**/librac_backend_onnx.so", // ONNX backend shared by multiple modules
             "**/librac_commons.so",
             "**/libomp.so",
-            "**/libcdsprpc.so"
+            "**/libcdsprpc.so",
+            "**/libGenie.so",
+            "**/libQnn*.so",
+            "**/librac_backend_genie*.so"
         ]
-        if (!enableRunAnywhereGenie) {
-            excludes += [
-                "**/libGenie.so",
-                "**/libQnn*.so",
-                "**/librac_backend_genie*.so"
-            ]
-        }
     }
 
     // Use AGP's modern native packaging. The SDK Android modules also replace
@@ -200,9 +194,6 @@ dependencies {
     implementation project(':runanywhere_core')
     implementation project(':runanywhere_llamacpp')
     implementation project(':runanywhere_onnx')
-    if (enableRunAnywhereGenie) {
-        implementation project(':runanywhere_genie')
-    }
 
     def isHermesEnabled = project.hasProperty("hermesEnabled") ? project.hermesEnabled.toBoolean() : true
     // Expose hermesEnabled for other modules (like react-native-worklets)

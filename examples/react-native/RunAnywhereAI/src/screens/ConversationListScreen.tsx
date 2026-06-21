@@ -1,158 +1,59 @@
 /**
- * ConversationListScreen - Modal for managing conversations
+ * ConversationListScreen — conversation history in the app bottom sheet.
  *
- * Reference: iOS Core/Services/ConversationStore.swift (ConversationListView)
- *
- * Features:
- * - List all conversations with search
- * - Create new conversation
- * - Delete conversation with confirmation
- * - Switch between conversations
+ * Search, start a new chat, switch conversations, and delete with confirmation.
+ * Rows show title, last-message preview, a relative date and the framework chip.
  */
-
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
   Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius, IconSize } from '../theme/spacing';
+import { BottomSheet, BottomSheetScrollView } from '../components/ui/BottomSheet';
+import { Icon, useTheme } from '../theme/system';
 import type { Conversation } from '../types/chat';
 import {
   useConversationStore,
-  getConversationSummary,
   getLastMessagePreview,
   formatRelativeDate,
 } from '../stores/conversationStore';
 
 interface ConversationListScreenProps {
+  visible: boolean;
   onClose: () => void;
   onSelectConversation: (conversation: Conversation) => void;
 }
 
-/**
- * ConversationRow - Individual conversation item in list
- * Matches iOS ConversationRow struct
- */
-interface ConversationRowProps {
-  conversation: Conversation;
-  onPress: () => void;
-  onDelete: () => void;
-}
-
-/**
- * Stable separator component to avoid react/no-unstable-nested-components
- */
-const ItemSeparator: React.FC = () => <View style={styles.separator} />;
-
-const ConversationRow: React.FC<ConversationRowProps> = ({
-  conversation,
-  onPress,
-  onDelete,
-}) => {
-  const handleDelete = useCallback(() => {
-    Alert.alert(
-      'Delete Conversation',
-      `Are you sure you want to delete "${conversation.title}"? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: onDelete,
-        },
-      ]
-    );
-  }, [conversation.title, onDelete]);
-
-  return (
-    <TouchableOpacity style={styles.conversationRow} onPress={onPress}>
-      <View style={styles.conversationContent}>
-        {/* Title */}
-        <Text style={styles.conversationTitle} numberOfLines={1}>
-          {conversation.title}
-        </Text>
-
-        {/* Last message preview */}
-        <Text style={styles.conversationPreview} numberOfLines={2}>
-          {getLastMessagePreview(conversation)}
-        </Text>
-
-        {/* Summary line */}
-        <Text style={styles.conversationSummary}>
-          {getConversationSummary(conversation)}
-        </Text>
-
-        {/* Bottom row: date and framework badge */}
-        <View style={styles.conversationBottom}>
-          <Text style={styles.conversationDate}>
-            {formatRelativeDate(conversation.updatedAt)}
-          </Text>
-
-          {conversation.frameworkName && (
-            <View style={styles.frameworkBadge}>
-              <Text style={styles.frameworkBadgeText}>
-                {conversation.frameworkName}
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* Delete button */}
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={handleDelete}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Icon name="trash-outline" size={20} color={Colors.primaryRed} />
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-};
+const SNAP_POINTS = ['85%'];
 
 export const ConversationListScreen: React.FC<ConversationListScreenProps> = ({
+  visible,
   onClose,
   onSelectConversation,
 }) => {
+  const { colors, typography } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const {
-    conversations,
-    createConversation,
-    deleteConversation,
-    searchConversations,
-  } = useConversationStore();
+  const { conversations, createConversation, deleteConversation, searchConversations } =
+    useConversationStore();
 
-  // Filter conversations based on search
-  const filteredConversations = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return conversations;
-    }
-    return searchConversations(searchQuery);
-  }, [conversations, searchQuery, searchConversations]);
+  const filtered = useMemo(
+    () =>
+      searchQuery.trim() ? searchConversations(searchQuery) : conversations,
+    [conversations, searchQuery, searchConversations]
+  );
 
-  /**
-   * Handle creating a new conversation
-   */
-  const handleCreateConversation = useCallback(async () => {
-    const newConversation = await createConversation();
-    onSelectConversation(newConversation);
+  const handleCreate = useCallback(async () => {
+    const created = await createConversation();
+    onSelectConversation(created);
     onClose();
   }, [createConversation, onSelectConversation, onClose]);
 
-  /**
-   * Handle selecting a conversation
-   */
-  const handleSelectConversation = useCallback(
+  const handleSelect = useCallback(
     (conversation: Conversation) => {
       onSelectConversation(conversation);
       onClose();
@@ -160,244 +61,213 @@ export const ConversationListScreen: React.FC<ConversationListScreenProps> = ({
     [onSelectConversation, onClose]
   );
 
-  /**
-   * Handle deleting a conversation
-   */
-  const handleDeleteConversation = useCallback(
-    async (conversationId: string) => {
-      await deleteConversation(conversationId);
+  const handleDelete = useCallback(
+    (conversation: Conversation) => {
+      Alert.alert(
+        'Delete conversation',
+        `Delete "${conversation.title}"? This can't be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => void deleteConversation(conversation.id),
+          },
+        ]
+      );
     },
     [deleteConversation]
   );
 
-  /**
-   * Render a conversation item
-   */
-  const renderConversation = ({ item }: { item: Conversation }) => (
-    <ConversationRow
-      conversation={item}
-      onPress={() => handleSelectConversation(item)}
-      onDelete={() => handleDeleteConversation(item.id)}
-    />
-  );
-
-  /**
-   * Render empty state
-   */
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <View style={styles.emptyIconContainer}>
-        <Icon
-          name="chatbubbles-outline"
-          size={IconSize.large}
-          color={Colors.textTertiary}
-        />
-      </View>
-      <Text style={styles.emptyTitle}>
-        {searchQuery ? 'No conversations found' : 'No conversations yet'}
-      </Text>
-      <Text style={styles.emptySubtitle}>
-        {searchQuery
-          ? 'Try a different search term'
-          : 'Tap the + button to start a new conversation'}
-      </Text>
-    </View>
-  );
-
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <BottomSheet visible={visible} onClose={onClose} snapPoints={SNAP_POINTS}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton} onPress={onClose}>
-          <Text style={styles.doneText}>Done</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Conversations</Text>
-
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={handleCreateConversation}
-        >
-          <Icon name="add" size={28} color={Colors.primaryBlue} />
+        <Text style={[typography.titleLarge, styles.bold, { color: colors.onSurface }]}>
+          Conversations
+        </Text>
+        <TouchableOpacity onPress={handleCreate} hitSlop={8}>
+          <Icon name="newChat" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Icon
-          name="search"
-          size={18}
-          color={Colors.textTertiary}
-          style={styles.searchIcon}
-        />
+      <View
+        style={[styles.search, { backgroundColor: colors.surfaceContainerHigh }]}
+      >
+        <Icon name="search" size={18} color={colors.onSurfaceVariant} />
         <TextInput
-          style={styles.searchInput}
-          placeholder="Search conversations..."
-          placeholderTextColor={Colors.textTertiary}
+          style={[styles.searchInput, typography.bodyMedium, { color: colors.onSurface }]}
+          placeholder="Search conversations"
+          placeholderTextColor={colors.onSurfaceVariant}
           value={searchQuery}
           onChangeText={setSearchQuery}
           autoCapitalize="none"
           autoCorrect={false}
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity
-            onPress={() => setSearchQuery('')}
-            style={styles.clearButton}
-          >
-            <Icon name="close-circle" size={18} color={Colors.textTertiary} />
+          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
+            <Icon name="close" size={18} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Conversations List */}
-      <FlatList
-        data={filteredConversations}
-        renderItem={renderConversation}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={[
-          styles.listContent,
-          filteredConversations.length === 0 && styles.emptyListContent,
-        ]}
-        ListEmptyComponent={renderEmptyState}
-        showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={ItemSeparator}
-      />
-    </SafeAreaView>
+      <BottomSheetScrollView contentContainerStyle={styles.list}>
+        {filtered.length === 0 ? (
+          <View style={styles.empty}>
+            <Icon name="chat" size={40} color={colors.onSurfaceVariant} />
+            <Text style={[typography.titleSmall, styles.bold, { color: colors.onSurface }]}>
+              {searchQuery ? 'No matches' : 'No conversations yet'}
+            </Text>
+            <Text
+              style={[
+                typography.bodyMedium,
+                styles.emptyText,
+                { color: colors.onSurfaceVariant },
+              ]}
+            >
+              {searchQuery
+                ? 'Try a different search term'
+                : 'Start a new chat with the + button'}
+            </Text>
+          </View>
+        ) : (
+          <View
+            style={[styles.card, { backgroundColor: colors.surfaceContainerHigh }]}
+          >
+            {filtered.map((c, i) => (
+              <View key={c.id}>
+                {i > 0 && (
+                  <View
+                    style={[styles.divider, { backgroundColor: colors.outlineVariant }]}
+                  />
+                )}
+                <TouchableOpacity
+                  style={styles.row}
+                  activeOpacity={0.7}
+                  onPress={() => handleSelect(c)}
+                >
+                  <View style={styles.rowText}>
+                    <Text
+                      style={[typography.titleSmall, styles.bold, { color: colors.onSurface }]}
+                      numberOfLines={1}
+                    >
+                      {c.title}
+                    </Text>
+                    <Text
+                      style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}
+                      numberOfLines={1}
+                    >
+                      {getLastMessagePreview(c)}
+                    </Text>
+                    <View style={styles.metaRow}>
+                      <Text
+                        style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}
+                      >
+                        {formatRelativeDate(c.updatedAt)}
+                      </Text>
+                      {!!c.frameworkName && (
+                        <View
+                          style={[styles.chip, { backgroundColor: colors.surfaceVariant }]}
+                        >
+                          <Text
+                            style={[
+                              typography.labelSmall,
+                              styles.bold,
+                              { color: colors.onSurfaceVariant },
+                            ]}
+                          >
+                            {c.frameworkName}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => handleDelete(c)}
+                    hitSlop={8}
+                  >
+                    <Icon name="trash" size={18} color={colors.error} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+      </BottomSheetScrollView>
+    </BottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 12,
   },
-  headerButton: {
-    minWidth: 60,
-  },
-  doneText: {
-    ...Typography.body,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
-  },
-  title: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-  },
-  searchContainer: {
+  search: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.medium,
-    marginHorizontal: Padding.padding16,
-    marginVertical: Padding.padding12,
-    paddingHorizontal: Padding.padding12,
-  },
-  searchIcon: {
-    marginRight: Spacing.small,
+    gap: 8,
+    marginHorizontal: 16,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    marginBottom: 12,
   },
   searchInput: {
     flex: 1,
-    ...Typography.body,
-    color: Colors.textPrimary,
-    paddingVertical: Padding.padding12,
+    paddingVertical: 11,
   },
-  clearButton: {
-    padding: Spacing.small,
+  list: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
   },
-  listContent: {
-    paddingBottom: Spacing.large,
+  card: {
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  emptyListContent: {
-    flex: 1,
-    justifyContent: 'center',
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 14,
   },
-  separator: {
-    height: 1,
-    backgroundColor: Colors.borderLight,
-    marginHorizontal: Padding.padding16,
-  },
-  conversationRow: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  conversationContent: {
+  rowText: {
     flex: 1,
-    marginRight: Spacing.medium,
+    gap: 3,
   },
-  conversationTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xSmall,
-  },
-  conversationPreview: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xSmall,
-    lineHeight: 20,
-  },
-  conversationSummary: {
-    ...Typography.caption,
-    color: Colors.textTertiary,
-    marginBottom: Spacing.xSmall,
-  },
-  conversationBottom: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.small,
+    gap: 8,
+    marginTop: 2,
   },
-  conversationDate: {
-    ...Typography.caption2,
-    color: Colors.textTertiary,
-  },
-  frameworkBadge: {
-    backgroundColor: Colors.primaryBlue + '20',
-    paddingHorizontal: Spacing.small,
+  chip: {
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: BorderRadius.small,
+    borderRadius: 999,
   },
-  frameworkBadgeText: {
-    ...Typography.caption2,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
+  deleteBtn: {
+    padding: 6,
   },
-  deleteButton: {
-    padding: Spacing.small,
-  },
-  emptyState: {
+  empty: {
     alignItems: 'center',
-    padding: Padding.padding40,
+    gap: 8,
+    paddingVertical: 48,
   },
-  emptyIconContainer: {
-    width: IconSize.huge,
-    height: IconSize.huge,
-    borderRadius: IconSize.huge / 2,
-    backgroundColor: Colors.backgroundSecondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.large,
-  },
-  emptyTitle: {
-    ...Typography.title3,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.small,
-  },
-  emptySubtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
+  emptyText: {
     textAlign: 'center',
-    maxWidth: 280,
+    maxWidth: 260,
+  },
+  bold: {
+    fontWeight: '700',
   },
 });
 

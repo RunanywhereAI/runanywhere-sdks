@@ -20,5 +20,11 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Figtree.ttf</string>
+		<string>Figtree-Italic.ttf</string>
+		<string>MapleMono.ttf</string>
+	</array>
 </dict>
 </plist>

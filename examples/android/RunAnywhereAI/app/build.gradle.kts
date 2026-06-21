@@ -97,6 +97,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
+    // files(...) AARs carry no POM; declare coroutines 1.11.0 directly so it outranks
+    // the older transitive core from androidx (SDK is compiled against 1.11.0).
+    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.proto.wire.runtime)
     testImplementation(libs.junit)
 

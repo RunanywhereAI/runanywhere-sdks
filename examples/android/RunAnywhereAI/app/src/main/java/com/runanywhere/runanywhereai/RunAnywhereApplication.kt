@@ -74,7 +74,11 @@ class RunAnywhereApplication : Application() {
         RunAnywhere.initialize(
             apiKey = BuildConfig.RUNANYWHERE_API_KEY,
             baseURL = BuildConfig.RUNANYWHERE_BASE_URL,
-            environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+            // STAGING (not PRODUCTION) so the railway *development* backend in
+            // local.properties is honored and telemetry lands — matches the
+            // Flutter example. PRODUCTION expects a production backend/auth and
+            // also disables console logging.
+            environment = SDKEnvironment.SDK_ENVIRONMENT_STAGING,
         )
         // Production env disables SDK console logging entirely; without this
         // debug builds emit zero SDK logs to logcat, which makes on-device

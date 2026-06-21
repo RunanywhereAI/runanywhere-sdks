@@ -1,45 +1,29 @@
 /**
- * ModelSelectionSheet - Reusable model selection component
+ * ModelSelectionSheet — model picker presented in the app bottom sheet.
  *
- * Reference: iOS Features/Models/ModelSelectionSheet.swift
- *
- * Features:
- * - Device status section
- * - Framework list with expansion
- * - Model list with download/select actions
- * - Loading overlay for model loading
- * - Context-based filtering (LLM, STT, TTS, Voice, VLM, RAG Embedding, RAG LLM)
+ * Design: a device-storage summary card, then models split into "On device"
+ * (ready to use) and "Available" (downloadable) sections of rich rows — no
+ * framework dropdown/accordion. Context-based filtering (LLM, STT, TTS, Voice,
+ * VLM, RAG Embedding, RAG LLM) selects which models are shown.
  */
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  Modal,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
   ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '../../theme/colors';
-import { Typography, FontWeight } from '../../theme/typography';
-import { Spacing, Padding, BorderRadius } from '../../theme/spacing';
+import { BottomSheet, BottomSheetScrollView } from '../ui/BottomSheet';
+import { Icon, useTheme } from '../../theme/system';
 import {
   DEFAULT_INFERENCE_FRAMEWORK,
-  getFrameworkColor,
   getFrameworkDisplayName,
-  getFrameworkIcon,
   getModelDownloadSizeBytes,
   getModelFormatLabel,
   getModelFrameworks,
   getPrimaryFramework,
-  isModelCompatibleWithFramework,
 } from '../../utils/modelDisplay';
-
-// Import SDK types and values
-// Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere } from '@runanywhere/core';
 import {
   InferenceFramework,
@@ -47,54 +31,51 @@ import {
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 
-// Canonical SDK methods (Swift parity).
 const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
 const listModels = async (): Promise<SDKModelInfo[]> =>
   (await RunAnywhere.listModels()).models?.models ?? [];
 
-/**
- * Context for filtering frameworks and models based on the current experience/modality
- */
-export enum ModelSelectionContext {
-  LLM = 'llm', // Chat experience - show LLM frameworks
-  STT = 'stt', // Speech-to-Text - show STT frameworks
-  TTS = 'tts', // Text-to-Speech - show TTS frameworks
-  Voice = 'voice', // Voice Assistant - show all voice-related
-  VAD = 'vad', // Voice Activity Detection
-  VLM = 'vlm', // Vision - show VLM frameworks
-  RagEmbedding = 'ragEmbedding', // RAG embedding - ONNX embedding models only
-  RagLLM = 'ragLLM', // RAG generation - LlamaCpp language models only
-}
+type StorageSnapshot = Awaited<ReturnType<typeof RunAnywhere.getStorageInfo>>;
+
+// Opens tall (long model lists); drag up to near-full.
+const SNAP_POINTS = ['60%', '92%'];
 
 /**
- * Get title for context
+ * Context for filtering models based on the current experience/modality.
  */
+export enum ModelSelectionContext {
+  LLM = 'llm',
+  STT = 'stt',
+  TTS = 'tts',
+  Voice = 'voice',
+  VAD = 'vad',
+  VLM = 'vlm',
+  RagEmbedding = 'ragEmbedding',
+  RagLLM = 'ragLLM',
+}
+
 const getContextTitle = (context: ModelSelectionContext): string => {
   switch (context) {
     case ModelSelectionContext.LLM:
-      return 'Select LLM Model';
+      return 'Select a model';
     case ModelSelectionContext.STT:
-      return 'Select STT Model';
+      return 'Select a speech model';
     case ModelSelectionContext.TTS:
-      return 'Select TTS Model';
+      return 'Select a voice';
     case ModelSelectionContext.Voice:
-      return 'Select Model';
+      return 'Select a model';
     case ModelSelectionContext.VAD:
-      return 'Select VAD Model';
+      return 'Select a VAD model';
     case ModelSelectionContext.VLM:
-      return 'Select Vision Model';
+      return 'Select a vision model';
     case ModelSelectionContext.RagEmbedding:
-      return 'Select Embedding Model';
+      return 'Select an embedding model';
     case ModelSelectionContext.RagLLM:
-      return 'Select LLM Model';
+      return 'Select a model';
   }
 };
 
-/**
- * Get category for SDK filtering (uses SDK's `ModelCategory` proto enum).
- * Returns the proto-canonical numeric `ModelCategory` value or `null` to mean
- * "show all".
- */
+/** SDK category filter (proto `ModelCategory`); null = show all. */
 const getCategoryForContext = (
   context: ModelSelectionContext
 ): ModelCategory | null => {
@@ -106,7 +87,7 @@ const getCategoryForContext = (
     case ModelSelectionContext.TTS:
       return ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
     case ModelSelectionContext.Voice:
-      return null; // Show all
+      return null;
     case ModelSelectionContext.VAD:
       return ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
     case ModelSelectionContext.VLM:
@@ -118,10 +99,7 @@ const getCategoryForContext = (
   }
 };
 
-/**
- * Get allowed frameworks for context.
- * Returns null if all frameworks are acceptable.
- */
+/** Framework restriction for a context; null = any framework. */
 const getAllowedFrameworksForContext = (
   context: ModelSelectionContext
 ): Set<InferenceFramework> | null => {
@@ -135,54 +113,40 @@ const getAllowedFrameworksForContext = (
   }
 };
 
-/**
- * Whether this context is a RAG context (no model pre-loading needed)
- */
 const isRAGContext = (context: ModelSelectionContext): boolean =>
   context === ModelSelectionContext.RagEmbedding ||
   context === ModelSelectionContext.RagLLM;
 
-/**
- * Framework info for display
- */
-interface FrameworkDisplayInfo {
-  framework: InferenceFramework;
-  displayName: string;
-  iconName: string;
-  color: string;
-  modelCount: number;
-}
+const isOnDevice = (model: SDKModelInfo): boolean =>
+  Boolean(model.isDownloaded || model.localPath);
 
-/**
- * Get framework display info
- */
-const getFrameworkInfo = (
-  framework: InferenceFramework,
-  modelCount: number
-): FrameworkDisplayInfo => {
-  return {
-    framework,
-    displayName: getFrameworkDisplayName(framework),
-    iconName: getFrameworkIcon(framework),
-    color: getFrameworkColor(framework),
-    modelCount,
-  };
-};
-
-/**
- * Format bytes to human-readable string
- */
 const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
+  if (!bytes || bytes <= 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 };
 
+const modelSubtitle = (model: SDKModelInfo): string => {
+  const size = getModelDownloadSizeBytes(model);
+  const framework = getFrameworkDisplayName(
+    getPrimaryFramework(model, DEFAULT_INFERENCE_FRAMEWORK)
+  );
+  return [
+    size > 0 ? formatBytes(size) : null,
+    getModelFormatLabel(model.format),
+    framework,
+  ]
+    .filter(Boolean)
+    .join('  ·  ');
+};
+
 interface ModelSelectionSheetProps {
   visible: boolean;
   context: ModelSelectionContext;
+  /** Id of the model currently loaded/in use, so its row shows "In use". */
+  activeModelId?: string | null;
   onClose: () => void;
   onModelSelected: (model: SDKModelInfo) => Promise<void>;
 }
@@ -190,745 +154,474 @@ interface ModelSelectionSheetProps {
 export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   visible,
   context,
+  activeModelId,
   onClose,
   onModelSelected,
 }) => {
-  // State
-  const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
-  const [expandedFramework, setExpandedFramework] =
-    useState<InferenceFramework | null>(null);
-  const [isLoadingModel, setIsLoadingModel] = useState(false);
-  const [loadingProgress, _setLoadingProgress] = useState('');
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  // Track multiple downloads: modelId -> progress (0-1)
-  const [downloadingModels, setDownloadingModels] = useState<
-    Record<string, number>
-  >({});
+  const { colors, typography } = useTheme();
+  const [models, setModels] = useState<SDKModelInfo[]>([]);
+  const [storage, setStorage] = useState<StorageSnapshot | null>(null);
+  const [downloading, setDownloading] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
-  /**
-   * Load available models
-   */
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Single canonical SDK query — category + (optional) framework
-      // filter applied registry-side. The previous triple-fallback
-      // (category → framework → all-models) papered over the registry
-      // catalog when chosen IDs didn't match the strict combination;
-      // empty results are now surfaced via the empty-state UI so the
-      // user sees that no model is registered for the selected mode.
-      const allModels = await listModels();
+      const [allModels, storageInfo] = await Promise.all([
+        listModels(),
+        RunAnywhere.getStorageInfo().catch(() => null),
+      ]);
+      setStorage(storageInfo);
+
       const categoryFilter = getCategoryForContext(context);
       const allowedFrameworks = getAllowedFrameworksForContext(context);
-
-      const filteredModels = categoryFilter
-        ? allModels.filter((m: SDKModelInfo) => {
-            const modelCategory = m.category;
+      const filtered = categoryFilter
+        ? allModels.filter((m) => {
             const categoryMatch =
-              modelCategory === categoryFilter ||
-              String(modelCategory).toLowerCase() ===
+              m.category === categoryFilter ||
+              String(m.category).toLowerCase() ===
                 String(categoryFilter).toLowerCase();
             if (!categoryMatch) return false;
-
-            // Framework restriction (e.g., ONNX-only for embedding,
-            // LlamaCpp-only for RAG LLM).
             if (allowedFrameworks) {
-              const frameworks = getModelFrameworks(m);
-              if (!frameworks.some((fw) => allowedFrameworks.has(fw))) {
-                return false;
-              }
+              return getModelFrameworks(m).some((fw) =>
+                allowedFrameworks.has(fw)
+              );
             }
             return true;
           })
         : allModels;
-
-      setAvailableModels(filteredModels);
+      setModels(filtered);
     } catch (error) {
-      console.error('[ModelSelectionSheet] Error loading data:', error);
+      console.error('[ModelSelectionSheet] load failed:', error);
     } finally {
       setIsLoading(false);
     }
   }, [context]);
 
-  // Load data when visible or on mount
-  // This ensures models are loaded even if the sheet renders before becoming visible
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Reload data when visibility changes to ensure fresh data
   useEffect(() => {
-    if (visible) {
-      loadData();
-    }
+    if (visible) loadData();
   }, [visible, loadData]);
 
-  // B-RN-Sheet-Routing: clear stale lists when context changes so we don't
-  // briefly render the previous tab's models while loadData is in flight.
   useEffect(() => {
-    setAvailableModels([]);
-    setExpandedFramework(null);
-    setSelectedModelId(null);
+    setModels([]);
   }, [context]);
 
-  /**
-   * Get frameworks with their model counts
-   */
-  const getFrameworks = useCallback((): FrameworkDisplayInfo[] => {
-    const frameworkCounts = new Map<InferenceFramework, number>();
-
-    availableModels.forEach((model: SDKModelInfo, _index: number) => {
-      const framework = getPrimaryFramework(model, DEFAULT_INFERENCE_FRAMEWORK);
-
-      const count = frameworkCounts.get(framework) || 0;
-      frameworkCounts.set(framework, count + 1);
-    });
-
-    return Array.from(frameworkCounts.entries())
-      .map(([framework, count]) => getFrameworkInfo(framework, count))
-      .sort((a, b) => b.modelCount - a.modelCount);
-  }, [availableModels]);
-
-  /**
-   * Get models for a specific framework
-   */
-  const getModelsForFramework = useCallback(
-    (framework: InferenceFramework): SDKModelInfo[] => {
-      return availableModels.filter((model: SDKModelInfo) => {
-        return isModelCompatibleWithFramework(model, framework);
-      });
-    },
-    [availableModels]
-  );
-
-  /**
-   * Toggle framework expansion
-   */
-  const toggleFramework = (framework: InferenceFramework) => {
-    setExpandedFramework(expandedFramework === framework ? null : framework);
-  };
-
-  /**
-   * Handle model selection
-   */
-  const handleSelectModel = async (model: SDKModelInfo) => {
-    console.warn('[ModelSelectionSheet] Select tapped:', model.id);
-    if (!model.isDownloaded && !model.localPath) {
-      return;
-    }
-
-    try {
-      if (isRAGContext(context)) {
-        // RAG models are referenced by file path at pipeline creation time,
-        // not pre-loaded into memory. Just pass the selection back and close.
-        await onModelSelected(model);
-        onClose();
-      } else {
-        await onModelSelected(model);
-      }
-    } catch (error) {
-      console.error('[ModelSelectionSheet] Error selecting model:', error);
-    }
-  };
-
+  // E2E hooks.
   useEffect(() => {
-    const testGlobal = globalThis as typeof globalThis & {
+    const g = globalThis as typeof globalThis & {
       __testModels?: SDKModelInfo[];
       __testOnModelSelected?: (model: SDKModelInfo) => Promise<void>;
     };
-    testGlobal.__testModels = availableModels;
-    testGlobal.__testOnModelSelected = onModelSelected;
-  }, [availableModels, onModelSelected]);
+    g.__testModels = models;
+    g.__testOnModelSelected = onModelSelected;
+  }, [models, onModelSelected]);
 
-  /**
-   * Handle model download with real-time progress
-   * Supports multiple concurrent downloads
-   */
-  const handleDownloadModel = async (model: SDKModelInfo) => {
-    // B-RN-3-002: log entry so a missing call is visible in metro/logcat
-    console.warn('[ModelSelectionSheet] Download tapped:', model.id);
-    // Add this model to downloading set
-    setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
+  const handleSheetClose = useCallback(() => {
+    onClose();
+  }, [onClose]);
 
-    try {
-      // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
-      const dlIter = downloadModelStreamHelper(model)[Symbol.asyncIterator]();
-      let dlResult = await dlIter.next();
-      while (!dlResult.done) {
-        const progress = dlResult.value;
-        setDownloadingModels((prev) => ({
-          ...prev,
-          [model.id]: progress.stageProgress ?? 0,
-        }));
-        console.warn(
-          `[Download] ${model.id}: ${Math.round((progress.stageProgress ?? 0) * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`
-        );
-        dlResult = await dlIter.next();
+  const handleSelect = useCallback(
+    async (model: SDKModelInfo) => {
+      if (!isOnDevice(model)) return;
+      setLoadingId(model.id);
+      try {
+        await onModelSelected(model);
+        setActiveId(model.id);
+        if (isRAGContext(context)) onClose();
+      } catch (error) {
+        console.error('[ModelSelectionSheet] select failed:', error);
+      } finally {
+        setLoadingId(null);
       }
+    },
+    [context, onClose, onModelSelected]
+  );
 
-      // Refresh models after download
-      await loadData();
-    } catch (error) {
-      console.error('[ModelSelectionSheet] Error downloading model:', error);
-    } finally {
-      // Remove this model from downloading set
-      setDownloadingModels((prev) => {
-        const updated = { ...prev };
-        delete updated[model.id];
-        return updated;
-      });
-    }
-  };
+  const handleDownload = useCallback(
+    async (model: SDKModelInfo) => {
+      setDownloading((prev) => ({ ...prev, [model.id]: 0 }));
+      try {
+        const iter = downloadModelStreamHelper(model)[Symbol.asyncIterator]();
+        let step = await iter.next();
+        while (!step.done) {
+          const p = step.value.stageProgress ?? 0;
+          setDownloading((prev) => ({ ...prev, [model.id]: p }));
+          step = await iter.next();
+        }
+        await loadData();
+      } catch (error) {
+        console.error('[ModelSelectionSheet] download failed:', error);
+      } finally {
+        setDownloading((prev) => {
+          const next = { ...prev };
+          delete next[model.id];
+          return next;
+        });
+      }
+    },
+    [loadData]
+  );
 
-  /**
-   * Render framework row
-   */
-  const renderFrameworkRow = (info: FrameworkDisplayInfo) => {
-    const isExpanded = expandedFramework === info.framework;
+  const onDeviceModels = useMemo(() => models.filter(isOnDevice), [models]);
+  const availableModels = useMemo(
+    () => models.filter((m) => !isOnDevice(m)),
+    [models]
+  );
 
+  const renderRow = (model: SDKModelInfo, ready: boolean) => {
+    const progress = downloading[model.id];
+    const isDownloading = progress !== undefined;
     return (
-      <View key={info.framework}>
-        <TouchableOpacity
-          style={styles.frameworkRow}
-          onPress={() => toggleFramework(info.framework)}
-        >
-          <View
-            style={[
-              styles.frameworkIcon,
-              { backgroundColor: info.color + '20' },
-            ]}
-          >
-            <Icon name={info.iconName} size={20} color={info.color} />
-          </View>
-
-          <View style={styles.frameworkInfo}>
-            <Text style={styles.frameworkName}>{info.displayName}</Text>
-            <Text style={styles.frameworkCount}>
-              {info.modelCount} {info.modelCount === 1 ? 'model' : 'models'}
-            </Text>
-          </View>
-
-          <Icon
-            name={isExpanded ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color={Colors.textSecondary}
-          />
-        </TouchableOpacity>
-
-        {isExpanded && renderExpandedModels(info.framework)}
-      </View>
-    );
-  };
-
-  /**
-   * Render expanded models for a framework
-   */
-  const renderExpandedModels = (framework: InferenceFramework) => {
-    const models = getModelsForFramework(framework);
-
-    if (models.length === 0) {
-      return (
-        <View style={styles.emptyModels}>
-          <Text style={styles.emptyText}>
-            No models available for this framework
-          </Text>
+      <TouchableOpacity
+        key={model.id}
+        style={styles.row}
+        activeOpacity={0.7}
+        disabled={isDownloading || loadingId === model.id}
+        onPress={() =>
+          ready ? handleSelect(model) : !isDownloading && handleDownload(model)
+        }
+      >
+        <View style={[styles.tile, { backgroundColor: colors.surfaceVariant }]}>
+          <Icon name="cpu" size={20} color={colors.onSurfaceVariant} />
         </View>
-      );
-    }
-
-    return (
-      <View style={styles.modelsList}>
-        {models.map((model) => renderModelRow(model))}
-      </View>
-    );
-  };
-
-  /**
-   * Render model row
-   */
-  const renderModelRow = (model: SDKModelInfo) => {
-    const isDownloading = model.id in downloadingModels;
-    const downloadProgress = downloadingModels[model.id] ?? 0;
-    const isSelected = selectedModelId === model.id;
-    const canSelect = model.isDownloaded || model.localPath;
-    const modelInfoContent = (
-      <>
-        <Text
-          style={[styles.modelName, isSelected && styles.modelNameSelected]}
-        >
-          {model.name}
-        </Text>
-
-        <View style={styles.modelMeta}>
-          {getModelDownloadSizeBytes(model) > 0 && (
-            <View style={styles.sizeTag}>
-              <Icon
-                name="server-outline"
-                size={12}
-                color={Colors.textSecondary}
+        <View style={styles.rowText}>
+          <Text
+            style={[
+              typography.titleMedium,
+              styles.bold,
+              { color: colors.onSurface },
+            ]}
+            numberOfLines={1}
+          >
+            {model.name}
+          </Text>
+          <Text
+            style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}
+            numberOfLines={1}
+          >
+            {isDownloading
+              ? `Downloading…  ${Math.round((progress ?? 0) * 100)}%`
+              : modelSubtitle(model)}
+          </Text>
+          {isDownloading && (
+            <View
+              style={[styles.track, { backgroundColor: colors.surfaceVariant }]}
+            >
+              <View
+                style={[
+                  styles.trackFill,
+                  {
+                    backgroundColor: colors.primary,
+                    width: `${Math.round((progress ?? 0) * 100)}%`,
+                  },
+                ]}
               />
-              <Text style={styles.sizeText}>
-                {formatBytes(getModelDownloadSizeBytes(model))}
-              </Text>
             </View>
           )}
+        </View>
+        {ready ? (
+          loadingId === model.id ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : activeId === model.id || activeModelId === model.id ? (
+            <View style={styles.inUse}>
+              <Icon name="check" size={16} color={colors.primary} />
+              <Text
+                style={[
+                  typography.labelLarge,
+                  styles.bold,
+                  { color: colors.primary },
+                ]}
+              >
+                In use
+              </Text>
+            </View>
+          ) : (
+            <View style={[styles.usePill, { backgroundColor: colors.primary }]}>
+              <Text
+                style={[
+                  typography.labelLarge,
+                  styles.bold,
+                  { color: colors.onPrimary },
+                ]}
+              >
+                Use
+              </Text>
+            </View>
+          )
+        ) : (
+          !isDownloading && (
+            <Icon name="download" size={22} color={colors.primary} />
+          )
+        )}
+      </TouchableOpacity>
+    );
+  };
 
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>
-              {getModelFormatLabel(model.format)}
+  const renderSection = (title: string, list: SDKModelInfo[], ready: boolean) =>
+    list.length > 0 && (
+      <View style={styles.section}>
+        <Text
+          style={[
+            styles.sectionLabel,
+            typography.labelMedium,
+            styles.bold,
+            { color: colors.onSurfaceVariant },
+          ]}
+        >
+          {title}
+        </Text>
+        <View
+          style={[styles.card, { backgroundColor: colors.surfaceContainerHigh }]}
+        >
+          {list.map((m) => renderRow(m, ready))}
+        </View>
+      </View>
+    );
+
+  return (
+    <BottomSheet
+      visible={visible}
+      onClose={handleSheetClose}
+      snapPoints={SNAP_POINTS}
+    >
+      <View style={styles.header}>
+        <Text
+          style={[typography.titleLarge, styles.bold, { color: colors.onSurface }]}
+        >
+          {getContextTitle(context)}
+        </Text>
+      </View>
+
+      <BottomSheetScrollView contentContainerStyle={styles.content}>
+        {isLoading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator color={colors.primary} />
+            <Text
+              style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}
+            >
+              Loading models…
             </Text>
           </View>
-        </View>
-
-        {/* Download/Status indicator */}
-        <View style={styles.statusRow}>
-          {isDownloading ? (
-            <View style={styles.downloadProgressContainer}>
-              <View style={styles.downloadProgressRow}>
-                <ActivityIndicator size="small" color={Colors.primaryBlue} />
-                <Text style={styles.statusText}>
-                  Downloading... {Math.round(downloadProgress * 100)}%
+        ) : (
+          <>
+            <View
+              style={[
+                styles.storageCard,
+                { backgroundColor: colors.primaryContainer },
+              ]}
+            >
+              <View style={styles.storageTop}>
+                <View
+                  style={[styles.storageIcon, { backgroundColor: colors.surface }]}
+                >
+                  <Icon name="storageDevice" size={18} color={colors.primary} />
+                </View>
+                <Text
+                  style={[
+                    typography.labelMedium,
+                    styles.bold,
+                    styles.storageLabel,
+                    { color: colors.onPrimaryContainer },
+                  ]}
+                >
+                  Device storage
                 </Text>
               </View>
-              {/* Progress bar */}
-              <View style={styles.progressBarBackground}>
+
+              <View style={styles.storageStatRow}>
+                <Text
+                  style={[
+                    typography.displaySmall,
+                    styles.bold,
+                    { color: colors.onPrimaryContainer },
+                  ]}
+                >
+                  {formatBytes(storage?.device?.freeBytes ?? 0)}
+                </Text>
+                <Text
+                  style={[
+                    typography.titleMedium,
+                    styles.italic,
+                    { color: colors.onPrimaryContainer },
+                  ]}
+                >
+                  free
+                </Text>
+                <View style={styles.flexSpacer} />
+                <Text
+                  style={[
+                    typography.bodyMedium,
+                    { color: colors.onPrimaryContainer },
+                  ]}
+                >
+                  of {formatBytes(storage?.device?.totalBytes ?? 0)}
+                </Text>
+              </View>
+
+              <View
+                style={[styles.usageTrack, { backgroundColor: colors.surface }]}
+              >
                 <View
                   style={[
-                    styles.progressBarFill,
-                    { width: `${Math.round(downloadProgress * 100)}%` },
+                    styles.usageFill,
+                    {
+                      backgroundColor: colors.primary,
+                      width: `${Math.min(100, Math.max(0, storage?.device?.usedPercent ?? 0))}%`,
+                    },
                   ]}
                 />
               </View>
-            </View>
-          ) : canSelect ? (
-            <>
-              <Icon
-                name="checkmark-circle"
-                size={14}
-                color={Colors.statusGreen}
-              />
-              <Text style={[styles.statusText, { color: Colors.statusGreen }]}>
-                Downloaded
-              </Text>
-            </>
-          ) : (
-            <>
-              <Icon
-                name="cloud-download-outline"
-                size={14}
-                color={Colors.statusBlue}
-              />
-              <Text style={[styles.statusText, { color: Colors.statusBlue }]}>
-                Available for download
-              </Text>
-            </>
-          )}
-        </View>
-      </>
-    );
 
-    return (
-      <View
-        key={model.id}
-        style={[
-          styles.modelRow,
-          isLoadingModel && !isSelected && styles.dimmed,
-        ]}
-      >
-        {canSelect ? (
-          <TouchableOpacity
-            style={styles.modelInfo}
-            onPress={() => handleSelectModel(model)}
-            disabled={isLoadingModel || isSelected}
-            accessible={false}
-          >
-            {modelInfoContent}
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.modelInfo}>{modelInfoContent}</View>
+              <Text
+                style={[
+                  typography.bodySmall,
+                  styles.italic,
+                  { color: colors.onPrimaryContainer },
+                ]}
+              >
+                {formatBytes(storage?.totalModelsBytes ?? 0)} in models  ·  {onDeviceModels.length} on device
+              </Text>
+            </View>
+
+            {renderSection('On device', onDeviceModels, true)}
+            {renderSection('Available', availableModels, false)}
+
+            {models.length === 0 && (
+              <Text
+                style={[
+                  typography.bodyMedium,
+                  styles.empty,
+                  { color: colors.onSurfaceVariant },
+                ]}
+              >
+                No models available for this mode.
+              </Text>
+            )}
+          </>
         )}
-
-        {/* Action button */}
-        <View style={styles.actionButtons}>
-          {isDownloading ? (
-            <View style={styles.downloadingIndicator}>
-              <ActivityIndicator size="small" color={Colors.primaryBlue} />
-            </View>
-          ) : canSelect ? (
-            <TouchableOpacity
-              style={[
-                styles.selectButton,
-                (isLoadingModel || isSelected) && styles.buttonDisabled,
-              ]}
-              onPress={() => handleSelectModel(model)}
-              disabled={isLoadingModel || isSelected}
-              accessible={true}
-              accessibilityLabel={`Select ${model.name}`}
-              accessibilityRole="button"
-            >
-              <Text style={styles.selectButtonText}>Select</Text>
-            </TouchableOpacity>
-          ) : (
-            // B-RN-3-002: Removed `disabled={isLoadingModel}` — concurrent
-            // downloads are supported (each model has its own progress entry
-            // in `downloadingModels`), so a load-in-progress on a different
-            // model must not block downloads. Per-model `isDownloading` is
-            // managed via `downloadingModels[model.id]`.
-            <TouchableOpacity
-              style={styles.downloadButton}
-              onPress={() => handleDownloadModel(model)}
-              disabled={downloadingModels[model.id] !== undefined}
-              accessible={true}
-              accessibilityLabel={`Download ${model.name}`}
-              accessibilityRole="button"
-            >
-              <Text style={styles.downloadButtonText}>Download</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    );
-  };
-
-  /**
-   * Render loading overlay
-   */
-  const renderLoadingOverlay = () => {
-    if (!isLoadingModel) return null;
-
-    return (
-      <View style={styles.loadingOverlay}>
-        <View style={styles.loadingCard}>
-          <ActivityIndicator size="large" color={Colors.primaryBlue} />
-          <Text style={styles.loadingTitle}>Loading Model</Text>
-          <Text style={styles.loadingMessage}>{loadingProgress}</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const frameworks = getFrameworks();
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
-      onDismiss={() => {
-        // Ensure state is cleaned up when modal is dismissed
-        setIsLoadingModel(false);
-        setSelectedModelId(null);
-        // Don't clear downloads - they continue in background
-      }}
-    >
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={onClose}
-            disabled={isLoadingModel}
-          >
-            <Text
-              style={[styles.cancelText, isLoadingModel && styles.textDisabled]}
-            >
-              Cancel
-            </Text>
-          </TouchableOpacity>
-
-          <Text style={styles.title}>{getContextTitle(context)}</Text>
-
-          <View style={styles.headerSpacer} />
-        </View>
-
-        {/* Content */}
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={styles.contentContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.primaryBlue} />
-              <Text style={styles.loadingText}>Loading models...</Text>
-            </View>
-          ) : (
-            <>
-              {/* Frameworks Section */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Available Frameworks</Text>
-                <View style={styles.card}>
-                  {frameworks.length > 0 ? (
-                    frameworks.map(renderFrameworkRow)
-                  ) : (
-                    <View style={styles.emptyModels}>
-                      <Text style={styles.emptyText}>
-                        No frameworks available
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </>
-          )}
-        </ScrollView>
-
-        {/* Loading Overlay */}
-        {renderLoadingOverlay()}
-      </SafeAreaView>
-    </Modal>
+      </BottomSheetScrollView>
+    </BottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundSecondary,
-  },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    backgroundColor: Colors.backgroundPrimary,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  cancelButton: {
-    minWidth: 60,
-  },
-  cancelText: {
-    ...Typography.body,
-    color: Colors.primaryBlue,
-  },
-  textDisabled: {
-    opacity: 0.5,
-  },
-  title: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-  },
-  headerSpacer: {
-    minWidth: 60,
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 12,
   },
   content: {
-    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    gap: 16,
   },
-  // B-RN-3-004: ensure the last model row's CTA button clears the
-  // bottom tab bar so users on shorter devices don't have to overscroll
-  // to reveal it.
-  contentContainer: {
-    paddingBottom: 80,
+  loading: {
+    paddingVertical: 48,
+    alignItems: 'center',
+    gap: 12,
   },
-  loadingContainer: {
-    flex: 1,
+  storageCard: {
+    borderRadius: 22,
+    padding: 18,
+    gap: 12,
+  },
+  storageTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  storageIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Padding.padding60,
   },
-  loadingText: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-    marginTop: Spacing.medium,
-  },
-  section: {
-    marginBottom: Spacing.large,
-  },
-  sectionTitle: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
+  storageLabel: {
     textTransform: 'uppercase',
-    marginHorizontal: Padding.padding16,
-    marginBottom: Spacing.small,
-    marginTop: Spacing.large,
+    letterSpacing: 1,
   },
-  card: {
-    backgroundColor: Colors.backgroundPrimary,
-    marginHorizontal: Padding.padding16,
-    borderRadius: BorderRadius.medium,
+  storageStatRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  flexSpacer: {
+    flex: 1,
+  },
+  usageTrack: {
+    height: 8,
+    borderRadius: 999,
     overflow: 'hidden',
   },
-  frameworkRow: {
+  usageFill: {
+    height: 8,
+    borderRadius: 999,
+  },
+  usePill: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  inUse: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Padding.padding12,
-    paddingHorizontal: Padding.padding16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.borderLight,
+    gap: 4,
   },
-  frameworkIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.regular,
+  bold: {
+    fontWeight: '700',
+  },
+  italic: {
+    fontStyle: 'italic',
+  },
+  section: {
+    gap: 8,
+  },
+  sectionLabel: {
+    textTransform: 'uppercase',
+    paddingHorizontal: 4,
+  },
+  card: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  tile: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  frameworkInfo: {
+  rowText: {
     flex: 1,
-    marginLeft: Spacing.mediumLarge,
+    gap: 2,
   },
-  frameworkName: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
-  frameworkCount: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-  modelsList: {
-    backgroundColor: Colors.backgroundSecondary,
-    paddingHorizontal: Padding.padding16,
-  },
-  modelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundPrimary,
-    marginVertical: Spacing.xSmall,
-    paddingVertical: Padding.padding12,
-    paddingHorizontal: Padding.padding12,
-    borderRadius: BorderRadius.regular,
-  },
-  dimmed: {
-    opacity: 0.6,
-  },
-  modelInfo: {
-    flex: 1,
-  },
-  modelName: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-  },
-  modelNameSelected: {
-    fontWeight: FontWeight.semibold,
-  },
-  modelMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-    marginTop: Spacing.xSmall,
-  },
-  sizeTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xxSmall,
-  },
-  sizeText: {
-    ...Typography.caption2,
-    color: Colors.textSecondary,
-  },
-  badge: {
-    backgroundColor: Colors.badgeGray,
-    paddingHorizontal: Spacing.small,
-    paddingVertical: Spacing.xxSmall,
-    borderRadius: BorderRadius.small,
-  },
-  badgeText: {
-    ...Typography.caption2,
-    color: Colors.textSecondary,
-  },
-  modelMetaText: {
-    ...Typography.caption2,
-    color: Colors.textSecondary,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xSmall,
-    marginTop: Spacing.xSmall,
-  },
-  statusText: {
-    ...Typography.caption2,
-    color: Colors.textSecondary,
-  },
-  downloadProgressContainer: {
-    flex: 1,
-  },
-  downloadProgressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xSmall,
-  },
-  progressBarBackground: {
-    height: 4,
-    backgroundColor: Colors.backgroundGray5,
-    borderRadius: 2,
+  track: {
+    height: 3,
+    borderRadius: 999,
     marginTop: 6,
     overflow: 'hidden',
   },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: Colors.primaryBlue,
-    borderRadius: 2,
+  trackFill: {
+    height: 3,
+    borderRadius: 999,
   },
-  actionButtons: {
-    marginLeft: Spacing.medium,
-  },
-  selectButton: {
-    backgroundColor: Colors.primaryBlue,
-    paddingHorizontal: Padding.padding12,
-    paddingVertical: Padding.padding6,
-    borderRadius: BorderRadius.regular,
-  },
-  selectButtonText: {
-    ...Typography.caption,
-    color: Colors.textWhite,
-    fontWeight: FontWeight.semibold,
-  },
-  downloadButton: {
-    backgroundColor: Colors.primaryBlue,
-    paddingHorizontal: Padding.padding12,
-    paddingVertical: Padding.padding6,
-    borderRadius: BorderRadius.regular,
-  },
-  downloadButtonText: {
-    ...Typography.caption,
-    color: Colors.textWhite,
-    fontWeight: FontWeight.semibold,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  downloadingIndicator: {
-    padding: Padding.padding8,
-  },
-  emptyModels: {
-    padding: Padding.padding16,
-    alignItems: 'center',
-  },
-  emptyText: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: Colors.overlayMedium,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingCard: {
-    backgroundColor: Colors.backgroundPrimary,
-    paddingHorizontal: Padding.padding40,
-    paddingVertical: Padding.padding30,
-    borderRadius: BorderRadius.large,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  loadingTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-    marginTop: Spacing.large,
-  },
-  loadingMessage: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-    marginTop: Spacing.small,
+  empty: {
     textAlign: 'center',
+    paddingVertical: 32,
   },
 });
 
