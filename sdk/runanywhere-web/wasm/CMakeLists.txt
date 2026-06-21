@@ -895,6 +895,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_auth_is_authenticated"
     "_rac_auth_get_user_id"
     "_rac_auth_get_organization_id"
+    "_rac_auth_get_access_token"
     "_rac_state_is_device_registered"
 
     # Telemetry
