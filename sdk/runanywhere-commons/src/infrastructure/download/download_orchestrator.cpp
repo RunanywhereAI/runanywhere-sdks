@@ -1320,8 +1320,330 @@ void run_proto_download_worker_async(void* user_data) {
     run_proto_download_worker(args->task, args->resume_from);
 }
 
+// =============================================================================
+// EVENT-DRIVEN ASYNC DOWNLOAD DRIVER (Emscripten / Web)
+// =============================================================================
+// The synchronous worker above buffers the whole body on the main thread when
+// the only transport is FetchHttpTransport's sync XHR — the UI freezes and the
+// poll loop never ticks until 100%. When the platform supplies the async
+// `http_download` adapter slot (the Web SDK implements it with streaming
+// fetch + ReadableStream), drive the plan event-driven instead: start a file,
+// report each chunk via the progress callback, and on completion advance to the
+// next file or finalize. Nothing blocks the main thread, so progress is live.
+//
+// This path reuses every leaf helper the synchronous worker uses
+// (set_task_progress / emit_progress / extraction / validate_downloaded_sizes /
+// resolve_completion_local_path / self_heal_registry). Only the *sequencing*
+// differs (callback continuation vs a blocking loop). The synchronous worker
+// and all native code are left untouched and remain the fallback when the slot
+// is absent.
+//
+// Integrity: the slot delivers bytes to the platform (MEMFS), never to C++, so
+// the streaming SHA-256 the synchronous path computes cannot run here. The
+// post-download size guard (validate_downloaded_sizes) plus HTTPS transport
+// integrity cover truncation/stub responses; per-byte checksum is a Web-path
+// tradeoff (the native path keeps full SHA-256).
+struct web_download_driver {
+    std::shared_ptr<proto_download_task> task;
+    int64_t total_expected = 0;
+    int64_t completed_before_file = 0;
+    size_t file_index = 0;
+    std::string final_path;
+    char* current_task_id = nullptr;  // owned C string from http_download out_task_id
+    bool cancel_abort_sent = false;
+};
+
+// Keeps each driver alive across the async callbacks (the callbacks carry only a
+// raw driver* as user_data). Erasing drops the last owner and frees the driver.
+std::map<web_download_driver*, std::shared_ptr<web_download_driver>>& web_download_registry() {
+    static std::map<web_download_driver*, std::shared_ptr<web_download_driver>> registry;
+    return registry;
+}
+
+void web_download_start_file(web_download_driver* drv);
+void web_download_finalize_all(web_download_driver* drv);
+
+// MUST be the final action on a driver in any terminal branch — frees the
+// driver, so nothing may touch `drv` afterwards.
+void web_download_finish(web_download_driver* drv) {
+    if (!drv) {
+        return;
+    }
+    if (drv->current_task_id) {
+        free(drv->current_task_id);
+        drv->current_task_id = nullptr;
+    }
+    web_download_registry().erase(drv);
+}
+
+// rac_http_progress_callback_fn: void (int64 bytes, int64 total, void* user_data).
+void web_download_on_progress(int64_t bytes_downloaded, int64_t /*total_bytes*/, void* user_data) {
+    auto* drv = static_cast<web_download_driver*>(user_data);
+    if (!drv) {
+        return;
+    }
+    const std::shared_ptr<proto_download_task>& task = drv->task;
+
+    // Cooperative cancel: abort the in-flight fetch once; on_complete then fires
+    // with RAC_ERROR_CANCELLED and emits the terminal event.
+    if (task->cancel_requested.load() && !drv->cancel_abort_sent) {
+        drv->cancel_abort_sent = true;
+        const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+        if (adapter && adapter->http_download_cancel && drv->current_task_id) {
+            adapter->http_download_cancel(drv->current_task_id, adapter->user_data);
+        }
+        return;
+    }
+
+    const int64_t downloaded = drv->completed_before_file + bytes_downloaded;
+    const proto_plan_file& file = task->files[drv->file_index];
+    set_task_progress(task, rav1::DOWNLOAD_STATE_DOWNLOADING, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                      downloaded, drv->total_expected, static_cast<int32_t>(drv->file_index),
+                      file.storage_key, "", "");
+    emit_progress(task);
+}
+
+// rac_http_complete_callback_fn: void (rac_result_t, const char* path, void* user_data).
+void web_download_on_complete(rac_result_t result, const char* /*downloaded_path*/, void* user_data) {
+    auto* drv = static_cast<web_download_driver*>(user_data);
+    if (!drv) {
+        return;
+    }
+    // Keep the task alive independently of the driver (web_download_finish frees
+    // the driver at the end of the terminal branches).
+    std::shared_ptr<proto_download_task> task = drv->task;
+    if (drv->current_task_id) {
+        free(drv->current_task_id);
+        drv->current_task_id = nullptr;
+    }
+
+    const size_t i = drv->file_index;
+    const proto_plan_file& file = task->files[i];
+
+    const bool cancelled = task->cancel_requested.load() || result == RAC_ERROR_CANCELLED;
+    if (cancelled) {
+        int64_t file_partial = file_size_or_zero(file.destination_path);
+        int64_t deleted = 0;
+        bool delete_partial = false;
+        {
+            std::lock_guard<std::mutex> lock(task->mutex);
+            delete_partial = task->delete_partial_on_cancel;
+        }
+        if (delete_partial) {
+            deleted = delete_partial_file(file.destination_path);
+            file_partial = 0;
+        }
+        {
+            std::lock_guard<std::mutex> lock(task->mutex);
+            task->last_deleted_bytes = deleted;
+            task->last_partial_bytes = drv->completed_before_file + file_partial;
+        }
+        set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          drv->completed_before_file + file_partial, drv->total_expected,
+                          static_cast<int32_t>(i), file.storage_key, "", "download cancelled");
+        mark_task_stopped(task);
+        emit_progress(task);
+        web_download_finish(drv);
+        return;
+    }
+
+    if (result != RAC_SUCCESS) {
+        int64_t partial = drv->completed_before_file + file_size_or_zero(file.destination_path);
+        {
+            std::lock_guard<std::mutex> lock(task->mutex);
+            task->last_partial_bytes = partial;
+        }
+        set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          partial, drv->total_expected, static_cast<int32_t>(i), file.storage_key,
+                          "", "download failed");
+        mark_task_stopped(task);
+        emit_progress(task);
+        web_download_finish(drv);
+        return;
+    }
+
+    // Success: extract (if archive) and advance the cumulative counter — mirrors
+    // the post-download tail of process_plan_file.
+    if (file.requires_extraction) {
+        set_task_progress(task, rav1::DOWNLOAD_STATE_EXTRACTING, rav1::DOWNLOAD_STAGE_EXTRACTING,
+                          drv->total_expected > 0 ? drv->completed_before_file + file.expected_bytes
+                                                  : 0,
+                          drv->total_expected, static_cast<int32_t>(i), file.storage_key, "", "");
+        emit_progress(task);
+
+        mkdir_p(task->model_folder_path.c_str());
+
+        rac_extraction_result_t extraction_result{};
+        rac_result_t extract_rc = rac_extract_archive_native(
+            file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
+            nullptr, &extraction_result);
+        if (extract_rc != RAC_SUCCESS) {
+            set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
+                              drv->total_expected > 0
+                                  ? drv->completed_before_file + file.expected_bytes
+                                  : 0,
+                              drv->total_expected, static_cast<int32_t>(i), file.storage_key, "",
+                              "archive extraction failed");
+            mark_task_stopped(task);
+            emit_progress(task);
+            web_download_finish(drv);
+            return;
+        }
+
+        delete_file(file.destination_path.c_str());
+
+        char resolved_path[4096];
+        rac_result_t find_rc = rac_find_model_path_after_extraction(
+            task->model_folder_path.c_str(), task->archive_structure, task->framework, task->format,
+            resolved_path, sizeof(resolved_path));
+        drv->final_path = (find_rc == RAC_SUCCESS && resolved_path[0] != '\0')
+                              ? std::string(resolved_path)
+                              : task->model_folder_path;
+    } else {
+        drv->final_path = file.destination_path;
+    }
+
+    if (drv->total_expected > 0) {
+        drv->completed_before_file += std::max<int64_t>(file.expected_bytes, 0);
+    } else {
+        drv->completed_before_file += file_size_or_zero(drv->final_path);
+    }
+
+    drv->file_index += 1;
+    if (drv->file_index < task->files.size()) {
+        web_download_start_file(drv);
+    } else {
+        web_download_finalize_all(drv);
+    }
+}
+
+void web_download_start_file(web_download_driver* drv) {
+    const std::shared_ptr<proto_download_task>& task = drv->task;
+    const size_t i = drv->file_index;
+    const proto_plan_file& file = task->files[i];
+
+    if (task->cancel_requested.load()) {
+        set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          drv->completed_before_file, drv->total_expected, static_cast<int32_t>(i),
+                          file.storage_key, "", "download cancelled");
+        mark_task_stopped(task);
+        emit_progress(task);
+        web_download_finish(drv);
+        return;
+    }
+
+    // A previous attempt may already have landed this file completely; skip the
+    // fetch and run the success tail directly (extraction + advance).
+    const bool already_complete =
+        file.expected_bytes > 0 && file_size_or_zero(file.destination_path) == file.expected_bytes;
+    if (already_complete) {
+        web_download_on_complete(RAC_SUCCESS, file.destination_path.c_str(), drv);
+        return;
+    }
+
+    set_task_progress(task, rav1::DOWNLOAD_STATE_DOWNLOADING, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                      drv->completed_before_file, drv->total_expected, static_cast<int32_t>(i),
+                      file.storage_key, "", "");
+    emit_progress(task);
+
+    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+    char* task_id = nullptr;
+    rac_result_t rc = adapter->http_download(file.url.c_str(), file.destination_path.c_str(),
+                                             web_download_on_progress, web_download_on_complete, drv,
+                                             &task_id, adapter->user_data);
+    drv->current_task_id = task_id;
+    if (rc != RAC_SUCCESS) {
+        set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          drv->completed_before_file, drv->total_expected, static_cast<int32_t>(i),
+                          file.storage_key, "", "failed to start download");
+        mark_task_stopped(task);
+        emit_progress(task);
+        web_download_finish(drv);
+    }
+}
+
+void web_download_finalize_all(web_download_driver* drv) {
+    const std::shared_ptr<proto_download_task>& task = drv->task;
+
+    if (task->cancel_requested.load()) {
+        set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          drv->completed_before_file, drv->total_expected, 0, "", "",
+                          "download cancelled");
+        mark_task_stopped(task);
+        emit_progress(task);
+        web_download_finish(drv);
+        return;
+    }
+
+    const int64_t completed_bytes =
+        drv->total_expected > 0 ? drv->total_expected : drv->completed_before_file;
+
+    size_t failing_index = 0;
+    std::string sanity_error;
+    if (!validate_downloaded_sizes(task, failing_index, sanity_error)) {
+        int64_t failed_bytes = drv->total_expected > 0 ? drv->completed_before_file : 0;
+        set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          failed_bytes, drv->total_expected, static_cast<int32_t>(failing_index),
+                          task->files[failing_index].storage_key, "", sanity_error);
+        mark_task_stopped(task);
+        emit_progress(task);
+        web_download_finish(drv);
+        return;
+    }
+
+    std::string completion_local_path = resolve_completion_local_path(task, drv->final_path);
+    set_task_progress(task, rav1::DOWNLOAD_STATE_COMPLETED, rav1::DOWNLOAD_STAGE_COMPLETED,
+                      completed_bytes, drv->total_expected,
+                      static_cast<int32_t>(task->files.size() - 1),
+                      task->files.empty() ? "" : task->files.back().storage_key,
+                      completion_local_path, "");
+    mark_task_stopped(task);
+    emit_progress(task);
+    self_heal_registry(task, completion_local_path);
+    web_download_finish(drv);
+}
+
+// Non-blocking entry: kick off file 0; the adapter's async callbacks drive the
+// rest. Mirrors run_proto_download_worker's telemetry-start preamble.
+void web_download_start(const std::shared_ptr<proto_download_task>& task, int64_t /*resume_from*/) {
+    auto drv = std::make_shared<web_download_driver>();
+    drv->task = task;
+    drv->total_expected = plan_total_expected(task->files);
+    web_download_registry()[drv.get()] = drv;
+
+    std::string started_model_id;
+    int64_t started_total_bytes = 0;
+    {
+        std::lock_guard<std::mutex> lock(task->mutex);
+        task->running = true;
+        if (!task->download_telemetry_started) {
+            task->download_telemetry_started = true;
+            started_model_id = task->model_id;
+            started_total_bytes = task->progress.total_bytes();
+        }
+    }
+    if (!started_model_id.empty()) {
+        rac::events::emit_model_download_started(started_model_id.c_str(), started_total_bytes,
+                                                 nullptr);
+    }
+
+    if (task->files.empty()) {
+        web_download_finalize_all(drv.get());
+        return;
+    }
+    web_download_start_file(drv.get());
+}
+
 void start_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
                                  int64_t resume_from) {
+    // Prefer the async streaming slot when the platform supplies it (Web): it
+    // reports progress per chunk without blocking the main thread. Otherwise
+    // fall back to the synchronous worker on a deferred tick.
+    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+    if (adapter && adapter->http_download) {
+        web_download_start(task, resume_from);
+        return;
+    }
     auto* args = new emscripten_proto_download_args{task, resume_from};
     emscripten_async_call(run_proto_download_worker_async, args, 0);
 }

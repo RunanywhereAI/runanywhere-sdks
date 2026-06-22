@@ -376,6 +376,8 @@ async function initializeSDK(): Promise<void> {
       console.warn(
         '[RunAnywhere] onnx backend failed to register; STT/TTS/VAD will show feature-unavailable:',
         formatError(err),
+        '| details:',
+        (err as { proto?: { nestedMessage?: string } })?.proto?.nestedMessage ?? '(none)',
       );
     }
 
