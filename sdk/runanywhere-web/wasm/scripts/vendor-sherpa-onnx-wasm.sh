@@ -18,6 +18,43 @@ DEST_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm"
 ORT_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm"
 BUILD_DIR="${SRC_DIR}/build-wasm-static"
 
+# --- Prebuilt WASM bundle (download-first; mirrors the Android prebuilt .so) ---
+# Download + extract the matched ORT+sherpa WASM static libs from the
+# sherpa-onnx-rac release instead of building from source. Force a source build
+# with RAC_WASM_BUILD_FROM_SOURCE=1; override the source repo/tag with
+# RAC_WASM_PREBUILT_REPO / RAC_WASM_PREBUILT_TAG.
+if [ "${RAC_WASM_BUILD_FROM_SOURCE:-0}" != "1" ]; then
+  if [ -f "${DEST_DIR}/lib/libsherpa-onnx-c-api.a" ]; then
+    echo "Sherpa-ONNX WASM already vendored: ${DEST_DIR}/lib/libsherpa-onnx-c-api.a"
+    exit 0
+  fi
+  _RAC_TP="${REPO_ROOT}/sdk/runanywhere-commons/third_party"
+  _RAC_REPO="${RAC_WASM_PREBUILT_REPO:-${SHERPA_ONNX_REPO_ANDROID:-Siddhesh2377/sherpa-onnx-rac}}"
+  _RAC_TAG="${RAC_WASM_PREBUILT_TAG:-v${SHERPA_ONNX_VERSION_LINUX}}"
+  _RAC_TARBALL="sherpa-onnx-${_RAC_TAG}-wasm.tar.bz2"
+  _RAC_URL="https://github.com/${_RAC_REPO}/releases/download/${_RAC_TAG}/${_RAC_TARBALL}"
+  _RAC_CACHE="${WASM_DIR}/third_party/${_RAC_TARBALL}"
+  if [ ! -f "${_RAC_CACHE}" ]; then
+    echo "Downloading prebuilt WASM bundle: ${_RAC_URL}"
+    if curl -fL --retry 3 -o "${_RAC_CACHE}.part" "${_RAC_URL}"; then
+      mv "${_RAC_CACHE}.part" "${_RAC_CACHE}"
+    else
+      echo "Prebuilt download failed; falling back to from-source build."
+      rm -f "${_RAC_CACHE}.part"
+    fi
+  fi
+  if [ -f "${_RAC_CACHE}" ]; then
+    mkdir -p "${_RAC_TP}"
+    tar -xjf "${_RAC_CACHE}" -C "${_RAC_TP}" onnxruntime-wasm sherpa-onnx-wasm
+    if [ -f "${DEST_DIR}/lib/libsherpa-onnx-c-api.a" ]; then
+      echo "Vendored Sherpa-ONNX WASM from prebuilt bundle: ${DEST_DIR}/lib/libsherpa-onnx-c-api.a"
+      exit 0
+    fi
+    echo "Prebuilt extract did not produce libsherpa-onnx-c-api.a; falling back to from-source build."
+  fi
+fi
+# --- from-source build (reached if RAC_WASM_BUILD_FROM_SOURCE=1 or download failed) ---
+
 if [ ! -f "${ORT_DIR}/lib/libonnxruntime.a" ]; then
   echo "ERROR: ${ORT_DIR}/lib/libonnxruntime.a is required before building Sherpa-ONNX WASM." >&2
   echo "Run: sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh" >&2

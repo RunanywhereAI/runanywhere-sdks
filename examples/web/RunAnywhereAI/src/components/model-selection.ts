@@ -65,6 +65,7 @@ let toolbarText: HTMLElement | null = null;
 let getStartedOverlay: HTMLElement | null = null;
 let getStartedBtn: HTMLButtonElement | null = null;
 let catalogRegistered = false;
+let hydratedSubscribed = false;
 const listeners: Array<() => void> = [];
 
 /**
@@ -94,6 +95,30 @@ export function notifyCatalogRegistered(registeredCount: number): void {
   catalogRegistered = registeredCount > 0;
   if (catalogRegistered) {
     hydrateRowStatesFromRegistry();
+  }
+  // Cold-start hydration (RunAnywhere.hydrateModelRegistry) runs asynchronously
+  // after phase-2 and may mark models downloaded *after* this initial seed.
+  // Subscribe once so the picker, toolbar pill, and per-view consumers refresh
+  // to Downloaded/Load instead of showing Download for already-present models.
+  if (!hydratedSubscribed) {
+    hydratedSubscribed = true;
+    try {
+      RunAnywhere.events.on('models.hydrated', () => {
+        hydrateRowStatesFromRegistry();
+        if (modalEl) renderRows();
+        refreshToolbarLabel();
+        refreshOverlayVisibility();
+        for (const listener of listeners) {
+          try {
+            listener();
+          } catch (err) {
+            console.warn('[model-selection] hydrated listener threw', err);
+          }
+        }
+      });
+    } catch {
+      hydratedSubscribed = false; // EventBus unavailable; retry on next call
+    }
   }
   refreshToolbarLabel();
   refreshOverlayVisibility();

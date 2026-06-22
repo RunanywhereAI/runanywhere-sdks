@@ -56,16 +56,19 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
       <div class="docs-section">
         <h3>Pipeline models</h3>
         <p class="text-secondary">Choose an embedding model and an LLM model from the registry; the RAG pipeline is created with this pair.</p>
-        <div class="docs-actions" style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div class="docs-actions" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
           <label style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem;">
             Embedding model
             <select id="docs-embedding-model" class="chat-input" style="min-width:220px"></select>
           </label>
+          <button class="btn btn-secondary" id="docs-embedding-download-btn">Download</button>
           <label style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem;">
             LLM model
             <select id="docs-llm-model" class="chat-input" style="min-width:220px"></select>
           </label>
+          <button class="btn btn-secondary" id="docs-llm-download-btn">Download</button>
         </div>
+        <div id="docs-model-status" class="docs-status"></div>
       </div>
       <div class="docs-section">
         <h3>Indexed documents</h3>
@@ -104,8 +107,85 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
   container.querySelector('#docs-ask-btn')!.addEventListener('click', () => {
     void askQuestion();
   });
+  container.querySelector('#docs-embedding-download-btn')!.addEventListener('click', () => {
+    void downloadSelectedModel(selectedEmbeddingModelId, 'embedding');
+  });
+  container.querySelector('#docs-llm-download-btn')!.addEventListener('click', () => {
+    void downloadSelectedModel(selectedLlmModelId, 'LLM');
+  });
+  refreshModelButtons();
 
   return {};
+}
+
+// ---------------------------------------------------------------------------
+// Model download
+// ---------------------------------------------------------------------------
+
+function setModelStatus(msg: string): void {
+  const el = container.querySelector<HTMLElement>('#docs-model-status');
+  if (el) el.textContent = msg;
+}
+
+/** Reflect downloaded state on the two download buttons. */
+function refreshModelButtons(): void {
+  const pairs: Array<['embedding' | 'llm', string]> = [
+    ['embedding', selectedEmbeddingModelId],
+    ['llm', selectedLlmModelId],
+  ];
+  for (const [kind, modelId] of pairs) {
+    const btn = container.querySelector<HTMLButtonElement>(`#docs-${kind}-download-btn`);
+    if (!btn) continue;
+    const model = modelId ? RunAnywhere.getModel(modelId) : null;
+    const downloaded = !!(model?.isDownloaded || model?.localPath);
+    btn.disabled = isBusy || !modelId || downloaded;
+    btn.textContent = downloaded ? 'Downloaded' : 'Download';
+  }
+}
+
+async function downloadSelectedModel(
+  modelId: string,
+  label: string,
+): Promise<void> {
+  if (!modelId) {
+    setModelStatus(`Select a ${label} model first.`);
+    return;
+  }
+  const model = RunAnywhere.getModel(modelId);
+  if (!model) {
+    setModelStatus(`${label} model '${modelId}' is not registered.`);
+    return;
+  }
+  isBusy = true;
+  refreshModelButtons();
+  setModelStatus(`Downloading ${label} model ${model.name || modelId}…`);
+  try {
+    await RunAnywhere.downloadModel({
+      modelId,
+      model,
+      allowMeteredNetwork: true,
+      resumeExisting: true,
+      verifyChecksums: false,
+      validateExistingBytes: false,
+      updateRegistryOnCompletion: true,
+      storageNamespace: '',
+      availableStorageBytes: 0,
+      requiredFreeBytesAfterDownload: 0,
+      pollIntervalMs: 500,
+      onProgress: (next) => {
+        const pct = next.totalBytes > 0
+          ? Math.round((Number(next.bytesDownloaded) / Number(next.totalBytes)) * 100)
+          : 0;
+        setModelStatus(`Downloading ${label} model… ${pct}%`);
+      },
+    });
+    setModelStatus(`${label} model ready: ${model.name || modelId}.`);
+  } catch (err) {
+    setModelStatus(`${label} model download failed: ${formatError(err)}`);
+  } finally {
+    isBusy = false;
+    refreshModelButtons();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -136,9 +216,11 @@ function populateModelPickers(): void {
 
   embeddingSelect.addEventListener('change', () => {
     selectedEmbeddingModelId = embeddingSelect.value;
+    refreshModelButtons();
   });
   llmSelect.addEventListener('change', () => {
     selectedLlmModelId = llmSelect.value;
+    refreshModelButtons();
   });
 }
 

@@ -43,6 +43,9 @@ const CAPTURE_DIMENSION = 384;
 let container: HTMLElement;
 let camera: VideoCapture | null = null;
 let latestFrame: { rgbPixels: Uint8Array; width: number; height: number } | null = null;
+// Data URL preview for an image loaded from disk (null when the source is the
+// live camera). Lets the preview survive innerHTML re-renders without a camera.
+let loadedPreviewUrl: string | null = null;
 let lastResult: string | null = null;
 let status = '';
 let isBusy = false;
@@ -90,7 +93,7 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
 function renderView(): void {
   const modelLoaded = isVLMModelLoaded();
   const captureReady = camera?.isCapturing ?? false;
-  const canAnalyze = modelLoaded && captureReady && !isBusy;
+  const canAnalyze = modelLoaded && (captureReady || latestFrame !== null) && !isBusy;
 
   container.innerHTML = `
     <div class="toolbar">
@@ -120,6 +123,10 @@ function renderView(): void {
           <button class="btn btn-secondary" id="vision-capture-btn" ${captureReady && !isBusy ? '' : 'disabled'}>
             Capture frame
           </button>
+          <button class="btn btn-secondary" id="vision-load-image-btn" ${isBusy ? 'disabled' : ''}>
+            Load image…
+          </button>
+          <input type="file" id="vision-image-input" accept="image/*" hidden />
         </div>
         <div id="vision-preview" class="vision-preview"></div>
         <div id="vision-frame-meta" class="docs-status">${frameMetaLabel()}</div>
@@ -165,6 +172,11 @@ function renderView(): void {
   container
     .querySelector('#vision-capture-btn')!
     .addEventListener('click', () => captureFrame());
+  const imageInput = container.querySelector<HTMLInputElement>('#vision-image-input')!;
+  container
+    .querySelector('#vision-load-image-btn')!
+    .addEventListener('click', () => imageInput.click());
+  imageInput.addEventListener('change', () => void onImageFileSelected(imageInput));
   container
     .querySelector('#vision-analyze-btn')!
     .addEventListener('click', () => void onAnalyze());
@@ -175,9 +187,20 @@ function renderView(): void {
 
 function reattachCameraPreview(): void {
   const host = container.querySelector<HTMLElement>('#vision-preview');
-  if (!host || !camera) return;
+  if (!host) return;
   host.innerHTML = '';
-  host.appendChild(camera.videoElement);
+  if (camera) {
+    host.appendChild(camera.videoElement);
+    return;
+  }
+  if (loadedPreviewUrl) {
+    const img = document.createElement('img');
+    img.src = loadedPreviewUrl;
+    img.alt = 'Loaded image';
+    img.style.maxWidth = '100%';
+    img.style.borderRadius = '8px';
+    host.appendChild(img);
+  }
 }
 
 function frameMetaLabel(): string {
@@ -234,8 +257,87 @@ function captureFrame(): void {
     return;
   }
   latestFrame = frame;
+  loadedPreviewUrl = null;
   setStatus(`Captured ${frame.width}×${frame.height} frame.`);
   renderView();
+}
+
+// ---------------------------------------------------------------------------
+// Image from disk
+// ---------------------------------------------------------------------------
+
+async function onImageFileSelected(input: HTMLInputElement): Promise<void> {
+  const file = input.files?.[0];
+  // Reset so re-selecting the same file fires `change` again.
+  input.value = '';
+  if (!file) return;
+
+  isBusy = true;
+  setStatus('Loading image…');
+  renderView();
+  try {
+    const decoded = await decodeImageToRgbFrame(file, CAPTURE_DIMENSION);
+    // A loaded image is an alternative frame source — drop the live camera so
+    // the preview and analysis operate on the picked image.
+    stopCamera();
+    latestFrame = {
+      rgbPixels: decoded.rgbPixels,
+      width: decoded.width,
+      height: decoded.height,
+    };
+    loadedPreviewUrl = decoded.previewUrl;
+    setStatus(`Loaded ${decoded.width}×${decoded.height} image from ${file.name}.`);
+  } catch (err) {
+    setStatus(`Failed to load image: ${formatError(err)}`);
+  } finally {
+    isBusy = false;
+    renderView();
+  }
+}
+
+/**
+ * Decode an image file into the same raw-RGB frame shape the camera produces:
+ * aspect-preserving downscale so the longest side is `maxDim`, alpha stripped.
+ */
+async function decodeImageToRgbFrame(
+  file: File,
+  maxDim: number,
+): Promise<{ rgbPixels: Uint8Array; width: number; height: number; previewUrl: string }> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await loadImageElement(objectUrl);
+    const longest = Math.max(img.naturalWidth, img.naturalHeight) || 1;
+    const scale = Math.min(1, maxDim / longest);
+    const width = Math.max(1, Math.round(img.naturalWidth * scale));
+    const height = Math.max(1, Math.round(img.naturalHeight * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('2D canvas context unavailable');
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const { data } = ctx.getImageData(0, 0, width, height); // RGBA
+    const rgbPixels = new Uint8Array(width * height * 3);
+    for (let src = 0, dst = 0; src < data.length; src += 4, dst += 3) {
+      rgbPixels[dst] = data[src];
+      rgbPixels[dst + 1] = data[src + 1];
+      rgbPixels[dst + 2] = data[src + 2];
+    }
+    return { rgbPixels, width, height, previewUrl: canvas.toDataURL('image/png') };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not decode the selected image'));
+    img.src = src;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -243,12 +345,6 @@ function captureFrame(): void {
 // ---------------------------------------------------------------------------
 
 async function onAnalyze(): Promise<void> {
-  if (!camera?.isCapturing) {
-    setStatus('Start the camera first.');
-    renderView();
-    return;
-  }
-
   // Gate on the lifecycle's loaded multimodal model — iOS parity:
   // VLMViewModel.swift:58-62 checkModelStatus() (currentModel(.multimodal)).
   if (!isVLMModelLoaded()) {
@@ -259,9 +355,11 @@ async function onAnalyze(): Promise<void> {
     return;
   }
 
-  const frame = latestFrame ?? camera.captureFrame(CAPTURE_DIMENSION);
+  // Frame source: an already-captured/loaded frame, or a fresh camera grab.
+  const frame =
+    latestFrame ?? (camera?.isCapturing ? camera.captureFrame(CAPTURE_DIMENSION) : null);
   if (!frame) {
-    setStatus('Failed to capture a frame for analysis.');
+    setStatus('Capture a camera frame or load an image first.');
     renderView();
     return;
   }

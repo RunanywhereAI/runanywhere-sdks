@@ -457,6 +457,13 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_framework_supports_tts"
     "_rac_model_format_extension"
 
+    # Framework <-> OPFS directory resolution. FrameworkOPFSPaths.ts needs both
+    # to compute the per-framework model folder (e.g. "LlamaCpp") on the JS side
+    # for cold-start hydration; without them frameworkOPFSDir() returns null and
+    # hydrateModelRegistry() can never re-detect downloaded models after reload.
+    "_rac_inference_framework_from_proto"
+    "_rac_framework_raw_value"
+
     # Model paths — base-dir configuration. Web has no native filesystem root,
     # but the C++ download orchestrator rejects an empty base via
     # `rac_model_paths_get_model_folder`. The TypeScript bridge installs a
@@ -1224,7 +1231,14 @@ function(rac_wasm_add_target)
     if(RAC_WASM_PTHREADS)
         list(APPEND _link_flags
             "-pthread"
-            "-sPTHREAD_POOL_SIZE=4"
+            # Pre-spawn enough workers to cover the engine's max compute thread
+            # count (get_num_threads caps at 8). VLM inference runs synchronously
+            # on the main thread; if ggml's threadpool needs to spawn a worker
+            # on-demand mid-encode, the blocked main thread can never service the
+            # Worker creation → mtmd_helper_eval_chunks deadlocks. Sizing the
+            # pool to 8 means all compute threads are already live, so no
+            # on-demand spawn happens during the blocked call.
+            "-sPTHREAD_POOL_SIZE=8"
             "-sPTHREAD_POOL_SIZE_STRICT=0"
         )
         target_compile_options(${RWT_NAME} PRIVATE "-pthread")
