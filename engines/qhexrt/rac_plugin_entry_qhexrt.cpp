@@ -1,0 +1,138 @@
+/**
+ * @file rac_plugin_entry_qhexrt.cpp
+ * @brief Unified-ABI entry point for the QHexRT (Qualcomm Hexagon NPU) engine.
+ *
+ * Two compile modes (USAGE B in engines/common/rac_engine_unavailable.h),
+ * selected by RAC_QHEXRT_ENGINE_AVAILABLE from CMakeLists.txt:
+ *
+ *   - ROUTABLE (engine linked): a hand-written manifest + vtable exposing
+ *     RAC_PRIMITIVE_GENERATE_TEXT via g_qhexrt_llm_ops (qhexrt_llm_ops.cpp).
+ *   - STUB (engine absent, the public default): the shared all-NULL,
+ *     not-routable shell whose capability_check rejects registration so the
+ *     router can never select QHexRT.
+ *
+ * Both modes expose the SAME `rac_plugin_entry_qhexrt` symbol and the same
+ * `.rodata` vtable contract, so downstream SDK bridges load either build with
+ * no platform-specific branches.
+ */
+
+#include "qhexrt_backend.h"
+#include "common/rac_engine_unavailable.h"
+
+#include "rac/core/rac_error.h"
+#include "rac/plugin/rac_engine_manifest.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
+
+#if defined(__ANDROID__) && defined(RAC_QHEXRT_ENGINE_AVAILABLE) && RAC_QHEXRT_ENGINE_AVAILABLE
+#define RAC_QHEXRT_ROUTABLE 1
+#else
+#define RAC_QHEXRT_ROUTABLE 0
+#endif
+
+#if RAC_QHEXRT_ROUTABLE
+#include "rac/features/llm/rac_llm_service.h"
+#include "rac/plugin/rac_model_format_ids.h"
+#include "rac/plugin/rac_primitive.h"
+#endif
+
+namespace {
+
+// capability_check runs during rac_plugin_register, before the plugin enters
+// the primitive tables. QHexRT targets Snapdragon Android only; off-platform
+// builds report UNSUPPORTED (silent), Android builds without the linked engine
+// report BACKEND_UNAVAILABLE. The 3-way decision is the shared helper.
+rac_result_t qhexrt_capability_check(void) {
+    return rac_engine_unavailable_capability(
+#if defined(__ANDROID__)
+        1, /* platform_supported: runtime targets Snapdragon Android */
+#else
+        0,
+#endif
+#if defined(RAC_QHEXRT_ENGINE_AVAILABLE) && RAC_QHEXRT_ENGINE_AVAILABLE
+        1 /* backend_present: prebuilt QHexRT archive linked */
+#else
+        0
+#endif
+    );
+}
+
+}  // namespace
+
+extern "C" {
+
+// Build marker (both modes) — lets tests assert engine visibility without the
+// private QHexRT header.
+const char* qhexrt_backend_build_info(void) {
+#if RAC_QHEXRT_ROUTABLE
+    return "qhexrt:engine-available";
+#else
+    return "qhexrt:engine-unavailable";
+#endif
+}
+
+#if RAC_QHEXRT_ROUTABLE
+
+// LLM vtable defined in qhexrt_llm_ops.cpp.
+extern const rac_llm_service_ops_t g_qhexrt_llm_ops;
+
+// Advisory routing metadata (validated at register, NOT used for selection —
+// selection is plain priority order via rac_plugin_find).
+static const rac_runtime_id_t k_qhexrt_runtimes[] = {RAC_RUNTIME_QNN};
+
+// QHexRT runs prebuilt QNN context binaries referenced by a JSON manifest.
+static const uint32_t k_qhexrt_formats[] = {RAC_MODEL_FORMAT_ID_QNN_CONTEXT};
+
+// LLM today; VLM / TTS / ASR slots are reserved for follow-up wiring.
+static const rac_primitive_t k_qhexrt_primitives[] = {RAC_PRIMITIVE_GENERATE_TEXT};
+
+static const rac_engine_manifest_t k_qhexrt_manifest = {
+    .name = "qhexrt",
+    .display_name = "QHexRT (Qualcomm Hexagon NPU)",
+    .version = nullptr,
+    .package_owner = "runanywhere",
+    .package_name = "runanywhere_qhexrt",
+    .availability = RAC_ENGINE_AVAILABILITY_PRIVATE,
+    // Above llamacpp (100) so the NPU runtime wins for QNN-context models when
+    // both are registered; falls back to llamacpp for formats QHexRT rejects.
+    .priority = 150,
+    .capability_flags = 0,
+    .primitives = k_qhexrt_primitives,
+    .primitives_count = sizeof(k_qhexrt_primitives) / sizeof(k_qhexrt_primitives[0]),
+    .runtimes = k_qhexrt_runtimes,
+    .runtimes_count = sizeof(k_qhexrt_runtimes) / sizeof(k_qhexrt_runtimes[0]),
+    .formats = k_qhexrt_formats,
+    .formats_count = sizeof(k_qhexrt_formats) / sizeof(k_qhexrt_formats[0]),
+    .reserved_0 = 0,
+    .reserved_1 = 0,
+};
+
+static const rac_engine_vtable_t g_qhexrt_engine_vtable = {
+    /* metadata         */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_qhexrt_manifest),
+    /* capability_check */ qhexrt_capability_check,
+    /* on_unload        */ nullptr,
+
+    /* llm_ops          */ &g_qhexrt_llm_ops,
+    /* stt_ops          */ nullptr,
+    /* tts_ops          */ nullptr,
+    /* vad_ops          */ nullptr,
+    /* embedding_ops    */ nullptr,
+    /* vlm_ops          */ nullptr,
+    /* diffusion_ops    */ nullptr,
+
+    /* reserved_slot_0..9 */
+    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr, nullptr, nullptr, nullptr, nullptr,
+};
+
+RAC_PLUGIN_ENTRY_DEF(qhexrt) {
+    return rac_engine_entry_with_manifest(&k_qhexrt_manifest, &g_qhexrt_engine_vtable);
+}
+
+#else  // !RAC_QHEXRT_ROUTABLE — not-routable shell (public default)
+
+RAC_ENGINE_UNAVAILABLE_PLUGIN(qhexrt, "QHexRT (Qualcomm Hexagon NPU)", qhexrt_capability_check)
+
+#endif  // RAC_QHEXRT_ROUTABLE
+
+}  // extern "C"
