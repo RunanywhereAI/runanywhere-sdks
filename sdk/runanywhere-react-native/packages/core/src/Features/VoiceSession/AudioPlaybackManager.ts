@@ -58,6 +58,34 @@ export class AudioPlaybackManager {
     }
   }
 
+  /**
+   * Play a ready-made WAV buffer (RIFF header + samples) directly, without
+   * re-encoding. Use this when the source is already a complete WAV — e.g. the
+   * voice agent's `VoiceAgentResult.synthesizedAudio`, which commons emits as a
+   * full WAV blob. Passing such a blob to {@link play} would misinterpret the
+   * RIFF header + int16 samples as raw float32 PCM and wrap it in a second WAV
+   * header → fast/noisy garbage.
+   */
+  async playWav(wavData: ArrayBuffer): Promise<void> {
+    if (this.state === 'playing') {
+      this.stop();
+    }
+    this.state = 'playing';
+    try {
+      await AudioPlayback.play(wavData);
+      this.state = 'idle';
+    } catch (error) {
+      if ((this.state as PlaybackState) === 'stopped') {
+        return;
+      }
+      this.state = 'error';
+      logger.error(
+        `WAV playback failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+      throw error;
+    }
+  }
+
   /** Play an audio file from disk. Resolves when playback finishes. */
   async playFile(filePath: string): Promise<void> {
     this.state = 'playing';

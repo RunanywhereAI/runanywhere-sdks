@@ -118,6 +118,16 @@ class AudioPlaybackManager {
     _currentTempFile = tempFile;
     await tempFile.writeAsBytes(wavData);
 
+    // Mix with other audio instead of taking exclusive audio focus. On Android
+    // this maps to AndroidAudioFocus.none, so playing a TTS reply does NOT
+    // evict the voice-agent mic recorder (which otherwise receives
+    // AUDIOFOCUS_LOSS and stops — leaving the pipeline deaf after the first
+    // turn). The voice-agent mic driver gates capture during playback, so
+    // coexisting record + playback never self-transcribes.
+    await _player.setAudioContext(
+      AudioContextConfig(focus: AudioContextConfigFocus.mixWithOthers).build(),
+    );
+
     await _player.setVolume(volume.clamp(0.0, 1.0));
     await _player.setPlaybackRate(rate.clamp(0.5, 2.0));
 
