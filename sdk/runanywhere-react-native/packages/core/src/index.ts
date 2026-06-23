@@ -112,6 +112,17 @@ export type { ErrorContext } from './Foundation/Errors';
 // Features/TTS/Services/AudioPlaybackManager.swift.
 export { AudioCaptureManager } from './Features/VoiceSession/AudioCaptureManager';
 export { AudioPlaybackManager } from './Features/VoiceSession/AudioPlaybackManager';
+// Mic-driven voice-agent ingress (capture → endpoint → processVoiceTurn → TTS
+// playback). Mirrors the Kotlin/Flutter VoiceAgentMicDriver; without it the
+// voice agent only observes output events and never receives audio.
+export {
+  VoiceAgentMicDriver,
+} from './Features/VoiceSession/VoiceAgentMicDriver';
+export type {
+  VoiceAgentMicTurn,
+  VoiceAgentMicPhase,
+  VoiceAgentMicCallbacks,
+} from './Features/VoiceSession/VoiceAgentMicDriver';
 
 export { EventBus, modelLifecycleChange } from './Public/Events/EventBus';
 export type {

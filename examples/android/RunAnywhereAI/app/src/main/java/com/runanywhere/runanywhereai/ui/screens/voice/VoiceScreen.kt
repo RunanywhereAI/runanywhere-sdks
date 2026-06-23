@@ -62,13 +62,16 @@ fun VoiceScreen() {
         viewModel(key = "voice-stt", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.STT))
     val ttsVm: ModelSelectionViewModel =
         viewModel(key = "voice-tts", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.TTS))
+    val vadVm: ModelSelectionViewModel =
+        viewModel(key = "voice-vad", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.VAD))
     var sheet by remember { mutableStateOf<ModelSelectionViewModel?>(null) }
     val listState = rememberLazyListState()
 
     val llmName = GlobalState.model.loaded?.name
     val sttName = sttVm.state.models.firstOrNull { it.id == sttVm.state.currentModelId }?.name
     val ttsVoice = ttsVm.state.models.firstOrNull { it.id == ttsVm.state.currentModelId }
-    val ready = llmName != null && sttName != null && ttsVoice != null
+    val vadName = vadVm.state.models.firstOrNull { it.id == vadVm.state.currentModelId }?.name
+    val ready = llmName != null && sttName != null && ttsVoice != null && vadName != null
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -110,7 +113,9 @@ fun VoiceScreen() {
                 SetupRow(RACIcons.Outline.Brain, "Speech to text", sttName, onClick = { sheet = sttVm })
                 Divider()
                 SetupRow(RACIcons.Outline.Robot, "Voice", ttsVoice?.name, onClick = { sheet = ttsVm })
-            }
+                Divider()
+                SetupRow(RACIcons.Outline.Activity, "Voice activity (VAD)", vadName, onClick = { sheet = vadVm })
+}
         }
 
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {

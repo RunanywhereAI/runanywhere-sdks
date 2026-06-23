@@ -17,16 +17,16 @@ import {
 } from '../components/model';
 import type { VoiceConversationEntry } from '../types/voice';
 import { VoicePipelineStatus } from '../types/voice';
-import { RunAnywhere } from '@runanywhere/core';
+import { RunAnywhere, VoiceAgentMicDriver } from '@runanywhere/core';
+import type {
+  VoiceAgentMicTurn,
+  VoiceAgentMicPhase,
+} from '@runanywhere/core';
 import {
   ModelCategory,
   ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import { PipelineState as VoiceEventPipelineState } from '@runanywhere/proto-ts/voice_events';
-import { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
-import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
-import { requestMicrophonePermission } from '../utils/micPermission';
 
 const listModels = async (): Promise<SDKModelInfo[]> =>
   (await RunAnywhere.listModels()).models?.models ?? [];
@@ -41,6 +41,7 @@ export const VoiceAssistantScreen: React.FC = () => {
   const [sttModel, setSTTModel] = useState<SDKModelInfo | null>(null);
   const [llmModel, setLLMModel] = useState<SDKModelInfo | null>(null);
   const [ttsModel, setTTSModel] = useState<SDKModelInfo | null>(null);
+  const [vadModel, setVADModel] = useState<SDKModelInfo | null>(null);
   const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
 
   const [status, setStatus] = useState<VoicePipelineStatus>(VoicePipelineStatus.Idle);
@@ -50,15 +51,15 @@ export const VoiceAssistantScreen: React.FC = () => {
   const [activeSelectionContext, setActiveSelectionContext] =
     useState<ModelSelectionContext>(ModelSelectionContext.STT);
 
-  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const micDriverRef = useRef<VoiceAgentMicDriver | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
-  const allModelsLoaded = sttModel && llmModel && ttsModel;
+  const allModelsLoaded = sttModel && llmModel && ttsModel && vadModel;
 
   const cleanupVoiceSession = useCallback(async () => {
-    if (unsubscribeRef.current) {
-      unsubscribeRef.current();
-      unsubscribeRef.current = null;
+    if (micDriverRef.current) {
+      micDriverRef.current.stop();
+      micDriverRef.current = null;
     }
     try {
       await RunAnywhere.cleanupVoiceAgent();
@@ -97,101 +98,61 @@ export const VoiceAssistantScreen: React.FC = () => {
 
   const checkModelStatus = async () => {
     try {
-      const [loadedSTT, loadedLLM, loadedTTS] = await Promise.all([
+      const [loadedSTT, loadedLLM, loadedTTS, loadedVAD] = await Promise.all([
         RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
         RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE),
         RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
+        RunAnywhere.modelInfoForCategory(
+          ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
+        ).catch(() => null),
       ]);
       if (loadedSTT) setSTTModel(loadedSTT);
       if (loadedLLM) setLLMModel(loadedLLM);
       if (loadedTTS) setTTSModel(loadedTTS);
+      if (loadedVAD) setVADModel(loadedVAD);
     } catch (error) {
       console.warn('[VoiceAssistant] Error checking model status:', error);
     }
   };
 
-  const handleProtoEvent = useCallback(
-    (event: VoiceEvent) => {
-      if (event.state) {
-        switch (event.state.current) {
-          case VoiceEventPipelineState.PIPELINE_STATE_LISTENING:
-            setStatus(VoicePipelineStatus.Listening);
-            break;
-          case VoiceEventPipelineState.PIPELINE_STATE_THINKING:
-            setStatus(VoicePipelineStatus.Thinking);
-            break;
-          case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING:
-            setStatus(VoicePipelineStatus.Speaking);
-            break;
-          case VoiceEventPipelineState.PIPELINE_STATE_STOPPED:
-            setStatus(VoicePipelineStatus.Idle);
-            setIsSessionActive(false);
-            void cleanupVoiceSession();
-            break;
-          default:
-            break;
-        }
-        return;
-      }
+  // Map the mic driver's coarse phase to the UI pipeline status.
+  const phaseToStatus = useCallback((phase: VoiceAgentMicPhase) => {
+    switch (phase) {
+      case 'listening':
+        setStatus(VoicePipelineStatus.Listening);
+        break;
+      case 'processing':
+        setStatus(VoicePipelineStatus.Processing);
+        break;
+      case 'speaking':
+        setStatus(VoicePipelineStatus.Speaking);
+        break;
+    }
+  }, []);
 
-      if (event.vad) {
-        if (event.vad.type === VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY) {
-          if (event.vad.isSpeech) {
-            console.warn('[VoiceAssistant] Speech started');
-          } else {
-            console.warn('[VoiceAssistant] Speech ended — processing');
-            setStatus(VoicePipelineStatus.Processing);
-          }
-        }
-        return;
-      }
-
-      if (event.userSaid?.text) {
-        const text = event.userSaid.text;
-        const userEntry: VoiceConversationEntry = {
+  // Append a finished turn as distinct user + assistant conversation bubbles.
+  const appendTurn = useCallback((turn: VoiceAgentMicTurn) => {
+    setConversation((prev) => {
+      const next = [...prev];
+      if (turn.userText.length > 0) {
+        next.push({
           id: generateId(),
           speaker: 'user',
-          text,
+          text: turn.userText,
           timestamp: new Date(),
-        };
-        setConversation((prev) => [...prev, userEntry]);
-        setStatus(VoicePipelineStatus.Thinking);
-        return;
-      }
-
-      if (event.assistantToken?.text) {
-        const token = event.assistantToken.text;
-        setConversation((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.speaker === 'assistant') {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + token };
-            return updated;
-          }
-          return [
-            ...prev,
-            { id: generateId(), speaker: 'assistant', text: token, timestamp: new Date() },
-          ];
         });
-        return;
       }
-
-      if (event.audio) {
-        setStatus(VoicePipelineStatus.Speaking);
-        return;
+      if (turn.assistantText.length > 0) {
+        next.push({
+          id: generateId(),
+          speaker: 'assistant',
+          text: turn.assistantText,
+          timestamp: new Date(),
+        });
       }
-
-      if (event.error) {
-        console.error('[VoiceAssistant] Error:', event.error.message);
-        setStatus(VoicePipelineStatus.Error);
-        Alert.alert('Error', event.error.message || 'An error occurred');
-        setTimeout(() => setStatus(VoicePipelineStatus.Idle), 2000);
-        setIsSessionActive(false);
-        void cleanupVoiceSession();
-      }
-    },
-    [cleanupVoiceSession]
-  );
+      return next;
+    });
+  }, []);
 
   const handleToggleSession = useCallback(async () => {
     if (status === VoicePipelineStatus.Processing || status === VoicePipelineStatus.Thinking) {
@@ -210,28 +171,35 @@ export const VoiceAssistantScreen: React.FC = () => {
       );
       return;
     }
-    const hasMicPermission = await requestMicrophonePermission();
-    if (!hasMicPermission) return;
     try {
+      // Compose the pipeline against the loaded models. ensureVAD defaults to
+      // true → loads silero-vad so the C++ agent uses the model VAD.
       await RunAnywhere.initializeVoiceAgentWithLoadedModels();
-      const eventStream = await RunAnywhere.streamVoiceAgent();
-      const eventIterator = eventStream[Symbol.asyncIterator]();
-      (async () => {
-        try {
-          while (true) {
-            const { done, value } = await eventIterator.next();
-            if (done) break;
-            handleProtoEvent(value);
-          }
-        } catch (err) {
-          if ((err as Error).name !== 'AbortError') {
-            console.error('[VoiceAssistant] Stream error:', err);
-          }
-        }
-      })();
-      unsubscribeRef.current = () => {
-        void eventIterator.return?.();
-      };
+
+      // The mic driver is the audio ingress: it captures, endpoints, runs each
+      // utterance through processVoiceTurn (VAD→STT→LLM→TTS), surfaces the
+      // turn, and plays the synthesized reply. (streamVoiceAgent alone is dead
+      // air — the C ABI owns no microphone.)
+      const driver = new VoiceAgentMicDriver();
+      micDriverRef.current = driver;
+      const started = await driver.start({
+        onTurn: appendTurn,
+        onPhase: phaseToStatus,
+        onError: (err) => {
+          console.error('[VoiceAssistant] Voice turn error:', err);
+          setStatus(VoicePipelineStatus.Error);
+          setTimeout(() => setStatus(VoicePipelineStatus.Listening), 2000);
+        },
+      });
+      if (!started) {
+        micDriverRef.current = null;
+        await cleanupVoiceSession();
+        Alert.alert(
+          'Microphone needed',
+          'Grant microphone permission to use the voice assistant.'
+        );
+        return;
+      }
       setIsSessionActive(true);
       setStatus(VoicePipelineStatus.Listening);
     } catch (error) {
@@ -239,17 +207,18 @@ export const VoiceAssistantScreen: React.FC = () => {
       await cleanupVoiceSession();
       Alert.alert('Error', `Failed to start voice agent: ${error}`);
     }
-  }, [isSessionActive, allModelsLoaded, status, handleProtoEvent, cleanupVoiceSession]);
+  }, [isSessionActive, allModelsLoaded, status, appendTurn, phaseToStatus, cleanupVoiceSession]);
 
-  const getSelectionContext = (type: 'stt' | 'llm' | 'tts'): ModelSelectionContext => {
+  const getSelectionContext = (type: 'stt' | 'llm' | 'tts' | 'vad'): ModelSelectionContext => {
     switch (type) {
       case 'stt': return ModelSelectionContext.STT;
       case 'llm': return ModelSelectionContext.LLM;
       case 'tts': return ModelSelectionContext.TTS;
+      case 'vad': return ModelSelectionContext.VAD;
     }
   };
 
-  const handleSelectModel = useCallback((type: 'stt' | 'llm' | 'tts') => {
+  const handleSelectModel = useCallback((type: 'stt' | 'llm' | 'tts' | 'vad') => {
     setActiveSelectionContext(getSelectionContext(type));
     setShowModelSelection(true);
   }, []);
@@ -320,6 +289,25 @@ export const VoiceAssistantScreen: React.FC = () => {
             }
             break;
           }
+          case ModelSelectionContext.VAD: {
+            const result = await loadModelWithRequest(
+              ModelLoadRequest.fromPartial({
+                modelId: model.id,
+                category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+                forceReload: false,
+                validateAvailability: true,
+              })
+            );
+            if (result.success) {
+              const loaded = await RunAnywhere.modelInfoForCategory(
+                ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
+              ).catch(() => null);
+              setVADModel(loaded ?? model);
+            } else {
+              Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
+            }
+            break;
+          }
         }
       } catch (error) {
         Alert.alert('Error', `Failed to load model: ${error}`);
@@ -357,7 +345,7 @@ export const VoiceAssistantScreen: React.FC = () => {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-      {/* Setup card: LLM / STT / TTS rows */}
+      {/* Setup card: LLM / STT / TTS / VAD rows */}
       <View style={[styles.setupCard, { backgroundColor: colors.surfaceContainerHigh, borderRadius: dimens.radius.lg }]}>
         <SetupRow
           iconName="chat"
@@ -384,6 +372,15 @@ export const VoiceAssistantScreen: React.FC = () => {
           colors={colors}
           typography={typography}
           onPress={() => handleSelectModel('tts')}
+        />
+        <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+        <SetupRow
+          iconName="vad"
+          label="Voice activity (VAD)"
+          value={vadModel?.name ?? null}
+          colors={colors}
+          typography={typography}
+          onPress={() => handleSelectModel('vad')}
         />
       </View>
 
