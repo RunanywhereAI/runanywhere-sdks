@@ -11,13 +11,13 @@ kotlin = "2.4.0"
 # AndroidX core
 coreKtx = "1.19.0"
 activityCompose = "1.13.0"
-lifecycleRuntimeKtx = "2.10.0"
+lifecycleRuntimeKtx = "2.11.0"
 
 # Security
 securityCrypto = "1.1.0"
 
 # Compose
-composeBom = "2026.05.01"
+composeBom = "2026.06.00"
 
 # Navigation & serialization
 navigationCompose = "2.9.8"
@@ -37,7 +37,7 @@ espressoCore = "3.7.0"
 wire = "6.4.0"
 
 # Networking
-okhttp = "5.3.2"
+okhttp = "5.4.0"
 
 # Document parsing (RAG ingestion)
 pdfbox = "2.0.27.0"
