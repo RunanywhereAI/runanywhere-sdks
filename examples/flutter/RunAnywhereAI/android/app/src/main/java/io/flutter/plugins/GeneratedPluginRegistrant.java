@@ -96,6 +96,11 @@ public final class GeneratedPluginRegistrant {
       Log.e(TAG, "Error registering plugin runanywhere_onnx, ai.runanywhere.sdk.onnx.OnnxPlugin", e);
     }
     try {
+      flutterEngine.getPlugins().add(new ai.runanywhere.sdk.qhexrt.QhexrtPlugin());
+    } catch (Exception e) {
+      Log.e(TAG, "Error registering plugin runanywhere_qhexrt, ai.runanywhere.sdk.qhexrt.QhexrtPlugin", e);
+    }
+    try {
       flutterEngine.getPlugins().add(new io.flutter.plugins.sharedpreferences.SharedPreferencesPlugin());
     } catch (Exception e) {
       Log.e(TAG, "Error registering plugin shared_preferences_android, io.flutter.plugins.sharedpreferences.SharedPreferencesPlugin", e);

@@ -27,6 +27,7 @@ import RAGScreen from '../screens/RAGScreen';
 import StorageScreen from '../screens/StorageScreen';
 import SolutionsScreen from '../screens/SolutionsScreen';
 import BenchmarkScreen from '../screens/BenchmarkScreen';
+import NpuScreen from '../screens/NpuScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -63,6 +64,11 @@ export const RootNavigator: React.FC = () => (
         name={ROUTES.Benchmarks}
         component={BenchmarkScreen}
         options={{ headerShown: true, title: 'Benchmarks' }}
+      />
+      <Stack.Screen
+        name={ROUTES.Npu}
+        component={NpuScreen}
+        options={{ headerShown: true, title: 'NPU (QHexRT)' }}
       />
     </Stack.Navigator>
   </NavigationContainer>

@@ -34,6 +34,7 @@
     "@runanywhere/llamacpp": "workspace:*",
     "@runanywhere/onnx": "workspace:*",
     "@runanywhere/proto-ts": "workspace:*",
+    "@runanywhere/qhexrt": "workspace:*",
     "lucide-react-native": "^1.21.0",
     "react": "19.2.3",
     "react-native": "0.85.3",

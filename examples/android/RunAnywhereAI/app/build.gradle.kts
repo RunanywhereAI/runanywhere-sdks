@@ -82,6 +82,7 @@ dependencies {
     implementation(files("../libs/runanywhere-sdk.aar"))
     implementation(files("../libs/runanywhere-llamacpp.aar"))
     implementation(files("../libs/runanywhere-onnx.aar"))
+    implementation(files("../libs/runanywhere-qhexrt.aar"))
     implementation(libs.okhttp)
     implementation(libs.pdfbox.android)
 

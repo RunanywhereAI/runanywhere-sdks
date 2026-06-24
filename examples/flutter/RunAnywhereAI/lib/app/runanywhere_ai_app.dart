@@ -12,6 +12,7 @@ import 'package:runanywhere_ai/core/utilities/url_utils.dart';
 import 'package:runanywhere_genie/runanywhere_genie.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
+import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 
 /// RunAnywhereAIApp
 ///
@@ -167,6 +168,19 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugPrint('✅ ONNX backend registered (STT + TTS + VAD + Embeddings)');
     } catch (e) {
       debugPrint('⚠️ ONNX backend not available: $e');
+    }
+
+    // QHexRT (Qualcomm Hexagon NPU). Safe no-op on non-Snapdragon / non-Android;
+    // register() rejects internally on unsupported parts.
+    if (QHexRT.isAvailable) {
+      try {
+        await QHexRT.register();
+        debugPrint('✅ QHexRT NPU backend registered (LLM + VLM + STT + TTS)');
+      } catch (e) {
+        debugPrint('⚠️ QHexRT backend not available: $e');
+      }
+    } else {
+      debugPrint('ℹ️ QHexRT NPU not available (non-Snapdragon device)');
     }
 
     _backendsRegistered = true;

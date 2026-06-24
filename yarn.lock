@@ -2790,7 +2790,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@runanywhere/qhexrt@workspace:sdk/runanywhere-react-native/packages/qhexrt":
+"@runanywhere/qhexrt@workspace:*, @runanywhere/qhexrt@workspace:sdk/runanywhere-react-native/packages/qhexrt":
   version: 0.0.0-use.local
   resolution: "@runanywhere/qhexrt@workspace:sdk/runanywhere-react-native/packages/qhexrt"
   dependencies:
@@ -9042,6 +9042,7 @@ __metadata:
     "@runanywhere/llamacpp": "workspace:*"
     "@runanywhere/onnx": "workspace:*"
     "@runanywhere/proto-ts": "workspace:*"
+    "@runanywhere/qhexrt": "workspace:*"
     "@types/react": ~19.2.14
     "@types/react-native-vector-icons": ^6.4.18
     "@typescript-eslint/eslint-plugin": ^8.59.3

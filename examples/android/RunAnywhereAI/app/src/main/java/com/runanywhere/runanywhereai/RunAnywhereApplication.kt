@@ -15,6 +15,7 @@ import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.hybrid.AndroidDeviceStateProvider
 import com.runanywhere.sdk.hybrid.HybridDeviceState
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
+import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.setDebugMode
 import kotlinx.coroutines.CoroutineScope
@@ -71,6 +72,9 @@ class RunAnywhereApplication : Application() {
         // and fail with -422 "No provider could handle the request" (same ordering as iOS).
         LlamaCPP.register()
         ONNX.register()
+        // QHexRT (Qualcomm Hexagon NPU). Registration is rejected internally on
+        // unsupported parts, so this is a safe no-op on non-v79/v81 devices.
+        QHexRT.register()
         RunAnywhere.initialize(
             apiKey = BuildConfig.RUNANYWHERE_API_KEY,
             baseURL = BuildConfig.RUNANYWHERE_BASE_URL,

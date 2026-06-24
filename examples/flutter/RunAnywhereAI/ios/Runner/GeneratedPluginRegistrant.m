@@ -84,6 +84,12 @@
 @import runanywhere_onnx;
 #endif
 
+#if __has_include(<runanywhere_qhexrt/QhexrtPlugin.h>)
+#import <runanywhere_qhexrt/QhexrtPlugin.h>
+#else
+@import runanywhere_qhexrt;
+#endif
+
 #if __has_include(<shared_preferences_foundation/SharedPreferencesPlugin.h>)
 #import <shared_preferences_foundation/SharedPreferencesPlugin.h>
 #else
@@ -112,6 +118,7 @@
   [GeniePlugin registerWithRegistrar:[registry registrarForPlugin:@"GeniePlugin"]];
   [LlamaCppPlugin registerWithRegistrar:[registry registrarForPlugin:@"LlamaCppPlugin"]];
   [OnnxPlugin registerWithRegistrar:[registry registrarForPlugin:@"OnnxPlugin"]];
+  [QhexrtPlugin registerWithRegistrar:[registry registrarForPlugin:@"QhexrtPlugin"]];
   [SharedPreferencesPlugin registerWithRegistrar:[registry registrarForPlugin:@"SharedPreferencesPlugin"]];
   [URLLauncherPlugin registerWithRegistrar:[registry registrarForPlugin:@"URLLauncherPlugin"]];
 }

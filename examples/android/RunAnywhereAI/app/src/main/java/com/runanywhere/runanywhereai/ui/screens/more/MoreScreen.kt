@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.runanywhere.runanywhereai.ui.navigation.Benchmarks
 import com.runanywhere.runanywhereai.ui.navigation.CloudProviders
 import com.runanywhere.runanywhereai.ui.navigation.Documents
+import com.runanywhere.runanywhereai.ui.navigation.Npu
 import com.runanywhere.runanywhereai.ui.navigation.Settings
 import com.runanywhere.runanywhereai.ui.navigation.Solutions
 import com.runanywhere.runanywhereai.ui.navigation.Stt
@@ -44,6 +45,7 @@ private data class MoreEntry(
 fun MoreScreen(onNavigate: (Any) -> Unit) {
     val dimens = LocalDimens.current
     val entries = listOf(
+        MoreEntry("NPU (QHexRT)", "Qualcomm Hexagon NPU status & detection", RACIcons.Outline.Cpu, Npu),
         MoreEntry("Settings", "Generation and storage", RACIcons.Outline.Settings, Settings),
         MoreEntry("Tool Calling", "Let the LLM use registered tools", RACIcons.Outline.Tool, Tools),
         MoreEntry("Text to Speech", "Read text aloud", RACIcons.Outline.Robot, Tts),
