@@ -62,9 +62,48 @@ private enum VoiceAgentStateProtoABI {
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
 
+    typealias TurnEventCallback = @convention(c) (
+        UnsafePointer<UInt8>?,
+        Int,
+        UnsafeMutableRawPointer?
+    ) -> Void
+
+    typealias ProcessTurnWithEvents = @convention(c) (
+        rac_voice_agent_handle_t?,
+        UnsafePointer<UInt8>?,
+        Int,
+        TurnEventCallback?,
+        UnsafeMutableRawPointer?
+    ) -> rac_result_t
+
     static let processTurnName = "rac_voice_agent_process_voice_turn_proto"
+    static let processTurnWithEventsName = "rac_voice_agent_process_turn_proto"
 
     static let processTurn = NativeProtoABI.load(processTurnName, as: ProcessTurn.self)
+    static let processTurnWithEvents = NativeProtoABI.load(
+        processTurnWithEventsName,
+        as: ProcessTurnWithEvents.self
+    )
+}
+
+private final class VoiceTurnEventCollector: @unchecked Sendable {
+    let onEvent: @Sendable (RAVoiceEvent) -> Void
+
+    init(onEvent: @escaping @Sendable (RAVoiceEvent) -> Void) {
+        self.onEvent = onEvent
+    }
+}
+
+private func voiceAgentTurnEventCallback(
+    bytes: UnsafePointer<UInt8>?,
+    size: Int,
+    userData: UnsafeMutableRawPointer?
+) {
+    guard let userData, let bytes, size > 0 else { return }
+    let collector = Unmanaged<VoiceTurnEventCollector>.fromOpaque(userData).takeUnretainedValue()
+    let data = Data(bytes: bytes, count: size)
+    guard let event = try? RAVoiceEvent(serializedBytes: data) else { return }
+    collector.onEvent(event)
 }
 
 private enum VLMCustomProtoABI {
@@ -437,6 +476,46 @@ extension CppBridge.VoiceAgent {
             audioData.withUnsafeBytes { audio in
                 processTurn(handle, audio.baseAddress, audioData.count, outBuffer)
             }
+        }
+    }
+
+    /// Drive one voice turn from serialized `RAVoiceAgentTurnRequest` bytes.
+    /// VoiceEvents fan out to the handle callback (and optional per-turn listener).
+    nonisolated static func processTurnProto(
+        handle: rac_voice_agent_handle_t,
+        request: RAVoiceAgentTurnRequest,
+        onTurnEvent: (@Sendable (RAVoiceEvent) -> Void)? = nil
+    ) throws -> rac_result_t {
+        let processTurn = try NativeProtoABI.require(
+            VoiceAgentStateProtoABI.processTurnWithEvents,
+            named: VoiceAgentStateProtoABI.processTurnWithEventsName
+        )
+        let requestData = try request.serializedData()
+
+        if let onTurnEvent {
+            let collector = VoiceTurnEventCollector(onEvent: onTurnEvent)
+            let collectorPtr = Unmanaged.passRetained(collector).toOpaque()
+            defer { Unmanaged<VoiceTurnEventCollector>.fromOpaque(collectorPtr).release() }
+
+            return requestData.withUnsafeBytes { requestBytes in
+                processTurn(
+                    handle,
+                    requestBytes.bindMemory(to: UInt8.self).baseAddress,
+                    requestData.count,
+                    voiceAgentTurnEventCallback,
+                    collectorPtr
+                )
+            }
+        }
+
+        return requestData.withUnsafeBytes { requestBytes in
+            processTurn(
+                handle,
+                requestBytes.bindMemory(to: UInt8.self).baseAddress,
+                requestData.count,
+                nil,
+                nil
+            )
         }
     }
 }

@@ -1213,8 +1213,10 @@ rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data)
     }
 
     const char* safe_token = token ? token : "";
-    ctx->text += safe_token;
-    if (safe_token[0] != '\0') {
+    char cleaned[512];
+    const char* display_token = vlm_strip_special_tokens(safe_token, cleaned, sizeof(cleaned));
+    if (display_token[0] != '\0') {
+        ctx->text += display_token;
         ++ctx->token_count;
     }
 
@@ -1224,14 +1226,18 @@ rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data)
     generation->set_kind(ctx->token_count == 1
                              ? runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED
                              : runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED);
-    generation->set_token(safe_token);
+    generation->set_token(display_token);
     generation->set_streaming_text(ctx->text);
     generation->set_tokens_count(ctx->token_count);
     if (ctx->ref->model_id)
         generation->set_model_id(ctx->ref->model_id);
     publish_event(event);
 
-    return dispatch_vlm_stream_event(ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN, safe_token,
+    if (display_token[0] == '\0') {
+        return RAC_TRUE;
+    }
+
+    return dispatch_vlm_stream_event(ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN, display_token,
                                      false, nullptr, nullptr, 0);
 }
 

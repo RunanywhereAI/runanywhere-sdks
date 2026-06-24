@@ -64,7 +64,7 @@ See `docs/RELEASE_INSTRUCTIONS.md`. Key step: after building, run `./scripts/pat
 | 0 | `ChatInterfaceView` | LLM chat with tool calling, LoRA, analytics |
 | 1 | `VisionHubView` | VLM camera |
 | 2 | `VoiceAssistantView` | Full voice agent (STT + LLM + TTS pipeline) |
-| 3 | `MoreHubView` | RAG, STT, TTS, VAD, Storage, Solutions, Voice Keyboard |
+| 3 | `MoreHubView` | RAG, STT, TTS, VAD, Storage, Voice Keyboard |
 | 4 | `CombinedSettingsView` | Generation params, API keys, tools, storage |
 
 > **Deferred backends.** MetalRT and Diffusion (image generation)
@@ -126,7 +126,6 @@ RunAnywhereAI/
 │   ├── Models/                         # Model browser/downloader (7 files)
 │   ├── Storage/                        # Disk usage management (2 files)
 │   ├── Settings/                       # App configuration (3 files)
-│   └── Solutions/                      # YAML pipeline demo (1 file)
 ├── Shared/
 │   ├── SharedConstants.swift           # IPC keys, Darwin notification names, URL scheme
 │   └── SharedDataBridge.swift          # App Group UserDefaults + Darwin CFNotificationCenter
@@ -261,10 +260,6 @@ Deterministic performance testing across 4 modalities (LLM, STT, TTS, VLM). Each
 `SettingsViewModel` (singleton): temperature, maxTokens, systemPrompt (UserDefaults), API key/baseURL (Keychain), thinking mode toggle. Auto-saves via Combine `debounce(0.5s)`.
 
 `ToolSettingsViewModel`: registers/clears demo tools via `RunAnywhere.registerTool(definition:executor:)`. Includes `SafeMathEvaluator` (recursive-descent parser) for the `calculate` tool.
-
-### 13. Solutions (`Features/Solutions/`)
-
-Minimal demo of `RunAnywhere.solutions.run(yaml:)` — the SDK's declarative pipeline API. Two hardcoded YAML strings (voice agent, RAG) submitted to SDK, lifecycle callbacks logged.
 
 ---
 
