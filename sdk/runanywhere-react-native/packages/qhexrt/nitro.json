@@ -1,0 +1,16 @@
+{
+  "cxxNamespace": ["runanywhere", "qhexrt"],
+  "ios": {
+    "iosModuleName": "RunAnywhereQHexRT"
+  },
+  "android": {
+    "androidNamespace": ["runanywhere", "qhexrt"],
+    "androidCxxLibName": "runanywhereqhexrt"
+  },
+  "autolinking": {
+    "RunAnywhereQHexRT": {
+      "cpp": "HybridRunAnywhereQHexRT"
+    }
+  },
+  "ignorePaths": ["node_modules", "lib", "example"]
+}

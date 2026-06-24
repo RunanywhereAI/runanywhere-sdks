@@ -32,6 +32,9 @@
 
 #if RAC_QHEXRT_ROUTABLE
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/stt/rac_stt_service.h"
+#include "rac/features/tts/rac_tts_service.h"
+#include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_primitive.h"
 #endif
@@ -73,8 +76,11 @@ const char* qhexrt_backend_build_info(void) {
 
 #if RAC_QHEXRT_ROUTABLE
 
-// LLM vtable defined in qhexrt_llm_ops.cpp.
+// Per-modality vtables defined in qhexrt_{llm,vlm,stt,tts}_ops.cpp.
 extern const rac_llm_service_ops_t g_qhexrt_llm_ops;
+extern const rac_vlm_service_ops_t g_qhexrt_vlm_ops;
+extern const rac_stt_service_ops_t g_qhexrt_stt_ops;
+extern const rac_tts_service_ops_t g_qhexrt_tts_ops;
 
 // Advisory routing metadata (validated at register, NOT used for selection —
 // selection is plain priority order via rac_plugin_find).
@@ -83,8 +89,14 @@ static const rac_runtime_id_t k_qhexrt_runtimes[] = {RAC_RUNTIME_QNN};
 // QHexRT runs prebuilt QNN context binaries referenced by a JSON manifest.
 static const uint32_t k_qhexrt_formats[] = {RAC_MODEL_FORMAT_ID_QNN_CONTEXT};
 
-// LLM today; VLM / TTS / ASR slots are reserved for follow-up wiring.
-static const rac_primitive_t k_qhexrt_primitives[] = {RAC_PRIMITIVE_GENERATE_TEXT};
+// One engine, four modalities: text (LLM), vision (VLM), speech-in (Whisper STT),
+// speech-out (MeloTTS).
+static const rac_primitive_t k_qhexrt_primitives[] = {
+    RAC_PRIMITIVE_GENERATE_TEXT,
+    RAC_PRIMITIVE_VLM,
+    RAC_PRIMITIVE_TRANSCRIBE,
+    RAC_PRIMITIVE_SYNTHESIZE,
+};
 
 static const rac_engine_manifest_t k_qhexrt_manifest = {
     .name = "qhexrt",
@@ -113,11 +125,11 @@ static const rac_engine_vtable_t g_qhexrt_engine_vtable = {
     /* on_unload        */ nullptr,
 
     /* llm_ops          */ &g_qhexrt_llm_ops,
-    /* stt_ops          */ nullptr,
-    /* tts_ops          */ nullptr,
+    /* stt_ops          */ &g_qhexrt_stt_ops,
+    /* tts_ops          */ &g_qhexrt_tts_ops,
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,
-    /* vlm_ops          */ nullptr,
+    /* vlm_ops          */ &g_qhexrt_vlm_ops,
     /* diffusion_ops    */ nullptr,
 
     /* reserved_slot_0..9 */

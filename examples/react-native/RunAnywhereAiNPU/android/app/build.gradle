@@ -1,0 +1,205 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+/**
+ * This is the configuration block to customize your React Native Android app.
+ * By default you don't need to apply any configuration, just uncomment the lines you need.
+ */
+react {
+    /* Autolinking */
+    autolinkLibrariesWithApp()
+}
+
+// =============================================================================
+// Auto-sync SDK native libraries into node_modules before each build
+// =============================================================================
+// node_modules/@runanywhere/<pkg> is a real copy (not symlink), so .so files from
+// the SDK source tree never automatically reach the Gradle modules that read from
+// node_modules/. Without this sync, every SDK rebuild requires a manual `cp` step
+// before `assembleDebug`, and stale .so silently ship in the APK.
+// =============================================================================
+// rootProject.projectDir resolves to examples/react-native/RunAnywhereAI/android,
+// so we walk up four levels (android -> RunAnywhereAI -> react-native -> examples -> root).
+def sdkRnPackagesRoot = file("${rootProject.projectDir}/../../../../sdk/runanywhere-react-native/packages")
+def rnExampleNodeModules = file("${rootProject.projectDir}/../node_modules/@runanywhere")
+
+def packageNameMap = [
+    "core"    : "core",
+    "llamacpp": "llamacpp",
+    "onnx"    : "onnx",
+]
+
+task syncSdkNativeLibs {
+    description = "Copy fresh .so + headers from SDK source tree into node_modules/@runanywhere/* before build."
+    group = "build setup"
+
+    doLast {
+        if (!sdkRnPackagesRoot.exists()) {
+            logger.lifecycle("[syncSdkNativeLibs] Skipping — SDK source tree not present at ${sdkRnPackagesRoot}")
+            return
+        }
+        def synced = 0
+        packageNameMap.each { sdkPkg, npmPkg ->
+            def src = new File(sdkRnPackagesRoot, "${sdkPkg}/android/src/main/jniLibs")
+            def dst = new File(rnExampleNodeModules, "${npmPkg}/android/src/main/jniLibs")
+            if (!src.exists()) {
+                logger.lifecycle("[syncSdkNativeLibs] No source jniLibs at ${src} — skipping ${sdkPkg}")
+                return
+            }
+            if (!dst.parentFile.exists()) {
+                logger.lifecycle("[syncSdkNativeLibs] Skipping ${sdkPkg} — node_modules dest missing (run yarn install?)")
+                return
+            }
+            // When yarn workspaces hoist + symlink node_modules/@runanywhere/* back into
+            // sdk/runanywhere-react-native/packages/*, src and dst resolve to the same
+            // canonical path — copying onto itself wipes header bytes. Skip in that case.
+            if (src.canonicalPath == dst.canonicalPath) {
+                logger.lifecycle("[syncSdkNativeLibs] Skipping ${sdkPkg} — node_modules entry is symlinked to SDK source (no copy needed)")
+                return
+            }
+            project.copy {
+                from src
+                into dst
+            }
+            synced++
+            logger.lifecycle("[syncSdkNativeLibs] Synced ${sdkPkg} -> ${dst}")
+        }
+        logger.lifecycle("[syncSdkNativeLibs] Synced ${synced} package(s)")
+    }
+}
+
+// Hook into the standard pre-build task so every assemble/install runs the sync.
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn syncSdkNativeLibs
+}
+
+// react-native-vision-camera 4.7.3 + Gradle 9.0
+// has a task-dependency race where :app:configureCMakeDebug[<abi>] tries to read
+// the vision-camera prefab directory before :react-native-vision-camera:prefabDebugPackage
+// has produced it. AGP only auto-wires prefabDebugConfigurePackage (which sets up the
+// publication metadata) but not prefabDebugPackage (which writes the actual prefab
+// dir under build/intermediates/prefab_package/debug/prefab/). Forcing the package
+// task as a hard dependency of every configureCMake variant resolves CXX1429 with
+// "directory ... is not readable".
+afterEvaluate {
+    def visionCameraProject = rootProject.findProject(":react-native-vision-camera")
+    if (visionCameraProject != null) {
+        tasks.matching { it.name.startsWith("configureCMakeDebug") || it.name.startsWith("configureCMakeRelWithDebInfo") || it.name.startsWith("configureCMakeRelease") }.configureEach { configTask ->
+            visionCameraProject.tasks.matching { it.name.startsWith("prefab") && it.name.endsWith("Package") }.configureEach { prefabTask ->
+                configTask.dependsOn prefabTask
+            }
+        }
+    }
+}
+
+/**
+ * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ */
+def enableProguardInReleaseBuilds = false
+
+/**
+ * The preferred build flavor of JavaScriptCore (JSC)
+ */
+def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "com.runanywhereaI"
+    defaultConfig {
+        applicationId "com.runanywhere.npu"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+
+        // Only build for arm64-v8a (actual devices)
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+
+        // 16KB page size support for Android 15+ (API 35)
+        // Use patched CheckIPOSupported.cmake to skip IPO check on Android
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+                          "-DCMAKE_MODULE_PATH=${projectDir}"
+            }
+        }
+        ndkVersion "27.0.12077973"
+    }
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            // Caution! In production, you need to generate your own keystore file.
+            // see https://reactnative.dev/docs/signed-apk-android.
+            signingConfig signingConfigs.debug
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+
+    // Handle duplicate native libraries from different sources
+    packagingOptions {
+        pickFirsts = [
+            "**/libc++_shared.so",
+            "**/libjsi.so",
+            "**/libfbjni.so",
+            "**/libfolly_runtime.so",
+            "**/libreactnative.so",
+            "**/libNitroModules.so",  // Nitro modules shared by @runanywhere/onnx and react-native-nitro-modules
+            "**/librac_backend_onnx.so", // ONNX backend shared by multiple modules
+            "**/librac_commons.so",
+            "**/libomp.so",
+            "**/libcdsprpc.so",
+            "**/libGenie.so",
+            "**/libQnn*.so",
+            "**/librac_backend_genie*.so"
+        ]
+    }
+
+    // Use AGP's modern native packaging. The SDK Android modules also replace
+    // NDK runtime .so files with 16 KB ELF-aligned copies before merge.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+}
+
+dependencies {
+    // The version of react-native is set by the React Native Gradle Plugin
+    implementation("com.facebook.react:react-android")
+
+    // PDF text extraction for DocumentService (RAG)
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
+    // Manually link Nitro modules (excluded from autolinking)
+    implementation project(':react-native-nitro-modules')
+
+    // Manually link @runanywhere packages (Nitro modules)
+    implementation project(':runanywhere_core')
+    implementation project(':runanywhere_qhexrt')
+
+    def isHermesEnabled = project.hasProperty("hermesEnabled") ? project.hermesEnabled.toBoolean() : true
+    // Expose hermesEnabled for other modules (like react-native-worklets)
+    project.ext.hermesEnabled = isHermesEnabled
+    if (isHermesEnabled) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation jscFlavor
+    }
+}

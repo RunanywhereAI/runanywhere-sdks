@@ -838,6 +838,8 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
             return "MetalRT";
         case RAC_FRAMEWORK_GENIE:
             return "Genie";
+        case RAC_FRAMEWORK_QHEXRT:
+            return "QHexRT";
         case RAC_FRAMEWORK_BUILTIN:
             return "BuiltIn";
         case RAC_FRAMEWORK_NONE:
@@ -1420,6 +1422,9 @@ rac_result_t rac_model_paths_extract_framework(const char* path,
         return RAC_SUCCESS;
     } else if (nextComponent == "Genie") {
         *out_framework = RAC_FRAMEWORK_GENIE;
+        return RAC_SUCCESS;
+    } else if (nextComponent == "QHexRT") {
+        *out_framework = RAC_FRAMEWORK_QHEXRT;
         return RAC_SUCCESS;
     }
 

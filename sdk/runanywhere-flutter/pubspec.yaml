@@ -9,6 +9,7 @@ workspace:
   - packages/runanywhere_llamacpp
   - packages/runanywhere_onnx
   - packages/runanywhere_genie
+  - packages/runanywhere_qhexrt
 
 dev_dependencies:
   melos: ^7.7.0

@@ -2,29 +2,19 @@
  * @file qhexrt_llm_ops.cpp
  * @brief LLM (RAC_PRIMITIVE_GENERATE_TEXT) vtable over the QHexRT C ABI.
  *
- * Compiled ONLY in linked builds (RAC_QHEXRT_ENGINE_AVAILABLE=1); the public
- * stub build never sees this TU (see CMakeLists.txt). It adapts the generic
- * `rac_llm_service_ops_t` contract onto QHexRT's `qhx_*` C ABI
- * (qhexrt/qhexrt_c.h, supplied by the prebuilt archive under QHEXRT_ROOT).
- *
- * Ownership / lifetime:
- *   - One process-wide qhx_runtime, refcounted across impls (QHexRT documents
- *     the runtime as one-per-process; burst clock pinned on create).
- *   - One qhx_model + qhx_session per impl. Sessions are NOT thread-safe, so a
- *     single impl must not be driven concurrently — the SDK owns one impl per
- *     logical model handle.
+ * Compiled ONLY in routable builds (RAC_QHEXRT_ENGINE_AVAILABLE=1); the public
+ * stub build never sees this TU (see CMakeLists.txt). Adapts the generic
+ * `rac_llm_service_ops_t` onto QHexRT's `qhx_*` C ABI via the shared session
+ * helper (qhexrt_session.h).
  *
  * No C++ exception may cross back into the registry / JNI: every op body wraps
- * its allocating work and coerces failures to rac_result_t, matching the
- * noexcept contract the plugin registry relies on.
+ * its allocating work and coerces failures to rac_result_t.
  */
 
-#include <atomic>
 #include <cstdint>
-#include <mutex>
 #include <string>
 
-#include "qhexrt/qhexrt_c.h"  // private ABI header, from QHEXRT_ROOT/include
+#include "qhexrt_session.h"
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -35,46 +25,11 @@ namespace {
 
 const char* LOG_CAT = "QHexRT";
 
-// ─────────────────────────── process-wide runtime ───────────────────────────
-std::mutex g_rt_mutex;
-qhx_runtime* g_rt = nullptr;
-std::size_t g_rt_refs = 0;
+using qhexrt_engine::Session;
+using qhexrt_engine::session_close;
+using qhexrt_engine::session_open;
 
-qhx_runtime* runtime_acquire() {
-    std::lock_guard<std::mutex> lock(g_rt_mutex);
-    if (g_rt == nullptr) {
-        g_rt = qhx_runtime_create(nullptr, nullptr);  // default libQnnHtp.so / libQnnSystem.so
-        if (g_rt == nullptr) {
-            RAC_LOG_ERROR(LOG_CAT, "qhx_runtime_create failed (QNN libs unavailable?)");
-            return nullptr;
-        }
-        char arch[32] = {0};
-        qhx_runtime_device(g_rt, arch, sizeof(arch), nullptr, nullptr);
-        RAC_LOG_INFO(LOG_CAT, "QHexRT runtime up (arch=%s, %s)", arch, qhx_version());
-    }
-    ++g_rt_refs;
-    return g_rt;
-}
-
-void runtime_release() {
-    std::lock_guard<std::mutex> lock(g_rt_mutex);
-    if (g_rt_refs == 0) {
-        return;
-    }
-    if (--g_rt_refs == 0) {
-        qhx_runtime_free(g_rt);
-        g_rt = nullptr;
-    }
-}
-
-// ─────────────────────────────── per-impl state ─────────────────────────────
-struct QhxImpl {
-    qhx_model* model = nullptr;
-    qhx_session* sess = nullptr;
-    std::atomic<bool> cancel{false};
-};
-
-QhxImpl* as_impl(void* impl) { return static_cast<QhxImpl*>(impl); }
+Session* as_session(void* impl) { return static_cast<Session*>(impl); }
 
 void fill_cfg(qhx_gen_cfg* cfg, const rac_llm_options_t* o) {
     qhx_gen_cfg_default(cfg);
@@ -107,7 +62,7 @@ void fill_inputs(qhx_inputs* in, const char* prompt, const rac_llm_options_t* o)
 struct StreamCtx {
     rac_llm_stream_callback_fn cb;
     void* user;
-    QhxImpl* impl;
+    Session* session;
     std::string buf;  // reused per chunk to NUL-terminate
 };
 
@@ -116,7 +71,7 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
     if (c == nullptr || is_final != 0 || utf8 == nullptr) {
         return 1;  // nothing to forward on the terminal call
     }
-    if (c->impl != nullptr && c->impl->cancel.load(std::memory_order_relaxed)) {
+    if (c->session != nullptr && c->session->cancel.load(std::memory_order_relaxed)) {
         return 0;  // barge-in
     }
     if (c->cb == nullptr) {
@@ -140,7 +95,7 @@ void fill_result(rac_llm_result_t* out, const qhx_output& o) {
 // ───────────────────────────────── vtable ops ───────────────────────────────
 
 // QHexRT loads the model eagerly in create(); model_id IS the manifest path.
-rac_result_t qhexrt_create(const char* model_id, const char* /*config_json*/, void** out_impl) {
+rac_result_t qhexrt_llm_create(const char* model_id, const char* /*config_json*/, void** out_impl) {
     if (out_impl == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -148,45 +103,21 @@ rac_result_t qhexrt_create(const char* model_id, const char* /*config_json*/, vo
     if (model_id == nullptr || model_id[0] == '\0') {
         return RAC_ERROR_NULL_POINTER;
     }
-    RAC_LOG_INFO(LOG_CAT, "qhexrt_create: manifest=%s", model_id);
-
-    qhx_runtime* rt = runtime_acquire();
-    if (rt == nullptr) {
+    RAC_LOG_INFO(LOG_CAT, "qhexrt_llm_create: manifest=%s", model_id);
+    Session* s = session_open(model_id);
+    if (s == nullptr) {
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
-
-    QhxImpl* impl = nullptr;
-    try {
-        impl = new QhxImpl();
-    } catch (...) {
-        runtime_release();
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-
-    impl->model = qhx_model_load(rt, model_id, nullptr);
-    if (impl->model == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "qhx_model_load failed: %s", model_id);
-        delete impl;
-        runtime_release();
-        return RAC_ERROR_GENERATION_FAILED;
-    }
-    impl->sess = qhx_session_create(impl->model);
-    if (impl->sess == nullptr) {
-        qhx_model_free(impl->model);
-        delete impl;
-        runtime_release();
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    *out_impl = impl;
+    *out_impl = s;
     return RAC_SUCCESS;
 }
 
 // Model is already loaded in create(); initialize is a no-op for symmetry.
-rac_result_t qhexrt_initialize(void* /*impl*/, const char* /*model_path*/) { return RAC_SUCCESS; }
+rac_result_t qhexrt_llm_initialize(void* /*impl*/, const char* /*model_path*/) { return RAC_SUCCESS; }
 
-rac_result_t qhexrt_generate(void* impl, const char* prompt, const rac_llm_options_t* options,
-                             rac_llm_result_t* out_result) {
-    auto* c = as_impl(impl);
+rac_result_t qhexrt_llm_generate(void* impl, const char* prompt, const rac_llm_options_t* options,
+                                 rac_llm_result_t* out_result) {
+    auto* c = as_session(impl);
     if (c == nullptr || c->sess == nullptr || out_result == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
@@ -209,10 +140,10 @@ rac_result_t qhexrt_generate(void* impl, const char* prompt, const rac_llm_optio
     }
 }
 
-rac_result_t qhexrt_generate_stream(void* impl, const char* prompt,
-                                    const rac_llm_options_t* options,
-                                    rac_llm_stream_callback_fn callback, void* user_data) {
-    auto* c = as_impl(impl);
+rac_result_t qhexrt_llm_generate_stream(void* impl, const char* prompt,
+                                        const rac_llm_options_t* options,
+                                        rac_llm_stream_callback_fn callback, void* user_data) {
+    auto* c = as_session(impl);
     if (c == nullptr || c->sess == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
@@ -235,11 +166,11 @@ rac_result_t qhexrt_generate_stream(void* impl, const char* prompt,
     }
 }
 
-rac_result_t qhexrt_get_info(void* impl, rac_llm_info_t* out_info) {
+rac_result_t qhexrt_llm_get_info(void* impl, rac_llm_info_t* out_info) {
     if (out_info == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
-    auto* c = as_impl(impl);
+    auto* c = as_session(impl);
     out_info->is_ready = (c != nullptr && c->sess != nullptr) ? RAC_TRUE : RAC_FALSE;
     out_info->current_model = nullptr;
     out_info->context_length = 0;
@@ -247,8 +178,8 @@ rac_result_t qhexrt_get_info(void* impl, rac_llm_info_t* out_info) {
     return RAC_SUCCESS;
 }
 
-rac_result_t qhexrt_cancel(void* impl) {
-    auto* c = as_impl(impl);
+rac_result_t qhexrt_llm_cancel(void* impl) {
+    auto* c = as_session(impl);
     if (c != nullptr) {
         c->cancel.store(true, std::memory_order_relaxed);
     }
@@ -256,43 +187,29 @@ rac_result_t qhexrt_cancel(void* impl) {
 }
 
 // Drop KV / counters; keeps the service (model + session) alive.
-rac_result_t qhexrt_cleanup(void* impl) {
-    auto* c = as_impl(impl);
+rac_result_t qhexrt_llm_cleanup(void* impl) {
+    auto* c = as_session(impl);
     if (c != nullptr && c->sess != nullptr) {
         qhx_session_reset(c->sess);
     }
     return RAC_SUCCESS;
 }
 
-void qhexrt_destroy(void* impl) {
-    auto* c = as_impl(impl);
-    if (c == nullptr) {
-        return;
-    }
-    if (c->sess != nullptr) {
-        qhx_session_free(c->sess);
-    }
-    if (c->model != nullptr) {
-        qhx_model_free(c->model);
-    }
-    delete c;
-    runtime_release();
-}
+void qhexrt_llm_destroy(void* impl) { session_close(as_session(impl)); }
 
 }  // namespace
 
 // Consumed by rac_plugin_entry_qhexrt.cpp (external linkage; visibility limited
-// to the carrier library by the plugin target's hidden-by-default visibility).
-// Optional ops QHexRT does not serve (LoRA, adaptive-context) are NULL: the
-// registry maps NULL to RAC_ERROR_NOT_SUPPORTED.
+// to the carrier library). Optional ops QHexRT does not serve (LoRA, adaptive
+// context) are NULL: the registry maps NULL to RAC_ERROR_NOT_SUPPORTED.
 extern "C" const rac_llm_service_ops_t g_qhexrt_llm_ops = {
-    /* .initialize            = */ qhexrt_initialize,
-    /* .generate              = */ qhexrt_generate,
-    /* .generate_stream       = */ qhexrt_generate_stream,
-    /* .get_info              = */ qhexrt_get_info,
-    /* .cancel                = */ qhexrt_cancel,
-    /* .cleanup               = */ qhexrt_cleanup,
-    /* .destroy               = */ qhexrt_destroy,
+    /* .initialize            = */ qhexrt_llm_initialize,
+    /* .generate              = */ qhexrt_llm_generate,
+    /* .generate_stream       = */ qhexrt_llm_generate_stream,
+    /* .get_info              = */ qhexrt_llm_get_info,
+    /* .cancel                = */ qhexrt_llm_cancel,
+    /* .cleanup               = */ qhexrt_llm_cleanup,
+    /* .destroy               = */ qhexrt_llm_destroy,
     /* .load_lora             = */ nullptr,
     /* .remove_lora           = */ nullptr,
     /* .clear_lora            = */ nullptr,
@@ -301,5 +218,5 @@ extern "C" const rac_llm_service_ops_t g_qhexrt_llm_ops = {
     /* .append_context        = */ nullptr,
     /* .generate_from_context = */ nullptr,
     /* .clear_context         = */ nullptr,
-    /* .create                = */ qhexrt_create,
+    /* .create                = */ qhexrt_llm_create,
 };

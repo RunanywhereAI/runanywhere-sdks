@@ -612,6 +612,8 @@ rac_inference_framework_t proto_framework_to_c(rav1::InferenceFramework framewor
             return RAC_FRAMEWORK_GENIE;
         case rav1::INFERENCE_FRAMEWORK_SHERPA:
             return RAC_FRAMEWORK_SHERPA;
+        case rav1::INFERENCE_FRAMEWORK_QHEXRT:
+            return RAC_FRAMEWORK_QHEXRT;
         case rav1::INFERENCE_FRAMEWORK_NONE:
             return RAC_FRAMEWORK_NONE;
         default:

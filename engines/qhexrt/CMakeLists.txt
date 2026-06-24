@@ -57,7 +57,9 @@ if(NOT _qhexrt_abi)
     set(_qhexrt_abi "arm64-v8a")
 endif()
 
-set(QHEXRT_SOURCES rac_plugin_entry_qhexrt.cpp)
+set(QHEXRT_SOURCES
+    rac_plugin_entry_qhexrt.cpp
+    rac_backend_qhexrt_register.cpp)
 set(QHEXRT_LINK_LIBS "")
 set(QHEXRT_COMPILE_DEFS RAC_QHEXRT_BUILDING)
 set(QHEXRT_INCLUDE_DIRS
@@ -66,20 +68,27 @@ set(QHEXRT_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/..)  # engines/ — for engines/common/rac_engine_unavailable.h
 
 # Discover the prebuilt archive + private header. All three must be present to
-# claim the engine available; a partial tree falls back to the stub.
-find_library(QHEXRT_CORE_LIB NAMES qhexrt_core
-    PATHS "${QHEXRT_ROOT}/lib/${_qhexrt_abi}" NO_DEFAULT_PATH)
-find_library(QHEXRT_HOST_LIB NAMES qhexrt_host
-    PATHS "${QHEXRT_ROOT}/lib/${_qhexrt_abi}" NO_DEFAULT_PATH)
+# claim the engine available; a partial tree falls back to the stub. Explicit
+# paths (not find_library): the Android NDK toolchain re-roots find_library
+# PATHS under the sysroot (CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY), which would
+# never see this out-of-sysroot prebuilt tree.
+set(QHEXRT_CORE_LIB "${QHEXRT_ROOT}/lib/${_qhexrt_abi}/libqhexrt_core.a")
+set(QHEXRT_HOST_LIB "${QHEXRT_ROOT}/lib/${_qhexrt_abi}/libqhexrt_host.a")
 
-if(QHEXRT_CORE_LIB AND QHEXRT_HOST_LIB AND EXISTS "${QHEXRT_ROOT}/include/qhexrt/qhexrt_c.h")
+if(EXISTS "${QHEXRT_CORE_LIB}" AND EXISTS "${QHEXRT_HOST_LIB}" AND
+   EXISTS "${QHEXRT_ROOT}/include/qhexrt/qhexrt_c.h")
     set(RAC_QHEXRT_ENGINE_AVAILABLE 1)
     message(STATUS "  QHexRT engine discovered:")
     message(STATUS "    header: ${QHEXRT_ROOT}/include/qhexrt/qhexrt_c.h")
     message(STATUS "    core:   ${QHEXRT_CORE_LIB}")
     message(STATUS "    host:   ${QHEXRT_HOST_LIB}")
 
-    list(APPEND QHEXRT_SOURCES qhexrt_llm_ops.cpp)
+    list(APPEND QHEXRT_SOURCES
+        qhexrt_session.cpp
+        qhexrt_llm_ops.cpp
+        qhexrt_vlm_ops.cpp
+        qhexrt_stt_ops.cpp
+        qhexrt_tts_ops.cpp)
     list(APPEND QHEXRT_INCLUDE_DIRS "${QHEXRT_ROOT}/include")
     list(APPEND QHEXRT_COMPILE_DEFS RAC_QHEXRT_ENGINE_AVAILABLE=1)
 
@@ -120,6 +129,46 @@ if(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_backend_qhexrt PRIVATE log)
     target_compile_options(rac_backend_qhexrt PRIVATE -O3 -ffunction-sections -fdata-sections)
     target_link_options(rac_backend_qhexrt PRIVATE
+        -Wl,--gc-sections
+        -Wl,-z,max-page-size=16384
+        -Wl,-z,common-page-size=16384)
+endif()
+
+# =============================================================================
+# JNI bridge (Android) — librac_backend_qhexrt_jni.so
+#
+# Standalone JNI carrier the Kotlin runanywhere-core-qhexrt module loads. Owns
+# JNI_OnLoad; nativeRegister calls rac_backend_qhexrt_register(); nativeProbeNpu
+# calls rac_npu_probe() (resolved at runtime from librac_commons.so). Builds in
+# both stub and linked modes; in stub mode register reports BACKEND_UNAVAILABLE.
+# =============================================================================
+if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED AND RAC_BUILD_JNI)
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+        set(_QHEXRT_NDK_HOST_TAG "darwin-x86_64")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+        set(_QHEXRT_NDK_HOST_TAG "linux-x86_64")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+        set(_QHEXRT_NDK_HOST_TAG "windows-x86_64")
+    else()
+        message(FATAL_ERROR "Unsupported host for QHexRT JNI bridge: ${CMAKE_HOST_SYSTEM_NAME}")
+    endif()
+
+    set(_QHEXRT_NDK_SYSROOT_INCLUDE
+        "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/${_QHEXRT_NDK_HOST_TAG}/sysroot/usr/include")
+    if(NOT EXISTS "${_QHEXRT_NDK_SYSROOT_INCLUDE}/jni.h")
+        message(FATAL_ERROR "Could not locate Android NDK JNI headers at ${_QHEXRT_NDK_SYSROOT_INCLUDE}")
+    endif()
+
+    add_library(rac_backend_qhexrt_jni SHARED jni/rac_backend_qhexrt_jni.cpp)
+    target_include_directories(rac_backend_qhexrt_jni PRIVATE
+        ${_QHEXRT_NDK_SYSROOT_INCLUDE}
+        ${_QHEXRT_NDK_SYSROOT_INCLUDE}/android
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${RAC_COMMONS_ROOT_DIR}/include)
+    target_link_libraries(rac_backend_qhexrt_jni PRIVATE rac_backend_qhexrt log)
+    target_compile_options(rac_backend_qhexrt_jni PRIVATE
+        -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
+    target_link_options(rac_backend_qhexrt_jni PRIVATE
         -Wl,--gc-sections
         -Wl,-z,max-page-size=16384
         -Wl,-z,common-page-size=16384)
