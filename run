@@ -6,7 +6,6 @@ cd "${REPO_ROOT}"
 
 KOTLIN_SDK_DIR="sdk/runanywhere-kotlin"
 ANDROID_EXAMPLE_DIR="examples/android/RunAnywhereAI"
-NPU_EXAMPLE_DIR="examples/android/RunAnywhereAiNPU"
 
 if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ]; then
     C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_CMD=$'\033[36m'
@@ -55,7 +54,6 @@ ${C_BOLD}EXAMPLE APPS${C_RESET}
   ${C_CMD}example android install${C_RESET}      Stage + build + install + launch on device
   ${C_CMD}example android lint${C_RESET}         ktlint + detekt for the example app
   ${C_CMD}example android clean${C_RESET}        Clean Android example build outputs
-  ${C_CMD}example npu${C_RESET} {build|install|clean}  QHexRT NPU demo — publishes SDK to ~/.m2, then builds/installs
   ${C_CMD}example flutter${C_RESET} {build|clean}
   ${C_CMD}example ios${C_RESET}     {build|clean}   ${C_DIM}(macOS only)${C_RESET}
   ${C_CMD}example web${C_RESET}     {dev|build|clean}
@@ -176,17 +174,6 @@ cmd_example_android() {
     esac
 }
 
-cmd_example_npu() {
-    case "${1:-}" in
-        build)    cmd_sdk_kotlin publish && (cd "${NPU_EXAMPLE_DIR}" && ./gradlew :app:assembleDebug) ;;
-        install)  cmd_sdk_kotlin publish \
-                    && (cd "${NPU_EXAMPLE_DIR}" && ./gradlew :app:installDebug) \
-                    && adb shell am start -n com.runanywhere.sdk.runanywhereainpu/.MainActivity ;;
-        clean)    (cd "${NPU_EXAMPLE_DIR}" && ./gradlew clean) ;;
-        *)        bad_subcommand "example npu" "${1:-}" ;;
-    esac
-}
-
 cmd_example_flutter() {
     local ex_dir="${EX:-examples/flutter/RunAnywhereAI}"
     case "${1:-}" in
@@ -219,7 +206,6 @@ cmd_example_web() {
 cmd_example() {
     case "${1:-}" in
         android) shift; cmd_example_android "$@" ;;
-        npu)     shift; cmd_example_npu     "$@" ;;
         flutter) shift; cmd_example_flutter "$@" ;;
         ios)     shift; cmd_example_ios     "$@" ;;
         web)     shift; cmd_example_web     "$@" ;;

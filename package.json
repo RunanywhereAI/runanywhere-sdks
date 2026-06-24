@@ -9,8 +9,7 @@
     "sdk/runanywhere-react-native/packages/llamacpp",
     "sdk/runanywhere-react-native/packages/onnx",
     "sdk/runanywhere-react-native/packages/qhexrt",
-    "examples/react-native/RunAnywhereAI",
-    "examples/react-native/RunAnywhereAiNPU"
+    "examples/react-native/RunAnywhereAI"
   ],
   "packageManager": "yarn@3.6.1",
   "resolutions": {

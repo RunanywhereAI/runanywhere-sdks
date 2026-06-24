@@ -131,34 +131,39 @@ $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/*/bin/llvm-nm -D \
 > `librac_commons.so`. Adding a commons symbol means re-staging the fresh `.so`
 > into every target, not just one.
 
-### 4.4 Build the demo apps
+### 4.4 Build the existing example apps (they consume QHexRT)
 
-**Kotlin** (`examples/android/RunAnywhereAiNPU`):
+QHexRT is consumed by the **existing** `RunAnywhereAI` example apps — there is no
+separate NPU app. Each registers the QHexRT backend (Android-only, guarded
+alongside llamacpp/onnx), surfaces the NPU capability probe, and exposes a
+dedicated NPU section.
+
+**Kotlin** (`examples/android/RunAnywhereAI`):
 
 ```bash
-./run example npu build      # publishes the Kotlin SDK to ~/.m2, then assembleDebug
-./run example npu install    # + installDebug + launch
+./run example android build      # stage SDK AARs, then assembleDebug
+./run example android install    # + installDebug + launch
 ```
 
-**Flutter** (`examples/flutter/RunAnywhereAiNPU`):
+**Flutter** (`examples/flutter/RunAnywhereAI`):
 
 ```bash
-cd examples/flutter/RunAnywhereAiNPU
+cd examples/flutter/RunAnywhereAI
 flutter pub get
 flutter build apk --debug
-flutter install              # or: adb install -r build/app/outputs/flutter-apk/app-debug.apk
+flutter install
 ```
 
-**React Native** (`examples/react-native/RunAnywhereAiNPU`):
+**React Native** (`examples/react-native/RunAnywhereAI`):
 
 ```bash
-# from repo root — links the workspace (includes @runanywhere/qhexrt + this app)
+# from repo root — links the workspace (includes @runanywhere/qhexrt)
 corepack yarn install
 # regenerate the Nitro bridge if the .nitro.ts spec changed:
 (cd sdk/runanywhere-react-native/packages/qhexrt && \
    ../../node_modules/.bin/nitrogen)
 
-cd examples/react-native/RunAnywhereAiNPU/android
+cd examples/react-native/RunAnywhereAI/android
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 
@@ -166,8 +171,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb reverse tcp:8081 tcp:8081
 corepack yarn start
 ```
-
-App id / label: `com.runanywhere.npu` / "RunAnywhere NPU".
 
 ## 5. NPU capability detection
 
@@ -190,9 +193,9 @@ sdk/runanywhere-commons/  ──┘                                  librac_back
         │ stage .so into each package jniLibs
         ▼
 kt / flutter / rn  qhexrt packages + core packages
-        │ build
+        │ consumed by
         ▼
-RunAnywhereAiNPU demo apps  (kt / flutter / rn)
+existing RunAnywhereAI example apps  (kt / flutter / rn)
 ```
 
 ## 7. Known gaps
