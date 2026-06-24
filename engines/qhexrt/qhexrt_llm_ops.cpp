@@ -68,13 +68,16 @@ struct StreamCtx {
 
 int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, int is_final) {
     auto* c = static_cast<StreamCtx*>(user);
-    if (c == nullptr || is_final != 0 || utf8 == nullptr) {
-        return 1;  // nothing to forward on the terminal call
+    if (c == nullptr || utf8 == nullptr) {
+        return 1;
     }
     if (c->session != nullptr && c->session->cancel.load(std::memory_order_relaxed)) {
         return 0;  // barge-in
     }
     if (c->cb == nullptr) {
+        return 1;
+    }
+    if (is_final != 0 && len <= 0) {
         return 1;
     }
     c->buf.assign(utf8, static_cast<size_t>(len < 0 ? 0 : len));

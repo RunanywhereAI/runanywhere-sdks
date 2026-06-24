@@ -71,7 +71,7 @@ fun VoiceScreen() {
     val sttName = sttVm.state.models.firstOrNull { it.id == sttVm.state.currentModelId }?.name
     val ttsVoice = ttsVm.state.models.firstOrNull { it.id == ttsVm.state.currentModelId }
     val vadName = vadVm.state.models.firstOrNull { it.id == vadVm.state.currentModelId }?.name
-    val ready = llmName != null && sttName != null && ttsVoice != null && vadName != null
+    val ready = llmName != null && sttName != null && ttsVoice != null
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -115,13 +115,13 @@ fun VoiceScreen() {
                 SetupRow(RACIcons.Outline.Robot, "Voice", ttsVoice?.name, onClick = { sheet = ttsVm })
                 Divider()
                 SetupRow(RACIcons.Outline.Activity, "Voice activity (VAD)", vadName, onClick = { sheet = vadVm })
-}
+            }
         }
 
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
             if (voiceVm.turns.isEmpty()) {
                 Text(
-                    text = if (ready) "Tap the mic and start talking" else "Pick a model for each step to begin",
+                    text = if (ready) "Tap the mic and start talking" else "Pick the required models to begin",
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -152,8 +152,16 @@ rac_result_t qhexrt_tts_synthesize_stream(void* impl, const char* text,
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(tts stream) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
-        if (callback != nullptr && out.audio != nullptr && out.n_audio > 0) {
-            callback(out.audio, static_cast<size_t>(out.n_audio) * sizeof(float), user_data);
+        if (callback != nullptr) {
+            void* audio = nullptr;
+            size_t bytes = 0;
+            if (!copy_waveform(out, &audio, &bytes)) {
+                return RAC_ERROR_OUT_OF_MEMORY;
+            }
+            if (audio != nullptr && bytes > 0) {
+                callback(audio, bytes, user_data);
+            }
+            std::free(audio);
         }
         return RAC_SUCCESS;
     } catch (...) {

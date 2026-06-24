@@ -1,6 +1,5 @@
 package com.runanywhere.sdk.runanywhereainpu.ui.screens
 
-import ai.runanywhere.proto.v1.VLMImageFormat
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,7 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.fromEncoded
+import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
@@ -41,12 +40,14 @@ import com.runanywhere.sdk.runanywhereainpu.ui.theme.Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 @Composable
 fun VlmScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var imageBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var imagePath by remember { mutableStateOf<String?>(null) }
     var thumbnail by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var prompt by remember { mutableStateOf(TextFieldValue("Describe this image.")) }
     var output by remember { mutableStateOf("") }
@@ -57,8 +58,12 @@ fun VlmScreen() {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            imagePath?.let { runCatching { File(it).delete() } }
             imageBytes = bytes
             thumbnail = bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
+            imagePath = bytes?.let {
+                File.createTempFile("vlm_", ".jpg", context.cacheDir).apply { writeBytes(it) }.absolutePath
+            }
         }
     }
 
@@ -87,10 +92,10 @@ fun VlmScreen() {
         Button(
             onClick = {
                 output = ""; error = null; running = true
-                val bytes = imageBytes!!
+                val path = imagePath!!
                 scope.launch {
                     try {
-                        val image = RAVLMImage.fromEncoded(bytes, VLMImageFormat.VLM_IMAGE_FORMAT_JPEG)
+                        val image = RAVLMImage.fromFilePath(path)
                         val opts = RAVLMGenerationOptions(prompt = prompt.text, max_tokens = 200)
                         val result = withContext(Dispatchers.Default) {
                             RunAnywhere.processImage(image, opts)
@@ -104,7 +109,7 @@ fun VlmScreen() {
                     }
                 }
             },
-            enabled = !running && imageBytes != null && prompt.text.isNotBlank(),
+            enabled = !running && imagePath != null && prompt.text.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(if (running) "Processing…" else "Describe")
