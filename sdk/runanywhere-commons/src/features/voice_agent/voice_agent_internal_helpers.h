@@ -114,6 +114,25 @@ void emit_component_failure(rac_voice_agent_handle_t handle, const char* compone
 // in `proto`; caller must keep `proto` alive across the use.
 rac_voice_agent_config_t config_from_proto(const runanywhere::v1::VoiceAgentComposeConfig& proto);
 
+// Run one complete VAD -> STT -> LLM -> TTS turn over a pre-segmented
+// `audio` buffer (16 kHz mono PCM16). This is the shared pipeline core of
+// the full-session ABI: `rac_voice_agent_process_turn_proto` calls it with
+// the parsed turn request, and `rac_voice_agent_feed_audio_proto` calls it
+// once the in-core segmenter closes an utterance. Emits the same d7
+// VoiceEvents (component states, turn lifecycle, pipeline state, VAD, STT,
+// LLM token, TTS audio) through @p event_callback (may be NULL — the
+// per-handle proto callback still receives every event) and, when
+// @p out_result is non-NULL, also fills a `VoiceAgentResult` carrying the
+// transcript, response, and synthesized WAV for inline playback.
+//
+// Acquires `handle->mutex` internally. The caller owns admission
+// (InFlightGuard) and the `is_configured` gate.
+rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::string& audio,
+                                  const std::string& session_id, const std::string& turn_id,
+                                  const std::string& request_id, const std::string& language_code,
+                                  rac_voice_agent_turn_event_callback_fn event_callback,
+                                  void* user_data, runanywhere::v1::VoiceAgentResult* out_result);
+
 #endif  // RAC_HAVE_PROTOBUF
 
 // Validate all four voice-agent modalities are READY (lifecycle preferred,
