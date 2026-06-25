@@ -202,30 +202,46 @@ public extension RunAnywhere {
     /// Open a stream of canonical `RAVoiceEvent` proto events for the active
     /// voice agent.
     ///
+    /// While the stream is consumed, a platform mic driver captures audio,
+    /// segments utterances, and submits them via `rac_voice_agent_process_turn_proto`.
+    /// Events fan out through the handle callback registered by
+    /// `VoiceAgentStreamAdapter`.
+    ///
     /// Cancellation: breaking out of the consuming `for-await` loop (or
-    /// cancelling the surrounding `Task`) tears down the C callback via
-    /// `rac_voice_agent_set_proto_callback(handle, nullptr, nullptr)`.
+    /// cancelling the surrounding `Task`) tears down mic capture and the C
+    /// callback via `rac_voice_agent_set_proto_callback(handle, nullptr, nullptr)`.
     static func streamVoiceAgent() -> AsyncStream<RAVoiceEvent> {
         AsyncStream { continuation in
             let task = Task {
-                guard isInitialized else {
-                    continuation.finish()
-                    return
-                }
-
-                let handle: rac_voice_agent_handle_t
                 do {
-                    try await ensureServicesReady()
-                    handle = try await CppBridge.VoiceAgent.shared.getHandle()
-                } catch {
-                    continuation.finish()
-                    return
-                }
+                    guard isInitialized else {
+                        continuation.finish()
+                        return
+                    }
 
-                let adapter = VoiceAgentStreamAdapter(handle: handle)
-                for await event in adapter.stream() {
-                    if Task.isCancelled { break }
-                    continuation.yield(event)
+                    try await ensureServicesReady()
+                    let handle = try await CppBridge.VoiceAgent.shared.getHandle()
+
+                    let micDriver = VoiceAgentMicDriver(handle: handle)
+                    let micTask = Task {
+                        do {
+                            try await micDriver.run()
+                        } catch is CancellationError {
+                            // Expected when the consumer stops the session.
+                        } catch {
+                            SDKLogger.voiceAgent.error("Voice-agent mic driver stopped: \(error.localizedDescription)")
+                        }
+                    }
+
+                    defer { micTask.cancel() }
+
+                    let adapter = VoiceAgentStreamAdapter(handle: handle)
+                    for await event in adapter.stream() {
+                        if Task.isCancelled { break }
+                        continuation.yield(event)
+                    }
+                } catch {
+                    SDKLogger.voiceAgent.error("Voice agent stream setup failed: \(error.localizedDescription)")
                 }
                 continuation.finish()
             }

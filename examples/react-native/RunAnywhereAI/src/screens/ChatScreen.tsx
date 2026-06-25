@@ -787,7 +787,7 @@ export const ChatScreen: React.FC = () => {
       {/* Model Status Banner */}
       <ModelStatusBanner
         modelName={currentModel?.name}
-        framework={currentModel?.preferredFramework}
+        framework={currentModel?.preferredFramework ?? currentModel?.framework}
         isLoading={isModelLoading}
         onSelectModel={handleSelectModel}
       />

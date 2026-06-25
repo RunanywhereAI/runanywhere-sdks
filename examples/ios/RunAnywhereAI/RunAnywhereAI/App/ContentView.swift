@@ -167,17 +167,6 @@ struct MoreHubView: View {
                         )
                     }
 
-                    NavigationLink {
-                        SolutionsView()
-                    } label: {
-                        FeatureRow(
-                            icon: "square.stack.3d.up",
-                            iconColor: .teal,
-                            title: "Solutions",
-                            subtitle: "Run prepackaged pipelines from YAML"
-                        )
-                    }
-
                     #if os(iOS)
                     NavigationLink {
                         VoiceDictationManagementView()

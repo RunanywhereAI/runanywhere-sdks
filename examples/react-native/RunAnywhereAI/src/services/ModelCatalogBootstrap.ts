@@ -51,21 +51,23 @@ export async function registerAll(
         name: 'Llama 2 7B Chat Q4_K_M',
         url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 4_000_000_000,
+        // memoryRequirement doubles as downloadSizeBytes for the post-finalize
+        // size guard — set to the exact artifact Content-Length.
+        memoryRequirement: 4_081_004_224,
       }),
       registerModel({
         id: 'mistral-7b-instruct-q4_k_m',
         name: 'Mistral 7B Instruct Q4_K_M',
         url: 'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 4_000_000_000,
+        memoryRequirement: 4_368_438_944,
       }),
       registerModel({
         id: 'qwen2.5-0.5b-instruct-q6_k',
         name: 'Qwen 2.5 0.5B Instruct Q6_K',
         url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 600_000_000,
+        memoryRequirement: 650_379_104,
         // Base model of the seeded abliterated adapter
         // (qwen2.5-0.5b-abliterated-lora-f16.gguf) — matches iOS/Android.
         supportsLora: true,
@@ -75,14 +77,20 @@ export async function registerAll(
         name: 'Qwen 2.5 1.5B Instruct Q4_K_M',
         url: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 2_500_000_000,
+        // Q4_K_M artifact is ~1.1 GB; the prior 2.5 GB estimate tripped the
+        // 80% download size guard (actual was only 45% of declared).
+        memoryRequirement: 1_117_320_736,
       }),
       registerModel({
         id: 'qwen3-0.6b-q4_k_m',
         name: 'Qwen3 0.6B Q4_K_M',
         url: 'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 500_000_000,
+        // Actual Qwen3-0.6B-Q4_K_M.gguf artifact size (verified Content-Length).
+        // memoryRequirement doubles as downloadSizeBytes, which feeds the
+        // post-finalize download size guard. The prior 500 MB estimate tripped
+        // the 80% guard on the valid ~378 MB download.
+        memoryRequirement: 396_705_472,
         supportsThinking: true,
       }),
       registerModel({
@@ -90,7 +98,7 @@ export async function registerAll(
         name: 'Qwen3 1.7B Q4_K_M',
         url: 'https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 1_200_000_000,
+        memoryRequirement: 1_107_409_472,
         supportsThinking: true,
       }),
       registerModel({
@@ -98,7 +106,7 @@ export async function registerAll(
         name: 'Qwen3 4B Q4_K_M',
         url: 'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 2_800_000_000,
+        memoryRequirement: 2_497_281_312,
         supportsThinking: true,
       }),
       registerModel({
@@ -106,42 +114,42 @@ export async function registerAll(
         name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
         url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 2_000_000_000,
+        memoryRequirement: 2_019_377_696,
       }),
       registerModel({
         id: 'lfm2-350m-q4_k_m',
         name: 'LiquidAI LFM2 350M Q4_K_M',
         url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 250_000_000,
+        memoryRequirement: 229_309_376,
       }),
       registerModel({
         id: 'lfm2-350m-q8_0',
         name: 'LiquidAI LFM2 350M Q8_0',
         url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 400_000_000,
+        memoryRequirement: 379_214_784,
       }),
       registerModel({
         id: 'lfm2.5-1.2b-instruct-q4_k_m',
         name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
         url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 900_000_000,
+        memoryRequirement: 730_895_168,
       }),
       registerModel({
         id: 'lfm2-1.2b-tool-q4_k_m',
         name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
         url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 800_000_000,
+        memoryRequirement: 730_894_048,
       }),
       registerModel({
         id: 'lfm2-1.2b-tool-q8_0',
         name: 'LiquidAI LFM2 1.2B Tool Q8_0',
         url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 1_400_000_000,
+        memoryRequirement: 1_246_252_768,
       }),
     ]);
   } else {
@@ -182,7 +190,8 @@ export async function registerAll(
         ],
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
         modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        memoryRequirement: 1_800_000_000,
+        // Sum of file Content-Lengths: main (986 MB) + mmproj (710 MB).
+        memoryRequirement: 1_695_930_304,
       }),
       // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
       registerMultiFileModel({
@@ -202,7 +211,8 @@ export async function registerAll(
         ],
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
         modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        memoryRequirement: 600_000_000,
+        // Sum of file Content-Lengths: main (379 MB) + mmproj (104 MB).
+        memoryRequirement: 483_105_280,
       }),
     ]);
   }
@@ -283,7 +293,8 @@ export async function registerAll(
       ],
       framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
       modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
-      memoryRequirement: 25_500_000,
+      // Sum of file Content-Lengths: model.onnx (90 MB) + vocab.txt (232 KB).
+      memoryRequirement: 90_619_114,
     }),
   ]);
 

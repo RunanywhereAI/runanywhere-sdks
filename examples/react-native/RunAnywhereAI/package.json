@@ -34,7 +34,7 @@
     "@runanywhere/llamacpp": "workspace:*",
     "@runanywhere/onnx": "workspace:*",
     "@runanywhere/proto-ts": "workspace:*",
-    "react": "19.2.7",
+    "react": "19.2.3",
     "react-native": "0.85.3",
     "react-native-fs": "^2.20.0",
     "react-native-image-picker": "^8.2.1",

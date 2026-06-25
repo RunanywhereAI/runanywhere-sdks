@@ -397,7 +397,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
         }
         {
             const std::string stt_text(stt.text);
-            const std::string llm_text(llm.text ? llm.text : "");
+            const std::string llm_text(llm.text);
             pending_emits.emplace_back([handle, stt_text, llm_text]() {
                 emit_turn_lifecycle(
                     handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED,
