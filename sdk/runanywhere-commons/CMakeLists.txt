@@ -947,12 +947,14 @@ set(RAC_FEATURES_SOURCES
     #   voice_agent.cpp                       — lifecycle (create/destroy/init)
     #   voice_agent_proto_abi.cpp             — synchronous proto C ABI
     #   voice_agent_d7_abi.cpp                — full-session proto ABI
+    #   voice_agent_feed_abi.cpp              — streaming raw-frame ingress + segmentation
     #   voice_agent_audio_pipeline_state.cpp  — audio pipeline state helpers
     #   voice_agent_internal_helpers.cpp      — shared emit/state helpers
     src/features/voice_agent/voice_agent.cpp
     src/features/voice_agent/voice_agent_internal_helpers.cpp
     src/features/voice_agent/voice_agent_proto_abi.cpp
     src/features/voice_agent/voice_agent_d7_abi.cpp
+    src/features/voice_agent/voice_agent_feed_abi.cpp
     src/features/voice_agent/voice_agent_audio_pipeline_state.cpp
     # Proto-byte event ABI for VoiceEvent streaming.
     src/features/voice_agent/rac_voice_event_abi.cpp

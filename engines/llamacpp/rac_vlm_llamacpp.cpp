@@ -66,6 +66,7 @@ enum class VLMModelType {
     SmolVLM,  // SmolVLM uses "User:" / "Assistant:" format
     Qwen2VL,  // Qwen2-VL uses chatml with <|im_start|>user format
     LLaVA,    // LLaVA uses "USER:" / "ASSISTANT:" format
+    LFM2VL,   // Liquid LFM2-VL uses <|startoftext|> + ChatML + <image>
     Generic   // Generic chatml fallback
 };
 
@@ -226,6 +227,17 @@ std::string format_vlm_prompt_manual(const std::string& user_content, const char
             formatted += user_content;
             formatted += "\nASSISTANT:";
             break;
+        case VLMModelType::LFM2VL:
+            formatted = "<|startoftext|>";
+            if (effective_system) {
+                formatted += "<|im_start|>system\n";
+                formatted += effective_system;
+                formatted += "<|im_end|>\n";
+            }
+            formatted += "<|im_start|>user\n";
+            formatted += user_content;
+            formatted += "<|im_end|>\n<|im_start|>assistant\n";
+            break;
         case VLMModelType::Qwen2VL:
         case VLMModelType::Generic:
         case VLMModelType::Unknown:
@@ -293,6 +305,11 @@ VLMModelType detect_vlm_model_type(llama_model* model) {
             RAC_LOG_DEBUG(LOG_CAT, "Detected SmolVLM model type from architecture");
             return VLMModelType::SmolVLM;
         }
+        if (arch.find("lfm2") != std::string::npos &&
+            (arch.find("vl") != std::string::npos || arch.find("vision") != std::string::npos)) {
+            RAC_LOG_DEBUG(LOG_CAT, "Detected LFM2-VL model type from architecture");
+            return VLMModelType::LFM2VL;
+        }
     }
 
     // Fallback: model name metadata when architecture is missing or generic
@@ -318,6 +335,11 @@ VLMModelType detect_vlm_model_type(llama_model* model) {
         if (name.find("llava") != std::string::npos) {
             RAC_LOG_DEBUG(LOG_CAT, "Detected LLaVA model type from name");
             return VLMModelType::LLaVA;
+        }
+        if (name.find("lfm2-vl") != std::string::npos || name.find("lfm2vl") != std::string::npos ||
+            (name.find("lfm2") != std::string::npos && name.find("vl") != std::string::npos)) {
+            RAC_LOG_DEBUG(LOG_CAT, "Detected LFM2-VL model type from name");
+            return VLMModelType::LFM2VL;
         }
     }
 
