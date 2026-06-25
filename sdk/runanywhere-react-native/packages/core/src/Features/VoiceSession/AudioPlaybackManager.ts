@@ -58,6 +58,36 @@ export class AudioPlaybackManager {
     }
   }
 
+  /**
+   * Play already-encoded in-memory WAV audio. Unlike {@link play}, the bytes
+   * are handed to the native player as-is — no float32→WAV re-encoding. Used
+   * for the voice agent's synthesized reply, which commons returns as a
+   * complete WAV (`rac_audio_float32_to_wav`), not raw PCM.
+   */
+  async playWav(wavData: ArrayBuffer): Promise<void> {
+    if (this.state === 'playing') {
+      this.stop();
+    }
+
+    this.state = 'playing';
+    logger.info('Playing in-memory WAV...');
+
+    try {
+      await AudioPlayback.play(wavData);
+      this.state = 'idle';
+    } catch (error) {
+      if ((this.state as PlaybackState) === 'stopped') {
+        // stop() interrupts the in-flight play() — not an error.
+        return;
+      }
+      this.state = 'error';
+      logger.error(
+        `Playback failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+      throw error;
+    }
+  }
+
   /** Play an audio file from disk. Resolves when playback finishes. */
   async playFile(filePath: string): Promise<void> {
     this.state = 'playing';

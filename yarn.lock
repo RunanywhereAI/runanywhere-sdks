@@ -8188,10 +8188,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react@npm:19.0.0":
-  version: 19.0.0
-  resolution: "react@npm:19.0.0"
-  checksum: 86de15d85b2465feb40297a90319c325cb07cf27191a361d47bcfe8c6126c973d660125aa67b8f4cbbe39f15a2f32efd0c814e98196d8e5b68c567ba40a399c6
+"react@npm:19.2.3":
+  version: 19.2.3
+  resolution: "react@npm:19.2.3"
+  checksum: 506e369ae13cb46b7f303c0201aadf856642f482cdf5b1c3730c3a6d1762fd5a3ae1dd31196a4686bfbbe56456dcd0c48a4656c75cbcb45620e3028c54789ae9
   languageName: node
   linkType: hard
 
@@ -8459,7 +8459,7 @@ __metadata:
     knip: ^5.76.0
     patch-package: ^8.0.1
     prettier: ^3.8.3
-    react: 19.2.7
+    react: 19.2.3
     react-native: 0.85.3
     react-native-fs: ^2.20.0
     react-native-image-picker: ^8.2.1

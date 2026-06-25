@@ -32,13 +32,13 @@ import {
 } from '@runanywhere/proto-ts/llm_options';
 import {
   LLMGenerateRequest,
+  LLMStreamEvent,
   type LLMStreamEvent as LLMStreamEventType,
 } from '@runanywhere/proto-ts/llm_service';
 import { inferenceFrameworkToJSON, ModelCategory } from '@runanywhere/proto-ts/model_types';
 import { modelInfoForCategory } from '../Models/RunAnywhere+ModelLifecycle';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
-import { LLMStreamAdapter } from '../../../Adapters/LLMStreamAdapter';
 
 function buildLLMGenerateRequest(
   prompt: string,
@@ -150,12 +150,22 @@ export async function generate(
  *
  * Matches Swift SDK: `RunAnywhere.generateStream(_ request: RALLMGenerateRequest)`.
  *
- * Wire-up: events arrive via `LLMStreamAdapter` which calls
- * `NitroLLM.subscribeProtoEvents(handle, ...)` against the LLM handle
- * obtained from `RunAnywhereCore.getLLMHandle()`. Generation is triggered
- * by `native.llmGenerateProto` once the handle subscription is active.
+ * Wire-up (iOS parity): a single atomic `native.llmGenerateStreamProto`
+ * call — the RN binding for `rac_llm_generate_stream_proto` — wires the
+ * per-request stream callback and runs generation together, exactly like
+ * Swift's `CppBridge.LLM.generateStream` / `ProtoStreamContext.runRequestStream`.
+ * Each invocation of the callback delivers one serialized
+ * `runanywhere.v1.LLMStreamEvent`; the stream finishes on `event.isFinal`.
+ *
+ * This replaces the previous handle-subscription approach
+ * (`NitroLLM.subscribeProtoEvents` + `native.llmGenerateProto`), which
+ * registered a callback the *non-streaming* buffered generate path never
+ * feeds — so no events were ever delivered and the UI hung "thinking
+ * forever". `rac_llm_set_stream_proto_callback` is fed by the component
+ * `generate_stream` path, not by the handleless `rac_llm_generate_proto`.
+ *
  * Cancellation propagates through `for-await break` → `iterator.return()`
- * → `HandleFanOut.detach()` → `NitroLLM unsubscribe` → C++ callback cleared.
+ * → `native.llmCancelProto()` → C++ generation observes the cancel signal.
  */
 export function generateStream(
   request: LLMGenerateRequest,
@@ -180,36 +190,87 @@ export function generateStream(
 
   return {
     [Symbol.asyncIterator](): AsyncIterator<LLMStreamEventType> {
-      let inner: AsyncIterator<LLMStreamEventType> | null = null;
+      const queue: LLMStreamEventType[] = [];
+      let resolver: ((value: IteratorResult<LLMStreamEventType>) => void) | null = null;
+      let done = false;
       let started = false;
+      let streamError: Error | null = null;
 
-      const ensureStarted = async (): Promise<AsyncIterator<LLMStreamEventType>> => {
-        if (!started) {
-          started = true;
-          await ensureServicesReady();
-          const handle = await native.getLLMHandle();
-          const adapter = new LLMStreamAdapter(handle);
-          // Kick off generation before entering the event loop so the C++ side
-          // starts pushing proto-byte callbacks into the registered slot.
-          native.llmGenerateProto(requestBytes).catch(() => { /* errors surface as stream events */ });
-          inner = adapter.stream(llmRequest)[Symbol.asyncIterator]();
+      const finish = (): void => {
+        done = true;
+        if (resolver) {
+          resolver({ value: undefined as unknown as LLMStreamEventType, done: true });
+          resolver = null;
         }
-        return inner!;
+      };
+
+      const push = (event: LLMStreamEventType): void => {
+        if (resolver) {
+          resolver({ value: event, done: false });
+          resolver = null;
+        } else {
+          queue.push(event);
+        }
+      };
+
+      const start = (): void => {
+        if (started) return;
+        started = true;
+        // iOS parity: one atomic streaming call wires the callback + runs
+        // generation together (no register/generate race). The callback
+        // receives one serialized LLMStreamEvent per token; `isFinal` ends it.
+        ensureServicesReady()
+          .then(() =>
+            native.llmGenerateStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
+              try {
+                const event = LLMStreamEvent.decode(arrayBufferToBytes(eventBytes));
+                push(event);
+                if (event.isFinal) {
+                  finish();
+                }
+              } catch (error) {
+                streamError =
+                  error instanceof Error ? error : new Error(String(error));
+                finish();
+              }
+            }),
+          )
+          .then(() => {
+            if (!done) finish();
+          })
+          .catch((err: Error) => {
+            streamError = err;
+            finish();
+          });
       };
 
       return {
         async next(): Promise<IteratorResult<LLMStreamEventType>> {
-          const it = await ensureStarted();
-          return it.next();
+          start();
+          if (queue.length > 0) {
+            return { value: queue.shift()!, done: false };
+          }
+          if (streamError) {
+            throw streamError;
+          }
+          if (done) {
+            return { value: undefined as unknown as LLMStreamEventType, done: true };
+          }
+          return new Promise<IteratorResult<LLMStreamEventType>>((resolve) => {
+            resolver = resolve;
+          }).then((result) => {
+            if (streamError) {
+              throw streamError;
+            }
+            return result;
+          });
         },
         async return(): Promise<IteratorResult<LLMStreamEventType>> {
           // Await the native cancel before resolving so back-to-back
           // cancel → generate sequences are race-free. Matches Swift
           // cancelGeneration() which awaits CppBridge.LLM.shared.cancelProto().
           try { await native.llmCancelProto(); } catch { /* noop */ }
-          if (inner) {
-            try { await inner.return?.(); } catch { /* noop */ }
-          }
+          finish();
           return { value: undefined as unknown as LLMStreamEventType, done: true };
         },
       };

@@ -79,12 +79,15 @@ class HybridAudioCapture: HybridAudioCaptureSpec {
         }
     }
 
-    /// Activates the AVAudioSession without starting the audio engine
-    /// (background keepalive — Swift parity).
+    /// Activates a full-duplex `.playAndRecord` session WITHOUT starting the
+    /// audio engine. The voice-agent driver calls this before `startRecording`
+    /// so capture and playback share one session for the whole turn-taking loop
+    /// (mic stays live while the TTS reply plays). Mirrors the iOS Swift
+    /// voice-agent driver's `configureVoiceAudioSession()`.
     func activateAudioSession() throws -> Promise<Void> {
         return Promise.async { [weak self] in
-            try await Self.configureAndActivateSession()
-            self?.logger.info("Audio session activated (keepalive)")
+            try await Self.configureFullDuplexSession()
+            self?.logger.info("Full-duplex audio session activated (voice agent)")
         }
     }
 
@@ -137,8 +140,43 @@ class HybridAudioCapture: HybridAudioCaptureSpec {
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let audioSession = AVAudioSession.sharedInstance()
-                    try audioSession.setCategory(.record, mode: .measurement)
+                    // Preserve a full-duplex session if the voice agent already
+                    // configured one (activateAudioSession → .playAndRecord):
+                    // switching back to .record would silence the TTS reply and
+                    // disable the simultaneous playback the agent needs. STT capture
+                    // (no prior activate) falls through to the unprocessed
+                    // .record/.measurement path that gives Whisper the cleanest signal.
+                    if audioSession.category != .playAndRecord {
+                        try audioSession.setCategory(.record, mode: .measurement)
+                    }
                     try audioSession.setActive(true)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// Configures a full-duplex `.playAndRecord` session for the voice agent so
+    /// the mic stays live while TTS replies play. `.default` (not `.measurement`)
+    /// keeps input processing on so speech sits at a usable level for energy
+    /// endpointing; the speaker override routes replies to the loud speaker rather
+    /// than the receiver. Mirrors the iOS Swift voice-agent session config.
+    private static func configureFullDuplexSession() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let session = AVAudioSession.sharedInstance()
+                    try session.setCategory(
+                        .playAndRecord,
+                        mode: .default,
+                        options: [.defaultToSpeaker, .allowBluetooth]
+                    )
+                    try session.setActive(true)
+                    // `.defaultToSpeaker` alone can fall back to the receiver under
+                    // `.playAndRecord`; force the loud speaker route.
+                    try? session.overrideOutputAudioPort(.speaker)
                     continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)

@@ -31,6 +31,7 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import { currentModel, loadModel } from '../Models/RunAnywhere+ModelLifecycle';
 import { VoiceAgentStreamAdapter } from '../../../Adapters/VoiceAgentStreamAdapter';
+import { VoiceAgentMicDriver } from '../../../Features/VoiceAgent/VoiceAgentMicDriver';
 import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import {
@@ -321,9 +322,30 @@ export function streamVoiceAgent(): AsyncIterable<VoiceEvent> {
       if (!isSDKInitialized()) {
         return;
       }
+      await ensureServicesReady();
       const handle = await getVoiceAgentHandle();
       const adapter = new VoiceAgentStreamAdapter(handle);
-      yield* adapter.stream();
+
+      // Swift parity (RunAnywhere+VoiceAgent.swift:225-236): while the event
+      // stream is consumed, a platform mic driver captures audio, segments
+      // utterances, and submits each via `voiceAgentProcessTurnProto`. The C
+      // ABI owns no microphone access — without this driver the pipeline gets
+      // no audio buffer and stays "listening" forever (dead-air), per the
+      // rac_voice_agent.h Audio-Ingress Contract. Events emitted during each
+      // turn fan out to this same handle callback, so collectors see them.
+      const micDriver = new VoiceAgentMicDriver();
+      void micDriver.start().catch((error) => {
+        logger.error(
+          `Voice-agent mic driver stopped: ${error instanceof Error ? error.message : String(error)}`
+        );
+      });
+      try {
+        yield* adapter.stream();
+      } finally {
+        // Breaking out of the consuming loop (or unsubscribe) tears down mic
+        // capture, mirroring Swift's `defer { micTask.cancel() }`.
+        await micDriver.stop();
+      }
     },
   };
 }
