@@ -3,6 +3,7 @@ package com.runanywhere.runanywhereai.ui.screens.npu.screens
 import ai.runanywhere.proto.v1.ArchiveStructure
 import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.ModelCategory
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,22 +29,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import com.runanywhere.runanywhereai.ui.screens.npu.NPU_MODELS
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModality
 import com.runanywhere.runanywhereai.ui.screens.npu.NpuModel
 import com.runanywhere.runanywhereai.ui.screens.npu.SectionCard
 import com.runanywhere.runanywhereai.ui.screens.npu.StatusPill
-import com.runanywhere.runanywhereai.ui.screens.npu.formatNpuBytes
+import com.runanywhere.runanywhereai.ui.screens.npu.driveZipUrl
 import com.runanywhere.runanywhereai.ui.screens.npu.theme.RaSuccess
 import com.runanywhere.runanywhereai.ui.screens.npu.theme.Spacing
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.downloadModel
 import com.runanywhere.sdk.public.extensions.listModels
+import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.registerModel
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import kotlinx.coroutines.launch
 
 /**
- * The curated NPU (QHexRT) catalog from `runanywhere/genie-npu-models`
- * (Hugging Face, npu-tagged). Lists only NPU Hexagon bundles — not the generic
- * SDK registry — registering each as a TAR.GZ QHexRT archive on download.
+ * NPU (QHexRT) catalog — Google-Drive-hosted ZIP bundles. Download registers
+ * each as a ZIP archive (QHexRT framework); the SDK downloads + extracts it
+ * into the standard model dir, then loads it like any other model.
  */
 @Composable
 fun ModelsScreen() {
@@ -55,16 +59,21 @@ fun ModelsScreen() {
 
     LaunchedEffect(Unit) {
         try {
-            val list = RunAnywhere.listModels().models?.models ?: emptyList()
-            list.filter { it.local_path.isNotBlank() }.forEach { downloaded.add(it.id) }
+            RunAnywhere.listModels().models?.models
+                ?.filter { it.local_path.isNotBlank() }
+                ?.forEach { downloaded.add(it.id) }
         } catch (_: Exception) {
-            // Registry not reachable — entries render as not-downloaded.
+            // registry unreachable — rows render as not-downloaded.
         }
     }
 
+    fun modalityCat(m: NpuModel) =
+        if (m.modality == NpuModality.VLM) ModelCategory.MODEL_CATEGORY_MULTIMODAL
+        else ModelCategory.MODEL_CATEGORY_LANGUAGE
+
     Column(Modifier.fillMaxSize().padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         Text(
-            "${NPU_MODELS.size} NPU bundles · runanywhere/genie-npu-models",
+            "${NPU_MODELS.size} NPU bundles",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -83,18 +92,19 @@ fun ModelsScreen() {
                             error = null
                             try {
                                 val model = RunAnywhere.registerModel(
-                                    archiveUrl = m.url,
+                                    archiveUrl = driveZipUrl(m.driveId),
                                     structure = ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED,
                                     id = m.id,
                                     name = m.name,
                                     framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-                                    archiveType = ArchiveType.ARCHIVE_TYPE_TAR_GZ,
-                                    memoryRequirement = m.sizeBytes,
+                                    modality = modalityCat(m),
+                                    archiveType = ArchiveType.ARCHIVE_TYPE_ZIP,
                                 )
                                 RunAnywhere.downloadModel(model) { p -> progress[m.id] = p.stage_progress }
                                 progress.remove(m.id)
                                 downloaded.add(m.id)
                                 status = "Downloaded ${m.name}"
+                                RunAnywhere.loadModel(RAModelLoadRequest(model_id = m.id))
                             } catch (e: Exception) {
                                 progress.remove(m.id)
                                 error = e.message ?: "download failed"
@@ -114,6 +124,7 @@ private fun ModelRow(
     progress: Float?,
     onDownload: () -> Unit,
 ) {
+    val pending = model.driveId.isBlank()
     SectionCard {
         Row(
             Modifier.fillMaxWidth(),
@@ -123,13 +134,21 @@ private fun ModelRow(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Text(model.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "${model.detail} · ${formatNpuBytes(model.sizeBytes)}",
+                    model.detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 StatusPill(
-                    label = if (downloaded) "Downloaded" else "NPU",
-                    color = if (downloaded) RaSuccess else MaterialTheme.colorScheme.primary,
+                    label = when {
+                        downloaded -> "Downloaded"
+                        pending -> "Link pending"
+                        else -> model.modality.name
+                    },
+                    color = when {
+                        downloaded -> RaSuccess
+                        pending -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.primary
+                    },
                 )
             }
             when {
@@ -139,7 +158,7 @@ private fun ModelRow(
                     color = MaterialTheme.colorScheme.primary,
                 )
                 downloaded -> Text("Ready", style = MaterialTheme.typography.labelLarge, color = RaSuccess)
-                else -> Button(onClick = onDownload) { Text("Download") }
+                else -> Button(onClick = onDownload, enabled = !pending) { Text("Download") }
             }
         }
         if (progress != null) {

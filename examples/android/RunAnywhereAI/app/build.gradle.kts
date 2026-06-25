@@ -58,7 +58,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfigs.findByName("release")?.let { signingConfig = it }
+            // Prefer an env-provided release keystore (CI / store builds); fall back to
+            // the debug keystore so a release-type APK is still installable locally.
+            // Replace with a real upload keystore before publishing to a store.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {

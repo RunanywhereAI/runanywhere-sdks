@@ -1,73 +1,58 @@
-/// Curated NPU (QHexRT) model catalog.
+/// NPU (QHexRT) model catalog — Google-Drive-hosted ZIP bundles.
 ///
-/// Source of truth: the npu-tagged repo `runanywhere/genie-npu-models` on
-/// Hugging Face (tags: qualcomm, genie, npu, snapdragon) — Snapdragon Hexagon
-/// NPU LLM bundles (w4a16/w8a16, Snapdragon 8 Elite / 8 Elite Gen5). The NPU
-/// Models screen lists exactly these, not the generic SDK registry.
-const _hf = 'https://huggingface.co/runanywhere/genie-npu-models/resolve/main';
+/// Each model is a .zip archive on Google Drive. The Models screen registers it
+/// as a ZIP archive (DIRECTORY_BASED) and the SDK downloads + extracts it into
+/// the standard model dir, then loads it like any other model.
+///
+/// To wire a model: paste its Google Drive FILE ID into [driveId] (the long id
+/// from the share link `https://drive.google.com/file/d/<FILE_ID>/view`). An
+/// empty [driveId] renders the row as "link pending" with Download disabled.
+enum NpuModality { llm, vlm }
 
 class NpuModel {
   const NpuModel({
     required this.id,
     required this.name,
     required this.detail,
-    required this.sizeBytes,
-    required this.url,
+    required this.modality,
+    this.driveId = '',
+    this.sizeBytes,
   });
 
   final String id;
   final String name;
 
-  /// Short spec line: params · quant · target SoC.
+  /// Short spec line: modality · params · target arch.
   final String detail;
-  final int sizeBytes;
-  final String url;
+  final NpuModality modality;
+
+  /// Google Drive file id of the .zip bundle; '' until the link is provided.
+  final String driveId;
+  final int? sizeBytes;
 }
 
 const npuModels = <NpuModel>[
   NpuModel(
-    id: 'llama3.2-1b-instruct-genie-w4a16-8elite-gen5',
-    name: 'Llama 3.2 1B Instruct',
-    detail: '1B · w4a16 · 8 Elite Gen5',
-    sizeBytes: 1373507483,
-    url: '$_hf/llama3.2-1b-instruct-genie-w4a16-8elite-gen5.tar.gz',
+    id: 'llama3_2_1b_hnpu',
+    name: 'Llama 3.2 1B (HNPU)',
+    detail: 'LLM · 1B · Hexagon v79 / v81',
+    modality: NpuModality.llm,
+    driveId: '', // TODO: paste Google Drive file id for llama3_2_1b_HNPU.zip
   ),
   NpuModel(
-    id: 'llama3.2-1b-instruct-genie-w4a16-8elite',
-    name: 'Llama 3.2 1B Instruct',
-    detail: '1B · w4a16 · 8 Elite',
-    sizeBytes: 1369601674,
-    url: '$_hf/llama3.2-1b-instruct-genie-w4a16-8elite.tar.gz',
-  ),
-  NpuModel(
-    id: 'qwen3-4b-genie-w4a16-8elite-gen5',
-    name: 'Qwen3 4B',
-    detail: '4B · w4a16 · 8 Elite Gen5',
-    sizeBytes: 2538981899,
-    url: '$_hf/qwen3-4b-genie-w4a16-8elite-gen5.tar.gz',
-  ),
-  NpuModel(
-    id: 'qwen2.5-7b-instruct-genie-w8a16-8elite',
-    name: 'Qwen2.5 7B Instruct',
-    detail: '7B · w8a16 · 8 Elite',
-    sizeBytes: 4184248574,
-    url: '$_hf/qwen2.5-7b-instruct-genie-w8a16-8elite.tar.gz',
-  ),
-  NpuModel(
-    id: 'sea-lion3.5-8b-instruct-genie-w4a16-8elite-gen5',
-    name: 'SEA-LION 3.5 8B Instruct',
-    detail: '8B · w4a16 · 8 Elite Gen5',
-    sizeBytes: 4724747321,
-    url: '$_hf/sea-lion3.5-8b-instruct-genie-w4a16-8elite-gen5.tar.gz',
-  ),
-  NpuModel(
-    id: 'sea-lion3.5-8b-instruct-genie-w4a16-8elite',
-    name: 'SEA-LION 3.5 8B Instruct',
-    detail: '8B · w4a16 · 8 Elite',
-    sizeBytes: 4722492367,
-    url: '$_hf/sea-lion3.5-8b-instruct-genie-w4a16-8elite.tar.gz',
+    id: 'qwen3_vl_hnpu',
+    name: 'Qwen3-VL (HNPU)',
+    detail: 'VLM · Hexagon v79 / v81',
+    modality: NpuModality.vlm,
+    driveId: '', // TODO: paste Google Drive file id for qwen3_vl_HNPU.zip
   ),
 ];
+
+/// Direct-download URL for a Google Drive file id. Uses the usercontent host
+/// with `confirm=t` so large files skip the virus-scan HTML interstitial and
+/// stream the bytes.
+String driveZipUrl(String driveId) =>
+    'https://drive.usercontent.google.com/download?id=$driveId&export=download&confirm=t';
 
 String formatBytes(int bytes) {
   if (bytes >= 1000000000) return '${(bytes / 1e9).toStringAsFixed(1)} GB';

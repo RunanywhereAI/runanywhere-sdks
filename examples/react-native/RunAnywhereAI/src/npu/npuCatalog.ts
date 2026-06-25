@@ -1,66 +1,53 @@
 /**
- * Curated NPU (QHexRT) model catalog.
+ * NPU (QHexRT) model catalog — Google-Drive-hosted ZIP bundles.
  *
- * Source of truth: the npu-tagged repo `runanywhere/genie-npu-models` on
- * Hugging Face (tags: qualcomm, genie, npu, snapdragon). These are Snapdragon
- * Hexagon NPU LLM bundles (w4a16/w8a16, Snapdragon 8 Elite / 8 Elite Gen5).
- * The NPU Models screen lists exactly these — not the generic SDK registry.
+ * Each model is a .zip archive on Google Drive. The Models screen registers it
+ * as a ZIP archive (DIRECTORY_BASED) and the SDK downloads + extracts it into
+ * the standard model dir, then loads it like any other model.
+ *
+ * To wire a model: paste its Google Drive FILE ID into `driveId` (the long id
+ * from the share link `https://drive.google.com/file/d/<FILE_ID>/view`). An
+ * empty `driveId` renders the row as "link pending" with Download disabled.
  */
-const HF = 'https://huggingface.co/runanywhere/genie-npu-models/resolve/main';
+export type NpuModality = 'llm' | 'vlm';
 
 export interface NpuModel {
   id: string;
   name: string;
-  /** Short spec line: params · quant · target SoC. */
+  /** Short spec line: modality · params · target arch. */
   detail: string;
-  sizeBytes: number;
-  url: string;
+  modality: NpuModality;
+  /** Google Drive file id of the .zip bundle; '' until the link is provided. */
+  driveId: string;
+  /** Optional size hint in bytes (for display only). */
+  sizeBytes?: number;
 }
 
 export const NPU_MODELS: NpuModel[] = [
   {
-    id: 'llama3.2-1b-instruct-genie-w4a16-8elite-gen5',
-    name: 'Llama 3.2 1B Instruct',
-    detail: '1B · w4a16 · 8 Elite Gen5',
-    sizeBytes: 1373507483,
-    url: `${HF}/llama3.2-1b-instruct-genie-w4a16-8elite-gen5.tar.gz`,
+    id: 'llama3_2_1b_hnpu',
+    name: 'Llama 3.2 1B (HNPU)',
+    detail: 'LLM · 1B · Hexagon v79 / v81',
+    modality: 'llm',
+    driveId: '', // TODO: paste Google Drive file id for llama3_2_1b_HNPU.zip
   },
   {
-    id: 'llama3.2-1b-instruct-genie-w4a16-8elite',
-    name: 'Llama 3.2 1B Instruct',
-    detail: '1B · w4a16 · 8 Elite',
-    sizeBytes: 1369601674,
-    url: `${HF}/llama3.2-1b-instruct-genie-w4a16-8elite.tar.gz`,
-  },
-  {
-    id: 'qwen3-4b-genie-w4a16-8elite-gen5',
-    name: 'Qwen3 4B',
-    detail: '4B · w4a16 · 8 Elite Gen5',
-    sizeBytes: 2538981899,
-    url: `${HF}/qwen3-4b-genie-w4a16-8elite-gen5.tar.gz`,
-  },
-  {
-    id: 'qwen2.5-7b-instruct-genie-w8a16-8elite',
-    name: 'Qwen2.5 7B Instruct',
-    detail: '7B · w8a16 · 8 Elite',
-    sizeBytes: 4184248574,
-    url: `${HF}/qwen2.5-7b-instruct-genie-w8a16-8elite.tar.gz`,
-  },
-  {
-    id: 'sea-lion3.5-8b-instruct-genie-w4a16-8elite-gen5',
-    name: 'SEA-LION 3.5 8B Instruct',
-    detail: '8B · w4a16 · 8 Elite Gen5',
-    sizeBytes: 4724747321,
-    url: `${HF}/sea-lion3.5-8b-instruct-genie-w4a16-8elite-gen5.tar.gz`,
-  },
-  {
-    id: 'sea-lion3.5-8b-instruct-genie-w4a16-8elite',
-    name: 'SEA-LION 3.5 8B Instruct',
-    detail: '8B · w4a16 · 8 Elite',
-    sizeBytes: 4722492367,
-    url: `${HF}/sea-lion3.5-8b-instruct-genie-w4a16-8elite.tar.gz`,
+    id: 'qwen3_vl_hnpu',
+    name: 'Qwen3-VL (HNPU)',
+    detail: 'VLM · Hexagon v79 / v81',
+    modality: 'vlm',
+    driveId: '', // TODO: paste Google Drive file id for qwen3_vl_HNPU.zip
   },
 ];
+
+/**
+ * Direct-download URL for a Google Drive file id. Uses the usercontent host with
+ * `confirm=t` so large files skip the virus-scan HTML interstitial and stream
+ * the bytes.
+ */
+export function driveZipUrl(driveId: string): string {
+  return `https://drive.usercontent.google.com/download?id=${driveId}&export=download&confirm=t`;
+}
 
 /** Human-readable size, e.g. "1.4 GB". */
 export function formatBytes(bytes: number): string {

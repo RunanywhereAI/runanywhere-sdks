@@ -51,6 +51,12 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.debug
+            // Android shell shrinking. The Dart app is AOT-compiled (not touched
+            // by R8); these rules just keep the Flutter embedding + the
+            // runanywhere/QHexRT plugin JNI surface that R8 would otherwise strip.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 

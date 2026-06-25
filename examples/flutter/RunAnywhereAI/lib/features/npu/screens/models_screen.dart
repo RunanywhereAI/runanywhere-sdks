@@ -8,9 +8,9 @@ import '../npu_catalog.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-/// The curated NPU (QHexRT) catalog from `runanywhere/genie-npu-models`
-/// (Hugging Face, npu-tagged). Lists only NPU Hexagon bundles — not the generic
-/// SDK registry — and wires download + load through the core SDK.
+/// NPU (QHexRT) catalog — Google-Drive-hosted ZIP bundles. Download registers
+/// each as a ZIP archive; the SDK downloads + extracts it into the standard
+/// model dir, then loads it like any other model.
 class ModelsScreen extends StatefulWidget {
   const ModelsScreen({super.key});
 
@@ -41,17 +41,36 @@ class _ModelsScreenState extends State<ModelsScreen> {
         ..clear()
         ..addAll(have));
     } catch (_) {
-      // Registry not reachable — list still renders as not-downloaded.
+      // registry unreachable — rows render as not-downloaded.
     }
   }
 
-  void _download(NpuModel m) {
+  ra.ModelCategory _modality(NpuModel m) => m.modality == NpuModality.vlm
+      ? ra.ModelCategory.MODEL_CATEGORY_MULTIMODAL
+      : ra.ModelCategory.MODEL_CATEGORY_LANGUAGE;
+
+  Future<void> _download(NpuModel m) async {
+    if (m.driveId.isEmpty) {
+      setState(() => _error = '${m.name}: download link not configured yet.');
+      return;
+    }
     setState(() {
       _progress[m.id] = 0;
       _error = null;
     });
     try {
-      RunAnywhere.downloads.start(m.id).listen(
+      // NOTE: framework is GENIE until the Flutter protos are regenerated with
+      // INFERENCE_FRAMEWORK_QHEXRT (24); both route to the on-device NPU path.
+      final info = await RunAnywhere.models.registerArchiveModel(
+        archiveUrl: driveZipUrl(m.driveId),
+        structure: ra.ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED,
+        id: m.id,
+        name: m.name,
+        framework: ra.InferenceFramework.INFERENCE_FRAMEWORK_GENIE,
+        modality: _modality(m),
+        archiveType: ra.ArchiveType.ARCHIVE_TYPE_ZIP,
+      );
+      RunAnywhere.downloads.start(info.id).listen(
         (p) {
           setState(() => _progress[m.id] = p.overallProgress);
           if (p.state == ra.DownloadState.DOWNLOAD_STATE_COMPLETED) {
@@ -60,6 +79,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
               _downloaded.add(m.id);
               _status = 'Downloaded ${m.name}';
             });
+            unawaited(RunAnywhere.models.loadModel(info));
           } else if (p.state == ra.DownloadState.DOWNLOAD_STATE_FAILED) {
             setState(() {
               _progress.remove(m.id);
@@ -89,10 +109,8 @@ class _ModelsScreenState extends State<ModelsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${npuModels.length} NPU bundles · runanywhere/genie-npu-models',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
+            Text('${npuModels.length} NPU bundles',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
             if (_status != null) ...[
               const SizedBox(height: 8),
               Text(_status!, style: TextStyle(color: raSuccess)),
@@ -134,6 +152,7 @@ class _ModelCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final pending = model.driveId.isEmpty;
     return SectionCard(
       child: Row(
         children: [
@@ -143,10 +162,17 @@ class _ModelCard extends StatelessWidget {
               children: [
                 Text(model.name, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 2),
-                Text('${model.detail} · ${formatBytes(model.sizeBytes)}',
+                Text(model.detail,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                 const SizedBox(height: 6),
-                StatusPill(label: downloaded ? 'Downloaded' : 'NPU', color: downloaded ? raSuccess : cs.primary),
+                StatusPill(
+                  label: downloaded
+                      ? 'Downloaded'
+                      : pending
+                          ? 'Link pending'
+                          : model.modality.name.toUpperCase(),
+                  color: downloaded ? raSuccess : (pending ? cs.tertiary : cs.primary),
+                ),
               ],
             ),
           ),
@@ -157,7 +183,7 @@ class _ModelCard extends StatelessWidget {
           else if (downloaded)
             const FilledButton(onPressed: null, child: Text('Ready'))
           else
-            FilledButton(onPressed: onDownload, child: const Text('Download')),
+            FilledButton(onPressed: pending ? null : onDownload, child: const Text('Download')),
         ],
       ),
     );
