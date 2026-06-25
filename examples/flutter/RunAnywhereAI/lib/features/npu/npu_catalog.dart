@@ -33,18 +33,25 @@ class NpuModel {
 
 const npuModels = <NpuModel>[
   NpuModel(
-    id: 'llama3_2_1b_hnpu',
+    id: 'llama3_2_1b_v79',
     name: 'Llama 3.2 1B (HNPU)',
-    detail: 'LLM · 1B · Hexagon v79 / v81',
+    detail: 'LLM · 1B · Hexagon v79',
     modality: NpuModality.llm,
-    driveId: '', // TODO: paste Google Drive file id for llama3_2_1b_HNPU.zip
+    driveId: '1UeEE08KpZU-rFSwf_FRnu1z2KRwImdX5',
   ),
   NpuModel(
-    id: 'qwen3_vl_hnpu',
+    id: 'llama3_2_1b_v81',
+    name: 'Llama 3.2 1B (HNPU)',
+    detail: 'LLM · 1B · Hexagon v81',
+    modality: NpuModality.llm,
+    driveId: '1mbshG-jO684dCEUjKKcJ7AUJYRU7_oWX',
+  ),
+  NpuModel(
+    id: 'qwen3_vl_v79',
     name: 'Qwen3-VL (HNPU)',
-    detail: 'VLM · Hexagon v79 / v81',
+    detail: 'VLM · Hexagon v79',
     modality: NpuModality.vlm,
-    driveId: '', // TODO: paste Google Drive file id for qwen3_vl_HNPU.zip
+    driveId: '1Uj1yLliJCJVYuJV0gF_i4Sc_XhBMx1bA',
   ),
 ];
 
