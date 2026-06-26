@@ -921,6 +921,24 @@ export interface RunAnywhereCore extends HybridObject<{
   voiceAgentComponentStatesProto(): Promise<ArrayBuffer>;
   voiceAgentProcessTurnProto(audioBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
+  /**
+   * Stream raw mic frames into the in-core voice agent via the commons
+   * `rac_voice_agent_feed_audio_proto` ABI. The core performs energy-based
+   * utterance segmentation and runs the STT -> LLM -> TTS turn pipeline itself;
+   * there is NO SDK-side VAD. Each call returns a serialized
+   * `runanywhere.v1.VoiceAgentResult`: empty (zero-length) while the utterance
+   * is still open, non-empty (with `synthesizedAudio`) on the call that closes a
+   * turn. `isFinal` flushes the in-progress utterance. Mirrors the iOS Swift /
+   * Kotlin drivers' feed loop.
+   */
+  voiceAgentFeedAudioProto(
+    audioBytes: ArrayBuffer,
+    sampleRateHz: number,
+    channels: number,
+    encoding: number,
+    isFinal: boolean
+  ): Promise<ArrayBuffer>;
+
   // ============================================================================
   // Tool Calling Capability
   //

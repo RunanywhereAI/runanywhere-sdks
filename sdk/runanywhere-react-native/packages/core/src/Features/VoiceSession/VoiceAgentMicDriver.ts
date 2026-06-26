@@ -96,6 +96,15 @@ export class VoiceAgentMicDriver {
       return false;
     }
 
+    // The voice agent runs a single full-duplex (.playAndRecord) session for the
+    // whole turn-taking loop so TTS replies can play through the speaker while
+    // the mic session stays live. Activate it BEFORE startRecording so capture
+    // reuses it instead of forcing the output-only .record session — under
+    // .record, playback cannot claim the output and trips
+    // AVAudioSessionErrorInsufficientPriority ('!pri', OSStatus 561017449).
+    // Mirrors the iOS Swift driver's configureVoiceAudioSession(); no-op on
+    // Android.
+    await this.capture.activateAudioSession();
     await this.capture.startRecording((chunk) => this.onChunk(chunk));
     this.callbacks.onPhase?.('listening');
     logger.info('Voice-agent mic capture started');
