@@ -15,7 +15,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -23,7 +22,7 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { BottomSheet, BottomSheetScrollView } from '../ui/BottomSheet';
 import { RunAnywhere } from '@runanywhere/core';
 import {
   LoRAAdapterConfig,
@@ -39,11 +38,14 @@ import { Typography } from '../../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../../theme/spacing';
 
 interface LoRASheetProps {
+  visible: boolean;
   modelId: string | null;
   onClose: () => void;
   /** Lets the parent (ChatScreen badge) track the loaded-adapter count. */
   onAdaptersChanged?: (adapters: LoRAAdapterInfo[]) => void;
 }
+
+const LORA_SNAP_POINTS = ['75%'];
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
@@ -57,6 +59,7 @@ function lastPathComponent(path: string): string {
 }
 
 export const LoRASheet: React.FC<LoRASheetProps> = ({
+  visible,
   modelId,
   onClose,
   onAdaptersChanged,
@@ -92,27 +95,35 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
   /** Mirrors iOS refreshAvailableAdapters + refreshLoraAdapters. */
   const refresh = useCallback(async () => {
     setError(null);
+    // LoRA `list()` is a loaded-service operation: it requires an LLM model to
+    // be loaded. Calling it with no model fails with "LoRA service is not
+    // loaded" and emits a spurious lora.failed/-230 telemetry event. Guard both
+    // catalog + list on modelId so we never touch the service before a load.
+    if (!modelId) {
+      setAvailableAdapters([]);
+      updateLoaded([]);
+      return;
+    }
     try {
-      if (modelId) {
-        const result = await RunAnywhere.lora.queryCatalog(
-          LoraAdapterCatalogQuery.fromPartial({ modelId })
-        );
-        if (!result.success) {
-          throw new Error(result.errorMessage || 'LoRA catalog query failed');
-        }
-        setAvailableAdapters(result.entries);
-      } else {
-        setAvailableAdapters([]);
+      const result = await RunAnywhere.lora.queryCatalog(
+        LoraAdapterCatalogQuery.fromPartial({ modelId })
+      );
+      if (!result.success) {
+        throw new Error(result.errorMessage || 'LoRA catalog query failed');
       }
+      setAvailableAdapters(result.entries);
       handleLoraState(await RunAnywhere.lora.list());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [modelId, handleLoraState]);
+  }, [modelId, handleLoraState, updateLoaded]);
 
+  // Only refresh once the user actually opens the sheet — the sheet is mounted
+  // (hidden) on the chat screen at startup, so an unconditional mount-refresh
+  // would hit the LoRA service before any model is loaded.
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (visible) refresh();
+  }, [visible, refresh]);
 
   /** Mirrors iOS downloadAndLoadAdapter -> loadLoraAdapter. */
   const handleDownloadAndApply = useCallback(
@@ -190,15 +201,16 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      snapPoints={LORA_SNAP_POINTS}
+    >
+      <View style={styles.sheetHeader}>
         <Text style={styles.title}>LoRA Adapters</Text>
-        <TouchableOpacity onPress={onClose} style={styles.doneButton}>
-          <Text style={styles.doneText}>Done</Text>
-        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <BottomSheetScrollView contentContainerStyle={styles.content}>
         {error && (
           <View style={styles.errorBox}>
             <Icon name="alert-circle" size={16} color={Colors.primaryRed} />
@@ -347,12 +359,18 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
             </Text>
           </View>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </BottomSheetScrollView>
+    </BottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
+  sheetHeader: {
+    paddingHorizontal: Padding.padding16,
+    paddingTop: Spacing.small,
+    paddingBottom: Spacing.medium,
+    alignItems: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: Colors.backgroundPrimary,

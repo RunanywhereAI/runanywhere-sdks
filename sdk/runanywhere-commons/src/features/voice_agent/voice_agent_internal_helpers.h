@@ -109,10 +109,41 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
 void emit_component_failure(rac_voice_agent_handle_t handle, const char* component,
                             rac_result_t code, const char* message);
 
+// Publish a per-turn MetricsEvent (kMetrics) so the turn is recorded to
+// telemetry under the "voice" modality. telemetry_records() only records
+// voice-pipeline events whose payload is kMetrics, so turn lifecycle events
+// alone never reach telemetry — this is the row the dashboard shows. On
+// failure (error_code != RAC_SUCCESS) the envelope SDKError is set so the row
+// is marked Failed with the message/code. Pass 0 for any unmeasured stage.
+void publish_voice_turn_metrics(double stt_ms, double llm_ms, double tts_ms, double end_to_end_ms,
+                                int64_t tokens_generated, const char* session_id,
+                                const char* model_id, const char* framework,
+                                int32_t transcript_chars, int32_t response_chars,
+                                rac_result_t error_code, const char* error_message);
+
 // Translate a proto `VoiceAgentComposeConfig` into the C ABI
 // `rac_voice_agent_config_t`. The returned config aliases string pointers
 // in `proto`; caller must keep `proto` alive across the use.
 rac_voice_agent_config_t config_from_proto(const runanywhere::v1::VoiceAgentComposeConfig& proto);
+
+// Run one complete VAD -> STT -> LLM -> TTS turn over a pre-segmented
+// `audio` buffer (16 kHz mono PCM16). This is the shared pipeline core of
+// the full-session ABI: `rac_voice_agent_process_turn_proto` calls it with
+// the parsed turn request, and `rac_voice_agent_feed_audio_proto` calls it
+// once the in-core segmenter closes an utterance. Emits the same d7
+// VoiceEvents (component states, turn lifecycle, pipeline state, VAD, STT,
+// LLM token, TTS audio) through @p event_callback (may be NULL — the
+// per-handle proto callback still receives every event) and, when
+// @p out_result is non-NULL, also fills a `VoiceAgentResult` carrying the
+// transcript, response, and synthesized WAV for inline playback.
+//
+// Acquires `handle->mutex` internally. The caller owns admission
+// (InFlightGuard) and the `is_configured` gate.
+rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::string& audio,
+                                  const std::string& session_id, const std::string& turn_id,
+                                  const std::string& request_id, const std::string& language_code,
+                                  rac_voice_agent_turn_event_callback_fn event_callback,
+                                  void* user_data, runanywhere::v1::VoiceAgentResult* out_result);
 
 #endif  // RAC_HAVE_PROTOBUF
 

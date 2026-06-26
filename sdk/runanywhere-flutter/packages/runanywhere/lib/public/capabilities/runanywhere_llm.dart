@@ -336,9 +336,11 @@ class RunAnywhereLLM {
       await controller.close();
     }
 
+    // Start the worker only once a listener attaches (canonical lazy pattern),
+    // so generation can't begin — and tokens can't be produced — before the
+    // subscriber is ready. Mirrors the VLM bridge's onListen deferral.
+    controller.onListen = () => unawaited(run());
     controller.onCancel = _cancelProto;
-
-    unawaited(run());
     return controller.stream;
   }
 

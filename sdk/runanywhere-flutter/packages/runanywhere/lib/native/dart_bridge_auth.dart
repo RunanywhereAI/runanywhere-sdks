@@ -272,6 +272,14 @@ class DartBridgeAuth {
     final refreshed = await _retryHTTPViaCommons();
     if (refreshed != null && refreshed.isNotEmpty) return refreshed;
 
+    // A proactive refresh just failed (init race / transient network). Prefer a
+    // still-usable live token over giving up — returning empty here makes the
+    // adapter fall back to `Bearer <apiKey>`, which is a guaranteed 401 on the
+    // JWT-only V2 telemetry endpoints. The adapter's 401-retry path
+    // (_refreshForAdapter) still handles the case where this token is truly
+    // expired, so we never strand an auth'd request that had a valid token.
+    if (current != null && current.isNotEmpty) return current;
+
     // Last-resort cached access token (may still be stale; the server
     // will reject it and the 401 retry path will refresh again).
     return _secureCache['com.runanywhere.sdk.accessToken'];

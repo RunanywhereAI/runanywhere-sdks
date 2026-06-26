@@ -325,7 +325,8 @@ void publish_stt_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
                                  int64_t processing_ms, int64_t audio_length_ms,
                                  int32_t audio_size_bytes, int32_t word_count,
                                  double real_time_factor, const char* language, int32_t sample_rate,
-                                 const char* error) {
+                                 const char* error, const char* framework_name = nullptr,
+                                 bool is_streaming = false) {
     runanywhere::v1::VoiceLifecycleEvent voice;
     voice.set_kind(kind);
     if (model_id != nullptr && model_id[0] != '\0') {
@@ -361,6 +362,16 @@ void publish_stt_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
     if (error != nullptr && error[0] != '\0') {
         voice.set_error(error);
     }
+    // Framework + streaming flag — the proto path otherwise leaves these unset,
+    // so STT rows showed no framework and is_streaming defaulted. Convert the
+    // lifecycle ref's framework name to the proto enum the same way the
+    // component path does (track reads v.framework() via framework_proto_to_string).
+    if (framework_name != nullptr && framework_name[0] != '\0') {
+        rac_inference_framework_t fw = RAC_FRAMEWORK_UNKNOWN;
+        (void)rac_inference_framework_from_string(framework_name, &fw);
+        voice.set_framework(rac::events::framework_to_proto_int(fw));
+    }
+    voice.set_is_streaming(is_streaming);
     rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
                                       runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
                                       transcription_id);
@@ -1452,7 +1463,8 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
     const std::string transcription_id = generate_unique_id();
     publish_stt_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_TRANSCRIPTION_STARTED,
                                 transcription_id.c_str(), ref.model_id, nullptr, 0.0f, 0, 0, 0, 0,
-                                0.0, options.language, options.sample_rate, nullptr);
+                                0.0, options.language, options.sample_rate, nullptr,
+                                ref.framework_name, /*is_streaming=*/false);
 
     const auto transcribe_start = std::chrono::steady_clock::now();
     rc = rac_stt_transcribe(&service, audio.data(), audio.size(), &options, &raw);
@@ -1463,7 +1475,8 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
         publish_stt_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED,
                                     transcription_id.c_str(), ref.model_id, nullptr, 0.0f,
                                     processing_ms, 0, 0, 0, 0.0, options.language,
-                                    options.sample_rate, rac_error_message(rc));
+                                    options.sample_rate, rac_error_message(rc),
+                                    ref.framework_name, /*is_streaming=*/false);
         rac::lifecycle::release_lifecycle_stt(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
@@ -1503,7 +1516,7 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
         runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED, transcription_id.c_str(), ref.model_id,
         raw.text, raw.confidence, processing_ms, duration_ms,
         static_cast<int32_t>(audio.size()), word_count, real_time_factor, options.language,
-        options.sample_rate, nullptr);
+        options.sample_rate, nullptr, ref.framework_name, /*is_streaming=*/false);
 
     rc = copy_proto(output, out_result);
     rac_stt_result_free(&raw);

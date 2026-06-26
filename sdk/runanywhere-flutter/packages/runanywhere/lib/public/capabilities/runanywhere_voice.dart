@@ -13,7 +13,7 @@
 
 import 'dart:typed_data';
 
-import 'package:runanywhere/adapters/voice_agent_stream_adapter.dart';
+import 'package:runanywhere/features/voice_agent/services/voice_agent_mic_driver.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
@@ -239,20 +239,27 @@ class RunAnywhereVoice {
 
   /// Subscribe to canonical voice-agent events.
   ///
-  /// Symmetric with `RunAnywhere.llm.generateStream(...)`:
-  /// the capability owns adapter construction so callers never touch
-  /// `VoiceAgentStreamAdapter` directly. The handle is fetched from
-  /// the internal `DartBridgeVoiceAgent` singleton — call
-  /// [initializeWithLoadedModels] first.
+  /// The C ABI owns NO microphone (rac_voice_agent.h audio-ingress contract):
+  /// subscribing to the handle callback alone is dead air. While this stream is
+  /// collected, a [VoiceAgentMicDriver] captures mic audio, segments utterances
+  /// by energy endpointing, and drives per-utterance turns through
+  /// `rac_voice_agent_process_turn_proto`; their VoiceEvents are forwarded here
+  /// and the synthesized reply is played back. Mirrors Kotlin
+  /// `RunAnywhere.streamVoiceAgent()` (mic driver + event fan-out).
   ///
-  /// Cancellation propagates: cancelling the returned stream's
-  /// subscription tears down the underlying C-side proto callback.
+  /// Call [initializeWithLoadedModels] first. Cancelling the subscription stops
+  /// capture/playback and tears the turn pipeline down.
   ///
-  /// Advanced callers needing multiple fan-out subscriptions or a
-  /// custom handle can still construct `VoiceAgentStreamAdapter`
-  /// directly (exported from `package:runanywhere/runanywhere.dart`).
+  /// Advanced callers needing the raw handle-callback fan-out (no mic ingress)
+  /// can still construct `VoiceAgentStreamAdapter(handle)` directly (exported
+  /// from `package:runanywhere/runanywhere.dart`).
   Stream<VoiceEvent> eventStream() async* {
-    final handle = await DartBridge.voiceAgent.getHandle();
-    yield* VoiceAgentStreamAdapter(handle).stream();
+    final driver = VoiceAgentMicDriver();
+    await driver.start();
+    try {
+      yield* driver.events;
+    } finally {
+      await driver.stop();
+    }
   }
 }

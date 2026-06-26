@@ -116,6 +116,107 @@ struct rac_vad_component {
 
 namespace {
 
+// VAD utterance accumulator for telemetry enrichment. Keyed by an opaque
+// pointer so both the component activity path (key = component) and the
+// handle-less lifecycle process path (key = a static sentinel) share it. Tracks
+// per-utterance speech/silence duration + segment count, plus prev-frame speech
+// state for edge detection on the lifecycle path (whose backend returns raw
+// per-frame is_speech, not debounced transitions). Cleared on destroy/reset.
+struct VadUtteranceState {
+    int64_t utterance_start_ms = 0;  // when the current speech segment began
+    int64_t last_transition_ms = 0;  // last STARTED/ENDED time (silence base)
+    int32_t segment_count = 0;       // speech segments observed since reset
+    int32_t sample_rate = 0;         // last seen sample rate (for end-flush on reset)
+    std::string model_id;            // last seen VAD model id (for end-flush on reset)
+    bool prev_is_speech = false;     // last frame verdict (lifecycle edge detect)
+    bool has_prev = false;           // whether prev_is_speech is meaningful yet
+};
+
+// Per-utterance metrics returned by a transition; published to telemetry.
+struct VadMetrics {
+    int64_t speech_ms = 0;
+    int64_t silence_ms = 0;
+    int32_t segment_count = 0;
+};
+
+std::mutex& vad_utterance_mutex() {
+    static std::mutex m;
+    return m;
+}
+
+std::unordered_map<const void*, VadUtteranceState>& vad_utterance_states() {
+    static std::unordered_map<const void*, VadUtteranceState> m;
+    return m;
+}
+
+// Stable sentinel key for the process-wide handle-less lifecycle VAD (singleton
+// model → one logical session).
+const void* lifecycle_vad_key() {
+    static const int sentinel = 0;
+    return &sentinel;
+}
+
+void forget_vad_utterance_state(const void* key) {
+    std::lock_guard<std::mutex> lock(vad_utterance_mutex());
+    vad_utterance_states().erase(key);
+}
+
+// Update durations/segment count for a STARTED/ENDED transition on @p st.
+// Caller holds vad_utterance_mutex().
+VadMetrics apply_vad_transition(VadUtteranceState& st, bool started, int64_t now_ms) {
+    VadMetrics m;
+    if (started) {
+        if (st.last_transition_ms > 0) {
+            m.silence_ms = now_ms - st.last_transition_ms;
+        }
+        st.utterance_start_ms = now_ms;
+        st.last_transition_ms = now_ms;
+        st.segment_count += 1;
+    } else {
+        if (st.utterance_start_ms > 0) {
+            m.speech_ms = now_ms - st.utterance_start_ms;
+        }
+        st.last_transition_ms = now_ms;
+    }
+    m.segment_count = st.segment_count;
+    return m;
+}
+
+// Component path: explicit STARTED/ENDED from the energy VAD's debounced state
+// machine — just record the transition.
+VadMetrics record_vad_transition(const void* key, bool started) {
+    std::lock_guard<std::mutex> lock(vad_utterance_mutex());
+    return apply_vad_transition(vad_utterance_states()[key], started, rac_get_current_time_ms());
+}
+
+// Lifecycle path: raw per-frame is_speech → detect the edge ourselves (treating
+// pre-history as silence) and record the transition. fire==false → no edge.
+struct VadEdge {
+    bool fire = false;
+    bool started = false;
+    VadMetrics metrics;
+};
+
+VadEdge step_lifecycle_vad(bool is_speech_now, int32_t sample_rate, const char* model_id) {
+    VadEdge edge;
+    std::lock_guard<std::mutex> lock(vad_utterance_mutex());
+    VadUtteranceState& st = vad_utterance_states()[lifecycle_vad_key()];
+    st.sample_rate = sample_rate;
+    if (model_id != nullptr && model_id[0] != '\0') {
+        st.model_id = model_id;
+    }
+    const bool prev = st.has_prev && st.prev_is_speech;
+    st.prev_is_speech = is_speech_now;
+    st.has_prev = true;
+    if (is_speech_now == prev) {
+        return edge;  // no transition
+    }
+    edge.fire = true;
+    edge.started = is_speech_now;
+    edge.metrics = apply_vad_transition(st, is_speech_now, rac_get_current_time_ms());
+    return edge;
+}
+
 #if defined(RAC_HAVE_PROTOBUF)
 
 struct ProtoStreamSlot {
@@ -260,6 +361,76 @@ void publish_vad_pipeline_event(bool is_speech, float confidence, float energy, 
     (void)rac::events::publish_prebuilt(sdk_event);
 }
 
+// Build + publish the per-utterance VAD speech-activity telemetry event for a
+// transition. Shared by the component activity callback and the handle-less
+// lifecycle process path. duration_ms(7) is read as speech_duration_ms by the
+// telemetry extractor; silence_duration_ms / segment_count ride the envelope
+// properties carrier (no VoiceLifecycleEvent fields). Telemetry-only destination.
+void publish_vad_speech_telemetry(bool started, const VadMetrics& metrics, int32_t sample_rate,
+                                  const char* model_id) {
+    runanywhere::v1::SDKEvent event;
+    auto* voice = event.mutable_voice();
+    voice->set_kind(started ? runanywhere::v1::VOICE_EVENT_KIND_SPEECH_STARTED
+                            : runanywhere::v1::VOICE_EVENT_KIND_SPEECH_ENDED);
+    if (model_id != nullptr && model_id[0] != '\0') {
+        voice->set_model_id(model_id);
+    }
+    if (!started && metrics.speech_ms > 0) {
+        voice->set_duration_ms(metrics.speech_ms);
+    }
+    if (sample_rate > 0) {
+        voice->set_sample_rate(sample_rate);
+    }
+    if (metrics.silence_ms > 0) {
+        (*event.mutable_properties())["silence_duration_ms"] = std::to_string(metrics.silence_ms);
+    }
+    if (metrics.segment_count > 0) {
+        (*event.mutable_properties())["segment_count"] = std::to_string(metrics.segment_count);
+    }
+    event.set_destination(rac::events::legacy_destination_telemetry());
+    (void)rac::events::publish(event, runanywhere::v1::SDK_COMPONENT_VAD,
+                               runanywhere::v1::EVENT_CATEGORY_VAD);
+}
+
+// Handle-less lifecycle process telemetry: per-frame VAD event for the in-app
+// event stream + edge-detected speech-activity telemetry rows. The handle-less
+// path (rac_vad_process_lifecycle_proto) otherwise publishes nothing, so
+// standalone VAD never reached the telemetry dashboard. Mirrors the component
+// path's two layers (event stream + per-utterance telemetry).
+void emit_lifecycle_vad_telemetry(bool is_speech_now, int32_t sample_rate, float confidence,
+                                  float energy, int32_t duration_ms, const char* model_id) {
+    publish_vad_pipeline_event(is_speech_now, confidence, energy, duration_ms);
+    const VadEdge edge = step_lifecycle_vad(is_speech_now, sample_rate, model_id);
+    if (edge.fire) {
+        publish_vad_speech_telemetry(edge.started, edge.metrics, sample_rate, model_id);
+    }
+}
+
+// On session reset, if a speech utterance is still open (the stream stopped
+// mid-speech before a trailing silence frame arrived), emit its SPEECH_ENDED so
+// every STARTED has a matching ENDED row in telemetry.
+void flush_lifecycle_vad_end() {
+    bool emit = false;
+    VadMetrics metrics;
+    int32_t sample_rate = 0;
+    std::string model_id;
+    {
+        std::lock_guard<std::mutex> lock(vad_utterance_mutex());
+        VadUtteranceState& st = vad_utterance_states()[lifecycle_vad_key()];
+        if (st.has_prev && st.prev_is_speech) {
+            sample_rate = st.sample_rate;
+            model_id = st.model_id;
+            metrics = apply_vad_transition(st, /*started=*/false, rac_get_current_time_ms());
+            st.prev_is_speech = false;
+            emit = true;
+        }
+    }
+    if (emit) {
+        publish_vad_speech_telemetry(/*started=*/false, metrics, sample_rate,
+                                     model_id.empty() ? nullptr : model_id.c_str());
+    }
+}
+
 void proto_activity_trampoline(rac_speech_activity_t activity, void* user_data) {
     const rac_handle_t handle = reinterpret_cast<rac_handle_t>(user_data);
     ProtoStreamSlot slot;
@@ -303,19 +474,16 @@ static void vad_speech_activity_callback(rac_speech_activity_event_t event, void
     if (!component)
         return;
 
-    // Emit telemetry-only voice-lifecycle event for speech activity.
+    // Emit telemetry-only voice-lifecycle event for speech activity, enriched
+    // with per-utterance metrics from the accumulator so each transition row
+    // reports speech/silence duration, segment count, and sample rate instead
+    // of a bare start/end with no data.
 #if defined(RAC_HAVE_PROTOBUF)
     {
-        runanywhere::v1::VoiceLifecycleEvent voice;
-        voice.set_kind(event == RAC_SPEECH_ACTIVITY_STARTED
-                           ? runanywhere::v1::VOICE_EVENT_KIND_SPEECH_STARTED
-                           : runanywhere::v1::VOICE_EVENT_KIND_SPEECH_ENDED);
-        // SPEECH_ENDED telemetry reads speech_duration_ms (= duration_ms); the
-        // legacy call site passed the default (0) here, preserved exactly.
-        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_VAD,
-                                          runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice),
-                                          /*session_id=*/nullptr,
-                                          rac::events::legacy_destination_telemetry());
+        const bool started = (event == RAC_SPEECH_ACTIVITY_STARTED);
+        const VadMetrics metrics = record_vad_transition(component, started);
+        publish_vad_speech_telemetry(started, metrics, component->config.sample_rate,
+                                     component->loaded_model_id);
     }
 #endif
 
@@ -511,6 +679,7 @@ extern "C" void rac_vad_component_destroy(rac_handle_t handle) {
 #if defined(RAC_HAVE_PROTOBUF)
     clear_proto_activity_slot(handle);
 #endif
+    forget_vad_utterance_state(component);
 
     // Cleanup first
     rac_vad_component_cleanup(handle);
@@ -639,6 +808,9 @@ extern "C" rac_result_t rac_vad_component_reset(rac_handle_t handle) {
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
+
+    // New session → restart the per-utterance accumulator (segment count etc.).
+    forget_vad_utterance_state(component);
 
     if (!component->vad_service) {
         return RAC_ERROR_NOT_INITIALIZED;
@@ -1327,6 +1499,10 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     }
     rc = ref.ops->process(ref.impl, samples.data(), samples.size(), &is_speech);
     if (rc != RAC_SUCCESS) {
+        // Record the failure to telemetry — the handle-less path otherwise
+        // dropped failures silently (publish_vad_pipeline_event marks the event
+        // EVENT_CATEGORY_FAILURE with the error code/message).
+        publish_vad_pipeline_event(false, 0.0f, 0.0f, 0, rc);
         rac::lifecycle::release_lifecycle_vad(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
@@ -1346,6 +1522,14 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     }
     result.set_duration_ms(duration_ms);
     result.set_timestamp_ms(rac_get_current_time_ms());
+
+    // Emit telemetry for the standalone (handle-less) path: a per-frame VAD
+    // event for the in-app event stream + edge-detected speech-activity rows
+    // (started/ended with speech/silence duration + segment count). Without
+    // this, standalone VAD via processLifecycle never reached telemetry.
+    emit_lifecycle_vad_telemetry(is_speech == RAC_TRUE, sample_rate, result.confidence(), energy,
+                                 duration_ms, ref.model_id);
+
     rc = copy_proto(result, out_result);
     rac::lifecycle::release_lifecycle_vad(&ref);
     return rc;
@@ -1473,6 +1657,11 @@ rac_result_t rac_vad_reset_lifecycle_proto(rac_proto_buffer_t* out_result) {
 #if !defined(RAC_HAVE_PROTOBUF)
     return feature_unavailable_lifecycle(out_result);
 #else
+    // Close any utterance still open at stop (no trailing silence frame), then
+    // restart the lifecycle accumulator so durations don't bleed across sessions.
+    flush_lifecycle_vad_end();
+    forget_vad_utterance_state(lifecycle_vad_key());
+
     rac::lifecycle::LifecycleVadRef ref;
     rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
     if (rc != RAC_SUCCESS) {

@@ -23,7 +23,6 @@ const { registerModel, registerMultiFileModel } = RunAnywhere;
 export type BackendRegistrationState = {
   llamaRegistered: boolean;
   onnxRegistered: boolean;
-  genieRegistered: boolean;
 };
 
 /**

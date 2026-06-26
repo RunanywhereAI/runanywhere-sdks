@@ -62,17 +62,20 @@ class VoiceAgentViewModel extends ChangeNotifier {
   UiModelLoadState sttModelState = UiModelLoadState.notLoaded;
   UiModelLoadState llmModelState = UiModelLoadState.notLoaded;
   UiModelLoadState ttsModelState = UiModelLoadState.notLoaded;
+  UiModelLoadState vadModelState = UiModelLoadState.notLoaded;
 
   String currentSTTModel = 'Not loaded';
   String currentLLMModel = 'Not loaded';
   String currentTTSModel = 'Not loaded';
+  String currentVADModel = 'Not loaded';
 
   // --- Computed properties (for the view) -------------------------------------------
 
   bool get allModelsLoaded =>
       sttModelState == UiModelLoadState.loaded &&
       llmModelState == UiModelLoadState.loaded &&
-      ttsModelState == UiModelLoadState.loaded;
+      ttsModelState == UiModelLoadState.loaded &&
+      vadModelState == UiModelLoadState.loaded;
 
   bool get isActive =>
       sessionState != UiVoiceSessionState.disconnected &&
@@ -102,6 +105,7 @@ class VoiceAgentViewModel extends ChangeNotifier {
       final llmModelId = sdk.RunAnywhere.llm.currentModelId;
       final sttModelId = sdk.RunAnywhere.stt.currentModelId;
       final ttsVoiceId = sdk.RunAnywhere.tts.currentVoiceId;
+      final vadModelId = sdk.RunAnywhere.vad.currentModelId;
 
       sttModelState = sttModelId != null
           ? UiModelLoadState.loaded
@@ -112,10 +116,14 @@ class VoiceAgentViewModel extends ChangeNotifier {
       ttsModelState = ttsVoiceId != null
           ? UiModelLoadState.loaded
           : UiModelLoadState.notLoaded;
+      vadModelState = vadModelId != null
+          ? UiModelLoadState.loaded
+          : UiModelLoadState.notLoaded;
 
       currentSTTModel = sttModelId ?? 'Not loaded';
       currentLLMModel = llmModelId ?? 'Not loaded';
       currentTTSModel = ttsVoiceId ?? 'Not loaded';
+      currentVADModel = vadModelId ?? 'Not loaded';
       _notify();
     } catch (e) {
       debugPrint('Failed to get component states: $e');
@@ -146,7 +154,7 @@ class VoiceAgentViewModel extends ChangeNotifier {
     try {
       if (!sdk.RunAnywhere.voice.isReady) {
         sessionState = UiVoiceSessionState.error;
-        errorMessage = 'Please load STT, LLM, and TTS models first';
+        errorMessage = 'Please load STT, LLM, TTS, and VAD models first';
         _notify();
         return;
       }
@@ -186,6 +194,13 @@ class VoiceAgentViewModel extends ChangeNotifier {
     } catch (e) {
       debugPrint('Voice cleanup: $e');
     }
+
+    // Commit any assistant response that finished generating but hadn't yet
+    // reached PIPELINE_STATE_SPEAKING (where it is normally committed), so a
+    // stop in that window doesn't silently drop the turn. Safe from double-add:
+    // the subscription is already cancelled, and a committed turn leaves
+    // assistantResponse empty.
+    _commitAssistantResponse();
 
     sessionState = UiVoiceSessionState.disconnected;
     currentTranscript = '';
@@ -238,6 +253,13 @@ class VoiceAgentViewModel extends ChangeNotifier {
       case sdk.VoiceEvent_Payload.userSaid:
         final text = event.userSaid.text;
         if (text.isNotEmpty) {
+          // A new user utterance means the previous assistant reply is done.
+          // Commit it as its own bubble BEFORE appending this user turn — the
+          // mic-driver / process-turn path doesn't reliably emit
+          // agent-response/SPEAKING signals, so without this the next reply's
+          // tokens accumulate into the previous reply's buffer and the bubbles
+          // merge. Idempotent: a no-op if already committed elsewhere.
+          _commitAssistantResponse();
           conversation.add(
             ConversationTurn(
               role: proto.MessageRole.MESSAGE_ROLE_USER,
@@ -273,19 +295,49 @@ class VoiceAgentViewModel extends ChangeNotifier {
         _notify();
         break;
 
+      case sdk.VoiceEvent_Payload.agentResponseStarted:
+        // A new assistant reply is starting — flush any prior uncommitted
+        // response into its own turn first, so consecutive replies never merge
+        // into one bubble (the next assistant tokens then accumulate fresh).
+        _commitAssistantResponse();
+        sessionState = UiVoiceSessionState.processing;
+        _notify();
+        break;
+
+      case sdk.VoiceEvent_Payload.agentResponseCompleted:
+        // Canonical end-of-reply: commit the accumulated tokens as their own
+        // assistant turn. Idempotent with the SPEAKING-state commit below — the
+        // first to fire commits and clears; the other sees an empty buffer.
+        _commitAssistantResponse();
+        _notify();
+        break;
+
       case sdk.VoiceEvent_Payload.interrupted:
       case sdk.VoiceEvent_Payload.metrics:
       case sdk.VoiceEvent_Payload.componentStateChanged:
       case sdk.VoiceEvent_Payload.sessionError:
       case sdk.VoiceEvent_Payload.sessionStarted:
       case sdk.VoiceEvent_Payload.sessionStopped:
-      case sdk.VoiceEvent_Payload.agentResponseStarted:
-      case sdk.VoiceEvent_Payload.agentResponseCompleted:
       case sdk.VoiceEvent_Payload.turnLifecycle:
       case sdk.VoiceEvent_Payload.componentProgress:
       case sdk.VoiceEvent_Payload.notSet:
         break;
     }
+  }
+
+  /// Commit the accumulated assistant tokens as a distinct ASSISTANT turn, then
+  /// clear the buffer. No-op when empty, so it is safe to call from every
+  /// turn-boundary signal (response-started/completed, SPEAKING, stop) without
+  /// producing duplicate or merged bubbles.
+  void _commitAssistantResponse() {
+    if (assistantResponse.isEmpty) return;
+    conversation.add(
+      ConversationTurn(
+        role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
+        text: assistantResponse,
+      ),
+    );
+    assistantResponse = '';
   }
 
   void _handlePipelineState(sdk.PipelineState state) {
@@ -302,15 +354,7 @@ class VoiceAgentViewModel extends ChangeNotifier {
       case sdk.PipelineState.PIPELINE_STATE_SPEAKING:
         sessionState = UiVoiceSessionState.speaking;
         // Flush accumulated assistant tokens as a completed turn.
-        if (assistantResponse.isNotEmpty) {
-          conversation.add(
-            ConversationTurn(
-              role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
-              text: assistantResponse,
-            ),
-          );
-          assistantResponse = '';
-        }
+        _commitAssistantResponse();
         _notify();
         break;
       case sdk.PipelineState.PIPELINE_STATE_STOPPED:

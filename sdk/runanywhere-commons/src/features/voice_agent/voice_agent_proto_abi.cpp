@@ -8,6 +8,7 @@
  * `voice_agent_internal_helpers.h`.
  */
 
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -300,6 +301,23 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
     rac_result_t rc = RAC_SUCCESS;
     std::string error_message;
     rac_result_t error_code = RAC_SUCCESS;
+
+    // Per-turn timing for the telemetry MetricsEvent, read at both exits below.
+    // Declared here (function scope) so the cleanup_and_return path can publish
+    // partial metrics on failure.
+    double stt_ms = 0.0;
+    double llm_ms = 0.0;
+    double tts_ms = 0.0;
+    int64_t turn_tokens = 0;
+    std::string turn_model_id;
+    std::string turn_framework;
+    int32_t turn_transcript_chars = 0;
+    int32_t turn_response_chars = 0;
+    const auto turn_start = std::chrono::steady_clock::now();
+    auto ms_since = [](std::chrono::steady_clock::time_point t) {
+        return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t)
+            .count();
+    };
     {
         std::lock_guard<std::mutex> lock(handle->mutex);
 
@@ -322,6 +340,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
             rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
 
         rac_stt_result_t stt = {};
+        const auto t_stt = std::chrono::steady_clock::now();
         if (have_lifecycle_stt) {
             rac_stt_service_t stt_service{stt_ref.ops, stt_ref.impl, stt_ref.model_id};
             rc = rac_stt_transcribe(&stt_service, audio_data, audio_size, nullptr, &stt);
@@ -329,6 +348,8 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
             rc = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr,
                                               &stt);
         }
+        stt_ms = ms_since(t_stt);
+        turn_transcript_chars = stt.text ? static_cast<int32_t>(std::strlen(stt.text)) : 0;
         if (rc != RAC_SUCCESS) {
             if (have_lifecycle_stt) {
                 rac::lifecycle::release_lifecycle_stt(&stt_ref);
@@ -373,11 +394,21 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
         const bool have_lifecycle_llm = rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
 
         rac_llm_result_t llm = {};
+        const auto t_llm = std::chrono::steady_clock::now();
         if (have_lifecycle_llm) {
             rac_llm_service_t llm_service{llm_ref.ops, llm_ref.impl, llm_ref.model_id};
             rc = rac_llm_generate(&llm_service, stt.text, nullptr, &llm);
         } else {
             rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
+        }
+        llm_ms = ms_since(t_llm);
+        turn_tokens = llm.completion_tokens;
+        turn_response_chars = llm.text ? static_cast<int32_t>(std::strlen(llm.text)) : 0;
+        if (have_lifecycle_llm) {
+            if (llm_ref.model_id != nullptr)
+                turn_model_id = llm_ref.model_id;
+            if (llm_ref.framework_name != nullptr)
+                turn_framework = llm_ref.framework_name;
         }
         if (rc != RAC_SUCCESS) {
             if (have_lifecycle_llm) {
@@ -397,7 +428,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
         }
         {
             const std::string stt_text(stt.text);
-            const std::string llm_text(llm.text);
+            const std::string llm_text(llm.text ? llm.text : "");
             pending_emits.emplace_back([handle, stt_text, llm_text]() {
                 emit_turn_lifecycle(
                     handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED,
@@ -410,12 +441,14 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
             rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
 
         rac_tts_result_t tts = {};
+        const auto t_tts = std::chrono::steady_clock::now();
         if (have_lifecycle_tts) {
             rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
             rc = rac_tts_synthesize(&tts_service, llm.text, nullptr, &tts);
         } else {
             rc = rac_tts_component_synthesize(handle->tts_handle, llm.text, nullptr, &tts);
         }
+        tts_ms = ms_since(t_tts);
         if (rc != RAC_SUCCESS) {
             if (have_lifecycle_tts) {
                 rac::lifecycle::release_lifecycle_tts(&tts_ref);
@@ -503,10 +536,21 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
     }  // lock released here
 
     flush_emits();
+    publish_voice_turn_metrics(stt_ms, llm_ms, tts_ms, ms_since(turn_start), turn_tokens,
+                               /*session_id=*/nullptr,
+                               turn_model_id.empty() ? nullptr : turn_model_id.c_str(),
+                               turn_framework.empty() ? nullptr : turn_framework.c_str(),
+                               turn_transcript_chars, turn_response_chars, RAC_SUCCESS, nullptr);
     return copy_proto_message(result, out_result);
 
 cleanup_and_return:
     flush_emits();
+    publish_voice_turn_metrics(stt_ms, llm_ms, tts_ms, ms_since(turn_start), turn_tokens,
+                               /*session_id=*/nullptr,
+                               turn_model_id.empty() ? nullptr : turn_model_id.c_str(),
+                               turn_framework.empty() ? nullptr : turn_framework.c_str(),
+                               turn_transcript_chars, turn_response_chars, error_code,
+                               error_message.c_str());
     return rac_proto_buffer_set_error(out_result, error_code, error_message.c_str());
 #endif
 }

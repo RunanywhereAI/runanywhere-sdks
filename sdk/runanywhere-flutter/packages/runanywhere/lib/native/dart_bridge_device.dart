@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -282,8 +283,18 @@ class DartBridgeDevice {
 
     final accessToken =
         _accessToken ?? DartBridgeAuth.instance.getAccessToken();
-    if (requiresAuth && accessToken != null && accessToken.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $accessToken';
+    if (requiresAuth) {
+      // Fall back to the SDK API key when no access token has been issued yet.
+      // Device registration is the first authenticated call (before any JWT
+      // exists), so without this fallback the Authorization header is omitted
+      // and the backend returns 401 "Authorization header missing". Kotlin
+      // parity: HTTPClientAdapter.resolveToken() resolves token -> apiKey.
+      final token = (accessToken != null && accessToken.isNotEmpty)
+          ? accessToken
+          : HTTPClientAdapter.shared.apiKey;
+      if (token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
     }
 
     logger.debug('Device registration POST to: $fullUrl');
@@ -522,8 +533,15 @@ void _getDeviceInfoCallback(
     _cachedDeviceInfoPtrs.add(appIdPtr);
     outInfo.ref.appIdentifier = appIdPtr;
 
-    // Platform
-    final platformPtr = 'flutter'.toNativeUtf8();
+    // Platform = OS family (matches iOS/Kotlin + backend contract), not binding.
+    final platformName = Platform.isAndroid
+        ? 'android'
+        : Platform.isIOS
+            ? 'ios'
+            : Platform.isMacOS
+                ? 'macos'
+                : 'flutter';
+    final platformPtr = platformName.toNativeUtf8();
     _cachedDeviceInfoPtrs.add(platformPtr);
     outInfo.ref.platform = platformPtr;
   } catch (e) {

@@ -42,6 +42,9 @@
 #if defined(RAC_HAVE_PROTOBUF)
 #include "errors.pb.h"
 #include "llm_service.pb.h"
+#include "sdk_events.pb.h"
+
+#include "infrastructure/events/sdk_event_publish.h"
 #include "tool_calling.pb.h"
 #endif
 
@@ -541,6 +544,35 @@ bool run_generate_once(ToolCallingSession& session, const std::string& prompt,
     if (out_response) {
         *out_response = raw.text ? raw.text : "";
     }
+
+    // Telemetry: each tool-calling turn IS an LLM generation, but the session
+    // only emits ToolCallingSessionEvents — so without this the "llm" V2 table
+    // never fills for tools-enabled chats. Publish a routed GenerationEvent so
+    // the telemetry sink records the turn (component=LLM → modality "llm").
+    {
+        runanywhere::v1::SDKEvent llm_event;
+        auto* gen = llm_event.mutable_generation();
+        gen->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED);
+        if (ref.model_id != nullptr && ref.model_id[0] != '\0') {
+            gen->set_model_id(ref.model_id);
+        }
+        if (raw.completion_tokens > 0) {
+            gen->set_tokens_count(raw.completion_tokens);
+            gen->set_tokens_used(raw.completion_tokens);
+        }
+        if (raw.prompt_tokens > 0) {
+            gen->set_input_tokens(raw.prompt_tokens);
+        }
+        if (raw.tokens_per_second > 0.0f) {
+            gen->set_tokens_per_second(raw.tokens_per_second);
+        }
+        if (raw.time_to_first_token_ms > 0) {
+            gen->set_time_to_first_token_ms(raw.time_to_first_token_ms);
+        }
+        (void)rac::events::publish(llm_event, runanywhere::v1::SDK_COMPONENT_LLM,
+                                   runanywhere::v1::EVENT_CATEGORY_LLM);
+    }
+
     rac_llm_result_free(&raw);
     rac::llm::release_lifecycle_llm(&ref);
     if (out_rc)

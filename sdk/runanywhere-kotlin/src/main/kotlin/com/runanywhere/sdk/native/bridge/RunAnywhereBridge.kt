@@ -1092,6 +1092,27 @@ object RunAnywhereBridge {
         listener: NativeProtoProgressListener,
     ): Int
 
+    /**
+     * Feed raw mic frames (16 kHz mono PCM16) into the in-core segmenter. The
+     * core accumulates frames, performs energy-based utterance endpointing, and
+     * on each completed utterance runs the full VAD→STT→LLM→TTS turn pipeline.
+     * Returns serialized VoiceAgentResult bytes — carrying the synthesized
+     * reply (WAV) when a turn completed this call, or an empty result
+     * otherwise. Per-stage VoiceEvents fan out to the handle callback (so
+     * streamVoiceAgent() collectors observe them). Throws a native-proto
+     * failure on error. Pass [isFinal] = true to flush an in-progress
+     * utterance.
+     */
+    @JvmStatic
+    external fun racVoiceAgentFeedAudioProto(
+        handle: Long,
+        audioData: ByteArray,
+        sampleRateHz: Int,
+        channels: Int,
+        encoding: Int,
+        isFinal: Boolean,
+    ): ByteArray?
+
     // TOOL-CALLING SESSION (rac_tool_calling.h)
     //
     // Native-owned state machine for generate → parse → execute → loop. The

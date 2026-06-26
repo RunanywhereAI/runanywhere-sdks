@@ -210,7 +210,8 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 }
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
-                        const char* error) {
+                        const char* error, const char* model_id = nullptr,
+                        const char* adapter_id = nullptr, int64_t adapter_size_bytes = 0) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -224,12 +225,21 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_LLM);
+    if (model_id != nullptr && model_id[0] != '\0') {
+        cap->set_model_id(model_id);  // base model — telemetry "base_model_id"
+    }
     if (operation) {
         event.set_operation_id(operation);
         cap->set_operation(operation);
     }
     if (error)
         cap->set_error(error);
+    if (adapter_id != nullptr && adapter_id[0] != '\0') {
+        (*event.mutable_properties())["adapter_id"] = adapter_id;
+    }
+    if (adapter_size_bytes > 0) {
+        (*event.mutable_properties())["adapter_size_bytes"] = std::to_string(adapter_size_bytes);
+    }
     publish_event(event);
 }
 
@@ -487,7 +497,7 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
         }
         track_lora_cleared(backend_impl, base_model_id);
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED,
-                           "lora.apply.replaceExisting", nullptr);
+                           "lora.apply.replaceExisting", nullptr, base_model_id.c_str());
     }
 
     for (const auto& config : request.adapters()) {
@@ -518,8 +528,18 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
         track_lora_applied(backend_impl, base_model_id, applied_info);
         auto* info = result.add_adapters();
         *info = applied_info;
+        // Adapter file size for telemetry — read via ifstream (portable; no
+        // <filesystem> dependency). Best-effort: 0 if the path can't be opened.
+        int64_t adapter_size = 0;
+        {
+            std::ifstream sz(config.adapter_path(), std::ios::binary | std::ios::ate);
+            if (sz) {
+                adapter_size = static_cast<int64_t>(sz.tellg());
+            }
+        }
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED,
-                           "lora.apply", nullptr);
+                           "lora.apply", nullptr, base_model_id.c_str(),
+                           config.adapter_id().c_str(), adapter_size);
     }
 
     result.set_success(true);
@@ -580,7 +600,7 @@ rac_result_t rac_lora_remove_proto(const uint8_t* request_proto_bytes, size_t re
         track_lora_cleared(backend_impl, base_model_id);
         populate_tracked_state(backend_impl, base_model_id, &state);
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED,
-                           "lora.remove", nullptr);
+                           "lora.remove", nullptr, base_model_id.c_str());
         return finish(copy_proto(state, out_state));
     }
 
@@ -636,7 +656,7 @@ rac_result_t rac_lora_remove_proto(const uint8_t* request_proto_bytes, size_t re
         }
         track_lora_removed_path(backend_impl, base_model_id, adapter_path);
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED,
-                           "lora.remove", nullptr);
+                           "lora.remove", nullptr, base_model_id.c_str());
     }
 
     populate_tracked_state(backend_impl, base_model_id, &state);

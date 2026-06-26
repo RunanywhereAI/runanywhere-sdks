@@ -6,6 +6,7 @@ library;
 
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -167,6 +168,37 @@ class DartBridgeTTS {
     );
   }
 
+  /// Synthesize speech through the lifecycle-owned generated-proto TTS ABI,
+  /// running the blocking native call in a short-lived worker isolate
+  /// (`Isolate.run`) so the calling isolate — usually the Flutter UI isolate —
+  /// stays responsive for the whole synthesis. Vocoder synthesis of a full
+  /// utterance is a long synchronous block; on the UI isolate it freezes
+  /// frames. Mirrors `dart_bridge_stt.dart`'s `transcribeLifecycleProtoAsync`
+  /// and `dart_bridge_llm.dart`'s `generateProto`: this ABI is lifecycle-owned
+  /// (no Dart-held handle), so the worker re-resolves the engine via the
+  /// commons model lifecycle — nothing isolate-bound crosses.
+  Future<TTSOutput> synthesizeLifecycleProtoAsync(
+    TTSSynthesisRequest request,
+  ) async {
+    _validateLifecycleRequest(request);
+
+    final override = _synthesizeLifecycleProtoForTesting;
+    if (override != null) {
+      return override(request);
+    }
+
+    if (RacNative.bindings.rac_tts_synthesize_lifecycle_proto == null) {
+      throw UnsupportedError(
+        'rac_tts_synthesize_lifecycle_proto is unavailable',
+      );
+    }
+
+    final requestBytes = request.writeToBuffer();
+    final resultBytes =
+        await Isolate.run(() => _ttsSynthesizeWorker(requestBytes));
+    return TTSOutput.fromBuffer(resultBytes);
+  }
+
   /// Stream TTSStreamEvent chunks via the lifecycle-owned generated-proto ABI.
   ///
   /// Mirrors STT's `transcribeStreamLifecycleProto`. Requires commons to have
@@ -176,16 +208,20 @@ class DartBridgeTTS {
   ) {
     _validateLifecycleRequest(request);
 
-    final streamOverride = _synthesizeStreamLifecycleProtoForTesting;
-    // Defer the FFI lookup when a test seam is installed — accessing
+    // Test seam: drive the wrapper without the FFI. Accessing
     // `RacNative.bindings` triggers a `dlopen` of librac_commons, which fails
-    // in the unit-test harness where no native library is staged. The test
-    // group `DartBridgeTTS.synthesizeStreamLifecycleProto — real wrapper, fake
-    // FFI` covers the production wrapper without the FFI.
-    final fn = streamOverride == null
-        ? RacNative.bindings.rac_tts_synthesize_stream_lifecycle_proto
-        : null;
-    if (streamOverride == null && fn == null) {
+    // in the unit-test harness where no native library is staged. The seam
+    // path runs entirely on the calling isolate so the test group
+    // `DartBridgeTTS.synthesizeStreamLifecycleProto — real wrapper, fake FFI`
+    // exercises the production drain loop + dispatch closure without spawning
+    // a worker.
+    final streamOverride = _synthesizeStreamLifecycleProtoForTesting;
+    if (streamOverride != null) {
+      return _synthesizeStreamViaTestSeam(request, streamOverride);
+    }
+
+    final fn = RacNative.bindings.rac_tts_synthesize_stream_lifecycle_proto;
+    if (fn == null) {
       return Stream<TTSStreamEvent>.error(
         UnsupportedError(
           'rac_tts_synthesize_stream_lifecycle_proto is unavailable',
@@ -193,14 +229,111 @@ class DartBridgeTTS {
       );
     }
 
+    // Production path: the blocking `rac_tts_synthesize_stream_lifecycle_proto`
+    // call runs inside a short-lived worker isolate (`Isolate.run`), where a
+    // worker-owned `NativeCallable.isolateLocal` fires synchronously per chunk
+    // (commons serializes each event into a `thread_local` scratch buffer that
+    // is reused on the next emission, so the callback must copy eagerly and
+    // same-thread) and sends the copy over a `SendPort`. The calling isolate —
+    // usually the Flutter UI isolate — decodes and emits each event as it
+    // arrives and is never blocked for the synthesis duration. This is the
+    // Dart equivalent of `dart_bridge_llm.dart`'s `generateStreamProto`.
     final controller = StreamController<TTSStreamEvent>(sync: false);
-    NativeCallable<RacTtsStreamEventCallbackNative>? callback;
+    final receivePort = ReceivePort();
+    var sawTerminalEvent = false;
+    var tornDown = false;
+
+    void teardown() {
+      if (tornDown) return;
+      tornDown = true;
+      receivePort.close();
+    }
+
+    receivePort.listen((Object? message) {
+      if (message is Uint8List) {
+        // One serialized TTSStreamEvent, already copied in the worker's
+        // synchronous callback, delivered over the port in emission order.
+        if (controller.isClosed) return;
+        try {
+          final event = TTSStreamEvent.fromBuffer(message);
+          final isTerminal = event.kind ==
+                  TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED ||
+              event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR;
+          sawTerminalEvent = sawTerminalEvent || isTerminal;
+          controller.add(event);
+          if (isTerminal) {
+            unawaited(controller.close());
+          }
+        } catch (e, st) {
+          controller.addError(e, st);
+          unawaited(controller.close());
+        }
+      } else if (message is int) {
+        // rc sentinel — always the LAST message (same port as the chunks, so
+        // FIFO ordering is guaranteed). Early-return rcs (parse / no-model
+        // errors) produce no terminal event, so surface them.
+        if (message != RAC_SUCCESS &&
+            !sawTerminalEvent &&
+            !controller.isClosed) {
+          controller.addError(
+            StateError(
+              'rac_tts_synthesize_stream_lifecycle_proto failed: '
+              '${RacResultCode.getMessage(message)}',
+            ),
+          );
+        }
+        if (!controller.isClosed) {
+          unawaited(controller.close());
+        }
+        teardown();
+      }
+    });
+
+    final requestBytes = request.writeToBuffer();
+    final sendPort = receivePort.sendPort;
+    unawaited(
+      _runTtsStreamWorker(requestBytes, sendPort)
+          .catchError((Object e, StackTrace st) {
+        // Worker isolate crashed (RemoteError) before the rc sentinel.
+        if (!controller.isClosed) {
+          controller.addError(e, st);
+          unawaited(controller.close());
+        }
+        teardown();
+        return RAC_SUCCESS;
+      }),
+    );
+
+    controller.onCancel = () {
+      // Best-effort: ask commons to stop lifecycle synthesis so native CPU
+      // isn't burned for a Dart subscriber that has already gone away.
+      // RunAnywhereTTS.stopSynthesis() routes through the same ABI; mirror its
+      // semantics here. The worker's blocking call returns shortly after, emits
+      // a terminal event (dropped — the controller is closing) and the rc
+      // sentinel closes the port. Errors are swallowed so cancellation stays
+      // best-effort.
+      try {
+        stopLifecycleProto();
+      } catch (e) {
+        _logger.debug('stopLifecycleProto on stream cancel failed: $e');
+      }
+      teardown();
+    };
+
+    return controller.stream;
+  }
+
+  /// Test-only streaming path: drives the production drain loop + dispatch
+  /// closure with a Dart-side fake instead of the FFI. Runs entirely on the
+  /// calling isolate (the unit-test harness has no native library to `dlopen`
+  /// and no worker to spawn).
+  Stream<TTSStreamEvent> _synthesizeStreamViaTestSeam(
+    TTSSynthesisRequest request,
+    TTSStreamFakeFFI streamOverride,
+  ) {
+    final controller = StreamController<TTSStreamEvent>(sync: false);
     var sawTerminalEvent = false;
 
-    // Shared dispatch closure — used by both the real NativeCallable.listener
-    // and the test-injected fake FFI. Centralizing this guarantees the test
-    // path exercises the same listener-body behavior (closed-controller
-    // guard, terminal-kind tracking) as production.
     void dispatchEvent(TTSStreamEvent event) {
       if (controller.isClosed) return;
       sawTerminalEvent = sawTerminalEvent ||
@@ -210,111 +343,31 @@ class DartBridgeTTS {
     }
 
     Future<void> run() async {
-      // Test seam: skip FFI entirely; let the fake drive `dispatchEvent`
-      // synchronously then return an rc. Same drain + close semantics as
-      // the real path.
-      if (streamOverride != null) {
-        try {
-          final rc = await streamOverride(
-            request,
-            dispatchEvent,
-            () => sawTerminalEvent,
-          );
-          await drainPendingStreamCallbacks(() => sawTerminalEvent);
-          if (rc != RAC_SUCCESS && !controller.isClosed) {
-            controller.addError(StateError(
-              'rac_tts_synthesize_stream_lifecycle_proto (test fake) failed: '
-              '${RacResultCode.getMessage(rc)}',
-            ));
-          }
-          if (!controller.isClosed) {
-            await controller.close();
-          }
-        } catch (e, st) {
-          if (!controller.isClosed) {
-            controller.addError(e, st);
-            await controller.close();
-          }
-        }
-        return;
-      }
-
-      final bytes = request.writeToBuffer();
-      final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
-
       try {
-        // Main-isolate single-call ABI (NOTE: DartBridgeLLM.generateStreamProto
-        // has since moved its blocking call into a worker isolate — that is
-        // the template for converting this path; TTS still blocks the calling
-        // isolate for the duration of synthesis):
-        // use `isolateLocal` (not `.listener`) so the callback runs
-        // synchronously on the same thread that invoked
-        // `rac_tts_synthesize_stream_lifecycle_proto`. The commons producer
-        // (`emit_event` / `chunk_bridge` in rac_nonllm_lifecycle_proto_abi.cpp)
-        // serializes each event into a stack-local `std::vector<uint8_t>` and
-        // calls the callback with that buffer's pointer inline. With
-        // `.listener` the callback is queued onto the isolate's event loop and
-        // runs ASYNCHRONOUSLY — by then the producing call has returned and the
-        // stack buffer is gone, so `bytesPtr.asTypedList` reads freed memory
-        // (use-after-free → malformed/empty TTSStreamEvent bytes).
-        // `isolateLocal` is safe because the ABI runs synchronously on the
-        // Dart isolate that created the callback, so it always fires on that
-        // isolate and cannot be re-entered after `fn()` returns.
-        callback = NativeCallable<RacTtsStreamEventCallbackNative>.isolateLocal((
-          Pointer<Uint8> bytesPtr,
-          int bytesLen,
-          Pointer<Void> _,
-        ) {
-          if (bytesPtr == nullptr || bytesLen <= 0) return;
-          try {
-            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-            dispatchEvent(TTSStreamEvent.fromBuffer(copy));
-          } catch (e, st) {
-            controller.addError(e, st);
-            unawaited(controller.close());
-          }
-        });
-        final rc = fn!(
-          requestPtr,
-          bytes.length,
-          callback!.nativeFunction,
-          nullptr,
+        final rc = await streamOverride(
+          request,
+          dispatchEvent,
+          () => sawTerminalEvent,
         );
+        await drainPendingStreamCallbacks(() => sawTerminalEvent);
         if (rc != RAC_SUCCESS && !controller.isClosed) {
           controller.addError(StateError(
-            'rac_tts_synthesize_stream_lifecycle_proto failed: '
+            'rac_tts_synthesize_stream_lifecycle_proto (test fake) failed: '
             '${RacResultCode.getMessage(rc)}',
           ));
         }
         if (!controller.isClosed) {
           await controller.close();
         }
-      } finally {
-        calloc.free(requestPtr);
-        // Drain in-flight TTS chunk dispatches before
-        // closing the NativeCallable. `rac_tts_synthesize_stream_lifecycle_proto`
-        // may post the terminal COMPLETED/ERROR callback from a worker
-        // thread that copies the user_data slot under commons' internal
-        // mutex and releases it BEFORE invoking the callback (see
-        // `rac/features/tts/rac_tts_stream.h` warning). Without
-        // `rac_tts_proto_quiesce()` the C side can invoke the trampoline
-        // backed by NativeCallable user_data after `callback.close()` —
-        // UAF on the proto scratch buffer. Best-effort — if the commons
-        // binary predates the export (or, in unit-test harnesses, the
-        // native library is not staged) the call is skipped.
-        _quiesceBestEffort();
-        callback?.close();
-        callback = null;
+      } catch (e, st) {
+        if (!controller.isClosed) {
+          controller.addError(e, st);
+          await controller.close();
+        }
       }
     }
 
     controller.onCancel = () {
-      // Best-effort: ask commons to stop lifecycle synthesis so native CPU
-      // isn't burned for a Dart subscriber that has already gone away.
-      // RunAnywhereTTS.stopSynthesis() routes through the same ABI; mirror
-      // its semantics here so cancelling the public stream subscription
-      // also stops the underlying lifecycle work. Errors are swallowed so
-      // cancellation remains best-effort.
       try {
         final stopOverride = _stopLifecycleProtoForTesting;
         if (stopOverride != null) {
@@ -325,10 +378,6 @@ class DartBridgeTTS {
       } catch (e) {
         _logger.debug('stopLifecycleProto on stream cancel failed: $e');
       }
-      // Same ordering as the run() teardown — quiesce first.
-      _quiesceBestEffort();
-      callback?.close();
-      callback = null;
     };
 
     unawaited(run());
@@ -567,3 +616,98 @@ typedef TTSStreamFakeFFI = Future<int> Function(
   void Function(TTSStreamEvent) dispatch,
   bool Function() terminalObserved,
 );
+
+// MARK: - Worker-isolate entry points
+//
+// Top-level so `Isolate.run` closures capture only sendable values
+// (Uint8List / SendPort). `RacNative.bindings` is a per-isolate static — the
+// worker re-resolves the dylib symbols on first access (idempotent
+// `PlatformLoader.loadCommons()`, same convention as the LLM/STT/VLM workers).
+
+/// Blocking body of [DartBridgeTTS.synthesizeLifecycleProtoAsync]: a plain
+/// request→response proto call with no callbacks. Returns the serialized
+/// TTSOutput so the main isolate owns the decode.
+Uint8List _ttsSynthesizeWorker(Uint8List requestBytes) {
+  final bindings = RacNative.bindings;
+  final fn = bindings.rac_tts_synthesize_lifecycle_proto;
+  if (fn == null) {
+    throw UnsupportedError('rac_tts_synthesize_lifecycle_proto is unavailable');
+  }
+
+  final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
+  final out = calloc<RacProtoBuffer>();
+  try {
+    bindings.rac_proto_buffer_init(out);
+    final code = fn(requestPtr, requestBytes.length, out);
+    DartBridgeProtoUtils.ensureSuccess(
+      out,
+      code,
+      'rac_tts_synthesize_lifecycle_proto',
+    );
+    if (out.ref.data == nullptr || out.ref.size == 0) {
+      return Uint8List(0);
+    }
+    return Uint8List.fromList(out.ref.data.asTypedList(out.ref.size));
+  } finally {
+    bindings.rac_proto_buffer_free(out);
+    calloc.free(out);
+    calloc.free(requestPtr);
+  }
+}
+
+/// Runs [_ttsStreamWorker] in a worker isolate. Hoisted to top level so the
+/// `Isolate.run` closure captures ONLY its two sendable parameters
+/// (`Uint8List` + `SendPort`) — inlined, the closure would capture the
+/// unsendable `ReceivePort`/`StreamController` and fail the isolate spawn.
+Future<int> _runTtsStreamWorker(Uint8List requestBytes, SendPort port) =>
+    Isolate.run(() => _ttsStreamWorker(requestBytes, port));
+
+/// Blocking body of [DartBridgeTTS.synthesizeStreamLifecycleProto]. Runs the
+/// single-call streaming ABI on the worker isolate; the worker-owned
+/// `isolateLocal` callback fires synchronously per chunk (commons passes a
+/// pointer into a `thread_local` scratch buffer, so the callback must copy
+/// eagerly and same-thread), copies the bytes, and forwards the copy to the
+/// main isolate. The rc is sent LAST on the same port so it is FIFO-ordered
+/// after every chunk.
+int _ttsStreamWorker(Uint8List requestBytes, SendPort port) {
+  final bindings = RacNative.bindings;
+  final fn = bindings.rac_tts_synthesize_stream_lifecycle_proto;
+  if (fn == null) {
+    throw UnsupportedError(
+      'rac_tts_synthesize_stream_lifecycle_proto is unavailable',
+    );
+  }
+
+  final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
+  NativeCallable<RacTtsStreamEventCallbackNative>? callback;
+  try {
+    callback = NativeCallable<RacTtsStreamEventCallbackNative>.isolateLocal(
+      (Pointer<Uint8> bytesPtr, int bytesLen, Pointer<Void> _) {
+        if (bytesPtr == nullptr || bytesLen <= 0) return;
+        // Copy INSIDE the synchronous callback — commons reuses the scratch
+        // buffer the moment we return. The copy is what crosses isolates.
+        port.send(Uint8List.fromList(bytesPtr.asTypedList(bytesLen)));
+      },
+    );
+
+    final rc = fn(
+      requestPtr,
+      requestBytes.length,
+      callback.nativeFunction,
+      nullptr,
+    );
+    port.send(rc);
+    return rc;
+  } finally {
+    // Quiesce in-flight TTS chunk dispatches before closing the NativeCallable.
+    // `rac_tts_synthesize_stream_lifecycle_proto` may post the terminal
+    // callback from a worker thread that copies the user_data slot under
+    // commons' internal mutex and releases it BEFORE invoking the callback
+    // (see `rac/features/tts/rac_tts_stream.h`). Without `rac_tts_proto_quiesce`
+    // the C side can invoke the trampoline after `callback.close()` — UAF on
+    // the proto scratch buffer. Best-effort: skipped if the export is absent.
+    bindings.rac_tts_proto_quiesce?.call();
+    callback?.close();
+    calloc.free(requestPtr);
+  }
+}

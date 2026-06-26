@@ -1,0 +1,17 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "assets/fonts/Figtree-Italic.ttf",
+      "sha1": "478151ddbbdac0bcfe6d33c6e5ebd179feee721c"
+    },
+    {
+      "path": "assets/fonts/Figtree.ttf",
+      "sha1": "371ddf33582284211bcdd664470591441720988d"
+    },
+    {
+      "path": "assets/fonts/MapleMono.ttf",
+      "sha1": "ab9daff90e67a9e7c49b66a67557121f4144fdb8"
+    }
+  ]
+}

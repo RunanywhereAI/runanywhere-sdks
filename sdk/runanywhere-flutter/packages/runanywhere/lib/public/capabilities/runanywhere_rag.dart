@@ -112,7 +112,7 @@ class RunAnywhereRAG {
     }
 
     try {
-      return DartBridgeRAG.shared.ingestDocument(document);
+      return await DartBridgeRAG.shared.ingestDocumentAsync(document);
     } catch (e) {
       throw SDKException.invalidState('RAG ingestion failed: $e');
     }
@@ -140,7 +140,7 @@ class RunAnywhereRAG {
 
     try {
       for (final document in documents) {
-        DartBridgeRAG.shared.ingestDocument(document);
+        await DartBridgeRAG.shared.ingestDocumentAsync(document);
       }
     } catch (e) {
       throw SDKException.invalidState('RAG batch ingestion failed: $e');

@@ -383,13 +383,18 @@ void emit_sdk_models_loaded(int32_t count, double duration_ms) {
 
 void emit_model_download_started(const char* model_id, int64_t total_bytes,
                                  const char* archive_type) {
-    (void)archive_type;
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_DOWNLOAD_STARTED);
     if (model_id)
         m.set_model_id(model_id);
     m.set_total_bytes(total_bytes);
-    publish(v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_DOWNLOAD, std::move(m));
+    // ModelEvent has no archive_type field → carry it on the envelope
+    // properties (read into payload.archive_type by the kModel extraction).
+    v1::SDKEvent event;
+    *event.mutable_model() = std::move(m);
+    if (archive_type != nullptr && archive_type[0] != '\0')
+        (*event.mutable_properties())["archive_type"] = archive_type;
+    publish(event, v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_DOWNLOAD);
 }
 
 void emit_model_download_progress(const char* model_id, double progress, int64_t bytes_downloaded,
@@ -410,7 +415,6 @@ void emit_model_download_progress(const char* model_id, double progress, int64_t
 
 void emit_model_download_completed(const char* model_id, int64_t size_bytes, double duration_ms,
                                    const char* archive_type) {
-    (void)archive_type;
     v1::ModelEvent m;
     m.set_kind(v1::MODEL_EVENT_KIND_DOWNLOAD_COMPLETED);
     if (model_id)
@@ -418,7 +422,11 @@ void emit_model_download_completed(const char* model_id, int64_t size_bytes, dou
     m.set_model_size_bytes(size_bytes);
     m.set_duration_ms(static_cast<int64_t>(duration_ms));
     m.set_progress(1.0f);
-    publish(v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_DOWNLOAD, std::move(m));
+    v1::SDKEvent event;
+    *event.mutable_model() = std::move(m);
+    if (archive_type != nullptr && archive_type[0] != '\0')
+        (*event.mutable_properties())["archive_type"] = archive_type;
+    publish(event, v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_DOWNLOAD);
 }
 
 void emit_model_download_failed(const char* model_id, rac_result_t error_code,

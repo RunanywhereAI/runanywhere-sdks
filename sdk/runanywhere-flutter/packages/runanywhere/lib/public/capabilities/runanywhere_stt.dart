@@ -300,7 +300,7 @@ class RunAnywhereSTT {
       metadata: <String, String>{'model_id': modelId}.entries,
     );
 
-    return DartBridgeSTT.shared.transcribeLifecycleProto(request);
+    return DartBridgeSTT.shared.transcribeLifecycleProtoAsync(request);
   }
 
   Future<String> _requireLoadedModelId() async {

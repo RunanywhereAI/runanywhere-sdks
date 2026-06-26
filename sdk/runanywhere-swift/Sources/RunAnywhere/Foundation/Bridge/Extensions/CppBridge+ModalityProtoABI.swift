@@ -76,14 +76,29 @@ private enum VoiceAgentStateProtoABI {
         UnsafeMutableRawPointer?
     ) -> rac_result_t
 
+    // Streaming raw-frame ingress: the core segments utterances and runs the
+    // turn pipeline, returning a VoiceAgentResult inline when one completes.
+    typealias FeedAudio = @convention(c) (
+        rac_voice_agent_handle_t?,
+        UnsafeRawPointer?,
+        Int,
+        Int32,
+        Int32,
+        Int32,
+        rac_bool_t,
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
+
     static let processTurnName = "rac_voice_agent_process_voice_turn_proto"
     static let processTurnWithEventsName = "rac_voice_agent_process_turn_proto"
+    static let feedAudioName = "rac_voice_agent_feed_audio_proto"
 
     static let processTurn = NativeProtoABI.load(processTurnName, as: ProcessTurn.self)
     static let processTurnWithEvents = NativeProtoABI.load(
         processTurnWithEventsName,
         as: ProcessTurnWithEvents.self
     )
+    static let feedAudio = NativeProtoABI.load(feedAudioName, as: FeedAudio.self)
 }
 
 private final class VoiceTurnEventCollector: @unchecked Sendable {
@@ -517,6 +532,58 @@ extension CppBridge.VoiceAgent {
                 nil
             )
         }
+    }
+
+    /// Push raw mic frames (16 kHz mono PCM16) into the core. The C core
+    /// segments utterances itself and runs the full turn pipeline; when an
+    /// utterance completes this call, the returned `RAVoiceAgentResult`
+    /// carries the synthesized reply (WAV) for inline playback. Otherwise the
+    /// result is empty. Per-stage VoiceEvents still fan out to the handle
+    /// callback. Pass `isFinal` to flush an in-progress utterance.
+    ///
+    /// Returns the native status alongside the decoded result so the caller
+    /// can distinguish a fatal condition (e.g. the agent is no longer
+    /// initialized) from a recoverable per-turn failure (e.g. empty STT),
+    /// which should be logged but not stop the capture loop. Throws only when
+    /// the native symbol is unavailable or the proto cannot be decoded.
+    nonisolated static func feedAudioProto(
+        handle: rac_voice_agent_handle_t,
+        audio: Data,
+        sampleRateHz: Int32,
+        channels: Int32,
+        encoding: Int32,
+        isFinal: Bool
+    ) throws -> (status: rac_result_t, result: RAVoiceAgentResult?) {
+        let feed = try NativeProtoABI.require(
+            VoiceAgentStateProtoABI.feedAudio,
+            named: VoiceAgentStateProtoABI.feedAudioName
+        )
+        guard NativeProtoABI.canReceiveProtoBuffer else {
+            throw SDKException(
+                code: .notSupported,
+                message: NativeProtoABI.missingSymbolMessage(VoiceAgentStateProtoABI.feedAudioName),
+                category: .internal
+            )
+        }
+        var outBuffer = rac_proto_buffer_t()
+        defer { NativeProtoABI.free(&outBuffer) }
+        let status = audio.withUnsafeBytes { audioBytes in
+            feed(
+                handle,
+                audioBytes.baseAddress,
+                audio.count,
+                sampleRateHz,
+                channels,
+                encoding,
+                isFinal ? RAC_TRUE : RAC_FALSE,
+                &outBuffer
+            )
+        }
+        guard status == RAC_SUCCESS else {
+            return (status, nil)
+        }
+        let result = try NativeProtoABI.decode(RAVoiceAgentResult.self, from: outBuffer)
+        return (status, result)
     }
 }
 

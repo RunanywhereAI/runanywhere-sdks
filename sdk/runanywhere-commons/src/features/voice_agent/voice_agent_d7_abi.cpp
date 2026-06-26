@@ -16,6 +16,7 @@
  *     global SDKEvent publisher.
  */
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -232,55 +233,18 @@ std::string d7_pick_turn_id(const std::string& request_id) {
 
 }  // namespace
 
-#endif  // RAC_HAVE_PROTOBUF
+namespace rac::voice_agent::detail {
 
-extern "C" rac_result_t rac_voice_agent_process_turn_proto(
-    rac_voice_agent_handle_t handle, const uint8_t* request_bytes, size_t request_size,
-    rac_voice_agent_turn_event_callback_fn event_callback, void* user_data) {
-#if !defined(RAC_HAVE_PROTOBUF)
-    (void)handle;
-    (void)request_bytes;
-    (void)request_size;
-    (void)event_callback;
-    (void)user_data;
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#else
-    using namespace rac::voice_agent::detail;
-    if (!handle || !event_callback)
+rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::string& audio,
+                                  const std::string& session_id, const std::string& turn_id,
+                                  const std::string& request_id, const std::string& language_code,
+                                  rac_voice_agent_turn_event_callback_fn event_callback,
+                                  void* user_data, runanywhere::v1::VoiceAgentResult* out_result) {
+    if (audio.empty()) {
+        d7_emit_error(handle, RAC_ERROR_INVALID_ARGUMENT, "voice_agent",
+                      "voice turn buffer is empty", session_id, turn_id, request_id, event_callback,
+                      user_data);
         return RAC_ERROR_INVALID_ARGUMENT;
-    if (!proto_bytes_valid(request_bytes, request_size))
-        return RAC_ERROR_DECODING_ERROR;
-
-    runanywhere::v1::VoiceAgentTurnRequest request;
-    if (!request.ParseFromArray(proto_parse_data(request_bytes, request_size),
-                                static_cast<int>(request_size))) {
-        return RAC_ERROR_DECODING_ERROR;
-    }
-
-    const std::string session_id = request.session_id();
-    const std::string request_id = request.request_id();
-    const std::string turn_id = d7_pick_turn_id(request_id);
-
-    // Admit under the in-flight barrier so rac_voice_agent_destroy's
-    // drain loop covers this full STT+LLM+TTS turn. The d7 path reads
-    // is_configured below outside handle->mutex, so without the barrier a
-    // concurrent destroy could flip is_shutting_down after that read and tear
-    // the agent down mid-turn while this thread still emits events on it.
-    InFlightGuard guard(handle);
-    if (!guard.admitted()) {
-        d7_emit_error(handle, RAC_ERROR_INVALID_STATE, "voice_agent",
-                      "voice agent is shutting down", session_id, turn_id, request_id,
-                      event_callback, user_data);
-        return RAC_ERROR_INVALID_STATE;
-    }
-
-    if (!handle->is_configured.load(std::memory_order_acquire)) {
-        d7_emit_error(handle, RAC_ERROR_NOT_INITIALIZED, "voice_agent",
-                      "voice agent is not initialized", session_id, turn_id, request_id,
-                      event_callback, user_data);
-        emit_component_failure(handle, "voice_agent", RAC_ERROR_NOT_INITIALIZED,
-                               "voice agent is not initialized");
-        return RAC_ERROR_NOT_INITIALIZED;
     }
 
     runanywhere::v1::VoiceAgentComponentStates component_states;
@@ -312,18 +276,47 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         }
     }
 
-    const std::string& audio = request.audio_data();
-    if (audio.empty()) {
-        d7_emit_error(handle, RAC_ERROR_INVALID_ARGUMENT, "voice_agent",
-                      "voice turn request is missing audio_data", session_id, turn_id, request_id,
-                      event_callback, user_data);
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
+    // Per-turn telemetry: publish a MetricsEvent on every exit (success or any
+    // failure) so the turn lands under the "voice" modality. This path uses
+    // early `return rc` at each stage, so an RAII guard is the clean way to
+    // cover all exits. Declared BEFORE the lock so it destructs (and publishes)
+    // AFTER the handle mutex is released. `armed` gates it to turns that
+    // actually started (not the pre-flight config rejections above).
+    struct TurnMetricsGuard {
+        std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        double stt_ms = 0.0;
+        double llm_ms = 0.0;
+        double tts_ms = 0.0;
+        int64_t tokens = 0;
+        std::string session_id;
+        std::string model_id;
+        std::string framework;
+        int32_t transcript_chars = 0;
+        int32_t response_chars = 0;
+        rac_result_t error_code = RAC_SUCCESS;
+        std::string error_message;
+        bool armed = false;
+        ~TurnMetricsGuard() {
+            if (!armed)
+                return;
+            const double e2e_ms = std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - start)
+                                      .count();
+            rac::voice_agent::detail::publish_voice_turn_metrics(
+                stt_ms, llm_ms, tts_ms, e2e_ms, tokens,
+                session_id.empty() ? nullptr : session_id.c_str(),
+                model_id.empty() ? nullptr : model_id.c_str(),
+                framework.empty() ? nullptr : framework.c_str(), transcript_chars, response_chars,
+                error_code, error_message.empty() ? nullptr : error_message.c_str());
+        }
+    } turn_metrics;
+    turn_metrics.session_id = session_id;
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     emit_component_states(handle);
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_STARTED);
+    turn_metrics.armed = true;
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_IDLE,
                   runanywhere::v1::PIPELINE_STATE_LISTENING, session_id, turn_id, request_id,
                   event_callback, user_data);
@@ -377,6 +370,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
 
     rac_stt_result_t stt = {};
     rac_result_t rc;
+    const auto t_stt = std::chrono::steady_clock::now();
     if (have_lifecycle_stt) {
         rac_stt_service_t stt_service{stt_ref.ops, stt_ref.impl, stt_ref.model_id};
         rc = rac_stt_transcribe(&stt_service, audio.data(), audio.size(), nullptr, &stt);
@@ -384,10 +378,14 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         rc = rac_stt_component_transcribe(handle->stt_handle, audio.data(), audio.size(), nullptr,
                                           &stt);
     }
+    turn_metrics.stt_ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_stt).count();
     if (rc != RAC_SUCCESS) {
         if (have_lifecycle_stt) {
             rac::lifecycle::release_lifecycle_stt(&stt_ref);
         }
+        turn_metrics.error_code = rc;
+        turn_metrics.error_message = "STT transcription failed";
         d7_emit_error(handle, rc, "stt", "STT transcription failed", session_id, turn_id,
                       request_id, event_callback, user_data);
         emit_component_failure(handle, "stt", rc, "STT transcription failed");
@@ -398,6 +396,8 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         if (have_lifecycle_stt) {
             rac::lifecycle::release_lifecycle_stt(&stt_ref);
         }
+        turn_metrics.error_code = RAC_ERROR_INVALID_STATE;
+        turn_metrics.error_message = "STT transcription was empty";
         d7_emit_error(handle, RAC_ERROR_INVALID_STATE, "stt", "STT transcription was empty",
                       session_id, turn_id, request_id, event_callback, user_data);
         emit_component_failure(handle, "stt", RAC_ERROR_INVALID_STATE,
@@ -413,11 +413,9 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                     /*is_speech=*/false, session_id, turn_id, request_id, event_callback,
                     user_data);
     }
-    d7_emit_user_said(handle, stt.text,
-                      request.session_config().has_language_code()
-                          ? request.session_config().language_code()
-                          : std::string(),
-                      session_id, turn_id, request_id, event_callback, user_data);
+    turn_metrics.transcript_chars = stt.text ? static_cast<int32_t>(std::strlen(stt.text)) : 0;
+    d7_emit_user_said(handle, stt.text, language_code, session_id, turn_id, request_id,
+                      event_callback, user_data);
 
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_PROCESSING_SPEECH,
                   runanywhere::v1::PIPELINE_STATE_GENERATING_RESPONSE, session_id, turn_id,
@@ -425,13 +423,23 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
 
     rac::llm::LifecycleLlmRef llm_ref{};
     const bool have_lifecycle_llm = rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
+    if (have_lifecycle_llm) {
+        if (llm_ref.model_id != nullptr)
+            turn_metrics.model_id = llm_ref.model_id;
+        if (llm_ref.framework_name != nullptr)
+            turn_metrics.framework = llm_ref.framework_name;
+    }
     rac_llm_result_t llm = {};
+    const auto t_llm = std::chrono::steady_clock::now();
     if (have_lifecycle_llm) {
         rac_llm_service_t llm_service{llm_ref.ops, llm_ref.impl, llm_ref.model_id};
         rc = rac_llm_generate(&llm_service, stt.text, nullptr, &llm);
     } else {
         rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
     }
+    turn_metrics.llm_ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_llm).count();
+    turn_metrics.tokens = llm.completion_tokens;
     if (rc != RAC_SUCCESS) {
         if (have_lifecycle_llm) {
             rac::llm::release_lifecycle_llm(&llm_ref);
@@ -440,11 +448,14 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         if (have_lifecycle_stt) {
             rac::lifecycle::release_lifecycle_stt(&stt_ref);
         }
+        turn_metrics.error_code = rc;
+        turn_metrics.error_message = "LLM generation failed";
         d7_emit_error(handle, rc, "llm", "LLM generation failed", session_id, turn_id, request_id,
                       event_callback, user_data);
         emit_component_failure(handle, "llm", rc, "LLM generation failed");
         return rc;
     }
+    turn_metrics.response_chars = llm.text ? static_cast<int32_t>(std::strlen(llm.text)) : 0;
     d7_emit_assistant_token(handle, llm.text, true, session_id, turn_id, request_id, event_callback,
                             user_data);
 
@@ -455,12 +466,15 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     rac::lifecycle::LifecycleTtsRef tts_ref{};
     const bool have_lifecycle_tts = rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
     rac_tts_result_t tts = {};
+    const auto t_tts = std::chrono::steady_clock::now();
     if (have_lifecycle_tts) {
         rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
         rc = rac_tts_synthesize(&tts_service, llm.text, nullptr, &tts);
     } else {
         rc = rac_tts_component_synthesize(handle->tts_handle, llm.text, nullptr, &tts);
     }
+    turn_metrics.tts_ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_tts).count();
     if (rc != RAC_SUCCESS) {
         if (have_lifecycle_tts) {
             rac::lifecycle::release_lifecycle_tts(&tts_ref);
@@ -473,6 +487,8 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         if (have_lifecycle_stt) {
             rac::lifecycle::release_lifecycle_stt(&stt_ref);
         }
+        turn_metrics.error_code = rc;
+        turn_metrics.error_message = "TTS synthesis failed";
         d7_emit_error(handle, rc, "tts", "TTS synthesis failed", session_id, turn_id, request_id,
                       event_callback, user_data);
         emit_component_failure(handle, "tts", rc, "TTS synthesis failed");
@@ -483,6 +499,31 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                   tts.audio_data && tts.audio_size > 0 ? tts.audio_size : 0,
                   tts.sample_rate > 0 ? tts.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE, true,
                   session_id, turn_id, request_id, event_callback, user_data);
+
+    // When the caller wants the synthesized reply inline (the streaming
+    // feed-audio ingress path), package transcript + response + TTS audio as
+    // a VoiceAgentResult. The audio is converted to a self-describing WAV so
+    // the SDK plays it directly without tracking raw float32 rate/encoding.
+    if (out_result) {
+        out_result->set_speech_detected(turn_has_speech);
+        out_result->set_transcription(stt.text);
+        if (llm.text) {
+            out_result->set_assistant_response(llm.text);
+        }
+        if (tts.audio_data && tts.audio_size > 0) {
+            void* wav_data = nullptr;
+            size_t wav_size = 0;
+            if (rac_audio_float32_to_wav(
+                    tts.audio_data, tts.audio_size,
+                    tts.sample_rate > 0 ? tts.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE, &wav_data,
+                    &wav_size) == RAC_SUCCESS &&
+                wav_data && wav_size > 0) {
+                out_result->set_synthesized_audio(wav_data, wav_size);
+                std::free(wav_data);
+            }
+        }
+        fill_component_states(handle, out_result->mutable_final_state());
+    }
 
     // Honor the documented PLAYING_TTS -> COOLDOWN -> IDLE
     // pathway so frontends gating the microphone on
@@ -511,6 +552,69 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         rac::lifecycle::release_lifecycle_stt(&stt_ref);
     }
     return RAC_SUCCESS;
+}
+
+}  // namespace rac::voice_agent::detail
+
+#endif  // RAC_HAVE_PROTOBUF
+
+extern "C" rac_result_t rac_voice_agent_process_turn_proto(
+    rac_voice_agent_handle_t handle, const uint8_t* request_bytes, size_t request_size,
+    rac_voice_agent_turn_event_callback_fn event_callback, void* user_data) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)handle;
+    (void)request_bytes;
+    (void)request_size;
+    (void)event_callback;
+    (void)user_data;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    using namespace rac::voice_agent::detail;
+    if (!handle || !event_callback)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    if (!proto_bytes_valid(request_bytes, request_size))
+        return RAC_ERROR_DECODING_ERROR;
+
+    runanywhere::v1::VoiceAgentTurnRequest request;
+    if (!request.ParseFromArray(proto_parse_data(request_bytes, request_size),
+                                static_cast<int>(request_size))) {
+        return RAC_ERROR_DECODING_ERROR;
+    }
+
+    const std::string session_id = request.session_id();
+    const std::string request_id = request.request_id();
+    const std::string turn_id = d7_pick_turn_id(request_id);
+
+    // Admit under the in-flight barrier so rac_voice_agent_destroy's
+    // drain loop covers this full STT+LLM+TTS turn. The d7 path reads
+    // is_configured below outside handle->mutex, so without the barrier a
+    // concurrent destroy could flip is_shutting_down after that read and tear
+    // the agent down mid-turn while this thread still emits events on it.
+    InFlightGuard guard(handle);
+    if (!guard.admitted()) {
+        d7_emit_error(handle, RAC_ERROR_INVALID_STATE, "voice_agent",
+                      "voice agent is shutting down", session_id, turn_id, request_id,
+                      event_callback, user_data);
+        return RAC_ERROR_INVALID_STATE;
+    }
+
+    if (!handle->is_configured.load(std::memory_order_acquire)) {
+        d7_emit_error(handle, RAC_ERROR_NOT_INITIALIZED, "voice_agent",
+                      "voice agent is not initialized", session_id, turn_id, request_id,
+                      event_callback, user_data);
+        emit_component_failure(handle, "voice_agent", RAC_ERROR_NOT_INITIALIZED,
+                               "voice agent is not initialized");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    // The VAD -> STT -> LLM -> TTS pipeline + event emission is shared with
+    // the streaming feed-audio ingress path (rac_voice_agent_feed_audio_proto).
+    const std::string language_code =
+        request.session_config().has_language_code() ? request.session_config().language_code()
+                                                     : std::string();
+    return rac::voice_agent::detail::d7_process_utterance(
+        handle, request.audio_data(), session_id, turn_id, request_id, language_code,
+        event_callback, user_data, /*out_result=*/nullptr);
 #endif
 }
 

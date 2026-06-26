@@ -327,8 +327,9 @@ export function streamVoiceAgent(): AsyncIterable<VoiceEvent> {
       const adapter = new VoiceAgentStreamAdapter(handle);
 
       // Swift parity (RunAnywhere+VoiceAgent.swift:225-236): while the event
-      // stream is consumed, a platform mic driver captures audio, segments
-      // utterances, and submits each via `voiceAgentProcessTurnProto`. The C
+      // stream is consumed, a platform mic driver captures audio and feeds raw
+      // frames to the core via `voiceAgentFeedAudioProto`; the core segments
+      // utterances and runs the turn pipeline itself (no SDK-side VAD). The C
       // ABI owns no microphone access — without this driver the pipeline gets
       // no audio buffer and stays "listening" forever (dead-air), per the
       // rac_voice_agent.h Audio-Ingress Contract. Events emitted during each

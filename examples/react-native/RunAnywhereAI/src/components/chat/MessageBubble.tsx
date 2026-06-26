@@ -1,282 +1,263 @@
 /**
- * MessageBubble Component
+ * MessageBubble — a single chat message, Claude/ChatGPT-style and themed for
+ * light/dark.
  *
- * Displays a single chat message with role-specific styling.
- *
- * Reference: iOS MessageBubbleView.swift
+ * Assistant turns render flat and full-width (no bubble): a subtle framework
+ * label, the response text on the page background, an expandable thinking
+ * section, tool-call indicator, a thin streaming cursor and a muted tok/s meta.
+ * User turns render as a compact right-aligned bubble. Empty content (a turn
+ * that only ran tools, or one mid-stream) renders no text line.
  */
-
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
+  Animated,
   LayoutAnimation,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '../../theme/colors';
-import { Typography } from '../../theme/typography';
-import { Spacing, BorderRadius, Padding, Layout } from '../../theme/spacing';
+import { Icon, useTheme } from '../../theme/system';
 import type { Message } from '../../types/chat';
 import { MessageRole } from '../../types/chat';
 import { ToolCallIndicator } from './ToolCallIndicator';
 
 interface MessageBubbleProps {
   message: Message;
-  /** Maximum width as fraction of screen */
   maxWidthFraction?: number;
 }
 
-/**
- * Format timestamp to relative or time string
- */
-const formatTimestamp = (date: Date): string => {
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
+const formatTPS = (tps: number): string =>
+  tps >= 100 ? `${Math.round(tps)} tok/s` : `${tps.toFixed(1)} tok/s`;
 
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
+/** Three softly-pulsing dots shown while an assistant turn streams its first token. */
+const TypingDots: React.FC<{ color: string }> = ({ color }) => {
+  const progress = useRef(new Animated.Value(0)).current;
 
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-};
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(progress, {
+        toValue: 3,
+        duration: 1050,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [progress]);
 
-/**
- * Format tokens per second
- */
-const formatTPS = (tps: number): string => {
-  if (tps >= 100) return `${Math.round(tps)} tok/s`;
-  return `${tps.toFixed(1)} tok/s`;
+  return (
+    <View style={styles.dots}>
+      {[0, 1, 2].map((i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.dot,
+            {
+              backgroundColor: color,
+              opacity: progress.interpolate({
+                inputRange: [i, i + 0.5, i + 1],
+                outputRange: [0.3, 1, 0.3],
+                extrapolate: 'clamp',
+              }),
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
 };
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
-  maxWidthFraction = Layout.messageBubbleMaxWidth,
+  maxWidthFraction = 0.84,
 }) => {
+  const { colors, typography } = useTheme();
   const [showThinking, setShowThinking] = useState(false);
   const isUser = message.role === MessageRole.User;
   const isAssistant = message.role === MessageRole.Assistant;
   const hasThinking = !!message.thinkingContent;
+  const hasContent = !!message.content?.trim();
+  const tps = message.analytics?.performance.throughputTokensPerSec ?? 0;
 
   const toggleThinking = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowThinking(!showThinking);
   };
 
-  return (
-    <View
-      style={[
-        styles.container,
-        isUser ? styles.userContainer : styles.assistantContainer,
-      ]}
-    >
-      {/* Message Bubble */}
-      <View
-        style={[
-          styles.bubble,
-          isUser ? styles.userBubble : styles.assistantBubble,
-          { maxWidth: `${maxWidthFraction * 100}%` },
-        ]}
-      >
-        {/* Model Info Badge (for assistant messages) */}
-        {isAssistant &&
-          message.modelInfo &&
-          message.modelInfo.frameworkDisplayName && (
-            <View style={styles.modelBadge}>
-              <Icon name="cube-outline" size={10} color={Colors.primaryBlue} />
-              <Text style={styles.modelBadgeText}>
-                {message.modelInfo.frameworkDisplayName}
-              </Text>
-            </View>
-          )}
-
-        {/* Tool Call Indicator (for messages that used tools) */}
-        {isAssistant && message.toolCallInfo && (
-          <ToolCallIndicator toolCallInfo={message.toolCallInfo} />
-        )}
-
-        {/* Thinking Section (expandable) */}
-        {hasThinking && (
-          <TouchableOpacity
-            style={styles.thinkingHeader}
-            onPress={toggleThinking}
-            activeOpacity={0.7}
-          >
-            <Icon
-              name={showThinking ? 'chevron-down' : 'chevron-forward'}
-              size={14}
-              color={Colors.textSecondary}
-            />
-            <Text style={styles.thinkingLabel}>Thinking</Text>
-            {message.analytics?.thinkingTime && (
-              <Text style={styles.thinkingTime}>
-                {(message.analytics.thinkingTime / 1000).toFixed(1)}s
-              </Text>
-            )}
-          </TouchableOpacity>
-        )}
-
-        {showThinking && message.thinkingContent && (
-          <View style={styles.thinkingContent}>
-            <Text style={styles.thinkingText}>{message.thinkingContent}</Text>
-          </View>
-        )}
-
-        {/* Message Content */}
-        <Text
+  // User: compact right-aligned bubble.
+  if (isUser) {
+    return (
+      <View style={[styles.row, styles.alignEnd]}>
+        <View
           style={[
-            styles.messageText,
-            isUser ? styles.userText : styles.assistantText,
+            styles.userBubble,
+            { backgroundColor: colors.primary, maxWidth: `${maxWidthFraction * 100}%` },
           ]}
         >
-          {message.content}
-        </Text>
-
-        {/* Streaming Indicator */}
-        {message.isStreaming && (
-          <View style={styles.streamingIndicator}>
-            <View style={styles.cursor} />
-          </View>
-        )}
-
-        {/* Footer: Timestamp & Analytics */}
-        <View style={styles.footer}>
-          <Text
-            style={[
-              styles.timestamp,
-              isUser ? styles.userTimestamp : styles.assistantTimestamp,
-            ]}
-          >
-            {formatTimestamp(message.timestamp)}
-          </Text>
-
-          {/* Analytics (for assistant messages) */}
-          {isAssistant &&
-            message.analytics &&
-            message.analytics.performance.throughputTokensPerSec > 0 && (
-              <View style={styles.analytics}>
-                <Text style={styles.analyticsText}>
-                  {formatTPS(
-                    message.analytics.performance.throughputTokensPerSec
-                  )}
-                </Text>
-              </View>
-            )}
+          {hasContent && (
+            <Text style={[typography.bodyLarge, { color: colors.onPrimary }]}>
+              {message.content}
+            </Text>
+          )}
         </View>
       </View>
+    );
+  }
+
+  // Assistant: flat, full-width.
+  return (
+    <View style={styles.assistant}>
+      {message.modelInfo?.frameworkDisplayName && (
+        <View style={styles.label}>
+          <Icon name="cpu" size={12} color={colors.onSurfaceVariant} />
+          <Text
+            style={[
+              typography.labelSmall,
+              styles.bold,
+              { color: colors.onSurfaceVariant },
+            ]}
+          >
+            {message.modelInfo.frameworkDisplayName}
+          </Text>
+        </View>
+      )}
+
+      {message.toolCallInfo && (
+        <ToolCallIndicator toolCallInfo={message.toolCallInfo} />
+      )}
+
+      {hasThinking && (
+        <TouchableOpacity
+          style={styles.thinkingHeader}
+          onPress={toggleThinking}
+          activeOpacity={0.7}
+        >
+          <Icon
+            name={showThinking ? 'chevronDown' : 'chevronRight'}
+            size={14}
+            color={colors.onSurfaceVariant}
+          />
+          <Text
+            style={[
+              typography.labelMedium,
+              styles.bold,
+              { color: colors.onSurfaceVariant },
+            ]}
+          >
+            Thinking
+          </Text>
+          {!!message.analytics?.thinkingTime && (
+            <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+              {(message.analytics.thinkingTime / 1000).toFixed(1)}s
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
+
+      {showThinking && !!message.thinkingContent && (
+        <View
+          style={[
+            styles.thinkingContent,
+            { backgroundColor: colors.surfaceContainerHigh },
+          ]}
+        >
+          <Text
+            style={[
+              typography.bodySmall,
+              styles.italic,
+              { color: colors.onSurfaceVariant },
+            ]}
+          >
+            {message.thinkingContent}
+          </Text>
+        </View>
+      )}
+
+      {hasContent ? (
+        <Text style={[typography.bodyLarge, styles.body, { color: colors.onSurface }]}>
+          {message.content}
+        </Text>
+      ) : (
+        message.isStreaming && <TypingDots color={colors.onSurfaceVariant} />
+      )}
+
+      {hasContent && message.isStreaming && (
+        <View style={[styles.cursor, { backgroundColor: colors.primary }]} />
+      )}
+
+      {tps > 0 && (
+        <Text style={[typography.labelSmall, styles.meta, { color: colors.onSurfaceVariant }]}>
+          {formatTPS(tps)}
+        </Text>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: Spacing.xSmall,
-    paddingHorizontal: Padding.padding16,
+  row: {
+    paddingHorizontal: 16,
+    marginVertical: 4,
   },
-  userContainer: {
+  alignEnd: {
     alignItems: 'flex-end',
   },
-  assistantContainer: {
-    alignItems: 'flex-start',
-  },
-  bubble: {
-    borderRadius: BorderRadius.xLarge,
-    paddingHorizontal: Padding.padding14,
-    paddingVertical: Padding.padding10,
-  },
   userBubble: {
-    backgroundColor: Colors.primaryBlue,
-    borderBottomRightRadius: BorderRadius.small,
+    borderRadius: 18,
+    borderBottomRightRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
   },
-  assistantBubble: {
-    backgroundColor: Colors.assistantBubbleBg,
-    borderBottomLeftRadius: BorderRadius.small,
+  assistant: {
+    paddingHorizontal: 16,
+    marginTop: 6,
+    marginBottom: 10,
+    gap: 6,
   },
-  modelBadge: {
+  label: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xSmall,
-    marginBottom: Spacing.small,
-    backgroundColor: Colors.badgeBlue,
-    alignSelf: 'flex-start',
-    paddingHorizontal: Spacing.small,
-    paddingVertical: Spacing.xxSmall,
-    borderRadius: BorderRadius.small,
+    gap: 5,
   },
-  modelBadgeText: {
-    ...Typography.caption2,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
+  body: {
+    lineHeight: 24,
   },
   thinkingHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xSmall,
-    marginBottom: Spacing.small,
-    paddingVertical: Spacing.xSmall,
-  },
-  thinkingLabel: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  thinkingTime: {
-    ...Typography.caption,
-    color: Colors.textTertiary,
+    gap: 6,
   },
   thinkingContent: {
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.regular,
-    padding: Padding.padding10,
-    marginBottom: Spacing.smallMedium,
-  },
-  thinkingText: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  messageText: {
-    ...Typography.body,
-  },
-  userText: {
-    color: Colors.textWhite,
-  },
-  assistantText: {
-    color: Colors.textPrimary,
-  },
-  streamingIndicator: {
-    marginTop: Spacing.xSmall,
+    borderRadius: 10,
+    padding: 10,
   },
   cursor: {
-    width: 8,
-    height: 16,
-    backgroundColor: Colors.textSecondary,
-    opacity: 0.5,
+    width: 7,
+    height: 15,
+    borderRadius: 2,
+    opacity: 0.7,
   },
-  footer: {
+  dots: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.small,
+    gap: 5,
+    paddingVertical: 4,
   },
-  timestamp: {
-    ...Typography.caption2,
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
   },
-  userTimestamp: {
-    color: 'rgba(255, 255, 255, 0.7)',
+  meta: {
+    opacity: 0.7,
+    marginTop: 2,
   },
-  assistantTimestamp: {
-    color: Colors.textTertiary,
+  bold: {
+    fontWeight: '700',
   },
-  analytics: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-  },
-  analyticsText: {
-    ...Typography.caption2,
-    color: Colors.textTertiary,
+  italic: {
+    fontStyle: 'italic',
   },
 });
 

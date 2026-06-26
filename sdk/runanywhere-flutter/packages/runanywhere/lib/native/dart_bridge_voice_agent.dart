@@ -16,6 +16,7 @@ library;
 
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -233,95 +234,93 @@ class DartBridgeVoiceAgent {
     }
   }
 
-  /// Streaming turn processing. Invokes
-  /// `rac_voice_agent_process_turn_proto` and pipes decoded `VoiceEvent`
-  /// bytes onto the returned broadcast stream.
+  /// Streaming turn processing. Invokes `rac_voice_agent_process_turn_proto`
+  /// on a short-lived WORKER isolate and pipes each decoded `VoiceEvent` onto
+  /// the returned stream as it is emitted.
+  ///
+  /// Why a worker isolate: commons runs the ENTIRE turn (STT → LLM → TTS)
+  /// synchronously on the calling thread under `handle->mutex`, invoking the
+  /// event callback inline per VoiceEvent. Run on the MAIN isolate that blocks
+  /// the UI for the whole turn AND — because Dart can't pump the stream's
+  /// listener until the blocking FFI call returns — every event (including the
+  /// early `userSaid` transcript) is only delivered AFTER the LLM+TTS finish,
+  /// so the transcript appears seconds late. Running on a worker isolate (the
+  /// canonical pattern from `dart_bridge_llm.generateStreamProto`) lets the
+  /// worker-owned `isolateLocal` callback fire synchronously per event, copy
+  /// the bytes, and forward them over a `SendPort`; the main isolate decodes
+  /// and emits each as it arrives — transcript shows the instant STT finishes,
+  /// then LLM tokens stream, then audio. Mirrors Kotlin's `Dispatchers.IO`
+  /// placement of the same single-call ABI.
   Stream<voice_events_pb.VoiceEvent> processTurnStream(
     voice_agent_pb.VoiceAgentTurnRequest request,
   ) {
-    final controller = StreamController<voice_events_pb.VoiceEvent>();
-    NativeCallable<RacVoiceAgentProtoEventCallbackNative>? nativeCb;
+    if (RacNative.bindings.rac_voice_agent_process_turn_proto == null) {
+      return Stream<voice_events_pb.VoiceEvent>.error(UnsupportedError(
+          'rac_voice_agent_process_turn_proto is unavailable'));
+    }
+
+    final controller = StreamController<voice_events_pb.VoiceEvent>(sync: false);
+    final receivePort = ReceivePort();
+    var sawError = false;
+    var tornDown = false;
+
+    void teardown() {
+      if (tornDown) return;
+      tornDown = true;
+      receivePort.close();
+    }
+
+    receivePort.listen((Object? message) {
+      if (message is Uint8List) {
+        // One serialized VoiceEvent, copied in the worker's synchronous
+        // callback, delivered over the port in emission order.
+        if (controller.isClosed) return;
+        try {
+          controller.add(voice_events_pb.VoiceEvent.fromBuffer(message));
+        } catch (e, st) {
+          sawError = true;
+          controller.addError(e, st);
+        }
+      } else if (message is int) {
+        // rc sentinel — always LAST (same port as events ⇒ FIFO).
+        if (message != 0 && !sawError && !controller.isClosed) {
+          controller.addError(StateError(
+              'rac_voice_agent_process_turn_proto failed: code=$message'));
+        }
+        if (!controller.isClosed) {
+          unawaited(controller.close());
+        }
+        teardown();
+      }
+    });
 
     controller
       ..onListen = () async {
         try {
           final handle = await getHandle();
-          final fn = RacNative.bindings.rac_voice_agent_process_turn_proto;
-          if (fn == null) {
-            controller.addError(UnsupportedError(
-                'rac_voice_agent_process_turn_proto is unavailable'));
-            unawaited(controller.close());
-            return;
-          }
-          // Use `isolateLocal` (not `.listener`) so the
-          // callback fires SYNCHRONOUSLY on the same Dart isolate that
-          // invokes `rac_voice_agent_process_turn_proto`. The commons
-          // implementation in `voice_agent_d7_abi.cpp` runs the entire turn
-          // (STT → LLM → TTS) on the calling thread under `handle->mutex`
-          // and invokes `event_callback` for each VoiceEvent inline. With
-          // `.listener` mode the callbacks are queued onto the isolate's
-          // event loop and the `finally` below closes the controller before
-          // any of them drain — every event is silently dropped at
-          // `controller.add(...)` on a closed controller. `isolateLocal`
-          // ensures every emission lands on the still-open controller
-          // before `fn(...)` returns. This mirrors the canonical pattern in
-          // `dart_bridge_llm.dart` (`_generateStreamProto`).
-          nativeCb = NativeCallable<
-              RacVoiceAgentProtoEventCallbackNative>.isolateLocal((
-            Pointer<Uint8> bytesPtr,
-            int bytesLen,
-            Pointer<Void> _,
-          ) {
-            if (controller.isClosed || bytesLen <= 0 || bytesPtr == nullptr) {
-              return;
-            }
-            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-            try {
-              controller.add(voice_events_pb.VoiceEvent.fromBuffer(copy));
-            } catch (e, st) {
-              controller.addError(e, st);
-            }
-          });
-          final bytes = request.writeToBuffer();
-          final reqPtr = DartBridgeProtoUtils.copyBytes(bytes);
-          try {
-            final code = fn(
-              handle,
-              reqPtr,
-              bytes.length,
-              nativeCb!.nativeFunction,
-              nullptr,
-            );
-            if (code != 0) {
-              controller.addError(
-                StateError(
-                  'rac_voice_agent_process_turn_proto failed: code=$code',
-                ),
-              );
-            }
-          } finally {
-            calloc.free(reqPtr);
-          }
+          final requestBytes = request.writeToBuffer();
+          unawaited(
+            _runVoiceTurnWorker(
+                    handle.address, requestBytes, receivePort.sendPort)
+                .catchError((Object e, StackTrace st) {
+              // Worker isolate crashed before the rc sentinel.
+              if (!controller.isClosed) {
+                controller.addError(e, st);
+                unawaited(controller.close());
+              }
+              teardown();
+              return 0;
+            }),
+          );
         } catch (e, st) {
-          controller.addError(e, st);
-        } finally {
-          // Teardown: with `isolateLocal`
-          // all events have already drained by the time `fn` returns, but
-          // `rac_voice_agent_proto_quiesce()` is still invoked as a defensive
-          // barrier in case a future commons revision posts late events from
-          // a worker thread.
-          RacNative.bindings.rac_voice_agent_proto_quiesce?.call();
-          nativeCb?.close();
-          nativeCb = null;
-          unawaited(controller.close());
+          if (!controller.isClosed) {
+            controller.addError(e, st);
+            unawaited(controller.close());
+          }
+          teardown();
         }
       }
-      ..onCancel = () {
-        // Same ordering as the run() teardown above.
-        RacNative.bindings.rac_voice_agent_proto_quiesce?.call();
-        nativeCb?.close();
-        nativeCb = null;
-      };
+      ..onCancel = teardown;
 
     return controller.stream;
   }
@@ -482,5 +481,67 @@ void _safeRacFree(Pointer<Void> ptr) {
     NativeFunctions.racFree?.call(ptr);
   } catch (_) {
     // rac_free may not exist in some native builds
+  }
+}
+
+// MARK: - Voice-turn worker isolate
+//
+// Top-level so the `Isolate.run` closure captures ONLY sendable values
+// (int handle address + Uint8List + SendPort). Mirrors
+// `dart_bridge_llm._runLlmStreamWorker` / `_llmStreamWorker`. The voice turn
+// (STT → LLM → TTS) is inference over already-loaded models — the same class
+// of work STT/VLM/RAG/embeddings already run on worker isolates here — and
+// its only Dart-bound callbacks (SDK events, logging, telemetry HTTP wakeup)
+// are `.listener` (cross-isolate safe). The `Pointer.fromFunction`
+// platform-adapter trampolines that SIGABRT under `Isolate.run` (model LOAD)
+// are not invoked during a turn; if a future commons change adds one to this
+// path, make that callback `.listener` rather than moving the turn back to
+// the main isolate.
+
+/// Runs [_voiceTurnWorker] in a worker isolate. Hoisted to top level so the
+/// closure captures only its three sendable parameters.
+Future<int> _runVoiceTurnWorker(
+        int handleAddress, Uint8List requestBytes, SendPort port) =>
+    Isolate.run(() => _voiceTurnWorker(handleAddress, requestBytes, port));
+
+/// Blocking body of [DartBridgeVoiceAgent.processTurnStream]. The worker-owned
+/// `isolateLocal` callback fires synchronously per VoiceEvent (commons passes
+/// a pointer into a reused scratch buffer, so the bytes are copied INSIDE the
+/// callback before they cross the isolate). The rc is sent LAST on the same
+/// port, FIFO-ordered after every event.
+int _voiceTurnWorker(int handleAddress, Uint8List requestBytes, SendPort port) {
+  final bindings = RacNative.bindings;
+  final fn = bindings.rac_voice_agent_process_turn_proto;
+  if (fn == null) {
+    throw UnsupportedError('rac_voice_agent_process_turn_proto is unavailable');
+  }
+
+  final handle = Pointer<Void>.fromAddress(handleAddress);
+  final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
+  NativeCallable<RacVoiceAgentProtoEventCallbackNative>? callback;
+  try {
+    callback =
+        NativeCallable<RacVoiceAgentProtoEventCallbackNative>.isolateLocal(
+      (Pointer<Uint8> bytesPtr, int bytesLen, Pointer<Void> _) {
+        if (bytesPtr == nullptr || bytesLen <= 0) return;
+        // Copy inside the synchronous callback — commons reuses the scratch
+        // buffer the moment we return. The copy is what crosses isolates.
+        port.send(Uint8List.fromList(bytesPtr.asTypedList(bytesLen)));
+      },
+    );
+
+    final rc = fn(
+      handle,
+      requestPtr,
+      requestBytes.length,
+      callback.nativeFunction,
+      nullptr,
+    );
+    port.send(rc);
+    return rc;
+  } finally {
+    bindings.rac_voice_agent_proto_quiesce?.call();
+    callback?.close();
+    calloc.free(requestPtr);
   }
 }

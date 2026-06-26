@@ -412,6 +412,10 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   voiceAgentProcessTurnProto(
       const std::shared_ptr<ArrayBuffer> &audioBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  voiceAgentFeedAudioProto(const std::shared_ptr<ArrayBuffer> &audioBytes,
+                           double sampleRateHz, double channels, double encoding,
+                           bool isFinal) override;
 
   // ============================================================================
   // Tool Calling - delegates generated proto bytes to commons C ABI.

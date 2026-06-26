@@ -298,6 +298,7 @@ class DartBridge {
     // Phase 2 now owns assignment fetch through rac_http_transport.
     await DartBridgeModelAssignment.register(
       environment: _environment,
+      baseURL: baseURL,
       autoFetch: false,
     );
     _logger.debug('Model assignment callbacks registered (autoFetch: false)');

@@ -769,7 +769,11 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         float progress, const char* error, double duration_ms = 0.0,
-                        const char* model_id = nullptr) {
+                        const char* model_id = nullptr, int32_t prompt_length = 0,
+                        int32_t negative_prompt_length = 0, int32_t image_width = 0,
+                        int32_t image_height = 0, int32_t num_inference_steps = 0,
+                        double guidance_scale = 0.0, int64_t seed = 0,
+                        int64_t output_size_bytes = 0) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -796,6 +800,28 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     // the envelope properties map (see telemetry_manager kCapability extraction).
     if (duration_ms > 0.0) {
         (*event.mutable_properties())["duration_ms"] = std::to_string(duration_ms);
+    }
+    // ImageGen detail fields ride the properties carrier (extracted in the
+    // telemetry kCapability SDK_COMPONENT_DIFFUSION branch). Gated on >0 so the
+    // started/failed emits (which pass defaults) don't carry them.
+    if (prompt_length > 0)
+        (*event.mutable_properties())["prompt_length"] = std::to_string(prompt_length);
+    if (negative_prompt_length > 0)
+        (*event.mutable_properties())["negative_prompt_length"] =
+            std::to_string(negative_prompt_length);
+    if (image_width > 0)
+        (*event.mutable_properties())["image_width"] = std::to_string(image_width);
+    if (image_height > 0)
+        (*event.mutable_properties())["image_height"] = std::to_string(image_height);
+    if (num_inference_steps > 0)
+        (*event.mutable_properties())["num_inference_steps"] = std::to_string(num_inference_steps);
+    if (guidance_scale > 0.0)
+        (*event.mutable_properties())["guidance_scale"] = std::to_string(guidance_scale);
+    if (output_size_bytes > 0) {
+        (*event.mutable_properties())["output_size_bytes"] = std::to_string(output_size_bytes);
+        // seed is meaningful (incl. 0) but only emit it on a real completed
+        // generation — keyed off output_size_bytes being present.
+        (*event.mutable_properties())["seed"] = std::to_string(seed);
     }
     publish_event(event);
 }
@@ -926,9 +952,14 @@ rac_result_t rac_diffusion_generate_proto(rac_handle_t handle, const uint8_t* op
         rc = copy_proto(proto, out_result);
     }
     if (rc == RAC_SUCCESS) {
-        publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
-                           "diffusion.generate", 1.0f, nullptr,
-                           static_cast<double>(result.generation_time_ms), model_id);
+        publish_capability(
+            runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
+            "diffusion.generate", 1.0f, nullptr, static_cast<double>(result.generation_time_ms),
+            model_id, options.prompt ? static_cast<int32_t>(strlen(options.prompt)) : 0,
+            options.negative_prompt ? static_cast<int32_t>(strlen(options.negative_prompt)) : 0,
+            result.width, result.height, options.steps,
+            static_cast<double>(options.guidance_scale), result.seed_used,
+            static_cast<int64_t>(result.image_size));
     } else {
         publish_failure(rc, "diffusion.generate", rac_error_message(rc));
     }
@@ -989,9 +1020,14 @@ rac_result_t rac_diffusion_generate_with_progress_proto(
         rc = copy_proto(proto, out_result);
     }
     if (rc == RAC_SUCCESS) {
-        publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
-                           "diffusion.generate", 1.0f, nullptr,
-                           static_cast<double>(result.generation_time_ms), model_id);
+        publish_capability(
+            runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
+            "diffusion.generate", 1.0f, nullptr, static_cast<double>(result.generation_time_ms),
+            model_id, options.prompt ? static_cast<int32_t>(strlen(options.prompt)) : 0,
+            options.negative_prompt ? static_cast<int32_t>(strlen(options.negative_prompt)) : 0,
+            result.width, result.height, options.steps,
+            static_cast<double>(options.guidance_scale), result.seed_used,
+            static_cast<int64_t>(result.image_size));
     } else {
         publish_failure(rc, "diffusion.generate", rac_error_message(rc));
     }

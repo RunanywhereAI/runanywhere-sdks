@@ -32,7 +32,7 @@ import {
 } from '@runanywhere/proto-ts/llm_options';
 import {
   LLMGenerateRequest,
-  LLMStreamEvent,
+  LLMStreamEvent as LLMStreamEventMessage,
   type LLMStreamEvent as LLMStreamEventType,
 } from '@runanywhere/proto-ts/llm_service';
 import { inferenceFrameworkToJSON, ModelCategory } from '@runanywhere/proto-ts/model_types';
@@ -150,22 +150,11 @@ export async function generate(
  *
  * Matches Swift SDK: `RunAnywhere.generateStream(_ request: RALLMGenerateRequest)`.
  *
- * Wire-up (iOS parity): a single atomic `native.llmGenerateStreamProto`
- * call — the RN binding for `rac_llm_generate_stream_proto` — wires the
- * per-request stream callback and runs generation together, exactly like
- * Swift's `CppBridge.LLM.generateStream` / `ProtoStreamContext.runRequestStream`.
- * Each invocation of the callback delivers one serialized
- * `runanywhere.v1.LLMStreamEvent`; the stream finishes on `event.isFinal`.
- *
- * This replaces the previous handle-subscription approach
- * (`NitroLLM.subscribeProtoEvents` + `native.llmGenerateProto`), which
- * registered a callback the *non-streaming* buffered generate path never
- * feeds — so no events were ever delivered and the UI hung "thinking
- * forever". `rac_llm_set_stream_proto_callback` is fed by the component
- * `generate_stream` path, not by the handleless `rac_llm_generate_proto`.
- *
- * Cancellation propagates through `for-await break` → `iterator.return()`
- * → `native.llmCancelProto()` → C++ generation observes the cancel signal.
+ * Wire-up: events arrive via `native.llmGenerateStreamProto(bytes, onEvent)`
+ * — the dedicated callback-streaming method (same path as STT/TTS/VLM). Each
+ * `onEvent` delivers one proto-encoded `LLMStreamEvent`; the wrapper buffers
+ * them into this AsyncIterable. Cancellation propagates through
+ * `iterator.return()` → `native.llmCancelProto()`.
  */
 export function generateStream(
   request: LLMGenerateRequest,
@@ -188,10 +177,15 @@ export function generateStream(
   const llmRequest = normalizeLLMGenerateRequest(requestOrPrompt, options, true);
   const requestBytes = encodeLLMGenerateRequest(llmRequest);
 
+  // Stream via the dedicated callback method `llmGenerateStreamProto(bytes, cb)`
+  // — the same path STT/TTS/VLM use. The earlier handle-subscribe variant paired
+  // with the BLOCKING `llmGenerateProto` never fed the subscription (native
+  // generated, returned the aggregate, and emitted no per-token events), so the
+  // UI hung "generating" forever. Mirrors RunAnywhere+VisionLanguage.processStream.
   return {
     [Symbol.asyncIterator](): AsyncIterator<LLMStreamEventType> {
       const queue: LLMStreamEventType[] = [];
-      let resolver: ((value: IteratorResult<LLMStreamEventType>) => void) | null = null;
+      let resolver: ((v: IteratorResult<LLMStreamEventType>) => void) | null = null;
       let done = false;
       let started = false;
       let streamError: Error | null = null;
@@ -213,28 +207,29 @@ export function generateStream(
         }
       };
 
-      const start = (): void => {
+      const start = async (): Promise<void> => {
         if (started) return;
         started = true;
-        // iOS parity: one atomic streaming call wires the callback + runs
-        // generation together (no register/generate race). The callback
-        // receives one serialized LLMStreamEvent per token; `isFinal` ends it.
-        ensureServicesReady()
-          .then(() =>
-            native.llmGenerateStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
-              try {
-                const event = LLMStreamEvent.decode(arrayBufferToBytes(eventBytes));
-                push(event);
-                if (event.isFinal) {
-                  finish();
-                }
-              } catch (error) {
-                streamError =
-                  error instanceof Error ? error : new Error(String(error));
+        await ensureServicesReady();
+        native
+          .llmGenerateStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
+            try {
+              const event = LLMStreamEventMessage.decode(
+                arrayBufferToBytes(eventBytes)
+              );
+              if (event.errorMessage) {
+                streamError = new Error(event.errorMessage);
+              }
+              push(event);
+              if (event.isFinal) {
                 finish();
               }
-            }),
-          )
+            } catch (error) {
+              streamError =
+                error instanceof Error ? error : new Error(String(error));
+              finish();
+            }
+          })
           .then(() => {
             if (!done) finish();
           })
@@ -246,29 +241,24 @@ export function generateStream(
 
       return {
         async next(): Promise<IteratorResult<LLMStreamEventType>> {
-          start();
+          await start();
           if (queue.length > 0) {
             return { value: queue.shift()!, done: false };
           }
-          if (streamError) {
-            throw streamError;
-          }
+          if (streamError) throw streamError;
           if (done) {
             return { value: undefined as unknown as LLMStreamEventType, done: true };
           }
           return new Promise<IteratorResult<LLMStreamEventType>>((resolve) => {
             resolver = resolve;
           }).then((result) => {
-            if (streamError) {
-              throw streamError;
-            }
+            if (streamError) throw streamError;
             return result;
           });
         },
         async return(): Promise<IteratorResult<LLMStreamEventType>> {
           // Await the native cancel before resolving so back-to-back
-          // cancel → generate sequences are race-free. Matches Swift
-          // cancelGeneration() which awaits CppBridge.LLM.shared.cancelProto().
+          // cancel → generate sequences are race-free.
           try { await native.llmCancelProto(); } catch { /* noop */ }
           finish();
           return { value: undefined as unknown as LLMStreamEventType, done: true };
@@ -327,23 +317,36 @@ export async function aggregateStream(
   let terminalError = '';
   let finalEvent: LLMStreamEventType | undefined;
 
-  for await (const event of iterable) {
-    if (event.token && event.token.length > 0) {
-      if (firstTokenTimeMs === undefined) {
-        firstTokenTimeMs = Date.now();
+  // Drive the stream with a manual `iterator.next()` loop, NOT `for await...of`.
+  // Hermes does not support `for await...of` over the NitroModules-backed LLM
+  // stream — it silently fails to iterate, so tokens never arrive and the UI
+  // hangs "thinking" forever. `iterator.return()` in the finally tears the
+  // native subscription down (cancel) when we break early or throw.
+  const iterator = iterable[Symbol.asyncIterator]();
+  try {
+    for (;;) {
+      const next = await iterator.next();
+      if (next.done) break;
+      const event = next.value;
+      if (event.token && event.token.length > 0) {
+        if (firstTokenTimeMs === undefined) {
+          firstTokenTimeMs = Date.now();
+        }
+        fullResponse += event.token;
+        tokenCount += 1;
+        if (onToken) {
+          await onToken(fullResponse);
+        }
       }
-      fullResponse += event.token;
-      tokenCount += 1;
-      if (onToken) {
-        await onToken(fullResponse);
+      if (event.isFinal) {
+        finalEvent = event;
+        finishReason = event.finishReason ?? '';
+        terminalError = event.errorMessage ?? '';
+        break;
       }
     }
-    if (event.isFinal) {
-      finalEvent = event;
-      finishReason = event.finishReason ?? '';
-      terminalError = event.errorMessage ?? '';
-      break;
-    }
+  } finally {
+    await iterator.return?.();
   }
 
   const totalLatencyMs = Date.now() - startTimeMs;

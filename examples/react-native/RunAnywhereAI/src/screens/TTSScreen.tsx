@@ -1,20 +1,3 @@
-/**
- * TTSScreen - Tab 2: Text-to-Speech
- *
- * Provides on-device text-to-speech with voice selection. Mirrors the
- * iOS `TextToSpeechView` architecture: the SDK owns both synthesis and
- * playback through `RunAnywhere.speak()`, so the screen is just a thin
- * input form + Speak/Stop control surface.
- *
- * Architecture:
- * - Model loading via `RunAnywhere.loadModel(ModelLoadRequest)`
- * - ONNX/Sherpa TTS plays via `RunAnywhere.speak(text, options)` —
- *   the SDK handles PCM->WAV encoding and playback internally so no
- *   hand-rolled RIFF header or native audio module lives here.
- *
- * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/TextToSpeechView.swift
- */
-
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -25,29 +8,16 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
 import Slider from '@react-native-community/slider';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
-import {
-  Spacing,
-  Padding,
-  BorderRadius,
-  ButtonHeight,
-  Layout,
-} from '../theme/spacing';
-import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
+import { Icon, useTheme } from '../theme/system';
+import { ModelRequiredOverlay } from '../components/common';
 import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
 
-// Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere } from '@runanywhere/core';
 import {
   AudioFormat,
@@ -60,117 +30,192 @@ import {
   unloadModelsForCategory,
 } from '../utils/runAnywhereLifecycle';
 
-// Canonical SDK methods (Swift parity).
+const SURPRISE_PHRASES = [
+  'The quick brown fox jumps over the lazy dog.',
+  'To be or not to be, that is the question.',
+  'All that glitters is not gold.',
+  'Elementary, my dear Watson.',
+  'May the force be with you.',
+];
+
 const listModels = async (): Promise<SDKModelInfo[]> =>
   (await RunAnywhere.listModels()).models?.models ?? [];
 const loadModelWithRequest = RunAnywhere.loadModel;
 
+// ─── Voice card ────────────────────────────────────────────────────────────
+
+interface VoiceCardProps {
+  voiceName: string | undefined;
+  onPress: () => void;
+}
+
+const VoiceCard: React.FC<VoiceCardProps> = ({ voiceName, onPress }) => {
+  const { colors, typography, dimens } = useTheme();
+  return (
+    <TouchableOpacity
+      style={[styles.voiceCard, { backgroundColor: colors.surfaceContainerHigh, borderRadius: dimens.radius.lg }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.voiceIconTile, { backgroundColor: colors.surfaceVariant, borderRadius: dimens.radius.md }]}>
+        <Icon name="speak" size={dimens.icon.md} color={colors.primary} />
+      </View>
+      <View style={styles.voiceCardText}>
+        <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>Voice</Text>
+        <Text style={[typography.bodyLarge, { color: colors.onSurface, fontWeight: '600' }]} numberOfLines={1}>
+          {voiceName ?? 'Select a voice'}
+        </Text>
+      </View>
+      <Icon name="chevronRight" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
+    </TouchableOpacity>
+  );
+};
+
+// ─── Speed slider row ───────────────────────────────────────────────────────
+
+interface SliderRowProps {
+  label: string;
+  valueText: string;
+  value: number;
+  onValueChange: (v: number) => void;
+}
+
+const SliderRow: React.FC<SliderRowProps> = ({ label, valueText, value, onValueChange }) => {
+  const { colors, typography } = useTheme();
+  return (
+    <View style={styles.sliderRow}>
+      <View style={styles.sliderHeader}>
+        <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>{label}</Text>
+        <Text style={[typography.labelLarge, { color: colors.onSurfaceVariant, fontVariant: ['tabular-nums'] }]}>
+          {valueText}
+        </Text>
+      </View>
+      <Slider
+        style={styles.slider}
+        value={value}
+        onValueChange={(v) => onValueChange(Math.round(v * 10) / 10)}
+        minimumValue={0.5}
+        maximumValue={2.0}
+        step={0.1}
+        minimumTrackTintColor={colors.primary}
+        maximumTrackTintColor={colors.outlineVariant}
+        thumbTintColor={colors.primary}
+      />
+    </View>
+  );
+};
+
+// ─── Metrics card ───────────────────────────────────────────────────────────
+
+interface TtsMetrics {
+  durationMs?: number;
+  sampleRate?: number;
+  audioSizeBytes?: number;
+}
+
+interface MetricsCardProps {
+  metrics: TtsMetrics;
+}
+
+const formatBytes = (bytes: number): string => {
+  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  if (bytes >= 1_000) return `${Math.round(bytes / 1_000)} KB`;
+  return `${bytes} B`;
+};
+
+const MetricsCard: React.FC<MetricsCardProps> = ({ metrics }) => {
+  const { colors, typography, dimens } = useTheme();
+  const rows: [string, string][] = [];
+  if (metrics.durationMs != null)
+    rows.push(['Duration', `${(metrics.durationMs / 1000).toFixed(1)}s`]);
+  if (metrics.audioSizeBytes != null)
+    rows.push(['Audio size', formatBytes(metrics.audioSizeBytes)]);
+  if (metrics.sampleRate != null)
+    rows.push(['Sample rate', `${metrics.sampleRate} Hz`]);
+  if (rows.length === 0) return null;
+  return (
+    <View style={[styles.metricsCard, { backgroundColor: colors.surfaceContainerHigh, borderRadius: dimens.radius.lg }]}>
+      {rows.map(([label, value]) => (
+        <View key={label} style={styles.metricRow}>
+          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>{label}</Text>
+          <Text style={[typography.labelLarge, { color: colors.onSurface, fontVariant: ['tabular-nums'] }]}>{value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+// ─── Main screen ────────────────────────────────────────────────────────────
+
 export const TTSScreen: React.FC = () => {
-  // State
+  const { colors, typography, dimens } = useTheme();
+  const insets = useSafeAreaInsets();
+
   const [text, setText] = useState('');
   const [speed, setSpeed] = useState(1.0);
-  // Pitch slider is currently commented out (see renderSlider below); setter kept for future re-enable.
   const [pitch, _setPitch] = useState(1.0);
   const [volume, setVolume] = useState(1.0);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [currentModel, setCurrentModel] = useState<SDKModelInfo | null>(null);
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
   const [showModelSelection, setShowModelSelection] = useState(false);
+  const [lastMetrics, setLastMetrics] = useState<TtsMetrics | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Safe area insets for header status bar handling
-  const insets = useSafeAreaInsets();
+  const busy = isGenerating || isSpeaking;
+  const hasText = text.trim().length > 0 && currentModel != null;
+  const canSpeak = hasText && !busy;
 
-  // Character count
-  const charCount = text.length;
-  const maxChars = 1000;
-
-  // Cleanup on unmount — make sure no audio keeps playing.
   useEffect(() => {
     return () => {
       RunAnywhere.stopSpeaking().catch(() => {});
     };
   }, []);
 
-  /**
-   * Load available models and check for loaded model
-   * Called on mount and when screen comes into focus
-   */
   const loadModels = useCallback(async () => {
     try {
-      // Get available TTS models from catalog
       const allModels = await listModels();
-      // Filter by category (speech-synthesis) matching SDK's ModelCategory
       const ttsModels = allModels.filter(
-        (m: SDKModelInfo) =>
-          m.category === ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+        (m: SDKModelInfo) => m.category === ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
       );
       setAvailableModels(ttsModels);
-
-      // Ask the SDK for the loaded TTS model directly so the banner
-      // reflects the actual loaded model name (no fabricated stand-in).
       if (!currentModel) {
         const loaded = await RunAnywhere.modelInfoForCategory(
           ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
         );
-        if (loaded) {
-          setCurrentModel(loaded);
-          console.warn('[TTSScreen] Loaded TTS model:', loaded.name);
-        }
+        if (loaded) setCurrentModel(loaded);
       }
-    } catch (error) {
-      console.warn('[TTSScreen] Error loading models:', error);
+    } catch (err) {
+      console.warn('[TTSScreen] Error loading models:', err);
     }
   }, [currentModel]);
 
-  // Refresh models when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadModels();
     }, [loadModels])
   );
 
-  /**
-   * Handle model selection - opens model selection sheet
-   */
   const handleSelectModel = useCallback(() => {
     setShowModelSelection(true);
   }, []);
 
-  /**
-   * Load a model from its info
-   */
   const loadModel = useCallback(async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-
+      setError(null);
       if (!model.isDownloaded && !model.localPath) {
-        Alert.alert(
-          'Error',
-          'Model has not been downloaded. Open the model picker to download it first.'
-        );
+        Alert.alert('Error', 'Model has not been downloaded. Open the model picker to download it first.');
         return;
       }
-
-      // Unload any existing TTS model first
       try {
-        const wasLoaded = await isModelLoadedForCategory(
-          ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-        );
-        if (wasLoaded) {
-          await unloadModelsForCategory(
-            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-          );
-        }
-      } catch (unloadError) {
-        console.warn(
-          '[TTSScreen] Error unloading previous model (ignoring):',
-          unloadError
-        );
+        const wasLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
+        if (wasLoaded) await unloadModelsForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
+      } catch (unloadErr) {
+        console.warn('[TTSScreen] Error unloading previous model (ignoring):', unloadErr);
       }
-
-      // Path-first loading was removed in V2 — model ID is the canonical
-      // handle and the native registry resolves the artifact path.
       const result = await loadModelWithRequest(
         ModelLoadRequest.fromPartial({
           modelId: model.id,
@@ -179,32 +224,21 @@ export const TTSScreen: React.FC = () => {
           validateAvailability: true,
         })
       );
-
       if (result.success) {
-        const loaded = await RunAnywhere.modelInfoForCategory(
-          ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-        );
+        const loaded = await RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
         setCurrentModel(loaded ?? model);
       } else {
-        const error =
-          result.errorMessage ||
-          'Native model lifecycle returned an unsuccessful load result';
-        Alert.alert(
-          'Error',
-          `Failed to load model: ${error || 'Unknown error'}`
-        );
+        const msg = result.errorMessage || 'Native model lifecycle returned an unsuccessful load result';
+        Alert.alert('Error', `Failed to load model: ${msg}`);
       }
-    } catch (error) {
-      console.error('[TTSScreen] Error loading model:', error);
-      Alert.alert('Error', `Failed to load model: ${error}`);
+    } catch (err) {
+      console.error('[TTSScreen] Error loading model:', err);
+      Alert.alert('Error', `Failed to load model: ${err}`);
     } finally {
       setIsModelLoading(false);
     }
   }, []);
 
-  /**
-   * Handle model selected from the sheet
-   */
   const handleModelSelected = useCallback(
     async (model: SDKModelInfo) => {
       setShowModelSelection(false);
@@ -213,30 +247,22 @@ export const TTSScreen: React.FC = () => {
     [loadModel]
   );
 
-  /**
-   * Speak the entered text. Mirrors iOS `TTSViewModel.speak(text:)`:
-   * delegate synthesis + playback to the SDK in one call so the
-   * example does not own PCM/WAV bytes or playback chrome.
-   */
+  const surpriseMe = useCallback(() => {
+    const phrase = SURPRISE_PHRASES[Math.floor(Math.random() * SURPRISE_PHRASES.length)];
+    setText(phrase);
+  }, []);
+
   const handleSpeak = useCallback(async () => {
     if (!text.trim() || !currentModel) return;
-
-    // Cancel any in-flight speech.
     await RunAnywhere.stopSpeaking().catch(() => {});
-
-    // ONNX-backed TTS: ensure the model is actually loaded first.
-    const isLoaded = await isModelLoadedForCategory(
-      ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-    );
+    const isLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
     if (!isLoaded) {
       Alert.alert('Model Not Loaded', 'Please load a TTS model first.');
       return;
     }
-
     setIsSpeaking(true);
+    setError(null);
     try {
-      // Proto-canonical TTSOptions (aligned to
-      // @runanywhere/proto-ts/tts_options).
       const sdkConfig = {
         voice: 'default',
         languageCode: '',
@@ -247,179 +273,179 @@ export const TTSScreen: React.FC = () => {
         audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
       };
       const result = await RunAnywhere.speak(text, sdkConfig);
-      console.warn('[TTSScreen] Speech complete:', {
-        sampleRate: result.sampleRate,
+      setLastMetrics({
         durationMs: result.durationMs,
+        sampleRate: result.sampleRate,
         audioSizeBytes: result.audioSizeBytes,
       });
-    } catch (error) {
-      console.error('[TTSScreen] Speech error:', error);
-      Alert.alert('Error', `Failed to speak: ${error}`);
+    } catch (err) {
+      console.error('[TTSScreen] Speech error:', err);
+      setError(`Failed to speak: ${err}`);
     } finally {
       setIsSpeaking(false);
     }
   }, [text, speed, pitch, volume, currentModel]);
 
-  /**
-   * Stop in-flight speech.
-   */
   const handleStop = useCallback(async () => {
     await RunAnywhere.stopSpeaking().catch(() => {});
     setIsSpeaking(false);
+    setIsGenerating(false);
   }, []);
 
-  /**
-   * Clear text
-   */
-  const handleClear = useCallback(() => {
-    setText('');
-    setIsSpeaking(false);
-  }, []);
-
-  /**
-   * Render slider with label
-   */
-  const renderSlider = (
-    label: string,
-    value: number,
-    onValueChange: (value: number) => void,
-    min: number = 0.5,
-    max: number = 2.0,
-    step: number = 0.1,
-    formatValue: (v: number) => string = (v) => `${v.toFixed(1)}x`
-  ) => (
-    <View style={styles.sliderContainer}>
-      <View style={styles.sliderHeader}>
-        <Text style={styles.sliderLabel}>{label}</Text>
-        <Text style={styles.sliderValue}>{formatValue(value)}</Text>
-      </View>
-      <Slider
-        style={styles.slider}
-        value={value}
-        onValueChange={(v: number) =>
-          onValueChange(Math.round(v / step) * step)
-        }
-        minimumValue={min}
-        maximumValue={max}
-        step={step}
-        minimumTrackTintColor={Colors.primaryBlue}
-        maximumTrackTintColor={Colors.backgroundGray5}
-        thumbTintColor={Colors.primaryBlue}
-      />
-    </View>
-  );
-
-  /**
-   * Render header
-   */
-  const renderHeader = () => (
-    <View
-      style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}
-    >
-      <Text style={styles.title}>Text to Speech</Text>
-      {text && (
-        <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-          <Icon name="close-circle" size={22} color={Colors.textSecondary} />
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-
-  // Show model required overlay if no model
   if (!currentModel && !isModelLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        {renderHeader()}
-        <ModelRequiredOverlay
-          modality="tts"
-          onSelectModel={handleSelectModel}
-        />
-        {/* Model Selection Sheet */}
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <View style={[styles.headerBar, { paddingTop: insets.top + 8, borderBottomColor: colors.outlineVariant }]}>
+          <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '700' }]}>
+            Text to Speech
+          </Text>
+        </View>
+        <ModelRequiredOverlay modality="tts" onSelectModel={handleSelectModel} />
         <ModelSelectionSheet
           visible={showModelSelection}
           context={ModelSelectionContext.TTS}
           onClose={() => setShowModelSelection(false)}
           onModelSelected={handleModelSelected}
         />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {renderHeader()}
-
-      {/* Model Status Banner */}
-      <ModelStatusBanner
-        modelName={currentModel?.name}
-        framework={currentModel?.preferredFramework ?? currentModel?.framework}
-        isLoading={isModelLoading}
-        onSelectModel={handleSelectModel}
-        placeholder="Select a voice model"
-      />
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Text Input */}
-        <View style={styles.inputSection}>
-          <Text style={styles.sectionLabel}>Text to speak</Text>
-          <TextInput
-            style={styles.textInput}
-            value={text}
-            onChangeText={setText}
-            placeholder="Enter text to convert to speech..."
-            placeholderTextColor={Colors.textTertiary}
-            multiline
-            maxLength={maxChars}
-          />
-          <Text style={styles.charCount}>
-            {charCount}/{maxChars} characters
-          </Text>
-        </View>
-
-        {/* Voice Settings */}
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionLabel}>Voice Settings</Text>
-          {renderSlider('Speed', speed, setSpeed)}
-          {/* Pitch slider - Commented out for now as it is not implemented in the current TTS models */}
-          {/* {renderSlider('Pitch', pitch, setPitch)} */}
-          {renderSlider(
-            'Volume',
-            volume,
-            setVolume,
-            0,
-            1,
-            0.1,
-            (v) => `${Math.round(v * 100)}%`
-          )}
-        </View>
-      </ScrollView>
-
-      {/* Speak / Stop button (mirrors iOS one-shot speak control). */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[
-            styles.generateButton,
-            !text.trim() && !isSpeaking && styles.generateButtonDisabled,
-          ]}
-          onPress={isSpeaking ? handleStop : handleSpeak}
-          disabled={!text.trim() && !isSpeaking}
-          activeOpacity={0.8}
-        >
-          {isSpeaking ? (
-            <>
-              <Icon name="stop" size={20} color={Colors.textWhite} />
-              <Text style={styles.generateButtonText}>Stop Speaking</Text>
-            </>
-          ) : (
-            <>
-              <Icon name="volume-high" size={20} color={Colors.textWhite} />
-              <Text style={styles.generateButtonText}>Speak</Text>
-            </>
-          )}
-        </TouchableOpacity>
+    <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['bottom']}>
+      {/* Header */}
+      <View style={[styles.headerBar, { paddingTop: insets.top + 8, borderBottomColor: colors.outlineVariant }]}>
+        <Text style={[typography.titleLarge, { color: colors.onSurface, fontWeight: '700' }]}>
+          Text to Speech
+        </Text>
       </View>
 
-      {/* Model Selection Sheet */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: dimens.screenPadding, paddingBottom: 120 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Voice card */}
+        <VoiceCard voiceName={currentModel?.name} onPress={handleSelectModel} />
+
+        {/* Text input */}
+        <TextInput
+          style={[
+            styles.textInput,
+            {
+              backgroundColor: colors.surfaceContainerHigh,
+              borderColor: colors.outlineVariant,
+              borderRadius: dimens.radius.lg,
+              color: colors.onSurface,
+            },
+            typography.bodyLarge,
+          ]}
+          value={text}
+          onChangeText={setText}
+          placeholder="Text to speak"
+          placeholderTextColor={colors.onSurfaceVariant}
+          multiline
+          textAlignVertical="top"
+        />
+
+        {/* Surprise me */}
+        <TouchableOpacity style={styles.surpriseRow} onPress={surpriseMe} activeOpacity={0.7}>
+          <Icon name="sparkles" size={dimens.icon.sm} color={colors.primary} />
+          <Text style={[typography.labelLarge, { color: colors.primary, fontWeight: '600' }]}>
+            Surprise me
+          </Text>
+        </TouchableOpacity>
+
+        {/* Speed slider */}
+        <SliderRow
+          label="Speed"
+          valueText={`${speed.toFixed(1)}×`}
+          value={speed}
+          onValueChange={setSpeed}
+        />
+
+        {/* Action row: Generate + Speak/Stop */}
+        <View style={styles.actionRow}>
+          {/* Generate (outlined style) */}
+          <TouchableOpacity
+            style={[
+              styles.outlinedBtn,
+              {
+                borderColor: busy || !hasText ? colors.outlineVariant : colors.primary,
+                borderRadius: dimens.radius.full,
+                opacity: busy || !hasText ? 0.45 : 1,
+              },
+            ]}
+            onPress={async () => {
+              if (!currentModel || busy) return;
+              setIsGenerating(true);
+              try {
+                await handleSpeak();
+              } finally {
+                setIsGenerating(false);
+              }
+            }}
+            disabled={busy || !hasText}
+            activeOpacity={0.7}
+          >
+            <Icon
+              name="sparkles"
+              size={dimens.icon.sm}
+              color={busy || !hasText ? colors.onSurfaceVariant : colors.primary}
+            />
+            <Text
+              style={[
+                typography.labelLarge,
+                { color: busy || !hasText ? colors.onSurfaceVariant : colors.primary, fontWeight: '700' },
+              ]}
+            >
+              {isGenerating ? 'Generating…' : 'Generate'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Speak / Stop (filled style) */}
+          <TouchableOpacity
+            style={[
+              styles.filledBtn,
+              {
+                backgroundColor: isSpeaking || canSpeak ? colors.primary : colors.surfaceContainerHigh,
+                borderRadius: dimens.radius.full,
+              },
+            ]}
+            onPress={isSpeaking ? handleStop : handleSpeak}
+            disabled={!isSpeaking && !canSpeak}
+            activeOpacity={0.8}
+          >
+            <Icon
+              name={isSpeaking ? 'close' : 'speak'}
+              size={dimens.icon.sm}
+              color={isSpeaking || canSpeak ? colors.onPrimary : colors.onSurfaceVariant}
+            />
+            <Text
+              style={[
+                typography.labelLarge,
+                {
+                  color: isSpeaking || canSpeak ? colors.onPrimary : colors.onSurfaceVariant,
+                  fontWeight: '700',
+                },
+              ]}
+            >
+              {isSpeaking ? 'Stop' : 'Speak'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Metrics card */}
+        {lastMetrics && <MetricsCard metrics={lastMetrics} />}
+
+        {/* Error text */}
+        {error && (
+          <Text style={[typography.bodySmall, { color: colors.error, marginTop: 4 }]}>{error}</Text>
+        )}
+      </ScrollView>
+
+      {/* Model selection sheet */}
       <ModelSelectionSheet
         visible={showModelSelection}
         context={ModelSelectionContext.TTS}
@@ -431,101 +457,89 @@ export const TTSScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
   },
-  header: {
+  headerBar: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    gap: 16,
+    paddingTop: 16,
+  },
+  voiceCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Padding.padding16,
-    paddingTop: 0,
-    paddingBottom: Padding.padding12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    gap: 12,
+    padding: 16,
   },
-  title: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
+  voiceIconTile: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  clearButton: {
-    padding: Spacing.small,
-  },
-  content: {
+  voiceCardText: {
     flex: 1,
-    paddingHorizontal: Padding.padding16,
-  },
-  inputSection: {
-    marginTop: Spacing.large,
-  },
-  sectionLabel: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.smallMedium,
+    gap: 2,
   },
   textInput: {
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.medium,
-    padding: Padding.padding14,
-    minHeight: Layout.textAreaMinHeight,
-    ...Typography.body,
-    color: Colors.textPrimary,
-    textAlignVertical: 'top',
+    minHeight: 120,
+    padding: 14,
+    borderWidth: 1,
   },
-  charCount: {
-    ...Typography.caption,
-    color: Colors.textTertiary,
-    textAlign: 'right',
-    marginTop: Spacing.small,
+  surpriseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
   },
-  settingsSection: {
-    marginTop: Spacing.xLarge,
-  },
-  sliderContainer: {
-    marginBottom: Spacing.large,
+  sliderRow: {
+    gap: 4,
   },
   sliderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.small,
-  },
-  sliderLabel: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-  },
-  sliderValue: {
-    ...Typography.subheadline,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
   },
   slider: {
     width: '100%',
     height: 36,
   },
-  footer: {
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding16,
-    paddingBottom: Padding.padding30,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  generateButton: {
+  outlinedBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.smallMedium,
-    backgroundColor: Colors.primaryBlue,
-    height: ButtonHeight.regular,
-    borderRadius: BorderRadius.large,
+    gap: 6,
+    height: 48,
+    borderWidth: 1.5,
   },
-  generateButtonDisabled: {
-    backgroundColor: Colors.backgroundGray5,
+  filledBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 48,
   },
-  generateButtonText: {
-    ...Typography.headline,
-    color: Colors.textWhite,
+  metricsCard: {
+    padding: 16,
+    gap: 10,
+  },
+  metricRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });
 

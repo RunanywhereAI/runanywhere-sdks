@@ -147,6 +147,20 @@ class ChatViewModel extends ChangeNotifier {
     // LLMViewModel.subscribeToModelLifecycle).
     _lifecycleSubscription =
         sdk.RunAnywhere.events.modelLifecycle.listen((change) {
+      // iOS parity (LLMViewModel.handleModelLifecycle): only react to LLM
+      // component changes. The lifecycle echo published by currentModel()
+      // when nothing is loaded carries an unspecified component, so this
+      // also drops it.
+      if (change.component != sdk.SDKComponent.SDK_COMPONENT_LLM &&
+          change.event.category != sdk.EventCategory.EVENT_CATEGORY_LLM) {
+        return;
+      }
+      // syncModelState() calls currentModel(), which itself re-publishes a
+      // lifecycle event. Re-sync only on an actual transition so that echo
+      // cannot feed back into an infinite query -> publish loop.
+      final loaded = change.kind == sdk.ModelLifecycleChangeKind.loaded;
+      if (loaded && change.modelId == _loadedModelId) return;
+      if (!loaded && _loadedModelId == null) return;
       unawaited(syncModelState());
     });
 

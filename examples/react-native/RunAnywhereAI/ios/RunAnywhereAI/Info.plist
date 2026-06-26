@@ -32,7 +32,7 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string/>
 	<key>NSCameraUsageDescription</key>
 	<string>Vision AI needs camera access to describe what you see</string>
 	<key>NSMicrophoneUsageDescription</key>
@@ -46,6 +46,9 @@
 	<key>UIAppFonts</key>
 	<array>
 		<string>Ionicons.ttf</string>
+		<string>Figtree.ttf</string>
+		<string>Figtree-Italic.ttf</string>
+		<string>MapleMono.ttf</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

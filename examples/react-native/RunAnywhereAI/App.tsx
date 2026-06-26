@@ -18,14 +18,15 @@ import {
   View,
   Text,
   StyleSheet,
-  ActivityIndicator,
   TouchableOpacity,
-  Platform,
+  StatusBar,
 } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import TabNavigator from './src/navigation/TabNavigator';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import RootNavigator from './src/navigation/RootNavigator';
+import IntroScreen from './src/features/intro/IntroScreen';
+import { ThemeProvider, useTheme } from './src/theme/system';
 import { Colors } from './src/theme/colors';
 import { Typography } from './src/theme/typography';
 import {
@@ -72,14 +73,6 @@ try {
   );
 }
 
-// Make Genie optional (Android/Snapdragon only)
-let Genie: OptionalBackend | null = null;
-try {
-  Genie = require('@runanywhere/genie').Genie as OptionalBackend;
-} catch {
-  logDiagnostic('[App] Genie NPU backend not available');
-}
-
 let ONNX: OptionalBackend | null = null;
 try {
   ONNX = require('@runanywhere/onnx').ONNX as OptionalBackend;
@@ -93,28 +86,13 @@ import {
 } from './src/screens/SettingsScreen';
 import { logDiagnostic } from './src/utils/diagnostics';
 
-type InitState = 'loading' | 'ready' | 'error';
+// Default backend config for the development Railway backend (mirrors the
+// Android example's gitignored local.properties → BuildConfig.RUNANYWHERE_*).
+// Used when no custom configuration has been saved in Settings.
+const DEFAULT_BASE_URL = 'YOUR_PRODUCTION_BASE_URL';
+const DEFAULT_API_KEY = 'YOUR_PRODUCTION_API_KEY';
 
-const InitializationLoadingView: React.FC = () => (
-  <View style={styles.loadingContainer}>
-    <View style={styles.loadingContent}>
-      <View style={styles.iconContainer}>
-        <Icon
-          name="hardware-chip-outline"
-          size={48}
-          color={Colors.primaryBlue}
-        />
-      </View>
-      <Text style={styles.loadingTitle}>RunAnywhere AI</Text>
-      <Text style={styles.loadingSubtitle}>Initializing SDK...</Text>
-      <ActivityIndicator
-        size="large"
-        color={Colors.primaryBlue}
-        style={styles.spinner}
-      />
-    </View>
-  </View>
-);
+type InitState = 'loading' | 'ready' | 'error';
 
 const InitializationErrorView: React.FC<{
   error: string;
@@ -149,15 +127,6 @@ async function registerBackends(): Promise<BackendRegistrationState> {
     );
   }
 
-  let genieRegistered = false;
-  if (Platform.OS === 'android' && Genie && Genie.isAvailable) {
-    const result = await Genie.register();
-    genieRegistered = result !== false;
-    logDiagnostic(
-      '[App] Genie backend registered; NPU model catalog is pending generated registry/catalog support'
-    );
-  }
-
   const onnxResult = ONNX ? await ONNX.register() : false;
   const onnxRegistered = onnxResult !== false;
   if (!ONNX) {
@@ -168,7 +137,7 @@ async function registerBackends(): Promise<BackendRegistrationState> {
     );
   }
 
-  return { llamaRegistered, onnxRegistered, genieRegistered };
+  return { llamaRegistered, onnxRegistered };
 }
 
 const App: React.FC = () => {
@@ -192,21 +161,27 @@ const App: React.FC = () => {
       const customBaseURL = await getStoredBaseURL();
       const hasCustomConfig = await hasCustomConfiguration();
 
+      const effectiveApiKey =
+        hasCustomConfig && customApiKey ? customApiKey : DEFAULT_API_KEY;
+      const effectiveBaseURL =
+        hasCustomConfig && customBaseURL ? customBaseURL : DEFAULT_BASE_URL;
+
       if (
-        hasCustomConfig &&
-        customApiKey &&
-        customBaseURL &&
-        hasUsableBackendConfig({ apiKey: customApiKey, baseURL: customBaseURL })
+        hasUsableBackendConfig({
+          apiKey: effectiveApiKey,
+          baseURL: effectiveBaseURL,
+        })
       ) {
-        console.log('[App] Found custom API configuration');
+        console.log('[App] Found backend configuration');
+        // Staging (not Production) so the custom base URL is honored AND
+        // local logging stays on — Production sets enableLocalLogging:false,
+        // hiding all SDK/telemetry logs. Development would ignore baseURL.
         await RunAnywhere.initialize({
-          apiKey: customApiKey,
-          baseURL: customBaseURL,
-          environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+          apiKey: effectiveApiKey,
+          baseURL: effectiveBaseURL,
+          environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
         });
-        console.log(
-          '[App] SDK initialized with custom configuration (production)'
-        );
+        console.log('[App] SDK initialized with backend configuration (staging)');
       } else {
         await RunAnywhere.initialize({
           apiKey: '',
@@ -249,65 +224,51 @@ const App: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [initializeSDK]);
 
+  let content: React.ReactNode;
   if (initState === 'loading') {
-    return (
-      <SafeAreaProvider>
-        <InitializationLoadingView />
-      </SafeAreaProvider>
+    content = <IntroScreen />;
+  } else if (initState === 'error') {
+    content = (
+      <InitializationErrorView
+        error={error || 'Failed to initialize SDK'}
+        onRetry={initializeSDK}
+      />
     );
-  }
-
-  if (initState === 'error') {
-    return (
-      <SafeAreaProvider>
-        <InitializationErrorView
-          error={error || 'Failed to initialize SDK'}
-          onRetry={initializeSDK}
-        />
-      </SafeAreaProvider>
-    );
+  } else {
+    content = <RootNavigator />;
   }
 
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <TabNavigator />
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <ThemedStatusBar />
+          {content}
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+};
+
+/**
+ * Edge-to-edge status bar driven by the theme. System bars are transparent and
+ * content draws behind them; only barStyle (icon color) is honored on Android
+ * 15+, so it follows light/dark to keep the clock/battery/nav glyphs visible.
+ */
+const ThemedStatusBar: React.FC = () => {
+  const { dark } = useTheme();
+  return (
+    <StatusBar
+      barStyle={dark ? 'light-content' : 'dark-content'}
+      backgroundColor="transparent"
+      translucent
+    />
   );
 };
 
 const styles = StyleSheet.create({
-  loadingContainer: {
+  root: {
     flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingContent: {
-    alignItems: 'center',
-  },
-  iconContainer: {
-    width: IconSize.huge,
-    height: IconSize.huge,
-    borderRadius: IconSize.huge / 2,
-    backgroundColor: Colors.badgeBlue,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.xLarge,
-  },
-  loadingTitle: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.small,
-  },
-  loadingSubtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xLarge,
-  },
-  spinner: {
-    marginTop: Spacing.large,
   },
   errorContainer: {
     flex: 1,

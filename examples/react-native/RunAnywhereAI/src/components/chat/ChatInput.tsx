@@ -1,47 +1,36 @@
 /**
- * ChatInput Component
+ * ChatInput — the chat composer: an auto-growing pill text field with a send /
+ * stop action button, themed on the design system.
  *
- * Text input with send button for chat messages.
- *
- * Reference: iOS ChatInterfaceView input area
+ * Keyboard handling: tracks the IME height per-pixel via reanimated's
+ * useAnimatedKeyboard() so the bar rides up smoothly with the keyboard, and
+ * falls back to the bottom safe-area inset (gesture nav bar) when it's closed.
+ * Send turns into a stop control (white rounded square) while generating.
  */
-
 import React, { useState } from 'react';
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '../../theme/colors';
-import { Typography } from '../../theme/typography';
-import {
-  Spacing,
-  BorderRadius,
-  Padding,
-  ButtonHeight,
-  Layout,
-} from '../../theme/spacing';
+import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import Animated, {
+  useAnimatedKeyboard,
+  useAnimatedStyle,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon, useTheme } from '../../theme/system';
 
 interface ChatInputProps {
-  /** Current input value */
   value: string;
-  /** Callback when value changes */
   onChangeText: (text: string) => void;
-  /** Callback when send button pressed */
   onSend: () => void;
-  /** Callback when stop button pressed during generation */
   onStop?: () => void;
-  /** Whether input is disabled */
   disabled?: boolean;
-  /** Placeholder text */
   placeholder?: string;
-  /** Whether currently sending/generating */
   isLoading?: boolean;
+  /** When provided, renders a tool-calling toggle button at the start of the bar. */
+  toolsEnabled?: boolean;
+  onToggleTools?: () => void;
 }
+
+const MIN_HEIGHT = 24;
+const MAX_HEIGHT = 120;
 
 export const ChatInput: React.FC<ChatInputProps> = ({
   value,
@@ -49,118 +38,166 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
   onStop,
   disabled = false,
-  placeholder = 'Type a message...',
+  placeholder = 'Type a message…',
   isLoading = false,
+  toolsEnabled = false,
+  onToggleTools,
 }) => {
-  const [inputHeight, setInputHeight] = useState<number>(Layout.inputMinHeight);
+  const { colors, typography } = useTheme();
+  const insets = useSafeAreaInsets();
+  const keyboard = useAnimatedKeyboard();
+  const [inputHeight, setInputHeight] = useState(MIN_HEIGHT);
+
   const canSend = value.trim().length > 0 && !disabled && !isLoading;
   const canStop = isLoading && !!onStop;
   const canPressAction = canSend || canStop;
 
+  // Under edge-to-edge the window isn't resized for us, so lift the bar by the
+  // keyboard height. reanimated reports that height from the very bottom of the
+  // screen (including the gesture nav region), so subtract the bottom inset to
+  // sit snug on the keyboard. When closed, rest on the bottom safe-area inset.
+  const animatedStyle = useAnimatedStyle(() => ({
+    paddingBottom:
+      keyboard.height.value > 0
+        ? Math.max(keyboard.height.value - insets.bottom, 8)
+        : Math.max(insets.bottom, 8),
+  }));
+
   const handleContentSizeChange = (event: {
     nativeEvent: { contentSize: { height: number } };
   }) => {
-    const height = event.nativeEvent.contentSize.height;
-    // Clamp between min and max (4 lines max)
-    const clampedHeight = Math.min(
-      Math.max(height, Layout.inputMinHeight),
-      120
-    );
-    setInputHeight(clampedHeight);
+    const h = event.nativeEvent.contentSize.height;
+    setInputHeight(Math.min(Math.max(h, MIN_HEIGHT), MAX_HEIGHT));
   };
 
-  const handleSend = () => {
-    if (canStop) {
-      onStop?.();
-    } else if (canSend) {
-      onSend();
-    }
+  const handleAction = () => {
+    if (canStop) onStop?.();
+    else if (canSend) onSend();
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.outlineVariant,
+        },
+        animatedStyle,
+      ]}
     >
-      <View style={styles.container}>
-        <View style={styles.inputContainer}>
+      <View style={styles.row}>
+        {onToggleTools && (
+          <TouchableOpacity
+            style={[
+              styles.tool,
+              {
+                backgroundColor: toolsEnabled
+                  ? colors.primaryContainer
+                  : colors.surfaceContainerHigh,
+              },
+            ]}
+            onPress={onToggleTools}
+            activeOpacity={0.8}
+            accessibilityLabel={toolsEnabled ? 'Disable tools' : 'Enable tools'}
+          >
+            <Icon
+              name="tool"
+              size={20}
+              color={toolsEnabled ? colors.primary : colors.onSurfaceVariant}
+            />
+          </TouchableOpacity>
+        )}
+        <View
+          style={[styles.field, { backgroundColor: colors.surfaceContainerHigh }]}
+        >
           <TextInput
             style={[
               styles.input,
-              { height: Math.max(inputHeight, Layout.inputMinHeight) },
+              typography.bodyLarge,
+              { color: colors.onSurface, height: inputHeight },
             ]}
             value={value}
             onChangeText={onChangeText}
             placeholder={placeholder}
-            placeholderTextColor={Colors.textTertiary}
+            placeholderTextColor={colors.onSurfaceVariant}
             multiline
             editable={!disabled}
             onContentSizeChange={handleContentSizeChange}
             returnKeyType="default"
-            blurOnSubmit={false}
+            submitBehavior="newline"
           />
-
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              canPressAction
-                ? styles.sendButtonActive
-                : styles.sendButtonInactive,
-            ]}
-            onPress={handleSend}
-            disabled={!canPressAction}
-            activeOpacity={0.7}
-          >
-            <Icon
-              name={isLoading ? 'stop' : 'arrow-up'}
-              size={20}
-              color={canPressAction ? Colors.textWhite : Colors.textTertiary}
-            />
-          </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={[
+            styles.action,
+            {
+              backgroundColor: canPressAction
+                ? colors.primary
+                : colors.surfaceVariant,
+            },
+          ]}
+          onPress={handleAction}
+          disabled={!canPressAction}
+          activeOpacity={0.8}
+        >
+          {canStop ? (
+            <View style={[styles.stop, { backgroundColor: colors.onPrimary }]} />
+          ) : (
+            <Icon
+              name="send"
+              size={20}
+              color={canPressAction ? colors.onPrimary : colors.onSurfaceVariant}
+            />
+          )}
+        </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding10,
-    paddingBottom:
-      Platform.OS === 'ios' ? Padding.padding20 : Padding.padding10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingTop: 10,
   },
-  inputContainer: {
+  row: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: Spacing.smallMedium,
+    gap: 8,
   },
-  input: {
-    flex: 1,
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.large,
-    paddingHorizontal: Padding.padding16,
-    paddingTop: Padding.padding12,
-    paddingBottom: Padding.padding12,
-    ...Typography.body,
-    color: Colors.textPrimary,
-    maxHeight: 120,
-  },
-  sendButton: {
-    width: ButtonHeight.regular,
-    height: ButtonHeight.regular,
-    borderRadius: ButtonHeight.regular / 2,
+  tool: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sendButtonActive: {
-    backgroundColor: Colors.primaryBlue,
+  field: {
+    flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+    borderRadius: 22,
+    paddingHorizontal: 16,
   },
-  sendButtonInactive: {
-    backgroundColor: Colors.backgroundGray5,
+  input: {
+    paddingTop: 8,
+    paddingBottom: 8,
+    maxHeight: MAX_HEIGHT,
+  },
+  action: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stop: {
+    width: 13,
+    height: 13,
+    borderRadius: 3,
   },
 });
 

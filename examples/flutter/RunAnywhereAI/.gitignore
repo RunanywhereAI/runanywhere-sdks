@@ -68,3 +68,6 @@ android/settings.gradle.kts
 
 # FVM Version Cache
 .fvm/
+
+# Local --dart-define secrets (API key / base URL)
+dart_defines.json

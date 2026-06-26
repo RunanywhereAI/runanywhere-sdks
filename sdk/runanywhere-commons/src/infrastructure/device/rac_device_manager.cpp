@@ -104,6 +104,13 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
         state.callbacks.is_registered(state.callbacks.user_data) == RAC_TRUE;
     if (was_registered && env != RAC_ENV_DEVELOPMENT) {
         RAC_LOG_DEBUG(LOG_CAT, "Device already registered, skipping (production mode)");
+        // Skip the network round-trip, but still emit the device.registered
+        // telemetry so the dashboard reflects the active device on every launch
+        // (not only the first-ever registration).
+        const char* registered_device_id = state.callbacks.get_device_id(state.callbacks.user_data);
+        if (registered_device_id != nullptr && registered_device_id[0] != '\0') {
+            emit_device_registered(registered_device_id);
+        }
         return RAC_SUCCESS;
     }
 

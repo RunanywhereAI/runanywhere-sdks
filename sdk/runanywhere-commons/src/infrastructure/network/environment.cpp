@@ -58,7 +58,12 @@ rac_log_level_t rac_env_default_log_level(rac_environment_t env) {
 }
 
 bool rac_env_should_send_telemetry(rac_environment_t env) {
-    return env == RAC_ENV_PRODUCTION;
+    // Telemetry is sent in every environment — development flushes immediately to
+    // the local backend, staging and production batch + send with auth. This must
+    // agree with the actual send gate (rac_env_requires_auth, also !=DEVELOPMENT);
+    // returning production-only here previously contradicted that and mislabeled
+    // staging as "no telemetry" even though staging does send.
+    return env != RAC_ENV_DEVELOPMENT;
 }
 
 bool rac_env_should_sync_with_backend(rac_environment_t env) {

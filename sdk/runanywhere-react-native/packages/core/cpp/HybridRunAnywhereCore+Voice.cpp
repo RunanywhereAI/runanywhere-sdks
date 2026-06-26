@@ -1429,6 +1429,37 @@ HybridRunAnywhereCore::voiceAgentProcessTurnProto(
     });
 }
 
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::voiceAgentFeedAudioProto(
+    const std::shared_ptr<ArrayBuffer>& audioBytes, double sampleRateHz,
+    double channels, double encoding, bool isFinal) {
+    auto audio = copyVoiceArrayBufferBytes(audioBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [audio = std::move(audio), sampleRateHz, channels, encoding, isFinal]() {
+            rac_voice_agent_handle_t handle = getGlobalVoiceAgentHandle();
+            auto fn = proto_compat::symbol<proto_compat::VoiceAgentFeedAudioProtoFn>(
+                "rac_voice_agent_feed_audio_proto");
+            if (!handle || !fn) {
+                LOGE("voiceAgentFeedAudioProto: handle or proto ABI unavailable");
+                return emptyVoiceProtoBuffer();
+            }
+            rac_proto_buffer_t out;
+            proto_compat::initBuffer(&out);
+            const void* data = audio.empty() ? nullptr : audio.data();
+            rac_result_t rc = fn(static_cast<void*>(handle), data, audio.size(),
+                                 static_cast<int32_t>(sampleRateHz),
+                                 static_cast<int32_t>(channels),
+                                 static_cast<int32_t>(encoding),
+                                 isFinal ? RAC_TRUE : RAC_FALSE, &out);
+            if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+                LOGE("voiceAgentFeedAudioProto: rc=%d", rc);
+                proto_compat::freeBuffer(&out);
+                return emptyVoiceProtoBuffer();
+            }
+            return copyVoiceProtoBuffer(out, "voiceAgentFeedAudioProto");
+        });
+}
+
 // ============================================================================
 // Global component teardown
 // ============================================================================

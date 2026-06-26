@@ -31,7 +31,13 @@ const RAC_ERROR_FILE_NOT_FOUND = -183;
 const RAC_ERROR_FILE_WRITE_FAILED = -185;
 const RAC_ERROR_PLATFORM = -180;
 const RAC_ERROR_INVALID_ARGUMENT = -259;
+const RAC_ERROR_CANCELLED = -380;
 const RAC_DIRECTORY_ENTRY_NAME_MAX = 512;
+
+// In-flight async downloads started through the `http_download` adapter slot,
+// keyed by the task id handed back to C++. Used by `http_download_cancel`.
+let httpDownloadCounter = 0;
+const httpDownloadTasks = new Map<string, AbortController>();
 
 /**
  * Structural Emscripten-module surface the adapter needs. Any RACommons
@@ -66,6 +72,8 @@ interface CallbackPtrs {
   fileListDirectory: number;
   isNonEmptyDirectory: number;
   getVendorId: number;
+  httpDownload: number;
+  httpDownloadCancel: number;
 }
 
 export class PlatformAdapter {
@@ -113,6 +121,8 @@ export class PlatformAdapter {
       fileListDirectory: this.registerFileListDirectory(),
       isNonEmptyDirectory: this.registerIsNonEmptyDirectory(),
       getVendorId: this.registerGetVendorId(),
+      httpDownload: this.registerHttpDownload(),
+      httpDownloadCancel: this.registerHttpDownloadCancel(),
     };
 
     // Runtime struct offsets — each helper must be exported by
@@ -147,10 +157,12 @@ export class PlatformAdapter {
     m.setValue(this.adapterPtr + getOffset('log'), this.callbacks.log, '*');
     m.setValue(this.adapterPtr + getOffset('now_ms'), this.callbacks.nowMs, '*');
     m.setValue(this.adapterPtr + getOffset('get_memory_info'), this.callbacks.getMemoryInfo, '*');
-    // http_download (optional) → null. The HTTPAdapter / FetchHttpTransport
-    // path takes over once setRunanywhereModule installs the module.
-    m.setValue(this.adapterPtr + getOffset('http_download'), 0, '*');
-    m.setValue(this.adapterPtr + getOffset('http_download_cancel'), 0, '*');
+    // http_download (async streaming slot). The C++ download orchestrator
+    // prefers this slot on Emscripten (event-driven, non-blocking) so progress
+    // ticks live; without it, the synchronous FetchHttpTransport path buffers
+    // the whole body on the main thread and the UI freezes at 0% until 100%.
+    m.setValue(this.adapterPtr + getOffset('http_download'), this.callbacks.httpDownload, '*');
+    m.setValue(this.adapterPtr + getOffset('http_download_cancel'), this.callbacks.httpDownloadCancel, '*');
     // extract_archive — native libarchive is compiled into WASM.
     m.setValue(this.adapterPtr + getOffset('extract_archive'), 0, '*');
     m.setValue(this.adapterPtr + getOffset('file_list_directory'), this.callbacks.fileListDirectory, '*');
@@ -427,6 +439,84 @@ export class PlatformAdapter {
       }
     }, 'iiii');
   }
+
+  /**
+   * rac_result_t (*http_download)(const char* url, const char* destination_path,
+   *     rac_http_progress_callback_fn progress_callback,
+   *     rac_http_complete_callback_fn complete_callback,
+   *     void* callback_user_data, char** out_task_id, void* user_data)
+   *
+   * Async by contract: start the transfer, return RAC_OK immediately with a
+   * task id, then stream bytes to MEMFS while calling progress_callback per
+   * chunk and complete_callback at the end. Because it returns immediately and
+   * the fetch runs on the event loop, the main thread is never blocked — the
+   * C++ download orchestrator's poll loop sees live byte counts and the UI does
+   * not freeze (unlike the synchronous FetchHttpTransport fallback).
+   */
+  private registerHttpDownload(): number {
+    const m = this.m;
+    return m.addFunction((
+      urlPtr: number,
+      destPtr: number,
+      progressCbPtr: number,
+      completeCbPtr: number,
+      cbUserData: number,
+      outTaskIdPtr: number,
+      _userData: number,
+    ) => {
+      try {
+        const url = m.UTF8ToString(urlPtr);
+        const dest = m.UTF8ToString(destPtr);
+        const taskId = `webdl_${++httpDownloadCounter}`;
+
+        // Hand the task id back to C++ as an owned C string (orchestrator frees).
+        if (outTaskIdPtr) {
+          const len = m.lengthBytesUTF8(taskId) + 1;
+          const idPtr = m._malloc(len);
+          m.stringToUTF8(taskId, idPtr, len);
+          m.setValue(outTaskIdPtr, idPtr, '*');
+        }
+
+        const controller = new AbortController();
+        httpDownloadTasks.set(taskId, controller);
+
+        // Fire-and-forget: the transfer drives itself on the event loop and
+        // reports back through the C callbacks. Errors are surfaced via
+        // complete_callback, never thrown out of this synchronous start call.
+        void runHttpDownload(m, {
+          url,
+          dest,
+          progressCbPtr,
+          completeCbPtr,
+          cbUserData,
+          controller,
+        }).finally(() => httpDownloadTasks.delete(taskId));
+
+        return RAC_OK;
+      } catch (error) {
+        logger.warning(`http_download start failed: ${error instanceof Error ? error.message : String(error)}`);
+        return RAC_ERROR_PLATFORM;
+      }
+    }, 'iiiiiiii');
+  }
+
+  /** rac_result_t (*http_download_cancel)(const char* task_id, void* user_data) */
+  private registerHttpDownloadCancel(): number {
+    const m = this.m;
+    return m.addFunction((taskIdPtr: number, _userData: number) => {
+      try {
+        const taskId = m.UTF8ToString(taskIdPtr);
+        const controller = httpDownloadTasks.get(taskId);
+        if (controller) {
+          controller.abort();
+          httpDownloadTasks.delete(taskId);
+        }
+        return RAC_OK;
+      } catch {
+        return RAC_ERROR_PLATFORM;
+      }
+    }, 'iii');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -447,6 +537,194 @@ function readBytes(m: PlatformAdapterModule, srcPtr: number, length: number): Ui
   const out = new Uint8Array(length);
   for (let i = 0; i < length; i++) out[i] = m.getValue(srcPtr + i, 'i8') & 0xff;
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// http_download slot — async streaming fetch → MEMFS with progress callbacks.
+// ---------------------------------------------------------------------------
+
+/** Emscripten FS stream-write surface needed to write chunks incrementally. */
+interface StreamingFS {
+  open(path: string, flags: string): unknown;
+  write(stream: unknown, buffer: ArrayBufferView, offset: number, length: number, position?: number): number;
+  close(stream: unknown): void;
+  mkdirTree?(path: string): void;
+  analyzePath?(path: string): { exists: boolean };
+  stat?(path: string): { size?: number };
+}
+
+function streamingFsOf(m: PlatformAdapterModule): StreamingFS | null {
+  const fs = (m as { FS?: unknown }).FS as Partial<StreamingFS> | undefined;
+  if (fs && typeof fs.open === 'function' && typeof fs.write === 'function'
+    && typeof fs.close === 'function') {
+    return fs as StreamingFS;
+  }
+  return null;
+}
+
+function memfsFileSize(fs: StreamingFS, path: string): number {
+  try {
+    if (fs.analyzePath && !fs.analyzePath(path)?.exists) return 0;
+    return fs.stat?.(path)?.size ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Resolve a WASM-table entry as a callable (i64 args are passed as BigInt). */
+function wasmCallable(
+  m: PlatformAdapterModule,
+  ptr: number,
+): ((...args: Array<number | bigint>) => number) | null {
+  if (ptr === 0) return null;
+  const tbl = m as unknown as {
+    getWasmTableEntry?: (p: number) => (...args: Array<number | bigint>) => number;
+    wasmTable?: { get(p: number): (...args: Array<number | bigint>) => number };
+  };
+  if (typeof tbl.getWasmTableEntry === 'function') return tbl.getWasmTableEntry(ptr);
+  if (tbl.wasmTable && typeof tbl.wasmTable.get === 'function') return tbl.wasmTable.get(ptr);
+  return null;
+}
+
+/** Invoke rac_http_progress_callback_fn — void (int64, int64, void*). */
+function invokeProgressCallback(
+  m: PlatformAdapterModule,
+  cbPtr: number,
+  bytesDownloaded: number,
+  totalBytes: number,
+  userData: number,
+): void {
+  const callable = wasmCallable(m, cbPtr);
+  if (!callable) return;
+  try {
+    callable(BigInt(bytesDownloaded), BigInt(totalBytes), userData);
+  } catch (error) {
+    logger.warning(`http_download progress callback threw: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** Invoke rac_http_complete_callback_fn — void (rac_result_t, const char*, void*). */
+function invokeCompleteCallback(
+  m: PlatformAdapterModule,
+  cbPtr: number,
+  result: number,
+  downloadedPath: string | null,
+  userData: number,
+): void {
+  const callable = wasmCallable(m, cbPtr);
+  if (!callable) return;
+  let pathPtr = 0;
+  try {
+    if (downloadedPath) {
+      const len = m.lengthBytesUTF8(downloadedPath) + 1;
+      pathPtr = m._malloc(len);
+      m.stringToUTF8(downloadedPath, pathPtr, len);
+    }
+    callable(result, pathPtr, userData);
+  } catch (error) {
+    logger.warning(`http_download complete callback threw: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    if (pathPtr) {
+      try { m._free(pathPtr); } catch { /* noop */ }
+    }
+  }
+}
+
+interface HttpDownloadArgs {
+  url: string;
+  dest: string;
+  progressCbPtr: number;
+  completeCbPtr: number;
+  cbUserData: number;
+  controller: AbortController;
+}
+
+/**
+ * Stream `url` into the MEMFS file at `dest`, reporting incremental progress.
+ * Resumes from any bytes already on disk via a Range request when the server
+ * honours it (HTTP 206); otherwise restarts from zero. Always finishes by
+ * invoking the C complete callback (success, cancel, or error) exactly once.
+ */
+async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs): Promise<void> {
+  const { url, dest, progressCbPtr, completeCbPtr, cbUserData, controller } = args;
+  const fs = streamingFsOf(m);
+  if (!fs) {
+    invokeCompleteCallback(m, completeCbPtr, RAC_ERROR_PLATFORM, null, cbUserData);
+    return;
+  }
+
+  let stream: unknown = null;
+  try {
+    const parent = dest.slice(0, dest.lastIndexOf('/')) || '/';
+    try { fs.mkdirTree?.(parent); } catch { /* dir may already exist */ }
+
+    const existing = memfsFileSize(fs, dest);
+    const headers: Record<string, string> = {};
+    if (existing > 0) headers.Range = `bytes=${existing}-`;
+
+    const response = await fetch(url, { headers, signal: controller.signal });
+
+    // 416 Range Not Satisfiable on a resume request means the file on disk is
+    // already at/past the requested offset — i.e. the download is complete.
+    // Report success without rewriting so a re-trigger of an already-present
+    // model is a no-op rather than a hard failure.
+    if (existing > 0 && response.status === 416) {
+      invokeCompleteCallback(m, completeCbPtr, RAC_OK, dest, cbUserData);
+      return;
+    }
+
+    let received = 0;
+    let position = 0;
+    if (existing > 0 && response.status === 206) {
+      // Server honoured the range — append to the partial file.
+      received = existing;
+      position = existing;
+      stream = fs.open(dest, 'r+');
+    } else {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      // Fresh download (or server ignored Range) — truncate and restart.
+      stream = fs.open(dest, 'w');
+    }
+
+    const contentLength = Number(response.headers.get('Content-Length') ?? 0);
+    const totalBytes = contentLength > 0 ? received + contentLength : 0;
+
+    if (!response.body) throw new Error('response has no readable body');
+    const reader = response.body.getReader();
+
+    invokeProgressCallback(m, progressCbPtr, received, totalBytes, cbUserData);
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && value.length > 0) {
+        fs.write(stream, value, 0, value.length, position);
+        position += value.length;
+        received += value.length;
+        invokeProgressCallback(m, progressCbPtr, received, totalBytes, cbUserData);
+      }
+    }
+
+    fs.close(stream);
+    stream = null;
+    invokeCompleteCallback(m, completeCbPtr, RAC_OK, dest, cbUserData);
+  } catch (error) {
+    if (stream) {
+      try { fs.close(stream); } catch { /* noop */ }
+    }
+    const aborted = controller.signal.aborted
+      || (error instanceof DOMException && error.name === 'AbortError');
+    if (!aborted) {
+      logger.warning(`http_download '${url}' failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    invokeCompleteCallback(
+      m,
+      completeCbPtr,
+      aborted ? RAC_ERROR_CANCELLED : RAC_ERROR_PLATFORM,
+      null,
+      cbUserData,
+    );
+  }
 }
 
 interface DirectoryEntryInfo {

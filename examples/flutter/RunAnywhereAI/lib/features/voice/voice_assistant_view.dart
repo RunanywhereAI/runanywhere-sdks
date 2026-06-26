@@ -34,6 +34,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
+  // Keeps the conversation pinned to the newest message.
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -54,7 +57,21 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     _viewModel.removeListener(_syncPulseAnimation);
     _viewModel.dispose();
     _pulseController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Pin the conversation list to the newest message after the frame paints.
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   void _syncPulseAnimation() {
@@ -128,6 +145,22 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         backgroundColor: Colors.transparent,
         builder: (context) => ModelSelectionSheet(
           context: ModelSelectionContext.tts,
+          onModelSelected: (model) async {
+            await _viewModel.refreshComponentStates();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showVADModelSelection() {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => ModelSelectionSheet(
+          context: ModelSelectionContext.vad,
           onModelSelected: (model) async {
             await _viewModel.refreshComponentStates();
           },
@@ -230,6 +263,17 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               state: _viewModel.ttsModelState,
               color: AppColors.primaryPurple,
               onTap: _showTTSModelSelection,
+            ),
+            const SizedBox(height: AppSpacing.large),
+
+            // VAD Model
+            _buildModelConfigRow(
+              icon: Icons.hearing,
+              label: 'Voice Activity (VAD)',
+              modelName: _viewModel.currentVADModel,
+              state: _viewModel.vadModelState,
+              color: AppColors.statusOrange,
+              onTap: _showVADModelSelection,
             ),
             const SizedBox(height: AppSpacing.smallMedium),
 
@@ -505,7 +549,10 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       );
     }
 
+    _scrollToBottom();
+
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.all(AppSpacing.large),
       children: [
         // Past conversation turns
@@ -534,34 +581,51 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
   Widget _buildConversationBubble(ConversationTurn turn) {
     final isUser = turn.role == proto.MessageRole.MESSAGE_ROLE_USER;
-    final speaker = isUser ? 'You' : 'Assistant';
+    const radius = AppSpacing.cornerRadiusBubble;
+
+    final bubble = ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.76,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.large,
+          vertical: AppSpacing.mediumLarge,
+        ),
+        decoration: BoxDecoration(
+          gradient: isUser
+              ? LinearGradient(
+                  colors: [
+                    AppColors.userBubbleGradientStart,
+                    AppColors.userBubbleGradientEnd,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: isUser ? null : AppColors.assistantBubbleBg(context),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(radius),
+            topRight: const Radius.circular(radius),
+            bottomLeft: Radius.circular(isUser ? radius : 4),
+            bottomRight: Radius.circular(isUser ? 4 : radius),
+          ),
+        ),
+        child: Text(
+          turn.text,
+          style: AppTypography.body(context).copyWith(
+            color: isUser ? Colors.white : AppColors.textPrimary(context),
+          ),
+        ),
+      ),
+    );
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.large),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            speaker,
-            style: AppTypography.caption(context).copyWith(
-              color: AppColors.textSecondary(context),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.mediumLarge),
-            decoration: BoxDecoration(
-              color: isUser
-                  ? AppColors.backgroundGray5(context)
-                  : AppColors.primaryBlue.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(
-                AppSpacing.cornerRadiusBubble,
-              ),
-            ),
-            child: Text(turn.text, style: AppTypography.body(context)),
-          ),
-        ],
+      padding: const EdgeInsets.only(bottom: AppSpacing.mediumLarge),
+      child: Row(
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [bubble],
       ),
     );
   }

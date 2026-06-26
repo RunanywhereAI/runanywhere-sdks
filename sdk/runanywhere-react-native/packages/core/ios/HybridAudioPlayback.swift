@@ -180,9 +180,16 @@ class HybridAudioPlayback: HybridAudioPlaybackSpec {
         // on cleanup. The TTS-only screen (no capture session) still gets a
         // dedicated `.playback` session.
         if session.category == .playAndRecord {
+            // Reuse the voice agent's live session untouched, but force the loud
+            // speaker route: under `.playAndRecord` the output can fall back to the
+            // quiet receiver/earpiece, which presents as "no audio" even though
+            // playback succeeded.
+            try? session.overrideOutputAudioPort(.speaker)
+            logger.info("[playback-v2] reusing active .playAndRecord session (speaker route, no setCategory)")
             lock.withLock { $0.ownsSession = false }
             return
         }
+        logger.info("[playback-v2] configuring dedicated .playback session (category was \(session.category.rawValue))")
         try session.setCategory(.playback, mode: .default, options: [.duckOthers])
         try session.setActive(true)
         lock.withLock { $0.ownsSession = true }

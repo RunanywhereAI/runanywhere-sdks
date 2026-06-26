@@ -66,6 +66,16 @@ class AudioPlaybackManager {
 
   final AudioPlayer _player = AudioPlayer();
 
+  /// When `true` (default) this manager configures playback with the
+  /// output-only `.playback` audio session category — correct for standalone
+  /// `RunAnywhere.speak(...)`. Set to `false` when the caller owns a live
+  /// full-duplex session — e.g. the voice agent keeps a single `.playAndRecord`
+  /// session active across capture and playback. Switching to `.playback` while
+  /// the mic session is live trips AVAudioSessionErrorInsufficientPriority
+  /// ('!pri', OSStatus 561017449) and the reply never plays. Mirrors Swift
+  /// `AudioPlaybackManager.managesAudioSession`.
+  bool managesAudioSession = true;
+
   bool _isPlaying = false;
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
@@ -117,6 +127,45 @@ class AudioPlaybackManager {
     final tempFile = File('${tempDir.path}/runanywhere_tts_$timestamp.wav');
     _currentTempFile = tempFile;
     await tempFile.writeAsBytes(wavData);
+
+    // Mix with other audio instead of taking exclusive audio focus. On Android
+    // this maps to AndroidAudioFocus.none, so playing a TTS reply does NOT
+    // evict the voice-agent mic recorder (which otherwise receives
+    // AUDIOFOCUS_LOSS and stops — leaving the pipeline deaf after the first
+    // turn). The voice-agent mic driver gates capture during playback, so
+    // coexisting record + playback never self-transcribes.
+    if (managesAudioSession) {
+      await _player.setAudioContext(
+        AudioContextConfig(focus: AudioContextConfigFocus.mixWithOthers)
+            .build(),
+      );
+    } else {
+      // The voice agent owns a live `.playAndRecord` mic session (the `record`
+      // plugin's default category). Match that category here instead of the
+      // default `.playback`: switching to an output-only category while the mic
+      // session is active trips AVAudioSessionErrorInsufficientPriority ('!pri',
+      // OSStatus 561017449) and the reply is silently dropped. `defaultToSpeaker`
+      // forces the loud speaker route (under `.playAndRecord` the output can
+      // otherwise fall back to the quiet receiver). Android keeps focus=none so
+      // playback does not evict the recorder. Mirrors the iOS Swift driver's
+      // configureVoiceAudioSession() + managesAudioSession=false.
+      await _player.setAudioContext(
+        AudioContext(
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playAndRecord,
+            options: const {
+              AVAudioSessionOptions.defaultToSpeaker,
+              AVAudioSessionOptions.mixWithOthers,
+              AVAudioSessionOptions.allowBluetooth,
+              AVAudioSessionOptions.allowBluetoothA2DP,
+            },
+          ),
+          android: const AudioContextAndroid(
+            audioFocus: AndroidAudioFocus.none,
+          ),
+        ),
+      );
+    }
 
     await _player.setVolume(volume.clamp(0.0, 1.0));
     await _player.setPlaybackRate(rate.clamp(0.5, 2.0));

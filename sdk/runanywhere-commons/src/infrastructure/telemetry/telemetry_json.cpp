@@ -99,6 +99,13 @@ class JsonBuilder {
         ss_ << "\"" << key << "\":" << value;
     }
 
+    // Emit even when 0 — for fields where 0 is a meaningful measurement
+    // (e.g. temperature=0.0 greedy decode) rather than "unset".
+    void add_double_always(const char* key, double value) {
+        comma();
+        ss_ << "\"" << key << "\":" << value;
+    }
+
     void add_bool(const char* key, rac_bool_t value, rac_bool_t has_value) {
         if (has_value == RAC_FALSE)
             return;
@@ -246,7 +253,7 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_double("prompt_eval_time_ms", payload->prompt_eval_time_ms);
         json.add_double("generation_time_ms", payload->generation_time_ms);
         json.add_int("context_length", payload->context_length);
-        json.add_double("temperature", payload->temperature);
+        json.add_double_always("temperature", payload->temperature);
         json.add_int("max_tokens", payload->max_tokens);
     } else if (strcmp(modality, "stt") == 0) {
         json.add_double("audio_duration_ms", payload->audio_duration_ms);
@@ -263,8 +270,10 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_string("voice", payload->voice);
         json.add_double("output_duration_ms", payload->output_duration_ms);
     } else if (strcmp(modality, "vlm") == 0) {
-        // VLM = LLM token fields PLUS vision fields. Only image_count has a data
-        // source today; the other vision fields are optional and omitted.
+        // VLM = LLM token fields PLUS vision fields. The token fields are now
+        // populated via the properties carrier (input/total tokens, tps, ttft,
+        // generation_time). The vision-specific fields (vision_tokens,
+        // vision_encode_time_ms, image_resolution) still need carriers.
         json.add_int("input_tokens", payload->input_tokens);
         json.add_int("output_tokens", payload->output_tokens);
         json.add_int("total_tokens", payload->total_tokens);
@@ -273,18 +282,27 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_double("prompt_eval_time_ms", payload->prompt_eval_time_ms);
         json.add_double("generation_time_ms", payload->generation_time_ms);
         json.add_int("context_length", payload->context_length);
-        json.add_double("temperature", payload->temperature);
+        json.add_double_always("temperature", payload->temperature);
         json.add_int("max_tokens", payload->max_tokens);
         json.add_int("image_count", payload->image_count);
+        json.add_int("vision_tokens", payload->vision_tokens);
+        json.add_double("vision_encode_time_ms", payload->vision_encode_time_ms);
+        json.add_string("image_resolution", payload->image_resolution);
     } else if (strcmp(modality, "rag") == 0) {
-        // Only retrieved_docs_count has a data source today; the other RAG fields
-        // (query_token_count, embedding_model, top_k, …) are optional and omitted.
+        // retrieved_docs_count / top_k / retrieval_time_ms / embedding_model have
+        // sources today (via the properties carrier). query_token_count /
+        // reranker_used / context_tokens still need carriers.
         json.add_int("retrieved_docs_count", payload->retrieved_docs_count);
+        json.add_int("top_k", payload->top_k);
+        json.add_double("retrieval_time_ms", payload->retrieval_time_ms);
+        json.add_string("embedding_model", payload->embedding_model);
     } else if (strcmp(modality, "embeddings") == 0) {
-        // input_count / vectors_produced / embedding_model have sources today;
-        // embedding_dimension / total_tokens / batch_size need a proto carrier.
+        // input_count / vectors_produced / embedding_model / embedding_dimension
+        // have sources today (dimension via the properties carrier).
+        // total_tokens / batch_size still need a carrier.
         json.add_int("input_count", payload->input_count);
         json.add_int("vectors_produced", payload->vectors_produced);
+        json.add_int("embedding_dimension", payload->embedding_dimension);
         json.add_string("embedding_model", payload->model_id);
     } else if (strcmp(modality, "voice") == 0) {
         // Per-turn voice-agent pipeline summary (from MetricsEvent).
@@ -292,25 +310,43 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_double("llm_ms", payload->voice_llm_ms);
         json.add_double("tts_ms", payload->voice_tts_ms);
         json.add_double("total_ms", payload->voice_total_ms);
+        json.add_int("transcript_chars", payload->transcript_chars);
+        json.add_int("response_chars", payload->response_chars);
     } else if (strcmp(modality, "vad") == 0) {
         json.add_double("speech_duration_ms", payload->speech_duration_ms);
         json.add_double("silence_duration_ms", payload->silence_duration_ms);
+        json.add_int("segment_count", payload->segment_count);
         json.add_int("sample_rate", payload->sample_rate);
     } else if (strcmp(modality, "lora") == 0) {
-        // operation is encoded in event_type; base model rides on model_id.
+        // base model rides on model_id; adapter_id + operation via the carrier.
+        // adapter_size_bytes still needs a source (would require stat-ing the file).
+        json.add_string("operation", payload->operation);
         json.add_string("base_model_id", payload->model_id);
+        json.add_string("adapter_id", payload->adapter_id);
+        json.add_int("adapter_size_bytes", payload->adapter_size_bytes);
     } else if (strcmp(modality, "imagegen") == 0) {
-        // Diffusion capability events carry only progress, which the imagegen
-        // schema does not accept — emit base fields only until diffusion supplies
-        // real metrics (num_images, image_width, …).
+        // Diffusion detail fields ride the properties carrier (extracted in the
+        // kCapability SDK_COMPONENT_DIFFUSION branch). seed=0 / steps=0 are
+        // meaningful, so those use add_int_always.
+        json.add_int("prompt_length", payload->imagegen_prompt_length);
+        json.add_int("negative_prompt_length", payload->imagegen_negative_prompt_length);
+        json.add_int("image_width", payload->image_width);
+        json.add_int("image_height", payload->image_height);
+        json.add_int("num_images", payload->num_images);
+        json.add_int("num_inference_steps", payload->num_inference_steps);
+        json.add_double("guidance_scale", payload->guidance_scale);
+        json.add_int_always("seed", payload->seed);
+        json.add_int("output_size_bytes", payload->output_size_bytes);
+        json.add_string("scheduler", payload->scheduler);
+        json.add_string("output_format", payload->output_format);
     } else if (strcmp(modality, "model") == 0) {
         json.add_int("model_size_bytes", payload->model_size_bytes);
         json.add_string("archive_type", payload->archive_type);
         json.add_double("progress", payload->progress);
     } else {
         // "system": SDK lifecycle / storage / network.
-        json.add_int("count", payload->count);
-        json.add_int("freed_bytes", payload->freed_bytes);
+        json.add_int_always("count", payload->count);
+        json.add_int_always("freed_bytes", payload->freed_bytes);
         json.add_bool("is_online", payload->is_online, payload->has_is_online);
     }
 

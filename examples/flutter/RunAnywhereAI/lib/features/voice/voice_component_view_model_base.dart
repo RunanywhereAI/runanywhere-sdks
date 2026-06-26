@@ -124,7 +124,15 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
         }
         switch (change.kind) {
           case sdk.ModelLifecycleChangeKind.loaded:
-            unawaited(applyCurrentModelSnapshot('loaded'));
+            // Resolve from the event payload, never re-query the SDK here:
+            // `modelLifecycle.current()` itself publishes a loaded lifecycle
+            // event, so calling it from inside this handler feeds back into an
+            // infinite loaded -> current() -> loaded loop that ANRs the app.
+            // The change carries the model id; resolve the rest from the
+            // catalog and apply through `applyLoadedModel` so the subclass
+            // overrides (STT live-mode, TTS system-voice) still run.
+            applyLoadedModel(resolveLoadedModel(change.modelId));
+            debugPrint('Voice component model loaded: ${change.modelId}');
           case sdk.ModelLifecycleChangeKind.unloaded:
             clearLoadedModel();
             debugPrint('Voice component model unloaded');
@@ -141,10 +149,11 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
       applyCurrentModelSnapshot('already loaded');
 
   /// Resolve the current model for this modality via the SDK snapshot and
-  /// apply it to published state. Shared by [checkInitialModelState] (cold
-  /// start) and the lifecycle-loaded listener — the lifecycle change only
-  /// carries modelId/kind, so the full `ModelInfo` is re-resolved through the
-  /// SDK rather than passed from the event.
+  /// apply it to published state. Used ONLY at cold start
+  /// ([checkInitialModelState]); a one-shot `current()` outside an event
+  /// handler is safe. The lifecycle-loaded listener must NOT call this:
+  /// `modelLifecycle.current()` re-publishes a loaded event, which from inside
+  /// the handler loops forever — it resolves from the event payload instead.
   @protected
   Future<void> applyCurrentModelSnapshot(String reason) async {
     final result = await sdk.RunAnywhere.modelLifecycle.current(
@@ -192,6 +201,19 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
       selectedFramework = model.framework;
     }
     notify();
+  }
+
+  /// Resolve the full [ModelInfo] for a just-loaded [modelId] from the shared
+  /// catalog, falling back to an id-only model when the catalog has no entry.
+  /// Used by the lifecycle-loaded listener, which only carries the id — this
+  /// avoids re-querying the SDK (which would loop) while still giving the
+  /// subclass `applyLoadedModel` overrides a populated name/framework.
+  @protected
+  ModelInfo resolveLoadedModel(String modelId) {
+    final matches = ModelListViewModel.shared.availableModels
+        .where((m) => m.id == modelId);
+    if (matches.isNotEmpty) return matches.first;
+    return ModelInfo()..id = modelId;
   }
 
   /// Clear published state for an unloaded model.
