@@ -89,8 +89,7 @@ import { logDiagnostic } from './src/utils/diagnostics';
 // Default backend config for the development Railway backend (mirrors the
 // Android example's gitignored local.properties → BuildConfig.RUNANYWHERE_*).
 // Used when no custom configuration has been saved in Settings.
-const DEFAULT_BASE_URL =
-  'YOUR_PRODUCTION_BASE_URL';
+const DEFAULT_BASE_URL = 'YOUR_PRODUCTION_BASE_URL';
 const DEFAULT_API_KEY = 'YOUR_PRODUCTION_API_KEY';
 
 type InitState = 'loading' | 'ready' | 'error';

@@ -35,7 +35,7 @@
     "@runanywhere/onnx": "workspace:*",
     "@runanywhere/proto-ts": "workspace:*",
     "lucide-react-native": "^1.21.0",
-    "react": "19.2.3",
+    "react": "19.2.7",
     "react-native": "0.85.3",
     "react-native-actions-sheet": "^10.1.2",
     "react-native-fs": "^2.20.0",
