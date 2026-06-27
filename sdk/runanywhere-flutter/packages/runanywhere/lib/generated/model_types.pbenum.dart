@@ -210,6 +210,9 @@ class InferenceFramework extends $pb.ProtobufEnum {
   static const InferenceFramework INFERENCE_FRAMEWORK_SHERPA =
       InferenceFramework._(
           23, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_SHERPA');
+  static const InferenceFramework INFERENCE_FRAMEWORK_QHEXRT =
+      InferenceFramework._(
+          24, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_QHEXRT');
 
   static const $core.List<InferenceFramework> values = <InferenceFramework>[
     INFERENCE_FRAMEWORK_UNSPECIFIED,
@@ -233,10 +236,11 @@ class InferenceFramework extends $pb.ProtobufEnum {
     INFERENCE_FRAMEWORK_NONE,
     INFERENCE_FRAMEWORK_UNKNOWN,
     INFERENCE_FRAMEWORK_SHERPA,
+    INFERENCE_FRAMEWORK_QHEXRT,
   ];
 
   static final $core.List<InferenceFramework?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 23);
+      $pb.ProtobufEnum.$_initByValueList(values, 24);
   static InferenceFramework? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
