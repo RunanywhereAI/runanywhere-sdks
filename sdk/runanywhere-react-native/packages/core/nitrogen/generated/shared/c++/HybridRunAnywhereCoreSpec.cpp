@@ -130,6 +130,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("voiceAgentInitializeProto", &HybridRunAnywhereCoreSpec::voiceAgentInitializeProto);
       prototype.registerHybridMethod("voiceAgentComponentStatesProto", &HybridRunAnywhereCoreSpec::voiceAgentComponentStatesProto);
       prototype.registerHybridMethod("voiceAgentProcessTurnProto", &HybridRunAnywhereCoreSpec::voiceAgentProcessTurnProto);
+      prototype.registerHybridMethod("voiceAgentFeedAudioProto", &HybridRunAnywhereCoreSpec::voiceAgentFeedAudioProto);
       prototype.registerHybridMethod("toolParseProto", &HybridRunAnywhereCoreSpec::toolParseProto);
       prototype.registerHybridMethod("toolFormatPromptProto", &HybridRunAnywhereCoreSpec::toolFormatPromptProto);
       prototype.registerHybridMethod("toolValidateProto", &HybridRunAnywhereCoreSpec::toolValidateProto);

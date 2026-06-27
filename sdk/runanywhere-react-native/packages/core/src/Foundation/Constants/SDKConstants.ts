@@ -15,20 +15,9 @@ import { Platform } from 'react-native';
  * `SDKConstants.platform` getter and Kotlin's "android".
  */
 function osPlatform(): string {
-  switch (Platform.OS) {
-    case 'ios':
-      return 'ios';
-    case 'android':
-      return 'android';
-    case 'macos':
-      return 'macos';
-    case 'windows':
-      return 'windows';
-    case 'web':
-      return 'web';
-    default:
-      return Platform.OS;
-  }
+  // Platform.OS is already the OS family the backend expects
+  // ("ios"/"android"/"macos"/"windows"/"web"), never the binding name.
+  return Platform.OS;
 }
 
 export const SDKConstants = {

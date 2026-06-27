@@ -13,6 +13,6 @@
   ],
   "packageManager": "yarn@3.6.1",
   "resolutions": {
-    "react": "19.2.3"
+    "react": "19.2.7"
   }
 }

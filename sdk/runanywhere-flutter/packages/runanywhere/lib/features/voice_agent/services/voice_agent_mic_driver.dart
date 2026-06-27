@@ -93,6 +93,14 @@ class VoiceAgentMicDriver {
   /// Begin mic capture. On permission/capture failure the [events] stream is
   /// closed with an error so the collector can surface it.
   Future<void> start() async {
+    // The voice agent runs a single full-duplex (.playAndRecord) session for the
+    // whole turn-taking loop — the `record` plugin configures it on
+    // startRecording (defaultToSpeaker by default). Playback must NOT switch the
+    // session to the output-only `.playback` category, or it trips
+    // AVAudioSessionErrorInsufficientPriority ('!pri', OSStatus 561017449) and
+    // the reply is dropped. Mirrors the iOS Swift driver
+    // (playback.managesAudioSession = false).
+    _playback.managesAudioSession = false;
     final stream =
         await _capture.startRecording(sampleRate: _sampleRateHz, numChannels: 1);
     if (stream == null) {

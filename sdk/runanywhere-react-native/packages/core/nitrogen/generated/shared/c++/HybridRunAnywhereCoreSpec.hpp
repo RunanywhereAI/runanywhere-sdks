@@ -47,7 +47,7 @@ namespace margelo::nitro::runanywhere {
 
     public:
       // Properties
-
+      
 
     public:
       // Methods
@@ -167,6 +167,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentInitializeProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentComponentStatesProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentProcessTurnProto(const std::shared_ptr<ArrayBuffer>& audioBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentFeedAudioProto(const std::shared_ptr<ArrayBuffer>& audioBytes, double sampleRateHz, double channels, double encoding, bool isFinal) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolParseProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolFormatPromptProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolValidateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;

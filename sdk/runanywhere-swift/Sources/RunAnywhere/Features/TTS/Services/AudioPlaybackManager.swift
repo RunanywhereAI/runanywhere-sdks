@@ -50,6 +50,13 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
     @Published public var currentTime: TimeInterval = 0.0
     @Published public var duration: TimeInterval = 0.0
 
+    /// When `true` (default) this manager configures the AVAudioSession for
+    /// playback and deactivates it when playback ends. Set to `false` when the
+    /// caller owns the session lifecycle — e.g. the voice agent keeps a single
+    /// `.playAndRecord` session active across capture and playback; reconfiguring
+    /// to `.playback` or deactivating it here would tear down the live mic engine.
+    public var managesAudioSession = true
+
     public override init() {
         super.init()
         logger.info("AudioPlaybackManager initialized")
@@ -131,8 +138,10 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
             stop()
         }
 
-        // Configure audio session for playback
-        try configureAudioSession()
+        // Configure audio session for playback (unless the caller owns it)
+        if managesAudioSession {
+            try configureAudioSession()
+        }
 
         // Create and configure audio player
         let player = try AVAudioPlayer(data: audioData)
@@ -194,7 +203,9 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
 
     private func cleanupPlayback(success: Bool) {
         stopProgressTimer()
-        deactivateAudioSession()
+        if managesAudioSession {
+            deactivateAudioSession()
+        }
 
         DispatchQueue.main.async {
             self.isPlaying = false

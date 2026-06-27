@@ -88,25 +88,37 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
     }
 
     /// Start recording audio from microphone
+    /// - Parameters:
+    ///   - configureSession: When `true` (default) this manager configures and
+    ///     activates the AVAudioSession (`.record`/`.measurement`). Pass `false`
+    ///     when the caller owns the session — e.g. the voice agent keeps a single
+    ///     `.playAndRecord` session active across capture and playback, and a
+    ///     `.record` override would silence playback and disable voice-processing
+    ///     AGC on the captured signal.
     /// - Note: Not supported on watchOS due to AVAudioEngine limitations
-    public func startRecording(onAudioData: @escaping @Sendable (Data) -> Void) async throws {
+    public func startRecording(
+        configureSession: Bool = true,
+        onAudioData: @escaping @Sendable (Data) -> Void
+    ) async throws {
         guard !isRecording else {
             logger.warning("Already recording")
             return
         }
 
         #if os(iOS) || os(tvOS)
-        // Configure audio session on a background thread to avoid blocking the main thread.
-        // AVAudioSession.setActive() performs IPC to mediaserverd which can block for 100-300ms.
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let audioSession = AVAudioSession.sharedInstance()
-                    try audioSession.setCategory(.record, mode: .measurement)
-                    try audioSession.setActive(true)
-                    continuation.resume()
-                } catch {
-                    continuation.resume(throwing: error)
+        if configureSession {
+            // Configure audio session on a background thread to avoid blocking the main thread.
+            // AVAudioSession.setActive() performs IPC to mediaserverd which can block for 100-300ms.
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        let audioSession = AVAudioSession.sharedInstance()
+                        try audioSession.setCategory(.record, mode: .measurement)
+                        try audioSession.setActive(true)
+                        continuation.resume()
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
         }
