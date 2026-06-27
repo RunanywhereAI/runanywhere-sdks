@@ -5704,6 +5704,27 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentProcessTur
     return static_cast<jint>(rc);
 }
 
+// Streaming raw-frame ingress: the core segments utterances and runs the turn
+// pipeline, returning a VoiceAgentResult inline when one completes (empty
+// otherwise). VoiceEvents fan out to the handle callback (no per-call
+// listener).
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentFeedAudioProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData, jint sampleRateHz, jint channels,
+    jint encoding, jboolean isFinal) {
+    (void)clazz;
+    JByteArrayView audio(env, audioData);
+    if (handle == 0L || !audio.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_voice_agent_feed_audio_proto(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), audio.data(), audio.size(),
+        static_cast<int32_t>(sampleRateHz), static_cast<int32_t>(channels),
+        static_cast<int32_t>(encoding), isFinal == JNI_TRUE ? RAC_TRUE : RAC_FALSE, &result);
+    return makeProtoCallResult(env, rc, &result, "racVoiceAgentFeedAudioProto");
+}
+
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentTranscribeProto(
     JNIEnv* env, jclass clazz, jlong handle, jbyteArray requestBytes) {

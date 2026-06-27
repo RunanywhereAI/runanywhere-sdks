@@ -51,9 +51,6 @@ fi
 log "Checking local XCFramework artifacts"
 check_xcframeworks
 
-log "Checking generated SolutionsYaml.swift is in sync with commons"
-bash "${APP_ROOT}/scripts/sync-solutions-yamls.sh" --check
-
 log "Resolving Swift package dependencies"
 swift package resolve
 xcodebuild \

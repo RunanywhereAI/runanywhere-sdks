@@ -447,7 +447,19 @@ RAC_API rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t 
  *      through these APIs MUST call them once per detected utterance — the
  *      C core will not transcribe anything until the SDK pushes a buffer.
  *
- *   2. Continuous streaming (per-modality, no voice-agent aggregation):
+ *   2. Streaming raw-frame ingress (in-core segmentation):
+ *        rac_voice_agent_feed_audio_proto(handle, pcm, n, sample_rate,
+ *                                         channels, encoding, is_final,
+ *                                         &result).
+ *      The SDK pushes raw mic frames continuously (16 kHz mono PCM16); the
+ *      C core performs energy-based utterance segmentation internally and,
+ *      once an utterance closes, runs the same VAD -> STT -> LLM -> TTS
+ *      pipeline as the per-turn path, fanning out VoiceEvents through the
+ *      registered proto callback and returning the synthesized reply inline
+ *      via `out_result`. This is the recommended ingress: the SDK driver
+ *      reduces to "capture -> feed -> play" with no SDK-side VAD.
+ *
+ *   3. Continuous per-modality streaming (no voice-agent aggregation):
  *        rac_stt_stream_feed_audio_proto(session, audio_bytes, n) and
  *        rac_vad_stream_feed_audio_proto(session, audio_bytes, n).
  *      SDKs that prefer per-frame VAD/STT events bypass the voice-agent
@@ -455,17 +467,10 @@ RAC_API rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t 
  *      rac_voice_agent_transcribe_proto / synthesize_speech_proto /
  *      generate-LLM helpers for the remaining stages.
  *
- * Planned (NOT yet wired): a streaming
- * `rac_voice_agent_feed_audio_proto(handle, samples, n, sample_rate,
- * is_final)` entry point that internally tees the audio into the STT/VAD
- * streams and emits an aggregated VoiceEvent stream identical to the
- * per-turn path. Until that lands, SDK frontends MUST use one of the two
- * modes above; the voice-agent will NOT silently consume mic audio.
- *
  * Frontend authors: if a voice-screen view-model only calls
- * rac_voice_agent_set_proto_callback / rac_voice_agent_process_turn_proto
- * without ever pushing an audio buffer, expect dead-air. Either drive the
- * per-turn API per utterance, or attach a parallel STT/VAD stream session.
+ * rac_voice_agent_set_proto_callback without ever pushing audio, expect
+ * dead-air. Either feed raw frames (mode 2), drive the per-turn API per
+ * utterance (mode 1), or attach a parallel STT/VAD stream session (mode 3).
  */
 
 /**
@@ -523,6 +528,45 @@ typedef void (*rac_voice_agent_turn_event_callback_fn)(const uint8_t* event_byte
 RAC_API rac_result_t rac_voice_agent_process_turn_proto(
     rac_voice_agent_handle_t handle, const uint8_t* request_bytes, size_t request_size,
     rac_voice_agent_turn_event_callback_fn event_callback, void* user_data);
+
+/**
+ * @brief Streaming raw-frame audio ingress with in-core segmentation.
+ *
+ * Ingress mode 2 (see the @ref voice_agent_audio_ingress section). The SDK
+ * pushes raw mic frames as they are captured — 16 kHz mono signed-16-bit
+ * little-endian PCM (UNSPECIFIED encoding is treated as PCM_S16_LE). The C
+ * core accumulates them, performs energy-based utterance endpointing, and on
+ * each completed utterance runs the full VAD -> STT -> LLM -> TTS turn
+ * pipeline, emitting the same VoiceEvents as
+ * `rac_voice_agent_process_turn_proto` through the proto callback registered
+ * via `rac_voice_agent_set_proto_callback`.
+ *
+ * When a turn completes during a call, @p out_result is filled with a
+ * serialized `runanywhere.v1.VoiceAgentResult` carrying the transcript,
+ * assistant response, and synthesized reply as WAV bytes (for inline
+ * playback). When no utterance closes this call, @p out_result is an empty
+ * success buffer. Pass @p is_final = RAC_TRUE to flush any in-progress
+ * utterance (e.g. when the session is stopping).
+ *
+ * The call may block for the duration of a turn when an utterance closes; do
+ * not call it from a real-time audio callback — feed from a dedicated
+ * consumer loop. @p out_result must be released with rac_proto_buffer_free().
+ *
+ * @param handle        Voice agent handle.
+ * @param audio_data    Raw PCM frame bytes (may be NULL only when size == 0).
+ * @param audio_size    Size of @p audio_data in bytes.
+ * @param sample_rate_hz Sample rate hint (16000 expected).
+ * @param channels      Channel count hint (1 expected).
+ * @param encoding      AudioEncoding value (0/UNSPECIFIED or PCM_S16_LE).
+ * @param is_final      RAC_TRUE to flush the in-progress utterance.
+ * @param out_result    Output: serialized VoiceAgentResult (owned).
+ * @return RAC_SUCCESS or error code.
+ */
+RAC_API rac_result_t rac_voice_agent_feed_audio_proto(rac_voice_agent_handle_t handle,
+                                                      const void* audio_data, size_t audio_size,
+                                                      int32_t sample_rate_hz, int32_t channels,
+                                                      int32_t encoding, rac_bool_t is_final,
+                                                      rac_proto_buffer_t* out_result);
 
 RAC_API rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_t handle,
                                                       const uint8_t* request_bytes,

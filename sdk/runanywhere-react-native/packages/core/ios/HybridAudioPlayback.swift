@@ -45,6 +45,10 @@ class HybridAudioPlayback: HybridAudioPlaybackSpec {
     private struct State {
         var audioPlayer: AVAudioPlayer?
         var playbackContinuation: CheckedContinuation<Void, Error>?
+        /// Whether THIS playback configured/activated the session (TTS-only
+        /// screen). When the voice agent owns a shared `.playAndRecord` session
+        /// this stays false so cleanup does not deactivate it mid-capture.
+        var ownsSession = false
     }
 
     /// The mutable playback state lives behind a single unfair lock so the
@@ -167,12 +171,37 @@ class HybridAudioPlayback: HybridAudioPlaybackSpec {
     }
 
     private func configureAudioSession() throws {
-        let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.playback, mode: .default, options: [.duckOthers])
-        try audioSession.setActive(true)
+        let session = AVAudioSession.sharedInstance()
+        // The voice agent owns a full-duplex `.playAndRecord` session for the
+        // whole turn-taking loop (mic capture stays live while the reply plays).
+        // Forcing `.playback` here is output-only: it tears down the running
+        // capture engine and trips cannotStartPlaying (OSStatus 561017449). When
+        // such a session is already active, reuse it untouched and leave it alone
+        // on cleanup. The TTS-only screen (no capture session) still gets a
+        // dedicated `.playback` session.
+        if session.category == .playAndRecord {
+            // Reuse the voice agent's live session untouched, but force the loud
+            // speaker route: under `.playAndRecord` the output can fall back to the
+            // quiet receiver/earpiece, which presents as "no audio" even though
+            // playback succeeded.
+            try? session.overrideOutputAudioPort(.speaker)
+            logger.info("[playback-v2] reusing active .playAndRecord session (speaker route, no setCategory)")
+            lock.withLock { $0.ownsSession = false }
+            return
+        }
+        logger.info("[playback-v2] configuring dedicated .playback session (category was \(session.category.rawValue))")
+        try session.setCategory(.playback, mode: .default, options: [.duckOthers])
+        try session.setActive(true)
+        lock.withLock { $0.ownsSession = true }
     }
 
     private func deactivateAudioSession() {
+        let owns = lock.withLock { current -> Bool in
+            let value = current.ownsSession
+            current.ownsSession = false
+            return value
+        }
+        guard owns else { return }
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 

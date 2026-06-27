@@ -319,6 +319,7 @@ _rac_voice_agent_component_states_proto
 _rac_voice_agent_process_voice_turn_proto
 # Full-session voice-agent ABI + per-helper proto wrappers.
 _rac_voice_agent_process_turn_proto
+_rac_voice_agent_feed_audio_proto
 _rac_voice_agent_transcribe_proto
 _rac_voice_agent_synthesize_speech_proto
 _rac_voice_agent_component_create_proto
