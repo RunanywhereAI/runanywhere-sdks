@@ -2116,6 +2116,42 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
     }
     const rav1::ModelInfo& model = *model_ptr;
 
+    // A model can be registered as an archive artifact (ZIP/TAR) whose download
+    // URL carries no archive file extension — e.g. a Google Drive / CDN link
+    // that ends in a query string ("...&export=download&confirm=t"). The URL
+    // sniff (rac_archive_type_from_path) only catches the extension case, so
+    // consult the registered artifact metadata as the authoritative signal and
+    // fall back to it below when the URL itself is opaque.
+    const rac_archive_type_t registered_archive_type = [&]() -> rac_archive_type_t {
+        switch (model.artifact_type()) {
+            case rav1::MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
+                return RAC_ARCHIVE_TYPE_ZIP;
+            case rav1::MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
+                return RAC_ARCHIVE_TYPE_TAR_GZ;
+            case rav1::MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE:
+                return RAC_ARCHIVE_TYPE_TAR_BZ2;
+            case rav1::MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE:
+                return RAC_ARCHIVE_TYPE_TAR_XZ;
+            default:
+                break;
+        }
+        if (model.has_archive()) {
+            switch (model.archive().type()) {
+                case rav1::ARCHIVE_TYPE_ZIP:
+                    return RAC_ARCHIVE_TYPE_ZIP;
+                case rav1::ARCHIVE_TYPE_TAR_GZ:
+                    return RAC_ARCHIVE_TYPE_TAR_GZ;
+                case rav1::ARCHIVE_TYPE_TAR_BZ2:
+                    return RAC_ARCHIVE_TYPE_TAR_BZ2;
+                case rav1::ARCHIVE_TYPE_TAR_XZ:
+                    return RAC_ARCHIVE_TYPE_TAR_XZ;
+                default:
+                    break;
+            }
+        }
+        return RAC_ARCHIVE_TYPE_NONE;
+    }();
+
     rac_inference_framework_t framework = proto_framework_to_c(model.framework());
     if (framework == RAC_FRAMEWORK_UNKNOWN) {
         framework = RAC_FRAMEWORK_LLAMACPP;
@@ -2197,6 +2233,25 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
             result.set_can_start(false);
             result.set_error_message("failed to compute download destination");
             return serialize_proto_to_buffer(result, out_result);
+        }
+
+        // The URL carried no archive extension (rac_download_compute_destination
+        // resolved a direct-to-model-folder path) but the model is registered as
+        // an archive artifact. Re-stage to the shared downloads temp dir and force
+        // extraction so the bundle is unpacked into the per-model folder — mirrors
+        // the archive branch of rac_download_compute_destination.
+        if (needs_extraction == RAC_FALSE && registered_archive_type != RAC_ARCHIVE_TYPE_NONE) {
+            char downloads_dir[4096];
+            if (rac_model_paths_get_downloads_directory(downloads_dir, sizeof(downloads_dir)) ==
+                RAC_SUCCESS) {
+                std::string stem = get_filename_stem(url.c_str());
+                if (stem.empty()) {
+                    stem = model_id;
+                }
+                snprintf(destination, sizeof(destination), "%s/%s.%s", downloads_dir, stem.c_str(),
+                         rac_archive_type_extension(registered_archive_type));
+                needs_extraction = RAC_TRUE;
+            }
         }
 
         rav1::ModelFileDescriptor descriptor;

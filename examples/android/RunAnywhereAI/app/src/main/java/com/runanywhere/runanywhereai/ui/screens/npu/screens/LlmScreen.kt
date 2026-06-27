@@ -24,6 +24,8 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.aggregateStream
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.runanywhereai.ui.screens.npu.MetricStrip
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModality
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelLoader
 import com.runanywhere.runanywhereai.ui.screens.npu.SectionCard
 import com.runanywhere.runanywhereai.ui.screens.npu.theme.Spacing
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
@@ -39,11 +41,14 @@ fun LlmScreen() {
     var tps by remember { mutableStateOf("—") }
     var ttft by remember { mutableStateOf("—") }
     var engine by remember { mutableStateOf("—") }
+    var loadedModelId by remember { mutableStateOf<String?>(null) }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
+        NpuModelLoader(modality = NpuModality.LLM, onLoadedChange = { loadedModelId = it })
+
         OutlinedTextField(
             value = prompt,
             onValueChange = { prompt = it },
@@ -75,10 +80,16 @@ fun LlmScreen() {
                     }
                 }
             },
-            enabled = !running && prompt.text.isNotBlank(),
+            enabled = !running && prompt.text.isNotBlank() && loadedModelId != null,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(if (running) "Generating…" else "Generate")
+            Text(
+                when {
+                    running -> "Generating…"
+                    loadedModelId == null -> "Load a model to generate"
+                    else -> "Generate"
+                },
+            )
         }
 
         MetricStrip(listOf("tokens/s" to tps, "ttft" to ttft, "engine" to engine))

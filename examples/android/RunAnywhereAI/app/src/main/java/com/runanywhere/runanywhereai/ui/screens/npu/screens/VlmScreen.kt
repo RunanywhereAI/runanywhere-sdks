@@ -36,6 +36,8 @@ import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import com.runanywhere.runanywhereai.ui.screens.npu.MetricStrip
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModality
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelLoader
 import com.runanywhere.runanywhereai.ui.screens.npu.SectionCard
 import com.runanywhere.runanywhereai.ui.screens.npu.theme.Spacing
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +55,7 @@ fun VlmScreen() {
     var running by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var tps by remember { mutableStateOf("—") }
+    var loadedModelId by remember { mutableStateOf<String?>(null) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -66,6 +69,8 @@ fun VlmScreen() {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
+        NpuModelLoader(modality = NpuModality.VLM, onLoadedChange = { loadedModelId = it })
+
         OutlinedButton(onClick = { picker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
             Text(if (imageBytes == null) "Pick an image" else "Change image")
         }
@@ -104,10 +109,16 @@ fun VlmScreen() {
                     }
                 }
             },
-            enabled = !running && imageBytes != null && prompt.text.isNotBlank(),
+            enabled = !running && imageBytes != null && prompt.text.isNotBlank() && loadedModelId != null,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(if (running) "Processing…" else "Describe")
+            Text(
+                when {
+                    running -> "Processing…"
+                    loadedModelId == null -> "Load a model to describe"
+                    else -> "Describe"
+                },
+            )
         }
 
         MetricStrip(listOf("tokens/s" to tps, "image" to if (imageBytes != null) "loaded" else "—"))
