@@ -40,9 +40,10 @@ struct RAGBackendConfig {
     // at session create. 384 applies only if that derivation fails.
     size_t embedding_dimension = 384;
     size_t top_k = 5;
-    // 0.3, not 0.7 — MiniLM-class cosine similarities rarely exceed ~0.5 for
-    // relevant chunks; a 0.7 floor returns nothing (matches idl/rag.proto).
-    float similarity_threshold = 0.3f;
+    // 0.0 (accept-everything) — MiniLM-class cosine similarities rarely exceed
+    // ~0.5 for relevant chunks, so any positive floor risks returning nothing;
+    // retrieval relies on top_k for relevance (matches idl/rag.proto).
+    float similarity_threshold = 0.0f;
     size_t max_context_tokens = 2048;
     size_t chunk_size = 512;
     size_t chunk_overlap = 64;

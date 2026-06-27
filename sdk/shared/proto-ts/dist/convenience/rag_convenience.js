@@ -19,7 +19,7 @@ const rAGConfigurationDefaults = () => ({
     embeddingModelId: '',
     llmModelId: '',
     topK: 5,
-    similarityThreshold: 0.3,
+    similarityThreshold: 0.0,
     chunkSize: 512,
     chunkOverlap: 64,
     persistIndex: false,

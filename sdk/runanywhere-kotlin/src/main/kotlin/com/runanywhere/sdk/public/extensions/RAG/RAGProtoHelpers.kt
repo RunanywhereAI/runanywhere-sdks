@@ -29,7 +29,7 @@ import kotlinx.serialization.json.contentOrNull
 
 /**
  * Build a [RAGConfiguration] populated with the canonical RAG defaults:
- * top-K of 5, similarity threshold 0.3, 512-token chunks with 64 tokens of
+ * top-K of 5, similarity threshold 0.0, 512-token chunks with 64 tokens of
  * overlap (mirrors the rac_default annotations in idl/rag.proto).
  *
  * `embedding_dimension` is deliberately left UNSET: commons derives it from
@@ -37,9 +37,10 @@ import kotlinx.serialization.json.contentOrNull
  * non-384-dim encoders work without any SDK/app hardcoding. Set it on the
  * returned config only to override.
  *
- * The threshold is 0.3 — not 0.7 — because all-MiniLM-class embeddings produce
- * cosine similarities that rarely exceed ~0.5 even for relevant chunks, so a
- * 0.7 floor filters out every match and retrieval returns nothing.
+ * The threshold is 0.0 (accept-everything) because all-MiniLM-class embeddings
+ * produce cosine similarities that rarely exceed ~0.5 even for relevant chunks,
+ * so any positive floor risks filtering out every match and returning nothing;
+ * retrieval relies on top_k for relevance.
  */
 fun RAGConfiguration.Companion.defaults(
     embeddingModelId: String = "",
@@ -49,7 +50,7 @@ fun RAGConfiguration.Companion.defaults(
         embedding_model_id = embeddingModelId,
         llm_model_id = llmModelId,
         top_k = 5,
-        similarity_threshold = 0.3f,
+        similarity_threshold = 0.0f,
         chunk_size = 512,
         chunk_overlap = 64,
     )
@@ -71,7 +72,7 @@ fun RARAGConfiguration.validate() {
     if (effectiveTopK <= 0) {
         throw SDKException.invalidArgument("topK must be > 0 (got $effectiveTopK)")
     }
-    val effectiveThreshold = similarity_threshold ?: 0.3f
+    val effectiveThreshold = similarity_threshold ?: 0.0f
     if (effectiveThreshold < 0f || effectiveThreshold > 1.0f) {
         throw SDKException.invalidArgument(
             "Similarity threshold must be in 0..1.0 (got $effectiveThreshold)",

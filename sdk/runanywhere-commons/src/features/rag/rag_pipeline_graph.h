@@ -62,7 +62,7 @@ struct RAGGraphInputs {
 
     size_t embedding_dimension = 384;
     size_t top_k = 10;
-    float similarity_threshold = 0.12f;
+    float similarity_threshold = 0.0f;
     size_t max_context_tokens = 2048;
 };
 

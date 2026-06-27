@@ -273,7 +273,7 @@ public fun LoggingConfiguration.Companion.defaults(): LoggingConfiguration =
 public fun RAGConfiguration.Companion.defaults(): RAGConfiguration =
     RAGConfiguration(
         top_k = 5,
-        similarity_threshold = 0.3f,
+        similarity_threshold = 0.0f,
         chunk_size = 512,
         chunk_overlap = 64,
     )
