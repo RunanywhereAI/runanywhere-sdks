@@ -37,7 +37,8 @@ import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import com.runanywhere.runanywhereai.ui.screens.npu.MetricStrip
 import com.runanywhere.runanywhereai.ui.screens.npu.NpuModality
-import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelLoader
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelBar
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelsViewModel
 import com.runanywhere.runanywhereai.ui.screens.npu.SectionCard
 import com.runanywhere.runanywhereai.ui.screens.npu.theme.Spacing
 import kotlinx.coroutines.Dispatchers
@@ -45,7 +46,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun VlmScreen() {
+fun VlmScreen(modelsVm: NpuModelsViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var imageBytes by remember { mutableStateOf<ByteArray?>(null) }
@@ -55,7 +56,7 @@ fun VlmScreen() {
     var running by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var tps by remember { mutableStateOf("—") }
-    var loadedModelId by remember { mutableStateOf<String?>(null) }
+    val loadedModelId = modelsVm.loadedId(NpuModality.VLM)
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -69,7 +70,7 @@ fun VlmScreen() {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        NpuModelLoader(modality = NpuModality.VLM, onLoadedChange = { loadedModelId = it })
+        NpuModelBar(modality = NpuModality.VLM, vm = modelsVm)
 
         OutlinedButton(onClick = { picker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
             Text(if (imageBytes == null) "Pick an image" else "Change image")

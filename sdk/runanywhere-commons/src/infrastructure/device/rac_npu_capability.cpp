@@ -18,7 +18,7 @@ namespace {
 // (Android API 31+). Only the entries the SDK cares about are listed; any
 // unlisted SoC resolves to UNKNOWN and is treated as unsupported (CPU
 // fallback). QHexRT context binaries are arch-exact, so the supported set is
-// deliberately limited to v79/v81.
+// deliberately limited to v75/v79/v81.
 struct SocArchEntry {
     const char* model;  // exact ro.soc.model value, upper-case
     rac_hexagon_arch_t arch;
@@ -121,7 +121,8 @@ rac_result_t rac_npu_probe(rac_npu_info_t* out) {
     }
 #endif  // __ANDROID__
 
-    out->qhexrt_supported = (out->hexagon_arch == RAC_HEXAGON_ARCH_V79 ||
+    out->qhexrt_supported = (out->hexagon_arch == RAC_HEXAGON_ARCH_V75 ||
+                             out->hexagon_arch == RAC_HEXAGON_ARCH_V79 ||
                              out->hexagon_arch == RAC_HEXAGON_ARCH_V81)
                                 ? RAC_TRUE
                                 : RAC_FALSE;

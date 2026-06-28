@@ -29,6 +29,9 @@ import androidx.core.content.ContextCompat
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.runanywhereai.ui.screens.npu.MetricStrip
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModality
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelBar
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelsViewModel
 import com.runanywhere.runanywhereai.ui.screens.npu.SectionCard
 import com.runanywhere.runanywhereai.ui.screens.npu.theme.Spacing
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +42,7 @@ import java.io.ByteArrayOutputStream
 private const val SAMPLE_RATE = 16_000
 
 @Composable
-fun SttScreen() {
+fun SttScreen(modelsVm: NpuModelsViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var recording by remember { mutableStateOf(false) }
@@ -48,6 +51,7 @@ fun SttScreen() {
     var error by remember { mutableStateOf<String?>(null) }
     var conf by remember { mutableStateOf("—") }
     val recorderState = remember { RecorderState() }
+    val loadedModelId = modelsVm.loadedId(NpuModality.STT)
 
     fun transcribe(pcm: ByteArray) {
         running = true; error = null
@@ -75,6 +79,8 @@ fun SttScreen() {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
+        NpuModelBar(modality = NpuModality.STT, vm = modelsVm)
+
         Button(
             onClick = {
                 if (!recording) {
@@ -92,10 +98,17 @@ fun SttScreen() {
                     if (pcm.isNotEmpty()) transcribe(pcm)
                 }
             },
-            enabled = !running,
+            enabled = !running && (recording || loadedModelId != null),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(if (recording) "Stop & transcribe" else if (running) "Transcribing…" else "Record")
+            Text(
+                when {
+                    recording -> "Stop & transcribe"
+                    running -> "Transcribing…"
+                    loadedModelId == null -> "Load a model to transcribe"
+                    else -> "Record"
+                },
+            )
         }
 
         MetricStrip(listOf("confidence" to conf, "sample rate" to "16 kHz"))

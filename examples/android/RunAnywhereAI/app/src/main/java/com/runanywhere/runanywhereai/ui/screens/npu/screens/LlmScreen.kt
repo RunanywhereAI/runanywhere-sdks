@@ -25,14 +25,15 @@ import com.runanywhere.sdk.public.extensions.aggregateStream
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.runanywhereai.ui.screens.npu.MetricStrip
 import com.runanywhere.runanywhereai.ui.screens.npu.NpuModality
-import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelLoader
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelBar
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelsViewModel
 import com.runanywhere.runanywhereai.ui.screens.npu.SectionCard
 import com.runanywhere.runanywhereai.ui.screens.npu.theme.Spacing
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import kotlinx.coroutines.launch
 
 @Composable
-fun LlmScreen() {
+fun LlmScreen(modelsVm: NpuModelsViewModel) {
     val scope = rememberCoroutineScope()
     var prompt by remember { mutableStateOf(TextFieldValue("Explain what an NPU is in one sentence.")) }
     var output by remember { mutableStateOf("") }
@@ -41,13 +42,13 @@ fun LlmScreen() {
     var tps by remember { mutableStateOf("—") }
     var ttft by remember { mutableStateOf("—") }
     var engine by remember { mutableStateOf("—") }
-    var loadedModelId by remember { mutableStateOf<String?>(null) }
+    val loadedModelId = modelsVm.loadedId(NpuModality.LLM)
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        NpuModelLoader(modality = NpuModality.LLM, onLoadedChange = { loadedModelId = it })
+        NpuModelBar(modality = NpuModality.LLM, vm = modelsVm)
 
         OutlinedTextField(
             value = prompt,

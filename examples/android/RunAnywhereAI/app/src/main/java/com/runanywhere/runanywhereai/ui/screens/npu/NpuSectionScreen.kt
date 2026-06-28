@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,11 @@ private val ContentMaxWidth = 640.dp
 @Composable
 fun NpuSectionScreen(onExit: () -> Unit, vm: AppViewModel = viewModel()) {
     val state by vm.state.collectAsState()
+    // Shared across every NPU screen (same nav owner), so downloads survive
+    // navigation. Fed the probed Hexagon arch so each screen only offers
+    // bundles that can actually load on this chip.
+    val modelsVm: NpuModelsViewModel = viewModel()
+    LaunchedEffect(state.npu?.arch) { modelsVm.setDeviceArch(state.npu?.arch) }
     var screen by rememberSaveable { mutableStateOf(Screen.Home) }
 
     RunAnywhereAiNPUTheme {
@@ -83,11 +89,11 @@ fun NpuSectionScreen(onExit: () -> Unit, vm: AppViewModel = viewModel()) {
                         state.bootstrapping -> Bootstrapping()
                         else -> when (screen) {
                             Screen.Home -> HomeScreen(state = state, onNavigate = { screen = it })
-                            Screen.Llm -> LlmScreen()
-                            Screen.Vlm -> VlmScreen()
-                            Screen.Stt -> SttScreen()
-                            Screen.Tts -> TtsScreen()
-                            Screen.Models -> ModelsScreen()
+                            Screen.Llm -> LlmScreen(modelsVm)
+                            Screen.Vlm -> VlmScreen(modelsVm)
+                            Screen.Stt -> SttScreen(modelsVm)
+                            Screen.Tts -> TtsScreen(modelsVm)
+                            Screen.Models -> ModelsScreen(modelsVm)
                         }
                     }
                 }

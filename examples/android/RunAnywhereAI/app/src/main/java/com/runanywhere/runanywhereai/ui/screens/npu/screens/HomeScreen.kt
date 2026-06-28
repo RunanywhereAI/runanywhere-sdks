@@ -75,7 +75,7 @@ fun HomeScreen(
                 border = BorderStroke(1.dp, warnColor.copy(alpha = 0.5f)),
             ) {
                 Text(
-                    "QHexRT requires a Hexagon v79 or v81 NPU (Snapdragon 8 Elite or newer). " +
+                    "QHexRT requires a Hexagon v75, v79 or v81 NPU (Snapdragon 8 Gen 3 or newer). " +
                         "Detected ${npu?.arch ?: "unknown"} — this device is not supported.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = warnColor,

@@ -24,23 +24,29 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.speak
 import com.runanywhere.sdk.public.extensions.stopSpeaking
 import com.runanywhere.runanywhereai.ui.screens.npu.MetricStrip
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModality
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelBar
+import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelsViewModel
 import com.runanywhere.runanywhereai.ui.screens.npu.SectionCard
 import com.runanywhere.runanywhereai.ui.screens.npu.theme.Spacing
 import kotlinx.coroutines.launch
 
 @Composable
-fun TtsScreen() {
+fun TtsScreen(modelsVm: NpuModelsViewModel) {
     val scope = rememberCoroutineScope()
     var text by remember { mutableStateOf(TextFieldValue("Hello from the RunAnywhere NPU runtime.")) }
     var running by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var durationMs by remember { mutableStateOf("—") }
     var rate by remember { mutableStateOf("—") }
+    val loadedModelId = modelsVm.loadedId(NpuModality.TTS)
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
+        NpuModelBar(modality = NpuModality.TTS, vm = modelsVm)
+
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
@@ -63,10 +69,16 @@ fun TtsScreen() {
                     }
                 }
             },
-            enabled = !running && text.text.isNotBlank(),
+            enabled = !running && text.text.isNotBlank() && loadedModelId != null,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(if (running) "Speaking…" else "Speak")
+            Text(
+                when {
+                    running -> "Speaking…"
+                    loadedModelId == null -> "Load a model to speak"
+                    else -> "Speak"
+                },
+            )
         }
         OutlinedButton(
             onClick = { scope.launch { runCatching { RunAnywhere.stopSpeaking() } } },

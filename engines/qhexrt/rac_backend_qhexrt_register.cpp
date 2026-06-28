@@ -35,7 +35,7 @@ rac_result_t rac_backend_qhexrt_register(void) {
     if (g_registered) {
         return RAC_SUCCESS;
     }
-    // Arch gate: only register on a Hexagon v79/v81 part. On unsupported
+    // Arch gate: only register on a Hexagon v75/v79/v81 part. On unsupported
     // devices QHexRT cannot run, and registering its providers would make the
     // router select QHexRT for *all* LLM/VLM/STT/TTS loads (intercepting
     // llamacpp / onnx / genie models and failing them). Refuse here so the
@@ -44,7 +44,7 @@ rac_result_t rac_backend_qhexrt_register(void) {
     rac_npu_info_t npu;
     if (rac_npu_probe(&npu) == RAC_SUCCESS && npu.qhexrt_supported != RAC_TRUE) {
         RAC_LOG_WARNING(LOG_CAT,
-                        "QHexRT not registered: Hexagon %s is unsupported (requires v79/v81)",
+                        "QHexRT not registered: Hexagon %s is unsupported (requires v75/v79/v81)",
                         rac_hexagon_arch_name(npu.hexagon_arch));
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
