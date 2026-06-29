@@ -8,6 +8,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere/runanywhere_protos.dart' as ra;
 
+import '../npu_catalog.dart';
+import '../npu_model_bar.dart';
 import '../widgets.dart';
 
 /// Vision (VLM) screen. Two modes:
@@ -26,6 +28,14 @@ class VlmScreen extends StatefulWidget {
 
 enum _Mode { static_, live }
 
+// Live mode favours short, fast captions over verbose paragraphs: a one-sentence
+// prompt plus a low token cap means each frame finishes in ~1–2s instead of the
+// ~6s a full description takes, so the caption refreshes often rather than
+// appearing frozen. Mirrors the React Native VlmScreen live constants.
+const Duration _liveInterval = Duration(milliseconds: 2500);
+const int _liveMaxTokens = 64;
+const String _livePrompt = 'Describe what you see in one sentence.';
+
 class _VlmScreenState extends State<VlmScreen> {
   final _controller = TextEditingController(text: 'Describe this image.');
   _Mode _mode = _Mode.static_;
@@ -43,6 +53,7 @@ class _VlmScreenState extends State<VlmScreen> {
   bool _running = false;
   String? _error;
   String _tps = '—';
+  bool _modelLoaded = false;
 
   @override
   void dispose() {
@@ -50,6 +61,19 @@ class _VlmScreenState extends State<VlmScreen> {
     _camera?.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onModelLoadedChange(String? id) {
+    final loaded = id != null;
+    setState(() => _modelLoaded = loaded);
+    // If the user loads a model while already in live mode with the camera up,
+    // kick off the caption loop that _enterLive skipped when no model was ready.
+    if (loaded &&
+        _mode == _Mode.live &&
+        _loop == null &&
+        _camera?.value.isInitialized == true) {
+      _loop = Timer.periodic(_liveInterval, (_) => _captionFrame());
+    }
   }
 
   Future<void> _pick() async {
@@ -120,7 +144,11 @@ class _VlmScreenState extends State<VlmScreen> {
         return;
       }
       setState(() => _camera = controller);
-      _loop = Timer.periodic(const Duration(milliseconds: 2500), (_) => _captionFrame());
+      // Only drive the caption loop once a VLM model is resident — otherwise
+      // every frame's processImage throws "no VLM model loaded".
+      if (_modelLoaded) {
+        _loop = Timer.periodic(_liveInterval, (_) => _captionFrame());
+      }
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     }
@@ -142,14 +170,14 @@ class _VlmScreenState extends State<VlmScreen> {
 
   Future<void> _captionFrame() async {
     final cam = _camera;
-    if (cam == null || !cam.value.isInitialized || _liveBusy) return;
-    _liveBusy = true;
+    if (cam == null || !cam.value.isInitialized || _liveBusy || !_modelLoaded) return;
+    if (mounted) setState(() => _liveBusy = true);
     try {
       final shot = await cam.takePicture();
       final result = await RunAnywhere.vlm.processImage(
         ra.VLMImage(filePath: shot.path),
-        prompt: _controller.text,
-        options: ra.VLMGenerationOptions(maxTokens: 120),
+        prompt: _livePrompt,
+        options: ra.VLMGenerationOptions(maxTokens: _liveMaxTokens),
       );
       if (!mounted) return;
       setState(() {
@@ -159,7 +187,7 @@ class _VlmScreenState extends State<VlmScreen> {
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     } finally {
-      _liveBusy = false;
+      if (mounted) setState(() => _liveBusy = false);
     }
   }
 
@@ -172,6 +200,10 @@ class _VlmScreenState extends State<VlmScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            NpuModelBar(
+              modality: NpuModality.vlm,
+              onLoadedChange: _onModelLoadedChange,
+            ),
             SegmentedButton<_Mode>(
               segments: const [
                 ButtonSegment(value: _Mode.static_, label: Text('Image'), icon: Icon(Icons.image)),
@@ -201,17 +233,41 @@ class _VlmScreenState extends State<VlmScreen> {
             const SizedBox(height: 16),
             SectionCard(
               title: _mode == _Mode.live ? 'Live caption' : 'Result',
-              child: Text(
-                _output.isEmpty
-                    ? (_running || _liveBusy
-                        ? '…'
-                        : _mode == _Mode.live
-                            ? 'Point the camera at a scene.'
-                            : 'Pick an image and describe it.')
-                    : _output,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: _output.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_mode == _Mode.live && _liveBusy) ...[
+                    Row(
+                      children: [
+                        const SizedBox(
+                            height: 14,
+                            width: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2)),
+                        const SizedBox(width: 8),
+                        Text('Analyzing frame…',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant)),
+                      ],
                     ),
+                    const SizedBox(height: 8),
+                  ],
+                  Text(
+                    _output.isEmpty
+                        ? (_running
+                            ? '…'
+                            : _mode == _Mode.live
+                                ? (_modelLoaded
+                                    ? 'Point the camera at a scene.'
+                                    : 'Load an NPU VLM model above to start live captioning.')
+                                : 'Pick an image and describe it.')
+                        : _output,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: _output.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
+                        ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -245,8 +301,14 @@ class _VlmScreenState extends State<VlmScreen> {
         SizedBox(
           width: double.infinity,
           child: FilledButton(
-            onPressed: (_running || _imageBytes == null) ? null : _process,
-            child: Text(_running ? 'Processing…' : 'Describe'),
+            onPressed: (_running || _imageBytes == null || !_modelLoaded) ? null : _process,
+            child: Text(
+              _running
+                  ? 'Processing…'
+                  : _modelLoaded
+                      ? 'Describe'
+                      : 'Load a model above',
+            ),
           ),
         ),
       ];
@@ -272,10 +334,10 @@ class _VlmScreenState extends State<VlmScreen> {
           ),
           child: Text('Starting camera…', style: TextStyle(color: cs.onSurfaceVariant)),
         ),
-      const SizedBox(height: 16),
-      TextField(
-        controller: _controller,
-        decoration: const InputDecoration(labelText: 'Prompt', border: OutlineInputBorder()),
+      const SizedBox(height: 12),
+      Text(
+        'Captures a frame every ${(_liveInterval.inMilliseconds / 1000).toStringAsFixed(1)}s and captions it in one sentence on the NPU.',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
       ),
     ];
   }

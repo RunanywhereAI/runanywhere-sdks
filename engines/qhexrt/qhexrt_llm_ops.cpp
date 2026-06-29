@@ -31,7 +31,23 @@ using qhexrt_engine::session_open;
 
 Session* as_session(void* impl) { return static_cast<Session*>(impl); }
 
-void fill_cfg(qhx_gen_cfg* cfg, const rac_llm_options_t* o) {
+// End-of-turn marker for a templated family. The runtime's EOS-token-id stop
+// can miss the templated turn terminator (the bundles carry no chat template,
+// so its detokenizer doesn't always map the turn-end token back to a stop),
+// which lets generation run to the token cap emitting post-turn padding. A
+// stop *string* halts decoding deterministically at the turn boundary (and
+// trims the marker from the output). Empty => no marker (pass-through family).
+std::string family_stop_marker(const std::string& pre) {
+    if (pre == "qwen2" || pre == "qwen3" || pre == "lfm") {
+        return "<|im_end|>";
+    }
+    if (pre == "gemma") {
+        return "<end_of_turn>";
+    }
+    return {};
+}
+
+void fill_cfg(qhx_gen_cfg* cfg, Session* c, const rac_llm_options_t* o) {
     qhx_gen_cfg_default(cfg);
     if (o == nullptr) {
         return;
@@ -43,17 +59,76 @@ void fill_cfg(qhx_gen_cfg* cfg, const rac_llm_options_t* o) {
     if (o->repetition_penalty > 0.0f) cfg->repetition_penalty = o->repetition_penalty;
     cfg->min_p = o->min_p;
     if (o->seed != 0) cfg->seed = static_cast<uint64_t>(o->seed);
-    if (o->stop_sequences != nullptr && o->num_stop_sequences > 0) {
+
+    // Merge the templated family's end-of-turn marker with any caller stops, and
+    // keep them alive on the session for the qhx_generate call.
+    if (c != nullptr) {
+        c->stop_storage.clear();
+        c->stop_ptrs.clear();
+        const std::string marker = family_stop_marker(c->tokenizer_pre);
+        if (!marker.empty()) {
+            c->stop_storage.push_back(marker);
+        }
+        for (int i = 0; o->stop_sequences != nullptr && i < o->num_stop_sequences; ++i) {
+            if (o->stop_sequences[i] != nullptr) {
+                c->stop_storage.emplace_back(o->stop_sequences[i]);
+            }
+        }
+        if (!c->stop_storage.empty()) {
+            c->stop_ptrs.reserve(c->stop_storage.size());
+            for (const auto& s : c->stop_storage) {
+                c->stop_ptrs.push_back(s.c_str());
+            }
+            cfg->stop_strings = c->stop_ptrs.data();
+            cfg->n_stop_strings = static_cast<int>(c->stop_ptrs.size());
+        }
+    } else if (o->stop_sequences != nullptr && o->num_stop_sequences > 0) {
         cfg->stop_strings = o->stop_sequences;
         cfg->n_stop_strings = static_cast<int>(o->num_stop_sequences);
     }
 }
 
-void fill_inputs(qhx_inputs* in, const char* prompt, const rac_llm_options_t* o) {
+// Wrap the user prompt in the model family's chat template. QHexRT bundles ship
+// no chat template and the raw-decode host plans (qwen3_generate, lfm_generate,
+// …) feed `qhx_inputs.text` to the tokenizer verbatim while ignoring
+// `system_prompt`. Without turn markers a conversational prompt never forms —
+// the model just continues the text and loops ("hi bro" → endless rambling). We
+// therefore build the turn structure here, keyed on the manifest's
+// `tokenizer_pre`, and fold the system prompt in (which is also the only way a
+// caller-supplied system prompt actually reaches these models).
+std::string build_chat_prompt(const std::string& pre, const char* user_c, const char* sys_c) {
+    const std::string user = (user_c != nullptr) ? user_c : "";
+    const std::string sys =
+        (sys_c != nullptr && sys_c[0] != '\0') ? sys_c : "You are a helpful assistant.";
+
+    // ChatML — Qwen2/Qwen3, DeepSeek-R1-Distill-Qwen, and LFM2 all share it.
+    if (pre == "qwen2" || pre == "qwen3" || pre == "lfm") {
+        return "<|im_start|>system\n" + sys + "<|im_end|>\n" + "<|im_start|>user\n" + user +
+               "<|im_end|>\n" + "<|im_start|>assistant\n";
+    }
+    // Gemma turn format has no system role; fold the system text into the user turn.
+    if (pre == "gemma") {
+        const std::string u = sys.empty() ? user : (sys + "\n\n" + user);
+        return "<start_of_turn>user\n" + u + "<end_of_turn>\n<start_of_turn>model\n";
+    }
+    // Unknown family ("default", etc.): pass the prompt through unchanged so we
+    // never regress a model whose chat template we have not validated.
+    return user;
+}
+
+void fill_inputs(qhx_inputs* in, Session* c, const char* prompt, const rac_llm_options_t* o) {
     *in = qhx_inputs{};
-    in->text = prompt;
-    if (o != nullptr && o->system_prompt != nullptr && o->system_prompt[0] != '\0') {
-        in->system_prompt = o->system_prompt;
+    const char* sys = (o != nullptr) ? o->system_prompt : nullptr;
+    if (c != nullptr && !c->tokenizer_pre.empty()) {
+        c->prompt_scratch = build_chat_prompt(c->tokenizer_pre, prompt, sys);
+        in->text = c->prompt_scratch.c_str();
+        // System prompt is folded into the templated text above; do not also
+        // pass it as a separate (runtime-ignored) turn.
+    } else {
+        in->text = prompt;
+        if (sys != nullptr && sys[0] != '\0') {
+            in->system_prompt = sys;
+        }
     }
 }
 
@@ -124,9 +199,9 @@ rac_result_t qhexrt_llm_generate(void* impl, const char* prompt, const rac_llm_o
     try {
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
-        fill_inputs(&in, prompt, options);
+        fill_inputs(&in, c, prompt, options);
         qhx_gen_cfg cfg;
-        fill_cfg(&cfg, options);
+        fill_cfg(&cfg, c, options);
         qhx_output out{};
         qhx_status st = qhx_generate(c->sess, &in, &cfg, nullptr, nullptr, &out);
         if (st != 0) {
@@ -150,9 +225,9 @@ rac_result_t qhexrt_llm_generate_stream(void* impl, const char* prompt,
     try {
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
-        fill_inputs(&in, prompt, options);
+        fill_inputs(&in, c, prompt, options);
         qhx_gen_cfg cfg;
-        fill_cfg(&cfg, options);
+        fill_cfg(&cfg, c, options);
         StreamCtx ctx{callback, user_data, c, std::string()};
         qhx_output out{};
         qhx_status st = qhx_generate(c->sess, &in, &cfg, stream_trampoline, &ctx, &out);

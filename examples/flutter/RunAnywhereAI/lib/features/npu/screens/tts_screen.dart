@@ -53,6 +53,10 @@ class _TtsScreenState extends State<TtsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            NpuModelBar(
+              modality: NpuModality.tts,
+              onLoadedChange: (id) => setState(() => _modelLoaded = id != null),
+            ),
             TextField(
               controller: _controller,
               enabled: !_running,
@@ -63,8 +67,14 @@ class _TtsScreenState extends State<TtsScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _running ? null : _speak,
-                child: Text(_running ? 'Speaking…' : 'Speak'),
+                onPressed: (_running || !_modelLoaded) ? null : _speak,
+                child: Text(
+                  _running
+                      ? 'Speaking…'
+                      : _modelLoaded
+                          ? 'Speak'
+                          : 'Load a model above',
+                ),
               ),
             ),
             const SizedBox(height: 8),

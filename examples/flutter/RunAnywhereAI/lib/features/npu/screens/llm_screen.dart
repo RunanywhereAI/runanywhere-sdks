@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere/runanywhere_protos.dart' as ra;
+import 'package:runanywhere_ai/core/utilities/constants.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../npu_catalog.dart';
 import '../npu_model_bar.dart';
@@ -36,7 +38,25 @@ class _LlmScreenState extends State<LlmScreen> {
       _running = true;
     });
     try {
-      final opts = ra.LLMGenerationOptions(maxTokens: 256, temperature: 0.7);
+      // Drive generation from the app-wide Settings (More → Settings) so the
+      // NPU Chat honors the same system prompt / temperature / max tokens as the
+      // rest of the app. The QHexRT engine wraps this prompt + system prompt in
+      // the model's chat template (keyed on the manifest's tokenizer_pre), which
+      // is what turns a bare "hi bro" into a real assistant reply.
+      final prefs = await SharedPreferences.getInstance();
+      final temperature =
+          prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
+      final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 256;
+      final systemPrompt =
+          prefs.getString(PreferenceKeys.defaultSystemPrompt) ??
+              kDefaultSystemPrompt;
+      final opts = ra.LLMGenerationOptions(
+        maxTokens: maxTokens,
+        temperature: temperature,
+        // Small NPU bundles loop without a penalty; the runtime honors this.
+        repetitionPenalty: 1.3,
+        systemPrompt: systemPrompt,
+      );
       await for (final e in RunAnywhere.llm.generateStream(_controller.text, opts)) {
         if (e.token.isNotEmpty) {
           setState(() => _output += e.token);

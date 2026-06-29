@@ -5,6 +5,8 @@ import 'package:record/record.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere/runanywhere_protos.dart' as ra;
 
+import '../npu_catalog.dart';
+import '../npu_model_bar.dart';
 import '../widgets.dart';
 
 class SttScreen extends StatefulWidget {
@@ -22,6 +24,7 @@ class _SttScreenState extends State<SttScreen> {
   String? _error;
   String _conf = '—';
   String? _path;
+  bool _modelLoaded = false;
 
   @override
   void dispose() {
@@ -88,15 +91,21 @@ class _SttScreenState extends State<SttScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            NpuModelBar(
+              modality: NpuModality.stt,
+              onLoadedChange: (id) => setState(() => _modelLoaded = id != null),
+            ),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _running ? null : _toggle,
+                onPressed: (_running || !_modelLoaded) ? null : _toggle,
                 child: Text(_recording
                     ? 'Stop & transcribe'
                     : _running
                         ? 'Transcribing…'
-                        : 'Record'),
+                        : _modelLoaded
+                            ? 'Record'
+                            : 'Load a model above'),
               ),
             ),
             const SizedBox(height: 16),
