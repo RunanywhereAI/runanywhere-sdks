@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.npu.screens
 
-import ai.runanywhere.proto.v1.VLMImageFormat
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -9,11 +8,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,7 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.fromEncoded
+import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
@@ -44,6 +45,7 @@ import com.runanywhere.runanywhereai.ui.screens.npu.theme.Spacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 @Composable
 fun VlmScreen(modelsVm: NpuModelsViewModel) {
@@ -56,6 +58,7 @@ fun VlmScreen(modelsVm: NpuModelsViewModel) {
     var running by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var tps by remember { mutableStateOf("—") }
+    var liveMode by remember { mutableStateOf(false) }
     val loadedModelId = modelsVm.loadedId(NpuModality.VLM)
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -71,6 +74,24 @@ fun VlmScreen(modelsVm: NpuModelsViewModel) {
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         NpuModelBar(modality = NpuModality.VLM, vm = modelsVm)
+
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            FilterChip(
+                selected = !liveMode,
+                onClick = { liveMode = false },
+                label = { Text("Image") },
+            )
+            FilterChip(
+                selected = liveMode,
+                onClick = { liveMode = true },
+                label = { Text("Live view") },
+            )
+        }
+
+        if (liveMode) {
+            VlmLiveView(loadedModelId = loadedModelId)
+            return@Column
+        }
 
         OutlinedButton(onClick = { picker.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
             Text(if (imageBytes == null) "Pick an image" else "Change image")
@@ -96,7 +117,15 @@ fun VlmScreen(modelsVm: NpuModelsViewModel) {
                 val bytes = imageBytes!!
                 scope.launch {
                     try {
-                        val image = RAVLMImage.fromEncoded(bytes, VLMImageFormat.VLM_IMAGE_FORMAT_JPEG)
+                        // The NPU (QHexRT) VLM ABI consumes the image by file path and
+                        // decodes the container itself; raw-pixel / base64 forms are not
+                        // accepted. Spool the picked image to a cache file and pass the
+                        // path — this also works for every other VLM engine.
+                        val image = withContext(Dispatchers.IO) {
+                            val file = File(context.cacheDir, "vlm_input.jpg")
+                            file.writeBytes(bytes)
+                            RAVLMImage.fromFilePath(file.absolutePath)
+                        }
                         val opts = RAVLMGenerationOptions(prompt = prompt.text, max_tokens = 200)
                         val result = withContext(Dispatchers.Default) {
                             RunAnywhere.processImage(image, opts)

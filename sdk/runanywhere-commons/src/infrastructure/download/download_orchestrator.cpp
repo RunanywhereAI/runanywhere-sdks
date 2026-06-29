@@ -838,10 +838,18 @@ void mark_task_stopped(const std::shared_ptr<proto_download_task>& task) {
     }
 }
 
+// `overall_override` (>= 0) lets a caller supply the whole-download fraction
+// directly, for the case where it cannot be derived from bytes. Multi-file
+// bundles without per-file sizes (total_bytes is then a single file's length,
+// not the plan total) would otherwise mix a cumulative numerator with a
+// single-file denominator and pin overall_progress to ~100% after the first
+// (tiny) file. Callers pass a monotonic file-count fraction instead. Default
+// (-1) keeps the byte-derived behavior for single-file / known-total plans.
 void set_task_progress(const std::shared_ptr<proto_download_task>& task, rav1::DownloadState state,
                        rav1::DownloadStage stage, int64_t bytes_downloaded, int64_t total_bytes,
                        int32_t file_index, const std::string& storage_key,
-                       const std::string& local_path, const std::string& error_message) {
+                       const std::string& local_path, const std::string& error_message,
+                       float overall_override = -1.0f) {
     if (!task) {
         return;
     }
@@ -883,7 +891,15 @@ void set_task_progress(const std::shared_ptr<proto_download_task>& task, rav1::D
         stage_progress = 1.0f;
     }
     progress->set_stage_progress(stage_progress);
-    progress->set_overall_progress(state == rav1::DOWNLOAD_STATE_COMPLETED ? 1.0f : stage_progress);
+    float overall_progress;
+    if (state == rav1::DOWNLOAD_STATE_COMPLETED) {
+        overall_progress = 1.0f;
+    } else if (overall_override >= 0.0f) {
+        overall_progress = std::min(1.0f, std::max(0.0f, overall_override));
+    } else {
+        overall_progress = stage_progress;
+    }
+    progress->set_overall_progress(overall_progress);
     int64_t elapsed_ms = now_ms - task->started_at_unix_ms;
     if (elapsed_ms > 0 && bytes_downloaded > 0) {
         float speed = static_cast<float>(static_cast<double>(bytes_downloaded) /
@@ -928,8 +944,22 @@ rac_bool_t proto_http_progress(uint64_t bytes_written, uint64_t total_bytes, voi
         std::lock_guard<std::mutex> lock(ctx->task->mutex);
         ctx->task->last_partial_bytes = downloaded;
     }
+    // For multi-file bundles whose per-file sizes are unknown (total_expected
+    // == 0, e.g. HuggingFace NPU bundles), derive a monotonic overall fraction
+    // from file count + current file's own fraction, so the bar doesn't pin to
+    // 100% after the first (tiny manifest) file.
+    float overall_override = -1.0f;
+    const size_t num_files = ctx->task->files.size();
+    if (ctx->total_expected <= 0 && num_files > 1) {
+        double file_fraction =
+            total_bytes > 0
+                ? std::min(1.0, static_cast<double>(bytes_written) / static_cast<double>(total_bytes))
+                : 0.0;
+        overall_override = static_cast<float>(
+            (static_cast<double>(ctx->file_index) + file_fraction) / static_cast<double>(num_files));
+    }
     set_task_progress(ctx->task, rav1::DOWNLOAD_STATE_DOWNLOADING, rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                      downloaded, total, ctx->file_index, ctx->storage_key, "", "");
+                      downloaded, total, ctx->file_index, ctx->storage_key, "", "", overall_override);
     emit_progress(ctx->task);
     return RAC_TRUE;
 }
@@ -996,6 +1026,16 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
                                  const proto_plan_file& file, size_t i, int64_t total_expected,
                                  uint64_t file_resume_from, int64_t& completed_before_file,
                                  std::string& final_path) {
+    // Ensure the file's parent directory exists. Most bundles write straight
+    // into the per-model folder (already created), but a descriptor may carry a
+    // multi-segment subpath (e.g. VLM host-weight fixtures under "vlm/…") whose
+    // intermediate directory the HTTP writer will not create on its own.
+    {
+        fs::path dest_path(file.destination_path);
+        if (dest_path.has_parent_path())
+            mkdir_p(dest_path.parent_path().string().c_str());
+    }
+
     // A previous attempt may already have landed this file completely (e.g. a
     // size-guard refusal caused by a stale catalog size estimate, or a re-pull
     // after an interrupted finalize). Re-fetching would resume from EOF and
@@ -1379,7 +1419,7 @@ void web_download_finish(web_download_driver* drv) {
 }
 
 // rac_http_progress_callback_fn: void (int64 bytes, int64 total, void* user_data).
-void web_download_on_progress(int64_t bytes_downloaded, int64_t /*total_bytes*/, void* user_data) {
+void web_download_on_progress(int64_t bytes_downloaded, int64_t total_bytes, void* user_data) {
     auto* drv = static_cast<web_download_driver*>(user_data);
     if (!drv) {
         return;
@@ -1399,9 +1439,22 @@ void web_download_on_progress(int64_t bytes_downloaded, int64_t /*total_bytes*/,
 
     const int64_t downloaded = drv->completed_before_file + bytes_downloaded;
     const proto_plan_file& file = task->files[drv->file_index];
+    // See proto_http_progress: multi-file bundles without per-file sizes need a
+    // monotonic file-count overall fraction (a byte ratio against an unknown
+    // plan total would otherwise stay at 0 the whole download, then snap to 1).
+    float overall_override = -1.0f;
+    const size_t num_files = task->files.size();
+    if (drv->total_expected <= 0 && num_files > 1) {
+        double file_fraction = total_bytes > 0
+                                   ? std::min(1.0, static_cast<double>(bytes_downloaded) /
+                                                       static_cast<double>(total_bytes))
+                                   : 0.0;
+        overall_override = static_cast<float>(
+            (static_cast<double>(drv->file_index) + file_fraction) / static_cast<double>(num_files));
+    }
     set_task_progress(task, rav1::DOWNLOAD_STATE_DOWNLOADING, rav1::DOWNLOAD_STAGE_DOWNLOADING,
                       downloaded, drv->total_expected, static_cast<int32_t>(drv->file_index),
-                      file.storage_key, "", "");
+                      file.storage_key, "", "", overall_override);
     emit_progress(task);
 }
 
@@ -1532,6 +1585,14 @@ void web_download_start_file(web_download_driver* drv) {
         emit_progress(task);
         web_download_finish(drv);
         return;
+    }
+
+    // Ensure the file's parent directory exists (multi-segment subpaths such as
+    // VLM host-weight fixtures under "vlm/…" need their intermediate dir).
+    {
+        fs::path dest_path(file.destination_path);
+        if (dest_path.has_parent_path())
+            mkdir_p(dest_path.parent_path().string().c_str());
     }
 
     // A previous attempt may already have landed this file completely; skip the
@@ -1676,6 +1737,28 @@ std::string destination_from_model_file(const std::string& model_folder,
         // Intentionally fall through to the filename-based path below so the
         // download still completes safely instead of aborting the whole plan.
     }
+
+    // A descriptor may declare a multi-segment relative subpath (in
+    // relative_path, or carried inline in filename) so a bundle preserves its
+    // on-disk directory layout — e.g. InternVL VLM host-weight fixtures staged
+    // under "vlm/pe_w.bin" that the QHexRT runtime resolves via fixture_dir.
+    // A plain `filename` is a single segment (is_safe_path_segment forbids
+    // separators); only route through the subdir-aware joiner when separators
+    // are actually present, so the common single-file case is unchanged.
+    // safe_descriptor_path_under validates every segment ('.'/'..'/empty/
+    // backslash are rejected) and enforces containment under model_folder, so
+    // this preserves the path-traversal hardening while allowing legit subdirs.
+    auto subpath_destination = [&](const std::string& rel) -> std::optional<std::string> {
+        if (rel.empty() || (rel.find('/') == std::string::npos && rel.find('\\') == std::string::npos))
+            return std::nullopt;
+        return safe_descriptor_path_under(model_folder, rel);
+    };
+    if (file.has_relative_path()) {
+        if (auto safe = subpath_destination(file.relative_path()))
+            return *safe;
+    }
+    if (auto safe = subpath_destination(file.filename()))
+        return *safe;
 
     std::string filename = file.filename();
     if (!filename.empty() && !is_safe_path_segment(filename)) {

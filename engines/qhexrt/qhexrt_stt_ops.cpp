@@ -3,14 +3,17 @@
  * @brief STT (RAC_PRIMITIVE_TRANSCRIBE) vtable over the QHexRT C ABI.
  *
  * Compiled ONLY in routable builds. Maps `rac_stt_service_ops_t` onto
- * `qhx_generate` with an audio input (QHexRT Whisper family). The QHexRT C ABI
- * consumes mono float32 PCM in [-1,1]; only RAC_AUDIO_FORMAT_PCM input is
- * accepted (compressed formats need decoding QHexRT does not perform and return
- * RAC_ERROR_NOT_SUPPORTED).
+ * `qhx_generate` with an audio input (QHexRT Whisper family). The QHexRT runtime
+ * consumes mono float32 PCM in [-1,1], but the RAC STT contract delivers mono
+ * int16 PCM (RAC_AUDIO_FORMAT_PCM == int16, per stt_module.cpp); this adapter
+ * converts int16 -> float32 before calling qhx_generate. Only RAC_AUDIO_FORMAT_PCM
+ * input is accepted (compressed formats need decoding QHexRT does not perform and
+ * return RAC_ERROR_NOT_SUPPORTED).
  */
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "qhexrt_session.h"
 
@@ -29,19 +32,28 @@ using qhexrt_engine::session_open;
 
 Session* as_session(void* impl) { return static_cast<Session*>(impl); }
 
-// Maps the raw STT audio buffer onto qhx_inputs. Returns false (caller ->
-// NOT_SUPPORTED) for formats QHexRT cannot consume directly.
-bool fill_audio(qhx_inputs* in, const void* audio_data, size_t audio_size,
-                const rac_stt_options_t* o) {
+// Converts the raw STT audio buffer (mono int16 PCM, the RAC contract) into the
+// mono float32 [-1,1] buffer the QHexRT runtime expects. The converted samples
+// are stored in `scratch`, which must outlive the qhx_generate() call. Returns
+// false (caller -> NOT_SUPPORTED) for formats QHexRT cannot consume directly.
+bool fill_audio(qhx_inputs* in, std::vector<float>& scratch, const void* audio_data,
+                size_t audio_size, const rac_stt_options_t* o) {
     *in = qhx_inputs{};
-    if (audio_data == nullptr || audio_size < sizeof(float)) {
+    if (audio_data == nullptr || audio_size < sizeof(int16_t)) {
         return false;
     }
     if (o != nullptr && o->audio_format != RAC_AUDIO_FORMAT_PCM) {
         return false;  // mp3/wav/opus/... need decoding QHexRT does not do
     }
-    in->audio = static_cast<const float*>(audio_data);
-    in->n_audio = static_cast<int>(audio_size / sizeof(float));
+    const auto* pcm = static_cast<const int16_t*>(audio_data);
+    const size_t n = audio_size / sizeof(int16_t);
+    scratch.resize(n);
+    constexpr float kInvScale = 1.0f / 32768.0f;
+    for (size_t i = 0; i < n; ++i) {
+        scratch[i] = static_cast<float>(pcm[i]) * kInvScale;
+    }
+    in->audio = scratch.data();
+    in->n_audio = static_cast<int>(n);
     in->audio_sr = (o != nullptr && o->sample_rate > 0) ? o->sample_rate : 16000;
     return true;
 }
@@ -115,7 +127,8 @@ rac_result_t qhexrt_stt_transcribe(void* impl, const void* audio_data, size_t au
     try {
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
-        if (!fill_audio(&in, audio_data, audio_size, options)) {
+        std::vector<float> audio_f32;
+        if (!fill_audio(&in, audio_f32, audio_data, audio_size, options)) {
             return RAC_ERROR_NOT_SUPPORTED;
         }
         qhx_gen_cfg cfg;
@@ -143,7 +156,8 @@ rac_result_t qhexrt_stt_transcribe_stream(void* impl, const void* audio_data, si
     try {
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
-        if (!fill_audio(&in, audio_data, audio_size, options)) {
+        std::vector<float> audio_f32;
+        if (!fill_audio(&in, audio_f32, audio_data, audio_size, options)) {
             return RAC_ERROR_NOT_SUPPORTED;
         }
         qhx_gen_cfg cfg;

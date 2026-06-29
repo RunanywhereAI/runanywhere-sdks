@@ -34,7 +34,10 @@ data class NpuModelsState(
     val loadedByModality: Map<NpuModality, String?> = emptyMap(),
     /** Model id currently downloading or loading (only one at a time). */
     val busyId: String? = null,
-    /** 0..1 download progress for [busyId] while downloading; null while loading. */
+    /**
+     * 0..1 *overall* download progress for [busyId] while downloading (across all
+     * files of a multi-file bundle); null while loading.
+     */
     val progress: Float? = null,
     val error: String? = null,
 )
@@ -109,7 +112,12 @@ class NpuModelsViewModel : ViewModel() {
             try {
                 val registered = register(model)
                 RunAnywhere.downloadModel(registered) { p ->
-                    state = state.copy(progress = p.stage_progress.coerceIn(0f, 1f))
+                    // Multi-file bundles (every NPU model) report per-file progress
+                    // in stage_progress, which resets each file; overall_progress
+                    // spans the whole download. Prefer it, fall back for archives.
+                    val pct = (if (p.overall_progress > 0f) p.overall_progress else p.stage_progress)
+                        .coerceIn(0f, 1f)
+                    state = state.copy(progress = pct)
                 }
                 state = state.copy(progress = null)
                 reload()
