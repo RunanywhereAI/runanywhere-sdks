@@ -12,7 +12,6 @@ import LlmScreen from './screens/LlmScreen';
 import VlmScreen from './screens/VlmScreen';
 import SttScreen from './screens/SttScreen';
 import TtsScreen from './screens/TtsScreen';
-import ModelsScreen from './screens/ModelsScreen';
 
 const Stack = createNativeStackNavigator<NpuStackParamList>();
 
@@ -23,7 +22,6 @@ export const NpuNavigator: React.FC = () => (
     <Stack.Screen name="Vlm" component={VlmScreen} />
     <Stack.Screen name="Stt" component={SttScreen} />
     <Stack.Screen name="Tts" component={TtsScreen} />
-    <Stack.Screen name="Models" component={ModelsScreen} />
   </Stack.Navigator>
 );
 

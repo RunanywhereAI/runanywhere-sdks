@@ -4,7 +4,6 @@ import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'llm_screen.dart';
-import 'models_screen.dart';
 import 'stt_screen.dart';
 import 'tts_screen.dart';
 import 'vlm_screen.dart';
@@ -84,8 +83,6 @@ class HomeScreen extends StatelessWidget {
                   _NavRow('Speech to Text', 'Transcribe audio (Whisper)', () => const SttScreen()),
                   const SizedBox(height: 8),
                   _NavRow('Text to Speech', 'Synthesize audio (MeloTTS)', () => const TtsScreen()),
-                  const SizedBox(height: 8),
-                  _NavRow('Models', 'Download + manage models', () => const ModelsScreen()),
                 ],
               ),
             ),

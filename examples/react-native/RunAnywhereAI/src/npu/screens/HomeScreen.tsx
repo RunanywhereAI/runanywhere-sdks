@@ -74,7 +74,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <NavTile title="Vision (VLM)" subtitle="Ask about an image" onPress={() => navigation.navigate('Vlm')} />
         <NavTile title="Speech-to-Text" subtitle="Transcribe audio" onPress={() => navigation.navigate('Stt')} />
         <NavTile title="Text-to-Speech" subtitle="Synthesize speech" onPress={() => navigation.navigate('Tts')} />
-        <NavTile title="Models" subtitle="Download & manage NPU bundles" onPress={() => navigation.navigate('Models')} />
       </SectionCard>
     </Screen>
   );

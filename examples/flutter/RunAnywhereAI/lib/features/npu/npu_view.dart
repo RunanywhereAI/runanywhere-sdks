@@ -7,7 +7,7 @@ import 'theme.dart';
 /// Self-contained NPU (QHexRT) section, reached from More → NPU.
 ///
 /// Hosts its own nested [Navigator] under the standalone NPU theme so the whole
-/// section — Home + LLM/VLM/STT/TTS/Models — renders exactly like the dedicated
+/// section — Home + LLM/VLM/STT/TTS — renders exactly like the dedicated
 /// NPU app, without disturbing the host app's screens or theme.
 class NpuView extends StatefulWidget {
   const NpuView({super.key});

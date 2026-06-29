@@ -8,5 +8,4 @@ export type NpuStackParamList = {
   Vlm: undefined;
   Stt: undefined;
   Tts: undefined;
-  Models: undefined;
 };
