@@ -8,6 +8,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { NpuStackParamList } from '../navTypes';
 import { useAppColors, Space } from '../theme';
 import { Screen, SectionCard, Field, PrimaryButton } from '../widgets';
+import NpuModelBar from '../NpuModelBar';
 import { RunAnywhere } from '@runanywhere/core';
 
 type Props = NativeStackScreenProps<NpuStackParamList, 'Tts'>;
@@ -18,6 +19,7 @@ const TtsScreen: React.FC<Props> = ({ navigation }) => {
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [modelLoaded, setModelLoaded] = useState(false);
 
   const speak = async () => {
     setRunning(true);
@@ -43,6 +45,7 @@ const TtsScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <Screen title="Text-to-Speech" onBack={() => navigation.goBack()}>
+      <NpuModelBar modality="tts" onLoadedChange={(id) => setModelLoaded(!!id)} />
       <Field
         value={text}
         onChangeText={setText}
@@ -52,14 +55,19 @@ const TtsScreen: React.FC<Props> = ({ navigation }) => {
         placeholder="Text to speak"
         style={styles.input}
       />
-      <PrimaryButton label={running ? 'Speaking…' : 'Speak'} onPress={speak} busy={running} />
+      <PrimaryButton
+        label={running ? 'Speaking…' : modelLoaded ? 'Speak' : 'Load a model to speak'}
+        onPress={speak}
+        busy={running}
+        disabled={!modelLoaded}
+      />
       <View style={{ height: Space.sm }} />
       <PrimaryButton label="Stop" onPress={stop} disabled={!running} />
       {error ? <Text style={[styles.error, { color: c.error }]}>{error}</Text> : null}
       <View style={{ height: Space.lg }} />
       <SectionCard title="Status">
         <Text style={{ color: c.onSurfaceVariant, fontSize: 14, lineHeight: 20 }}>
-          {status || 'Load an NPU TTS model from the Models screen, then synthesize speech.'}
+          {status || 'Load an NPU TTS model above, then synthesize speech.'}
         </Text>
       </SectionCard>
     </Screen>

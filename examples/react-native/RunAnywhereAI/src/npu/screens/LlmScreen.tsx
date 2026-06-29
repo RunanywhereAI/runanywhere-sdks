@@ -8,6 +8,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { NpuStackParamList } from '../navTypes';
 import { useAppColors, Space } from '../theme';
 import { Screen, SectionCard, Field, PrimaryButton, MetricStrip } from '../widgets';
+import NpuModelBar from '../NpuModelBar';
 import { RunAnywhere } from '@runanywhere/core';
 import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 
@@ -21,6 +22,7 @@ const LlmScreen: React.FC<Props> = ({ navigation }) => {
   const [error, setError] = useState<string | null>(null);
   const [tps, setTps] = useState('—');
   const [ttft, setTtft] = useState('—');
+  const [modelLoaded, setModelLoaded] = useState(false);
 
   const generate = async () => {
     setRunning(true);
@@ -48,6 +50,7 @@ const LlmScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <Screen title="Chat" onBack={() => navigation.goBack()}>
+      <NpuModelBar modality="llm" onLoadedChange={(id) => setModelLoaded(!!id)} />
       <Field
         value={prompt}
         onChangeText={setPrompt}
@@ -57,13 +60,18 @@ const LlmScreen: React.FC<Props> = ({ navigation }) => {
         placeholder="Prompt"
         style={styles.prompt}
       />
-      <PrimaryButton label={running ? 'Generating…' : 'Generate'} onPress={generate} busy={running} />
+      <PrimaryButton
+        label={running ? 'Generating…' : modelLoaded ? 'Generate' : 'Load a model to generate'}
+        onPress={generate}
+        busy={running}
+        disabled={!modelLoaded}
+      />
       <View style={{ height: Space.lg }} />
       <MetricStrip items={[['tokens/s', tps], ['ttft', ttft]]} />
       {error ? <Text style={[styles.error, { color: c.error }]}>{error}</Text> : null}
       <SectionCard title="Response">
         <Text style={{ color: output ? c.onSurface : c.onSurfaceVariant, fontSize: 15, lineHeight: 22 }}>
-          {output || (running ? '…' : 'Output appears here. Load an NPU LLM model from the Models screen first.')}
+          {output || (running ? '…' : 'Output appears here. Load an NPU LLM model above first.')}
         </Text>
       </SectionCard>
     </Screen>

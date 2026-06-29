@@ -58,7 +58,16 @@ class _SttScreenState extends State<SttScreen> {
     });
     try {
       final bytes = await File(path).readAsBytes();
-      final out = await RunAnywhere.stt.transcribe(bytes, ra.STTOptions(sampleRate: 16000));
+      // QHexRT STT consumes raw int16 PCM only; the SDK otherwise defaults the
+      // format to WAV, which the engine rejects with NOT_SUPPORTED. The `record`
+      // package writes bare PCM (pcm16bits), so tag it as PCM explicitly.
+      final out = await RunAnywhere.stt.transcribe(
+        bytes,
+        ra.STTOptions(
+          sampleRate: 16000,
+          audioFormat: ra.AudioFormat.AUDIO_FORMAT_PCM,
+        ),
+      );
       setState(() {
         _text = out.text;
         _conf = '${(out.confidence * 100).toStringAsFixed(0)}%';

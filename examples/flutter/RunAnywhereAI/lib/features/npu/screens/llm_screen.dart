@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere/runanywhere_protos.dart' as ra;
 
+import '../npu_catalog.dart';
+import '../npu_model_bar.dart';
 import '../widgets.dart';
 
 class LlmScreen extends StatefulWidget {
@@ -19,6 +21,7 @@ class _LlmScreenState extends State<LlmScreen> {
   String _tps = '—';
   String _ttft = '—';
   String _total = '—';
+  bool _modelLoaded = false;
 
   @override
   void dispose() {
@@ -63,6 +66,10 @@ class _LlmScreenState extends State<LlmScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            NpuModelBar(
+              modality: NpuModality.llm,
+              onLoadedChange: (id) => setState(() => _modelLoaded = id != null),
+            ),
             TextField(
               controller: _controller,
               enabled: !_running,
@@ -73,8 +80,14 @@ class _LlmScreenState extends State<LlmScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _running ? null : _generate,
-                child: Text(_running ? 'Generating…' : 'Generate'),
+                onPressed: (_running || !_modelLoaded) ? null : _generate,
+                child: Text(
+                  _running
+                      ? 'Generating…'
+                      : _modelLoaded
+                          ? 'Generate'
+                          : 'Load a model above',
+                ),
               ),
             ),
             const SizedBox(height: 16),

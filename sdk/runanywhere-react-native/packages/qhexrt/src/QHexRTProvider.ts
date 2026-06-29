@@ -7,7 +7,7 @@
  */
 
 import {
-  requireNativeQHexRTModule,
+  getNativeQHexRTModule,
   isNativeQHexRTModuleAvailable,
 } from './native/NativeRunAnywhereQHexRT';
 import { SDKLogger } from '@runanywhere/core/internal';
@@ -52,7 +52,7 @@ export class QHexRTProvider {
     log.debug('Registering QHexRT backend with C++ registry');
 
     try {
-      const native = requireNativeQHexRTModule();
+      const native = getNativeQHexRTModule();
       const success = await native.registerBackend();
       if (success) {
         this.registered = true;
@@ -79,7 +79,7 @@ export class QHexRTProvider {
       return false;
     }
 
-    const native = requireNativeQHexRTModule();
+    const native = getNativeQHexRTModule();
 
     try {
       const success = await native.unregisterBackend();
@@ -104,7 +104,7 @@ export class QHexRTProvider {
     }
 
     try {
-      const native = requireNativeQHexRTModule();
+      const native = getNativeQHexRTModule();
       const registered = await native.isBackendRegistered();
       this.registered = registered;
       return registered;
@@ -124,7 +124,7 @@ export class QHexRTProvider {
       return null;
     }
     try {
-      const native = requireNativeQHexRTModule();
+      const native = getNativeQHexRTModule();
       return await native.probeNpu();
     } catch (error) {
       log.warning(`QHexRT NPU probe failed: ${error instanceof Error ? error.message : String(error)}`);

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart';
 
+import '../npu_catalog.dart';
+import '../npu_model_bar.dart';
 import '../widgets.dart';
 
 class TtsScreen extends StatefulWidget {
@@ -16,6 +18,7 @@ class _TtsScreenState extends State<TtsScreen> {
   String? _error;
   String _duration = '—';
   String _rate = '—';
+  bool _modelLoaded = false;
 
   @override
   void dispose() {

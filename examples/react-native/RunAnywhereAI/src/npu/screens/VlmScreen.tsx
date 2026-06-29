@@ -26,6 +26,7 @@ import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { NpuStackParamList } from '../navTypes';
 import { useAppColors, Space, Radius } from '../theme';
 import { Screen, SectionCard, Field, PrimaryButton, StatusPill } from '../widgets';
+import NpuModelBar from '../NpuModelBar';
 import { RunAnywhere, VLMImages } from '@runanywhere/core';
 import { VLMGenerationOptions } from '@runanywhere/proto-ts/vlm_options';
 
@@ -40,6 +41,7 @@ const stripFilePrefix = (uri: string): string => uri.replace('file://', '');
 const VlmScreen: React.FC<Props> = ({ navigation }) => {
   const c = useAppColors();
   const [mode, setMode] = useState<'static' | 'live'>('static');
+  const [modelLoaded, setModelLoaded] = useState(false);
 
   // Static mode
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -128,8 +130,14 @@ const VlmScreen: React.FC<Props> = ({ navigation }) => {
   }, [mode, requestCamera]);
 
   useEffect(() => {
-    if (mode === 'live' && cameraAuthorized && device) {
+    // Drive the live caption loop only once a VLM model is resident — otherwise
+    // every frame's processImage throws "no VLM model loaded" and the caption
+    // would silently sit on the placeholder forever.
+    if (mode === 'live' && cameraAuthorized && device && modelLoaded) {
+      setLiveCaption('Point the camera at a scene.');
       liveTimerRef.current = setInterval(captureLiveFrame, LIVE_INTERVAL_MS);
+    } else if (mode === 'live' && !modelLoaded) {
+      setLiveCaption('Load an NPU VLM model above to start live captioning.');
     }
     return () => {
       if (liveTimerRef.current) {
@@ -137,10 +145,11 @@ const VlmScreen: React.FC<Props> = ({ navigation }) => {
         liveTimerRef.current = null;
       }
     };
-  }, [mode, cameraAuthorized, device, captureLiveFrame]);
+  }, [mode, cameraAuthorized, device, modelLoaded, captureLiveFrame]);
 
   return (
     <Screen title="Vision" onBack={() => navigation.goBack()}>
+      <NpuModelBar modality="vlm" onLoadedChange={(id) => setModelLoaded(!!id)} />
       <View style={styles.toggleRow}>
         {(['static', 'live'] as const).map((m) => {
           const active = mode === m;
@@ -185,13 +194,13 @@ const VlmScreen: React.FC<Props> = ({ navigation }) => {
             label={running ? 'Analyzing…' : 'Describe'}
             onPress={describe}
             busy={running}
-            disabled={!imageUri}
+            disabled={!imageUri || !modelLoaded}
           />
           {error ? <Text style={[styles.error, { color: c.error }]}>{error}</Text> : null}
           <View style={{ height: Space.lg }} />
           <SectionCard title="Answer">
             <Text style={{ color: output ? c.onSurface : c.onSurfaceVariant, fontSize: 15, lineHeight: 22 }}>
-              {output || (running ? '…' : 'Pick an image and load an NPU VLM model from the Models screen.')}
+              {output || (running ? '…' : 'Pick an image and load an NPU VLM model above.')}
             </Text>
           </SectionCard>
         </>
@@ -233,8 +242,8 @@ const VlmScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           </SectionCard>
           <Text style={{ color: c.onSurfaceVariant, fontSize: 12, lineHeight: 18 }}>
-            Captures a frame every {(LIVE_INTERVAL_MS / 1000).toFixed(1)}s. Load an NPU VLM model from the
-            Models screen first.
+            Captures a frame every {(LIVE_INTERVAL_MS / 1000).toFixed(1)}s. Load an NPU VLM model above
+            first.
           </Text>
         </>
       )}

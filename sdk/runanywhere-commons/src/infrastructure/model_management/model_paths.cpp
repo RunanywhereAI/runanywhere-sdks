@@ -464,6 +464,7 @@ static fs::path effective_model_root(const fs::path& root, rac_model_format_t fo
     }
 
     bool has_direct_model_file = false;
+    bool has_regular_file = false;
     std::vector<fs::path> child_dirs;
     for (fs::directory_iterator it(root, fs::directory_options::skip_permission_denied, ec), end;
          !ec && it != end; it.increment(ec)) {
@@ -471,13 +472,22 @@ static fs::path effective_model_root(const fs::path& root, rac_model_format_t fo
         if (should_skip_model_entry(child)) {
             continue;
         }
-        if (it->is_regular_file(ec) && matches_model_format(child, format)) {
-            has_direct_model_file = true;
+        if (it->is_regular_file(ec)) {
+            has_regular_file = true;
+            if (matches_model_format(child, format)) {
+                has_direct_model_file = true;
+            }
         } else if (it->is_directory(ec)) {
             child_dirs.push_back(child);
         }
     }
-    if (!has_direct_model_file && child_dirs.size() == 1) {
+    // Descend into a lone wrapper subdirectory only when the root holds no
+    // files of its own — the classic "archive extracted to root/<subdir>/..."
+    // layout. When the root already carries regular files (e.g. a QHexRT
+    // bundle: a <name>.json manifest + weights alongside a companion subfolder
+    // such as vlm/), the root *is* the model directory; descending would
+    // strand the manifest under the wrong root and break model load.
+    if (!has_direct_model_file && !has_regular_file && child_dirs.size() == 1) {
         return child_dirs.front();
     }
     return root;
