@@ -36,6 +36,7 @@ import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
+import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.ui.screens.npu.MetricStrip
 import com.runanywhere.runanywhereai.ui.screens.npu.NpuModality
 import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelBar
@@ -126,7 +127,15 @@ fun VlmScreen(modelsVm: NpuModelsViewModel) {
                             file.writeBytes(bytes)
                             RAVLMImage.fromFilePath(file.absolutePath)
                         }
-                        val opts = RAVLMGenerationOptions(prompt = prompt.text, max_tokens = 200)
+                        // Honor the app-wide Settings (More → Settings) for the NPU/QHexRT
+                        // VLM tab: max tokens caps the description length and the system
+                        // prompt steers the persona. The image prompt stays user-driven.
+                        val s = SettingsRepository.settings
+                        val opts = RAVLMGenerationOptions(
+                            prompt = prompt.text,
+                            max_tokens = s.maxTokens,
+                            system_prompt = s.systemPrompt.ifBlank { null },
+                        )
                         val result = withContext(Dispatchers.Default) {
                             RunAnywhere.processImage(image, opts)
                         }

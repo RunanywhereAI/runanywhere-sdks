@@ -52,6 +52,7 @@ import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
+import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -109,9 +110,15 @@ fun VlmLiveView(loadedModelId: String?, modifier: Modifier = Modifier) {
                         file.absolutePath
                     }
                     val image = RAVLMImage.fromFilePath(path)
+                    // Live view honors the app-wide system prompt (More → Settings) for
+                    // persona, but keeps a tight token cap so each frame analyzes quickly
+                    // and the live cadence stays responsive (a large global max_tokens
+                    // would make captions long and stall the loop).
+                    val s = SettingsRepository.settings
                     val opts = RAVLMGenerationOptions(
                         prompt = "Describe what you see in one sentence.",
-                        max_tokens = 100,
+                        max_tokens = minOf(s.maxTokens, 100),
+                        system_prompt = s.systemPrompt.ifBlank { null },
                     )
                     // Use the non-streaming process() — the same path the static
                     // "Describe" button uses. The QHexRT VLM streaming token path

@@ -22,7 +22,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import com.runanywhere.sdk.npu.qhexrt.NpuInfo
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.aggregateStream
+import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
+import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.ui.screens.npu.MetricStrip
 import com.runanywhere.runanywhereai.ui.screens.npu.NpuModality
 import com.runanywhere.runanywhereai.ui.screens.npu.NpuModelBar
@@ -62,13 +64,23 @@ fun LlmScreen(modelsVm: NpuModelsViewModel) {
                 output = ""; error = null; running = true
                 scope.launch {
                     try {
+                        // Drive generation from the app-wide Settings (More → Settings),
+                        // so the NPU/QHexRT tab honors the same temperature / max tokens /
+                        // system prompt / streaming toggle as the rest of the app.
+                        val s = SettingsRepository.settings
                         val opts = RALLMGenerationOptions(
-                            max_tokens = 256,
-                            temperature = 0.7f,
+                            max_tokens = s.maxTokens,
+                            temperature = s.temperature,
+                            system_prompt = s.systemPrompt.ifBlank { null },
+                            streaming_enabled = s.streaming,
                         )
-                        val events = RunAnywhere.generateStream(prompt.text, opts)
-                        val result = RunAnywhere.aggregateStream(prompt.text, events) { acc ->
-                            output = acc
+                        val result = if (s.streaming) {
+                            val events = RunAnywhere.generateStream(prompt.text, opts)
+                            RunAnywhere.aggregateStream(prompt.text, events) { acc ->
+                                output = acc
+                            }
+                        } else {
+                            RunAnywhere.generate(prompt.text, opts)
                         }
                         output = result.text
                         tps = "%.1f".format(result.tokens_per_second)
