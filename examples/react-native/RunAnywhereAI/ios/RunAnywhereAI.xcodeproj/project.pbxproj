@@ -12,16 +12,16 @@
 		131BD3E69C56FB3D2407D933 /* libPods-RunAnywhereAI-RunAnywhereAITests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 22B57BB26B1AA1AAAD263C4E /* libPods-RunAnywhereAI-RunAnywhereAITests.a */; };
 		13B07FBC1A68108700A75B9A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB01A68108700A75B9A /* AppDelegate.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		2E85DD22A18E406887A7C196 /* Figtree.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8BF95992387943D3A4344FFE /* Figtree.ttf */; };
+		31FE98DC2C9C407FB812B3C9 /* Figtree-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */; };
+		36293524965A46A4B5A96AA5 /* Figtree.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8BF95992387943D3A4344FFE /* Figtree.ttf */; };
+		5387F1DFAAC3441BA3D3240C /* Figtree-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */; };
 		5B7EAD8CABC3ABC09C3EBCB0 /* libPods-RunAnywhereAI.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9E75FBBD9CE4CFEFC37E3C16 /* libPods-RunAnywhereAI.a */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		A081B5C032C04D09B5E70F0F /* MapleMono.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */; };
+		B0629D4718BB4063BAA49E2D /* MapleMono.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */; };
 		CCDD001122334455 /* DocumentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCDD001122334456 /* DocumentService.swift */; };
 		CCDD001122334457 /* DocumentService.m in Sources */ = {isa = PBXBuildFile; fileRef = CCDD001122334458 /* DocumentService.m */; };
-		36293524965A46A4B5A96AA5 /* Figtree.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8BF95992387943D3A4344FFE /* Figtree.ttf */; };
-		2E85DD22A18E406887A7C196 /* Figtree.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8BF95992387943D3A4344FFE /* Figtree.ttf */; };
-		5387F1DFAAC3441BA3D3240C /* Figtree-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */; };
-		31FE98DC2C9C407FB812B3C9 /* Figtree-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */; };
-		B0629D4718BB4063BAA49E2D /* MapleMono.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */; };
-		A081B5C032C04D09B5E70F0F /* MapleMono.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,18 +46,18 @@
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = RunAnywhereAI/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		22B57BB26B1AA1AAAD263C4E /* libPods-RunAnywhereAI-RunAnywhereAITests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RunAnywhereAI-RunAnywhereAITests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B933AC90856DEE721474248 /* Pods-RunAnywhereAI-RunAnywhereAITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAI-RunAnywhereAITests.release.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAI-RunAnywhereAITests/Pods-RunAnywhereAI-RunAnywhereAITests.release.xcconfig"; sourceTree = "<group>"; };
+		2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = MapleMono.ttf; path = ../assets/fonts/MapleMono.ttf; sourceTree = "<group>"; };
 		5A502ADF42182DE7D087E596 /* Pods-RunAnywhereAI.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAI.debug.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI.debug.xcconfig"; sourceTree = "<group>"; };
 		7B92E6D53088A71A1B54CCAB /* Pods-RunAnywhereAI-RunAnywhereAITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAI-RunAnywhereAITests.debug.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAI-RunAnywhereAITests/Pods-RunAnywhereAI-RunAnywhereAITests.debug.xcconfig"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = RunAnywhereAI/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		8BF95992387943D3A4344FFE /* Figtree.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = Figtree.ttf; path = ../assets/fonts/Figtree.ttf; sourceTree = "<group>"; };
 		9E75FBBD9CE4CFEFC37E3C16 /* libPods-RunAnywhereAI.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RunAnywhereAI.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AABB001122334459 /* RunAnywhereAI-Bridging-Header.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "RunAnywhereAI-Bridging-Header.h"; path = "RunAnywhereAI/RunAnywhereAI-Bridging-Header.h"; sourceTree = "<group>"; };
+		C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Figtree-Italic.ttf"; path = "../assets/fonts/Figtree-Italic.ttf"; sourceTree = "<group>"; };
 		CCDD001122334456 /* DocumentService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = DocumentService.swift; path = RunAnywhereAI/DocumentService.swift; sourceTree = "<group>"; };
 		CCDD001122334458 /* DocumentService.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = DocumentService.m; path = RunAnywhereAI/DocumentService.m; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FF375136ECCEFB06442E8E31 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = RunAnywhereAI/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		8BF95992387943D3A4344FFE /* Figtree.ttf */ = {isa = PBXFileReference; name = "Figtree.ttf"; path = "../assets/fonts/Figtree.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */ = {isa = PBXFileReference; name = "Figtree-Italic.ttf"; path = "../assets/fonts/Figtree-Italic.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */ = {isa = PBXFileReference; name = "MapleMono.ttf"; path = "../assets/fonts/MapleMono.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -123,6 +123,17 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		70589C1467784F73A9BA4885 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				8BF95992387943D3A4344FFE /* Figtree.ttf */,
+				C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */,
+				2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */,
+			);
+			name = Resources;
+			path = "";
+			sourceTree = "<group>";
+		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
 			isa = PBXGroup;
 			children = (
@@ -165,17 +176,6 @@
 			);
 			path = Pods;
 			sourceTree = "<group>";
-		};
-		70589C1467784F73A9BA4885 /* Resources */ = {
-			isa = "PBXGroup";
-			children = (
-				8BF95992387943D3A4344FFE /* Figtree.ttf */,
-				C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */,
-				2F2E57DBB1744F5AA3380581 /* MapleMono.ttf */,
-			);
-			name = Resources;
-			sourceTree = "<group>";
-			path = "";
 		};
 /* End PBXGroup section */
 

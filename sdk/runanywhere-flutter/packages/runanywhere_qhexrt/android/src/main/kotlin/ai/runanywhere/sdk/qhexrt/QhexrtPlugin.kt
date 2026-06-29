@@ -1,5 +1,6 @@
 package ai.runanywhere.sdk.qhexrt
 
+import android.content.Context
 import android.os.Build
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -42,6 +43,30 @@ class QhexrtPlugin : FlutterPlugin, MethodCallHandler {
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel.setMethodCallHandler(this)
+        configureQnnDspLibraryPath(binding.applicationContext)
+    }
+
+    /**
+     * QHexRT (QNN) loads the per-arch Hexagon DSP skel (e.g. libQnnHtpV81Skel.so)
+     * over fastRPC; the DSP only finds it when ADSP_LIBRARY_PATH includes the dir
+     * it ships in. The skel is bundled in the app's native lib dir, so point the
+     * DSP loader there (plus the standard vendor search paths) before any backend
+     * creates a QNN context. Mirrors the Kotlin example app's setup so Flutter
+     * apps need no app-level workaround.
+     */
+    private fun configureQnnDspLibraryPath(context: Context) {
+        runCatching {
+            val nativeLibDir = context.applicationInfo.nativeLibraryDir ?: return
+            val existing = System.getenv("ADSP_LIBRARY_PATH").orEmpty()
+            val path =
+                listOf(nativeLibDir, existing, "/vendor/dsp/cdsp", "/vendor/lib/rfsa/adsp")
+                    .filter { it.isNotBlank() }
+                    .joinToString(";")
+            android.system.Os.setenv("ADSP_LIBRARY_PATH", path, true)
+            android.util.Log.i("QHexRT", "ADSP_LIBRARY_PATH set to $path")
+        }.onFailure {
+            android.util.Log.e("QHexRT", "Failed to set ADSP_LIBRARY_PATH", it)
+        }
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {

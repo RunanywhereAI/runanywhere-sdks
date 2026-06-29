@@ -51,6 +51,15 @@ android {
 
         buildConfigField("String", "RUNANYWHERE_BASE_URL", "\"$runanywhereBaseUrl\"")
         buildConfigField("String", "RUNANYWHERE_API_KEY", "\"$runanywhereApiKey\"")
+
+        // Ship arm64-v8a only: the Qualcomm Hexagon NPU (QHexRT, Hexagon v75/v79/v81)
+        // is arm64-only hardware, and target devices (Snapdragon 8 Gen 3+) are all
+        // arm64. Constraining to one ABI keeps a single consistent native slice (no
+        // stale x86_64/armv7 commons), guarantees the v79+v81 QAIRT skels travel with
+        // it, and roughly halves the APK size.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     buildTypes {

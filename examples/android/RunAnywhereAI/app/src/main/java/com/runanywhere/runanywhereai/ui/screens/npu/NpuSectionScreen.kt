@@ -28,7 +28,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.screens.npu.screens.HomeScreen
 import com.runanywhere.runanywhereai.ui.screens.npu.screens.LlmScreen
-import com.runanywhere.runanywhereai.ui.screens.npu.screens.ModelsScreen
 import com.runanywhere.runanywhereai.ui.screens.npu.screens.SttScreen
 import com.runanywhere.runanywhereai.ui.screens.npu.screens.TtsScreen
 import com.runanywhere.runanywhereai.ui.screens.npu.screens.VlmScreen
@@ -42,7 +41,6 @@ enum class Screen(val title: String) {
     Vlm("Vision"),
     Stt("Speech to Text"),
     Tts("Text to Speech"),
-    Models("Models"),
 }
 
 private val ContentMaxWidth = 640.dp
@@ -93,7 +91,6 @@ fun NpuSectionScreen(onExit: () -> Unit, vm: AppViewModel = viewModel()) {
                             Screen.Vlm -> VlmScreen(modelsVm)
                             Screen.Stt -> SttScreen(modelsVm)
                             Screen.Tts -> TtsScreen(modelsVm)
-                            Screen.Models -> ModelsScreen(modelsVm)
                         }
                     }
                 }

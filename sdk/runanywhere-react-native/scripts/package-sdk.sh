@@ -93,6 +93,16 @@ if [ -n "$NATIVES_FROM" ]; then
             librac_backend_onnx.so librac_backend_onnx_jni.so librac_backend_sherpa.so \
             libonnxruntime.so libsherpa-onnx-c-api.so libsherpa-onnx-cxx-api.so \
             libsherpa-onnx-jni.so libc++_shared.so
+        # QHexRT (Qualcomm Hexagon NPU) is private + arm64-only: the backend .so
+        # plus the QAIRT runtime/skel set (libQnn*) are bundled directly in the
+        # package, not fetched from a public release. They are copied only when
+        # present in --natives-from (otherwise silently skipped by stage_android).
+        stage_android "$RN_ROOT/packages/qhexrt" \
+            librac_backend_qhexrt.so libc++_shared.so \
+            libQnnHtp.so libQnnHtpNetRunExtensions.so libQnnHtpPrepare.so libQnnSystem.so \
+            libQnnHtpV75CalculatorStub.so libQnnHtpV75Skel.so libQnnHtpV75Stub.so \
+            libQnnHtpV79CalculatorStub.so libQnnHtpV79Skel.so libQnnHtpV79Stub.so \
+            libQnnHtpV81CalculatorStub.so libQnnHtpV81Skel.so libQnnHtpV81Stub.so
     fi
 fi
 

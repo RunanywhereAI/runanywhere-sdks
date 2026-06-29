@@ -90,7 +90,6 @@ fun HomeScreen(
                 NavRow("Vision", "Image + prompt (VLM)", Screen.Vlm, onNavigate)
                 NavRow("Speech to Text", "Transcribe audio (Whisper)", Screen.Stt, onNavigate)
                 NavRow("Text to Speech", "Synthesize audio (MeloTTS)", Screen.Tts, onNavigate)
-                NavRow("Models", "Download + manage models", Screen.Models, onNavigate)
             }
         }
     }

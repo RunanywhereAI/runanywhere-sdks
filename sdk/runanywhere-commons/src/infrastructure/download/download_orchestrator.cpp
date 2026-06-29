@@ -42,6 +42,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -73,6 +74,7 @@
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/events/rac_sdk_emit.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
+#include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -85,6 +87,91 @@
 static const char* LOG_TAG = "DownloadOrchestrator";
 
 namespace fs = std::filesystem;
+
+namespace {
+
+// ───────────────────────── disk-space pre-flight helpers ─────────────────────
+// Shared by the planner (pre-flight gate) and the per-file worker (runtime
+// safety net) so a download is refused — with a clear message — before it can
+// fill the device and leave a stuck partial.
+
+// Human-readable size, e.g. "6.2 GB" / "850 MB".
+std::string human_size(int64_t bytes) {
+    char buf[32];
+    if (bytes >= 1000000000LL) {
+        snprintf(buf, sizeof(buf), "%.1f GB", static_cast<double>(bytes) / 1e9);
+    } else {
+        snprintf(buf, sizeof(buf), "%.0f MB", static_cast<double>(bytes) / 1e6);
+    }
+    return std::string(buf);
+}
+
+// Free bytes on the filesystem that will hold `path`. The per-model folder may
+// not exist yet, so walk up to the nearest existing ancestor. Returns -1 when
+// it cannot be determined (e.g. WASM/MEMFS), so callers can skip the gate.
+int64_t filesystem_available_bytes(const std::string& path) {
+    std::error_code ec;
+    fs::path probe(path);
+    while (!probe.empty()) {
+        if (fs::exists(probe, ec)) break;
+        fs::path parent = probe.parent_path();
+        if (parent == probe) break;
+        probe = parent;
+    }
+    if (probe.empty()) return -1;
+    fs::space_info si = fs::space(probe, ec);
+    if (ec) return -1;
+    if (si.available == static_cast<uintmax_t>(-1)) return -1;
+    if (si.available > static_cast<uintmax_t>(INT64_MAX)) return INT64_MAX;
+    return static_cast<int64_t>(si.available);
+}
+
+// Synchronous HTTP HEAD to learn a remote file's Content-Length. Returns the
+// byte length, or -1 when unknown (no transport, non-2xx, or missing header).
+// Used at plan time to size multi-file bundles whose catalog entries carry no
+// per-file size, so the pre-flight storage gate can fire before any bytes land.
+int64_t http_head_content_length(const std::string& url) {
+    if (rac_http_transport_is_registered() != RAC_TRUE) return -1;
+    rac_http_client_t* client = nullptr;
+    if (rac_http_client_create(&client) != RAC_SUCCESS || client == nullptr) return -1;
+    rac_http_request_t req{};
+    req.method = "HEAD";
+    req.url = url.c_str();
+    req.timeout_ms = 15000;
+    req.follow_redirects = RAC_TRUE;
+    rac_http_response_t resp{};
+    int64_t len = -1;
+    rac_result_t rc = rac_http_request_send(client, &req, &resp);
+    if (rc == RAC_SUCCESS && resp.status >= 200 && resp.status < 300 && resp.headers != nullptr) {
+        for (size_t i = 0; i < resp.header_count; ++i) {
+            const char* name = resp.headers[i].name;
+            const char* value = resp.headers[i].value;
+            if (name == nullptr || value == nullptr) continue;
+            static const char* kWant = "content-length";
+            const size_t n = std::strlen(kWant);
+            if (std::strlen(name) != n) continue;
+            bool match = true;
+            for (size_t k = 0; k < n; ++k) {
+                char c = name[k];
+                if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+                if (c != kWant[k]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                long long v = std::strtoll(value, nullptr, 10);
+                if (v > 0) len = static_cast<int64_t>(v);
+                break;
+            }
+        }
+    }
+    rac_http_response_free(&resp);
+    rac_http_client_destroy(client);
+    return len;
+}
+
+}  // namespace
 
 // =============================================================================
 // INTERNAL HELPERS
@@ -1051,6 +1138,38 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
     }
 
     if (!already_complete) {
+        // Runtime free-space safety net. The planner gate runs once up front,
+        // but free space can shrink between planning and this file's turn (other
+        // downloads, the bytes already written by earlier files in this bundle),
+        // and the planner can't size files the server won't HEAD. Refuse before
+        // streaming so we never fill the disk and strand a half-written model.
+        if (file.expected_bytes > 0) {
+            int64_t still_needed =
+                file.expected_bytes - static_cast<int64_t>(file_resume_from);
+            if (still_needed > 0) {
+                int64_t available = filesystem_available_bytes(file.destination_path);
+                const int64_t margin = 32LL * 1024 * 1024;  // 32 MiB headroom
+                if (available >= 0 && available < still_needed + margin) {
+                    std::string error =
+                        "Not enough storage to finish downloading this model: " + file.filename +
+                        " needs about " + human_size(still_needed) + " more but only " +
+                        human_size(available) + " is free. Free up space and try again.";
+                    int64_t partial =
+                        completed_before_file + file_size_or_zero(file.destination_path);
+                    {
+                        std::lock_guard<std::mutex> lock(task->mutex);
+                        task->last_partial_bytes = partial;
+                    }
+                    set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED,
+                                      rav1::DOWNLOAD_STAGE_DOWNLOADING, partial, total_expected,
+                                      static_cast<int32_t>(i), file.storage_key, "", error);
+                    mark_task_stopped(task);
+                    emit_progress(task);
+                    return plan_file_step::STOP;
+                }
+            }
+        }
+
         proto_download_callback_ctx cb_ctx;
         cb_ctx.task = task;
         cb_ctx.file_index = static_cast<int>(i);
@@ -2281,6 +2400,15 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
             any_extraction = any_extraction || requires_extraction;
 
             int64_t expected_bytes = file.has_size_bytes() ? file.size_bytes() : 0;
+            if (expected_bytes <= 0 && !requires_extraction) {
+                // Multi-file NPU/VLM bundles register without per-file sizes.
+                // Probe the server (HEAD → Content-Length) so the pre-flight
+                // storage gate can size the bundle before any bytes land.
+                int64_t probed = http_head_content_length(url);
+                if (probed > 0) {
+                    expected_bytes = probed;
+                }
+            }
             if (expected_bytes > 0) {
                 total_bytes += expected_bytes;
             } else {
@@ -2341,17 +2469,23 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         descriptor.set_url(url);
         descriptor.set_filename(get_filename(url.c_str()));
         descriptor.set_destination_path(destination);
-        if (model.download_size_bytes() > 0) {
-            descriptor.set_size_bytes(model.download_size_bytes());
-        }
-        descriptor.set_is_required(true);
 
         int64_t expected_bytes = model.download_size_bytes();
+        if (expected_bytes <= 0 && needs_extraction == RAC_FALSE) {
+            // Catalog carries no size — probe the server so the pre-flight
+            // storage gate can fire before any bytes land.
+            int64_t probed = http_head_content_length(url);
+            if (probed > 0) {
+                expected_bytes = probed;
+            }
+        }
         if (expected_bytes > 0) {
+            descriptor.set_size_bytes(expected_bytes);
             total_bytes += expected_bytes;
         } else {
             all_sizes_known = false;
         }
+        descriptor.set_is_required(true);
         any_extraction = needs_extraction == RAC_TRUE;
         if (request.verify_checksums() && model_checksum.empty()) {
             result.add_warnings("checksum verification requested but model checksum is missing");
@@ -2379,19 +2513,40 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         }
     }
 
+    // Free space: prefer the value the SDK supplied; otherwise query the
+    // device filesystem directly so the gate works even when the app passes
+    // nothing (the common case for the NPU bundles).
+    int64_t available_bytes = request.available_storage_bytes();
+    if (available_bytes <= 0) {
+        available_bytes = filesystem_available_bytes(model_folder);
+    }
+
+    // Resumable bytes already on disk don't need to be re-downloaded, so they
+    // count toward the space we still have to find.
     int64_t required_bytes = total_bytes;
-    if (required_bytes > 0 && request.required_free_bytes_after_download() > 0) {
-        required_bytes += request.required_free_bytes_after_download();
+    if (required_bytes > 0) {
+        if (resume_from > 0 && resume_from < required_bytes) {
+            required_bytes -= resume_from;
+        }
+        // Headroom so we never fill the disk to the last byte (FS metadata,
+        // extraction temp space, other writers): max(128 MiB, 3% of payload).
+        int64_t margin = std::max<int64_t>(128LL * 1024 * 1024, required_bytes / 33);
+        required_bytes += margin;
+        if (request.required_free_bytes_after_download() > 0) {
+            required_bytes += request.required_free_bytes_after_download();
+        }
     }
 
     if (invalid_existing_bytes) {
         result.set_can_start(false);
         result.set_error_message("existing partial bytes exceed expected byte count");
         result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
-    } else if (request.available_storage_bytes() > 0 && required_bytes > 0 &&
-               required_bytes > request.available_storage_bytes()) {
+    } else if (available_bytes > 0 && required_bytes > 0 && required_bytes > available_bytes) {
         result.set_can_start(false);
-        result.set_error_message("insufficient storage for planned download");
+        result.set_error_message("Not enough storage to download this model: it needs about " +
+                                 human_size(total_bytes) + " but only " +
+                                 human_size(available_bytes) +
+                                 " is free on the device. Free up space and try again.");
         result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE);
     } else {
         result.set_can_start(result.files_size() > 0);

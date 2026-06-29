@@ -309,6 +309,8 @@ var InferenceFramework;
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_UNKNOWN"] = 22] = "INFERENCE_FRAMEWORK_UNKNOWN";
     /** INFERENCE_FRAMEWORK_SHERPA - Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_SHERPA"] = 23] = "INFERENCE_FRAMEWORK_SHERPA";
+    /** INFERENCE_FRAMEWORK_QHEXRT - Qualcomm Hexagon NPU (QHexRT runtime) */
+    InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_QHEXRT"] = 24] = "INFERENCE_FRAMEWORK_QHEXRT";
     InferenceFramework[InferenceFramework["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(InferenceFramework || (exports.InferenceFramework = InferenceFramework = {}));
 function inferenceFrameworkFromJSON(object) {
@@ -376,6 +378,9 @@ function inferenceFrameworkFromJSON(object) {
         case 23:
         case "INFERENCE_FRAMEWORK_SHERPA":
             return InferenceFramework.INFERENCE_FRAMEWORK_SHERPA;
+        case 24:
+        case "INFERENCE_FRAMEWORK_QHEXRT":
+            return InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -426,6 +431,8 @@ function inferenceFrameworkToJSON(object) {
             return "INFERENCE_FRAMEWORK_UNKNOWN";
         case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
             return "INFERENCE_FRAMEWORK_SHERPA";
+        case InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
+            return "INFERENCE_FRAMEWORK_QHEXRT";
         case InferenceFramework.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";

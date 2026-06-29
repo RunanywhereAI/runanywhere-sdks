@@ -28,6 +28,7 @@ def packageNameMap = [
     "core"    : "core",
     "llamacpp": "llamacpp",
     "onnx"    : "onnx",
+    "qhexrt"  : "qhexrt",
 ]
 
 task syncSdkNativeLibs {
@@ -171,11 +172,16 @@ android {
         ]
     }
 
-    // Use AGP's modern native packaging. The SDK Android modules also replace
-    // NDK runtime .so files with 16 KB ELF-aligned copies before merge.
+    // QHexRT (QNN) requires the Hexagon HTP skel .so files (libQnnHtpV*Skel.so)
+    // to exist as real files on disk: FastRPC fopen()s them to offload to the
+    // cDSP. With modern packaging (extractNativeLibs=false) the skels are
+    // page-mapped from the APK with no on-disk file, so the DSP load fails with
+    // "cannot open libQnnHtpV81Skel.so, errno 2" and model load fails. Legacy
+    // packaging extracts them to nativeLibraryDir, matching the working Kotlin
+    // app. The .so set is already 16 KB-aligned, so 16 KB-page devices are fine.
     packaging {
         jniLibs {
-            useLegacyPackaging = false
+            useLegacyPackaging = true
         }
     }
 }

@@ -53,7 +53,7 @@ const SttScreen: React.FC<Props> = ({ navigation }) => {
     setError(null);
     setTranscript('');
     try {
-      const result = await RunAnywhere.transcribe(silentWav(), { language: 'en' });
+      const result = await RunAnywhere.transcribe(silentWav());
       setTranscript(result?.text || '(no speech detected)');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

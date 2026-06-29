@@ -1,35 +1,42 @@
 /**
- * Models - the NPU (QHexRT) catalog. Each entry is a Google-Drive-hosted ZIP
- * bundle; Download registers it as a ZIP archive and the SDK downloads +
- * extracts it into the standard model dir, then loads it like any other model.
+ * Models — the NPU (QHexRT) catalog of public HuggingFace multi-file bundles.
+ *
+ * Rows are filtered to the Hexagon architecture probed on the device (a v81
+ * phone only sees v81 bundles), then grouped by modality. Download registers a
+ * multi-file model with the QHexRT framework and streams the bundle; Load pulls
+ * it into memory for the matching modality screen.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { NpuStackParamList } from '../navTypes';
-import { useAppColors, Space, Radius } from '../theme';
-import { Screen, PrimaryButton, StatusPill } from '../widgets';
-import { NPU_MODELS, driveZipUrl, type NpuModel } from '../npuCatalog';
-import { RunAnywhere } from '@runanywhere/core';
+import { useAppColors, Space } from '../theme';
+import { Screen, PrimaryButton, StatusPill, SectionCard } from '../widgets';
 import {
-  ArchiveType,
-  ArchiveStructure,
-  ModelCategory,
-  ModelLoadRequest,
-} from '@runanywhere/proto-ts/model_types';
+  NPU_MODELS,
+  modalityCategory,
+  modalityLabel,
+  type NpuModel,
+  type NpuModality,
+} from '../npuCatalog';
+import { RunAnywhere } from '@runanywhere/core';
+import { InferenceFramework, ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
+import {
+  QHexRT,
+  hexagonArchName,
+  HexagonArch,
+  UNKNOWN_NPU_INFO,
+  type NpuInfo,
+} from '@runanywhere/qhexrt';
 
 type Props = NativeStackScreenProps<NpuStackParamList, 'Models'>;
 
-// QHexRT framework wire value (proto INFERENCE_FRAMEWORK_QHEXRT = 24); passed
-// numerically because @runanywhere/proto-ts is not yet regenerated with it.
-const FRAMEWORK_QHEXRT = 24;
-
-const modalityCategory = (m: NpuModel): ModelCategory =>
-  m.modality === 'vlm' ? ModelCategory.MODEL_CATEGORY_MULTIMODAL : ModelCategory.MODEL_CATEGORY_LANGUAGE;
+const MODALITY_ORDER: NpuModality[] = ['llm', 'vlm', 'stt', 'tts'];
 
 const ModelsScreen: React.FC<Props> = ({ navigation }) => {
   const c = useAppColors();
+  const [npu, setNpu] = useState<NpuInfo>(UNKNOWN_NPU_INFO);
   const [downloaded, setDownloaded] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +44,11 @@ const ModelsScreen: React.FC<Props> = ({ navigation }) => {
   const refresh = useCallback(async () => {
     try {
       const res = await RunAnywhere.listModels();
-      const list = (res?.models?.models ?? []) as Array<{ id: string; isDownloaded?: boolean; localPath?: string }>;
+      const list = (res?.models?.models ?? []) as Array<{
+        id: string;
+        isDownloaded?: boolean;
+        localPath?: string;
+      }>;
       setDownloaded(new Set(list.filter((m) => m.isDownloaded || m.localPath).map((m) => m.id)));
     } catch {
       /* registry unreachable — rows render as not-downloaded */
@@ -45,33 +56,34 @@ const ModelsScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
+    let alive = true;
+    (async () => {
+      const probed = await QHexRT.probeNpu();
+      if (!alive) return;
+      setNpu(probed);
+    })();
     refresh();
+    return () => {
+      alive = false;
+    };
   }, [refresh]);
 
   const act = async (m: NpuModel) => {
-    if (!m.driveId) {
-      setError(`${m.name}: download link not configured yet.`);
-      return;
-    }
     setBusyId(m.id);
     setError(null);
     try {
       if (!downloaded.has(m.id)) {
-        await RunAnywhere.registerArchiveModel({
+        const info = await RunAnywhere.registerMultiFileModel({
           id: m.id,
           name: m.name,
-          url: driveZipUrl(m.driveId),
-          framework: FRAMEWORK_QHEXRT,
-          modality: modalityCategory(m),
-          archiveType: ArchiveType.ARCHIVE_TYPE_ZIP,
-          structure: ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED,
+          files: m.files.map((f) => ({ url: f.url, filename: f.filename, isRequired: true })),
+          framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+          modality: modalityCategory(m.modality),
         });
-        const dl = RunAnywhere.downloadModel(m.id)[Symbol.asyncIterator]();
-        let r = await dl.next();
-        while (!r.done) r = await dl.next();
+        await RunAnywhere.downloadModel(info);
       }
       await RunAnywhere.loadModel(
-        ModelLoadRequest.fromPartial({ modelId: m.id, category: modalityCategory(m) })
+        ModelLoadRequest.fromPartial({ modelId: m.id, category: modalityCategory(m.modality) })
       );
       await refresh();
     } catch (e) {
@@ -81,41 +93,58 @@ const ModelsScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  // Arch filtering: a QHexRT bundle is compiled for an exact Hexagon arch, so
+  // only show bundles that match the probed device. When the probe is unknown
+  // (non-Snapdragon / unsupported), show everything so the catalog is still
+  // browsable.
+  const archName = hexagonArchName(npu.hexagonArch);
+  const archKnown = npu.hexagonArch !== HexagonArch.Unknown;
+  const visible = archKnown ? NPU_MODELS.filter((m) => m.arch === archName) : NPU_MODELS;
+
   return (
     <Screen title="NPU Models" onBack={() => navigation.goBack()}>
       <Text style={[styles.count, { color: c.onSurfaceVariant }]}>
-        {NPU_MODELS.length} NPU bundles
+        {visible.length} bundles{archKnown ? ` for Hexagon ${archName}` : ' (all architectures)'}
       </Text>
 
       {error ? <Text style={[styles.error, { color: c.error }]}>{error}</Text> : null}
 
-      {NPU_MODELS.map((m) => {
-        const have = downloaded.has(m.id);
-        const pending = !m.driveId;
+      {MODALITY_ORDER.map((modality) => {
+        const rows = visible.filter((m) => m.modality === modality);
+        if (rows.length === 0) return null;
         return (
-          <View key={m.id} style={[styles.row, { backgroundColor: c.surface, borderColor: c.outline }]}>
-            <View style={{ flex: 1, paddingRight: Space.md }}>
-              <Text style={[styles.name, { color: c.onSurface }]} numberOfLines={1}>
-                {m.name}
-              </Text>
-              <Text style={[styles.detail, { color: c.onSurfaceVariant }]} numberOfLines={1}>
-                {m.detail}
-              </Text>
-              <View style={{ height: 6 }} />
-              <StatusPill
-                label={have ? 'Downloaded' : pending ? 'Link pending' : m.modality.toUpperCase()}
-                tone={have ? 'ok' : pending ? 'warn' : 'neutral'}
-              />
-            </View>
-            <View style={{ width: 130 }}>
-              <PrimaryButton
-                label={have ? 'Load' : 'Download'}
-                onPress={() => act(m)}
-                busy={busyId === m.id}
-                disabled={pending}
-              />
-            </View>
-          </View>
+          <SectionCard key={modality} title={modalityLabel(modality)}>
+            {rows.map((m) => {
+              const have = downloaded.has(m.id);
+              return (
+                <View
+                  key={m.id}
+                  style={[styles.row, { borderColor: c.outline }]}
+                >
+                  <View style={{ flex: 1, paddingRight: Space.md }}>
+                    <Text style={[styles.name, { color: c.onSurface }]} numberOfLines={1}>
+                      {m.name}
+                    </Text>
+                    <Text style={[styles.detail, { color: c.onSurfaceVariant }]} numberOfLines={1}>
+                      {m.detail}
+                    </Text>
+                    <View style={{ height: 6 }} />
+                    <StatusPill
+                      label={have ? 'Downloaded' : m.modality.toUpperCase()}
+                      tone={have ? 'ok' : 'neutral'}
+                    />
+                  </View>
+                  <View style={{ width: 130 }}>
+                    <PrimaryButton
+                      label={have ? 'Load' : 'Download'}
+                      onPress={() => act(m)}
+                      busy={busyId === m.id}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </SectionCard>
         );
       })}
     </Screen>
@@ -128,10 +157,8 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    padding: Space.lg,
-    marginBottom: Space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: Space.md,
   },
   name: { fontSize: 15, fontWeight: '700' },
   detail: { fontSize: 12, marginTop: 2 },

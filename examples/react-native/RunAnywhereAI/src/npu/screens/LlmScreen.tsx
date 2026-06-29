@@ -9,6 +9,7 @@ import { NpuStackParamList } from '../navTypes';
 import { useAppColors, Space } from '../theme';
 import { Screen, SectionCard, Field, PrimaryButton, MetricStrip } from '../widgets';
 import { RunAnywhere } from '@runanywhere/core';
+import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 
 type Props = NativeStackScreenProps<NpuStackParamList, 'Llm'>;
 
@@ -28,7 +29,10 @@ const LlmScreen: React.FC<Props> = ({ navigation }) => {
     setTps('—');
     setTtft('—');
     try {
-      const events = RunAnywhere.generateStream(prompt, { maxTokens: 256, temperature: 0.7 });
+      const events = RunAnywhere.generateStream(
+        prompt,
+        LLMGenerationOptions.fromPartial({ maxTokens: 256, temperature: 0.7 })
+      );
       const result = await RunAnywhere.aggregateStream(prompt, events, async (transcript: string) => {
         setOutput(transcript);
       });
