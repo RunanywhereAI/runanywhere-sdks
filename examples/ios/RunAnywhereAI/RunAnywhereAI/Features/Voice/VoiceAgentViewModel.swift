@@ -561,6 +561,37 @@ final class VoiceAgentViewModel: ObservableObject {
         case let .error(err):
             logger.error("Voice agent error: \(err.message)")
             errorMessage = err.message
+            sessionState = .error(err.message)
+            currentStatus = "Error"
+
+        case let .sessionError(err):
+            logger.error("Voice session error: \(err.message)")
+            errorMessage = err.message
+            if !err.recoverable {
+                sessionState = .error(err.message)
+                currentStatus = "Error"
+            }
+
+        case .sessionStopped:
+            sessionState = .disconnected
+            currentStatus = "Ready"
+            audioLevel = 0
+            isSpeechDetected = false
+
+        case .sessionStarted:
+            sessionState = .listening
+            currentStatus = "Listening..."
+
+        case .agentResponseStarted:
+            assistantResponse = ""
+            currentTranscript = ""
+
+        case .agentResponseCompleted:
+            sessionState = .listening
+            currentStatus = "Listening..."
+
+        case let .audioLevel(level):
+            audioLevel = min(max(level.rms, 0), 1)
 
         case .wakewordDetected:
             sessionState = .listening
@@ -568,15 +599,9 @@ final class VoiceAgentViewModel: ObservableObject {
             isSpeechDetected = false
 
         case .interrupted, .metrics, .none:
-            // No UX-visible effect for these arms today.
             break
 
-        // The regenerated RAVoiceEvent payload added new arms; we do not
-        // surface them in the UI yet, so they are intentionally folded into
-        // the same no-op bucket as .interrupted / .metrics.
-        case .componentStateChanged, .sessionError, .sessionStarted,
-             .sessionStopped, .agentResponseStarted, .agentResponseCompleted,
-             .speechTurnDetection, .turnLifecycle:
+        case .componentStateChanged, .speechTurnDetection, .turnLifecycle:
             break
         default:
             break

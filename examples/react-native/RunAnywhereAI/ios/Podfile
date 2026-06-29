@@ -88,12 +88,24 @@ target 'RunAnywhereAI' do
       project.save
     end
 
-    # Fix Xcode 16 sandbox issue for script phases
+    # Fix Xcode 16 sandbox issue for script phases.
+    #
+    # IMPORTANT: do NOT mark "[CP] Copy XCFrameworks" phases as always-out-of-date.
+    # On Xcode 26, always_out_of_date = "1" makes the build system IGNORE a phase's
+    # output file list for dependency analysis. The Copy XCFrameworks phase is what
+    # stages the vendored static libraries (librac_commons.a, librac_backend_*.a)
+    # into ${PODS_XCFRAMEWORKS_BUILD_DIR}; the app link step consumes them via
+    # `-force_load`/`-l`. If that phase's outputs are untracked, the linker has no
+    # declared producer for those .a files and the build fails with:
+    #   "Build input file cannot be found:
+    #    .../XCFrameworkIntermediates/RunAnywhereCore/librac_commons.a.
+    #    Did you forget to declare this file as an output of a script phase ...?"
+    # Keep dependency analysis on those copy phases so the link is correctly ordered.
     installer.pods_project.targets.each do |target|
       target.build_phases.each do |phase|
-        if phase.is_a?(Xcodeproj::Project::Object::PBXShellScriptBuildPhase)
-          phase.always_out_of_date = "1"
-        end
+        next unless phase.is_a?(Xcodeproj::Project::Object::PBXShellScriptBuildPhase)
+        next if phase.respond_to?(:name) && phase.name.to_s.include?('Copy XCFrameworks')
+        phase.always_out_of_date = "1"
       end
     end
 
@@ -150,6 +162,53 @@ target 'RunAnywhereAI' do
           cxxflags << '-DFMT_USE_CONSTEVAL=0'
         end
         config.build_settings['OTHER_CPLUSPLUSFLAGS'] = cxxflags
+      end
+    end
+
+    # Xcode 26 + CocoaPods 1.14.3: for *static-library* xcframeworks (the
+    # RunAnywhere RACommons / RABackend* binaries ship a `lib*.a`, not a
+    # `.framework` bundle), CocoaPods writes an INCORRECT "[CP] Copy XCFrameworks"
+    # output file list — it declares "<XCFrameworkName>.framework" instead of the
+    # real "lib*.a" that the copy script actually stages. Xcode 26's stricter
+    # build graph then fails the app link step with
+    #   "Build input file cannot be found: .../XCFrameworkIntermediates/<Target>/librac_commons.a.
+    #    Did you forget to declare this file as an output of a script phase ...?"
+    # because the `-force_load .../librac_commons.a` (and `-l"rac_*"`) inputs have
+    # no declared producer. Rewrite each output xcfilelist to point at the actual
+    # static library, derived generically from the xcframework's Info.plist
+    # (LibraryPath). Framework-type xcframeworks are left unchanged.
+    pods_root = installer.sandbox.root.to_s
+    Dir.glob(File.join(pods_root, 'Target Support Files', '*', '*-xcframeworks-output-files.xcfilelist')).each do |output_list|
+      dir = File.dirname(output_list)
+      target_name = File.basename(dir)
+      input_list = File.join(dir, "#{target_name}-xcframeworks-input-files.xcfilelist")
+      next unless File.exist?(input_list)
+
+      xcframework_lines = File.readlines(input_list).map(&:strip).select { |l| l.end_with?('.xcframework') }
+      next if xcframework_lines.empty?
+
+      new_lines = []
+      xcframework_lines.each do |raw|
+        resolved = raw.gsub('${PODS_ROOT}', pods_root).gsub('$(PODS_ROOT)', pods_root)
+        info_plist = File.join(resolved, 'Info.plist')
+        next unless File.exist?(info_plist)
+
+        plist = Xcodeproj::Plist.read_from_path(info_plist)
+        library_path = (plist['AvailableLibraries'] || [])
+                         .map { |slice| slice['LibraryPath'] }
+                         .compact
+                         .first
+        next unless library_path
+
+        new_lines << "${PODS_XCFRAMEWORKS_BUILD_DIR}/#{target_name}/#{library_path}"
+      end
+
+      next if new_lines.empty?
+
+      desired = new_lines.join("\n") + "\n"
+      if File.read(output_list) != desired
+        File.write(output_list, desired)
+        Pod::UI.puts "[RunAnywhere] Fixed XCFramework output file list for #{target_name}".green
       end
     end
   end

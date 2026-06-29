@@ -294,6 +294,17 @@ using VoiceAgentProcessTurnProtoFn = rac_result_t (*)(
     const void*,
     size_t,
     rac_proto_buffer_t*);
+// Streaming feed-audio ingress (rac_voice_agent_feed_audio_proto): raw frames
+// in, serialized VoiceAgentResult out (empty until the core closes a turn).
+using VoiceAgentFeedAudioProtoFn = rac_result_t (*)(
+    void*,
+    const void*,
+    size_t,
+    int32_t,
+    int32_t,
+    int32_t,
+    rac_bool_t,
+    rac_proto_buffer_t*);
 
 // D-7 helper-level proto wrappers for the voice-agent sub-components.
 using VoiceAgentTranscribeProtoFn = rac_result_t (*)(
