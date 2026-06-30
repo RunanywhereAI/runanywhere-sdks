@@ -159,13 +159,32 @@ std::string read_tokenizer_pre(const fs::path& manifest) {
     return content.substr(q1 + 1, q2 - q1 - 1);
 }
 
-// Resolve the model reference (a bundle dir or a manifest file) to a manifest
-// path, preferring the subdirectory matching `arch` (e.g. "v79").
+std::string find_manifest_near_file(const fs::path& file, const char* arch) {
+    fs::path dir = file.parent_path();
+    if (dir.empty()) {
+        return {};
+    }
+    if (arch != nullptr && arch[0] != '\0' && dir.filename() != arch) {
+        std::string m = find_manifest_in_dir(dir / arch);
+        if (!m.empty()) {
+            return m;
+        }
+    }
+    return find_manifest_in_dir(dir);
+}
+
+// Resolve the model reference (a bundle dir, a manifest file, or any file inside
+// a downloaded bundle) to a manifest path, preferring the subdirectory matching
+// `arch` (e.g. "v79"). Commons can preserve the last downloaded file as
+// local_path; do not treat arbitrary .bin files as manifests.
 std::string resolve_manifest(const char* path, const char* arch) {
     std::error_code ec;
     fs::path p(path);
     if (fs::is_regular_file(p, ec)) {
-        return p.generic_string();  // a manifest file was passed directly
+        if (ends_with_ci(p.filename().generic_string(), ".json") && looks_like_manifest(p)) {
+            return p.generic_string();  // a manifest file was passed directly
+        }
+        return find_manifest_near_file(p, arch);
     }
     if (!fs::is_directory(p, ec)) {
         return {};

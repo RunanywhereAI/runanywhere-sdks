@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.npu.qhexrt
 
+import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.coroutines.sync.Mutex
@@ -130,7 +131,35 @@ internal fun QHexRT.registerNative(): Int {
         logger.error("Failed to load QHexRT native library")
         throw UnsatisfiedLinkError("Failed to load QHexRT native library")
     }
+    configureAdspLibraryPath()
     return QHexRTBridge.nativeRegister()
+}
+
+/**
+ * QNN loads Hexagon DSP skels (e.g. libQnnHtpV81Skel.so) over FastRPC. The skels
+ * ship in the app's nativeLibraryDir; [libcdsprpc.so] must be visible to the
+ * stub (declare `<uses-native-library android:name="libcdsprpc.so" />` in the
+ * app manifest). Point ADSP_LIBRARY_PATH at the native lib dir before any QNN
+ * context is created.
+ */
+private fun configureAdspLibraryPath() {
+    if (!AndroidPlatformContext.isInitialized()) {
+        logger.warning("AndroidPlatformContext not initialized — skipping ADSP_LIBRARY_PATH")
+        return
+    }
+    runCatching {
+        val nativeLibDir = AndroidPlatformContext.applicationContext.applicationInfo.nativeLibraryDir
+            ?: return
+        val existing = System.getenv("ADSP_LIBRARY_PATH").orEmpty()
+        val path =
+            listOf(nativeLibDir, existing, "/vendor/dsp/cdsp", "/vendor/lib/rfsa/adsp")
+                .filter { it.isNotBlank() }
+                .joinToString(";")
+        android.system.Os.setenv("ADSP_LIBRARY_PATH", path, true)
+        logger.info("ADSP_LIBRARY_PATH set to $path")
+    }.onFailure { e ->
+        logger.error("Failed to set ADSP_LIBRARY_PATH: ${e.message}", throwable = e)
+    }
 }
 
 internal fun QHexRT.unregisterNative(): Int = QHexRTBridge.nativeUnregister()
