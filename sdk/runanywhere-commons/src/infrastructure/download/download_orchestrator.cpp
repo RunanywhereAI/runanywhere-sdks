@@ -1011,7 +1011,15 @@ struct proto_download_callback_ctx {
     int64_t total_expected = 0;
     std::string storage_key;
     std::string destination_path;
+    std::chrono::steady_clock::time_point last_emit{};
 };
+
+// Emit at most ~8 progress events/sec. The HTTP adapter delivers a callback per
+// ~8 KiB chunk; serializing + marshalling a proto across the JNI/FFI boundary on
+// every chunk dominates CPU on multi-GB bundles and throttles real throughput.
+// last_partial_bytes is still recorded every chunk (cheap, needed for resume);
+// only the emission is coalesced. The per-file finalize emits the completion event.
+constexpr auto kProgressEmitInterval = std::chrono::milliseconds(120);
 
 rac_bool_t proto_http_progress(uint64_t bytes_written, uint64_t total_bytes, void* user_data) {
     auto* ctx = static_cast<proto_download_callback_ctx*>(user_data);
@@ -1045,6 +1053,13 @@ rac_bool_t proto_http_progress(uint64_t bytes_written, uint64_t total_bytes, voi
         overall_override = static_cast<float>(
             (static_cast<double>(ctx->file_index) + file_fraction) / static_cast<double>(num_files));
     }
+    const auto now = std::chrono::steady_clock::now();
+    if (ctx->last_emit.time_since_epoch().count() != 0 &&
+        now - ctx->last_emit < kProgressEmitInterval) {
+        return RAC_TRUE;
+    }
+    ctx->last_emit = now;
+
     set_task_progress(ctx->task, rav1::DOWNLOAD_STATE_DOWNLOADING, rav1::DOWNLOAD_STAGE_DOWNLOADING,
                       downloaded, total, ctx->file_index, ctx->storage_key, "", "", overall_override);
     emit_progress(ctx->task);

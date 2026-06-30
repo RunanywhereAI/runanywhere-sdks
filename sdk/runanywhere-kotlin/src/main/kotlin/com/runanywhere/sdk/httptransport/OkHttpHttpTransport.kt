@@ -65,7 +65,7 @@ object OkHttpHttpTransport {
     private val logger = SDKLogger("OkHttpHttpTransport")
 
     /** Chunk size used for streaming body delivery (32 KB matches Okio's default). */
-    private const val STREAM_CHUNK_SIZE = 32 * 1024
+    private const val STREAM_CHUNK_SIZE = 256 * 1024
 
     /**
      * Default OkHttp client backing the buffered `request_send` path.
