@@ -373,6 +373,9 @@ struct proto_download_task {
     std::string model_folder_path;
     std::string resume_token;
     std::vector<proto_plan_file> files;
+    std::vector<int64_t> parallel_file_bytes;
+    std::vector<int64_t> parallel_file_totals;
+    std::vector<bool> parallel_file_done;
     rav1::DownloadProgress progress;
     std::atomic<bool> cancel_requested{false};
     bool running = false;
@@ -1011,15 +1014,90 @@ struct proto_download_callback_ctx {
     int64_t total_expected = 0;
     std::string storage_key;
     std::string destination_path;
+    bool aggregate_parallel_files = false;
+    std::atomic<bool>* abort_requested = nullptr;
 };
+
+struct parallel_progress_snapshot {
+    int64_t bytes_downloaded = 0;
+    int64_t total_bytes = 0;
+    float overall_override = -1.0f;
+};
+
+parallel_progress_snapshot update_parallel_progress(
+    const std::shared_ptr<proto_download_task>& task, size_t file_index, int64_t bytes_written,
+    int64_t total_bytes, int64_t total_expected, bool mark_done) {
+    parallel_progress_snapshot snapshot;
+    if (!task) {
+        return snapshot;
+    }
+
+    std::lock_guard<std::mutex> lock(task->mutex);
+    const size_t file_count = task->files.size();
+    if (task->parallel_file_bytes.size() != file_count) {
+        task->parallel_file_bytes.assign(file_count, 0);
+    }
+    if (task->parallel_file_totals.size() != file_count) {
+        task->parallel_file_totals.assign(file_count, 0);
+    }
+    if (task->parallel_file_done.size() != file_count) {
+        task->parallel_file_done.assign(file_count, false);
+    }
+    if (file_index < file_count) {
+        task->parallel_file_bytes[file_index] = std::max<int64_t>(bytes_written, 0);
+        if (total_bytes > 0) {
+            task->parallel_file_totals[file_index] = total_bytes;
+        } else if (task->files[file_index].expected_bytes > 0) {
+            task->parallel_file_totals[file_index] = task->files[file_index].expected_bytes;
+        }
+        if (mark_done) {
+            task->parallel_file_done[file_index] = true;
+        }
+    }
+
+    double file_fraction_sum = 0.0;
+    int64_t known_total_sum = 0;
+    for (size_t i = 0; i < file_count; ++i) {
+        snapshot.bytes_downloaded += std::max<int64_t>(task->parallel_file_bytes[i], 0);
+        known_total_sum += std::max<int64_t>(task->parallel_file_totals[i], 0);
+        if (task->parallel_file_done[i]) {
+            file_fraction_sum += 1.0;
+        } else if (task->parallel_file_totals[i] > 0) {
+            file_fraction_sum += std::min(
+                1.0, static_cast<double>(std::max<int64_t>(task->parallel_file_bytes[i], 0)) /
+                         static_cast<double>(task->parallel_file_totals[i]));
+        }
+    }
+    snapshot.total_bytes = total_expected > 0 ? total_expected : known_total_sum;
+    if (total_expected <= 0 && file_count > 0) {
+        snapshot.overall_override =
+            static_cast<float>(std::min(1.0, file_fraction_sum / static_cast<double>(file_count)));
+    }
+    task->last_partial_bytes = snapshot.bytes_downloaded;
+    return snapshot;
+}
 
 rac_bool_t proto_http_progress(uint64_t bytes_written, uint64_t total_bytes, void* user_data) {
     auto* ctx = static_cast<proto_download_callback_ctx*>(user_data);
     if (!ctx || !ctx->task) {
         return RAC_TRUE;
     }
-    if (ctx->task->cancel_requested.load()) {
+    if (ctx->task->cancel_requested.load() ||
+        (ctx->abort_requested && ctx->abort_requested->load())) {
         return RAC_FALSE;
+    }
+
+    if (ctx->aggregate_parallel_files) {
+        parallel_progress_snapshot snapshot = update_parallel_progress(
+            ctx->task, static_cast<size_t>(std::max(ctx->file_index, 0)),
+            static_cast<int64_t>(bytes_written), static_cast<int64_t>(total_bytes),
+            ctx->total_expected, false);
+        set_task_progress(ctx->task, rav1::DOWNLOAD_STATE_DOWNLOADING,
+                          rav1::DOWNLOAD_STAGE_DOWNLOADING, snapshot.bytes_downloaded,
+                          snapshot.total_bytes, ctx->file_index, ctx->storage_key, "", "",
+                          snapshot.overall_override);
+        emit_progress(ctx->task);
+        return RAC_TRUE;
     }
 
     int64_t total = ctx->total_expected > 0
@@ -1388,6 +1466,214 @@ void self_heal_registry(const std::shared_ptr<proto_download_task>& task,
     }
 }
 
+bool can_download_files_in_parallel(const std::shared_ptr<proto_download_task>& task,
+                                    int64_t resume_from) {
+    if (!task || task->files.size() <= 1 || resume_from > 0) {
+        return false;
+    }
+    for (const auto& file : task->files) {
+        if (file.requires_extraction) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool run_parallel_direct_download_worker(const std::shared_ptr<proto_download_task>& task,
+                                         int64_t total_expected, int64_t resume_from) {
+    if (!task || !can_download_files_in_parallel(task, resume_from)) {
+        return false;
+    }
+
+    constexpr size_t kMaxParallelFiles = 3;
+    const size_t file_count = task->files.size();
+    {
+        std::lock_guard<std::mutex> lock(task->mutex);
+        task->parallel_file_bytes.assign(file_count, 0);
+        task->parallel_file_totals.assign(file_count, 0);
+        task->parallel_file_done.assign(file_count, false);
+        for (size_t i = 0; i < file_count; ++i) {
+            if (task->files[i].expected_bytes > 0) {
+                task->parallel_file_totals[i] = task->files[i].expected_bytes;
+            }
+        }
+    }
+
+    RAC_LOG_INFO(LOG_TAG, "Downloading %zu files for model %s with parallelism=%zu", file_count,
+                 task->model_id.c_str(), std::min(kMaxParallelFiles, file_count));
+
+    std::atomic<size_t> next_index{0};
+    std::atomic<bool> abort_requested{false};
+    std::atomic<bool> saw_failure{false};
+    std::mutex result_mutex;
+    size_t terminal_index = 0;
+    std::string terminal_error;
+    bool terminal_cancelled = false;
+
+    auto record_terminal = [&](size_t index, bool cancelled, const std::string& error) {
+        bool expected = false;
+        if (!saw_failure.compare_exchange_strong(expected, true)) {
+            return;
+        }
+        {
+            std::lock_guard<std::mutex> lock(result_mutex);
+            terminal_index = index;
+            terminal_cancelled = cancelled;
+            terminal_error = error;
+        }
+        abort_requested.store(true);
+    };
+
+    auto worker = [&]() {
+        while (!abort_requested.load() && !task->cancel_requested.load()) {
+            size_t i = next_index.fetch_add(1);
+            if (i >= file_count) {
+                return;
+            }
+            const proto_plan_file file = task->files[i];
+
+            {
+                fs::path dest_path(file.destination_path);
+                if (dest_path.has_parent_path())
+                    mkdir_p(dest_path.parent_path().string().c_str());
+            }
+
+            const bool already_complete =
+                file.expected_bytes > 0 &&
+                file_size_or_zero(file.destination_path) == file.expected_bytes;
+            if (already_complete) {
+                update_parallel_progress(task, i, file.expected_bytes, file.expected_bytes,
+                                         total_expected, true);
+                continue;
+            }
+
+            if (file.expected_bytes > 0) {
+                int64_t available = filesystem_available_bytes(file.destination_path);
+                const int64_t margin = 32LL * 1024 * 1024;  // 32 MiB headroom
+                if (available >= 0 && available < file.expected_bytes + margin) {
+                    record_terminal(
+                        i, false,
+                        "Not enough storage to finish downloading this model: " + file.filename +
+                            " needs about " + human_size(file.expected_bytes) + " but only " +
+                            human_size(available) + " is free. Free up space and try again.");
+                    return;
+                }
+            }
+
+            proto_download_callback_ctx cb_ctx;
+            cb_ctx.task = task;
+            cb_ctx.file_index = static_cast<int>(i);
+            cb_ctx.total_expected = total_expected;
+            cb_ctx.storage_key = file.storage_key;
+            cb_ctx.destination_path = file.destination_path;
+            cb_ctx.aggregate_parallel_files = true;
+            cb_ctx.abort_requested = &abort_requested;
+
+            rac_http_download_request_t req{};
+            req.url = file.url.c_str();
+            req.destination_path = file.destination_path.c_str();
+            req.timeout_ms = 0;
+            req.follow_redirects = RAC_TRUE;
+            req.resume_from_byte = 0;
+            req.expected_sha256_hex =
+                file.checksum_sha256.empty() ? nullptr : file.checksum_sha256.c_str();
+
+            int32_t http_status = 0;
+            rac_http_download_status_t status =
+                rac::http::execute_stream(req, proto_http_progress, &cb_ctx, &http_status);
+
+            if (task->cancel_requested.load() || status == RAC_HTTP_DL_CANCELLED) {
+                int64_t deleted = 0;
+                bool delete_partial = false;
+                {
+                    std::lock_guard<std::mutex> lock(task->mutex);
+                    delete_partial = task->delete_partial_on_cancel;
+                }
+                if (delete_partial) {
+                    deleted = delete_partial_file(file.destination_path);
+                }
+                {
+                    std::lock_guard<std::mutex> lock(task->mutex);
+                    task->last_deleted_bytes += deleted;
+                }
+                record_terminal(i, true, "download cancelled");
+                return;
+            }
+
+            if (status != RAC_HTTP_DL_OK) {
+                record_terminal(i, false, http_status_message(status, http_status));
+                return;
+            }
+
+            const int64_t final_size = file_size_or_zero(file.destination_path);
+            update_parallel_progress(task, i, final_size,
+                                     file.expected_bytes > 0 ? file.expected_bytes : final_size,
+                                     total_expected, true);
+        }
+    };
+
+    std::vector<std::thread> workers;
+    workers.reserve(std::min(kMaxParallelFiles, file_count));
+    for (size_t i = 0; i < std::min(kMaxParallelFiles, file_count); ++i) {
+        workers.emplace_back(worker);
+    }
+    for (auto& thread : workers) {
+        if (thread.joinable()) {
+            thread.join();
+        }
+    }
+
+    parallel_progress_snapshot snapshot =
+        update_parallel_progress(task, file_count - 1, task->parallel_file_bytes[file_count - 1],
+                                 task->parallel_file_totals[file_count - 1], total_expected, false);
+
+    if (saw_failure.load()) {
+        std::lock_guard<std::mutex> lock(result_mutex);
+        const rav1::DownloadState state =
+            terminal_cancelled ? rav1::DOWNLOAD_STATE_CANCELLED : rav1::DOWNLOAD_STATE_FAILED;
+        set_task_progress(task, state, rav1::DOWNLOAD_STAGE_DOWNLOADING, snapshot.bytes_downloaded,
+                          snapshot.total_bytes, static_cast<int32_t>(terminal_index),
+                          terminal_index < task->files.size() ? task->files[terminal_index].storage_key
+                                                              : "",
+                          "", terminal_error);
+        mark_task_stopped(task);
+        emit_progress(task);
+        return true;
+    }
+
+    if (task->cancel_requested.load()) {
+        set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          snapshot.bytes_downloaded, snapshot.total_bytes, 0, "", "",
+                          "download cancelled");
+        mark_task_stopped(task);
+        emit_progress(task);
+        return true;
+    }
+
+    size_t failing_index = 0;
+    std::string sanity_error;
+    if (!validate_downloaded_sizes(task, failing_index, sanity_error)) {
+        set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          snapshot.bytes_downloaded, snapshot.total_bytes,
+                          static_cast<int32_t>(failing_index), task->files[failing_index].storage_key,
+                          "", sanity_error);
+        mark_task_stopped(task);
+        emit_progress(task);
+        return true;
+    }
+
+    const int64_t completed_bytes = total_expected > 0 ? total_expected : snapshot.bytes_downloaded;
+    std::string completion_local_path =
+        resolve_completion_local_path(task, task->files.back().destination_path);
+    set_task_progress(task, rav1::DOWNLOAD_STATE_COMPLETED, rav1::DOWNLOAD_STAGE_COMPLETED,
+                      completed_bytes, total_expected, static_cast<int32_t>(task->files.size() - 1),
+                      task->files.back().storage_key, completion_local_path, "");
+    mark_task_stopped(task);
+    emit_progress(task);
+    self_heal_registry(task, completion_local_path);
+    return true;
+}
+
 void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
                                int64_t resume_from) {
     if (!task) {
@@ -1411,6 +1697,10 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
     }
 
     const int64_t total_expected = plan_total_expected(task->files);
+    if (run_parallel_direct_download_worker(task, total_expected, resume_from)) {
+        return;
+    }
+
     int64_t completed_before_file = 0;
     std::string final_path;
 

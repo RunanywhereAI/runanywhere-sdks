@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai
 
+import ai.runanywhere.proto.v1.ArchiveStructure
+import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFileRole
@@ -163,22 +165,34 @@ class NpuModelE2ETest {
     }
 
     private suspend fun register(model: NpuModel) =
-        RunAnywhere.registerModel(
-            multiFile = model.files.mapIndexed { idx, f ->
-                ModelFileDescriptor(
-                    url = f.url,
-                    filename = f.filename,
-                    is_required = true,
-                    role = if (idx == 0) ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
-                    else ModelFileRole.MODEL_FILE_ROLE_COMPANION,
-                )
-            },
-            id = model.id,
-            name = model.name,
-            framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-            modality = model.modality.category(),
-            source = ModelSource.MODEL_SOURCE_REMOTE,
-        )
+        if (model.files.isNotEmpty()) {
+            RunAnywhere.registerModel(
+                multiFile = model.files.mapIndexed { idx, f ->
+                    ModelFileDescriptor(
+                        url = f.url,
+                        filename = f.filename,
+                        is_required = true,
+                        role = if (idx == 0) ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
+                        else ModelFileRole.MODEL_FILE_ROLE_COMPANION,
+                    )
+                },
+                id = model.id,
+                name = model.name,
+                framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+                modality = model.modality.category(),
+                source = ModelSource.MODEL_SOURCE_REMOTE,
+            )
+        } else {
+            RunAnywhere.registerModel(
+                archiveUrl = model.resolvedArchiveUrl,
+                structure = ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED,
+                id = model.id,
+                name = model.name,
+                framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+                modality = model.modality.category(),
+                archiveType = ArchiveType.ARCHIVE_TYPE_ZIP,
+            )
+        }
 
     private suspend fun cleanup(model: NpuModel) {
         runCatching { RunAnywhere.deleteModel(model.id) }

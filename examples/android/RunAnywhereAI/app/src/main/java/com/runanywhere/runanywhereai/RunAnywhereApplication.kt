@@ -81,14 +81,21 @@ class RunAnywhereApplication : Application() {
         // QHexRT (Qualcomm Hexagon NPU). Registration is rejected internally on
         // unsupported parts, so this is a safe no-op on non-v79/v81 devices.
         QHexRT.register()
+        val hasBackendConfig =
+            BuildConfig.RUNANYWHERE_API_KEY.isNotBlank() &&
+                BuildConfig.RUNANYWHERE_BASE_URL.isNotBlank()
+        val environment =
+            if (hasBackendConfig) {
+                SDKEnvironment.SDK_ENVIRONMENT_STAGING
+            } else {
+                SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+            }
         RunAnywhere.initialize(
             apiKey = BuildConfig.RUNANYWHERE_API_KEY,
             baseURL = BuildConfig.RUNANYWHERE_BASE_URL,
-            // STAGING (not PRODUCTION) so the railway *development* backend in
-            // local.properties is honored and telemetry lands — matches the
-            // Flutter example. PRODUCTION expects a production backend/auth and
-            // also disables console logging.
-            environment = SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+            // Use staging only when local.properties provides a real backend
+            // config. Empty debug defaults boot in development/offline mode.
+            environment = environment,
         )
         // Production env disables SDK console logging entirely; without this
         // debug builds emit zero SDK logs to logcat, which makes on-device
