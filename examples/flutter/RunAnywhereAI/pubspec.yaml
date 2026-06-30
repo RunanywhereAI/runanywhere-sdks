@@ -27,10 +27,6 @@ dependencies:
   # RunAnywhere SDK - ONNX Backend (STT/TTS/VAD/Embeddings)
   runanywhere_onnx:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
-
-  # RunAnywhere SDK - QHexRT NPU Backend (Android/Snapdragon Hexagon only)
-  runanywhere_qhexrt:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_qhexrt
   # Int64 proto scalars (LoRA catalog sizeBytes) — already transitive via
   # protobuf; declared directly because the app constructs proto messages.
   fixnum: ^1.1.1
@@ -83,8 +79,6 @@ dependency_overrides:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
   runanywhere_onnx:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
-  runanywhere_qhexrt:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_qhexrt
   # win32 ^6.x override (P10 dep-bump 2026-05-19): `device_info_plus 13.x`
   # and `package_info_plus 10.x` both require win32 ^6.x. Win32 is a
   # mobile-no-op (this app targets iOS/Android only), so 6.x is safe.

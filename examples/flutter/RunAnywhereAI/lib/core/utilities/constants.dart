@@ -40,10 +40,3 @@ class PreferenceKeys {
   static const String toolCallingEnabled = 'toolCallingEnabled';
   static const String deviceRegistered = 'com.runanywhere.sdk.deviceRegistered';
 }
-
-/// Default system prompt applied across every chat surface (main Chat + NPU
-/// Chat) when the user has not set their own in Settings. A concrete persona
-/// keeps small on-device models anchored as a conversational assistant.
-const String kDefaultSystemPrompt =
-    'You are a helpful, friendly AI assistant. Answer the user clearly and '
-    'concisely.';

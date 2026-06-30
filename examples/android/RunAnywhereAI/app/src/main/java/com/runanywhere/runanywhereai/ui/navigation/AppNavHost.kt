@@ -17,7 +17,6 @@ import com.runanywhere.runanywhereai.ui.screens.benchmark.BenchmarkDetailScreen
 import com.runanywhere.runanywhereai.ui.screens.benchmark.BenchmarkScreen
 import com.runanywhere.runanywhereai.ui.screens.cloud.CloudProvidersScreen
 import com.runanywhere.runanywhereai.ui.screens.more.MoreScreen
-import com.runanywhere.runanywhereai.ui.screens.npu.NpuSectionScreen
 import com.runanywhere.runanywhereai.ui.screens.rag.RagScreen
 import com.runanywhere.runanywhereai.ui.screens.settings.SettingsScreen
 import com.runanywhere.runanywhereai.ui.screens.solutions.SolutionsScreen
@@ -65,7 +64,6 @@ fun AppNavHost(
         composable<Stt> { SttScreen() }
         composable<Vad> { VadScreen() }
         composable<Vision> { VisionScreen() }
-        composable<Npu> { NpuSectionScreen(onExit = { navController.popBackStack() }) }
         composable<Documents> { RagScreen() }
         composable<Solutions> { SolutionsScreen() }
         composable<CloudProviders> { CloudProvidersScreen() }

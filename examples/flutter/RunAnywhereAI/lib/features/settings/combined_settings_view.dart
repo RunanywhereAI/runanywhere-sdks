@@ -76,10 +76,8 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         _maxTokens = (prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000)
             .clamp(500, 20000)
             .toInt();
-        final storedPrompt = prefs.getString(PreferenceKeys.defaultSystemPrompt);
-        // Prefill a meaningful default the first time (null) so it's applied and
-        // editable everywhere; respect an explicit empty string the user saved.
-        _systemPrompt = storedPrompt ?? kDefaultSystemPrompt;
+        _systemPrompt =
+            prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
         _thinkingModeEnabled =
             prefs.getBool(PreferenceKeys.thinkingModeEnabled) ?? true;
         _systemPromptController.text = _systemPrompt;

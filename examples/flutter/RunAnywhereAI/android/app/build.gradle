@@ -51,12 +51,6 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.debug
-            // Android shell shrinking. The Dart app is AOT-compiled (not touched
-            // by R8); these rules just keep the Flutter embedding + the
-            // runanywhere/QHexRT plugin JNI surface that R8 would otherwise strip.
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
@@ -65,16 +59,10 @@ android {
         // runanywhere native .so files — AGP needs a tie-breaker.
         pickFirst '**/libc++_shared.so'
         pickFirst '**/libomp.so'
-        // QHexRT (QNN) needs the Hexagon HTP skel .so files (libQnnHtpV*Skel.so)
-        // to exist as real on-disk files: FastRPC fopen()s them to offload to the
-        // cDSP. With useLegacyPackaging=false the skels are page-mapped from the
-        // APK with no on-disk file, so the DSP load fails ("cannot open
-        // libQnnHtpV81Skel.so, errno 2") and QHexRT model load fails. Legacy
-        // packaging extracts them to nativeLibraryDir, matching the working
-        // Kotlin app. The .so set is built 16 KB-aligned, so the extracted files
-        // still mmap cleanly on 16 KB-page (Android 15+/16) devices.
+        // BUG-FLT-ANDROID-004: keep .so files uncompressed + page-aligned inside
+        // the APK so Android 16 (16 KB page-size) can mmap them directly.
         jniLibs {
-            useLegacyPackaging = true
+            useLegacyPackaging = false
         }
     }
 }

@@ -90,15 +90,6 @@ enum ModelSelectionContext {
   /// (ModelSelectionSheet.swift:104-111) — mirror that exactly.
   bool includes(ModelInfo model) {
     if (!relevantCategories.contains(model.category)) return false;
-    // NPU (QHexRT) bundles are managed exclusively from the NPU section's own
-    // model bar (More → NPU). Keep them out of every main-app picker so they
-    // can't be loaded into the generic chat/voice/vision pipelines, which apply
-    // a non-QHexRT prompt template and make these arch-specific bundles
-    // degenerate (e.g. endless "hi,hi,hi" with no EOS).
-    if (model.framework ==
-        sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT) {
-      return false;
-    }
     final frameworks = allowedFrameworks;
     if (frameworks != null && !frameworks.contains(model.framework)) {
       return false;
