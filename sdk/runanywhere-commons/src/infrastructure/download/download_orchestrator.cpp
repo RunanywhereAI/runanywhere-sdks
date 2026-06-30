@@ -1054,7 +1054,8 @@ rac_bool_t proto_http_progress(uint64_t bytes_written, uint64_t total_bytes, voi
             (static_cast<double>(ctx->file_index) + file_fraction) / static_cast<double>(num_files));
     }
     const auto now = std::chrono::steady_clock::now();
-    if (ctx->last_emit.time_since_epoch().count() != 0 &&
+    const bool is_completion_progress = total_bytes > 0 && bytes_written == total_bytes;
+    if (!is_completion_progress && ctx->last_emit.time_since_epoch().count() != 0 &&
         now - ctx->last_emit < kProgressEmitInterval) {
         return RAC_TRUE;
     }
