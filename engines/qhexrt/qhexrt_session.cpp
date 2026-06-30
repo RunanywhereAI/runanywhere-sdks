@@ -16,7 +16,6 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <iterator>
 #include <mutex>
 #include <new>
 #include <string>
@@ -129,36 +128,6 @@ std::string find_manifest_in_dir(const fs::path& dir) {
     return {};
 }
 
-// Extract the manifest's `model.tokenizer_pre` value with a minimal scan (the
-// engine deliberately avoids a JSON dependency). Returns "" if absent. The
-// manifest is a small, well-formed RunAnywhere file, so a quoted-value lookup
-// is sufficient and robust here.
-std::string read_tokenizer_pre(const fs::path& manifest) {
-    std::ifstream in(manifest, std::ios::binary);
-    if (!in) {
-        return {};
-    }
-    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    const std::string key = "\"tokenizer_pre\"";
-    size_t k = content.find(key);
-    if (k == std::string::npos) {
-        return {};
-    }
-    size_t colon = content.find(':', k + key.size());
-    if (colon == std::string::npos) {
-        return {};
-    }
-    size_t q1 = content.find('"', colon + 1);
-    if (q1 == std::string::npos) {
-        return {};
-    }
-    size_t q2 = content.find('"', q1 + 1);
-    if (q2 == std::string::npos) {
-        return {};
-    }
-    return content.substr(q1 + 1, q2 - q1 - 1);
-}
-
 // Resolve the model reference (a bundle dir or a manifest file) to a manifest
 // path, preferring the subdirectory matching `arch` (e.g. "v79").
 std::string resolve_manifest(const char* path, const char* arch) {
@@ -219,9 +188,6 @@ Session* session_open(const char* manifest_path) {
         runtime_release();
         return nullptr;
     }
-    s->tokenizer_pre = read_tokenizer_pre(manifest);
-    RAC_LOG_INFO(LOG_CAT, "QHexRT session ready (tokenizer_pre=%s)",
-                 s->tokenizer_pre.empty() ? "<none>" : s->tokenizer_pre.c_str());
     return s;
 }
 
