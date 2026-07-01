@@ -24,6 +24,8 @@ esac
 
 cd "${SDK_DIR}"
 ./gradlew \
+    --max-workers=2 \
+    -x buildLocalJniLibs \
     "${SDK_TASK}" \
     ":modules:runanywhere-core-llamacpp:${SDK_TASK}" \
     ":modules:runanywhere-core-onnx:${SDK_TASK}" \

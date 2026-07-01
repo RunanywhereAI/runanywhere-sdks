@@ -48,9 +48,25 @@ android {
         versionName flutterVersionName
     }
 
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv("KEYSTORE_PATH")
+            def keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+            def releaseKeyAlias = System.getenv("KEY_ALIAS")
+            def releaseKeyPassword = System.getenv("KEY_PASSWORD")
+
+            if (keystorePath && keystorePassword && releaseKeyAlias && releaseKeyPassword) {
+                storeFile file(keystorePath)
+                storePassword keystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release.storeFile != null ? signingConfigs.release : signingConfigs.debug
             // Android shell shrinking. The Dart app is AOT-compiled (not touched
             // by R8); these rules just keep the Flutter embedding + the
             // runanywhere/QHexRT plugin JNI surface that R8 would otherwise strip.

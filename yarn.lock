@@ -8783,10 +8783,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react@npm:19.2.7":
-  version: 19.2.7
-  resolution: "react@npm:19.2.7"
-  checksum: be94ec2f1779b27cac328ddae18e52933c2977a2425b67039229ead45c62d0363b66e894076236616c8d98821a9a760fcbab8a9da8ae9c4b2849dfd12cc32a46
+"react@npm:19.2.3":
+  version: 19.2.3
+  resolution: "react@npm:19.2.3"
+  checksum: 506e369ae13cb46b7f303c0201aadf856642f482cdf5b1c3730c3a6d1762fd5a3ae1dd31196a4686bfbbe56456dcd0c48a4656c75cbcb45620e3028c54789ae9
   languageName: node
   linkType: hard
 
@@ -9056,7 +9056,7 @@ __metadata:
     lucide-react-native: ^1.21.0
     patch-package: ^8.0.1
     prettier: ^3.8.3
-    react: 19.2.7
+    react: 19.2.3
     react-native: 0.85.3
     react-native-actions-sheet: ^10.1.2
     react-native-fs: ^2.20.0
