@@ -12,6 +12,7 @@
  */
 
 #include <cstdint>
+#include <cstring>
 #include <string>
 
 #include "qhexrt_session.h"
@@ -47,6 +48,30 @@ void fill_cfg(qhx_gen_cfg* cfg, const rac_llm_options_t* o) {
         cfg->stop_strings = o->stop_sequences;
         cfg->n_stop_strings = static_cast<int>(o->num_stop_sequences);
     }
+    // Grammar-constrained decoding (QHexRT owns the logit mask). The SDK carries one `grammar` string
+    // (rac_llm_options_t.grammar); QHexRT's qhx_gen_cfg needs {kind, spec}. The caller encodes the kind as
+    // a prefix:
+    //   "json[:<spec>]"          -> a single valid JSON object
+    //   "toolcall[:<names>]"     -> strict [name(args)] over an enumerated tool set
+    //   "toolcall_opt[:<names>]" -> free chat OR one valid [name(args)] (a unified chat+tool path)
+    // <names> is a comma-separated tool list; omit it to use QHexRT's default set. The spec pointer aliases
+    // o->grammar, which outlives this synchronous qhx_generate call. (Requires the grammar-enabled
+    // qhexrt_c.h staged in prebuilt/; older headers lack grammar/grammar_kind and won't compile this block.)
+    if (o->grammar != nullptr && o->grammar[0] != '\0') {
+        const char* g = o->grammar;
+        auto spec_after = [](const char* s, size_t n) -> const char* { return (s[n] == ':') ? s + n + 1 : ""; };
+        if (std::strncmp(g, "toolcall_opt", 12) == 0) {
+            cfg->grammar_kind = 3;  // GrammarKind::ToolCallOptional
+            cfg->grammar = spec_after(g, 12);
+        } else if (std::strncmp(g, "toolcall", 8) == 0) {
+            cfg->grammar_kind = 2;  // GrammarKind::ToolCall
+            cfg->grammar = spec_after(g, 8);
+        } else if (std::strncmp(g, "json", 4) == 0) {
+            cfg->grammar_kind = 1;  // GrammarKind::JsonObject
+            cfg->grammar = spec_after(g, 4);
+        }
+        // Unknown prefix => grammar_kind stays 0 (off): plain, unconstrained generation.
+    }
 }
 
 void fill_inputs(qhx_inputs* in, const char* prompt, const rac_llm_options_t* o) {
@@ -54,6 +79,13 @@ void fill_inputs(qhx_inputs* in, const char* prompt, const rac_llm_options_t* o)
     in->text = prompt;
     if (o != nullptr && o->system_prompt != nullptr && o->system_prompt[0] != '\0') {
         in->system_prompt = o->system_prompt;
+    }
+    // Prior conversation turns (alternating user,assistant). QHexRT's runtime
+    // chat template renders {system_prompt, history, text} from the model's
+    // manifest markers, so the app never hand-builds a ChatML string.
+    if (o != nullptr && o->history != nullptr && o->n_history > 0) {
+        in->history = o->history;
+        in->n_history = o->n_history;
     }
 }
 
