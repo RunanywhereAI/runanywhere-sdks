@@ -253,6 +253,8 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->framework = RAC_FRAMEWORK_FLUID_AUDIO;
         else if (framework == "genie" || framework == "qnn_genie" || framework == "Genie")
             model->framework = RAC_FRAMEWORK_GENIE;
+        else if (framework == "qhexrt" || framework == "qhx" || framework == "qnn")
+            model->framework = RAC_FRAMEWORK_QHEXRT;
         else if (framework == "sherpa" || framework == "sherpa_onnx" || framework == "sherpa-onnx")
             model->framework = RAC_FRAMEWORK_SHERPA;
         else
@@ -580,6 +582,7 @@ static ModelCategory infer_proto_category_from_framework(InferenceFramework fram
         case runanywhere::v1::INFERENCE_FRAMEWORK_MLX:
         case runanywhere::v1::INFERENCE_FRAMEWORK_METALRT:
         case runanywhere::v1::INFERENCE_FRAMEWORK_GENIE:
+        case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
         case runanywhere::v1::INFERENCE_FRAMEWORK_EXECUTORCH:
         case runanywhere::v1::INFERENCE_FRAMEWORK_MLC:
         case runanywhere::v1::INFERENCE_FRAMEWORK_PICO_LLM:
@@ -614,6 +617,8 @@ static InferenceFramework proto_framework_from_struct(rac_inference_framework_t 
             return runanywhere::v1::INFERENCE_FRAMEWORK_METALRT;
         case RAC_FRAMEWORK_GENIE:
             return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
+        case RAC_FRAMEWORK_QHEXRT:
+            return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
         case RAC_FRAMEWORK_SHERPA:
             return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;
         case RAC_FRAMEWORK_UNKNOWN:
@@ -1056,6 +1061,8 @@ static InferenceFramework framework_from_assignment_token(const std::string& tok
                 return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
             case 12:
                 return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;
+            case 13:
+                return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
             default:
                 return runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN;
         }
@@ -1084,6 +1091,9 @@ static InferenceFramework framework_from_assignment_token(const std::string& tok
     }
     if (lower == "genie" || lower == "qnn_genie" || lower == "qnn-genie") {
         return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
+    }
+    if (lower == "qhexrt" || lower == "qhx" || lower == "qnn") {
+        return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
     }
     if (lower == "sherpa" || lower == "sherpa_onnx" || lower == "sherpa-onnx") {
         return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;

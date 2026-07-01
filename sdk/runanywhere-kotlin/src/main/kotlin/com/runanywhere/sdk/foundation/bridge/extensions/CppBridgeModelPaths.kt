@@ -177,6 +177,7 @@ object CppBridgeModelPaths {
             CppBridgeModelRegistry.Framework.METALRT -> InferenceFramework.INFERENCE_FRAMEWORK_METALRT
             CppBridgeModelRegistry.Framework.GENIE -> InferenceFramework.INFERENCE_FRAMEWORK_GENIE
             CppBridgeModelRegistry.Framework.SHERPA -> InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
+            CppBridgeModelRegistry.Framework.QHEXRT -> InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
             else -> InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
         }
 

@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "baseUrl": ".",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "@runanywhere/core": ["../core/src"],
+      "@runanywhere/core/*": ["../core/src/*"],
+      "@runanywhere/qhexrt": ["./src"],
+      "@runanywhere/qhexrt/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "lib"],
+  "references": [
+    { "path": "../core" }
+  ]
+}

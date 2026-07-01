@@ -48,6 +48,37 @@ std::mutex g_lifecycle_mutex;
 std::condition_variable g_lifecycle_cv;
 std::map<runanywhere::v1::SDKComponent, std::shared_ptr<LoadedModel>> g_loaded;
 
+// Map a model's declared inference framework to the registered plugin engine
+// name (the manifest `.name` each engine publishes). Returns nullptr for
+// frameworks that have no dedicated engine (UNSPECIFIED / built-in / system),
+// which keeps the caller on plain priority selection.
+//
+// Why this exists: plugin selection is plain priority order, so the moment a
+// high-priority specialist backend (e.g. QHexRT, priority 150) registers it
+// wins EVERY load for its primitive — even a generic GGUF model that only
+// llamacpp can open. Pinning by the model's own framework lets each model land
+// on the engine it was built for, regardless of who else is registered.
+const char* engine_name_for_framework(runanywhere::v1::InferenceFramework framework) {
+    switch (framework) {
+        case runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP:
+            return "llamacpp";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
+            return "qhexrt";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
+            return "onnx";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:
+            return "sherpa";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_GENIE:
+            return "genie";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_METALRT:
+            return "metalrt";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
+            return "coreml";
+        default:
+            return nullptr;
+    }
+}
+
 void destroy_loaded_model(const std::shared_ptr<LoadedModel>& model) {
     if (!model) {
         return;
@@ -492,9 +523,20 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                     runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
                                     request.model_id(), nullptr, nullptr, nullptr);
 
-    // Pick the highest-priority registered plugin that serves this primitive
-    // (priority assigned at backend registration; no hardware/format scoring).
-    const rac_engine_vtable_t* vt = rac_plugin_find(primitive);
+    // Pin the engine the model was built for when its framework is known
+    // (priority order alone cannot tell two backends serving the same primitive
+    // apart — e.g. QHexRT at priority 150 would otherwise hijack every GGUF
+    // load meant for llamacpp). Fall back to plain priority selection when the
+    // framework is unspecified or its engine isn't registered.
+    const char* engine_hint = detail::engine_name_for_framework(framework);
+    const rac_engine_vtable_t* vt =
+        engine_hint ? rac_plugin_find_for_engine(primitive, engine_hint) : nullptr;
+    if (vt) {
+        RAC_LOG_INFO("model_lifecycle", "Pinned engine '%s' for framework %s", engine_hint,
+                     runanywhere::v1::InferenceFramework_Name(framework).c_str());
+    } else {
+        vt = rac_plugin_find(primitive);
+    }
     if (!vt) {
         std::string error = "no registered backend serves the requested primitive";
         ModelLoadResult result =

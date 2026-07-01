@@ -107,6 +107,7 @@ enum InferenceFramework {
     INFERENCE_FRAMEWORK_NONE               = 21;
     INFERENCE_FRAMEWORK_UNKNOWN            = 22;
     INFERENCE_FRAMEWORK_SHERPA             = 23;  // Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
+    INFERENCE_FRAMEWORK_QHEXRT             = 24;  // Qualcomm Hexagon NPU (QHexRT runtime)
 
     reserved 8, 17, 18;
     reserved "INFERENCE_FRAMEWORK_WHISPERKIT_COREML", "INFERENCE_FRAMEWORK_WHISPERKIT", "INFERENCE_FRAMEWORK_OPENAI_WHISPER";

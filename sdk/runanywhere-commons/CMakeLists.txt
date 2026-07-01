@@ -827,6 +827,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # (Keychain -> identifierForVendor -> generate UUID) collapsed from each
     # platform SDK into a single C entry point.
     src/infrastructure/device/device_identity.cpp
+    src/infrastructure/device/rac_npu_capability.cpp
     src/infrastructure/extraction/rac_extraction.cpp
     # DAG streaming runtime. The primitives
     # under include/rac/graph/ (CancelToken / StreamEdge / RingBuffer /

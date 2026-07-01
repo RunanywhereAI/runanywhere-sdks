@@ -162,5 +162,6 @@ val InferenceFramework.wireString: String
             InferenceFramework.INFERENCE_FRAMEWORK_NONE -> "none"
             InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN -> "unknown"
             InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> "sherpa"
+            InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> "qhexrt"
             InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED -> ""
         }

@@ -79,6 +79,15 @@ try {
 } catch {
   logDiagnostic('[App] ONNX backend not available - speech features disabled');
 }
+
+// QHexRT (Qualcomm Hexagon NPU) — Android arm64 only. On other platforms the
+// native hybrid is absent, so register() returns false and the app falls back.
+let QHexRT: OptionalBackend | null = null;
+try {
+  QHexRT = require('@runanywhere/qhexrt').QHexRT as OptionalBackend;
+} catch {
+  logDiagnostic('[App] QHexRT backend not available - NPU disabled on this platform');
+}
 import {
   getStoredApiKey,
   getStoredBaseURL,
@@ -87,7 +96,7 @@ import {
 import { logDiagnostic } from './src/utils/diagnostics';
 
 // Default backend config for the development Railway backend (mirrors the
-// Android example's gitignored local.properties → BuildConfig.RUNANYWHERE_*).
+// Android example's gitignored local.properties -> BuildConfig.RUNANYWHERE_*).
 // Used when no custom configuration has been saved in Settings.
 const DEFAULT_BASE_URL = 'YOUR_PRODUCTION_BASE_URL';
 const DEFAULT_API_KEY = 'YOUR_PRODUCTION_API_KEY';
@@ -134,6 +143,17 @@ async function registerBackends(): Promise<BackendRegistrationState> {
   } else if (!onnxRegistered) {
     logDiagnostic(
       '[App] ONNX.register() returned false - skipping STT/TTS/VAD/embedding model registration'
+    );
+  }
+
+  // QHexRT registers all NPU modalities (LLM/VLM/STT/TTS) in one call. No-op /
+  // false on non-Snapdragon devices and non-Android platforms.
+  if (QHexRT) {
+    const qhexrtRegistered = (await QHexRT.register()) !== false;
+    logDiagnostic(
+      qhexrtRegistered
+        ? '[App] QHexRT (NPU) backend registered'
+        : '[App] QHexRT.register() returned false - NPU unavailable on this device'
     );
   }
 

@@ -267,6 +267,9 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
 
   /// Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
   case sherpa // = 23
+
+  /// Qualcomm Hexagon NPU (QHexRT runtime)
+  case qhexrt // = 24
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -296,6 +299,7 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     case 21: self = .none
     case 22: self = .unknown
     case 23: self = .sherpa
+    case 24: self = .qhexrt
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -323,6 +327,7 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     case .none: return 21
     case .unknown: return 22
     case .sherpa: return 23
+    case .qhexrt: return 24
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -350,6 +355,7 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     .none,
     .unknown,
     .sherpa,
+    .qhexrt,
   ]
 
 }
@@ -2918,7 +2924,7 @@ nonisolated extension RAModelFormat: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension RAInferenceFramework: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0INFERENCE_FRAMEWORK_UNSPECIFIED\0\u{1}INFERENCE_FRAMEWORK_ONNX\0\u{1}INFERENCE_FRAMEWORK_LLAMA_CPP\0\u{1}INFERENCE_FRAMEWORK_FOUNDATION_MODELS\0\u{1}INFERENCE_FRAMEWORK_SYSTEM_TTS\0\u{1}INFERENCE_FRAMEWORK_FLUID_AUDIO\0\u{1}INFERENCE_FRAMEWORK_COREML\0\u{1}INFERENCE_FRAMEWORK_MLX\0\u{2}\u{2}INFERENCE_FRAMEWORK_METALRT\0\u{1}INFERENCE_FRAMEWORK_GENIE\0\u{1}INFERENCE_FRAMEWORK_TFLITE\0\u{1}INFERENCE_FRAMEWORK_EXECUTORCH\0\u{1}INFERENCE_FRAMEWORK_MEDIAPIPE\0\u{1}INFERENCE_FRAMEWORK_MLC\0\u{1}INFERENCE_FRAMEWORK_PICO_LLM\0\u{1}INFERENCE_FRAMEWORK_PIPER_TTS\0\u{2}\u{3}INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS\0\u{1}INFERENCE_FRAMEWORK_BUILT_IN\0\u{1}INFERENCE_FRAMEWORK_NONE\0\u{1}INFERENCE_FRAMEWORK_UNKNOWN\0\u{1}INFERENCE_FRAMEWORK_SHERPA\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0INFERENCE_FRAMEWORK_UNSPECIFIED\0\u{1}INFERENCE_FRAMEWORK_ONNX\0\u{1}INFERENCE_FRAMEWORK_LLAMA_CPP\0\u{1}INFERENCE_FRAMEWORK_FOUNDATION_MODELS\0\u{1}INFERENCE_FRAMEWORK_SYSTEM_TTS\0\u{1}INFERENCE_FRAMEWORK_FLUID_AUDIO\0\u{1}INFERENCE_FRAMEWORK_COREML\0\u{1}INFERENCE_FRAMEWORK_MLX\0\u{2}\u{2}INFERENCE_FRAMEWORK_METALRT\0\u{1}INFERENCE_FRAMEWORK_GENIE\0\u{1}INFERENCE_FRAMEWORK_TFLITE\0\u{1}INFERENCE_FRAMEWORK_EXECUTORCH\0\u{1}INFERENCE_FRAMEWORK_MEDIAPIPE\0\u{1}INFERENCE_FRAMEWORK_MLC\0\u{1}INFERENCE_FRAMEWORK_PICO_LLM\0\u{1}INFERENCE_FRAMEWORK_PIPER_TTS\0\u{2}\u{3}INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS\0\u{1}INFERENCE_FRAMEWORK_BUILT_IN\0\u{1}INFERENCE_FRAMEWORK_NONE\0\u{1}INFERENCE_FRAMEWORK_UNKNOWN\0\u{1}INFERENCE_FRAMEWORK_SHERPA\0\u{1}INFERENCE_FRAMEWORK_QHEXRT\0")
 }
 
 nonisolated extension RAModelCategory: SwiftProtobuf._ProtoNameProviding {

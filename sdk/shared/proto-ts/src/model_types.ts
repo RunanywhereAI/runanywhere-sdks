@@ -288,6 +288,8 @@ export enum InferenceFramework {
   INFERENCE_FRAMEWORK_UNKNOWN = 22,
   /** INFERENCE_FRAMEWORK_SHERPA - Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
   INFERENCE_FRAMEWORK_SHERPA = 23,
+  /** INFERENCE_FRAMEWORK_QHEXRT - Qualcomm Hexagon NPU (QHexRT runtime) */
+  INFERENCE_FRAMEWORK_QHEXRT = 24,
   UNRECOGNIZED = -1,
 }
 
@@ -356,6 +358,9 @@ export function inferenceFrameworkFromJSON(object: any): InferenceFramework {
     case 23:
     case "INFERENCE_FRAMEWORK_SHERPA":
       return InferenceFramework.INFERENCE_FRAMEWORK_SHERPA;
+    case 24:
+    case "INFERENCE_FRAMEWORK_QHEXRT":
+      return InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -407,6 +412,8 @@ export function inferenceFrameworkToJSON(object: InferenceFramework): string {
       return "INFERENCE_FRAMEWORK_UNKNOWN";
     case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
       return "INFERENCE_FRAMEWORK_SHERPA";
+    case InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
+      return "INFERENCE_FRAMEWORK_QHEXRT";
     case InferenceFramework.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

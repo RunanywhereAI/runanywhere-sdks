@@ -17,6 +17,12 @@ type MoreEntry = {
 
 const ENTRIES: MoreEntry[] = [
   {
+    label: 'NPU (QHexRT)',
+    description: 'Qualcomm Hexagon NPU status & detection',
+    icon: 'cpu',
+    route: ROUTES.Npu,
+  },
+  {
     label: 'Settings',
     description: 'Generation and storage',
     icon: 'settings',

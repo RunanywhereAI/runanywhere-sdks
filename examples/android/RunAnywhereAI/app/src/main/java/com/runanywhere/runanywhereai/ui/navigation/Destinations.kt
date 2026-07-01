@@ -47,6 +47,9 @@ data object Solutions
 data object CloudProviders
 
 @Serializable
+data object Npu
+
+@Serializable
 data object Benchmarks
 
 @Serializable

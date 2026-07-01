@@ -59,6 +59,10 @@ class ModelSelectionViewModel(
         try {
             val models = RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
                 .filter { context.accepts(it.category) }
+                // QHexRT (NPU) models are managed exclusively inside the NPU section and
+                // must never surface in the main-app pickers, even though they share the
+                // SDK registry and LANGUAGE/MULTIMODAL categories.
+                .filterNot { it.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT }
             state = state.copy(models = models, isLoading = false, error = null)
             syncCurrent(models)
             autoLoadIfNeeded(models)

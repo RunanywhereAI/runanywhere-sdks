@@ -23,6 +23,7 @@ export const ROUTES = {
   Storage: 'Storage',
   Solutions: 'Solutions',
   Benchmarks: 'Benchmarks',
+  Npu: 'Npu',
   Settings: 'Settings',
 
   // Modal routes (presentation group, same root stack).

@@ -1413,7 +1413,9 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
                                        const std::string& system_prompt,
                                        std::vector<std::string>& stop_storage,
                                        std::vector<const char*>& stop_ptrs,
-                                       std::string& grammar_storage) {
+                                       std::string& grammar_storage,
+                                       std::vector<std::string>& history_storage,
+                                       std::vector<const char*>& history_ptrs) {
     rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
 
     const bool has_options = request.has_options();
@@ -1495,6 +1497,27 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     }
     options.stop_sequences = stop_ptrs.empty() ? nullptr : stop_ptrs.data();
     options.num_stop_sequences = stop_ptrs.size();
+
+    // Prior conversation turns (idl-chat: LLMGenerateRequest.history, repeated
+    // ChatMessage). Flatten each turn's content into the alternating string
+    // array the C ABI carries; an engine that owns its chat template renders
+    // {system_prompt, history, prompt} from it. history_storage keeps the
+    // strings alive for the lifetime of `options` (mirrors stop_storage).
+    history_storage.clear();
+    history_ptrs.clear();
+    const int history_count = request.history_size();
+    if (history_count > 0) {
+        history_storage.reserve(static_cast<size_t>(history_count));
+        for (const auto& msg : request.history()) {
+            history_storage.push_back(msg.content());
+        }
+        history_ptrs.reserve(history_storage.size());
+        for (const auto& turn : history_storage) {
+            history_ptrs.push_back(turn.c_str());
+        }
+    }
+    options.history = history_ptrs.empty() ? nullptr : history_ptrs.data();
+    options.n_history = static_cast<int32_t>(history_ptrs.size());
     return options;
 }
 
@@ -1907,8 +1930,11 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     std::vector<std::string> stop_storage;
     std::vector<const char*> stop_ptrs;
     std::string grammar_storage;
-    rac_llm_options_t options =
-        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage);
+    std::vector<std::string> history_storage;
+    std::vector<const char*> history_ptrs;
+    rac_llm_options_t options = options_from_request(
+        request, system_prompt, stop_storage, stop_ptrs, grammar_storage, history_storage,
+        history_ptrs);
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};
@@ -2009,8 +2035,11 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     std::vector<std::string> stop_storage;
     std::vector<const char*> stop_ptrs;
     std::string grammar_storage;
-    rac_llm_options_t options =
-        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage);
+    std::vector<std::string> history_storage;
+    std::vector<const char*> history_ptrs;
+    rac_llm_options_t options = options_from_request(
+        request, system_prompt, stop_storage, stop_ptrs, grammar_storage, history_storage,
+        history_ptrs);
     options.streaming_enabled = RAC_TRUE;
 
     ProtoStreamContext ctx;

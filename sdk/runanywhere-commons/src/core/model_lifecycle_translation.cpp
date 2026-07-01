@@ -149,6 +149,8 @@ rac_inference_framework_t c_framework_from_proto(runanywhere::v1::InferenceFrame
             return RAC_FRAMEWORK_GENIE;
         case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:
             return RAC_FRAMEWORK_SHERPA;
+        case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
+            return RAC_FRAMEWORK_QHEXRT;
         case runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED:
         default:
             return RAC_FRAMEWORK_UNKNOWN;

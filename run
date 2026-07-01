@@ -164,10 +164,10 @@ cmd_example_android() {
     local stage="${ANDROID_EXAMPLE_DIR}/scripts/stage-sdk-aars.sh"
     case "${1:-}" in
         stage)    bash "${stage}" release ;;
-        build)    bash "${stage}" release && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:assembleDebug) ;;
+        build)    bash "${stage}" release && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew --max-workers=2 :app:assembleDebug) ;;
         install)  bash "${stage}" release \
-                    && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:installDebug) \
-                    && adb shell am start -n com.runanywhere.runanywhereai.debug/com.runanywhere.runanywhereai.MainActivity ;;
+                    && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew --max-workers=2 :app:installDebug) \
+                    && adb shell am start -n com.runanywhere.runanywhereai/com.runanywhere.runanywhereai.MainActivity ;;
         lint)     (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:ktlintCheck :app:detekt) ;;
         clean)    (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew clean) ;;
         *)        bad_subcommand "example android" "${1:-}" ;;

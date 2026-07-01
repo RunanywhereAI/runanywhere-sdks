@@ -2123,6 +2123,22 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@runanywhere/qhexrt@workspace:packages/qhexrt":
+  version: 0.0.0-use.local
+  resolution: "@runanywhere/qhexrt@workspace:packages/qhexrt"
+  dependencies:
+    "@runanywhere/proto-ts": "workspace:*"
+    nitrogen: ^0.34.1
+    react-native-nitro-modules: ^0.33.9
+    typescript: ^5.9.3
+  peerDependencies:
+    "@runanywhere/core": ">=0.19.13"
+    react: ">=19.0.0"
+    react-native: ">=0.83.1"
+    react-native-nitro-modules: ^0.33.9
+  languageName: unknown
+  linkType: soft
+
 "@sigstore/bundle@npm:^2.3.2":
   version: 2.3.2
   resolution: "@sigstore/bundle@npm:2.3.2"

@@ -46,6 +46,7 @@ constexpr int32_t kProtoIfwBuiltIn = 20;
 constexpr int32_t kProtoIfwNone = 21;
 constexpr int32_t kProtoIfwUnknown = 22;
 constexpr int32_t kProtoIfwSherpa = 23;
+constexpr int32_t kProtoIfwQhexrt = 24;
 
 // ModelCategory
 constexpr int32_t kProtoMcUnspecified = 0;
@@ -140,6 +141,9 @@ rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
         case kProtoIfwSherpa:
             *out = RAC_FRAMEWORK_SHERPA;
             return RAC_SUCCESS;
+        case kProtoIfwQhexrt:
+            *out = RAC_FRAMEWORK_QHEXRT;
+            return RAC_SUCCESS;
         // Proto values defined in idl/model_types.proto but without a
         // corresponding rac_inference_framework_t case: TFLITE, EXECUTORCH,
         // MEDIAPIPE, MLC, PICO_LLM, PIPER_TTS, SWIFT_TRANSFORMERS. Fold these
@@ -200,6 +204,9 @@ rac_result_t rac_inference_framework_to_proto(rac_inference_framework_t value, i
             return RAC_SUCCESS;
         case RAC_FRAMEWORK_SHERPA:
             *out = kProtoIfwSherpa;
+            return RAC_SUCCESS;
+        case RAC_FRAMEWORK_QHEXRT:
+            *out = kProtoIfwQhexrt;
             return RAC_SUCCESS;
         case RAC_FRAMEWORK_UNKNOWN:
             *out = kProtoIfwUnknown;
