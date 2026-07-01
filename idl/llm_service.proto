@@ -25,6 +25,11 @@ import "tool_calling.proto";
 // backwards compatibility but are deprecated; consumers SHOULD prefer
 // `options.*`.
 import "llm_options.proto";
+// idl-chat: prior conversation turns as structured ChatMessages so an engine
+// that owns its chat template (e.g. QHexRT) can render {system, history, user}
+// itself instead of the caller hand-building a marker string. chat.proto
+// imports llm_options.proto (not llm_service.proto), so this adds no cycle.
+import "chat.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -95,6 +100,13 @@ message LLMGenerateRequest {
     // The wire schema retains the inline fields to avoid breaking existing
     // serialized requests; new callers should only populate `options`.
     optional LLMGenerationOptions options = 26;
+
+    // idl-chat: PRIOR conversation turns (excludes the current `prompt`, which
+    // stays the live user turn, and `system_prompt`, which stays separate).
+    // Alternating user/assistant ChatMessages in chronological order. An engine
+    // that owns its chat template renders {system_prompt, history, prompt} from
+    // its model's markers; engines that don't simply ignore this field.
+    repeated ChatMessage history = 27;
 }
 
 // Aggregate result carried on the terminal LLMStreamEvent. This intentionally
