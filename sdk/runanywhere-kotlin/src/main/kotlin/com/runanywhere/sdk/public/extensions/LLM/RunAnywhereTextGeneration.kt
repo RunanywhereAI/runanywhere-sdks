@@ -14,7 +14,6 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.TokenKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
@@ -183,7 +182,7 @@ suspend fun RunAnywhere.aggregateStream(
             emit(event)
             !event.is_final
         }.collect { event ->
-            if (event.token.isNotEmpty() && event.kind != TokenKind.TOKEN_KIND_THOUGHT) {
+            if (event.token.isNotEmpty()) {
                 if (firstTokenTimeMs == null) firstTokenTimeMs = System.currentTimeMillis()
                 fullResponse += event.token
                 tokenCount += 1
@@ -218,7 +217,7 @@ suspend fun RunAnywhere.aggregateStream(
     val inputTokens = final?.prompt_tokens ?: maxOf(1, prompt.length / 4)
     val tokensGenerated = final?.completion_tokens ?: tokenCount
     return RALLMGenerationResult(
-        text = final?.text?.takeIf { it.isNotBlank() } ?: fullResponse,
+        text = final?.text ?: fullResponse,
         thinking_content = final?.thinking_content,
         input_tokens = inputTokens,
         tokens_generated = tokensGenerated,

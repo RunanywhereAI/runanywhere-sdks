@@ -13,8 +13,6 @@
 #define RUNANYWHERE_QHEXRT_SESSION_H
 
 #include <atomic>
-#include <string>
-#include <vector>
 
 #include "qhexrt/qhexrt_c.h"
 
@@ -26,10 +24,6 @@ struct Session {
     qhx_model* model = nullptr;
     qhx_session* sess = nullptr;
     std::atomic<bool> cancel{false};
-
-    // Keeps chat_history strings alive for the duration of one qhx_generate call.
-    std::vector<std::string> history_storage;
-    std::vector<const char*> history_ptrs;
 };
 
 // Acquire the process runtime, load `manifest_path`, create a session.

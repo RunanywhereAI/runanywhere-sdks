@@ -139,11 +139,7 @@ class NpuModelE2ETest {
 
     private suspend fun infer(model: NpuModel): String = when (model.modality) {
         NpuModality.LLM -> {
-            val opts = RALLMGenerationOptions(
-                max_tokens = 64,
-                temperature = 0.7f,
-                disable_thinking = true,
-            )
+            val opts = RALLMGenerationOptions(max_tokens = 64, temperature = 0.7f)
             val prompt = "What is 2 + 2? Answer in one short sentence."
             val events = RunAnywhere.generateStream(prompt, opts)
             RunAnywhere.aggregateStream(prompt, events).text
