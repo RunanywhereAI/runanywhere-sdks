@@ -53,7 +53,10 @@ fun LLMGenerationOptions.Companion.defaults(): RALLMGenerationOptions =
  * - Promotes `execution_target` and `preferred_framework` to their wire
  *   string forms.
  */
-fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerateRequest {
+fun RALLMGenerationOptions.toRALLMGenerateRequest(
+    prompt: String,
+    chatHistory: List<String> = emptyList(),
+): RALLMGenerateRequest {
     val so = structured_output
     val schema =
         when {
@@ -82,6 +85,9 @@ fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerate
         response_format = responseFormat,
         grammar = grammar,
         execution_target = execution_target?.wireString.orEmpty(),
+        // idl-005: commons reads advanced knobs (disable_thinking, etc.) from nested options.
+        options = this,
+        chat_history = chatHistory,
     )
 }
 

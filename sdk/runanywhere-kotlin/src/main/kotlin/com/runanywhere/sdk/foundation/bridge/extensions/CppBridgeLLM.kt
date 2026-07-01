@@ -54,23 +54,12 @@ private fun checkRc(rc: Int, operation: String) {
 private fun RALLMGenerationOptions?.toGenerateRequest(
     prompt: String,
     streaming: Boolean,
+    chatHistory: List<String> = emptyList(),
 ): RALLMGenerateRequest {
     val options = this ?: RALLMGenerationOptions()
-    val schema = options.structured_output?.json_schema ?: options.json_schema.orEmpty()
-    return RALLMGenerateRequest(
-        prompt = prompt,
-        max_tokens = options.max_tokens,
-        temperature = options.temperature,
-        top_p = options.top_p,
-        top_k = options.top_k,
-        system_prompt = options.system_prompt.orEmpty(),
-        emit_thoughts = options.thinking_pattern != null,
-        repetition_penalty = options.repetition_penalty,
-        stop_sequences = options.stop_sequences,
+    return options.toRALLMGenerateRequest(prompt, chatHistory).copy(
         streaming_enabled = streaming || options.streaming_enabled,
-        preferred_framework = options.preferred_framework.name,
-        json_schema = schema,
-        execution_target = options.execution_target?.name.orEmpty(),
+        emit_thoughts = options.thinking_pattern != null,
     )
 }
 

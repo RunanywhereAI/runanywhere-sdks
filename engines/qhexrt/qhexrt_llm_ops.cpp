@@ -12,6 +12,7 @@
  */
 
 #include <cstdint>
+#include <cstring>
 #include <string>
 
 #include "qhexrt_session.h"
@@ -36,24 +37,58 @@ void fill_cfg(qhx_gen_cfg* cfg, const rac_llm_options_t* o) {
     if (o == nullptr) {
         return;
     }
-    if (o->max_tokens > 0) cfg->max_new_tokens = o->max_tokens;
-    cfg->temperature = o->temperature;
-    cfg->top_p = o->top_p;
-    if (o->top_k > 0) cfg->top_k = o->top_k;
-    if (o->repetition_penalty > 0.0f) cfg->repetition_penalty = o->repetition_penalty;
+    if (o->max_tokens > 0) {
+        cfg->max_new_tokens = o->max_tokens;
+    }
+    // Proto3 zero means unset; 1.0 disables nucleus sampling in QHexRT.
+    if (o->temperature > 0.0f) {
+        cfg->temperature = o->temperature;
+    }
+    if (o->top_p > 0.0f) {
+        cfg->top_p = o->top_p;
+    }
+    if (o->top_k > 0) {
+        cfg->top_k = o->top_k;
+    }
+    if (o->repetition_penalty > 0.0f) {
+        cfg->repetition_penalty = o->repetition_penalty;
+    }
     cfg->min_p = o->min_p;
-    if (o->seed != 0) cfg->seed = static_cast<uint64_t>(o->seed);
+    if (o->seed != 0) {
+        cfg->seed = static_cast<uint64_t>(o->seed);
+    }
     if (o->stop_sequences != nullptr && o->num_stop_sequences > 0) {
         cfg->stop_strings = o->stop_sequences;
         cfg->n_stop_strings = static_cast<int>(o->num_stop_sequences);
     }
 }
 
-void fill_inputs(qhx_inputs* in, const char* prompt, const rac_llm_options_t* o) {
+void fill_inputs(Session* c, qhx_inputs* in, const char* prompt, const rac_llm_options_t* o) {
     *in = qhx_inputs{};
     in->text = prompt;
-    if (o != nullptr && o->system_prompt != nullptr && o->system_prompt[0] != '\0') {
+    if (c == nullptr || o == nullptr) {
+        return;
+    }
+    c->history_storage.clear();
+    c->history_ptrs.clear();
+    if (o->system_prompt != nullptr && o->system_prompt[0] != '\0') {
         in->system_prompt = o->system_prompt;
+    }
+    if (o->chat_history != nullptr && o->num_chat_history > 0) {
+        c->history_storage.reserve(o->num_chat_history);
+        for (size_t i = 0; i < o->num_chat_history; ++i) {
+            if (o->chat_history[i] != nullptr && o->chat_history[i][0] != '\0') {
+                c->history_storage.emplace_back(o->chat_history[i]);
+            }
+        }
+        c->history_ptrs.reserve(c->history_storage.size());
+        for (const auto& turn : c->history_storage) {
+            c->history_ptrs.push_back(turn.c_str());
+        }
+        if (!c->history_ptrs.empty()) {
+            in->history = c->history_ptrs.data();
+            in->n_history = static_cast<int>(c->history_ptrs.size());
+        }
     }
 }
 
@@ -64,6 +99,7 @@ struct StreamCtx {
     void* user;
     Session* session;
     std::string buf;  // reused per chunk to NUL-terminate
+    bool saw_text = false;
 };
 
 int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, int is_final) {
@@ -76,6 +112,9 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
     }
     if (c->cb == nullptr) {
         return 1;
+    }
+    if (len > 0) {
+        c->saw_text = true;
     }
     c->buf.assign(utf8, static_cast<size_t>(len < 0 ? 0 : len));
     return c->cb(c->buf.c_str(), c->user) == RAC_FALSE ? 0 : 1;
@@ -123,8 +162,13 @@ rac_result_t qhexrt_llm_generate(void* impl, const char* prompt, const rac_llm_o
     }
     try {
         c->cancel.store(false, std::memory_order_relaxed);
+        // Only reset KV when rebuilding a multi-turn prompt; single-turn matches the
+        // pre-refactor path and avoids tearing down ion-persistent NPU buffers every call.
+        if (options != nullptr && options->num_chat_history > 0) {
+            qhx_session_reset(c->sess);
+        }
         qhx_inputs in;
-        fill_inputs(&in, prompt, options);
+        fill_inputs(c, &in, prompt, options);
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
         qhx_output out{};
@@ -149,8 +193,11 @@ rac_result_t qhexrt_llm_generate_stream(void* impl, const char* prompt,
     }
     try {
         c->cancel.store(false, std::memory_order_relaxed);
+        if (options != nullptr && options->num_chat_history > 0) {
+            qhx_session_reset(c->sess);
+        }
         qhx_inputs in;
-        fill_inputs(&in, prompt, options);
+        fill_inputs(c, &in, prompt, options);
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
         StreamCtx ctx{callback, user_data, c, std::string()};
@@ -159,6 +206,14 @@ rac_result_t qhexrt_llm_generate_stream(void* impl, const char* prompt,
         if (st != 0) {
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(stream) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
+        }
+        RAC_LOG_INFO(LOG_CAT, "qhx_generate done: n_prompt=%d n_gen=%d text_len=%zu saw_stream=%d",
+                     out.n_prompt, out.n_generated,
+                     out.text ? std::strlen(out.text) : 0u, ctx.saw_text ? 1 : 0);
+        // Populate commons raw_text when per-token stream chunks were empty after EOS strip.
+        if (callback != nullptr && !ctx.saw_text && out.text != nullptr && out.text[0] != '\0' &&
+            out.n_generated > 0) {
+            callback(out.text, user_data);
         }
         return RAC_SUCCESS;
     } catch (...) {

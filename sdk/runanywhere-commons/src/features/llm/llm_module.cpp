@@ -268,9 +268,8 @@ void emit_llm_streaming_update(const char* generation_id, int32_t tokens_generat
  *
  * Two pattern families are recognised:
  *   1. `<|TOKEN|>` — Qwen / Llama-3 / GPT-style pipe-wrapped sentinels.
- *      The scanner consumes everything between `<|` and the next `|>` so
- *      this naturally covers `im_end`, `eot_id`, `endoftext`, `im_start`,
- *      `vision_start`, `vision_end`, etc.
+ *      Only a known EOS/chat allowlist is stripped (not every pipe-wrapped
+ *      token — Qwen3.5 thinking markers must pass through).
  *   2. Bare `<TOKEN>` sentinels — `<eot>`, `<end_of_utterance>`,
  *      `<endoftext>`, `<eos>`. Only the explicit allowlist is stripped so
  *      legitimate user content containing `<` is preserved.
@@ -279,6 +278,28 @@ void emit_llm_streaming_update(const char* generation_id, int32_t tokens_generat
  * provided @p buf_size >= 1. The function returns @p buf for convenience —
  * if the entire token was a sentinel, @p buf points at the empty string.
  */
+static bool llm_is_strip_pipe_sentinel(const char* inner, size_t inner_len) {
+    static const char* kPipeSentinels[] = {
+        "redacted_im_end",
+        "im_end",
+        "eot_id",
+        "endoftext",
+        "end_of_text",
+        "im_start",
+        "vision_start",
+        "vision_end",
+        "image_pad",
+        "redacted_im_start",
+    };
+    for (const char* sentinel : kPipeSentinels) {
+        const size_t sentinel_len = strlen(sentinel);
+        if (inner_len == sentinel_len && strncmp(inner, sentinel, inner_len) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static const char* llm_strip_eos_tokens(const char* token, char* buf, size_t buf_size) {
     if (!buf || buf_size == 0) {
         return buf;
@@ -303,11 +324,18 @@ static const char* llm_strip_eos_tokens(const char* token, char* buf, size_t buf
     size_t i = 0;
     while (token[i] != '\0' && out + 1 < buf_size) {
         if (token[i] == '<' && token[i + 1] == '|') {
-            // Pipe-wrapped form: skip everything through the next |> .
-            size_t end = i + 2;
+            // Pipe-wrapped form: strip only known EOS/chat sentinels.
+            const size_t inner_start = i + 2;
+            size_t end = inner_start;
             while (token[end] != '\0') {
                 if (token[end] == '|' && token[end + 1] == '>') {
-                    i = end + 2;
+                    if (llm_is_strip_pipe_sentinel(token + inner_start, end - inner_start)) {
+                        i = end + 2;
+                    } else {
+                        while (i <= end + 1 && out + 1 < buf_size) {
+                            buf[out++] = token[i++];
+                        }
+                    }
                     break;
                 }
                 ++end;
@@ -1413,7 +1441,9 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
                                        const std::string& system_prompt,
                                        std::vector<std::string>& stop_storage,
                                        std::vector<const char*>& stop_ptrs,
-                                       std::string& grammar_storage) {
+                                       std::string& grammar_storage,
+                                       std::vector<std::string>& chat_history_storage,
+                                       std::vector<const char*>& chat_history_ptrs) {
     rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
 
     const bool has_options = request.has_options();
@@ -1495,6 +1525,24 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     }
     options.stop_sequences = stop_ptrs.empty() ? nullptr : stop_ptrs.data();
     options.num_stop_sequences = stop_ptrs.size();
+
+    chat_history_storage.clear();
+    chat_history_ptrs.clear();
+    const int history_count = request.chat_history_size();
+    if (history_count > 0) {
+        chat_history_storage.reserve(static_cast<size_t>(history_count));
+        for (const auto& turn : request.chat_history()) {
+            if (!turn.empty()) {
+                chat_history_storage.push_back(turn);
+            }
+        }
+        chat_history_ptrs.reserve(chat_history_storage.size());
+        for (const auto& turn : chat_history_storage) {
+            chat_history_ptrs.push_back(turn.c_str());
+        }
+    }
+    options.chat_history = chat_history_ptrs.empty() ? nullptr : chat_history_ptrs.data();
+    options.num_chat_history = chat_history_ptrs.size();
     return options;
 }
 
@@ -1567,6 +1615,7 @@ struct ProtoStreamContext {
     bool first_token_sent = false;
     bool inside_thinking = false;
     bool emit_thoughts = false;
+    bool disable_thinking = false;
     int64_t started_ms = 0;
     int64_t first_token_ms = 0;
     int32_t prompt_tokens = 0;
@@ -1822,7 +1871,32 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     }
 
     LLMStreamFinalResult final_result;
-    final_result.set_text(ctx->response_text);
+    std::string final_text = ctx->response_text;
+    // When emit_thoughts=false, THOUGHT segments are suppressed and never reach
+    // response_text; fall back to the raw stream with thinking blocks stripped.
+    // When disable_thinking is set, always strip thinking blocks from the final
+    // payload so models that ignore /no_think cannot leak tag wrappers into UI.
+    if (ctx->disable_thinking) {
+        const char* stripped = nullptr;
+        size_t stripped_len = 0;
+        const std::string& strip_input = !ctx->raw_text.empty() ? ctx->raw_text : final_text;
+        if (rac_llm_strip_thinking(strip_input.c_str(), &stripped, &stripped_len) ==
+                RAC_SUCCESS &&
+            stripped != nullptr) {
+            final_text.assign(stripped, stripped_len);
+        }
+    } else if (final_text.empty() && !ctx->raw_text.empty()) {
+        const char* stripped = nullptr;
+        size_t stripped_len = 0;
+        if (rac_llm_strip_thinking(ctx->raw_text.c_str(), &stripped, &stripped_len) ==
+                RAC_SUCCESS &&
+            stripped != nullptr && stripped_len > 0) {
+            final_text.assign(stripped, stripped_len);
+        } else {
+            final_text = ctx->raw_text;
+        }
+    }
+    final_result.set_text(final_text);
     if (!ctx->thinking_text.empty()) {
         final_result.set_thinking_content(ctx->thinking_text);
     }
@@ -1857,8 +1931,12 @@ rac_bool_t stream_token_callback(const char* token, void* user_data) {
         return RAC_FALSE;
     }
 
-    const char* safe_token = token ? token : "";
-    consume_thinking_aware_text(ctx, safe_token);
+    char cleaned_buf[512];
+    const char* cleaned = llm_strip_eos_tokens(token ? token : "", cleaned_buf, sizeof(cleaned_buf));
+    if (cleaned[0] == '\0') {
+        return RAC_TRUE;
+    }
+    consume_thinking_aware_text(ctx, cleaned);
     return RAC_TRUE;
 }
 
@@ -1907,8 +1985,11 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     std::vector<std::string> stop_storage;
     std::vector<const char*> stop_ptrs;
     std::string grammar_storage;
+    std::vector<std::string> chat_history_storage;
+    std::vector<const char*> chat_history_ptrs;
     rac_llm_options_t options =
-        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage);
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage,
+                             chat_history_storage, chat_history_ptrs);
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};
@@ -2009,8 +2090,11 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     std::vector<std::string> stop_storage;
     std::vector<const char*> stop_ptrs;
     std::string grammar_storage;
+    std::vector<std::string> chat_history_storage;
+    std::vector<const char*> chat_history_ptrs;
     rac_llm_options_t options =
-        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage);
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage,
+                             chat_history_storage, chat_history_ptrs);
     options.streaming_enabled = RAC_TRUE;
 
     ProtoStreamContext ctx;
@@ -2019,7 +2103,8 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.ref = &ref;
     ctx.started_ms = now_ms();
     ctx.prompt_tokens = estimate_tokens(request.prompt().c_str());
-    ctx.emit_thoughts = request.emit_thoughts();
+    ctx.disable_thinking = (options.disable_thinking == RAC_TRUE);
+    ctx.emit_thoughts = request.emit_thoughts() && !ctx.disable_thinking;
     ctx.request_id = request.request_id();
     ctx.conversation_id = request.conversation_id();
 

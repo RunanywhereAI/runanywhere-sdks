@@ -95,6 +95,10 @@ message LLMGenerateRequest {
     // The wire schema retains the inline fields to avoid breaking existing
     // serialized requests; new callers should only populate `options`.
     optional LLMGenerationOptions options = 26;
+
+    // Alternating prior chat turns: user, assistant, user, assistant, ...
+    // Consumed by QHexRT via qhx_inputs.history to build templated prompt_ids.
+    repeated string chat_history = 27;
 }
 
 // Aggregate result carried on the terminal LLMStreamEvent. This intentionally
