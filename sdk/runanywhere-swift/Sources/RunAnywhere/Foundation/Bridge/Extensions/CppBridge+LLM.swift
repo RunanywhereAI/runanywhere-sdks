@@ -144,9 +144,10 @@ extension CppBridge {
 
         private static func throwIfFailed(_ status: rac_result_t, operation: String) throws {
             guard status == RAC_SUCCESS else {
+                let nativeMessage = String(cString: rac_error_message(status))
                 throw SDKException(
                     code: .processingFailed,
-                    message: "LLM adaptive context \(operation) failed: \(status)",
+                    message: "LLM adaptive context \(operation) failed: \(nativeMessage) (\(status))",
                     category: .component
                 )
             }
