@@ -57,7 +57,7 @@ fi
 
 if [ ! -f "${ORT_DIR}/lib/libonnxruntime.a" ]; then
   echo "ERROR: ${ORT_DIR}/lib/libonnxruntime.a is required before building Sherpa-ONNX WASM." >&2
-  echo "Run: sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh" >&2
+  echo "Run: sdk/runanywhere-web-next/wasm/scripts/vendor-onnxruntime-wasm.sh" >&2
   exit 1
 fi
 

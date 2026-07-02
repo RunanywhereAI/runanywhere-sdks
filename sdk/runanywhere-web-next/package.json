@@ -16,7 +16,6 @@
     "vendor:wasm:onnxruntime": "RAC_WASM_BUILD_FROM_SOURCE=1 wasm/scripts/vendor-onnxruntime-wasm.sh",
     "vendor:wasm:sherpa": "RAC_WASM_BUILD_FROM_SOURCE=1 wasm/scripts/vendor-sherpa-onnx-wasm.sh",
     "vendor:wasm:speech": "npm run vendor:wasm:onnxruntime && npm run vendor:wasm:sherpa",
-    "stage:wasm": "bash scripts/stage-wasm.sh",
     "build:ts": "npm run build -w @runanywhere/proto-ts && npm run build -w packages/core && npm run build -w packages/llamacpp && npm run build -w packages/onnx",
     "build": "npm run build:ts",
     "dev": "npm run dev -w packages/core",

@@ -80,7 +80,7 @@ No cloud. No latency. No data leaves the device.
 |----------|--------|--------------|---------------|
 | **Swift** (iOS/macOS) | Stable | [Swift Package Manager](#swift-ios--macos) | [docs.runanywhere.ai/swift](https://docs.runanywhere.ai/swift/introduction) |
 | **Kotlin** (Android) | Stable | [Gradle](#kotlin-android) | [docs.runanywhere.ai/kotlin](https://docs.runanywhere.ai/kotlin/introduction) |
-| **Web** (Browser) | Beta | [npm](#web-browser) | [SDK README](sdk/runanywhere-web/) |
+| **Web** (Browser) | Beta | [npm](#web-browser) | [SDK README](sdk/runanywhere-web-next/) |
 | **React Native** | Beta | [npm](#react-native) | [docs.runanywhere.ai/react-native](https://docs.runanywhere.ai/react-native/introduction) |
 | **Flutter** | Beta | [pub.dev](#flutter) | [docs.runanywhere.ai/flutter](https://docs.runanywhere.ai/flutter/introduction) |
 
@@ -242,7 +242,7 @@ console.log(result.text); // "Paris is the capital of France."
 npm install @runanywhere/web
 ```
 
-[Full documentation →](sdk/runanywhere-web/) · [Source code](sdk/runanywhere-web/)
+[Full documentation →](sdk/runanywhere-web-next/) · [Source code](sdk/runanywhere-web-next/)
 
 ---
 
@@ -254,7 +254,7 @@ Full-featured demo applications demonstrating SDK capabilities:
 |----------|-------------|----------|
 | iOS | [examples/ios/RunAnywhereAI](examples/ios/RunAnywhereAI/) | [App Store](https://apps.apple.com/us/app/runanywhere/id6756506307) |
 | Android | [examples/android/RunAnywhereAI](examples/android/RunAnywhereAI/) | [Google Play](https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai) |
-| Web | [examples/web/RunAnywhereAI](examples/web/RunAnywhereAI/) | Build from source |
+| Web | [examples/web-next/RunAnywhereAI](examples/web-next/RunAnywhereAI/) | Build from source |
 | React Native | [examples/react-native/RunAnywhereAI](examples/react-native/RunAnywhereAI/) | Build from source |
 | Flutter | [examples/flutter/RunAnywhereAI](examples/flutter/RunAnywhereAI/) | Build from source |
 

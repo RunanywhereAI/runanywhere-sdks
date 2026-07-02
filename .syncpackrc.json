@@ -3,11 +3,11 @@
   "source": [
     "package.json",
     "sdk/shared/proto-ts/package.json",
-    "sdk/runanywhere-web/package.json",
-    "sdk/runanywhere-web/packages/*/package.json",
+    "sdk/runanywhere-web-next/package.json",
+    "sdk/runanywhere-web-next/packages/*/package.json",
     "sdk/runanywhere-react-native/package.json",
     "sdk/runanywhere-react-native/packages/*/package.json",
-    "examples/web/RunAnywhereAI/package.json",
+    "examples/web-next/RunAnywhereAI/package.json",
     "examples/react-native/RunAnywhereAI/package.json"
   ],
   "dependencyTypes": ["dev", "prod", "peer"],

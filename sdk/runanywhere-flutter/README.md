@@ -687,7 +687,7 @@ Sample App → Local Flutter SDK Packages → Local Frameworks/JNI libs
 |--------|-------------|
 | `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` | iOS: builds `RACommons`/`RABackendLLAMACPP`/`RABackendONNX`/`RABackendSherpa` XCFrameworks and stages into Flutter packages' `ios/Frameworks/`. |
 | `scripts/build/build-core-android.sh <ABI>` | Android: builds backend `.so` files and stages into Flutter packages' `android/src/main/jniLibs/<ABI>/`. |
-| `sdk/runanywhere-web/scripts/build-core-wasm.sh` | (Not used by Flutter; targets the Web SDK.) |
+| `sdk/runanywhere-web-next/scripts/build-core-wasm.sh` | (Not used by Flutter; targets the Web SDK.) |
 | `sdk/runanywhere-flutter/scripts/package-sdk.sh` | Validate all 4 Flutter packages via `pub publish --dry-run`. |
 
 ### Code Style

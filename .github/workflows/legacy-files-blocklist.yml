@@ -24,9 +24,9 @@ jobs:
             "sdk/runanywhere-react-native/packages/core/src/Features/VoiceSession/VoiceSessionHandle.ts"
             "sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+VoiceSession.ts"
             "sdk/runanywhere-react-native/scripts/build-react-native.sh"
-            "sdk/runanywhere-web/scripts/build-web.sh"
+            "sdk/runanywhere-web-next/scripts/build-web.sh"
           )
-          # T1.4 (PR #494): sdk/runanywhere-web/.../RunAnywhere+VoiceAgent.ts was
+          # T1.4 (PR #494): sdk/runanywhere-web-next/.../RunAnywhere+VoiceAgent.ts was
           # erroneously on this blocklist - it is the canonical v2 VoiceAgent
           # facade actively used by the web SDK (8+ call sites in Public/RunAnywhere.ts).
           # The web SDK uses a flat Extensions/ layout and there is no

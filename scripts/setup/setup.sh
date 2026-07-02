@@ -139,8 +139,8 @@ setup_ios() {
 setup_web() {
     heading "Web"
     if ! have yarn && ! have npm; then err "yarn/npm not found"; return 1; fi
-    if [ -d "${REPO_ROOT}/sdk/runanywhere-web" ]; then
-        cd "${REPO_ROOT}/sdk/runanywhere-web"
+    if [ -d "${REPO_ROOT}/sdk/runanywhere-web-next" ]; then
+        cd "${REPO_ROOT}/sdk/runanywhere-web-next"
         if have yarn; then yarn install && ok "sdk yarn install"; else npm install && ok "sdk npm install"; fi
     fi
     for ex in "${REPO_ROOT}"/examples/web/*/; do

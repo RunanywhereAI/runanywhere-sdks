@@ -312,7 +312,7 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_config_log_level(void) {
 
 // ---- rac_platform_adapter_t ----
 // The JS layer
-// (sdk/runanywhere-web/packages/llamacpp/src/Foundation/PlatformAdapter.ts)
+// (sdk/runanywhere-web-next/packages/llamacpp/src/Foundation/PlatformAdapter.ts)
 // packs function-pointer fields into this struct. Every field offset is
 // exposed here so the TypeScript side never hard-codes `PTR_SIZE = 4` or
 // a sequential accumulator — same rule as the HTTP struct helpers below.

@@ -17,7 +17,7 @@ sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**  linguist-generate
 
 # TypeScript (RN + Web)
 sdk/runanywhere-react-native/packages/core/src/generated/**  linguist-generated=true -diff
-sdk/runanywhere-web/packages/core/src/generated/**  linguist-generated=true -diff
+sdk/runanywhere-web-next/packages/core/src/generated/**  linguist-generated=true -diff
 sdk/shared/proto-ts/src/**  linguist-generated=true -diff
 sdk/shared/proto-ts/dist/**  linguist-generated=true -diff
 

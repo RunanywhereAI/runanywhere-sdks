@@ -48,7 +48,7 @@ Please add the appropriate label(s):
 - [ ] `Kotlin SDK` - Changes to Kotlin SDK (`sdk/runanywhere-kotlin`)
 - [ ] `Flutter SDK` - Changes to Flutter SDK (`sdk/runanywhere-flutter`)
 - [ ] `React Native SDK` - Changes to React Native SDK (`sdk/runanywhere-react-native`)
-- [ ] `Web SDK` - Changes to Web SDK (`sdk/runanywhere-web`)
+- [ ] `Web SDK` - Changes to Web SDK (`sdk/runanywhere-web-next`)
 - [ ] `Commons` - Changes to shared native code (`sdk/runanywhere-commons`)
 
 **Sample Apps:**

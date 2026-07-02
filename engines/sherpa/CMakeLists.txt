@@ -19,7 +19,7 @@
 # =============================================================================
 #
 # Sherpa-ONNX does NOT publish a prebuilt static archive for WASM.
-# sdk/runanywhere-web/wasm/scripts/build-sherpa-onnx.sh currently builds a
+# sdk/runanywhere-web-next/wasm/scripts/build-sherpa-onnx.sh currently builds a
 # STANDALONE Emscripten module (sherpa-onnx-wasm-nodejs.wasm, 12 MB) which is
 # shipped separately at packages/onnx/wasm/sherpa/sherpa-onnx.wasm. That
 # standalone module CANNOT be linked into racommons-llamacpp.wasm — it is a
@@ -45,7 +45,7 @@
 #         └── sherpa-onnx/c-api/c-api.h    (published by sherpa upstream)
 #
 # Build recipe:
-#   cd sdk/runanywhere-web/wasm/third_party/sherpa-onnx
+#   cd sdk/runanywhere-web-next/wasm/third_party/sherpa-onnx
 #   # Modify CMakeLists to build static archive targets instead of the
 #   # standalone sherpa-onnx-wasm-nodejs executable. Currently the WASM build
 #   # recipes in build-wasm-simd-{asr,tts,vad,nodejs}.sh all produce a final
@@ -68,7 +68,7 @@
 #     rac_plugin_entry_sherpa.cpp → RAC_STATIC_PLUGIN_REGISTER(sherpa) is
 #     the only registration path. No dlopen. Export symbol
 #     _rac_backend_sherpa_register must be kept live — add to
-#     RAC_EXPORTED_FUNCTIONS in sdk/runanywhere-web/wasm/CMakeLists.txt.
+#     RAC_EXPORTED_FUNCTIONS in sdk/runanywhere-web-next/wasm/CMakeLists.txt.
 #   - Piper TTS uses espeak-ng which has static initialization side-effects.
 #     Verify the C++ static constructors survive --whole-archive equivalent
 #     (Emscripten lacks -Wl,--whole-archive; use -sEXPORT_ALL=0 +

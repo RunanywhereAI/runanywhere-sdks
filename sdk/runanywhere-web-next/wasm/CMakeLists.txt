@@ -65,7 +65,7 @@ set(RAC_COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../runanywhere-commons")
 if(NOT EXISTS "${RAC_COMMONS_DIR}/CMakeLists.txt")
     message(FATAL_ERROR
         "RACommons not found at: ${RAC_COMMONS_DIR}\n"
-        "Expected: sdk/runanywhere-commons/ relative to sdk/runanywhere-web/"
+        "Expected: sdk/runanywhere-commons/ relative to sdk/runanywhere-web-next/"
     )
 endif()
 
@@ -301,7 +301,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # fetch() onto the commons libcurl-backed C ABI). See
     # sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_client.h
     # and rac_http_download.h. TypeScript wrapper lives at
-    # sdk/runanywhere-web/packages/core/src/Adapters/HTTPAdapter.ts.
+    # sdk/runanywhere-web-next/packages/core/src/Adapters/HTTPAdapter.ts.
     # Progress/body chunk callbacks are installed via addFunction, so the
     # runtime already enables the required ALLOW_TABLE_GROWTH flag above.
     "_rac_http_client_create"
@@ -708,7 +708,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_voice_agent_generate_response"
 
     # Voice Agent — proto-byte streaming ABI
-    # Required by sdk/runanywhere-web/packages/core/src/Adapters/
+    # Required by sdk/runanywhere-web-next/packages/core/src/Adapters/
     # VoiceAgentStreamAdapter.ts, which calls it through
     # m._rac_voice_agent_set_proto_callback(handle, cbPtr, 0). Pair with
     # -sEXPORTED_RUNTIME_METHODS=['addFunction','removeFunction'] +
@@ -721,7 +721,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_voice_agent_process_voice_turn_proto"
 
     # Solutions runtime (rac/solutions/rac_solution.h).
-    # Required by sdk/runanywhere-web/packages/core/src/Adapters/
+    # Required by sdk/runanywhere-web-next/packages/core/src/Adapters/
     # SolutionAdapter.ts (proto-byte / YAML driven L5 pipeline runtime).
     # `rac_solution_create_from_proto` consumes a serialized
     # `runanywhere.v1.SolutionConfig` (or PipelineSpec) message; the

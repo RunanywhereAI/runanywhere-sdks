@@ -18,8 +18,7 @@ cd sdk/runanywhere-web-next
 
 npm install
 npm run vendor:wasm:speech   # pull prebuilt sherpa-onnx + ORT static libs (needed for --onnx)
-npm run build:wasm           # build the Emscripten artifacts (reuses ../runanywhere-web/wasm)
-npm run stage:wasm           # link built .wasm/.js into packages/*/wasm
+npm run build:wasm           # build the Emscripten artifacts into packages/*/wasm
 npm run typecheck            # proto-ts + core (+ build) + backends
 npm run build                # compile all packages to dist
 ```
@@ -28,10 +27,9 @@ npm run build                # compile all packages to dist
 libraries (`libsherpa-onnx-c-api.a`, `libonnxruntime.a`) from the
 `Siddhesh2377/sherpa-onnx-rac` release into
 `sdk/runanywhere-commons/third_party/{sherpa-onnx-wasm,onnxruntime-wasm}`; the onnx
-WASM build links them in statically. `build:wasm` delegates to the existing
-`../runanywhere-web/wasm` build (Emscripten required). `stage:wasm` symlinks those
-artifacts into each package's `wasm/` dir so `new URL('../wasm/…', import.meta.url)`
-resolves. Re-run `stage:wasm` after any WASM rebuild.
+WASM build links them in statically. `build:wasm` runs the in-tree Emscripten
+toolchain under `wasm/` (Emscripten required) and emits `.wasm`/`.js` directly into
+each package's `wasm/` dir so `new URL('../wasm/…', import.meta.url)` resolves.
 
 ## Usage
 

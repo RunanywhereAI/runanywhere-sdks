@@ -39,4 +39,4 @@ Plan: `thoughts/shared/plans/web_sdk_rewrite.md`.
 ## Reference
 
 - Known-good checkout: `/home/home/Projects/runanywhere-sdks` (branch `siddhesh/web-sdk-fixes`).
-- Old SDK: `sdk/runanywhere-web/`. Lift logic per-item; don't guess.
+- Old SDK: `sdk/runanywhere-web-next/`. Lift logic per-item; don't guess.

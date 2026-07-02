@@ -239,20 +239,20 @@ thoughts/shared/plans/
 thoughts
 local/
 # Web SDK build artifacts (source is tracked)
-sdk/runanywhere-web/node_modules/
-sdk/runanywhere-web/packages/core/dist/
-sdk/runanywhere-web/packages/llamacpp/dist/
-sdk/runanywhere-web/packages/onnx/dist/
-sdk/runanywhere-web/wasm/build/
-sdk/runanywhere-web/packages/core/wasm/
-sdk/runanywhere-web/packages/onnx/wasm/
-sdk/runanywhere-web/packages/*/wasm/*.wasm
-sdk/runanywhere-web/packages/*/wasm/*.wasm.map
-sdk/runanywhere-web/packages/*/wasm/*.data
-sdk/runanywhere-web/emsdk/
-sdk/runanywhere-web/package-lock.json
+sdk/runanywhere-web-next/node_modules/
+sdk/runanywhere-web-next/packages/core/dist/
+sdk/runanywhere-web-next/packages/llamacpp/dist/
+sdk/runanywhere-web-next/packages/onnx/dist/
+sdk/runanywhere-web-next/wasm/build/
+sdk/runanywhere-web-next/packages/core/wasm/
+sdk/runanywhere-web-next/packages/onnx/wasm/
+sdk/runanywhere-web-next/packages/*/wasm/*.wasm
+sdk/runanywhere-web-next/packages/*/wasm/*.wasm.map
+sdk/runanywhere-web-next/packages/*/wasm/*.data
+sdk/runanywhere-web-next/emsdk/
+sdk/runanywhere-web-next/package-lock.json
 sdk/shared/proto-ts/package-lock.json
-examples/web/RunAnywhereAI/node_modules/
+examples/web-next/RunAnywhereAI/node_modules/
 
 # External repositories and distribution
 EXTERNAL/
@@ -423,7 +423,7 @@ docs/migrations/
 docs/plugins/
 docs/sdks/web-sdk.md
 engines/metalrt/README.md
-examples/web/RunAnywhereAI/README.md
+examples/web-next/RunAnywhereAI/README.md
 idl/README.md
 sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md
 sdk/runanywhere-commons/examples/solutions/README.md

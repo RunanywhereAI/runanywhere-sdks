@@ -161,7 +161,7 @@ if [ "$ONNX" = "ON" ]; then
     if [ ! -f "${ORT_WASM_ARCHIVE}" ]; then
         echo "ERROR: Web ONNX requires sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
         echo "       Build or vendor ONNX Runtime WASM static archives first:"
-        echo "       sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
+        echo "       sdk/runanywhere-web-next/wasm/scripts/vendor-onnxruntime-wasm.sh"
         exit 1
     fi
 fi
@@ -169,7 +169,7 @@ fi
 if [ "$ONNX_REQUESTED" = "ON" ] && [ ! -f "${SHERPA_WASM_ARCHIVE}" ]; then
     echo "ERROR: --onnx requires sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/lib/libsherpa-onnx-c-api.a"
     echo "       Build or vendor Sherpa-ONNX WASM static archives first:"
-    echo "       sdk/runanywhere-web/wasm/scripts/vendor-sherpa-onnx-wasm.sh"
+    echo "       sdk/runanywhere-web-next/wasm/scripts/vendor-sherpa-onnx-wasm.sh"
     exit 1
 fi
 

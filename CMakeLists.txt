@@ -94,7 +94,7 @@ set_property(CACHE RAC_SANITIZER PROPERTY STRINGS "" asan tsan ubsan)
 
 # WebAssembly knobs must be cached at the root so commons/engines see the
 # final values before their CMakeLists run. The wasm wrapper target itself
-# lives under sdk/runanywhere-web/wasm and is added after the engine targets.
+# lives under sdk/runanywhere-web-next/wasm and is added after the engine targets.
 if(EMSCRIPTEN)
     option(RAC_WASM_PTHREADS    "Enable pthreads in the WebAssembly target" OFF)
     option(RAC_WASM_DEBUG       "Enable debug assertions/logging in the WebAssembly target" OFF)
@@ -244,10 +244,10 @@ if(TARGET rac_backend_metalrt)
 endif()
 
 # WASM wrapper target — composes rac_commons + any enabled engine plugins into
-# the JavaScript/WebAssembly artifacts consumed by sdk/runanywhere-web.
+# the JavaScript/WebAssembly artifacts consumed by sdk/runanywhere-web-next.
 if(EMSCRIPTEN
-   AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-web/wasm/CMakeLists.txt")
-    add_subdirectory(sdk/runanywhere-web/wasm)
+   AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-web-next/wasm/CMakeLists.txt")
+    add_subdirectory(sdk/runanywhere-web-next/wasm)
 endif()
 
 # Smoke test for the plugin loader. Only built when explicitly

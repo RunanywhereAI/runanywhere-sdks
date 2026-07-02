@@ -71,7 +71,7 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | Kotlin (Android library) | `sdk/runanywhere-kotlin/` | JNI (`librunanywhere_jni.so`) | Android (min 24) |
 | Flutter | `sdk/runanywhere-flutter/` | Dart FFI (`ffi` package) | iOS, Android |
 | React Native | `sdk/runanywhere-react-native/` | NitroModules (JSI HybridObject) | iOS 15.1+, Android arm64 |
-| Web | `sdk/runanywhere-web/` | Emscripten WASM + TypeScript | Browsers (Chrome, Safari, Firefox) |
+| Web | `sdk/runanywhere-web-next/` | Emscripten WASM + TypeScript | Browsers (Chrome, Safari, Firefox) |
 
 ### Native Core
 | Directory | Contents |
@@ -88,7 +88,7 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | iOS | `examples/ios/RunAnywhereAI/` | SwiftUI + SPM |
 | Flutter | `examples/flutter/RunAnywhereAI/` | Flutter + Dart FFI |
 | React Native | `examples/react-native/RunAnywhereAI/` | RN 0.85 + NitroModules |
-| Web | `examples/web/RunAnywhereAI/` | Vanilla TS + Vite |
+| Web | `examples/web-next/RunAnywhereAI/` | Vanilla TS + Vite |
 
 ### Playground
 `Playground/` contains 6 standalone demo projects (not part of any build system): YapRun (iOS dictation app), swift-starter-app, on-device-browser-agent, android-use-agent, linux-voice-assistant, openclaw-hybrid-assistant.
@@ -182,8 +182,8 @@ cmake --preset wasm && cmake --build build/wasm
 # Android: Build .so for all ABIs → copies into all SDK jniLibs/ dirs
 ./scripts/build/build-core-android.sh
 
-# WASM: Build racommons-llamacpp.wasm → sdk/runanywhere-web/packages/llamacpp/wasm/
-./sdk/runanywhere-web/scripts/build-core-wasm.sh
+# WASM: Build racommons-llamacpp.wasm → sdk/runanywhere-web-next/packages/llamacpp/wasm/
+./sdk/runanywhere-web-next/scripts/build-core-wasm.sh
 
 # Version bump across all manifests
 ./scripts/release/sync-versions.sh <version>
@@ -201,7 +201,7 @@ cmake --preset wasm && cmake --build build/wasm
 |----------|--------|------------|
 | iOS | `sdk/runanywhere-swift/Binaries/*.xcframework` | Swift SPM, Flutter iOS, RN iOS |
 | Android | `*/jniLibs/{abi}/*.so` | Kotlin, Flutter Android, RN Android |
-| WASM | `sdk/runanywhere-web/packages/llamacpp/wasm/*.wasm` | Web SDK |
+| WASM | `sdk/runanywhere-web-next/packages/llamacpp/wasm/*.wasm` | Web SDK |
 | macOS/Linux | `build/<preset>/librac_commons.a` or `.so` | Local dev/testing |
 
 ---
@@ -290,12 +290,12 @@ yarn typecheck          # Primary verification gate
 
 NitroModules specs in `packages/core/src/specs/*.nitro.ts`. After spec changes, run `nitrogen` to regenerate C++ bridge code, then `scripts/fix-nitrogen-output.js`.
 
-### Web SDK (`sdk/runanywhere-web/`)
+### Web SDK (`sdk/runanywhere-web-next/`)
 
 Three npm packages: `@runanywhere/web` (core TS), `@runanywhere/web-llamacpp` (WASM), `@runanywhere/web-onnx` (Sherpa WASM).
 
 ```bash
-cd sdk/runanywhere-web/
+cd sdk/runanywhere-web-next/
 
 # Build WASM (requires Emscripten SDK)
 ./wasm/scripts/build.sh --llamacpp --vlm       # CPU variant
@@ -406,7 +406,7 @@ yarn typecheck      # Primary verification gate
 ### Web Example
 
 ```bash
-cd examples/web/RunAnywhereAI/
+cd examples/web-next/RunAnywhereAI/
 
 npm install
 npm run dev          # Vite dev server at port 5173
@@ -590,8 +590,8 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 | Component | Build | Test | Lint | Notes |
 |-----------|-------|------|------|-------|
 | Kotlin SDK (Android target) | `cd sdk/runanywhere-kotlin && ./gradlew compileDebugKotlin -Prunanywhere.useLocalNatives=false` | Android unit tests require device/emulator | `cd sdk/runanywhere-kotlin && ./gradlew ktlintCheck` | Single-target Android library (no KMP). `androidx.annotation` is always available because the build only targets Android. |
-| Web SDK (TypeScript) | `npm run build -w packages/core` (from `sdk/runanywhere-web/`) | N/A | `npm run typecheck -w packages/core` | `llamacpp` package has a pre-existing duplicate index signature TS error |
-| Web Example App | `npm run dev` (from `examples/web/RunAnywhereAI/`) | Manual browser testing at `localhost:5173` | N/A | Full Vite app, works in demo mode without WASM |
+| Web SDK (TypeScript) | `npm run build -w packages/core` (from `sdk/runanywhere-web-next/`) | N/A | `npm run typecheck -w packages/core` | `llamacpp` package has a pre-existing duplicate index signature TS error |
+| Web Example App | `npm run dev` (from `examples/web-next/RunAnywhereAI/`) | Manual browser testing at `localhost:5173` | N/A | Full Vite app, works in demo mode without WASM |
 | C++ Commons (core) | `cmake -B build ... && cmake --build build` (from `sdk/runanywhere-commons/`) | `./build/tests/test_core --run-all` (13 tests, no models needed) | N/A | Must use `gcc`/`g++` via `CC=gcc CXX=g++` (clang lacks C++ stdlib headers). Pass `-DRAC_BUILD_PLATFORM=OFF` on Linux |
 | C++ Commons (full backends) | `CC=gcc CXX=g++ bash scripts/build-linux.sh --shared` | Backend tests need downloaded models | N/A | Builds onnx+llamacpp. RAG backend has pre-existing zero-size array bug; use `-DRAC_BACKEND_RAG=OFF`. Sherpa-ONNX v1.12.23 URL changed: use `sherpa-onnx-v{VER}-linux-x64-shared.tar.bz2` (no `-cpu` suffix) |
 | Linux Voice Assistant | `cmake -B build && cmake --build build` (from `Playground/linux-voice-assistant/`) | `./build/test-pipeline <audio.wav>` runs full VAD→STT→LLM→TTS pipeline | N/A | Requires: ALSA headers (`libasound2-dev`), built commons with backends, downloaded models (`./scripts/download-models.sh`). Audio capture needs real hardware; `test-pipeline` works headless |

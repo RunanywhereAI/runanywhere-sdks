@@ -51,12 +51,12 @@ sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RAG/RunAnywhere
 # ============================================================================
 # Web SDK — files with JSON.parse/JSON.stringify in bridge code
 # ============================================================================
-sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+RAG.ts
-sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+StructuredOutput.ts
-sdk/runanywhere-web/packages/core/tests/unit/Public/Extensions/RunAnywhere+ToolCalling.test.ts
+sdk/runanywhere-web-next/packages/core/src/Public/Extensions/RunAnywhere+RAG.ts
+sdk/runanywhere-web-next/packages/core/src/Public/Extensions/RunAnywhere+StructuredOutput.ts
+sdk/runanywhere-web-next/packages/core/tests/unit/Public/Extensions/RunAnywhere+ToolCalling.test.ts
 
 # Web SDK — hand-written TypeScript type files
-sdk/runanywhere-web/packages/core/src/Adapters/ProtoAdapterTypes.ts
+sdk/runanywhere-web-next/packages/core/src/Adapters/ProtoAdapterTypes.ts
 
 # ============================================================================
 # C++ Public API — rac_*_json functions in public headers
@@ -96,6 +96,6 @@ sdk/runanywhere-commons/include/rac/router/rac_route.h
 # ============================================================================
 sdk/runanywhere-swift/Sources/RunAnywhere/Hybrid/Cloud.swift
 sdk/runanywhere-react-native/packages/core/src/Public/Extensions/Hybrid/CloudSTT.ts
-sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/CloudSTT.ts
-sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/HybridTypes.ts
+sdk/runanywhere-web-next/packages/core/src/Public/Extensions/Hybrid/CloudSTT.ts
+sdk/runanywhere-web-next/packages/core/src/Public/Extensions/Hybrid/HybridTypes.ts
 sdk/runanywhere-commons/include/rac/router/hybrid/rac_stt_hybrid_router.h

@@ -14,7 +14,7 @@ These serve multiple SDKs or the whole repo, so they're grouped by **function**
 
 > The Apple xcframework builder and the Web/WASM builder were moved into their
 > owning SDKs (`sdk/runanywhere-swift/scripts/build-core-xcframework.sh`,
-> `sdk/runanywhere-web/scripts/build-core-wasm.sh`) — see the per-SDK section below.
+> `sdk/runanywhere-web-next/scripts/build-core-wasm.sh`) — see the per-SDK section below.
 > `sync-swift-headers.sh` was deleted (unused; the vendored Swift headers are hand-maintained).
 
 ### `release/` — version / packaging
@@ -64,7 +64,7 @@ sdk/runanywhere-swift/scripts/
 sdk/runanywhere-kotlin/scripts/
     package-sdk.sh                     # unified contract; Gradle drives the rest
 
-sdk/runanywhere-web/scripts/
+sdk/runanywhere-web-next/scripts/
     package-sdk.sh                     # unified contract; npm drives the rest
     build-core-wasm.sh                 # builds the WebAssembly artifacts (Emscripten) → packages/llamacpp/wasm
 
@@ -75,7 +75,7 @@ sdk/runanywhere-react-native/scripts/
     package-sdk.sh                     # unified contract; yarn workspaces drive the rest
 ```
 
-For day-to-day iteration, build natives via `scripts/build/build-core-android.sh` (Android), `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` (Apple), or `sdk/runanywhere-web/scripts/build-core-wasm.sh` (Web), then drive the SDK's own toolchain (`swift build`, `./gradlew assembleDebug`, `npm run build:ts`, `flutter pub get`, `yarn typecheck`).
+For day-to-day iteration, build natives via `scripts/build/build-core-android.sh` (Android), `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` (Apple), or `sdk/runanywhere-web-next/scripts/build-core-wasm.sh` (Web), then drive the SDK's own toolchain (`swift build`, `./gradlew assembleDebug`, `npm run build:ts`, `flutter pub get`, `yarn typecheck`).
 
 ## `sdk/runanywhere-commons/scripts/` (C++ native build helpers)
 
@@ -110,9 +110,9 @@ run-tests-all.sh
 download-test-models.sh
 ```
 
-## WASM build — `sdk/runanywhere-web/wasm/scripts/`
+## WASM build — `sdk/runanywhere-web-next/wasm/scripts/`
 
-Emscripten-specific helpers invoked by the repo-root `sdk/runanywhere-web/scripts/build-core-wasm.sh`:
+Emscripten-specific helpers invoked by the repo-root `sdk/runanywhere-web-next/scripts/build-core-wasm.sh`:
 
 ```
 build.sh                # WASM compile orchestrator

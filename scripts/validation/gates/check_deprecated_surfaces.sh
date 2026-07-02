@@ -222,12 +222,12 @@ scan_find "sdk/runanywhere-react-native/packages" "*Bridge.ts" "rn:bridge-ts-fil
 # =========================================================================
 
 # 5a. JSON.parse/JSON.stringify in TypeScript source
-scan_grep_filtered "sdk/runanywhere-web/packages" \
+scan_grep_filtered "sdk/runanywhere-web-next/packages" \
   "(JSON\.parse|JSON\.stringify)" "*.ts" "web:ts-json-serialisation" \
   "/node_modules/" "/dist/" "/build/"
 
 # 5b. Hand-written *Types.ts files (non-proto type definitions)
-scan_find "sdk/runanywhere-web/packages" "*Types.ts" "web:hand-written-types-ts" \
+scan_find "sdk/runanywhere-web-next/packages" "*Types.ts" "web:hand-written-types-ts" \
   -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/build/*"
 
 # =========================================================================
