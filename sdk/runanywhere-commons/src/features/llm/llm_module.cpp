@@ -1080,6 +1080,7 @@ extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
 // ADAPTIVE CONTEXT API
 // =============================================================================
 
+/** Seed a component's adaptive KV context with a reusable system prompt. */
 extern "C" rac_result_t rac_llm_component_inject_system_prompt(rac_handle_t handle,
                                                                const char* prompt) {
     if (!handle)
@@ -1099,6 +1100,7 @@ extern "C" rac_result_t rac_llm_component_inject_system_prompt(rac_handle_t hand
     return rac_llm_inject_system_prompt(service, prompt);
 }
 
+/** Append text to a component's existing adaptive KV context. */
 extern "C" rac_result_t rac_llm_component_append_context(rac_handle_t handle, const char* text) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
@@ -1117,6 +1119,7 @@ extern "C" rac_result_t rac_llm_component_append_context(rac_handle_t handle, co
     return rac_llm_append_context(service, text);
 }
 
+/** Generate from a component's accumulated adaptive context. */
 extern "C" rac_result_t rac_llm_component_generate_from_context(
     rac_handle_t handle, const char* query, const rac_llm_options_t* options,
     rac_llm_result_t* out_result) {
@@ -1138,6 +1141,7 @@ extern "C" rac_result_t rac_llm_component_generate_from_context(
     return rac_llm_generate_from_context(service, query, effective_options, out_result);
 }
 
+/** Clear all adaptive context retained by a component. */
 extern "C" rac_result_t rac_llm_component_clear_context(rac_handle_t handle) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
@@ -2349,6 +2353,7 @@ rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event) {
 #endif
 }
 
+/** Seed the lifecycle-owned LLM's adaptive context with a system prompt. */
 rac_result_t rac_llm_inject_system_prompt_lifecycle(const char* prompt) {
     if (!prompt) {
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -2370,6 +2375,7 @@ rac_result_t rac_llm_inject_system_prompt_lifecycle(const char* prompt) {
 #endif
 }
 
+/** Append text to the lifecycle-owned LLM's adaptive context. */
 rac_result_t rac_llm_append_context_lifecycle(const char* text) {
     if (!text) {
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -2390,6 +2396,7 @@ rac_result_t rac_llm_append_context_lifecycle(const char* text) {
 #endif
 }
 
+/** Generate a protobuf result from the lifecycle-owned LLM's adaptive context. */
 rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_bytes,
                                                  size_t request_proto_size,
                                                  rac_proto_buffer_t* out_result) {
@@ -2475,6 +2482,7 @@ rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_by
 #endif
 }
 
+/** Clear adaptive context retained by the lifecycle-owned LLM. */
 rac_result_t rac_llm_clear_context_lifecycle(void) {
 #if !defined(RAC_HAVE_PROTOBUF)
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
