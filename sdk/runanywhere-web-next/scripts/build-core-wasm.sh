@@ -3,17 +3,17 @@
 #
 # build-core-wasm.sh — wraps the root wasm CMake preset (Emscripten
 # toolchain), builds the real runanywhere_wasm target, and verifies the
-# package-consumable artifacts under sdk/runanywhere-web/packages/llamacpp/wasm.
+# package-consumable artifacts under sdk/runanywhere-web-next/packages/llamacpp/wasm.
 #
 # WASM uses RAC_STATIC_PLUGINS=ON (set by the preset) — engines link
 # directly into the WASM module since dlopen is unavailable.
 #
 # Output:
-#   sdk/runanywhere-web/packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}
+#   sdk/runanywhere-web-next/packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-DEST="${REPO_ROOT}/sdk/runanywhere-web/packages/llamacpp/wasm"
+DEST="${REPO_ROOT}/sdk/runanywhere-web-next/packages/llamacpp/wasm"
 OUTPUT_NAME="${RAC_WASM_OUTPUT_NAME:-racommons-llamacpp}"
 BUILD_DIR="${REPO_ROOT}/build/wasm"
 
@@ -60,7 +60,7 @@ rm -f "${REPO_ROOT}/a.out.js" "${REPO_ROOT}/a.out.wasm"
 
 echo "▶ Configure wasm build"
 # NOTE: these flags mirror the canonical multi-target builder
-# sdk/runanywhere-web/wasm/scripts/build.sh so this thin wrapper produces an
+# sdk/runanywhere-web-next/wasm/scripts/build.sh so this thin wrapper produces an
 # equivalent llama.cpp artifact:
 #   * RAC_ENABLE_PROTOBUF=ON — the Web SDK is driven ENTIRELY through the
 #     proto-byte C ABI (every *_proto export, incl. the hybrid STT router's
@@ -102,7 +102,7 @@ echo "▶ Build wasm target"
 # (Ninja rejects a bare `-j`,
 # while Make accepts it). Lets CMake pick a sensible default job count.
 # The concrete executable target for the llama.cpp Web package is
-# racommons_llamacpp_wasm (see sdk/runanywhere-web/wasm/CMakeLists.txt
+# racommons_llamacpp_wasm (see sdk/runanywhere-web-next/wasm/CMakeLists.txt
 # rac_wasm_add_target NAME); it emits racommons-llamacpp.{js,wasm}. There is no
 # umbrella `runanywhere_wasm` target — each npm package has its own per-backend
 # executable target.

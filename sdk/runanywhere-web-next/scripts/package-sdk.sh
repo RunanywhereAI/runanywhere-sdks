@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# sdk/runanywhere-web/scripts/package-sdk.sh
+# sdk/runanywhere-web-next/scripts/package-sdk.sh
 # =============================================================================
 # Unified SDK packaging contract for the Web SDK. Consumes pre-built WASM
 # modules and produces npm tarballs (one per workspace) with checksums.
