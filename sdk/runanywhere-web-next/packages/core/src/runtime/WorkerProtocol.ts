@@ -10,11 +10,15 @@ export type WasmCallArg =
   | { k: 'outBytesSize'; freeFn: string }
   | { k: 'streamCallback'; returnsBool: boolean };
 
+import type { TelemetryInit } from './TelemetryBridge';
+
 export interface WorkerInit {
   moduleId: string;
   wasmJsUrl: string;
   logLevel?: number;
   registerFns?: string[];
+  /** Telemetry manager params; when present, the worker wires telemetry delivery. */
+  telemetry?: TelemetryInit;
 }
 
 export type WorkerRequest =
@@ -25,7 +29,7 @@ export type WorkerRequest =
   | { type: 'shutdown'; id: number };
 
 export type WorkerResponse =
-  | { type: 'ready'; id: number }
+  | { type: 'ready'; id: number; telemetryManagerPtr?: number }
   | { type: 'result'; id: number; rc: number; bytes: Uint8Array | null; outValues?: number[] }
   | { type: 'stream-open'; id: number; rc: number; outValues?: number[] }
   | { type: 'callback'; id: number; payload: Uint8Array }

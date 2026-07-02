@@ -1,0 +1,4 @@
+# Local env files hold secrets (API keys) — never commit them.
+.env
+.env.*
+!.env.example

@@ -49,8 +49,9 @@ export class WasmWorkerServer {
       logLevel: req.logLevel,
       registerFns: req.registerFns,
       secureStore,
+      telemetry: req.telemetry,
     });
-    this.post({ type: 'ready', id: req.id });
+    this.post({ type: 'ready', id: req.id, telemetryManagerPtr: this.loaded.telemetry?.managerPtr ?? 0 });
   }
 
   private async onCall(req: Extract<WorkerRequest, { type: 'call' }>): Promise<void> {
@@ -121,6 +122,8 @@ export class WasmWorkerServer {
     if (!this.loaded) return;
     for (const sub of this.subscriptions.values()) this.runUnsubscribe(sub);
     this.subscriptions.clear();
+    try { this.loaded.telemetry?.flush(); } catch {}
+    try { this.loaded.telemetry?.uninstall(); } catch {}
     try { this.loaded.module._rac_shutdown?.(); } catch {}
     this.loaded.adapter.cleanup();
     this.loaded = null;

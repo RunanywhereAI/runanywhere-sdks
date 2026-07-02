@@ -1,6 +1,8 @@
 import { RAC_OK, RAC_ERROR_MODULE_ALREADY_REGISTERED } from '../Foundation/RACErrors';
 import { SDKLogger } from '../Foundation/SDKLogger';
+import { FetchHttpTransport, type FetchHttpTransportModule } from './FetchHttpTransport';
 import { PlatformAdapter, type PlatformAdapterModule, type SecureStore } from './PlatformAdapter';
+import { TelemetryBridge, type TelemetryInit, type TelemetryModule } from './TelemetryBridge';
 import type { WorkerWasmModule } from './WasmCallMarshaller';
 
 const logger = new SDKLogger('WasmModuleLoader');
@@ -38,15 +40,17 @@ export interface BootOptions {
   registerFns?: string[];
   secureStore?: SecureStore;
   baseDir?: string;
+  telemetry?: TelemetryInit;
 }
 
 export interface LoadedModule {
   module: BootModule;
   adapter: PlatformAdapter;
+  telemetry: TelemetryBridge | null;
 }
 
 export async function loadWasmModule(opts: BootOptions): Promise<LoadedModule> {
-  const { wasmJsUrl, logLevel = 2, registerFns = [], secureStore, baseDir = '/opfs' } = opts;
+  const { wasmJsUrl, logLevel = 2, registerFns = [], secureStore, baseDir = '/opfs', telemetry } = opts;
 
   const glue = (await import(/* @vite-ignore */ wasmJsUrl)) as { default: CreateModuleFn };
   const baseUrl = wasmJsUrl.substring(0, wasmJsUrl.lastIndexOf('/') + 1);
@@ -62,18 +66,23 @@ export async function loadWasmModule(opts: BootOptions): Promise<LoadedModule> {
   const adapter = new PlatformAdapter(module as unknown as PlatformAdapterModule, secureStore);
   adapter.register();
 
+  let telemetryBridge: TelemetryBridge | null = null;
   try {
     initRAC(module, adapter.getAdapterPtr(), logLevel);
     setInferenceThreads(module);
     setBaseDir(module, baseDir);
     registerHttpTransport(module);
+    if (telemetry) {
+      telemetryBridge = TelemetryBridge.install(module as unknown as TelemetryModule, telemetry);
+    }
     runRegisterFns(module, registerFns);
   } catch (err) {
+    telemetryBridge?.uninstall();
     adapter.cleanup();
     throw err;
   }
 
-  return { module, adapter };
+  return { module, adapter, telemetry: telemetryBridge };
 }
 
 async function pingCheck(module: BootModule): Promise<void> {
@@ -142,10 +151,19 @@ function setBaseDir(module: BootModule, baseDir: string): void {
   }
 }
 
+// Prefer the JS-side transport (worker XHR) over the built-in emscripten_fetch
+// path. emscripten_fetch issues its request with EMSCRIPTEN_FETCH_SYNCHRONOUS,
+// which needs a separate proxying thread to run the blocking XHR; the web-next
+// WASM is built single-threaded, so that path has no worker to proxy to and
+// every request fails immediately with status=0. FetchHttpTransport runs the
+// sync XHR directly from JS inside this worker, sidestepping that requirement.
 function registerHttpTransport(module: BootModule): void {
+  if (FetchHttpTransport.install(module as FetchHttpTransportModule) !== null) {
+    return;
+  }
   const register = module._rac_http_transport_register_emscripten;
   if (typeof register !== 'function') {
-    logger.warning('WASM module missing _rac_http_transport_register_emscripten; commons HTTP (auth/device/API) unavailable');
+    logger.warning('WASM module missing HTTP transport exports; commons HTTP (auth/device/API) unavailable');
     return;
   }
   const rc = register();

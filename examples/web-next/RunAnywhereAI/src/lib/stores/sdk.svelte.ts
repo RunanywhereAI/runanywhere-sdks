@@ -39,7 +39,13 @@ class SdkStore {
     this.message = 'Spinning up the commons worker…';
     try {
       const { RunAnywhere } = await import('@runanywhere/web');
-      await RunAnywhere.initialize({});
+      const { settings } = await import('./settings.svelte');
+      console.log('[sdk] init env=%s baseUrl=%s apiKey=%s', settings.environment, settings.baseUrl, settings.apiKey ? 'set' : 'empty');
+      await RunAnywhere.initialize({
+        environment: settings.environmentEnum,
+        apiKey: settings.apiKey || undefined,
+        baseUrl: settings.baseUrl || undefined,
+      });
 
       this.message = 'Loading the LlamaCpp worker…';
       const { LlamaCPP } = await import('@runanywhere/web-llamacpp');

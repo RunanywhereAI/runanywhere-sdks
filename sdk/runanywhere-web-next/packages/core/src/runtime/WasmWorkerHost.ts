@@ -32,6 +32,13 @@ export class WasmWorkerHost {
   private readyPromise: Promise<void> | null = null;
   private handshakeResolve: (() => void) | null = null;
   private nextId = 1;
+  private _telemetryManagerPtr = 0;
+
+  /** Telemetry-manager pointer reported by the worker at init (0 if telemetry
+   * is not wired). Valid only for calls executed inside this worker. */
+  get telemetryManagerPtr(): number {
+    return this._telemetryManagerPtr;
+  }
   private readonly calls = new Map<number, CallWaiter>();
   private readonly streams = new Map<number, StreamSink>();
 
@@ -192,6 +199,7 @@ export class WasmWorkerHost {
   private handleResponse(msg: WorkerResponse): void {
     switch (msg.type) {
       case 'ready':
+        this._telemetryManagerPtr = msg.telemetryManagerPtr ?? 0;
         this.handshakeResolve?.();
         return;
       case 'result': {
