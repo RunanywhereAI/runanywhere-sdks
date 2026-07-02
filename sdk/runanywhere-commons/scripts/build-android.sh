@@ -97,4 +97,36 @@ rm -f "${DIST}/${ZIP}" "${DIST}/${ZIP}.sha256"
 (cd "${DIST}/android-staging" && zip -r "../${ZIP}" "${ABI}")
 (cd "${DIST}" && shasum -a 256 "${ZIP}" > "${ZIP}.sha256")
 
+checksum_zip() {
+    local zip="$1"
+    (cd "${DIST}" && shasum -a 256 "${zip}" > "${zip}.sha256")
+}
+
+package_subdir_zip() {
+    local subdir="$1"
+    local zip="$2"
+    local extra_file="${3:-}"
+    local package_root="${DIST}/android-package-${subdir}-${ABI}"
+
+    if [ -n "${extra_file}" ] && [ ! -f "${STAGING}/jni/${extra_file}" ]; then
+        echo "::error::Missing required extra file '${extra_file}' for backend '${subdir}'"
+        return 1
+    fi
+
+    rm -rf "${package_root}"
+    mkdir -p "${package_root}/${subdir}"
+    cp -R "${STAGING}/${subdir}/." "${package_root}/${subdir}/"
+    if [ -n "${extra_file}" ]; then
+        cp "${STAGING}/jni/${extra_file}" "${package_root}/${subdir}/"
+    fi
+
+    rm -f "${DIST}/${zip}" "${DIST}/${zip}.sha256"
+    (cd "${package_root}" && zip -r "${DIST}/${zip}" "${subdir}")
+    checksum_zip "${zip}"
+    rm -rf "${package_root}"
+}
+
+package_subdir_zip "llamacpp" "RABackendLLAMACPP-android-${ABI}-v${VERSION}.zip" "libc++_shared.so"
+package_subdir_zip "onnx" "RABackendONNX-android-${ABI}-v${VERSION}.zip"
+
 echo "✓ build-android.sh complete; staged ABI '${ABI}' → ${DIST}/${ZIP}"
