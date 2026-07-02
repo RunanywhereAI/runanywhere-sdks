@@ -10,11 +10,11 @@
     "packages/onnx"
   ],
   "scripts": {
-    "build:wasm": "cd ../runanywhere-web/wasm && ./scripts/build.sh",
-    "build:wasm:debug": "cd ../runanywhere-web/wasm && ./scripts/build.sh --debug",
-    "build:wasm:clean": "cd ../runanywhere-web/wasm && ./scripts/build.sh --clean",
-    "vendor:wasm:onnxruntime": "RAC_WASM_BUILD_FROM_SOURCE=1 ../runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh",
-    "vendor:wasm:sherpa": "RAC_WASM_BUILD_FROM_SOURCE=1 ../runanywhere-web/wasm/scripts/vendor-sherpa-onnx-wasm.sh",
+    "build:wasm": "cd wasm && ./scripts/build.sh",
+    "build:wasm:debug": "cd wasm && ./scripts/build.sh --debug",
+    "build:wasm:clean": "cd wasm && ./scripts/build.sh --clean",
+    "vendor:wasm:onnxruntime": "RAC_WASM_BUILD_FROM_SOURCE=1 wasm/scripts/vendor-onnxruntime-wasm.sh",
+    "vendor:wasm:sherpa": "RAC_WASM_BUILD_FROM_SOURCE=1 wasm/scripts/vendor-sherpa-onnx-wasm.sh",
     "vendor:wasm:speech": "npm run vendor:wasm:onnxruntime && npm run vendor:wasm:sherpa",
     "stage:wasm": "bash scripts/stage-wasm.sh",
     "build:ts": "npm run build -w @runanywhere/proto-ts && npm run build -w packages/core && npm run build -w packages/llamacpp && npm run build -w packages/onnx",
