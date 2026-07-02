@@ -29,6 +29,9 @@
 #include <limits>
 #include <vector>
 
+#include <thread>
+
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 
 // Direct logcat tag for confidence diagnostics. RAC_LOG_* routes through the
@@ -45,6 +48,31 @@
 #endif
 
 namespace runanywhere {
+
+// Resolve the ONNX Runtime thread count for Sherpa STT/TTS. Honors the
+// SDK-set preference (rac_set_inference_threads); 0/unset means auto from
+// hardware_concurrency. On WASM the value is clamped to the module's pthread
+// pool (PTHREAD_POOL_SIZE=8); on a non-pthreads build the pool is absent, but
+// the web onnx module is now built with pthreads so >1 is safe.
+static int sherpa_resolve_num_threads() {
+    int pref = rac_get_inference_threads();
+#if defined(__EMSCRIPTEN__)
+    // WASM: default single-threaded. The onnx/sherpa module is built without
+    // pthreads (threads made these small speech models ~10x slower via ORT
+    // thread-pool overhead), and ORT with num_threads>1 on a non-pthreads build
+    // aborts ("pthread_create failed"). A pthreads-enabled build can still
+    // request more explicitly via rac_set_inference_threads.
+    if (pref <= 0) pref = 1;
+    if (pref > 8) pref = 8;
+#else
+    if (pref <= 0) {
+        unsigned hc = std::thread::hardware_concurrency();
+        pref = hc > 0 ? static_cast<int>(hc) : 2;
+    }
+#endif
+    if (pref < 1) pref = 1;
+    return pref;
+}
 
 // =============================================================================
 // SherpaBackend Implementation
@@ -406,19 +434,11 @@ bool SherpaSTT::build_offline_recognizer_locked() {
     }
 
     recognizer_config.model_config.tokens = tokens_path_.c_str();
-#if defined(__EMSCRIPTEN__)
-    // ONNX Runtime tries to spawn an Eigen ThreadPool whenever
-    // num_threads > 1. The vendored sherpa-onnx-c-api WASM build links a
-    // single-threaded ONNX Runtime (the build script forces pthreads=OFF
-    // because the prebuilt .a was not compiled with pthread support). In a
-    // browser without a working pthread pool this aborts with
-    // "PosixThread: pthread_create failed". Run inference single-threaded
-    // on Web so the recognizer can come up without threading support.
-    recognizer_config.model_config.num_threads = 1;
-#else
-    recognizer_config.model_config.num_threads = 2;
-#endif
-    recognizer_config.model_config.debug = 1;
+    // Thread count is resolved from the SDK preference (rac_set_inference_threads)
+    // or hardware_concurrency. The web onnx module is now pthreads-enabled, so
+    // multi-threaded ORT is safe here.
+    recognizer_config.model_config.num_threads = sherpa_resolve_num_threads();
+    recognizer_config.model_config.debug = 0;
     recognizer_config.model_config.provider = "cpu";
 
     recognizer_config.model_config.modeling_unit = "cjkchar";
@@ -1474,13 +1494,8 @@ bool SherpaTTS::load_model(const std::string& model_path, TTSModelType model_typ
     tts_config.model.vits.length_scale = 1.0f;
 
     tts_config.model.provider = "cpu";
-#if defined(__EMSCRIPTEN__)
-    // Match STT: single-threaded ORT on WASM (no pthread pool in racommons-onnx-sherpa).
-    tts_config.model.num_threads = 1;
-#else
-    tts_config.model.num_threads = 2;
-#endif
-    tts_config.model.debug = 1;
+    tts_config.model.num_threads = sherpa_resolve_num_threads();
+    tts_config.model.debug = 0;
 
     RAC_LOG_INFO("Sherpa.TTS", "Creating SherpaOnnxOfflineTts (VITS/Piper)...");
 

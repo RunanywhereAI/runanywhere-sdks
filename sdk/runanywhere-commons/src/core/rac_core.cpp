@@ -293,6 +293,18 @@ const char* rac_sdk_get_version(void) {
     return s_version_string;
 }
 
+// Inference thread preference (0 = auto). Set by platform SDKs after init and
+// read by inference backends (e.g. Sherpa) when building their model config.
+static std::atomic<int32_t> s_inference_threads{0};
+
+void rac_set_inference_threads(int32_t num_threads) {
+    s_inference_threads.store(num_threads < 0 ? 0 : num_threads, std::memory_order_relaxed);
+}
+
+int32_t rac_get_inference_threads(void) {
+    return s_inference_threads.load(std::memory_order_relaxed);
+}
+
 rac_result_t rac_configure_logging(rac_environment_t environment) {
     switch (environment) {
         case RAC_ENV_DEVELOPMENT:

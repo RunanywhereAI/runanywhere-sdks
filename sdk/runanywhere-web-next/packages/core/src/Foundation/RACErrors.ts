@@ -1,0 +1,10 @@
+export const RAC_OK = 0 as const;
+export const RAC_ERROR_NETWORK_UNAVAILABLE = -150 as const;
+export const RAC_ERROR_NETWORK_ERROR = -151 as const;
+export const RAC_ERROR_OUT_OF_MEMORY = -221 as const;
+export const RAC_ERROR_INVALID_ARGUMENT = -259 as const;
+export const RAC_ERROR_NULL_POINTER = -260 as const;
+export const RAC_ERROR_CANCELLED = -380 as const;
+export const RAC_ERROR_MODULE_ALREADY_REGISTERED = -401 as const;
+export const RAC_ERROR_NOT_FOUND = -423 as const;
+export const RAC_ERROR_FEATURE_NOT_AVAILABLE = -801 as const;

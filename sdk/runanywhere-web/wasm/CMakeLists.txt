@@ -279,6 +279,8 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_is_initialized"
     "_rac_get_version"
     "_rac_configure_logging"
+    "_rac_set_inference_threads"
+    "_rac_get_inference_threads"
 
     # Platform adapter
     "_rac_set_platform_adapter"
@@ -1264,9 +1266,10 @@ function(rac_wasm_add_target)
     if(RAC_WASM_DEBUG)
         list(APPEND _link_flags
             "-sASSERTIONS=2"
-            "-sSAFE_HEAP=1"
-            "-sSTACK_OVERFLOW_CHECK=2"
-            "-g3"
+            # SAFE_HEAP + STACK_OVERFLOW_CHECK disabled: wasm-opt --safe-heap
+            # fails ("error after opts") on this large ONNX+sherpa module.
+            # ASSERTIONS=2 alone prints the mismatched function-pointer signature.
+            "-g2"
         )
     else()
         list(APPEND _link_flags
@@ -1450,6 +1453,16 @@ if(RAC_WASM_ONNX)
     # above receives the same exports when RAC_BACKEND_RAG=ON.)
     if(RAC_BACKEND_RAG)
         list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_RAG})
+    endif()
+
+    # llama.cpp LLM backend: linked into this bundle so a single worker can run
+    # the ONNX embedding provider AND the LLM. RAG generation (RAGConfiguration
+    # with an llm_model_id) then runs entirely in commons here — matching the
+    # single-process SDKs — instead of splitting retrieval and generation across
+    # workers.
+    if(RAC_WASM_LLAMACPP AND TARGET rac_backend_llamacpp)
+        list(APPEND _onnx_libs rac_backend_llamacpp)
+        list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_LLAMACPP})
     endif()
 
     rac_wasm_add_target(

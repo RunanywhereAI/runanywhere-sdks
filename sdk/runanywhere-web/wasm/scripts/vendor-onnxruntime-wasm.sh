@@ -101,14 +101,34 @@ rm -f "${ORT_BUILD_DIR}/libonnxruntime_webassembly.a"
 # the previously vendored `third_party/eigen` checkout is no longer needed
 # (and supplying the legacy flags causes argparse to reject them outright).
 set +e
+# EH-ABI match (web-next RAG fix): the racommons-onnx-sherpa module + sherpa are
+# compiled with classic Emscripten exceptions (-fexceptions). ORT's wasm build
+# leaves exceptions DISABLED at COMPILE time — its EXCEPTION_CATCHING=ON option
+# only appends `-s DISABLE_EXCEPTION_CATCHING=0`, a LINK setting that Emscripten
+# ignores during compilation ("linker setting ignored during compilation"), so
+# ORT objects still lack invoke_* EH trampolines. Calling into them from the
+# exception-enabled module then traps as "function signature mismatch" at
+# InferenceSession construction. Compile ORT WITH -fexceptions (mirrors
+# vendor-sherpa-onnx-wasm.sh) so every object in the final link shares one EH ABI.
+# RACommons pb35 port: build ORT against protobuf v35 (abseil) to match commons'
+# protobuf and eliminate the two-protobuf ODR crash. deps.txt is pointed at v35;
+# a host protoc-35 is supplied via RAC_PROTOC35 (build.py --path_to_protoc_exe);
+# protobuf fetches its own matching abseil (module + FORCE_FETCH), same as commons.
+RAC_PROTOC35="${RAC_PROTOC35:?set RAC_PROTOC35 to a host protoc-35 binary}"
+# protobuf v35 bundles utf8_range under the source tree; parse_context.h includes
+# "utf8_validity.h" but ORT's onnx_proto target compiles with only src/ on the
+# include path. Add the utf8_range dir globally so those headers resolve.
+_RAC_UTF8_INC="${ORT_BUILD_DIR}/_deps/protobuf-src/third_party/utf8_range"
 ./build.sh \
   --config "${BUILD_CONFIG}" \
   --build_wasm_static_lib \
   --enable_wasm_simd \
   --skip_tests \
   --disable_rtti \
+  --compile_no_warning_as_error \
   --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-12}" \
-  --cmake_extra_defines CMAKE_POLICY_VERSION_MINIMUM=3.5
+  --path_to_protoc_exe "${RAC_PROTOC35}" \
+  --cmake_extra_defines CMAKE_POLICY_VERSION_MINIMUM=3.5 onnxruntime_ENABLE_WEBASSEMBLY_EXCEPTION_CATCHING=ON "CMAKE_C_FLAGS=-fexceptions -I${_RAC_UTF8_INC}" "CMAKE_CXX_FLAGS=-fexceptions -I${_RAC_UTF8_INC}" protobuf_ABSL_PROVIDER=module protobuf_FORCE_FETCH_DEPENDENCIES=ON ABSL_PROPAGATE_CXX_STD=ON
 BUILD_RC=$?
 set -e
 

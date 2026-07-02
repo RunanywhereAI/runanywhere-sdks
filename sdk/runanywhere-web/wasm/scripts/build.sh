@@ -203,11 +203,12 @@ build_target() {
 
     local build_dir="${WASM_DIR}/build-${label}"
 
-    # ONNX target gating: the vendored libsherpa-onnx-c-api.a was built
-    # without the wasm 'atomics' feature, so wasm-ld rejects --shared-memory
-    # when linking it into a pthreads-enabled module. Force pthreads OFF for
-    # this single target. The other targets keep whatever the caller asked
-    # for (default ON for everything else).
+    # ONNX target gating: the vendored libsherpa-onnx-c-api.a is built without
+    # the wasm 'atomics' feature, so wasm-ld rejects --shared-memory when
+    # linking it into a pthreads-enabled module. Force pthreads OFF for this
+    # single target. (Threads made the small speech models ~10x slower anyway —
+    # ORT thread-pool overhead dwarfs the parallelism — so single-thread is the
+    # right config here; num_threads stays 1 via rac_set_inference_threads.)
     local pthreads_for_target="${PTHREADS}"
     if [ "$wasm_onnx" = "ON" ] && [ "$pthreads_for_target" = "ON" ]; then
         echo "NOTE: ONNX target requires pthreads=OFF (vendored sherpa-onnx-c-api.a"
@@ -445,7 +446,7 @@ if [ "$ONNX" = "ON" ]; then
         "racommons_onnx_wasm" \
         "racommons-onnx-sherpa" \
         "${WASM_DIR}/../packages/onnx/wasm" \
-        "OFF" "OFF" "ON" "OFF"
+        "OFF" "ON" "ON" "OFF"
 fi
 
 echo ""

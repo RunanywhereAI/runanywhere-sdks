@@ -1,0 +1,96 @@
+:root {
+  --bg: #fef8f6;
+  --surface: #fffbff;
+  --surface-2: #f2ecea;
+  --surface-3: #ede0db;
+  --ink: #1c1b1b;
+  --muted: #4e4542;
+  --muted-2: #807672;
+  --line: #e6ded6;
+  --line-strong: #d1c5c0;
+  --accent: #e65500;
+  --accent-soft: #ffdbca;
+  --on-accent: #fffbff;
+  --ok: #10b981;
+  --ok-soft: #d5f5e8;
+  --err: #ba1a1a;
+  --err-soft: #ffdad6;
+
+  --font-ui: "Figtree Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Maple Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r: 16px;
+  --r-lg: 22px;
+  --r-full: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(28, 26, 23, 0.05);
+  --shadow: 0 1px 2px rgba(28, 26, 23, 0.04), 0 10px 30px rgba(28, 26, 23, 0.08);
+  --shadow-lg: 0 8px 24px rgba(28, 26, 23, 0.1), 0 24px 60px rgba(28, 26, 23, 0.14);
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --nav: 68px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141414;
+    --surface: #1c1b1b;
+    --surface-2: #201f1f;
+    --surface-3: #2b2a2a;
+    --ink: #e6e1e0;
+    --muted: #d1c5c0;
+    --muted-2: #9b908b;
+    --line: #2b2a2a;
+    --line-strong: #363534;
+    --accent: #ff6d1f;
+    --accent-soft: #4e1c00;
+    --on-accent: #4e1c00;
+    --ok: #10b981;
+    --ok-soft: #10321f;
+    --err: #ffb4ab;
+    --err-soft: #4a1412;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5), 0 28px 70px rgba(0, 0, 0, 0.6);
+
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#app {
+  min-height: 100dvh;
+}
+
+button {
+  font-family: inherit;
+}
+
+::selection {
+  background: var(--accent-soft);
+}

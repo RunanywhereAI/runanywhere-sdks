@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "types": ["svelte", "vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@runanywhere/web": ["../../../sdk/runanywhere-web-next/packages/core/dist/types/index.d.ts"],
+      "@runanywhere/web/internal": ["../../../sdk/runanywhere-web-next/packages/core/dist/types/internal.d.ts"],
+      "@runanywhere/web-llamacpp": ["../../../sdk/runanywhere-web-next/packages/llamacpp/dist/index.d.ts"],
+      "@runanywhere/web-onnx": ["../../../sdk/runanywhere-web-next/packages/onnx/dist/index.d.ts"],
+      "@runanywhere/proto-ts": ["../../../sdk/shared/proto-ts/dist/index.d.ts"],
+      "@runanywhere/proto-ts/*": ["../../../sdk/shared/proto-ts/dist/*.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte", "vite.config.ts"]
+}

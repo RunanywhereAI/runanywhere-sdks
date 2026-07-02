@@ -101,6 +101,25 @@ RAC_API rac_version_t rac_get_version(void);
 RAC_API const char* rac_sdk_get_version(void);
 
 /**
+ * Sets the preferred number of CPU threads for on-device inference backends
+ * (e.g. the ONNX Runtime thread pool used by Sherpa STT/TTS). Platform SDKs
+ * call this once after init to size inference to the device — on Web, pass
+ * `navigator.hardwareConcurrency`.
+ *
+ * @param num_threads Desired thread count. `<= 0` means "auto" (the backend
+ *        picks `std::thread::hardware_concurrency()`). Backends clamp the value
+ *        to what their build supports (e.g. the WASM pthread pool size).
+ */
+RAC_API void rac_set_inference_threads(int32_t num_threads);
+
+/**
+ * Returns the inference thread preference set via `rac_set_inference_threads`,
+ * or 0 when unset (meaning "auto"). Inference backends call this when building
+ * their session/model config.
+ */
+RAC_API int32_t rac_get_inference_threads(void);
+
+/**
  * Configures logging based on the environment.
  *
  * This configures C++ local logging (stderr) based on the environment:
