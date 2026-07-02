@@ -20,9 +20,9 @@
 #   sdk/runanywhere-kotlin/gradle.properties               (runanywhere.nativeLibVersion + SDK_VERSION)
 #   sdk/runanywhere-kotlin/src/main/.../SDKConstants.kt    (Kotlin VERSION constant)
 #   sdk/shared/proto-ts/package.json                       (proto-ts package version)
-#   sdk/runanywhere-web/package.json                       (root version)
-#   sdk/runanywhere-web/packages/*/package.json            (each package version)
-#   sdk/runanywhere-web/.../Version.ts                     (web SDK_VERSION constant)
+#   sdk/runanywhere-web-next/package.json                       (root version)
+#   sdk/runanywhere-web-next/packages/*/package.json            (each package version)
+#   sdk/runanywhere-web-next/.../Version.ts                     (web SDK_VERSION constant)
 #   sdk/runanywhere-react-native/package.json              (root)
 #   sdk/runanywhere-react-native/packages/*/package.json   (each package + proto-ts dep)
 #   sdk/runanywhere-react-native/.../SDKConstants.ts       (RN version constant)
@@ -221,16 +221,16 @@ bump_versions_json_proto_ts_pin "${REPO_ROOT}/dependencies/versions.json"
 echo ""
 echo ">> Web SDK:"
 for pkg in \
-    "${REPO_ROOT}/sdk/runanywhere-web/package.json" \
-    "${REPO_ROOT}/sdk/runanywhere-web/packages/core/package.json" \
-    "${REPO_ROOT}/sdk/runanywhere-web/packages/llamacpp/package.json" \
-    "${REPO_ROOT}/sdk/runanywhere-web/packages/onnx/package.json"; do
+    "${REPO_ROOT}/sdk/runanywhere-web-next/package.json" \
+    "${REPO_ROOT}/sdk/runanywhere-web-next/packages/core/package.json" \
+    "${REPO_ROOT}/sdk/runanywhere-web-next/packages/llamacpp/package.json" \
+    "${REPO_ROOT}/sdk/runanywhere-web-next/packages/onnx/package.json"; do
     bump_json_version "$pkg"
     bump_npm_proto_ts_dep "$pkg"
 done
 # Web SDK public `RunAnywhere.version` surface — keeps the TS constant in
 # sync with the commons VERSION file and the package.json versions above.
-bump_line "${REPO_ROOT}/sdk/runanywhere-web/packages/core/src/Foundation/Version.ts" \
+bump_line "${REPO_ROOT}/sdk/runanywhere-web-next/packages/core/src/Foundation/Version.ts" \
     "export const SDK_VERSION = '[^']+'" \
     "export const SDK_VERSION = '${NEW_VERSION}'"
 

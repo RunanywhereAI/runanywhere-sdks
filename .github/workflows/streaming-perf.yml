@@ -28,8 +28,8 @@ on:
       - 'sdk/runanywhere-flutter/packages/*/test/**/streaming*'
       - 'sdk/runanywhere-react-native/packages/*/src/**/streaming/**'
       - 'sdk/runanywhere-react-native/packages/*/__tests__/**/streaming/**'
-      - 'sdk/runanywhere-web/packages/*/src/**/streaming/**'
-      - 'sdk/runanywhere-web/packages/*/test/**/streaming/**'
+      - 'sdk/runanywhere-web-next/packages/*/src/**/streaming/**'
+      - 'sdk/runanywhere-web-next/packages/*/test/**/streaming/**'
   push:
     branches:
       - main
@@ -52,8 +52,8 @@ on:
       - 'sdk/runanywhere-flutter/packages/*/test/**/streaming*'
       - 'sdk/runanywhere-react-native/packages/*/src/**/streaming/**'
       - 'sdk/runanywhere-react-native/packages/*/__tests__/**/streaming/**'
-      - 'sdk/runanywhere-web/packages/*/src/**/streaming/**'
-      - 'sdk/runanywhere-web/packages/*/test/**/streaming/**'
+      - 'sdk/runanywhere-web-next/packages/*/src/**/streaming/**'
+      - 'sdk/runanywhere-web-next/packages/*/test/**/streaming/**'
 
 permissions:
   contents: read

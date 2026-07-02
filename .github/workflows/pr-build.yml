@@ -371,7 +371,7 @@ jobs:
       # `typecheck` script builds proto-ts first, then typechecks core,
       # llamacpp, and onnx — exactly the surface this PR touches.
       # proto-ts is a workspace member of BOTH the repo-root Yarn workspace AND
-      # the sdk/runanywhere-web npm workspace. When we cd into proto-ts and run
+      # the sdk/runanywhere-web-next npm workspace. When we cd into proto-ts and run
       # `npm install`, npm walks up, finds the root Yarn package.json with
       # `workspace:*` deps it can't parse, and bails (EUNSUPPORTEDPROTOCOL).
       # `--workspaces=false` keeps npm from inheriting the root workspace
@@ -380,16 +380,16 @@ jobs:
         working-directory: sdk/shared/proto-ts
         run: npm install --no-audit --no-fund --workspaces=false
       - name: Install workspace dependencies
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/runanywhere-web-next
         run: npm install --no-audit --no-fund
       - name: Typecheck Web workspace (proto-ts + packages)
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/runanywhere-web-next
         run: npm run typecheck
       # Per-SDK lint lane — run eslint across the web workspace.
       # Soft (continue-on-error) until baseline is clean.
       - name: ESLint (web workspace lint lane)
         continue-on-error: true
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/runanywhere-web-next
         run: npm run lint || echo "eslint not yet wired"
 
   # Dedicated validation lane — runs the source-of-truth

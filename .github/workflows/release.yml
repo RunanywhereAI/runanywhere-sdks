@@ -272,10 +272,10 @@ jobs:
         with:
           platform: web
       - name: Build WASM (CPU, llama.cpp + VLM)
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/runanywhere-web-next
         run: npm run build:wasm -- --llamacpp --vlm
       - name: Build WASM (WebGPU, llama.cpp + VLM)
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/runanywhere-web-next
         run: npm run build:wasm -- --llamacpp --vlm --webgpu
       - name: Package Web/WASM outputs
         # The new wasm/scripts/build.sh emits every WASM variant (CPU, WebGPU)
@@ -283,7 +283,7 @@ jobs:
         # packages/onnx/wasm if present (vendored sherpa-onnx / ONNX Runtime
         # artifacts). Package only directories that actually exist so a
         # missing optional variant doesn't break the release.
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/runanywhere-web-next
         run: |
           set -euo pipefail
           mkdir -p dist
@@ -305,8 +305,8 @@ jobs:
         with:
           name: native-web
           path: |
-            sdk/runanywhere-web/dist/RACommons-web-*.tar.gz
-            sdk/runanywhere-web/dist/RACommons-web-*.tar.gz.sha256
+            sdk/runanywhere-web-next/dist/RACommons-web-*.tar.gz
+            sdk/runanywhere-web-next/dist/RACommons-web-*.tar.gz.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -367,12 +367,12 @@ jobs:
         # workspaces → npm install + build:ts → npm pack each package → checksum.
         # The script packs @runanywhere/proto-ts alongside the SDK packages (it
         # tracks the SDK version, bumped by scripts/release/sync-versions.sh).
-        run: bash sdk/runanywhere-web/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-web-staging"
+        run: bash sdk/runanywhere-web-next/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-web-staging"
       - name: Upload Web SDK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sdk-web
-          path: sdk/runanywhere-web/dist/sdk-web/**
+          path: sdk/runanywhere-web-next/dist/sdk-web/**
           retention-days: 7
           if-no-files-found: error
 
