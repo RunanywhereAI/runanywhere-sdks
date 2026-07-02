@@ -273,10 +273,10 @@ jobs:
           platform: web
       - name: Build WASM (CPU, llama.cpp + VLM)
         working-directory: sdk/runanywhere-web-next
-        run: npm run build:wasm -- --llamacpp --vlm
+        run: npm run build:wasm -- --llamacpp
       - name: Build WASM (WebGPU, llama.cpp + VLM)
         working-directory: sdk/runanywhere-web-next
-        run: npm run build:wasm -- --llamacpp --vlm --webgpu
+        run: npm run build:wasm -- --llamacpp --webgpu
       - name: Package Web/WASM outputs
         # The new wasm/scripts/build.sh emits every WASM variant (CPU, WebGPU)
         # under packages/llamacpp/wasm. Also include packages/core/wasm and
