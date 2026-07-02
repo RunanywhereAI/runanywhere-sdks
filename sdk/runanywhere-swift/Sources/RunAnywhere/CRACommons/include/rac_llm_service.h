@@ -13,6 +13,7 @@
 #include "rac_benchmark.h"
 #include "rac_error.h"
 #include "rac_llm_types.h"
+#include "rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -246,6 +247,37 @@ RAC_API void rac_llm_destroy(rac_handle_t handle);
  * @param result Result to free
  */
 RAC_API void rac_llm_result_free(rac_llm_result_t* result);
+
+/**
+ * @brief Inject a system prompt into the lifecycle-owned LLM's adaptive context
+ *
+ * Uses the LLM model loaded through rac_model_lifecycle_load_proto().
+ */
+RAC_API rac_result_t rac_llm_inject_system_prompt_lifecycle(const char* prompt);
+
+/**
+ * @brief Append text to the lifecycle-owned LLM's adaptive context
+ *
+ * Uses the LLM model loaded through rac_model_lifecycle_load_proto().
+ */
+RAC_API rac_result_t rac_llm_append_context_lifecycle(const char* text);
+
+/**
+ * @brief Generate from the lifecycle-owned LLM's accumulated adaptive context
+ *
+ * Accepts serialized runanywhere.v1.LLMGenerateRequest bytes and returns a
+ * serialized runanywhere.v1.LLMGenerationResult in out_result.
+ */
+RAC_API rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_bytes,
+                                                         size_t request_proto_size,
+                                                         rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Clear the lifecycle-owned LLM's adaptive context
+ *
+ * Uses the LLM model loaded through rac_model_lifecycle_load_proto().
+ */
+RAC_API rac_result_t rac_llm_clear_context_lifecycle(void);
 
 // =============================================================================
 // ADAPTIVE CONTEXT API - For RAG and similar pipelines

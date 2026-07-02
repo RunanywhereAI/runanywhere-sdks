@@ -252,6 +252,64 @@ RAC_API rac_result_t rac_llm_component_get_metrics(rac_handle_t handle,
                                                    rac_lifecycle_metrics_t* out_metrics);
 
 // =============================================================================
+// ADAPTIVE CONTEXT API
+// =============================================================================
+
+/**
+ * @brief Inject a system prompt into the loaded model's adaptive context
+ *
+ * Clears existing KV cache, then seeds it with the given prompt.
+ * Optional - returns RAC_ERROR_NOT_SUPPORTED if backend doesn't support it.
+ *
+ * @param handle Component handle
+ * @param prompt System prompt text
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_component_inject_system_prompt(rac_handle_t handle,
+                                                            const char* prompt);
+
+/**
+ * @brief Append text to the loaded model's adaptive context
+ *
+ * Does not clear existing KV state - accumulates context incrementally.
+ * Optional - returns RAC_ERROR_NOT_SUPPORTED if backend doesn't support it.
+ *
+ * @param handle Component handle
+ * @param text Text to append
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_component_append_context(rac_handle_t handle, const char* text);
+
+/**
+ * @brief Generate a response from accumulated adaptive context
+ *
+ * Unlike rac_llm_component_generate(), this does not clear the KV cache first.
+ * Use after inject_system_prompt + append_context to generate from accumulated state.
+ * Optional - returns RAC_ERROR_NOT_SUPPORTED if backend doesn't support it.
+ *
+ * @param handle Component handle
+ * @param query Query/suffix text to append before generation
+ * @param options Generation options (can be NULL for defaults)
+ * @param out_result Output: Generation result (caller must free with rac_llm_result_free)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_component_generate_from_context(rac_handle_t handle,
+                                                             const char* query,
+                                                             const rac_llm_options_t* options,
+                                                             rac_llm_result_t* out_result);
+
+/**
+ * @brief Clear all adaptive context state
+ *
+ * Resets the LLM's context for a fresh adaptive query cycle.
+ * Optional - returns RAC_ERROR_NOT_SUPPORTED if backend doesn't support it.
+ *
+ * @param handle Component handle
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_component_clear_context(rac_handle_t handle);
+
+// =============================================================================
 // LORA ADAPTER API
 // =============================================================================
 
