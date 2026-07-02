@@ -108,10 +108,15 @@ package_subdir_zip() {
     local extra_file="${3:-}"
     local package_root="${DIST}/android-package-${subdir}-${ABI}"
 
+    if [ -n "${extra_file}" ] && [ ! -f "${STAGING}/jni/${extra_file}" ]; then
+        echo "::error::Missing required extra file '${extra_file}' for backend '${subdir}'"
+        return 1
+    fi
+
     rm -rf "${package_root}"
     mkdir -p "${package_root}/${subdir}"
     cp -R "${STAGING}/${subdir}/." "${package_root}/${subdir}/"
-    if [ -n "${extra_file}" ] && [ -f "${STAGING}/jni/${extra_file}" ]; then
+    if [ -n "${extra_file}" ]; then
         cp "${STAGING}/jni/${extra_file}" "${package_root}/${subdir}/"
     fi
 

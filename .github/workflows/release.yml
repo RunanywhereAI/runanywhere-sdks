@@ -786,8 +786,11 @@ jobs:
           }
           assert_present "iOS XCFramework zip"      "RACommons-ios-v*.zip"
           assert_present "Android per-ABI zip"      "RACommons-android-*-v*.zip"
+          assert_present "Android per-ABI zip checksum" "RACommons-android-*-v*.zip.sha256"
           assert_present "Android LlamaCPP backend zip" "RABackendLLAMACPP-android-*-v*.zip"
+          assert_present "Android LlamaCPP backend zip checksum" "RABackendLLAMACPP-android-*-v*.zip.sha256"
           assert_present "Android ONNX backend zip" "RABackendONNX-android-*-v*.zip"
+          assert_present "Android ONNX backend zip checksum" "RABackendONNX-android-*-v*.zip.sha256"
           assert_present "Web WASM tar"             "RACommons-web-v*.tar.gz"
           assert_present "rcli macOS tarball"       "rcli-macos-arm64-v*.tar.gz"
           assert_present "rcli Linux tarball"       "rcli-linux-x86_64-v*.tar.gz"
