@@ -1134,7 +1134,8 @@ extern "C" rac_result_t rac_llm_component_generate_from_context(
         return RAC_ERROR_COMPONENT_NOT_READY;
     }
 
-    return rac_llm_generate_from_context(service, query, options, out_result);
+    const rac_llm_options_t* effective_options = options ? options : &component->default_options;
+    return rac_llm_generate_from_context(service, query, effective_options, out_result);
 }
 
 extern "C" rac_result_t rac_llm_component_clear_context(rac_handle_t handle) {
