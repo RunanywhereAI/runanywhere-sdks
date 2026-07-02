@@ -135,6 +135,7 @@ extension CppBridge {
             await inner.destroy()
         }
 
+        /// Convert a failed native adaptive-context status into an SDK error with backend detail.
         private static func throwIfFailed(_ status: rac_result_t, operation: String) throws {
             guard status == RAC_SUCCESS else {
                 let nativeMessage = String(cString: rac_error_message(status))
