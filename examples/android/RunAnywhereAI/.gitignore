@@ -15,3 +15,5 @@
 local.properties
 
 /.kotlin/
+# on-device NPU E2E reports (generated; shareable artifacts, not versioned)
+reports/
