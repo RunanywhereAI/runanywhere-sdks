@@ -53,8 +53,11 @@ def _load_whisper():
 def _transcribe(model, wav_path):
     import numpy as np  # whisper pulls numpy in
     with wave.open(str(wav_path), "rb") as w:
-        n = w.getnframes()
+        n, sr = w.getnframes(), w.getframerate()
         audio = np.frombuffer(w.readframes(n), dtype=np.int16).astype(np.float32) / 32768.0
+    if sr != 16000:  # whisper assumes a raw array is 16 kHz — resample TTS output (e.g. MeloTTS 44100) first
+        audio = np.interp(np.linspace(0, len(audio), int(len(audio) * 16000 / sr), endpoint=False),
+                          np.arange(len(audio)), audio).astype(np.float32)
     return model.transcribe(audio, language="en", fp16=False)["text"].strip()
 
 
