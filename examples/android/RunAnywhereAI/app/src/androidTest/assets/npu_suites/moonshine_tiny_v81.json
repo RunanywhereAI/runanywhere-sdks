@@ -1,0 +1,36 @@
+{
+  "schema": "npu_suite/v1",
+  "model_id": "moonshine_tiny_v81",
+  "hf_repo": "runanywhere/moonshine_tiny_HNPU",
+  "modality": "asr_aed",
+  "arch": "v81",
+  "reference": "hf:UsefulSensors/moonshine-tiny",
+  "gate": {
+    "suite_pass_frac": 0.6,
+    "metric": "wer",
+    "wer_max": 0.05,
+    "min_inputs": 4
+  },
+  "cases": [
+    {
+      "id": "clip0",
+      "input": {
+        "wav_asset": "ls16k_libri.pcm",
+        "sample_rate": 16000
+      },
+      "gold_text": "Mr. Quilter is the apostle of the middle classes, and we are glad to welcome his gospel."
+    },
+    {
+      "id": "clip1",
+      "input": {
+        "wav_asset": "speech_16k_mono.pcm",
+        "sample_rate": 16000
+      },
+      "gold_text": "The quick brown fox jumps over the lazy dog."
+    }
+  ],
+  "input_assets": [
+    "ls16k_libri.pcm",
+    "speech_16k_mono.pcm"
+  ]
+}

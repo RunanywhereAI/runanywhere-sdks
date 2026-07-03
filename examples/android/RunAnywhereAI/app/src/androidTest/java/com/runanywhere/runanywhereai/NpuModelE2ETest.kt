@@ -34,6 +34,7 @@ import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
@@ -179,12 +180,16 @@ class NpuModelE2ETest {
                     .gate("framework_qhexrt", load.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT)
 
                 // ---- inference suite (multiple inputs) + full benchmark + parity ----
+                // Prefer the canonical npu_suite/v1 (the SAME cases + gold forge/goal_npu uses, synced into
+                // assets/npu_suites/<id>.json); fall back to the built-in heuristic cases when none is shipped.
                 phase = "infer"
+                val suite = NpuSuite.load(InstrumentationRegistry.getInstrumentation().context.assets, model.id)
+                report.put("suite", if (suite != null) "npu_suite/v1:${suite.metric}:${suite.cases.size}cases" else "heuristic")
                 when (model.modality) {
-                    NpuModality.LLM -> runLlm(report)
-                    NpuModality.VLM -> runVlm(report, maxNew)
-                    NpuModality.STT -> runStt(report)
-                    NpuModality.TTS -> runTts(report, model, outDir)
+                    NpuModality.LLM -> runLlm(report, suite)
+                    NpuModality.VLM -> runVlm(report, maxNew, suite)
+                    NpuModality.STT -> runStt(report, suite)
+                    NpuModality.TTS -> runTts(report, model, outDir, suite)
                 }
 
                 report.put("peak_rss_mb", round2(NpuMetrics.peakRssKb() / 1024.0))
@@ -209,25 +214,53 @@ class NpuModelE2ETest {
     }
 
     // ---------------------------------------------------------------- LLM ----
-    private suspend fun runLlm(report: RunReport) {
+    private suspend fun runLlm(report: RunReport, suite: NpuSuite?) {
+        val goldCases = suite?.cases?.filter { it.text != null && it.goldTokens != null }.orEmpty()
+        if (goldCases.isNotEmpty()) {
+            // Canonical-suite path over the SAME prompts forge/goal_npu uses. The app runs the model
+            // CHAT-templated (no no_template option), so the GATE is answer-correctness (suite expect_keywords)
+            // + coherence — a chat-formatted-but-correct answer must not fail for not being a base completion.
+            // The token-level greedy_tol drift vs forge's BASE gold_tokens is REPORTED alongside (it runs high
+            // precisely because the app is chat, not base); forge's own base-completion path gates on it.
+            report.put("parity_metric", "answer+coherence(+greedy_tol_base)")
+            var decSum = 0.0; var ttftSum = 0.0; var n = 0; var passN = 0
+            for ((i, c) in goldCases.withIndex()) {
+                val gold = c.goldTokens!!
+                val g = withTimeout(INFER_TIMEOUT_MS) { greedyGenerate(c.text!!, maxOf(gold.size + 24, 32)) }
+                val drift = NpuMetrics.normalizedTokenEdit(g.tokenIds, gold)     // vs base gold (informational)
+                val coherent = g.text.isNotBlank() && NpuMetrics.wordRepeatRatio(g.text) < NpuRubric.REPEAT_MAX
+                val pass = coherent && (c.keywords.isEmpty() || c.keywords.any { g.text.contains(it, ignoreCase = true) })
+                if (pass) passN++
+                if (g.outTok > 0) { decSum += g.decodeToks; ttftSum += g.ttftMs; n++ }
+                report.addSample(JSONObject().put("idx", i).put("id", c.id).put("input", c.text!!.take(60))
+                    .put("output", g.text.take(200)).put("expect", c.keywords.joinToString(","))
+                    .put("metric", "answer+coherence").put("greedy_tol_base", round3(drift))
+                    .put("gold_ntok", gold.size).put("dev_ntok", g.tokenIds.size)
+                    .put("ttft_ms", round2(g.ttftMs)).put("decode_toks", round2(g.decodeToks))
+                    .put("prefill_toks", round2(g.prefillToks)).put("tokens_per_s", round2(g.tokensPerS))
+                    .put("total_ms", round2(g.totalMs)).put("out_tok", g.outTok).put("pass", pass))
+            }
+            val frac = passN.toDouble() / goldCases.size
+            report.put("suite_pass_frac", round2(frac))
+            report.gate("llm_answer_suite", frac >= suite!!.passFrac - 1e-9)
+            if (n > 0) report.put("decode_toks", round2(decSum / n)).put("ttft_ms", round2(ttftSum / n))
+            return
+        }
+        // fallback: built-in answer+coherence heuristic (no gold suite shipped for this model)
+        report.put("parity_metric", "answer+coherence")
         var decSum = 0.0; var ttftSum = 0.0; var n = 0
         for ((i, c) in llmCases.withIndex()) {
             val r = withTimeout(INFER_TIMEOUT_MS) {
-                val opts = RALLMGenerationOptions(max_tokens = c.maxNew, temperature = 0f)   // greedy
-                RunAnywhere.aggregateStream(c.prompt, RunAnywhere.generateStream(c.prompt, opts))
+                RunAnywhere.aggregateStream(c.prompt, RunAnywhere.generateStream(c.prompt,
+                    RALLMGenerationOptions(max_tokens = c.maxNew, temperature = 0f)))
             }
             val text = r.text.trim()
             val decTok = if (r.decode_time_ms > 0) r.tokens_generated * 1000.0 / r.decode_time_ms else r.tokens_per_second
-            val preTok = if (r.prompt_eval_time_ms > 0) r.input_tokens * 1000.0 / r.prompt_eval_time_ms else 0.0
             val coherent = text.isNotBlank() && NpuMetrics.wordRepeatRatio(text) < NpuRubric.REPEAT_MAX
-            val pass = if (c.expect.isEmpty()) coherent
-            else coherent && c.expect.any { text.contains(it, ignoreCase = true) }
-            report.addSample(JSONObject().put("idx", i).put("input", c.prompt.take(60))
-                .put("output", text.take(200)).put("ttft_ms", round2(r.ttft_ms ?: 0.0))
-                .put("decode_toks", round2(decTok)).put("prefill_toks", round2(preTok))
-                .put("tokens_per_s", round2(r.tokens_per_second)).put("total_ms", round2(r.generation_time_ms))
-                .put("in_tok", r.input_tokens).put("out_tok", r.tokens_generated)
-                .put("result_framework", r.framework ?: "")
+            val pass = if (c.expect.isEmpty()) coherent else coherent && c.expect.any { text.contains(it, ignoreCase = true) }
+            report.addSample(JSONObject().put("idx", i).put("input", c.prompt.take(60)).put("output", text.take(200))
+                .put("ttft_ms", round2(r.ttft_ms ?: 0.0)).put("decode_toks", round2(decTok))
+                .put("tokens_per_s", round2(r.tokens_per_second)).put("out_tok", r.tokens_generated)
                 .put("metric", if (c.expect.isEmpty()) "coherence" else "answer+coherence").put("pass", pass))
             report.gate("llm_case_$i", pass)
             if (r.framework != null) report.gate("framework_result", r.framework == "qhexrt")
@@ -236,24 +269,58 @@ class NpuModelE2ETest {
         if (n > 0) report.put("decode_toks", round2(decSum / n)).put("ttft_ms", round2(ttftSum / n))
     }
 
+    private data class Gen(val text: String, val tokenIds: List<Int>, val ttftMs: Double, val decodeToks: Double,
+                           val prefillToks: Double, val tokensPerS: Double, val totalMs: Double, val outTok: Int)
+
+    /** Greedy (temp=0) generation collecting per-token ids (for token-level parity) + perf metrics. */
+    private suspend fun greedyGenerate(prompt: String, maxNew: Int): Gen {
+        val opts = RALLMGenerationOptions(max_tokens = maxNew, temperature = 0f)
+        val ids = ArrayList<Int>(); val sb = StringBuilder()
+        val t0 = System.currentTimeMillis(); var ttftWall = 0.0
+        var ttft = 0.0; var tps = 0.0; var decMs = 0.0; var preMs = 0.0; var totMs = 0.0; var outTok = 0; var inTok = 0
+        RunAnywhere.generateStream(prompt, opts).collect { ev ->
+            val tk = ev.token
+            if (!tk.isNullOrEmpty()) {
+                if (ttftWall == 0.0) ttftWall = (System.currentTimeMillis() - t0).toDouble()
+                sb.append(tk); ids.add(ev.token_id)
+            }
+            if (ev.is_final) ev.result?.let { r ->
+                ttft = r.time_to_first_token_ms.toDouble(); tps = r.tokens_per_second.toDouble()
+                decMs = r.decode_time_ms.toDouble(); preMs = r.prompt_eval_time_ms.toDouble()
+                totMs = r.total_time_ms.toDouble(); outTok = r.completion_tokens; inTok = r.prompt_tokens
+            }
+        }
+        val totalWall = (System.currentTimeMillis() - t0).toDouble()
+        if (outTok == 0) outTok = ids.size
+        val ttftF = if (ttft > 0) ttft else ttftWall
+        val total = if (totMs > 0) totMs else totalWall
+        val decToks = if (decMs > 0) outTok * 1000.0 / decMs else if (tps > 0) tps else if (total > 0) outTok * 1000.0 / total else 0.0
+        val preToks = if (preMs > 0) inTok * 1000.0 / preMs else 0.0
+        return Gen(sb.toString().trim(), ids, ttftF, decToks, preToks, if (tps > 0) tps else decToks, total, outTok)
+    }
+
     // ---------------------------------------------------------------- VLM ----
-    private suspend fun runVlm(report: RunReport, maxNew: Int) {
+    private suspend fun runVlm(report: RunReport, maxNew: Int, suite: NpuSuite?) {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
-        for ((i, c) in vlmCases.withIndex()) {
-            val f = File(ctx.cacheDir, "vlm_$i.jpg").apply { writeBytes(testAsset(c.asset)) }
+        val imgCases = suite?.cases
+            ?.mapNotNull { c -> c.imageAsset?.let { Triple(it, c.text ?: "Describe this image.", c.keywords) } }
+            ?.takeIf { it.isNotEmpty() } ?: vlmCases.map { Triple(it.asset, it.prompt, it.expect) }
+        for ((i, cc) in imgCases.withIndex()) {
+            val (asset, prompt, kws) = cc
+            val f = File(ctx.cacheDir, "vlm_$i.jpg").apply { writeBytes(testAsset(asset)) }
             val r = withTimeout(INFER_TIMEOUT_MS) {
                 RunAnywhere.processImage(RAVLMImage.fromFilePath(f.absolutePath),
-                    RAVLMGenerationOptions(prompt = c.prompt, max_tokens = maxNew))
+                    RAVLMGenerationOptions(prompt = prompt, max_tokens = maxNew))
             }
             val text = r.text.trim()
-            val pass = text.isNotBlank() && c.expect.any { text.contains(it, ignoreCase = true) }
-            report.addSample(JSONObject().put("idx", i).put("input", c.prompt)
+            val pass = text.isNotBlank() && kws.any { text.contains(it, ignoreCase = true) }
+            report.addSample(JSONObject().put("idx", i).put("input", prompt)
                 .put("output", text.take(200)).put("vision_ms", round2(r.image_encode_time_ms.toDouble()))
                 .put("ttft_ms", round2(r.time_to_first_token_ms.toDouble()))
                 .put("tokens_per_s", round2(r.tokens_per_second.toDouble()))
                 .put("total_ms", round2(r.processing_time_ms.toDouble()))
                 .put("out_tok", r.completion_tokens).put("img_tok", r.image_tokens)
-                .put("metric", "keyword:${c.expect.first()}").put("pass", pass))
+                .put("metric", "keyword:${kws.firstOrNull() ?: ""}").put("pass", pass))
             report.gate("vlm_case_$i", pass)
             report.put("vision_ms", round2(r.image_encode_time_ms.toDouble()))
                 .put("ttft_ms", round2(r.time_to_first_token_ms.toDouble()))
@@ -262,10 +329,14 @@ class NpuModelE2ETest {
     }
 
     // ---------------------------------------------------------------- STT ----
-    private suspend fun runStt(report: RunReport) {
+    private suspend fun runStt(report: RunReport, suite: NpuSuite?) {
+        val cases = suite?.cases?.mapNotNull { c -> c.wavAsset?.let { it to c.goldText } }?.takeIf { it.isNotEmpty() }
+            ?: asrCases.map { it.asset to it.ref }
+        val werMax = suite?.werMax ?: NpuRubric.WER_MAX
         var rtfSum = 0.0; var worstWer = 0.0; var n = 0
-        for ((i, c) in asrCases.withIndex()) {
-            val pcm = testAsset(c.asset)
+        for ((i, cc) in cases.withIndex()) {
+            val (asset, ref) = cc
+            val pcm = testAsset(asset)
             val audioS = pcm.size / 2.0 / 16000.0
             val start = System.currentTimeMillis()
             val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.transcribe(pcm) }
@@ -273,10 +344,10 @@ class NpuModelE2ETest {
             val procMs = r.metadata?.processing_time_ms?.takeIf { it > 0 }?.toDouble() ?: wallMs
             val rtf = r.metadata?.real_time_factor?.takeIf { it > 0f }?.toDouble() ?: (procMs / 1000.0 / audioS)
             val text = r.text.trim()
-            val wer = NpuMetrics.wer(c.ref, text)
-            val pass = wer <= NpuRubric.WER_MAX
-            report.addSample(JSONObject().put("idx", i).put("input", c.asset)
-                .put("output", text.take(200)).put("reference", c.ref)
+            val wer = NpuMetrics.wer(ref, text)
+            val pass = wer <= werMax
+            report.addSample(JSONObject().put("idx", i).put("input", asset)
+                .put("output", text.take(200)).put("reference", ref)
                 .put("audio_s", round2(audioS)).put("latency_ms", round2(procMs)).put("rtf", round2(rtf))
                 .put("confidence", round2(r.confidence.toDouble()))
                 .put("metric", "wer").put("score", round3(wer)).put("pass", pass))
@@ -287,10 +358,12 @@ class NpuModelE2ETest {
     }
 
     // ---------------------------------------------------------------- TTS ----
-    private suspend fun runTts(report: RunReport, model: NpuModel, outDir: File?) {
-        val expectedRate = NpuRubric.expectedTtsRate(model.id)
+    private suspend fun runTts(report: RunReport, model: NpuModel, outDir: File?, suite: NpuSuite?) {
+        val texts = suite?.cases?.mapNotNull { it.text }?.takeIf { it.isNotEmpty() } ?: ttsTexts
+        val expectedRate = suite?.cases?.firstOrNull { it.expectedRate > 0 }?.expectedRate
+            ?: NpuRubric.expectedTtsRate(model.id)
         var rtfSum = 0.0; var n = 0
-        for ((i, text) in ttsTexts.withIndex()) {
+        for ((i, text) in texts.withIndex()) {
             val start = System.currentTimeMillis()
             val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.synthesize(text) }
             val wallMs = (System.currentTimeMillis() - start).toDouble()

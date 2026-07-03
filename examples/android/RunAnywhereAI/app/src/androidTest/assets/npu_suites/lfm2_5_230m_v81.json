@@ -1,0 +1,153 @@
+{
+  "schema": "npu_suite/v1",
+  "model_id": "lfm2_5_230m_v81",
+  "hf_repo": "runanywhere/lfm2_5_230m_HNPU",
+  "modality": "llm",
+  "arch": "v81",
+  "reference": "hf:LiquidAI/LFM2.5-230M",
+  "gate": {
+    "suite_pass_frac": 0.6,
+    "metric": "greedy_tol",
+    "edit_tol": 0.1,
+    "min_inputs": 6,
+    "min_decode_toks": 20.0
+  },
+  "cases": [
+    {
+      "id": "p0",
+      "input": {
+        "text": "The capital of France is"
+      },
+      "prompt_len": 6,
+      "gold_tokens": [
+        5242,
+        523,
+        7
+      ],
+      "gold_text": " Paris.",
+      "expect_keywords": [
+        "paris"
+      ]
+    },
+    {
+      "id": "p1",
+      "input": {
+        "text": "def add(a, b):\n    return"
+      },
+      "prompt_len": 9,
+      "gold_tokens": [
+        768,
+        2011,
+        794,
+        509,
+        3663,
+        10559,
+        1683,
+        13792,
+        521,
+        794,
+        5174,
+        861,
+        1789,
+        768,
+        1141,
+        794
+      ],
+      "gold_text": " a + b\n\ndef subtract(a, b):\n    return a - b",
+      "expect_keywords": []
+    },
+    {
+      "id": "p2",
+      "input": {
+        "text": "Question: What is two plus two? Answer:"
+      },
+      "prompt_len": 11,
+      "gold_tokens": [
+        730,
+        529,
+        708,
+        26298,
+        7
+      ],
+      "gold_text": " 4\n```",
+      "expect_keywords": [
+        "4",
+        "four"
+      ]
+    },
+    {
+      "id": "p3",
+      "input": {
+        "text": "List three primary colors:"
+      },
+      "prompt_len": 6,
+      "gold_tokens": [
+        509,
+        526,
+        523,
+        24306,
+        11277,
+        938,
+        5175,
+        875,
+        7305,
+        768,
+        6266,
+        3795,
+        803,
+        21418,
+        810,
+        12148
+      ],
+      "gold_text": "\n\n1. Primary colors are essential for creating a wide range of artistic and creative",
+      "expect_keywords": []
+    },
+    {
+      "id": "p4",
+      "input": {
+        "text": "Explain, in one sentence, why the sky appears blue:"
+      },
+      "prompt_len": 14,
+      "gold_tokens": [
+        509,
+        31466,
+        856,
+        5457,
+        968,
+        30682,
+        803,
+        19462,
+        968,
+        12709,
+        810,
+        10222,
+        797,
+        779,
+        11014,
+        523
+      ],
+      "gold_text": "\n\nBlue is caused by scattering of sunlight by molecules and particles in the atmosphere.",
+      "expect_keywords": [
+        "scatter",
+        "rayleigh",
+        "blue",
+        "light"
+      ]
+    },
+    {
+      "id": "p5",
+      "input": {
+        "text": "Translate to Spanish: good morning."
+      },
+      "prompt_len": 9,
+      "gold_tokens": [
+        7
+      ],
+      "gold_text": "",
+      "expect_keywords": [
+        "buen"
+      ]
+    }
+  ],
+  "input_assets": []
+}

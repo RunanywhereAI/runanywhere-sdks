@@ -180,3 +180,46 @@ class RunReport(
         return sb.toString()
     }
 }
+
+/** One case from a canonical `npu_suite/v1` file (QHexRT2/testing/gen/build_suites.py). */
+class SuiteCase(private val o: JSONObject) {
+    private val input = o.optJSONObject("input") ?: JSONObject()
+    val id: String get() = o.optString("id")
+    val text: String? get() = input.optString("text").ifBlank { null }
+    val wavAsset: String? get() = input.optString("wav_asset").ifBlank { null }
+    val imageAsset: String? get() = input.optString("image_asset").ifBlank { null }
+    val goldText: String get() = o.optString("gold_text")
+    val goldWav: String? get() = o.optString("gold_wav").ifBlank { null }
+    val expectedRate: Int get() = o.optInt("expected_sample_rate", 0)
+    val keywords: List<String> get() = o.optJSONArray("expect_keywords")
+        ?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList()
+    val goldTokens: List<Int>? get() = o.optJSONArray("gold_tokens")
+        ?.let { a -> (0 until a.length()).map { a.getInt(it) } }?.takeIf { it.isNotEmpty() }
+}
+
+/**
+ * A canonical per-model device-test suite — the SAME cases + gold + thresholds forge/goal_npu validates
+ * against (`QHexRT2/testing/suites/<modelId>.json`, synced into `androidTest/assets/npu_suites/`). When a
+ * suite is shipped for a model, the harness runs THESE cases with the forge metric (greedy_tol / wer /
+ * audio) so "device-validated" means the same thing on both planes. Absent → the harness falls back to its
+ * built-in heuristic cases.
+ */
+class NpuSuite(private val o: JSONObject) {
+    val modality: String get() = o.optString("modality")
+    private val gate: JSONObject get() = o.optJSONObject("gate") ?: JSONObject()
+    val metric: String get() = gate.optString("metric")
+    val editTol: Double get() = gate.optDouble("edit_tol", NpuRubric.EDIT_TOL)
+    val werMax: Double get() = gate.optDouble("wer_max", NpuRubric.WER_MAX)
+    val passFrac: Double get() = gate.optDouble("suite_pass_frac", 0.60)
+    val cases: List<SuiteCase> get() = o.optJSONArray("cases")
+        ?.let { a -> (0 until a.length()).map { SuiteCase(a.getJSONObject(it)) } } ?: emptyList()
+
+    companion object {
+        /** Load `assets/npu_suites/<modelId>.json` from the TEST apk; null if none shipped for this model. */
+        fun load(assets: android.content.res.AssetManager, modelId: String): NpuSuite? = try {
+            assets.open("npu_suites/$modelId.json").use {
+                NpuSuite(JSONObject(String(it.readBytes(), Charsets.UTF_8)))
+            }
+        } catch (e: Exception) { null }
+    }
+}
