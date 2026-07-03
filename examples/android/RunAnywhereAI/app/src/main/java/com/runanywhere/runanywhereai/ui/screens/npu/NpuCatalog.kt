@@ -327,6 +327,22 @@ val NPU_MODELS = listOf(
             "melo_tokens.txt",
         ),
     ),
+    NpuModel(
+        id = "melotts_en_v81",
+        name = "MeloTTS EN (HNPU)",
+        detail = "TTS · EN · Hexagon v81",
+        modality = NpuModality.TTS,
+        arch = "v81",
+        files = hfFiles(
+            "runanywhere/melotts_en_HNPU", "v81",
+            "melotts-en.json",
+            "melo_decoder.bin",
+            "melo_encoder.bin",
+            "melo_flow.bin",
+            "melo_lexicon.txt",
+            "melo_tokens.txt",
+        ),
+    ),
 )
 
 /**
