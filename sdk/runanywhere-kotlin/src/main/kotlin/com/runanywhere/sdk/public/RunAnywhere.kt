@@ -33,6 +33,7 @@ import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.generated.convenience.wireString
+import com.runanywhere.sdk.httptransport.OkHttpHttpTransport
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
@@ -223,6 +224,29 @@ object RunAnywhere {
      */
     val deviceId: String
         get() = platformDeviceId()
+
+    // HuggingFace model-download authentication
+
+    /**
+     * Supply a HuggingFace bearer token so the SDK can download **private**
+     * model repos (e.g. the private `runanywhere/<name>_HNPU` NPU bundles that are
+     * otherwise 401/403). The token is attached as `Authorization: Bearer
+     * <token>` ONLY to `huggingface.co` requests routed through the platform
+     * HTTP transport; it is never sent to any other host and never logged.
+     *
+     * Pass `null`/empty to clear it and restore the default public, no-auth
+     * download behavior. When unset, the transport falls back to the
+     * `HF_TOKEN` environment variable, so a plain env var works with no
+     * call-site change. Backward-compatible: absent token = today's exact
+     * public-no-auth behavior.
+     *
+     * Kotlin/Android-only: HuggingFace download auth is handled entirely by
+     * the platform OkHttp transport ([OkHttpHttpTransport]) — no C++/JNI
+     * change, no Swift-parity requirement.
+     */
+    fun setHfToken(token: String?) {
+        OkHttpHttpTransport.setHfToken(token)
+    }
 
     // Phase 1: core initialization (synchronous)
 

@@ -35,6 +35,7 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import okhttp3.Call
 import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -124,6 +125,20 @@ object OkHttpHttpTransport {
      * Reads are lock-free (AtomicReference); writes are atomic.
      */
     private val clientRef: AtomicReference<OkHttpClient?> = AtomicReference(null)
+
+    /**
+     * Optional HuggingFace bearer token for authenticating downloads of
+     * private repos (e.g. the private `runanywhere/<name>_HNPU` NPU bundles).
+     *
+     * Seeded once from the `HF_TOKEN` environment variable so a plain env var
+     * works with no call-site change, and overridable at runtime via
+     * [setHfToken]. Empty/absent = today's public, no-auth behavior. Attached
+     * only to HuggingFace hosts (see [isHuggingFaceHost]) and never logged.
+     *
+     * Reads are lock-free (AtomicReference); writes are atomic.
+     */
+    private val hfTokenRef: AtomicReference<String?> =
+        AtomicReference(System.getenv("HF_TOKEN")?.trim()?.ifEmpty { null })
 
     /**
      * Monotonic counter for keying the in-flight stream registry. OkHttp's
@@ -296,6 +311,23 @@ object OkHttpHttpTransport {
     /** Returns the currently installed custom client, or null if using default. */
     @JvmStatic
     fun getHttpClient(): OkHttpClient? = clientRef.get()
+
+    /**
+     * Set (or clear) the HuggingFace bearer token used to authenticate
+     * private-repo model downloads (e.g. the private `runanywhere/<name>_HNPU`
+     * bundles). When set, the token is attached as `Authorization: Bearer
+     * <token>` ONLY to `huggingface.co` requests routed through this
+     * transport; it is never sent to any other host and never logged.
+     *
+     * Pass `null`/empty to restore the default public, no-auth behavior.
+     * When unset, the transport falls back to the `HF_TOKEN` environment
+     * variable captured at load time. Safe to call at any time; subsequent
+     * requests pick up the new value.
+     */
+    @JvmStatic
+    fun setHfToken(token: String?) {
+        hfTokenRef.set(token?.trim()?.ifEmpty { null })
+    }
 
     // C-callback entry points (invoked by JNI; mirror Swift's
     // `cRequestSend` / `cRequestStream` / `cRequestResume` trampolines)
@@ -598,6 +630,7 @@ object OkHttpHttpTransport {
         val builder = Request.Builder().url(url)
 
         var contentType: String? = null
+        var hasAuthHeader = false
         var i = 0
         while (i < headersFlat.size - 1) {
             val name = headersFlat[i]
@@ -606,7 +639,24 @@ object OkHttpHttpTransport {
             if (name.equals("Content-Type", ignoreCase = true)) {
                 contentType = value
             }
+            if (name.equals("Authorization", ignoreCase = true)) {
+                hasAuthHeader = true
+            }
             i += 2
+        }
+
+        // HuggingFace bearer auth: when a runtime HF token is configured (via
+        // [setHfToken] or the HF_TOKEN env var), attach it ONLY to
+        // huggingface.co requests so private `runanywhere/<name>_HNPU` bundles
+        // resolve. Never override a caller-supplied Authorization header, and
+        // never send the token to any other host. OkHttp strips Authorization
+        // on cross-host redirects (the HF LFS 302 to the presigned CDN), so
+        // the token never leaves HuggingFace.
+        if (!hasAuthHeader) {
+            val token = hfTokenRef.get()
+            if (!token.isNullOrEmpty() && isHuggingFaceHost(url)) {
+                builder.header("Authorization", "Bearer $token")
+            }
         }
 
         // Attach the Range header for resume requests. Matches Swift's
@@ -631,6 +681,19 @@ object OkHttpHttpTransport {
         }
 
         return builder.build()
+    }
+
+    /**
+     * True only for the HuggingFace hosts eligible for the runtime bearer
+     * token — an exact host match (never subdomains). The token is for the
+     * Hub API + `resolve/main` file host; presigned LFS CDN redirect targets
+     * (`cdn-lfs*.hf.co`, xet/S3 hosts) must NOT receive it. OkHttp already
+     * strips Authorization on the cross-host redirect hop, so this host gate
+     * is the primary guard and that stripping is defense-in-depth.
+     */
+    private fun isHuggingFaceHost(url: String): Boolean {
+        val host = url.toHttpUrlOrNull()?.host ?: return false
+        return host == "huggingface.co" || host == "hf.co"
     }
 
     private fun resolveClient(timeoutMs: Long): OkHttpClient {
