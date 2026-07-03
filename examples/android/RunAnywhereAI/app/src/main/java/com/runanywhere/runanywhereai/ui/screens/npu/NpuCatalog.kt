@@ -87,10 +87,10 @@ data class NpuModel(
  * download is what increments the repo's public **downloads** metric. It stays a
  * companion (the arch manifest at index 0 remains the primary model file).
  */
-private fun hfFiles(repo: String, arch: String, vararg names: String): List<NpuFile> {
+private fun hfFiles(repo: String, arch: String, vararg names: String, addConfig: Boolean = true): List<NpuFile> {
     val base = "https://huggingface.co/$repo/resolve/main"
-    return names.map { NpuFile(it, "$base/$arch/$it") } +
-        NpuFile("config.json", "$base/config.json")
+    val files = names.map { NpuFile(it, "$base/$arch/$it") }
+    return if (addConfig) files + NpuFile("config.json", "$base/config.json") else files
 }
 
 /** The six files that make up the public LFM2.5 230M QHexRT bundle (512-ctx). */
@@ -341,6 +341,81 @@ val NPU_MODELS = listOf(
             "melo_flow.bin",
             "melo_lexicon.txt",
             "melo_tokens.txt",
+        ),
+    ),
+    NpuModel(
+        id = "kokoro_en_v81",
+        name = "Kokoro-82M EN (HNPU)",
+        detail = "TTS · 82M · Hexagon v81 (StyleTTS2, on-device g2p, all 8 graphs on-NPU)",
+        modality = NpuModality.TTS,
+        arch = "v81",
+        files = hfFiles(
+            "runanywhere/kokoro_en_HNPU", "v81",
+            "kokoro-en.json",
+            "acoustic_convs.bin",
+            "albert.bin",
+            "dec_backbone.bin",
+            "decode3.bin",
+            "duration_head.bin",
+            "f0n.bin",
+            "gen_s1.bin",
+            "gen_s2.bin",
+            "voices.bin",
+            "kokoro_lexicon.txt",
+            "kokoro_vocab.txt",
+            "voices.bin",
+            "host_weights/asr_res_bias.bin",
+            "host_weights/asr_res_weight.bin",
+            "host_weights/embeddings_LayerNorm_bias.bin",
+            "host_weights/embeddings_LayerNorm_weight.bin",
+            "host_weights/embeddings_hidden_mapping_bias.bin",
+            "host_weights/embeddings_hidden_mapping_weight.bin",
+            "host_weights/embeddings_position_embeddings.bin",
+            "host_weights/embeddings_token_type_embeddings.bin",
+            "host_weights/embeddings_word_embeddings.bin",
+            "host_weights/f0_conv_bias.bin",
+            "host_weights/f0_conv_weight.bin",
+            "host_weights/istft_inverse_basis.bin",
+            "host_weights/istft_window_sum.bin",
+            "host_weights/lstm_encoder_B.bin",
+            "host_weights/lstm_encoder_R.bin",
+            "host_weights/lstm_encoder_W.bin",
+            "host_weights/lstm_prosody_0_B.bin",
+            "host_weights/lstm_prosody_0_R.bin",
+            "host_weights/lstm_prosody_0_W.bin",
+            "host_weights/lstm_prosody_2_B.bin",
+            "host_weights/lstm_prosody_2_R.bin",
+            "host_weights/lstm_prosody_2_W.bin",
+            "host_weights/lstm_prosody_4_B.bin",
+            "host_weights/lstm_prosody_4_R.bin",
+            "host_weights/lstm_prosody_4_W.bin",
+            "host_weights/lstm_shared_B.bin",
+            "host_weights/lstm_shared_R.bin",
+            "host_weights/lstm_shared_W.bin",
+            "host_weights/lstm_textenc_B.bin",
+            "host_weights/lstm_textenc_R.bin",
+            "host_weights/lstm_textenc_W.bin",
+            "host_weights/n_conv_bias.bin",
+            "host_weights/n_conv_weight.bin",
+            "host_weights/prosody_adaln_1_fc_bias.bin",
+            "host_weights/prosody_adaln_1_fc_weight.bin",
+            "host_weights/prosody_adaln_3_fc_bias.bin",
+            "host_weights/prosody_adaln_3_fc_weight.bin",
+            "host_weights/prosody_adaln_5_fc_bias.bin",
+            "host_weights/prosody_adaln_5_fc_weight.bin",
+            "host_weights/sine_harmonics.bin",
+            "host_weights/sine_l_linear_bias.bin",
+            "host_weights/sine_l_linear_weight.bin",
+            "host_weights/sine_noise_std_unused.bin",
+            "host_weights/sine_pi.bin",
+            "host_weights/sine_sampling_rate.bin",
+            "host_weights/sine_sine_amp.bin",
+            "host_weights/sine_two.bin",
+            "host_weights/sine_upsample.bin",
+            "host_weights/sine_voiced_threshold.bin",
+            "host_weights/stft_window.bin",
+            "host_weights/textenc_embedding.bin",
+            addConfig = false,  // kokoro_en_HNPU has no repo-root config.json
         ),
     ),
 )

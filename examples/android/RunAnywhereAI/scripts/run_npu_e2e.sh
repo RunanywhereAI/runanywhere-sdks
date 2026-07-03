@@ -57,7 +57,7 @@ ADB=(adb); [ -n "$SERIAL" ] && ADB=(adb -s "$SERIAL")
 # default per-modality sweep by arch (the small public bundles)
 if [ ${#MODELS[@]} -eq 0 ] && [ -z "$REPO" ]; then
   case "$ARCH" in
-    v81) MODELS=(lfm2_5_230m_v81 moonshine_tiny_v81 melotts_en_v81 internvl3_5_1b_v81);;
+    v81) MODELS=(lfm2_5_230m_v81 moonshine_tiny_v81 melotts_en_v81 kokoro_en_v81 internvl3_5_1b_v81);;  # kokoro is private → needs --token
     v79) MODELS=(lfm2_5_230m_v79 whisper_base_v79 melotts_en_v79 internvl3_5_1b_v79);;
     *)   echo "no default model set for arch=$ARCH; pass model ids explicitly"; exit 2;;
   esac
