@@ -39,5 +39,12 @@
     }
   ],
   "input_assets": [],
-  "todo": "no shipped-model reference wav yet (melotts install blocked) -> mel-cosine pending; sample-rate + non-silence + offline round-trip WER run today"
+  "todo": "no shipped-model reference wav yet (melotts install blocked) -> mel-cosine pending; sample-rate + non-silence + offline round-trip WER run today",
+  "quant": "fp16",
+  "baseline": {
+    "ref": "melotts@EN",
+    "precision": "fp32",
+    "note": "device output is compared to this HF fp32 reference; a lower-precision variant's EXTRA drift vs this baseline is its quantization degradation"
+  },
+  "variants": []
 }

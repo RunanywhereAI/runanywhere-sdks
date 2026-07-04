@@ -32,5 +32,12 @@
   "input_assets": [
     "ls16k_libri.pcm",
     "speech_16k_mono.pcm"
-  ]
+  ],
+  "quant": "fp16",
+  "baseline": {
+    "ref": "hf:UsefulSensors/moonshine-tiny",
+    "precision": "fp32",
+    "note": "device output is compared to this HF fp32 reference; a lower-precision variant's EXTRA drift vs this baseline is its quantization degradation"
+  },
+  "variants": []
 }

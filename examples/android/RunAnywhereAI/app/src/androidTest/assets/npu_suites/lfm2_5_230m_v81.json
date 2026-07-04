@@ -149,5 +149,12 @@
       ]
     }
   ],
-  "input_assets": []
+  "input_assets": [],
+  "quant": "W8A16",
+  "baseline": {
+    "ref": "hf:LiquidAI/LFM2.5-230M",
+    "precision": "fp32",
+    "note": "device output is compared to this HF fp32 reference; a lower-precision variant's EXTRA drift vs this baseline is its quantization degradation"
+  },
+  "variants": []
 }

@@ -48,5 +48,12 @@
   ],
   "input_assets": [
     "test.jpg"
-  ]
+  ],
+  "quant": "W8A16 + fp16 vision",
+  "baseline": {
+    "ref": "hf:OpenGVLab/InternVL3_5-1B",
+    "precision": "fp32",
+    "note": "device output is compared to this HF fp32 reference; a lower-precision variant's EXTRA drift vs this baseline is its quantization degradation"
+  },
+  "variants": []
 }
