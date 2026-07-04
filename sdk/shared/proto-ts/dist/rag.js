@@ -869,9 +869,12 @@ function createBaseRAGQueryOptions() {
         topP: 0,
         topK: 0,
         retrievalTopK: 0,
-        similarityThreshold: 0,
+        similarityThreshold: undefined,
         stream: false,
         disableThinking: false,
+        enableMultiQuery: false,
+        multiQueryCount: undefined,
+        scopePrefix: undefined,
     };
 }
 exports.RAGQueryOptions = {
@@ -897,7 +900,7 @@ exports.RAGQueryOptions = {
         if (message.retrievalTopK !== 0) {
             writer.uint32(56).int32(message.retrievalTopK);
         }
-        if (message.similarityThreshold !== 0) {
+        if (message.similarityThreshold !== undefined) {
             writer.uint32(69).float(message.similarityThreshold);
         }
         if (message.stream !== false) {
@@ -905,6 +908,15 @@ exports.RAGQueryOptions = {
         }
         if (message.disableThinking !== false) {
             writer.uint32(80).bool(message.disableThinking);
+        }
+        if (message.enableMultiQuery !== false) {
+            writer.uint32(88).bool(message.enableMultiQuery);
+        }
+        if (message.multiQueryCount !== undefined) {
+            writer.uint32(96).int32(message.multiQueryCount);
+        }
+        if (message.scopePrefix !== undefined) {
+            writer.uint32(106).string(message.scopePrefix);
         }
         return writer;
     },
@@ -985,6 +997,27 @@ exports.RAGQueryOptions = {
                     message.disableThinking = reader.bool();
                     continue;
                 }
+                case 11: {
+                    if (tag !== 88) {
+                        break;
+                    }
+                    message.enableMultiQuery = reader.bool();
+                    continue;
+                }
+                case 12: {
+                    if (tag !== 96) {
+                        break;
+                    }
+                    message.multiQueryCount = reader.int32();
+                    continue;
+                }
+                case 13: {
+                    if (tag !== 106) {
+                        break;
+                    }
+                    message.scopePrefix = reader.string();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1026,13 +1059,28 @@ exports.RAGQueryOptions = {
                 ? globalThis.Number(object.similarityThreshold)
                 : isSet(object.similarity_threshold)
                     ? globalThis.Number(object.similarity_threshold)
-                    : 0,
+                    : undefined,
             stream: isSet(object.stream) ? globalThis.Boolean(object.stream) : false,
             disableThinking: isSet(object.disableThinking)
                 ? globalThis.Boolean(object.disableThinking)
                 : isSet(object.disable_thinking)
                     ? globalThis.Boolean(object.disable_thinking)
                     : false,
+            enableMultiQuery: isSet(object.enableMultiQuery)
+                ? globalThis.Boolean(object.enableMultiQuery)
+                : isSet(object.enable_multi_query)
+                    ? globalThis.Boolean(object.enable_multi_query)
+                    : false,
+            multiQueryCount: isSet(object.multiQueryCount)
+                ? globalThis.Number(object.multiQueryCount)
+                : isSet(object.multi_query_count)
+                    ? globalThis.Number(object.multi_query_count)
+                    : undefined,
+            scopePrefix: isSet(object.scopePrefix)
+                ? globalThis.String(object.scopePrefix)
+                : isSet(object.scope_prefix)
+                    ? globalThis.String(object.scope_prefix)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -1058,7 +1106,7 @@ exports.RAGQueryOptions = {
         if (message.retrievalTopK !== 0) {
             obj.retrievalTopK = Math.round(message.retrievalTopK);
         }
-        if (message.similarityThreshold !== 0) {
+        if (message.similarityThreshold !== undefined) {
             obj.similarityThreshold = message.similarityThreshold;
         }
         if (message.stream !== false) {
@@ -1066,6 +1114,15 @@ exports.RAGQueryOptions = {
         }
         if (message.disableThinking !== false) {
             obj.disableThinking = message.disableThinking;
+        }
+        if (message.enableMultiQuery !== false) {
+            obj.enableMultiQuery = message.enableMultiQuery;
+        }
+        if (message.multiQueryCount !== undefined) {
+            obj.multiQueryCount = Math.round(message.multiQueryCount);
+        }
+        if (message.scopePrefix !== undefined) {
+            obj.scopePrefix = message.scopePrefix;
         }
         return obj;
     },
@@ -1081,9 +1138,12 @@ exports.RAGQueryOptions = {
         message.topP = object.topP ?? 0;
         message.topK = object.topK ?? 0;
         message.retrievalTopK = object.retrievalTopK ?? 0;
-        message.similarityThreshold = object.similarityThreshold ?? 0;
+        message.similarityThreshold = object.similarityThreshold ?? undefined;
         message.stream = object.stream ?? false;
         message.disableThinking = object.disableThinking ?? false;
+        message.enableMultiQuery = object.enableMultiQuery ?? false;
+        message.multiQueryCount = object.multiQueryCount ?? undefined;
+        message.scopePrefix = object.scopePrefix ?? undefined;
         return message;
     },
 };

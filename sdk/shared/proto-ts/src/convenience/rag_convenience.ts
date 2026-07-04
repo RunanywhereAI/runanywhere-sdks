@@ -62,7 +62,17 @@ export const rAGQueryOptionsDefaults = (): RAGQueryOptions => ({
   topP: 1.0,
   topK: 0,
   retrievalTopK: 0,
-  similarityThreshold: 0,
   stream: false,
   disableThinking: false,
+  enableMultiQuery: false,
+  multiQueryCount: 3,
 });
+
+export const validateRAGQueryOptions = (m: RAGQueryOptions): void => {
+  if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1)) {
+    throw new ValidationError({
+      fieldPath: 'RAGQueryOptions.multi_query_count',
+      message: `multi_query_count must be in >= 1 (got ${m.multiQueryCount})`,
+    });
+  }
+};

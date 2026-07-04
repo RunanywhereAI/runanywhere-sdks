@@ -216,6 +216,42 @@ SDK-facing errors cross the boundary as `runanywhere.v1.SDKError` proto bytes vi
 
 Atomic level-check on hot path (no mutex). `RAC_LOG_TRACE/DEBUG/INFO/WARNING/ERROR/FATAL` macros skip `vsnprintf` entirely when level is filtered. Pre-init: falls back to stderr. Per-environment defaults: dev=DEBUG, staging=INFO, prod=WARNING.
 
+### RAG (`src/features/rag/`)
+
+Hybrid retrieval-augmented generation behind the proto-byte C ABI `rac_rag_*`
+(`include/rac/features/rag/rac_rag.h`). Query flow: `rac_rag_query_proto` → `RAGBackend::query`
+(`rag_backend.cpp`) → `run_rag_query` (`rag_pipeline_graph.cpp`): embed query → USearch
+dense search → BM25 keyword search → RRF fusion (`kRRFConstant=60`) → context assembly
+(token budget) → prompt format → streaming LLM generate. Ingest: `rac_rag_ingest_proto` →
+`RAGBackend::add_document`: recursive char-chunk → batch embed → USearch + BM25 insert.
+Dense store is USearch HNSW (`vector_store_usearch.cpp`), sparse store is a hand-rolled
+Okapi BM25 inverted index (`bm25_index.cpp`). Per-session `RAGBackend` guarded by a single
+`mutex_`; the graph runs outside the lock. Multi-session; each handle independent.
+
+Design rules for RAG work (do not relitigate):
+- **Keep USearch** as the dense ANN store. Do not replace it with a brute-force
+  Hamming/binary-quantized scan — techniques may be borrowed from reference engines, the
+  storage engine is not.
+- **Rerank is LLM-pointwise** (score fused candidates 1–5 with the existing LLM handle),
+  not a cross-encoder. The `rerank_ops` vtable slot / `RAC_PRIMITIVE_RERANK` was retired
+  in plugin ABI v4 — do not revive it for reranking.
+- **All RAG persistence goes through the platform adapter** file I/O
+  (`file_read`/`file_write`/`file_delete`/`file_exists`, `rac_platform_adapter.h`), never
+  direct `std::ofstream`/`fopen`. This is what makes persistence work on Web (OPFS) as well
+  as mobile.
+- **Content-addressed dedup: never re-embed the same input.** Documents are keyed by
+  `sha256(raw_bytes)` (files) or `sha256(normalized_text)` (text); chunk embeddings are
+  cached by `sha256(chunk_text) + embedding_model_fingerprint`. A matching hash + matching
+  fingerprint skips chunking/embedding. Embedding caches are **namespaced by embedding
+  fingerprint**, so switching models is safe and reversible.
+- **SHA-256 is the shared foundation util** `src/foundation/rac_sha256`. Do not add a
+  second SHA-256 implementation (the old file-local one in `rac_http_download.cpp` is being
+  consolidated here).
+- **Persisted indexes are fingerprint-guarded** (embedding model + dim + format version).
+  On mismatch, discard and re-embed — never load stale vectors against a different embedder.
+- Proto changes to `idl/rag.proto` are **additive only** (new optional fields); regenerate
+  all SDK bindings, no version bump.
+
 ## Error Code Ranges
 
 | Range | Category |

@@ -30,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
@@ -124,6 +125,10 @@ fun RagScreen() {
                     ready = ready,
                     isIngesting = ragVm.isIngesting,
                     collapsible = false,
+                    rerankEnabled = ragVm.rerankEnabled,
+                    onRerankChange = ragVm::updateRerank,
+                    multiQueryEnabled = ragVm.multiQueryEnabled,
+                    onMultiQueryChange = ragVm::updateMultiQuery,
                     onCollapse = {},
                     onPickEmbedding = { sheet = embeddingVm },
                     onPickLlm = { sheet = llmVm },
@@ -163,6 +168,10 @@ fun RagScreen() {
                     ready = ready,
                     isIngesting = ragVm.isIngesting,
                     collapsible = collapsible,
+                    rerankEnabled = ragVm.rerankEnabled,
+                    onRerankChange = ragVm::updateRerank,
+                    multiQueryEnabled = ragVm.multiQueryEnabled,
+                    onMultiQueryChange = ragVm::updateMultiQuery,
                     onCollapse = { setupExpanded = false },
                     onPickEmbedding = { sheet = embeddingVm },
                     onPickLlm = { sheet = llmVm },
@@ -220,6 +229,10 @@ private fun SetupCard(
     ready: Boolean,
     isIngesting: Boolean,
     collapsible: Boolean,
+    rerankEnabled: Boolean,
+    onRerankChange: (Boolean) -> Unit,
+    multiQueryEnabled: Boolean,
+    onMultiQueryChange: (Boolean) -> Unit,
     onCollapse: () -> Unit,
     onPickEmbedding: () -> Unit,
     onPickLlm: () -> Unit,
@@ -249,7 +262,78 @@ private fun SetupCard(
                 onAdd = onAdd,
                 onClear = onClear,
             )
+            Divider()
+            RetrievalOptions(
+                rerankEnabled = rerankEnabled,
+                onRerankChange = onRerankChange,
+                multiQueryEnabled = multiQueryEnabled,
+                onMultiQueryChange = onMultiQueryChange,
+            )
         }
+    }
+}
+
+// Retrieval-quality toggles backed by the public SDK RAG options: rerank
+// (RAGConfiguration.rerank_results) and multi-query expansion
+// (RAGQueryOptions.enable_multi_query).
+@Composable
+private fun RetrievalOptions(
+    rerankEnabled: Boolean,
+    onRerankChange: (Boolean) -> Unit,
+    multiQueryEnabled: Boolean,
+    onMultiQueryChange: (Boolean) -> Unit,
+) {
+    val dimens = LocalDimens.current
+    Column(modifier = Modifier.padding(dimens.spacingLg), verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
+        Text(
+            text = "Retrieval",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OptionToggle(
+            icon = RACIcons.Outline.Adjustments,
+            title = "Rerank results",
+            subtitle = "LLM re-scores retrieved chunks for relevance",
+            checked = rerankEnabled,
+            onCheckedChange = onRerankChange,
+        )
+        OptionToggle(
+            icon = RACIcons.Outline.Search,
+            title = "Multi-query expansion",
+            subtitle = "Rewrites the question into variants, fuses results",
+            checked = multiQueryEnabled,
+            onCheckedChange = onMultiQueryChange,
+        )
+    }
+}
+
+@Composable
+private fun OptionToggle(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val dimens = LocalDimens.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(dimens.iconMd),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

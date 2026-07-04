@@ -312,7 +312,18 @@ public fun RAGQueryOptions.Companion.defaults(): RAGQueryOptions =
         max_tokens = 512,
         temperature = 0.7f,
         top_p = 1.0f,
+        multi_query_count = 3,
     )
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun RAGQueryOptions.validate() {
+    if (multi_query_count != null && (multi_query_count < 1)) {
+        throw SDKException.validationFailed(
+            fieldPath = "RAGQueryOptions.multi_query_count",
+            message = "multi_query_count must be in >= 1 (got ${multi_query_count})",
+        )
+    }
+}
 
 /** Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/. */
 public val STTLanguage.wireString: String

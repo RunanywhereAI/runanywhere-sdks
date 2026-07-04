@@ -8,12 +8,19 @@
 #include "rag_pipeline_graph.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <initializer_list>
 #include <unordered_set>
 
+#include "bm25_index.h"
+#include "vector_store_usearch.h"
+
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_adapter.h"
+#include "rac/foundation/rac_sha256.h"
 
 #define LOG_TAG "RAG.Backend"
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
@@ -39,6 +46,38 @@ std::string first_string_metadata(const nlohmann::json& metadata,
 }
 
 } // namespace
+
+namespace {
+
+// Normalize text for content-addressing: trim ends and collapse internal
+// whitespace runs to a single space, so trivially-different copies of the same
+// document hash identically and are not re-embedded.
+std::string normalize_for_hash(const std::string& text) {
+    std::string out;
+    out.reserve(text.size());
+    size_t start = 0;
+    size_t end = text.size();
+    while (start < end && std::isspace(static_cast<unsigned char>(text[start])))
+        ++start;
+    while (end > start && std::isspace(static_cast<unsigned char>(text[end - 1])))
+        --end;
+    bool in_space = false;
+    for (size_t i = start; i < end; ++i) {
+        const char c = text[i];
+        if (std::isspace(static_cast<unsigned char>(c))) {
+            if (!in_space) {
+                out.push_back(' ');
+                in_space = true;
+            }
+        } else {
+            out.push_back(c);
+            in_space = false;
+        }
+    }
+    return out;
+}
+
+}  // namespace
 
 RAGBackend::RAGBackend(const RAGBackendConfig& config, rac_handle_t llm_service,
                        rac_handle_t embeddings_service, bool owns_services)
@@ -138,11 +177,19 @@ RAGBackend::embed_texts_batch(const std::vector<std::string>& texts) const {
 bool RAGBackend::add_document(const std::string& text, const nlohmann::json& metadata) {
     size_t embedding_dimension;
 
+    // Content-addressed dedup: skip re-chunk + re-embed when this exact input
+    // (normalized) was already ingested into this index.
+    const std::string content_hash = sha256_hex(normalize_for_hash(text));
+
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!initialized_) {
             LOGE("Pipeline not initialized");
             return false;
+        }
+        if (ingested_content_hashes_.count(content_hash)) {
+            LOGI("Document already ingested (content hash match) — skipping re-embed");
+            return true;
         }
         embedding_dimension = config_.embedding_dimension;
     }
@@ -212,6 +259,8 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
         chunk.embedding = std::move(embeddings[i]);
         chunk.metadata = metadata;
         chunk.metadata["source_text"] = source_preview;
+        // Persisted so load_index() can rebuild the dedup set from restored chunks.
+        chunk.metadata["content_hash"] = content_hash;
         doc_chunks.push_back(std::move(chunk));
     }
 
@@ -229,7 +278,13 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
         bm25_index_->add_chunks_batch(bm25_chunks);
     }
 
+    ingested_content_hashes_.insert(content_hash);
     LOGI("Successfully added %zu chunks from document", doc_chunks.size());
+
+    // Persist the updated index so a restart never re-embeds this corpus.
+    if (config_.persist_index && !config_.index_path.empty()) {
+        save_index();
+    }
     return true;
 }
 
@@ -417,6 +472,7 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
         g_in.similarity_threshold = config_.similarity_threshold;
         g_in.max_context_tokens = config_.max_context_tokens;
         g_in.prompt_template = config_.prompt_template;
+        g_in.rerank = config_.rerank;
     }
 
     // Per-query overrides from RAGQueryOptions (idl/rag.proto). Zero/unset
@@ -426,9 +482,15 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
         if (overrides->retrieval_top_k > 0) {
             g_in.top_k = static_cast<size_t>(overrides->retrieval_top_k);
         }
-        if (overrides->similarity_threshold > 0.0f) {
+        // Honor an explicit floor including 0.0 (accept-all); unset falls back.
+        if (overrides->has_similarity_threshold) {
             g_in.similarity_threshold = overrides->similarity_threshold;
         }
+        g_in.enable_multi_query = overrides->enable_multi_query;
+        if (overrides->multi_query_count > 0) {
+            g_in.multi_query_count = static_cast<size_t>(overrides->multi_query_count);
+        }
+        g_in.scope_prefix = overrides->scope_prefix;
     }
 
     g_in.question = question;
@@ -493,6 +555,146 @@ void RAGBackend::clear() {
     if (bm25_index_)
         bm25_index_->clear();
     next_chunk_id_ = 0;
+    ingested_content_hashes_.clear();
+    // NOTE: the on-disk snapshot is intentionally NOT deleted here — clear() runs
+    // from ~RAGBackend on every session teardown, which must not wipe persisted
+    // data. Explicit snapshot removal is delete_snapshot(), called by the RAG
+    // clear ABI.
+}
+
+void RAGBackend::delete_snapshot() const {
+    if (config_.index_path.empty())
+        return;
+    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+    if (adapter && adapter->file_delete) {
+        adapter->file_delete(config_.index_path.c_str(), adapter->user_data);
+    }
+}
+
+std::string RAGBackend::index_fingerprint() const {
+    // Bind snapshots to the embedding model + dimension (+ a format version) so a
+    // model or dim change never loads stale vectors against a different encoder.
+    const std::string material = "ragx-v1|" + config_.embedding_model_id +
+                                 "|dim=" + std::to_string(config_.embedding_dimension);
+    return sha256_hex(material);
+}
+
+bool RAGBackend::save_index() const {
+    if (!config_.persist_index || config_.index_path.empty() || !vector_store_)
+        return false;
+    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+    if (!adapter || !adapter->file_write) {
+        LOGE("save_index: platform adapter has no file_write");
+        return false;
+    }
+
+    std::vector<uint8_t> store_bytes;
+    if (!vector_store_->serialize_to_bytes(store_bytes)) {
+        LOGE("save_index: vector store serialization failed");
+        return false;
+    }
+
+    // Container: ['R','A','G','X'][u32 fp_len][fp][u64 next_chunk_id][store bytes].
+    const std::string fp = index_fingerprint();
+    std::vector<uint8_t> blob;
+    blob.reserve(4 + 4 + fp.size() + 8 + store_bytes.size());
+    const char magic[4] = {'R', 'A', 'G', 'X'};
+    blob.insert(blob.end(), magic, magic + 4);
+    const uint32_t fp_len = static_cast<uint32_t>(fp.size());
+    for (int i = 0; i < 4; ++i)
+        blob.push_back(static_cast<uint8_t>((fp_len >> (i * 8)) & 0xff));
+    blob.insert(blob.end(), fp.begin(), fp.end());
+    const uint64_t nid = static_cast<uint64_t>(next_chunk_id_);
+    for (int i = 0; i < 8; ++i)
+        blob.push_back(static_cast<uint8_t>((nid >> (i * 8)) & 0xff));
+    blob.insert(blob.end(), store_bytes.begin(), store_bytes.end());
+
+    const rac_result_t rc =
+        adapter->file_write(config_.index_path.c_str(), blob.data(), blob.size(), adapter->user_data);
+    if (rc != RAC_SUCCESS) {
+        LOGE("save_index: file_write failed (%d)", rc);
+        return false;
+    }
+    LOGI("save_index: wrote %zu bytes to %s", blob.size(), config_.index_path.c_str());
+    return true;
+}
+
+bool RAGBackend::load_index() {
+    if (!config_.persist_index || config_.index_path.empty() || !vector_store_)
+        return false;
+    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+    if (!adapter || !adapter->file_read || !adapter->file_exists)
+        return false;
+    if (adapter->file_exists(config_.index_path.c_str(), adapter->user_data) != RAC_TRUE)
+        return false;
+
+    void* data = nullptr;
+    size_t size = 0;
+    const rac_result_t rc =
+        adapter->file_read(config_.index_path.c_str(), &data, &size, adapter->user_data);
+    if (rc != RAC_SUCCESS || !data) {
+        if (data)
+            free(data);
+        return false;
+    }
+
+    const uint8_t* p = static_cast<const uint8_t*>(data);
+    bool ok = false;
+    do {
+        if (size < 8 || std::memcmp(p, "RAGX", 4) != 0) {
+            LOGE("load_index: bad magic");
+            break;
+        }
+        size_t pos = 4;
+        uint32_t fp_len = 0;
+        for (int i = 0; i < 4; ++i)
+            fp_len |= static_cast<uint32_t>(p[pos++]) << (i * 8);
+        if (pos + fp_len + 8 > size) {
+            LOGE("load_index: truncated header");
+            break;
+        }
+        const std::string fp(reinterpret_cast<const char*>(p + pos), fp_len);
+        pos += fp_len;
+        if (fp != index_fingerprint()) {
+            LOGI("load_index: fingerprint mismatch — ignoring snapshot, will re-embed");
+            break;
+        }
+        uint64_t nid = 0;
+        for (int i = 0; i < 8; ++i)
+            nid |= static_cast<uint64_t>(p[pos++]) << (i * 8);
+
+        if (!vector_store_->load_from_bytes(p + pos, size - pos)) {
+            LOGE("load_index: vector store load failed");
+            break;
+        }
+        // Rebuild BM25 from the restored chunks (BM25 is not itself serialized).
+        if (bm25_index_) {
+            bm25_index_->clear();
+            const auto texts = vector_store_->all_chunk_texts();
+            if (!texts.empty())
+                bm25_index_->add_chunks_batch(texts);
+        }
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            next_chunk_id_ = static_cast<size_t>(nid);
+            // Rebuild the content-addressed dedup set from restored chunk metadata
+            // so a re-ingest after restart is still skipped.
+            ingested_content_hashes_.clear();
+            for (const auto& [id, text] : vector_store_->all_chunk_texts()) {
+                (void)text;
+                const auto chunk = vector_store_->get_chunk(id);
+                if (chunk && chunk->metadata.contains("content_hash")) {
+                    ingested_content_hashes_.insert(
+                        chunk->metadata["content_hash"].get<std::string>());
+                }
+            }
+        }
+        ok = true;
+        LOGI("load_index: restored index from %s", config_.index_path.c_str());
+    } while (false);
+
+    free(data);
+    return ok;
 }
 
 nlohmann::json RAGBackend::get_statistics() const {

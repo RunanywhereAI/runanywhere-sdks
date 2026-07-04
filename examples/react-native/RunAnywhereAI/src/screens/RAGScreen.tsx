@@ -22,6 +22,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import Animated, {
   useAnimatedKeyboard,
@@ -105,6 +106,11 @@ export const RAGScreen: React.FC = () => {
   const [isQuerying, setIsQuerying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // RAG retrieval options. Rerank is a pipeline setting (RAGConfiguration);
+  // multi-query is a per-query option (RAGQueryOptions).
+  const [rerankEnabled, setRerankEnabled] = useState(false);
+  const [multiQueryEnabled, setMultiQueryEnabled] = useState(false);
+
   const scrollViewRef = useRef<ScrollView>(null);
 
   const areModelsReady =
@@ -177,6 +183,7 @@ export const RAGScreen: React.FC = () => {
         ...rAGConfigurationDefaults(),
         embeddingModelId,
         llmModelId,
+        rerankResults: rerankEnabled,
       });
 
       await RunAnywhere.ragCreatePipeline(config);
@@ -200,7 +207,7 @@ export const RAGScreen: React.FC = () => {
     } finally {
       setIsLoadingDocument(false);
     }
-  }, [areModelsReady, isNitroReady, selectedEmbeddingModel, selectedLLMModel]);
+  }, [areModelsReady, isNitroReady, selectedEmbeddingModel, selectedLLMModel, rerankEnabled]);
 
   const handleClearAll = useCallback(async () => {
     await RunAnywhere.ragDestroyPipeline();
@@ -210,6 +217,15 @@ export const RAGScreen: React.FC = () => {
     setCurrentQuestion('');
     setSetupExpanded(true);
   }, []);
+
+  // Rerank is a pipeline-level setting, so changing it rebuilds the pipeline.
+  // The current corpus is dropped (re-add documents), matching a model change.
+  const handleRerankChange = useCallback(async (value: boolean) => {
+    setRerankEnabled(value);
+    if (documents.length > 0) {
+      await handleClearAll();
+    }
+  }, [documents.length, handleClearAll]);
 
   // MARK: - Q&A
 
@@ -230,6 +246,7 @@ export const RAGScreen: React.FC = () => {
       const supportsThinking = selectedLLMModel?.supportsThinking ?? false;
       const result = await RunAnywhere.ragQuery(question, {
         disableThinking: supportsThinking && !thinkingModeEnabled,
+        enableMultiQuery: multiQueryEnabled,
       });
       setMessages((prev) => [
         ...prev,
@@ -249,7 +266,7 @@ export const RAGScreen: React.FC = () => {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
-  }, [currentQuestion, hasDocuments, selectedLLMModel]);
+  }, [currentQuestion, hasDocuments, selectedLLMModel, multiQueryEnabled]);
 
   // MARK: - Model Selection Callbacks
 
@@ -456,6 +473,33 @@ export const RAGScreen: React.FC = () => {
                     </>
                   )}
                 </TouchableOpacity>
+              </View>
+
+              <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+
+              {/* Retrieval options */}
+              <View style={{ padding: dimens.spacing.lg, gap: dimens.spacing.md }}>
+                <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+                  Retrieval
+                </Text>
+                <View style={styles.optionRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>Rerank results</Text>
+                    <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+                      LLM re-scores retrieved chunks for relevance
+                    </Text>
+                  </View>
+                  <Switch value={rerankEnabled} onValueChange={handleRerankChange} />
+                </View>
+                <View style={styles.optionRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>Multi-query expansion</Text>
+                    <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+                      Rewrites the question into variants, fuses results
+                    </Text>
+                  </View>
+                  <Switch value={multiQueryEnabled} onValueChange={setMultiQueryEnabled} />
+                </View>
               </View>
             </View>
           ) : (
@@ -666,6 +710,11 @@ const styles = StyleSheet.create({
   docRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   addDocButton: {
     flexDirection: 'row',

@@ -654,6 +654,17 @@ target_compile_features(test_tts_config_defaults PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tts_config_defaults)
 add_test(NAME tts_config_defaults_tests COMMAND test_tts_config_defaults)
 
+# Shared SHA-256 foundation util — known-answer + streaming parity.
+add_executable(test_sha256 test_sha256.cpp)
+target_include_directories(test_sha256 PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_sha256 PRIVATE rac_commons)
+rac_link_archive_deps(test_sha256)
+target_compile_features(test_sha256 PRIVATE cxx_std_17)
+add_test(NAME sha256_tests COMMAND test_sha256)
+
 # RAG symbols are folded into rac_commons only when the RAG OBJECT target is
 # enabled, so guard these tests the same way as test_advanced_modality_proto_abi.
 if(TARGET rac_backend_rag)
@@ -671,6 +682,51 @@ if(TARGET rac_backend_rag)
     target_compile_features(test_rag_pipeline_graph PRIVATE cxx_std_17)
     rac_test_define_have_protobuf(test_rag_pipeline_graph)
     add_test(NAME rag_pipeline_graph_tests COMMAND test_rag_pipeline_graph)
+
+    # Deterministic unit test for rerank score parsing + reordering (no LLM).
+    add_executable(test_rag_rerank test_rag_rerank.cpp)
+    target_include_directories(test_rag_rerank PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
+    )
+    target_link_libraries(test_rag_rerank PRIVATE rac_commons)
+    rac_link_archive_deps(test_rag_rerank)
+    target_compile_features(test_rag_rerank PRIVATE cxx_std_17)
+    rac_test_define_have_protobuf(test_rag_rerank)
+    add_test(NAME rag_rerank_tests COMMAND test_rag_rerank)
+
+    # Deterministic unit test for N-way RRF fusion + query-variant parsing.
+    add_executable(test_rag_fusion test_rag_fusion.cpp)
+    target_include_directories(test_rag_fusion PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
+    )
+    target_link_libraries(test_rag_fusion PRIVATE rac_commons)
+    rac_link_archive_deps(test_rag_fusion)
+    target_compile_features(test_rag_fusion PRIVATE cxx_std_17)
+    rac_test_define_have_protobuf(test_rag_fusion)
+    add_test(NAME rag_fusion_tests COMMAND test_rag_fusion)
+endif()
+
+# End-to-end RAG test with real models (ONNX embeddings + GGUF LLM). SKIPs
+# gracefully when the models are absent, so it is safe to register whenever the
+# RAG, llamacpp and onnx backends are all built.
+if(TARGET rac_backend_rag AND RAC_BACKEND_LLAMACPP AND RAC_BACKEND_ONNX)
+    add_executable(test_rag_e2e test_rag_e2e.cpp)
+    target_include_directories(test_rag_e2e PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
+    )
+    target_link_libraries(test_rag_e2e PRIVATE rac_commons rac_backend_llamacpp rac_backend_onnx)
+    rac_link_archive_deps(test_rag_e2e)
+    target_compile_features(test_rag_e2e PRIVATE cxx_std_17)
+    rac_test_define_have_protobuf(test_rag_e2e)
+    target_compile_definitions(test_rag_e2e PRIVATE
+        RAG_SAMPLE_DOC_PATH="${CMAKE_CURRENT_SOURCE_DIR}/data/rag_sample.md")
+    add_test(NAME rag_e2e_tests COMMAND test_rag_e2e)
 endif()
 
 # --- Per-framework "is this file a model file?" parity tests -----------------

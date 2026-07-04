@@ -51,8 +51,19 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
     var error by mutableStateOf<String?>(null)
         private set
 
+    // RAG retrieval options exposed as UI toggles. Rerank is a pipeline-level
+    // setting (RAGConfiguration); multi-query is a per-query option.
+    var rerankEnabled by mutableStateOf(false)
+        private set
+    var multiQueryEnabled by mutableStateOf(false)
+        private set
+
     private var pipelineKey: Pair<String, String>? = null
     private var job: Job? = null
+
+    // On-device index snapshot. Persistence means chunks survive an app restart
+    // (the fingerprint-guarded snapshot is reloaded instead of re-embedding).
+    private val indexPath: String = getApplication<Application>().filesDir.resolve("rag_index.bin").absolutePath
 
     val hasDocuments: Boolean get() = documents.isNotEmpty()
 
@@ -79,6 +90,26 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateMultiQuery(value: Boolean) {
+        multiQueryEnabled = value
+    }
+
+    // Rerank is set on the pipeline (RAGConfiguration), so flipping it recreates
+    // the pipeline. With persistence on, the snapshot is reloaded — the ingested
+    // corpus survives the recreate without re-embedding.
+    fun updateRerank(value: Boolean) {
+        if (rerankEnabled == value) return
+        rerankEnabled = value
+        val key = pipelineKey ?: return
+        viewModelScope.launch {
+            runCatching {
+                RunAnywhere.ragDestroyPipeline()
+                RunAnywhere.ragCreatePipeline(buildConfig(key.first, key.second))
+                chunkCount = RunAnywhere.ragGetStatistics().indexed_chunks.toInt()
+            }.onFailure { RACLog.e("rag rerank toggle failed", it) }
+        }
+    }
+
     fun ask(question: String) {
         val q = question.trim()
         if (q.isBlank() || isQuerying || !hasDocuments) return
@@ -87,7 +118,8 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
         isQuerying = true
         job = viewModelScope.launch {
             try {
-                val result = RunAnywhere.ragQuery(q, RAGQueryOptions.defaults(question = q))
+                val options = RAGQueryOptions.defaults(question = q).copy(enable_multi_query = multiQueryEnabled)
+                val result = RunAnywhere.ragQuery(q, options)
                 val sources = result.retrieved_chunks.map {
                     RagSource(text = it.text.trim(), score = it.similarity_score, document = it.source_document.orEmpty())
                 }
@@ -129,6 +161,15 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
         chunkCount = 0
     }
 
+    // Pipeline config: rerank + fingerprint-guarded persistence layered onto the
+    // model defaults. index_path makes the vector index survive app restarts.
+    private fun buildConfig(embeddingId: String, llmId: String): RAGConfiguration =
+        RAGConfiguration.defaults(embeddingModelId = embeddingId, llmModelId = llmId).copy(
+            rerank_results = rerankEnabled,
+            persist_index = true,
+            index_path = indexPath,
+        )
+
     private suspend fun ensurePipeline(embeddingId: String, llmId: String) {
         val key = embeddingId to llmId
         if (pipelineKey == key) return
@@ -136,9 +177,7 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
         documents.clear()
         messages.clear()
         chunkCount = 0
-        RunAnywhere.ragCreatePipeline(
-            RAGConfiguration.defaults(embeddingModelId = embeddingId, llmModelId = llmId),
-        )
+        RunAnywhere.ragCreatePipeline(buildConfig(embeddingId, llmId))
         pipelineKey = key
     }
 

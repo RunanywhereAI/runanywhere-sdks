@@ -162,6 +162,8 @@ class _RagDemoViewState extends State<RagDemoView> {
               const Divider(height: 1),
               _buildDocumentStatusBar(),
               const Divider(height: 1),
+              _buildRetrievalOptions(),
+              const Divider(height: 1),
               if (_viewModel.error != null) _buildErrorBanner(),
               Expanded(child: _buildMessagesArea()),
               _buildInputBar(),
@@ -196,6 +198,29 @@ class _RagDemoViewState extends State<RagDemoView> {
           ),
         ],
       ),
+    );
+  }
+
+  // Retrieval-quality toggles backed by the public SDK RAG options: rerank
+  // (RAGConfiguration.rerankResults) and multi-query (RAGQueryOptions.enableMultiQuery).
+  Widget _buildRetrievalOptions() {
+    return Column(
+      children: [
+        SwitchListTile(
+          dense: true,
+          title: const Text('Rerank results'),
+          subtitle: const Text('LLM re-scores retrieved chunks for relevance'),
+          value: _viewModel.rerankEnabled,
+          onChanged: (value) => unawaited(_viewModel.setRerankEnabled(value)),
+        ),
+        SwitchListTile(
+          dense: true,
+          title: const Text('Multi-query expansion'),
+          subtitle: const Text('Rewrites the question into variants, fuses results'),
+          value: _viewModel.multiQueryEnabled,
+          onChanged: (value) => _viewModel.multiQueryEnabled = value,
+        ),
+      ],
     );
   }
 

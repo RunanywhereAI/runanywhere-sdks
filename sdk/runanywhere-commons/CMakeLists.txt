@@ -722,6 +722,7 @@ set(RAC_CORE_SOURCES
     src/core/rac_error_model.cpp
     src/core/rac_error_proto.cpp
     src/foundation/rac_proto_buffer.cpp
+    src/foundation/rac_sha256.cpp
     # Canonical two-phase SDK init ABI. Wraps existing rac_state /
     # rac_auth / rac_device_manager / rac_model_assignment internals behind
     # one rac_sdk_init_phase{1,2}_proto + rac_sdk_retry_http_proto surface so
