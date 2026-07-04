@@ -274,21 +274,24 @@ class VectorStoreUSearch::Impl {
         return stats;
     }
 
-    bool save(const std::string& path) const {
+    bool serialize_to_bytes(std::vector<uint8_t>& out) const {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        // Save USearch index
-        auto save_result = index_.save(path.c_str());
-        if (!save_result) {
-            RAC_LOG_ERROR(LOG_TAG, "Failed to save USearch index: %s", save_result.error.what());
-            return false;
+        // USearch binary → in-memory buffer (no filesystem access).
+        const std::size_t idx_len = index_.serialized_length();
+        std::vector<uint8_t> idx_buf(idx_len);
+        if (idx_len > 0) {
+            memory_mapped_file_t mmf(reinterpret_cast<byte_t*>(idx_buf.data()), idx_len);
+            auto r = index_.save(std::move(mmf));
+            if (!r) {
+                LOGE("serialize: USearch save failed: %s", r.error.what());
+                return false;
+            }
         }
 
-        // Save metadata to JSON file
         nlohmann::json metadata;
         metadata["next_key"] = next_key_;
         metadata["chunks"] = nlohmann::json::array();
-
         for (const auto& [key, chunk] : chunks_) {
             nlohmann::json chunk_json;
             chunk_json["key"] = key;
@@ -297,76 +300,99 @@ class VectorStoreUSearch::Impl {
             chunk_json["metadata"] = chunk.metadata;
             metadata["chunks"].push_back(chunk_json);
         }
+        const std::string js = metadata.dump();
 
-        std::string metadata_path = path + ".metadata.json";
-        std::ofstream metadata_file(metadata_path);
-        if (!metadata_file) {
-            RAC_LOG_ERROR(LOG_TAG, "Failed to open metadata file: %s", metadata_path.c_str());
-            return false;
-        }
-        metadata_file << metadata.dump();
-        metadata_file.close();
-
-        RAC_LOG_INFO(LOG_TAG, "Saved index and metadata to %s", path.c_str());
+        // Frame: [u64 idx_len][idx bytes][u64 json_len][json bytes], little-endian.
+        out.clear();
+        out.reserve(16 + idx_len + js.size());
+        auto put_u64 = [&out](uint64_t v) {
+            for (int i = 0; i < 8; ++i)
+                out.push_back(static_cast<uint8_t>((v >> (i * 8)) & 0xff));
+        };
+        put_u64(idx_len);
+        out.insert(out.end(), idx_buf.begin(), idx_buf.end());
+        put_u64(js.size());
+        out.insert(out.end(), js.begin(), js.end());
         return true;
     }
 
-    bool load(const std::string& path) {
+    bool load_from_bytes(const uint8_t* data, size_t size) {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        // Load USearch index
-        auto load_result = index_.load(path.c_str());
-        if (!load_result) {
-            RAC_LOG_ERROR(LOG_TAG, "Failed to load USearch index: %s", load_result.error.what());
+        size_t pos = 0;
+        auto get_u64 = [&](uint64_t& v) -> bool {
+            if (pos + 8 > size)
+                return false;
+            v = 0;
+            for (int i = 0; i < 8; ++i)
+                v |= static_cast<uint64_t>(data[pos++]) << (i * 8);
+            return true;
+        };
+
+        uint64_t idx_len = 0;
+        if (!get_u64(idx_len) || pos + idx_len > size) {
+            LOGE("load: truncated index section");
             return false;
         }
+        const uint8_t* idx_ptr = data + pos;
+        pos += idx_len;
 
-        // Load metadata from JSON file
-        std::string metadata_path = path + ".metadata.json";
-        std::ifstream metadata_file(metadata_path);
-        if (!metadata_file) {
-            RAC_LOG_ERROR(LOG_TAG, "Failed to open metadata file: %s", metadata_path.c_str());
+        uint64_t js_len = 0;
+        if (!get_u64(js_len) || pos + js_len > size) {
+            LOGE("load: truncated metadata section");
             return false;
         }
+        const std::string js(reinterpret_cast<const char*>(data + pos), js_len);
 
-        nlohmann::json metadata;
+        if (idx_len > 0) {
+            memory_mapped_file_t mmf(const_cast<byte_t*>(reinterpret_cast<const byte_t*>(idx_ptr)),
+                                     idx_len);
+            auto r = index_.load(std::move(mmf));
+            if (!r) {
+                LOGE("load: USearch load failed: %s", r.error.what());
+                return false;
+            }
+        }
+
         try {
-            metadata_file >> metadata;
-
-            const auto& chunks_json = metadata.at("chunks");
-            const std::size_t parsed_next_key = metadata.at("next_key").get<std::size_t>();
-
+            const auto metadata = nlohmann::json::parse(js);
             decltype(chunks_) new_chunks;
             decltype(id_to_key_) new_id_to_key;
-
-            for (const auto& chunk_json : chunks_json) {
+            for (const auto& chunk_json : metadata.at("chunks")) {
                 const std::size_t key = chunk_json.at("key").get<std::size_t>();
-
                 DocumentChunk chunk;
                 chunk.id = chunk_json.at("id").get<std::string>();
                 chunk.text = chunk_json.at("text").get<std::string>();
-                if (chunk_json.contains("embedding")) {
-                    chunk.embedding = chunk_json.at("embedding").get<std::vector<float>>();
-                }
                 chunk.metadata = chunk_json.at("metadata");
-
-                std::string chunk_id = chunk.id;
+                const std::string id = chunk.id;
                 new_chunks[key] = std::move(chunk);
-                new_id_to_key[chunk_id] = key;
+                new_id_to_key[id] = key;
             }
-
-            next_key_ = parsed_next_key;
+            next_key_ = metadata.at("next_key").get<std::size_t>();
             chunks_ = std::move(new_chunks);
             id_to_key_ = std::move(new_id_to_key);
         } catch (const std::exception& e) {
-            RAC_LOG_ERROR(LOG_TAG, "Failed to parse metadata JSON: %s", e.what());
-            index_.clear();  // Revert to consistent empty state
+            LOGE("load: metadata parse failed: %s", e.what());
+            index_.clear();
+            chunks_.clear();
+            id_to_key_.clear();
+            next_key_ = 0;
             return false;
         }
 
-        RAC_LOG_INFO(LOG_TAG, "Loaded index and metadata from %s (next_key=%zu, chunks=%zu)",
-                     path.c_str(), next_key_, chunks_.size());
+        LOGI("load: restored %zu chunks (next_key=%zu)", chunks_.size(), next_key_);
         return true;
+    }
+
+    std::vector<std::pair<std::string, std::string>> all_chunk_texts() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        std::vector<std::pair<std::string, std::string>> out;
+        out.reserve(chunks_.size());
+        for (const auto& [key, chunk] : chunks_) {
+            (void)key;
+            out.emplace_back(chunk.id, chunk.text);
+        }
+        return out;
     }
 
    private:
@@ -432,12 +458,16 @@ nlohmann::json VectorStoreUSearch::get_statistics() const {
     return impl_->get_statistics();
 }
 
-bool VectorStoreUSearch::save(const std::string& path) const {
-    return impl_->save(path);
+bool VectorStoreUSearch::serialize_to_bytes(std::vector<uint8_t>& out) const {
+    return impl_->serialize_to_bytes(out);
 }
 
-bool VectorStoreUSearch::load(const std::string& path) {
-    return impl_->load(path);
+bool VectorStoreUSearch::load_from_bytes(const uint8_t* data, size_t size) {
+    return impl_->load_from_bytes(data, size);
+}
+
+std::vector<std::pair<std::string, std::string>> VectorStoreUSearch::all_chunk_texts() const {
+    return impl_->all_chunk_texts();
 }
 
 }  // namespace runanywhere::rag

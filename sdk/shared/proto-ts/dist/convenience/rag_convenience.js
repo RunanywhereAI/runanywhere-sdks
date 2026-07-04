@@ -13,7 +13,7 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.rAGQueryOptionsDefaults = exports.validateRAGConfiguration = exports.rAGConfigurationDefaults = void 0;
+exports.validateRAGQueryOptions = exports.rAGQueryOptionsDefaults = exports.validateRAGConfiguration = exports.rAGConfigurationDefaults = void 0;
 const _errors_1 = require("./_errors");
 const rAGConfigurationDefaults = () => ({
     embeddingModelId: '',
@@ -60,8 +60,18 @@ const rAGQueryOptionsDefaults = () => ({
     topP: 1.0,
     topK: 0,
     retrievalTopK: 0,
-    similarityThreshold: 0,
     stream: false,
     disableThinking: false,
+    enableMultiQuery: false,
+    multiQueryCount: 3,
 });
 exports.rAGQueryOptionsDefaults = rAGQueryOptionsDefaults;
+const validateRAGQueryOptions = (m) => {
+    if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1)) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'RAGQueryOptions.multi_query_count',
+            message: `multi_query_count must be in >= 1 (got ${m.multiQueryCount})`,
+        });
+    }
+};
+exports.validateRAGQueryOptions = validateRAGQueryOptions;

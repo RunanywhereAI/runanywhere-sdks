@@ -66,6 +66,33 @@ class RAGViewModel extends ChangeNotifier {
   RAGResult? _lastResult;
   RAGResult? get lastResult => _lastResult;
 
+  // RAG retrieval options. Rerank is a pipeline setting (RAGConfiguration);
+  // multi-query is a per-query option (RAGQueryOptions).
+  bool _rerankEnabled = false;
+  bool get rerankEnabled => _rerankEnabled;
+
+  bool _multiQueryEnabled = false;
+  bool get multiQueryEnabled => _multiQueryEnabled;
+
+  set multiQueryEnabled(bool value) {
+    _multiQueryEnabled = value;
+    notifyListeners();
+  }
+
+  // Rerank rebuilds the pipeline, so changing it after a document is loaded
+  // resets the session (re-add the document), matching a model change.
+  Future<void> setRerankEnabled(bool value) async {
+    if (_rerankEnabled == value) return;
+    _rerankEnabled = value;
+    if (_isDocumentLoaded) {
+      await RunAnywhere.rag.destroyPipeline();
+      _isDocumentLoaded = false;
+      _documentName = null;
+      _messages = [];
+    }
+    notifyListeners();
+  }
+
   bool get canAskQuestion =>
       _isDocumentLoaded && !_isQuerying && _currentQuestion.trim().isNotEmpty;
 
@@ -89,6 +116,7 @@ class RAGViewModel extends ChangeNotifier {
       await RunAnywhere.rag.ragCreatePipelineForModels(
         embeddingModel: embeddingModel,
         llmModel: llmModel,
+        baseConfiguration: RAGConfiguration(rerankResults: _rerankEnabled),
       );
       await RunAnywhere.rag.ingest(extractedText);
 
@@ -132,6 +160,7 @@ class RAGViewModel extends ChangeNotifier {
         question,
         options: RAGQueryOptions(
           disableThinking: _llmSupportsThinking && !thinkingModeEnabled,
+          enableMultiQuery: _multiQueryEnabled,
         ),
       );
 

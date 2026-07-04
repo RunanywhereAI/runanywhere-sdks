@@ -57,6 +57,13 @@ final class RAGViewModel {
 
     var currentQuestion = ""
 
+    // MARK: - Retrieval Options
+
+    /// Rerank is a pipeline setting (RARAGConfiguration); multi-query is a
+    /// per-query option (RARAGQueryOptions).
+    private(set) var rerankEnabled = false
+    var multiQueryEnabled = false
+
     // MARK: - Private
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RAGViewModel")
@@ -97,9 +104,12 @@ final class RAGViewModel {
             // Canonical defaults do the right thing: commons derives the
             // embedding dimension from the loaded embedding model, and the
             // retrieval/chunking values come from idl/rag.proto rac_defaults.
+            var configuration = RARAGConfiguration.defaults()
+            configuration.rerankResults = rerankEnabled
             try await RunAnywhere.ragCreatePipeline(
                 embeddingModel: embeddingModel,
-                llmModel: llmModel
+                llmModel: llmModel,
+                baseConfiguration: configuration
             )
 
             logger.info("Ingesting document text (\(extractedText.count) chars)")
@@ -139,6 +149,7 @@ final class RAGViewModel {
             // directive; the app never injects control tokens into prompts.
             options.disableThinking =
                 settings.loadedModelSupportsThinking && !settings.thinkingModeEnabled
+            options.enableMultiQuery = multiQueryEnabled
 
             logger.info("Querying RAG pipeline: \(question)")
             let result = try await RunAnywhere.ragQuery(options)
@@ -168,5 +179,16 @@ final class RAGViewModel {
         currentQuestion = ""
 
         logger.info("Document cleared and pipeline destroyed")
+    }
+
+    /// Rerank is a pipeline setting, so changing it rebuilds the pipeline. With a
+    /// document loaded, this resets the session (re-add the document) — matching
+    /// how changing models resets the pipeline.
+    func setRerankEnabled(_ value: Bool) async {
+        guard rerankEnabled != value else { return }
+        rerankEnabled = value
+        if isDocumentLoaded {
+            await clearDocument()
+        }
     }
 }

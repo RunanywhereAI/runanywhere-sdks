@@ -59,6 +59,8 @@ endif()
 set(RAG_PIPELINE_SOURCES
     rag_backend.cpp
     rag_pipeline_graph.cpp
+    rag_rerank.cpp
+    rag_fusion.cpp
     vector_store_usearch.cpp
     rag_chunker.cpp
     bm25_index.cpp
@@ -75,6 +77,7 @@ set(RAG_PIPELINE_SOURCES
 set(RAG_PIPELINE_HEADERS
     rag_backend.h
     rag_pipeline_graph.h
+    rag_rerank.h
     vector_store_usearch.h
     rag_chunker.h
     bm25_index.h

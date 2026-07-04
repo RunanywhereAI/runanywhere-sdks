@@ -202,13 +202,31 @@ message RAGQueryOptions {
 
     // Retrieval overrides. 0/unset = use RAGConfiguration defaults.
     int32 retrieval_top_k        = 7;
-    float similarity_threshold   = 8;
+    // Per-query similarity floor. `optional` so an explicit 0.0 (accept
+    // everything) is distinguishable from "unset" and can override a positive
+    // session-level default; unset falls back to RAGConfiguration.
+    optional float similarity_threshold = 8;
     bool  stream                 = 9;
 
     // When true, suppress the answer model's thinking phase (maps to
     // LLMGenerationOptions.disable_thinking so commons prepends the no-think
     // directive instead of the app injecting "/no_think"). Default false.
     bool  disable_thinking       = 10;
+
+    // Multi-query expansion: when true, the answer LLM rewrites the question
+    // into `multi_query_count` variants; retrieval runs for the original plus
+    // each variant and the rankings are RRF-fused before rerank. Falls back to
+    // a single query if expansion yields nothing.
+    bool  enable_multi_query     = 11;
+    optional int32 multi_query_count = 12 [
+        (runanywhere.v1.rac_default) = "3",
+        (runanywhere.v1.rac_min) = 1
+    ];
+
+    // Scoped retrieval: when set, only chunks whose document id begins with
+    // this prefix are eligible (e.g. a chat/collection namespace). Unset =
+    // search the whole index.
+    optional string scope_prefix = 13;
 }
 
 message RAGQueryRequest {

@@ -225,6 +225,13 @@ RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& p
         bc.chunk_overlap = static_cast<size_t>(proto.chunk_overlap());
     if (proto.has_prompt_template() && !proto.prompt_template().empty())
         bc.prompt_template = proto.prompt_template();
+    bc.rerank = proto.rerank_results();
+    // Persistence: index_path + persist_index drive fingerprint-guarded
+    // snapshotting; embedding_model_id feeds the fingerprint.
+    bc.embedding_model_id = proto.embedding_model_id();
+    bc.persist_index = proto.persist_index();
+    if (proto.has_index_path())
+        bc.index_path = proto.index_path();
     return bc;
 }
 
@@ -361,18 +368,13 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Reranking is part of the public RAGConfiguration surface (rag.proto:128,
-    // rag.proto:130) but no rerank backend is wired up: rag_pipeline_graph
-    // skips the rerank step (rag_pipeline_graph.h), and the rerank primitive +
-    // rerank_ops vtable slot were removed in plugin ABI v4. Silently honoring
-    // the request would let callers ship "reranked" RAG that is plain RRF
-    // fusion. Fail fast so misconfiguration surfaces at session-create instead
-    // of looking exactly like a working baseline.
-    const bool rerank_requested = proto.rerank_results() || (proto.has_reranker_model_id() &&
-                                                             !proto.reranker_model_id().empty());
-    if (rerank_requested) {
+    // rerank_results enables LLM-pointwise reranking of fused candidates, run
+    // by rag_pipeline_graph using the session's LLM handle. reranker_model_id
+    // (a dedicated cross-encoder) is not yet supported — reject only that.
+    if (proto.has_reranker_model_id() && !proto.reranker_model_id().empty()) {
         const char* msg =
-            "reranking is not yet implemented; unset rerank_results and reranker_model_id";
+            "reranker_model_id (dedicated cross-encoder) is not yet supported; use rerank_results "
+            "to enable LLM-pointwise reranking with the session LLM";
         publish_failure(RAC_ERROR_FEATURE_NOT_AVAILABLE, "rag.sessionCreate", msg);
         return RAC_ERROR_FEATURE_NOT_AVAILABLE;
     }
@@ -453,6 +455,14 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
                             "RAG pipeline failed to initialize");
             // session destructor clears owned services.
             return RAC_ERROR_INITIALIZATION_FAILED;
+        }
+        // Fingerprint-guarded snapshot restore: on a hit this avoids re-embedding
+        // the corpus; on a miss/mismatch the index stays empty and re-embeds on
+        // ingest.
+        if (backend_config.persist_index && !backend_config.index_path.empty()) {
+            if (session->backend->load_index()) {
+                LOGI("Restored RAG index snapshot from %s", backend_config.index_path.c_str());
+            }
         }
         *out_session = reinterpret_cast<rac_handle_t>(session.release());
         LOGI("RAG session created");
@@ -605,7 +615,13 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     // RAGBackend::query so legacy callers behave as before.
     RAGBackend::QueryOverrides overrides;
     overrides.retrieval_top_k = query_proto.retrieval_top_k();
+    overrides.has_similarity_threshold = query_proto.has_similarity_threshold();
     overrides.similarity_threshold = query_proto.similarity_threshold();
+    overrides.enable_multi_query = query_proto.enable_multi_query();
+    overrides.multi_query_count =
+        query_proto.has_multi_query_count() ? query_proto.multi_query_count() : 0;
+    if (query_proto.has_scope_prefix())
+        overrides.scope_prefix = query_proto.scope_prefix();
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
                        "rag.query", 0.0f, 1, 0, nullptr, 0.0,
@@ -715,6 +731,8 @@ rac_result_t rac_rag_clear_proto(rac_handle_t session, rac_proto_buffer_t* out_s
     }
     try {
         s->backend->clear();
+        // Explicit clear also drops the persisted snapshot (unlike teardown).
+        s->backend->delete_snapshot();
     } catch (const std::exception& e) {
         LOGE("rag.clear exception: %s", e.what());
         publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.clear", e.what());

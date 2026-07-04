@@ -410,7 +410,19 @@ extension RAGQueryOptionsConvenience on RAGQueryOptions {
     r.maxTokens = 512;
     r.temperature = 0.7;
     r.topP = 1.0;
+    r.multiQueryCount = 3;
     return r;
+  }
+}
+
+extension RAGQueryOptionsValidate on RAGQueryOptions {
+  void validate() {
+    if (multiQueryCount < 1) {
+      throw SDKException.validationFailed(
+        'multi_query_count must be in >= 1 (got $multiQueryCount)',
+        fieldPath: 'RAGQueryOptions.multi_query_count',
+      );
+    }
   }
 }
 

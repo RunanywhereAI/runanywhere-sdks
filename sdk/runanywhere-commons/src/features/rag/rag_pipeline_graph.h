@@ -17,11 +17,12 @@
  * drains, the scheduler joins, and tokens are forwarded to the caller's
  * callback as they stream out of the LLM node.
  *
- * Rerank: not supported. The `RAC_PRIMITIVE_RERANK` primitive and its
- * `rerank_ops` vtable slot were removed in plugin ABI v4 (no backend ever
- * implemented reranking), so this step is skipped. If reranking is
- * reintroduced it would need a new primitive plus a `RerankNode` between
- * Retrieve and ContextAssembly with the same per-query construction.
+ * Rerank: optional LLM-pointwise stage between Retrieve and ContextAssembly,
+ * enabled per query via RAGGraphInputs::rerank. Fused candidates are scored
+ * 1-5 for relevance by the same LLM handle used for generation (no
+ * cross-encoder — the `RAC_PRIMITIVE_RERANK` primitive / `rerank_ops` vtable
+ * slot were removed in plugin ABI v4) and reordered before context assembly.
+ * Any failure falls back to the fused order.
  */
 
 #ifndef RUNANYWHERE_RAG_PIPELINE_GRAPH_H
@@ -64,6 +65,19 @@ struct RAGGraphInputs {
     size_t top_k = 10;
     float similarity_threshold = 0.0f;
     size_t max_context_tokens = 2048;
+
+    // When true, fused candidates are reranked by LLM-pointwise relevance
+    // scoring (reusing llm_service) before context assembly.
+    bool rerank = false;
+
+    // Multi-query expansion: rewrite the question into `multi_query_count`
+    // variants (via llm_service), retrieve for each, RRF-fuse all rankings.
+    bool enable_multi_query = false;
+    size_t multi_query_count = 3;
+
+    // Scoped retrieval: only chunks whose document_id starts with this prefix
+    // are eligible. Empty = whole index.
+    std::string scope_prefix;
 };
 
 /**

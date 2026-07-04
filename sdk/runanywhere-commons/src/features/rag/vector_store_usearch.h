@@ -119,14 +119,26 @@ class VectorStoreUSearch {
     nlohmann::json get_statistics() const;
 
     /**
-     * @brief Save index to file
+     * @brief Serialize the index + chunk metadata to an in-memory byte buffer.
+     *
+     * I/O-free by design: the caller (RAGBackend) writes the bytes through the
+     * platform adapter so persistence works on every platform (incl. Web OPFS).
+     * @return false if USearch serialization fails.
      */
-    bool save(const std::string& path) const;
+    bool serialize_to_bytes(std::vector<uint8_t>& out) const;
 
     /**
-     * @brief Load index from file
+     * @brief Restore the index + chunk metadata from bytes produced by
+     * serialize_to_bytes(). On any failure the store is reset to empty.
+     * @return false on malformed input.
      */
-    bool load(const std::string& path);
+    bool load_from_bytes(const uint8_t* data, size_t size);
+
+    /**
+     * @brief Enumerate (chunk_id, text) for every stored chunk, e.g. to rebuild
+     * a companion index (BM25) after a snapshot load.
+     */
+    std::vector<std::pair<std::string, std::string>> all_chunk_texts() const;
 
    private:
     class Impl;

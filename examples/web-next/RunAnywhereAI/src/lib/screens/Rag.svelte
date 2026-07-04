@@ -167,6 +167,25 @@
             {/if}
           </button>
         </div>
+
+        <div class="hr"></div>
+        <div class="opts">
+          <div class="opthead">Retrieval</div>
+          <label class="opt">
+            <span class="ocol">
+              <span class="otitle">Rerank results</span>
+              <span class="osub">LLM re-scores retrieved chunks for relevance</span>
+            </span>
+            <input type="checkbox" checked={rag.rerankEnabled} onchange={(e) => rag.setRerank(e.currentTarget.checked)} />
+          </label>
+          <label class="opt">
+            <span class="ocol">
+              <span class="otitle">Multi-query expansion</span>
+              <span class="osub">Rewrites the question into variants, fuses results</span>
+            </span>
+            <input type="checkbox" checked={rag.multiQueryEnabled} onchange={(e) => rag.setMultiQuery(e.currentTarget.checked)} />
+          </label>
+        </div>
       </section>
     {:else}
       <button class="bar" onclick={() => (setupExpanded = true)}>
@@ -349,6 +368,14 @@
     cursor: pointer;
   }
   .add:disabled { color: var(--muted-2); cursor: default; }
+
+  .opts { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+  .opthead { font-size: 12px; color: var(--muted); }
+  .opt { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+  .ocol { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .otitle { font-size: 15px; color: var(--ink); }
+  .osub { font-size: 12px; color: var(--muted); }
+  .opt input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; flex: none; }
 
   .bar {
     display: flex;

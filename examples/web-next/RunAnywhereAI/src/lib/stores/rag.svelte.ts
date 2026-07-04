@@ -24,6 +24,11 @@ class RagStore {
   messages = $state<RagMessage[]>([]);
   error = $state<string | null>(null);
 
+  // RAG retrieval options. Rerank is a session-level setting (RAGConfiguration);
+  // multi-query is a per-query option (RAGQueryOptions).
+  rerankEnabled = $state(false);
+  multiQueryEnabled = $state(false);
+
   private sessionId: number | null = null;
   private sessionEmbeddingId: string | null = null;
   private sessionLlmId: string | null = null;
@@ -76,7 +81,7 @@ class RagStore {
       chunkSize: 256,
       chunkOverlap: 32,
       persistIndex: false,
-      rerankResults: false,
+      rerankResults: this.rerankEnabled,
     });
     const id = await RunAnywhere.ragCreateSession(config);
     if (id == null) throw new Error('Failed to create RAG session');
@@ -151,6 +156,7 @@ class RagStore {
           question: q,
           retrievalTopK: 4,
           similarityThreshold: 0,
+          enableMultiQuery: this.multiQueryEnabled,
           maxTokens: 512,
           temperature: 0.3,
           topP: 0.9,
@@ -174,6 +180,22 @@ class RagStore {
     } finally {
       patch({ pending: false, elapsedMs: Date.now() - started });
       this.generating = false;
+    }
+  }
+
+  setMultiQuery(value: boolean): void {
+    this.multiQueryEnabled = value;
+  }
+
+  // Rerank lives on the session config, so changing it rebuilds the session.
+  // The current corpus is dropped (re-add documents) — matches how changing
+  // models resets the pipeline.
+  async setRerank(value: boolean): Promise<void> {
+    if (this.rerankEnabled === value) return;
+    this.rerankEnabled = value;
+    if (this.sessionId != null) {
+      this.messages = [];
+      await this.destroySession();
     }
   }
 

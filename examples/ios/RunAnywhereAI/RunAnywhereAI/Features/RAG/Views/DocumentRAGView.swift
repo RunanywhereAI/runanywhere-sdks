@@ -32,6 +32,7 @@ struct DocumentRAGView: View {
             VStack(spacing: 0) {
                 modelSetupSection
                 documentStatusBar
+                retrievalOptionsSection
                 errorBanner
                 messagesArea
                 inputBar
@@ -89,6 +90,41 @@ extension DocumentRAGView {
                     model: selectedLLMModel
                 ) {
                     isShowingLLMModelPicker = true
+                }
+            }
+            .padding(.horizontal, AppSpacing.large)
+            .padding(.vertical, AppSpacing.mediumLarge)
+            Divider()
+        }
+        .background(AppColors.backgroundPrimary)
+    }
+
+    // Retrieval-quality toggles backed by the public SDK RAG options: rerank
+    // (RARAGConfiguration.rerankResults) and multi-query (RARAGQueryOptions.enableMultiQuery).
+    @ViewBuilder private var retrievalOptionsSection: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: AppSpacing.smallMedium) {
+                Toggle(isOn: Binding(
+                    get: { viewModel.rerankEnabled },
+                    set: { newValue in Task { await viewModel.setRerankEnabled(newValue) } }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Rerank results")
+                        Text("LLM re-scores retrieved chunks for relevance")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                Toggle(isOn: Binding(
+                    get: { viewModel.multiQueryEnabled },
+                    set: { viewModel.multiQueryEnabled = $0 }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Multi-query expansion")
+                        Text("Rewrites the question into variants, fuses results")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             .padding(.horizontal, AppSpacing.large)
