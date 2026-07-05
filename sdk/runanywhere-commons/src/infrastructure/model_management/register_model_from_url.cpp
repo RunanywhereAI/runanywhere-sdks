@@ -36,6 +36,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/model_management/rac_bundle_policy.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
@@ -136,6 +137,105 @@ rac_result_t register_from_hf_repo(const runanywhere::v1::RegisterModelFromUrlRe
     return register_multi_file_model(multi_file, out_proto);
 }
 
+// Looks up the registered bundle policy for the request's framework (NULL
+// when the request carries no framework or no engine registered one). The
+// registry is keyed by the C enum, so the proto value converts first.
+const rac_bundle_policy_t*
+bundle_policy_for(const runanywhere::v1::RegisterModelFromUrlRequest& request) {
+    if (!request.has_framework()) {
+        return nullptr;
+    }
+    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
+    if (rac_inference_framework_from_proto(static_cast<int32_t>(request.framework()),
+                                           &framework) != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return rac_bundle_policy_find(framework);
+}
+
+// Resolve a folder-level Hugging Face ref (hf.co/org/repo/<subdir>, or a
+// manifest-leaf ref when the framework's bundle policy allows it) into a
+// multi-file registration carrying EVERY file under the subfolder — the
+// self-describing bundle path for directory-based engines, mirroring how
+// archive registrations stay one-liners. Fully framework-agnostic: which file
+// is the manifest and what format to stamp come from the engine-registered
+// bundle policy; caller-supplied metadata wins.
+rac_result_t register_from_hf_folder(const runanywhere::v1::RegisterModelFromUrlRequest& request,
+                                     const rac_bundle_policy_t* policy,
+                                     rac_proto_buffer_t* out_proto) {
+    namespace hf = rac::infra::model_management::hf;
+
+    hf::ResolvedModel resolved;
+    std::string error;
+    const rac_result_t resolve_rc = hf::resolve_repo_folder(
+        request.url(),
+        (policy != nullptr && policy->manifest_leaf_names_bundle == RAC_TRUE)
+            ? policy->manifest_extension
+            : nullptr,
+        policy != nullptr ? policy->is_bundle_manifest : nullptr, &resolved, &error);
+    if (resolve_rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_proto, resolve_rc, error.c_str());
+    }
+
+    runanywhere::v1::RegisterMultiFileModelRequest multi_file;
+    multi_file.set_id(request.id().empty() ? resolved.model_id : request.id());
+    multi_file.set_name(request.name().empty() ? resolved.display_name : request.name());
+    if (request.has_framework()) {
+        multi_file.set_framework(request.framework());
+    }
+    if (policy != nullptr && policy->model_format != RAC_MODEL_FORMAT_UNSPECIFIED) {
+        int32_t proto_format = 0;
+        if (rac_model_format_to_proto(policy->model_format, &proto_format) == RAC_SUCCESS) {
+            multi_file.set_format(static_cast<runanywhere::v1::ModelFormat>(proto_format));
+        }
+    }
+    if (request.has_category()) {
+        multi_file.set_category(request.category());
+    }
+    if (request.has_source()) {
+        multi_file.set_source(request.source());
+    }
+    multi_file.set_download_size_bytes(request.has_download_size_bytes()
+                                           ? request.download_size_bytes()
+                                           : resolved.total_size_bytes);
+    if (request.has_memory_required_bytes()) {
+        multi_file.set_memory_required_bytes(request.memory_required_bytes());
+    }
+    if (request.has_context_length()) {
+        multi_file.set_context_length(request.context_length());
+    }
+    if (request.has_supports_thinking()) {
+        multi_file.set_supports_thinking(request.supports_thinking());
+    }
+    if (request.has_supports_lora()) {
+        multi_file.set_supports_lora(request.supports_lora());
+    }
+    if (request.has_description()) {
+        multi_file.set_description(request.description());
+    }
+
+    bool first = true;
+    for (const hf::ResolvedFile& resolved_file : resolved.files) {
+        runanywhere::v1::ModelFileDescriptor* file = multi_file.add_files();
+        file->set_url(resolved_file.url);
+        file->set_filename(resolved_file.filename);
+        file->set_is_required(true);
+        if (resolved_file.size_bytes > 0) {
+            file->set_size_bytes(resolved_file.size_bytes);
+        }
+        if (!resolved_file.sha256.empty()) {
+            file->set_checksum_sha256(resolved_file.sha256);
+        }
+        file->set_role(first ? runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL
+                             : runanywhere::v1::MODEL_FILE_ROLE_COMPANION);
+        first = false;
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "Registering Hugging Face folder bundle '%s' (%d files)",
+                 multi_file.id().c_str(), multi_file.files_size());
+    return register_multi_file_model(multi_file, out_proto);
+}
+
 // Copy a MakeRequest field (RegisterModelFromUrlRequest is wire-compatible with
 // ModelInfoMakeRequest by design — same field tags, same types — but we
 // translate explicitly so the proto layer is decoupled and either schema can
@@ -205,6 +305,18 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
     {
         namespace hf = rac::infra::model_management::hf;
         if (hf::is_hf_ref(request.url())) {
+            // Folder bundles: in-repo folder refs (no extension) for any
+            // framework, plus manifest-leaf refs when the framework's
+            // engine-registered bundle policy allows them. All framework
+            // specifics live in the policy — none here.
+            const rac_bundle_policy_t* policy = bundle_policy_for(request);
+            const char* manifest_leaf_ext =
+                (policy != nullptr && policy->manifest_leaf_names_bundle == RAC_TRUE)
+                    ? policy->manifest_extension
+                    : nullptr;
+            if (hf::is_folder_ref(request.url(), manifest_leaf_ext)) {
+                return register_from_hf_folder(request, policy, out_proto);
+            }
             const std::string direct_url = hf::normalize_explicit_file_ref(request.url());
             if (!direct_url.empty()) {
                 request.set_url(direct_url);

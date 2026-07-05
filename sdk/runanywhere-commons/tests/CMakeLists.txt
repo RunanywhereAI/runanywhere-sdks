@@ -1376,6 +1376,49 @@ if(WIN32 AND DEFINED onnxruntime_SOURCE_DIR AND NOT "${onnxruntime_SOURCE_DIR}" 
 endif()
 
 # =============================================================================
+# --- Hugging Face folder-bundle resolver (offline) ---------------------
+# Pure-core resolution of HF tree-API responses into folder bundles, with
+# the manifest heuristic injected as a predicate (in production it comes
+# from an engine's registered bundle policy).
+add_executable(test_hf_resolver_folder test_hf_resolver_folder.cpp)
+target_include_directories(test_hf_resolver_folder PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+)
+target_link_libraries(test_hf_resolver_folder PRIVATE rac_commons)
+rac_link_archive_deps(test_hf_resolver_folder)
+target_compile_features(test_hf_resolver_folder PRIVATE cxx_std_20)
+add_test(NAME hf_resolver_folder_tests COMMAND test_hf_resolver_folder)
+
+# --- Bundle-policy registry + the QHexRT policy (offline) --------------
+# Registry semantics plus the real QHexRT manifest predicate, included
+# header-only from engines/qhexrt (public-repo source; no prebuilt engine
+# needed) and driven through the generic folder resolver.
+add_executable(test_bundle_policy test_bundle_policy.cpp)
+target_include_directories(test_bundle_policy PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/engines/qhexrt
+)
+target_link_libraries(test_bundle_policy PRIVATE rac_commons)
+rac_link_archive_deps(test_bundle_policy)
+target_compile_features(test_bundle_policy PRIVATE cxx_std_20)
+add_test(NAME bundle_policy_tests COMMAND test_bundle_policy)
+
+# --- Hugging Face bearer auth (offline) --------------------------------
+# Host matching + bearer composition for rac_http_hf_token_set; ports the
+# retired per-platform (OkHttp) HF auth tests into commons.
+add_executable(test_hf_auth test_hf_auth.cpp)
+target_include_directories(test_hf_auth PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+)
+target_link_libraries(test_hf_auth PRIVATE rac_commons)
+rac_link_archive_deps(test_hf_auth)
+target_compile_features(test_hf_auth PRIVATE cxx_std_20)
+add_test(NAME hf_auth_tests COMMAND test_hf_auth)
+
+# =============================================================================
 # RAG Pipeline Tests (GoogleTest)
 # =============================================================================
 

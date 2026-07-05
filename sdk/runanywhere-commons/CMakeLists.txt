@@ -771,6 +771,9 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_format_infer_proto.cpp
     src/infrastructure/model_management/model_info_make_proto.cpp
     src/infrastructure/model_management/register_model_from_url.cpp
+    # Per-framework bundle-policy registry: engines register how their folder
+    # bundles resolve (manifest predicate, format); commons stays generic.
+    src/infrastructure/model_management/bundle_policy_registry.cpp
     src/infrastructure/model_management/artifact_expected_files_proto.cpp
     src/infrastructure/storage/storage_analyzer.cpp
     src/infrastructure/storage/storage_event_publisher.cpp
@@ -814,6 +817,11 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # sites in rac_http_client_default.cpp / rac_http_client_emscripten.cpp
     # consume it and apply the on_conflict URL rewrite + Prefer header.
     src/infrastructure/http/rac_http_upsert_mode.cpp
+    # Process-wide Hugging Face token (rac_http_hf_token_set + HF_TOKEN env
+    # fallback). The dispatch sites attach `Authorization: Bearer` to
+    # huggingface.co/hf.co requests so downloads, HEAD preflight, and the
+    # HF tree API authenticate uniformly on every platform.
+    src/infrastructure/http/rac_http_hf_auth.cpp
     # Single canonical default-header list shared across SDKs
     # (RunAnywhereSDK / commons VERSION / application-json). Lets every
     # platform's `defaultHeaders` block resolve through one C entry point
