@@ -82,6 +82,36 @@ void test_is_folder_ref(std::vector<TestResult>& results) {
         !hf::is_folder_ref("https://huggingface.co/org/repo/resolve/main/v81", ".json")));
 }
 
+void test_arch_folder_ref(std::vector<TestResult>& results) {
+    std::string out;
+    results.push_back(expect(
+        "arch ref: parent repo",
+        hf::make_arch_folder_ref("hf.co/org/repo", "v81", ".json", &out) &&
+            out == "https://huggingface.co/org/repo/v81",
+        out));
+    results.push_back(expect(
+        "arch ref: root manifest leaf",
+        hf::make_arch_folder_ref("https://huggingface.co/org/repo/lfm.json", "v81", ".json",
+                                 &out) &&
+            out == "https://huggingface.co/org/repo/v81/lfm.json",
+        out));
+    results.push_back(expect(
+        "arch ref: query manifest",
+        hf::make_arch_folder_ref("hf.co/org/repo?manifest=vlm.json", "v79", ".json", &out) &&
+            out == "https://huggingface.co/org/repo/v79/vlm.json",
+        out));
+    results.push_back(expect(
+        "arch ref: old explicit arch stays untouched",
+        !hf::make_arch_folder_ref("hf.co/org/repo/v81/lfm.json", "v79", ".json", &out)));
+    results.push_back(expect(
+        "arch ref: resolve URL untouched",
+        !hf::make_arch_folder_ref("https://huggingface.co/org/repo/resolve/main/v81/lfm.json",
+                                  "v79", ".json", &out)));
+    results.push_back(expect(
+        "arch ref: unknown arch rejected",
+        !hf::make_arch_folder_ref("hf.co/org/repo/lfm.json", "unknown", ".json", &out)));
+}
+
 void test_subdir_resolution(std::vector<TestResult>& results) {
     hf::ResolvedModel resolved;
     std::string error;
@@ -200,6 +230,7 @@ void test_errors(std::vector<TestResult>& results) {
 int main() {
     std::vector<TestResult> results;
     test_is_folder_ref(results);
+    test_arch_folder_ref(results);
     test_subdir_resolution(results);
     test_multi_manifest(results);
     test_no_policy(results);

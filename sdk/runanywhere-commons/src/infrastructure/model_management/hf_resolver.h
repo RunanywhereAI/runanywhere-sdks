@@ -9,6 +9,8 @@
  *   hf.co/{org}/{repo}:{quant}      -> quant tag matched against GGUF basenames
  *   hf.co/{org}/{repo}:{file.gguf}  -> exact filename match
  *   hf.co/{org}/{repo}/{path/file}  -> explicit file (normalized to /resolve/)
+ *   hf.co/{org}/{repo}/{manifest}   -> with a device arch, a logical folder
+ *                                      bundle ref under {arch}/{manifest}
  *   hf.co/{org}/{repo}/{subdir}     -> folder bundle: EVERY file under the
  *                                      subfolder (see resolve_repo_folder)
  *   hf://..., huggingface.co/...    -> same grammar, alternate prefixes
@@ -65,6 +67,19 @@ bool is_hf_ref(const std::string& ref);
  * URLs are never folder refs.
  */
 bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext);
+
+/**
+ * Rewrite a logical per-device folder-bundle ref into an arch-pinned folder ref.
+ * Used by QHexRT/HNPU registration before folder resolution:
+ *
+ *   hf.co/org/repo                  + v81 -> hf.co/org/repo/v81
+ *   hf.co/org/repo/model.json       + v81 -> hf.co/org/repo/v81/model.json
+ *   hf.co/org/repo?manifest=m.json  + v81 -> hf.co/org/repo/v81/m.json
+ *
+ * Already arch-pinned refs (`.../v81/...`) and non-HF refs return false.
+ */
+bool make_arch_folder_ref(const std::string& ref, const std::string& arch,
+                          const char* manifest_leaf_ext, std::string* out_ref);
 
 /**
  * Normalize an explicit-file HF ref (org/repo/path/file or an hf-hosted

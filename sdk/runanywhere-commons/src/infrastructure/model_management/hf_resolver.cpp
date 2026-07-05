@@ -47,6 +47,52 @@ std::string basename_of(const std::string& path) {
     return slash == std::string::npos ? path : path.substr(slash + 1);
 }
 
+std::string trim_trailing_slashes(std::string path) {
+    while (!path.empty() && path.back() == '/') {
+        path.pop_back();
+    }
+    return path;
+}
+
+bool has_extension(const std::string& path, const char* ext) {
+    if (ext == nullptr || ext[0] == '\0') {
+        return false;
+    }
+    return lowercase_copy(path).ends_with(lowercase_copy(ext));
+}
+
+bool is_arch_segment(const std::string& segment) {
+    if (segment.size() < 2 || segment[0] != 'v') {
+        return false;
+    }
+    return std::ranges::all_of(segment.begin() + 1, segment.end(),
+                               [](unsigned char c) { return std::isdigit(c) != 0; });
+}
+
+bool path_starts_with_arch(const std::string& path) {
+    const size_t slash = path.find('/');
+    const std::string first = slash == std::string::npos ? path : path.substr(0, slash);
+    return is_arch_segment(first);
+}
+
+std::string query_value(const std::string& query, const std::string& key) {
+    size_t start = 0;
+    while (start <= query.size()) {
+        const size_t end = query.find('&', start);
+        const std::string part =
+            query.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        const size_t eq = part.find('=');
+        if (eq != std::string::npos && part.substr(0, eq) == key) {
+            return part.substr(eq + 1);
+        }
+        if (end == std::string::npos) {
+            break;
+        }
+        start = end + 1;
+    }
+    return {};
+}
+
 // Strip a recognized HF prefix; returns "" when none matches.
 std::string strip_prefix(const std::string& ref) {
     for (const char* prefix : kRefPrefixes) {
@@ -218,10 +264,7 @@ bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext) {
     if (!parse_ref(ref, &parsed) || parsed.file_path.empty()) {
         return false;
     }
-    std::string path = parsed.file_path;
-    while (!path.empty() && path.back() == '/') {
-        path.pop_back();
-    }
+    std::string path = trim_trailing_slashes(parsed.file_path);
     if (path.empty()) {
         return false;
     }
@@ -229,8 +272,58 @@ bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext) {
     if (leaf.find('.') == std::string::npos) {
         return true;
     }
-    return manifest_leaf_ext != nullptr && manifest_leaf_ext[0] != '\0' &&
-           lowercase_copy(leaf).ends_with(lowercase_copy(manifest_leaf_ext));
+    return has_extension(leaf, manifest_leaf_ext);
+}
+
+bool make_arch_folder_ref(const std::string& ref, const std::string& arch,
+                          const char* manifest_leaf_ext, std::string* out_ref) {
+    if (out_ref == nullptr || arch.empty() || arch == "unknown" || !is_arch_segment(arch)) {
+        return false;
+    }
+    std::string rest = strip_prefix(ref);
+    if (rest.empty() || rest.find("/resolve/") != std::string::npos ||
+        rest.find("/blob/") != std::string::npos) {
+        return false;
+    }
+
+    std::string query;
+    const size_t query_pos = rest.find('?');
+    if (query_pos != std::string::npos) {
+        query = rest.substr(query_pos + 1);
+        rest = rest.substr(0, query_pos);
+    }
+
+    ParsedRef parsed;
+    if (!parse_ref("hf.co/" + rest, &parsed)) {
+        return false;
+    }
+
+    std::string manifest = query_value(query, "manifest");
+    if (!parsed.file_path.empty()) {
+        const std::string path = trim_trailing_slashes(parsed.file_path);
+        if (path.empty() || path_starts_with_arch(path)) {
+            return false;
+        }
+        if (path.find('/') != std::string::npos || !has_extension(path, manifest_leaf_ext)) {
+            return false;
+        }
+        if (manifest.empty()) {
+            manifest = path;
+        }
+    }
+
+    if (!manifest.empty()) {
+        manifest = trim_trailing_slashes(manifest);
+        if (manifest.find('/') != std::string::npos || !has_extension(manifest, manifest_leaf_ext)) {
+            return false;
+        }
+    }
+
+    *out_ref = "https://huggingface.co/" + parsed.org + "/" + parsed.repo + "/" + arch;
+    if (!manifest.empty()) {
+        *out_ref += "/" + manifest;
+    }
+    return true;
 }
 
 std::string normalize_explicit_file_ref(const std::string& ref) {

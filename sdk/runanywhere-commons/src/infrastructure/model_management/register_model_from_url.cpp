@@ -36,6 +36,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/device/rac_npu_capability.h"
 #include "rac/infrastructure/model_management/rac_bundle_policy.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
@@ -151,6 +152,74 @@ bundle_policy_for(const runanywhere::v1::RegisterModelFromUrlRequest& request) {
         return nullptr;
     }
     return rac_bundle_policy_find(framework);
+}
+
+bool is_qhexrt_request(const runanywhere::v1::RegisterModelFromUrlRequest& request) {
+    if (!request.has_framework()) {
+        return false;
+    }
+    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
+    return rac_inference_framework_from_proto(static_cast<int32_t>(request.framework()), &framework) ==
+               RAC_SUCCESS &&
+           framework == RAC_FRAMEWORK_QHEXRT;
+}
+
+rac_result_t qhexrt_current_arch(std::string* out_arch, std::string* error) {
+    if (out_arch == nullptr) {
+        if (error) {
+            *error = "output arch is required";
+        }
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    rac_npu_info_t npu;
+    const rac_result_t probe_rc = rac_npu_probe(&npu);
+    if (probe_rc != RAC_SUCCESS) {
+        if (error) {
+            *error = "QHexRT NPU probe failed";
+        }
+        return probe_rc;
+    }
+    if (npu.qhexrt_supported != RAC_TRUE) {
+        if (error) {
+            *error = std::string("QHexRT NPU is not supported on this device (arch=") +
+                     rac_hexagon_arch_name(npu.hexagon_arch) + ")";
+        }
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
+    *out_arch = rac_hexagon_arch_name(npu.hexagon_arch);
+    return RAC_SUCCESS;
+}
+
+rac_result_t maybe_resolve_qhexrt_logical_ref(
+    const rac_bundle_policy_t* policy, runanywhere::v1::RegisterModelFromUrlRequest* request,
+    rac_proto_buffer_t* out_proto) {
+    if (request == nullptr || !is_qhexrt_request(*request)) {
+        return RAC_SUCCESS;
+    }
+
+    std::string arch;
+    std::string error;
+    const rac_result_t arch_rc = qhexrt_current_arch(&arch, &error);
+    if (arch_rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_proto, arch_rc, error.c_str());
+    }
+
+    if (policy == nullptr || policy->framework != RAC_FRAMEWORK_QHEXRT) {
+        return rac_proto_buffer_set_error(
+            out_proto, RAC_ERROR_BACKEND_UNAVAILABLE,
+            "QHexRT bundle policy is not registered; call QHexRT.register() before registering HNPU URLs");
+    }
+
+    std::string arch_ref;
+    const char* manifest_leaf_ext =
+        (policy->manifest_leaf_names_bundle == RAC_TRUE) ? policy->manifest_extension : nullptr;
+    if (rac::infra::model_management::hf::make_arch_folder_ref(request->url(), arch,
+                                                               manifest_leaf_ext, &arch_ref)) {
+        RAC_LOG_INFO(LOG_CAT, "Resolved logical QHexRT bundle %s -> %s",
+                     request->url().c_str(), arch_ref.c_str());
+        request->set_url(arch_ref);
+    }
+    return RAC_SUCCESS;
 }
 
 // Resolve a folder-level Hugging Face ref (hf.co/org/repo/<subdir>, or a
@@ -310,6 +379,11 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
             // engine-registered bundle policy allows them. All framework
             // specifics live in the policy — none here.
             const rac_bundle_policy_t* policy = bundle_policy_for(request);
+            const rac_result_t qhexrt_rc =
+                maybe_resolve_qhexrt_logical_ref(policy, &request, out_proto);
+            if (qhexrt_rc != RAC_SUCCESS) {
+                return qhexrt_rc;
+            }
             const char* manifest_leaf_ext =
                 (policy != nullptr && policy->manifest_leaf_names_bundle == RAC_TRUE)
                     ? policy->manifest_extension
