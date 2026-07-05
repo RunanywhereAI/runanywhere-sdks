@@ -1615,6 +1615,15 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetBaseDir
     return value != nullptr ? env->NewStringUTF(value) : nullptr;
 }
 
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpHfTokenSet(JNIEnv* env,
+                                                                           jclass clazz,
+                                                                           jstring token) {
+    (void)clazz;
+    std::string storage;
+    rac_http_hf_token_set(getNullableCString(env, token, storage));
+}
+
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetModelFolder(
     JNIEnv* env, jclass clazz, jstring modelId, jint framework) {

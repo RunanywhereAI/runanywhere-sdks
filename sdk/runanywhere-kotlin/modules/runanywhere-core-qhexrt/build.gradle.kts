@@ -7,6 +7,13 @@ plugins {
     `maven-publish`
 }
 
+val useLocalNatives: Boolean =
+    rootProject.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+        ?: project.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+        ?: false
+
+logger.lifecycle("QHexRT Module: useLocalNatives=$useLocalNatives")
+
 // QHexRT is Qualcomm-only (Snapdragon Hexagon NPU): arm64-v8a exclusively.
 val qhexrtAbis = listOf("arm64-v8a")
 
@@ -16,7 +23,7 @@ fun androidNdkHomeForRuntime(): File {
     val androidSdk =
         System.getenv("ANDROID_HOME")
             ?: System.getenv("ANDROID_SDK_ROOT")
-            ?: "${System.getProperty("user.home")}/Android/Sdk"
+            ?: "${System.getProperty("user.home")}/Library/Android/sdk"
     val ndkVersion =
         rootProject.findProperty("racNdkVersion")?.toString()
             ?: project.findProperty("racNdkVersion")?.toString()
@@ -121,12 +128,18 @@ dependencies {
 }
 
 // Stage the 16 KB-aligned NDK libc++ alongside the bundled QHexRT .so files.
+// Only when natives are built locally (runanywhere.useLocalNatives=true, same
+// opt-out as llamacpp) — otherwise the staged jniLibs already ship libc++ and
+// the build must not require a local NDK.
 tasks.register("syncAndroidRuntimeLibs") {
     group = "runanywhere"
     description = "Stage 16 KB-aligned Android NDK libc++ into QHexRT JNI libs"
     val outputDir = file("src/main/jniLibs")
     outputs.dirs(qhexrtAbis.map { file("$outputDir/$it") })
-    doLast { syncAndroidNdkRuntimeLibs(outputDir) }
+    doLast {
+        if (!useLocalNatives) return@doLast
+        syncAndroidNdkRuntimeLibs(outputDir)
+    }
 }
 
 tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
@@ -136,7 +149,15 @@ tasks.matching { it.name == "preBuild" }.configureEach {
     dependsOn("syncAndroidRuntimeLibs")
 }
 
-group = "io.github.sanchitmonga22"
+val isJitPack = System.getenv("JITPACK") == "true"
+val usePendingNamespace = System.getenv("USE_RUNANYWHERE_NAMESPACE")?.toBoolean() ?: false
+group =
+    when {
+        isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
+        usePendingNamespace -> "com.runanywhere"
+        else -> "io.github.sanchitmonga22"
+    }
+
 version = System.getenv("SDK_VERSION")?.removePrefix("v")
     ?: System.getenv("VERSION")?.removePrefix("v")
     ?: "0.1.5-SNAPSHOT"

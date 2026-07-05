@@ -1,49 +1,49 @@
 package com.runanywhere.sdk.npu.qhexrt
 
+import ai.runanywhere.proto.v1.ErrorCode
+import ai.runanywhere.proto.v1.NpuCapability
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.json.JSONObject
-
-/**
- * Detected Hexagon NPU capability (pre-flight; no QNN load required).
- *
- * @property socModel  Vendor SoC model (e.g. "SM8750"); empty if unknown.
- * @property socId     /sys/devices/soc0/soc_id, or -1 when unavailable.
- * @property arch      Hexagon arch name ("v73", "v79", "v81", "unknown").
- * @property supported True when [arch] is one QHexRT runs on (v79/v81).
- */
-data class NpuInfo(
-    val socModel: String,
-    val socId: Int,
-    val arch: String,
-    val supported: Boolean,
-)
 
 /**
  * QHexRT module — RunAnywhere's private Qualcomm Hexagon NPU backend.
  *
- * Runs prebuilt QNN context binaries on Snapdragon NPUs (v79/v81), serving LLM,
- * VLM, STT and TTS through the standard SDK APIs once registered. A thin wrapper
- * over C++ backend registration; all inference lives in the C++ commons layer.
+ * Runs prebuilt QNN context binaries on Snapdragon NPUs (v75/v79/v81), serving
+ * LLM, VLM, STT and TTS through the standard SDK APIs once registered. A thin
+ * wrapper over C++ backend registration; all inference lives in the C++
+ * commons layer.
  *
  * ## Pre-flight
  * ```kotlin
  * val npu = QHexRT.probeNpu()
- * if (!npu.supported) { /* warn; fall back to CPU engines */ }
+ * if (!npu.qhexrt_supported) { /* warn; fall back to CPU engines */ }
  * ```
  *
  * ## Registration
  * ```kotlin
- * QHexRT.register()   // once during bootstrap, on a v79/v81 device
+ * QHexRT.register()   // once during bootstrap, on a v75/v79/v81 device
  * ```
  */
 object QHexRT {
     private val logger = SDKLogger("QHexRT")
 
-    /** Current version of the QHexRT module. */
-    const val version = "0.1.0"
+    // RunAnywhereBridge doesn't expose this one; derived the same way as its
+    // RAC_ERROR_* constants (signed C ABI value = negated proto-enum
+    // magnitude — see the "Result codes" block in RunAnywhereBridge).
+    private val RAC_ERROR_BACKEND_UNAVAILABLE = -ErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE.value
+
+    /** Current version of the QHexRT module, as reported by the native bridge. */
+    val version: String
+        get() {
+            RunAnywhereBridge.ensureNativeLibraryLoaded()
+            return if (QHexRTBridge.ensureNativeLibraryLoaded()) {
+                QHexRTBridge.nativeGetVersion()
+            } else {
+                "unknown"
+            }
+        }
 
     /** Human-readable module name. */
     const val moduleName: String = "QHexRT"
@@ -55,25 +55,21 @@ object QHexRT {
 
     /**
      * Probe the device's Hexagon NPU without loading QNN. Safe to call on any
-     * device; returns [NpuInfo.supported] = false on unsupported/unknown parts.
+     * device; returns the all-default [NpuCapability] (unknown arch,
+     * `qhexrt_supported = false`) on unsupported/unknown parts or probe
+     * failure.
      */
-    fun probeNpu(): NpuInfo {
+    fun probeNpu(): NpuCapability {
         RunAnywhereBridge.ensureNativeLibraryLoaded()
         if (!QHexRTBridge.ensureNativeLibraryLoaded()) {
             logger.error("QHexRT native library unavailable; reporting unsupported NPU")
-            return NpuInfo(socModel = "", socId = -1, arch = "unknown", supported = false)
+            return NpuCapability()
         }
         return try {
-            val json = JSONObject(QHexRTBridge.nativeProbeNpu())
-            NpuInfo(
-                socModel = json.optString("soc_model", ""),
-                socId = json.optInt("soc_id", -1),
-                arch = json.optString("arch", "unknown"),
-                supported = json.optBoolean("supported", false),
-            )
+            NpuCapability.ADAPTER.decode(QHexRTBridge.nativeProbeNpuProto())
         } catch (e: Exception) {
-            logger.error("Failed to parse NPU probe result: ${e.message}", throwable = e)
-            NpuInfo(socModel = "", socId = -1, arch = "unknown", supported = false)
+            logger.error("Failed to decode NPU probe proto: ${e.message}", throwable = e)
+            NpuCapability()
         }
     }
 
@@ -103,14 +99,20 @@ object QHexRT {
             return
         }
         logger.info("Registering QHexRT backend with C++ registry...")
-        val result = registerNative()
-        // 0 = RAC_SUCCESS, -4 = RAC_ERROR_MODULE_ALREADY_REGISTERED.
-        if (result != 0 && result != -4) {
-            logger.error("QHexRT registration failed with code: $result (likely no v79/v81 NPU)")
-            return
+        when (val result = registerNative()) {
+            RunAnywhereBridge.RAC_SUCCESS,
+            RunAnywhereBridge.RAC_ERROR_MODULE_ALREADY_REGISTERED,
+            -> {
+                isRegistered = true
+                logger.info("QHexRT backend registered successfully (LLM/VLM/STT/TTS)")
+            }
+            RAC_ERROR_BACKEND_UNAVAILABLE -> {
+                logger.info("QHexRT not registered: no supported Hexagon NPU on this device")
+            }
+            else -> {
+                logger.error("QHexRT registration failed with code: $result")
+            }
         }
-        isRegistered = true
-        logger.info("QHexRT backend registered successfully (LLM/VLM/STT/TTS)")
     }
 
     /**

@@ -26,8 +26,6 @@
 
 package com.runanywhere.sdk.httptransport
 
-import okhttp3.Dns
-import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -37,7 +35,6 @@ import org.junit.Before
 import org.junit.Test
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.StandardCharsets
@@ -150,9 +147,8 @@ class OkHttpHttpTransportTest {
 
     @Before
     fun resetTransport() {
-        // Ensure no host-installed client or HF token leaks between tests.
+        // Ensure no host-installed client leaks between tests.
         OkHttpHttpTransport.setHttpClient(null)
-        OkHttpHttpTransport.setHfToken(null)
     }
 
     @After
@@ -160,7 +156,6 @@ class OkHttpHttpTransportTest {
         server?.stop()
         server = null
         OkHttpHttpTransport.setHttpClient(null)
-        OkHttpHttpTransport.setHfToken(null)
     }
 
     private fun startStub(vararg responses: StubResponse): StubServer {
@@ -172,31 +167,9 @@ class OkHttpHttpTransportTest {
 
     private fun urlFor(s: StubServer): String = "http://127.0.0.1:${s.port}/probe"
 
-    /** Stub URL that keeps an arbitrary [host] in the URL (resolved to loopback
-     *  via [installLoopbackClient]) so host-gated logic sees the real host. */
-    private fun urlFor(host: String, s: StubServer): String = "http://$host:${s.port}/probe"
-
     /** Empty 200 response used by the header-only assertions below. */
     private fun okResponse(): StubResponse =
         StubResponse(statusLine = "HTTP/1.1 200 OK", headers = emptyList(), body = ByteArray(0))
-
-    /**
-     * Install a client whose DNS maps [hosts] to loopback, so a request to a
-     * real hostname (e.g. `huggingface.co`) actually reaches the in-process
-     * stub. Lets the tests exercise the real host-gated auth path offline.
-     */
-    private fun installLoopbackClient(vararg hosts: String) {
-        val dns =
-            object : Dns {
-                override fun lookup(hostname: String): List<InetAddress> =
-                    if (hosts.contains(hostname)) {
-                        listOf(InetAddress.getByName("127.0.0.1"))
-                    } else {
-                        Dns.SYSTEM.lookup(hostname)
-                    }
-            }
-        OkHttpHttpTransport.setHttpClient(OkHttpClient.Builder().dns(dns).build())
-    }
 
     @Test
     fun executeRequest_get_returnsStatusHeadersAndBody() {
@@ -334,130 +307,5 @@ class OkHttpHttpTransportTest {
 
         val captured = stub.received.single()
         assertNull("non-resume requests must not carry a Range header", captured.headers["Range"])
-    }
-
-    // HuggingFace bearer-token injection (host-gated, no-override)
-
-    @Test
-    fun hfToken_attachedToHuggingFaceHost() {
-        val stub = startStub(okResponse())
-        installLoopbackClient("huggingface.co")
-        OkHttpHttpTransport.setHfToken("secret-abc")
-
-        OkHttpHttpTransport.executeRequest(
-            method = "GET",
-            url = urlFor("huggingface.co", stub),
-            headersFlat = emptyArray(),
-            bodyBytes = null,
-            timeoutMs = 5_000L,
-        )
-
-        assertEquals(
-            "the configured HF token must be attached on huggingface.co",
-            "Bearer secret-abc",
-            stub.received.single().headers["Authorization"],
-        )
-    }
-
-    @Test
-    fun hfToken_notAttachedToNonHuggingFaceHost() {
-        val stub = startStub(okResponse())
-        OkHttpHttpTransport.setHfToken("secret-abc")
-
-        OkHttpHttpTransport.executeRequest(
-            method = "GET",
-            url = urlFor("127.0.0.1", stub),
-            headersFlat = emptyArray(),
-            bodyBytes = null,
-            timeoutMs = 5_000L,
-        )
-
-        assertNull(
-            "the HF token must never be sent to a non-HuggingFace host",
-            stub.received.single().headers["Authorization"],
-        )
-    }
-
-    @Test
-    fun hfToken_notAttachedToHuggingFaceSubdomain() {
-        // The presigned LFS CDN (cdn-lfs*.huggingface.co) is a different host
-        // than the API / resolve host and must NOT receive the bearer token.
-        val stub = startStub(okResponse())
-        installLoopbackClient("cdn-lfs.huggingface.co")
-        OkHttpHttpTransport.setHfToken("secret-abc")
-
-        OkHttpHttpTransport.executeRequest(
-            method = "GET",
-            url = urlFor("cdn-lfs.huggingface.co", stub),
-            headersFlat = emptyArray(),
-            bodyBytes = null,
-            timeoutMs = 5_000L,
-        )
-
-        assertNull(
-            "the HF token must not leak to HuggingFace CDN subdomains",
-            stub.received.single().headers["Authorization"],
-        )
-    }
-
-    @Test
-    fun hfToken_doesNotOverrideCallerSuppliedAuthorization() {
-        val stub = startStub(okResponse())
-        installLoopbackClient("huggingface.co")
-        OkHttpHttpTransport.setHfToken("secret-abc")
-
-        OkHttpHttpTransport.executeRequest(
-            method = "GET",
-            url = urlFor("huggingface.co", stub),
-            headersFlat = arrayOf("Authorization", "Bearer caller-token"),
-            bodyBytes = null,
-            timeoutMs = 5_000L,
-        )
-
-        assertEquals(
-            "a caller-supplied Authorization header must win over the HF token",
-            "Bearer caller-token",
-            stub.received.single().headers["Authorization"],
-        )
-    }
-
-    @Test
-    fun hfToken_absent_keepsRequestHeaderFree() {
-        val stub = startStub(okResponse())
-        installLoopbackClient("huggingface.co")
-        OkHttpHttpTransport.setHfToken(null) // explicit: no token → public no-auth path
-
-        OkHttpHttpTransport.executeRequest(
-            method = "GET",
-            url = urlFor("huggingface.co", stub),
-            headersFlat = emptyArray(),
-            bodyBytes = null,
-            timeoutMs = 5_000L,
-        )
-
-        assertNull(
-            "with no token configured the request must stay header-free (backward-compatible)",
-            stub.received.single().headers["Authorization"],
-        )
-    }
-
-    @Test
-    fun setHfToken_blankIsTreatedAsCleared() {
-        val stub = startStub(okResponse())
-        installLoopbackClient("huggingface.co")
-        OkHttpHttpTransport.setHfToken("   ") // whitespace-only → no auth
-
-        OkHttpHttpTransport.executeRequest(
-            method = "GET",
-            url = urlFor("huggingface.co", stub),
-            headersFlat = emptyArray(),
-            bodyBytes = null,
-            timeoutMs = 5_000L,
-        )
-
-        assertNull(
-            "a blank token must be treated as absent, not sent as 'Bearer '",
-            stub.received.single().headers["Authorization"],
-        )
     }
 }

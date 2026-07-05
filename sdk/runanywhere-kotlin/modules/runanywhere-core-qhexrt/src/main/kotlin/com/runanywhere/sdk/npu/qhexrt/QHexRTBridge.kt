@@ -7,7 +7,7 @@
  * Self-contained JNI bridge for the private QHexRT (Qualcomm Hexagon NPU)
  * backend module. The native library (librac_backend_qhexrt_jni.so) exposes:
  * - rac_backend_qhexrt_register() / rac_backend_qhexrt_unregister()
- * - rac_npu_probe() (pre-flight Hexagon arch detection)
+ * - rac_npu_probe_proto() (pre-flight Hexagon arch detection)
  */
 
 package com.runanywhere.sdk.npu.qhexrt
@@ -76,10 +76,16 @@ internal object QHexRTBridge {
     external fun nativeUnregister(): Int
 
     /**
-     * Pre-flight Hexagon NPU probe. Returns a JSON object:
-     * `{"soc_model":"SM8750","soc_id":618,"arch":"v79","supported":true}`.
-     * Works on any device (no QNN load), including non-v79/81 parts.
+     * Pre-flight Hexagon NPU probe. Returns serialized
+     * `runanywhere.v1.NpuCapability` proto bytes (decode with the generated
+     * Wire adapter); empty on failure, which decodes to the all-default
+     * (unknown/unsupported) capability. Works on any device (no QNN load),
+     * including non-v75/v79/v81 parts.
      */
     @JvmStatic
-    external fun nativeProbeNpu(): String
+    external fun nativeProbeNpuProto(): ByteArray
+
+    /** QHexRT module version string (RAC_QHEXRT_VERSION baked into the JNI lib). */
+    @JvmStatic
+    external fun nativeGetVersion(): String
 }
