@@ -215,8 +215,7 @@ rac_result_t maybe_resolve_qhexrt_logical_ref(
         (policy->manifest_leaf_names_bundle == RAC_TRUE) ? policy->manifest_extension : nullptr;
     if (rac::infra::model_management::hf::make_arch_folder_ref(request->url(), arch,
                                                                manifest_leaf_ext, &arch_ref)) {
-        RAC_LOG_INFO(LOG_CAT, "Resolved logical QHexRT bundle %s -> %s",
-                     request->url().c_str(), arch_ref.c_str());
+        RAC_LOG_INFO(LOG_CAT, "Resolved logical QHexRT bundle for arch %s", arch.c_str());
         request->set_url(arch_ref);
     }
     return RAC_SUCCESS;
