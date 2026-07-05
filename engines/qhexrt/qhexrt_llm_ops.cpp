@@ -43,7 +43,9 @@ void fill_cfg(qhx_gen_cfg* cfg, const rac_llm_options_t* o) {
     if (o->top_k > 0) cfg->top_k = o->top_k;
     if (o->repetition_penalty > 0.0f) cfg->repetition_penalty = o->repetition_penalty;
     cfg->min_p = o->min_p;
-    if (o->seed != 0) cfg->seed = static_cast<uint64_t>(o->seed);
+    // >0 like the VLM path: <=0 means "unset/random" (rejects a negative
+    // sentinel before the uint64_t cast).
+    if (o->seed > 0) cfg->seed = static_cast<uint64_t>(o->seed);
     if (o->stop_sequences != nullptr && o->num_stop_sequences > 0) {
         cfg->stop_strings = o->stop_sequences;
         cfg->n_stop_strings = static_cast<int>(o->num_stop_sequences);
@@ -100,6 +102,10 @@ struct StreamCtx {
 
 int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, int is_final) {
     auto* c = static_cast<StreamCtx*>(user);
+    // Terminal call carries no text (the QHexRT C ABI always sends
+    // (NULL, 0, is_final=1)); its qhx_output stats are not forwarded either —
+    // the rac stream callback ABI has no completion-stats channel (same as
+    // llamacpp), so streaming consumers compute timing app-side.
     if (c == nullptr || is_final != 0 || utf8 == nullptr) {
         return 1;  // nothing to forward on the terminal call
     }

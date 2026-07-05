@@ -15,6 +15,8 @@
 
 #include <mutex>
 
+#include "qhexrt_bundle_policy.h"
+
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/device/rac_npu_capability.h"
@@ -35,6 +37,11 @@ rac_result_t rac_backend_qhexrt_register(void) {
     if (g_registered) {
         return RAC_SUCCESS;
     }
+    // Bundle policy: how commons resolves HNPU folder bundles (manifest
+    // selection, QNN_CONTEXT format) for one-line HF registrations. Inert
+    // metadata, so it registers BEFORE the arch gate — deterministic on
+    // stub builds and unsupported devices alike.
+    rac_bundle_policy_register(qhexrt_bundle_policy());
     // Arch gate: only register on a Hexagon v75/v79/v81 part. On unsupported
     // devices QHexRT cannot run, and registering its providers would make the
     // router select QHexRT for *all* LLM/VLM/STT/TTS loads (intercepting
@@ -69,6 +76,7 @@ rac_result_t rac_backend_qhexrt_unregister(void) {
         return RAC_SUCCESS;
     }
     rac_plugin_unregister("qhexrt");
+    rac_bundle_policy_unregister(RAC_FRAMEWORK_QHEXRT);
     g_registered = false;
     return RAC_SUCCESS;
 }

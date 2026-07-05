@@ -6,8 +6,8 @@ wired into the Kotlin, Flutter, and React Native SDKs plus a `RunAnywhereAiNPU`
 demo app for each.
 
 > **Android arm64 only.** QNN is Snapdragon-only, so there is no iOS / desktop /
-> web / armv7 / x86 build. The engine requires a Hexagon **v79 or v81** part
-> (Snapdragon 8 Elite / 8 Gen 3 class); older parts fall back / warn.
+> web / armv7 / x86 build. The engine requires a Hexagon **v75, v79 or v81**
+> part (Snapdragon 8 Gen 3 / 8 Elite class); older parts fall back / warn.
 
 ---
 
@@ -176,8 +176,8 @@ corepack yarn start
 
 `rac_npu_probe` (commons, `rac_npu_capability.{h,cpp}`) reads the SoC identity
 (`ro.soc.model`, `/sys/devices/soc0/soc_id`) **without loading QNN** and reports
-the Hexagon arch + whether QHexRT supports it (v79/v81). Each demo app calls it
-on launch (`QHexRT.probeNpu()`) and warns on unsupported devices. Verified
+the Hexagon arch + whether QHexRT supports it (v75/v79/v81). Each example app
+calls it on launch (`QHexRT.probeNpu()`) and warns on unsupported devices. Verified
 on-device result on an `SM7635`: `Hexagon v73`, unsupported → warning shown,
 backend still registers.
 
@@ -200,10 +200,8 @@ existing RunAnywhereAI example apps  (kt / flutter / rn)
 
 ## 7. Known gaps
 
-- **No model bundles published yet.** The Models screen catalog is empty until
-  QHexRT/NPU bundles land in the npu-forge HuggingFace repo. Download/load flows
-  are wired and ready.
-- **`@runanywhere/proto-ts` not regenerated.** The IDL/commons/Kotlin carry
-  `INFERENCE_FRAMEWORK_QHEXRT = 24`, but the React Native TS wire types do not
-  yet. Detection and builds are unaffected; QHEXRT model registration over the
-  RN bridge needs proto-ts regenerated (`protoc` 35.x) once model links exist.
+- **`LLMGenerateRequest.history` (tag 27) is regenerated for C++/Kotlin only.**
+  Multi-turn chat over the QHexRT engine works from Kotlin; the Swift /
+  proto-ts / Dart `llm_service` types need a `idl/codegen/generate_all.sh`
+  run before RN/Flutter/iOS callers can populate `history`. (The
+  `INFERENCE_FRAMEWORK_QHEXRT` enum itself IS regenerated on every platform.)

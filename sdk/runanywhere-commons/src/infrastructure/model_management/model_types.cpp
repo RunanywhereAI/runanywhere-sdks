@@ -101,9 +101,13 @@ rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t
     switch (framework) {
         case RAC_FRAMEWORK_LLAMACPP:
         case RAC_FRAMEWORK_GENIE:
-        case RAC_FRAMEWORK_QHEXRT:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return RAC_MODEL_CATEGORY_LANGUAGE;
+        case RAC_FRAMEWORK_QHEXRT:
+            // QHexRT serves LLM/VLM/STT/TTS bundles alike — no single category
+            // is implied by the framework; the registered model's explicit
+            // category must drive.
+            return RAC_MODEL_CATEGORY_UNKNOWN;
         case RAC_FRAMEWORK_ONNX:
             return RAC_MODEL_CATEGORY_MULTIMODAL;
         case RAC_FRAMEWORK_SHERPA:

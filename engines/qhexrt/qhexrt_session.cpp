@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "qhexrt_bundle_policy.h"
 #include "rac/core/rac_logger.h"
 
 namespace fs = std::filesystem;
@@ -76,12 +77,10 @@ bool ends_with_ci(const std::string& s, const char* suffix) {
     return true;
 }
 
-// Aux JSON files that live next to a manifest but are not the manifest itself.
-bool is_aux_json(const std::string& name) {
-    return name == "tokenizer.json" || name == "tokenizer_config.json" ||
-           name == "config.json" || name == "generation_config.json" ||
-           name == "preprocessor_config.json";
-}
+// Aux JSON files that live next to a manifest but are not the manifest
+// itself. Single source of truth: qhexrt_bundle_policy.h, shared with the
+// commons-side bundle resolution so remote and on-disk selection agree.
+bool is_aux_json(const std::string& name) { return qhexrt_is_aux_json(name.c_str()) != 0; }
 
 // A QHexRT manifest carries a "plan"/"schema_version"/"dsp_arch" key. Sniff the
 // head of the file to disambiguate it from arbitrary JSON sidecars.

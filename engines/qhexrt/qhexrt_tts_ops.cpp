@@ -30,7 +30,7 @@ using qhexrt_engine::session_open;
 
 Session* as_session(void* impl) { return static_cast<Session*>(impl); }
 
-// Copies the QHexRT float32 waveform into a freshly malloc'd buffer (freed by
+// Copies the QHexRT float32 waveform into a fresh rac_alloc buffer (freed by
 // the caller via rac_free). Returns false on allocation failure.
 bool copy_waveform(const qhx_output& o, void** out_data, size_t* out_bytes) {
     *out_data = nullptr;
@@ -39,7 +39,7 @@ bool copy_waveform(const qhx_output& o, void** out_data, size_t* out_bytes) {
         return true;  // empty waveform is valid (NULL/0)
     }
     size_t bytes = static_cast<size_t>(o.n_audio) * sizeof(float);
-    void* buf = std::malloc(bytes);
+    void* buf = rac_alloc(bytes);
     if (buf == nullptr) {
         return false;
     }
@@ -152,8 +152,18 @@ rac_result_t qhexrt_tts_synthesize_stream(void* impl, const char* text,
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(tts stream) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
+        // qhx_output.audio is session-owned and only valid until the next
+        // qhx_generate()/free on this session — hand the callback a copy so a
+        // consumer that retains the buffer past this call can't use-after-free
+        // (mirrors the non-stream path).
         if (callback != nullptr && out.audio != nullptr && out.n_audio > 0) {
-            callback(out.audio, static_cast<size_t>(out.n_audio) * sizeof(float), user_data);
+            void* audio = nullptr;
+            size_t bytes = 0;
+            if (!copy_waveform(out, &audio, &bytes)) {
+                return RAC_ERROR_OUT_OF_MEMORY;
+            }
+            callback(audio, bytes, user_data);
+            rac_free(audio);
         }
         return RAC_SUCCESS;
     } catch (...) {
