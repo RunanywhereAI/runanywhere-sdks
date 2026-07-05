@@ -3,7 +3,7 @@
 - Repo: RunanywhereAI/runanywhere-sdks
 - PR Title: Add logical QHexRT HNPU catalog resolution
 - PR URL: https://github.com/RunanywhereAI/runanywhere-sdks/pull/522
-- API comment count verified: 3 issue comments + 3 inline review comments = 6
+- API comment count verified: 3 issue comments + 4 inline review comments = 7
 - Review bodies inspected: 2 CodeRabbit reviews with additional actionable bullets
 - Source commands:
   - `gh api repos/RunanywhereAI/runanywhere-sdks/pulls/522`
@@ -208,6 +208,22 @@ Original comment:
 
 Status: Fixed.
 
+### QEF-14 - Centralize Flutter HF token migration
+
+- Source comment: https://github.com/RunanywhereAI/runanywhere-sdks/pull/522#discussion_r3525518815
+- Author: coderabbitai[bot]
+- File / location: `examples/flutter/RunAnywhereAI/lib/features/settings/combined_settings_view.dart:145`
+- LUS: 4
+- CS: 1
+- Type: refactor
+
+Original comment:
+> Token migration logic belongs in the SDK, not the example view.
+
+Status: Fixed. Token read/write/migration now lives in shared `HfTokenStore`;
+the settings view, app startup, and model catalog bootstrap all call the same
+helper.
+
 ## Section 2 - Larger / Structural Issues
 
 ### ISSUE-CANDIDATE-1 - Move NPU catalog bootstrap into SDK APIs
@@ -249,10 +265,10 @@ Status:
 
 ## Summary & Status
 
-- API comments fetched and counted: 6/6.
+- API comments fetched and counted: 7/7.
 - Review bodies inspected: 2/2.
-- Quick fixes identified: 13.
-- Quick fixes fixed in this PR: 13.
+- Quick fixes identified: 14.
+- Quick fixes fixed in this PR: 14.
 - Larger issues identified: 1.
 - Larger issues created: 1, https://github.com/RunanywhereAI/runanywhere-sdks/issues/523.
 - Remaining TODOs: wait for final CI after pushing the comment-fix commit.

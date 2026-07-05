@@ -5,6 +5,7 @@ import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/app/content_view.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/services/hf_token_store.dart';
 import 'package:runanywhere_ai/core/services/model_catalog_bootstrap.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
@@ -87,8 +88,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
       // Re-apply the persisted HuggingFace token (Settings screen) so private
       // HF model repos stay downloadable across app restarts.
-      final hfToken =
-          (await KeychainHelper.loadString(KeychainKeys.hfToken))?.trim() ?? '';
+      final hfToken = await HfTokenStore.load();
       if (hfToken.isNotEmpty) {
         RunAnywhere.setHfToken(hfToken);
         debugPrint('🔑 Applied persisted HuggingFace token');

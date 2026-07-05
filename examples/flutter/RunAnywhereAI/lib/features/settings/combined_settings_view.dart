@@ -5,6 +5,7 @@ import 'package:runanywhere/runanywhere.dart' show RunAnywhere, ToolDefinition;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/services/hf_token_store.dart';
 import 'package:runanywhere_ai/core/services/model_catalog_bootstrap.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
@@ -116,7 +117,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
 
   /// Load the persisted HuggingFace token from secure storage.
   Future<void> _loadHfToken() async {
-    final token = await _loadSecureHfToken();
+    final token = await HfTokenStore.load();
     if (mounted) {
       setState(() {
         _hfTokenController.text = token;
@@ -124,36 +125,10 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     }
   }
 
-  Future<String> _loadSecureHfToken() async {
-    final storedToken = await KeychainHelper.loadString(KeychainKeys.hfToken);
-    if (storedToken != null) {
-      return storedToken.trim();
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final legacyToken = prefs.getString(PreferenceKeys.hfToken);
-    if (legacyToken == null) {
-      return '';
-    }
-
-    final token = legacyToken.trim();
-    if (token.isNotEmpty) {
-      await KeychainHelper.saveString(key: KeychainKeys.hfToken, data: token);
-    }
-    await prefs.remove(PreferenceKeys.hfToken);
-    return token;
-  }
-
   /// Persist the HuggingFace token and apply it to the SDK after editing.
   Future<void> _saveHfToken(String value, {bool showFeedback = false}) async {
     final token = value.trim();
-    final prefs = await SharedPreferences.getInstance();
-    if (token.isEmpty) {
-      await KeychainHelper.delete(KeychainKeys.hfToken);
-    } else {
-      await KeychainHelper.saveString(key: KeychainKeys.hfToken, data: token);
-    }
-    await prefs.remove(PreferenceKeys.hfToken);
+    await HfTokenStore.save(token);
     RunAnywhere.setHfToken(token);
     await ModelCatalogBootstrap.refreshNpuCatalog();
     if (showFeedback && mounted) {

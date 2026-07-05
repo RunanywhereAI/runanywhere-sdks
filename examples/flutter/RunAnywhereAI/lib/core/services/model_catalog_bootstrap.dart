@@ -1,8 +1,7 @@
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
-import 'package:runanywhere_ai/core/utilities/constants.dart';
-import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
+import 'package:runanywhere_ai/core/services/hf_token_store.dart';
 
 /// ModelCatalogBootstrap
 ///
@@ -664,10 +663,8 @@ abstract final class ModelCatalogBootstrap {
   }
 
   static Future<void> _applyPersistedHfToken() async {
-    final token = (await KeychainHelper.loadString(
-      KeychainKeys.hfToken,
-    ))?.trim();
-    if (token == null || token.isEmpty) {
+    final token = await HfTokenStore.load();
+    if (token.isEmpty) {
       return;
     }
     RunAnywhere.setHfToken(token);
