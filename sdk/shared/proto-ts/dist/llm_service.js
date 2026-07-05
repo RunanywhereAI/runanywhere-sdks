@@ -10,6 +10,7 @@ exports.lLMStreamEventKindFromJSON = lLMStreamEventKindFromJSON;
 exports.lLMStreamEventKindToJSON = lLMStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const chat_1 = require("./chat");
 const llm_options_1 = require("./llm_options");
 const tool_calling_1 = require("./tool_calling");
 const voice_events_1 = require("./voice_events");
@@ -109,6 +110,7 @@ function createBaseLLMGenerateRequest() {
         nThreads: 0,
         metadata: {},
         options: undefined,
+        history: [],
     };
 }
 exports.LLMGenerateRequest = {
@@ -190,6 +192,9 @@ exports.LLMGenerateRequest = {
         });
         if (message.options !== undefined) {
             llm_options_1.LLMGenerationOptions.encode(message.options, writer.uint32(210).fork()).join();
+        }
+        for (const v of message.history) {
+            chat_1.ChatMessage.encode(v, writer.uint32(218).fork()).join();
         }
         return writer;
     },
@@ -385,6 +390,13 @@ exports.LLMGenerateRequest = {
                     message.options = llm_options_1.LLMGenerationOptions.decode(reader, reader.uint32());
                     continue;
                 }
+                case 27: {
+                    if (tag !== 218) {
+                        break;
+                    }
+                    message.history.push(chat_1.ChatMessage.decode(reader, reader.uint32()));
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -506,6 +518,9 @@ exports.LLMGenerateRequest = {
                 }, {})
                 : {},
             options: isSet(object.options) ? llm_options_1.LLMGenerationOptions.fromJSON(object.options) : undefined,
+            history: globalThis.Array.isArray(object?.history)
+                ? object.history.map((e) => chat_1.ChatMessage.fromJSON(e))
+                : [],
         };
     },
     toJSON(message) {
@@ -594,6 +609,9 @@ exports.LLMGenerateRequest = {
         if (message.options !== undefined) {
             obj.options = llm_options_1.LLMGenerationOptions.toJSON(message.options);
         }
+        if (message.history?.length) {
+            obj.history = message.history.map((e) => chat_1.ChatMessage.toJSON(e));
+        }
         return obj;
     },
     create(base) {
@@ -634,6 +652,7 @@ exports.LLMGenerateRequest = {
         message.options = (object.options !== undefined && object.options !== null)
             ? llm_options_1.LLMGenerationOptions.fromPartial(object.options)
             : undefined;
+        message.history = object.history?.map((e) => chat_1.ChatMessage.fromPartial(e)) || [];
         return message;
     },
 };

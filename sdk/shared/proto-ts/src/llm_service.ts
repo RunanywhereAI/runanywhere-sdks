@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { ChatMessage } from "./chat";
 import { LLMGenerationOptions } from "./llm_options";
 import { ToolCall, ToolResult } from "./tool_calling";
 import { TokenKind, tokenKindFromJSON, tokenKindToJSON } from "./voice_events";
@@ -165,7 +166,17 @@ export interface LLMGenerateRequest {
    * The wire schema retains the inline fields to avoid breaking existing
    * serialized requests; new callers should only populate `options`.
    */
-  options?: LLMGenerationOptions | undefined;
+  options?:
+    | LLMGenerationOptions
+    | undefined;
+  /**
+   * idl-chat: PRIOR conversation turns (excludes the current `prompt`, which
+   * stays the live user turn, and `system_prompt`, which stays separate).
+   * Alternating user/assistant ChatMessages in chronological order. An engine
+   * that owns its chat template renders {system_prompt, history, prompt} from
+   * its model's markers; engines that don't simply ignore this field.
+   */
+  history: ChatMessage[];
 }
 
 export interface LLMGenerateRequest_MetadataEntry {
@@ -308,6 +319,7 @@ function createBaseLLMGenerateRequest(): LLMGenerateRequest {
     nThreads: 0,
     metadata: {},
     options: undefined,
+    history: [],
   };
 }
 
@@ -390,6 +402,9 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
     });
     if (message.options !== undefined) {
       LLMGenerationOptions.encode(message.options, writer.uint32(210).fork()).join();
+    }
+    for (const v of message.history) {
+      ChatMessage.encode(v!, writer.uint32(218).fork()).join();
     }
     return writer;
   },
@@ -612,6 +627,14 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
           message.options = LLMGenerationOptions.decode(reader, reader.uint32());
           continue;
         }
+        case 27: {
+          if (tag !== 218) {
+            break;
+          }
+
+          message.history.push(ChatMessage.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -737,6 +760,9 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
         )
         : {},
       options: isSet(object.options) ? LLMGenerationOptions.fromJSON(object.options) : undefined,
+      history: globalThis.Array.isArray(object?.history)
+        ? object.history.map((e: any) => ChatMessage.fromJSON(e))
+        : [],
     };
   },
 
@@ -826,6 +852,9 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
     if (message.options !== undefined) {
       obj.options = LLMGenerationOptions.toJSON(message.options);
     }
+    if (message.history?.length) {
+      obj.history = message.history.map((e) => ChatMessage.toJSON(e));
+    }
     return obj;
   },
 
@@ -870,6 +899,7 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
     message.options = (object.options !== undefined && object.options !== null)
       ? LLMGenerationOptions.fromPartial(object.options)
       : undefined;
+    message.history = object.history?.map((e) => ChatMessage.fromPartial(e)) || [];
     return message;
   },
 };
