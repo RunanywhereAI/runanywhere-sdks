@@ -20,6 +20,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("destroy", &HybridRunAnywhereCoreSpec::destroy);
       prototype.registerHybridMethod("isInitialized", &HybridRunAnywhereCoreSpec::isInitialized);
       prototype.registerHybridMethod("resultToProtoErrorProto", &HybridRunAnywhereCoreSpec::resultToProtoErrorProto);
+      prototype.registerHybridMethod("setHfToken", &HybridRunAnywhereCoreSpec::setHfToken);
       prototype.registerHybridMethod("pluginLoaderApiVersion", &HybridRunAnywhereCoreSpec::pluginLoaderApiVersion);
       prototype.registerHybridMethod("pluginLoaderRegisteredCount", &HybridRunAnywhereCoreSpec::pluginLoaderRegisteredCount);
       prototype.registerHybridMethod("pluginLoaderRegisteredNames", &HybridRunAnywhereCoreSpec::pluginLoaderRegisteredNames);

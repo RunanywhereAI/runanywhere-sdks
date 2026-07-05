@@ -84,6 +84,17 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   resultToProtoErrorProto(code: number): Promise<ArrayBuffer>;
 
+  /**
+   * Set (or clear) the process-wide Hugging Face token via commons'
+   * `rac_http_hf_token_set`. Auth lives in the C++ layer (attached only to
+   * https huggingface.co/hf.co requests, never overriding a caller
+   * Authorization header) so downloads, HEAD preflight, resumable transfers,
+   * and HF repo registration authenticate uniformly on every platform.
+   * Empty string clears the token and disables the HF_TOKEN env fallback.
+   * Kotlin parity: RunAnywhereBridge.racHttpHfTokenSet.
+   */
+  setHfToken(token: string): Promise<void>;
+
   // ============================================================================
   // Plugin Loader
   // Matches Swift: RunAnywhere.pluginLoader backed by rac_registry_*.

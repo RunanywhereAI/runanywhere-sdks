@@ -16,80 +16,36 @@
 
 import { QHexRTProvider } from './QHexRTProvider';
 import { SDKLogger } from '@runanywhere/core/internal';
+import {
+  NpuCapability,
+  HexagonArch,
+} from '@runanywhere/proto-ts/hardware_profile';
 
 const log = new SDKLogger('NPU.QHexRT');
 
-/**
- * Hexagon DSP (HTP) architecture generation reported by the probe.
- * Mirrors the C enum `rac_hexagon_arch_t`. QHexRT requires v79 or v81.
- */
-export enum HexagonArch {
-  Unknown = 0,
-  V68 = 68,
-  V69 = 69,
-  V73 = 73,
-  V75 = 75,
-  V79 = 79,
-  V81 = 81,
-}
+// Re-export the generated wire types so consumers never hand-mirror them.
+export { NpuCapability, HexagonArch };
 
 /**
- * Result of the pre-flight NPU capability probe.
- *
- * Mirrors the C struct `rac_npu_info_t` returned by `rac_npu_probe()`.
+ * The unknown/unsupported fallback used when the native probe is unavailable
+ * (non-Android platforms, non-Snapdragon devices, or an older commons without
+ * rac_npu_probe_proto).
  */
-export interface NpuInfo {
-  /** SoC model string (e.g. "SM8750"); empty when unknown. */
-  readonly socModel: string;
-  /** /sys/devices/soc0/soc_id value; -1 when unavailable. */
-  readonly socId: number;
-  /** Detected Hexagon architecture, or HexagonArch.Unknown. */
-  readonly hexagonArch: HexagonArch;
-  /** true iff hexagonArch is one QHexRT supports (v79/v81). */
-  readonly qhexrtSupported: boolean;
+function unknownNpuCapability(): NpuCapability {
+  return NpuCapability.fromPartial({ socId: -1, archName: 'unknown' });
 }
 
-/** The unknown/unsupported fallback used when the probe is unavailable. */
-export const UNKNOWN_NPU_INFO: NpuInfo = {
-  socModel: '',
-  socId: -1,
-  hexagonArch: HexagonArch.Unknown,
-  qhexrtSupported: false,
-};
-
-/** Lowercase arch name ("v79", "v81", ..., "unknown"). */
-export function hexagonArchName(arch: HexagonArch): string {
-  switch (arch) {
-    case HexagonArch.V68: return 'v68';
-    case HexagonArch.V69: return 'v69';
-    case HexagonArch.V73: return 'v73';
-    case HexagonArch.V75: return 'v75';
-    case HexagonArch.V79: return 'v79';
-    case HexagonArch.V81: return 'v81';
-    default: return 'unknown';
-  }
-}
-
-function parseNpuInfo(json: string | null): NpuInfo {
-  if (!json) {
-    return UNKNOWN_NPU_INFO;
+function decodeNpuCapability(buffer: ArrayBuffer | null): NpuCapability {
+  if (!buffer || buffer.byteLength === 0) {
+    return unknownNpuCapability();
   }
   try {
-    const o = JSON.parse(json) as Partial<{
-      socModel: string;
-      socId: number;
-      hexagonArch: number;
-      qhexrtSupported: boolean;
-    }>;
-    return {
-      socModel: typeof o.socModel === 'string' ? o.socModel : '',
-      socId: typeof o.socId === 'number' ? o.socId : -1,
-      hexagonArch: typeof o.hexagonArch === 'number' ? (o.hexagonArch as HexagonArch) : HexagonArch.Unknown,
-      qhexrtSupported: o.qhexrtSupported === true,
-    };
+    return NpuCapability.decode(new Uint8Array(buffer));
   } catch (error) {
-    log.warning(`Failed to parse NPU probe result: ${error instanceof Error ? error.message : String(error)}`);
-    return UNKNOWN_NPU_INFO;
+    log.warning(
+      `Failed to decode NPU probe result: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return unknownNpuCapability();
   }
 }
 
@@ -107,7 +63,7 @@ function parseNpuInfo(json: string | null): NpuInfo {
  *
  * const npu = await QHexRT.probeNpu();
  * if (!npu.qhexrtSupported) {
- *   // warn: this device's Hexagon part is not v79/v81
+ *   // warn: this device's Hexagon part is not v75/v79/v81
  * }
  * await QHexRT.register();
  * ```
@@ -145,11 +101,14 @@ export const QHexRT = {
 
   /**
    * Pre-flight probe of the device's Qualcomm Hexagon NPU capability.
-   * Does NOT load QNN or the engine. Returns the unknown/unsupported fallback
-   * when the native module is unavailable (e.g. non-Snapdragon devices).
+   * Does NOT load QNN or the engine. Decodes the serialized
+   * `runanywhere.v1.NpuCapability` proto emitted by commons'
+   * rac_npu_probe_proto(). Returns the unknown/unsupported fallback
+   * (socId -1, archName "unknown") when the native module is unavailable
+   * (e.g. non-Snapdragon devices).
    */
-  async probeNpu(): Promise<NpuInfo> {
+  async probeNpu(): Promise<NpuCapability> {
     const raw = await QHexRTProvider.probeNpuRaw();
-    return parseNpuInfo(raw);
+    return decodeNpuCapability(raw);
   },
 };

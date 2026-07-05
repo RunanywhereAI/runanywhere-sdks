@@ -19,7 +19,7 @@
  * // Warn unsupported devices up front (no QNN load).
  * const npu = await QHexRT.probeNpu();
  * if (!npu.qhexrtSupported) {
- *   console.warn(`Hexagon ${npu.hexagonArch} not supported (needs v79/v81)`);
+ *   console.warn(`Hexagon ${npu.archName} not supported (needs v75/v79/v81)`);
  * }
  *
  * // Register the QHexRT backend (covers LLM, VLM, STT, TTS).
@@ -42,8 +42,9 @@
 // Main API
 // =============================================================================
 
-export { QHexRT, HexagonArch, hexagonArchName, UNKNOWN_NPU_INFO } from './QHexRT';
-export type { NpuInfo } from './QHexRT';
+// NpuCapability / HexagonArch are the generated proto wire types
+// (@runanywhere/proto-ts/hardware_profile) — re-exported for consumers.
+export { QHexRT, NpuCapability, HexagonArch } from './QHexRT';
 
 // =============================================================================
 // Nitrogen Spec Types

@@ -17,15 +17,12 @@
   "files": [
     "src",
     "cpp",
-    "ios",
-    "!ios/build",
     "android/src",
     "android/build.gradle",
     "android/CMakeLists.txt",
     "nitrogen",
     "nitro.json",
-    "react-native.config.js",
-    "*.podspec"
+    "react-native.config.js"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",

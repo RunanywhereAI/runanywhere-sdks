@@ -16,7 +16,7 @@
 
 
 #include <NitroModules/Promise.hpp>
-#include <string>
+#include <NitroModules/ArrayBuffer.hpp>
 
 namespace margelo::nitro::runanywhere::qhexrt {
 
@@ -52,7 +52,7 @@ namespace margelo::nitro::runanywhere::qhexrt {
       virtual std::shared_ptr<Promise<bool>> registerBackend() = 0;
       virtual std::shared_ptr<Promise<bool>> unregisterBackend() = 0;
       virtual std::shared_ptr<Promise<bool>> isBackendRegistered() = 0;
-      virtual std::shared_ptr<Promise<std::string>> probeNpu() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> probeNpuProto() = 0;
 
     protected:
       // Hybrid Setup

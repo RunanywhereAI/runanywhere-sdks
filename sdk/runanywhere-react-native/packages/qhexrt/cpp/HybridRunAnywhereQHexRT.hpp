@@ -49,7 +49,7 @@ public:
   // NPU Capability Probe
   // ============================================================================
 
-  std::shared_ptr<Promise<std::string>> probeNpu() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> probeNpuProto() override;
 
 private:
   bool isRegistered_ = false;

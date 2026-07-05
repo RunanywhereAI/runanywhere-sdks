@@ -27,7 +27,9 @@ const log = new SDKLogger('NPU.QHexRTProvider');
 export class QHexRTProvider {
   static readonly moduleId = 'qhexrt';
   static readonly moduleName = 'QHexRT';
-  static readonly version = '1.0.0';
+  // Keep in sync with package.json "version" (same convention as the other
+  // backend providers — there is no runtime package.json read in RN bundles).
+  static readonly version = '0.19.13';
 
   private static registered = false;
 
@@ -115,17 +117,18 @@ export class QHexRTProvider {
 
   /**
    * Probe the device's Hexagon NPU capability (pre-flight, no QNN load).
-   * @returns the raw JSON string from the native probe, or null when the
-   *          native module is unavailable / the probe throws.
+   * @returns the raw serialized `runanywhere.v1.NpuCapability` proto bytes
+   *          from the native probe (empty when the probe symbol is missing),
+   *          or null when the native module is unavailable / the probe throws.
    */
-  static async probeNpuRaw(): Promise<string | null> {
+  static async probeNpuRaw(): Promise<ArrayBuffer | null> {
     if (!isNativeQHexRTModuleAvailable()) {
       log.warning('QHexRT native module not available; cannot probe NPU');
       return null;
     }
     try {
       const native = getNativeQHexRTModule();
-      return await native.probeNpu();
+      return await native.probeNpuProto();
     } catch (error) {
       log.warning(`QHexRT NPU probe failed: ${error instanceof Error ? error.message : String(error)}`);
       return null;

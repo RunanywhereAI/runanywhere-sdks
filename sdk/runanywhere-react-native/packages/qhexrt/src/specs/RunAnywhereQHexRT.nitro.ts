@@ -50,10 +50,11 @@ export interface RunAnywhereQHexRT
 
   /**
    * Pre-flight probe of the device's Qualcomm Hexagon NPU capability.
-   * Calls rac_npu_probe() in commons; does NOT load QNN or the engine.
-   * @returns a JSON string of the form
-   *   {"socModel":"SM8750","socId":123,"hexagonArch":81,"qhexrtSupported":true}
-   *   (socModel "" and hexagonArch 0 when unknown).
+   * Calls rac_npu_probe_proto() in commons; does NOT load QNN or the engine.
+   * @returns serialized `runanywhere.v1.NpuCapability` proto bytes — decode
+   *   with `NpuCapability.decode()` from
+   *   `@runanywhere/proto-ts/hardware_profile`. An empty buffer means the
+   *   probe is unavailable on this device/build.
    */
-  probeNpu(): Promise<string>;
+  probeNpuProto(): Promise<ArrayBuffer>;
 }

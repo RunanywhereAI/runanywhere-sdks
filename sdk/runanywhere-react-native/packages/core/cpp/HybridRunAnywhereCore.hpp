@@ -71,6 +71,7 @@ public:
   completeServicesInitialization() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   resultToProtoErrorProto(double code) override;
+  std::shared_ptr<Promise<void>> setHfToken(const std::string &token) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   retryHTTPSetupProto() override;
   std::shared_ptr<Promise<void>> destroy() override;

@@ -17,7 +17,7 @@ namespace margelo::nitro::runanywhere::qhexrt {
       prototype.registerHybridMethod("registerBackend", &HybridRunAnywhereQHexRTSpec::registerBackend);
       prototype.registerHybridMethod("unregisterBackend", &HybridRunAnywhereQHexRTSpec::unregisterBackend);
       prototype.registerHybridMethod("isBackendRegistered", &HybridRunAnywhereQHexRTSpec::isBackendRegistered);
-      prototype.registerHybridMethod("probeNpu", &HybridRunAnywhereQHexRTSpec::probeNpu);
+      prototype.registerHybridMethod("probeNpuProto", &HybridRunAnywhereQHexRTSpec::probeNpuProto);
     });
   }
 
