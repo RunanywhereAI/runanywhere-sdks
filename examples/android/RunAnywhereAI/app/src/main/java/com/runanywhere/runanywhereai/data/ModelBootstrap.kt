@@ -48,6 +48,24 @@ object ModelBootstrap {
         RACLog.i("catalog seeded: ok=$ok failed=$fail")
     }
 
+    suspend fun refreshNpuCatalog() {
+        var ok = 0
+        var fail = 0
+        for (model in ModelCatalog.npuModels()) {
+            try {
+                model.register()
+                ok++
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                fail++
+                RACLog.e("npu catalog: ${model.id} failed", e)
+            }
+        }
+        RunAnywhere.refreshModelRegistry()
+        RACLog.i("npu catalog refreshed: ok=$ok failed=$fail")
+    }
+
     private suspend fun seedLora() {
         for (adapter in ModelCatalog.loraAdapters) {
             try {

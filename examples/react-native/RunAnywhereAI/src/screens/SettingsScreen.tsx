@@ -45,6 +45,7 @@ import {
   isModelLoadedForCategory,
   unloadModelsForCategory,
 } from '../utils/runAnywhereLifecycle';
+import { refreshNpuCatalog } from '../services/ModelCatalogBootstrap';
 
 const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
 const listModels = async (): Promise<ModelInfo[]> =>
@@ -464,6 +465,7 @@ export const SettingsScreen: React.FC = () => {
       try {
         await AsyncStorage.setItem(STORAGE_KEYS.HF_TOKEN, trimmed);
         await RunAnywhere.setHfToken(trimmed);
+        await refreshNpuCatalog();
         if (options.showFeedback) {
           Alert.alert(
             trimmed ? 'Saved' : 'Cleared',
@@ -980,7 +982,6 @@ export const SettingsScreen: React.FC = () => {
               ]}
               value={hfToken}
               onChangeText={handleHfTokenChange}
-              onBlur={handleHfTokenCommit}
               onSubmitEditing={handleHfTokenCommit}
               placeholder="hf_…"
               placeholderTextColor={colors.onSurfaceVariant}

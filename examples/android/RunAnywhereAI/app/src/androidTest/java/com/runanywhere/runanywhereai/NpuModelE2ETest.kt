@@ -80,7 +80,7 @@ class NpuModelE2ETest {
                 "networks entirely on the phone. In two or three sentences, summarize why on-device " +
                 "inference matters for privacy and latency."
         val THINKING_TAGS = ThinkingTagPattern(open_tag = "<think>", close_tag = "</think>")
-        val ARCH_SUFFIX = Regex("(.+)_(v\\d+)$")
+        val ARCH_SUFFIX = Regex("(.+)_(v(?:75|79|81|83))$")
     }
 
     // ---- baselines (public, HF-derived; offline provenance documented in the skill) ----

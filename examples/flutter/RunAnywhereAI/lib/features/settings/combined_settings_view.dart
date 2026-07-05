@@ -5,6 +5,7 @@ import 'package:runanywhere/runanywhere.dart' show RunAnywhere, ToolDefinition;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/services/model_catalog_bootstrap.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere_ai/core/utilities/url_utils.dart';
@@ -128,6 +129,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(PreferenceKeys.hfToken, token);
     RunAnywhere.setHfToken(token.isEmpty ? '' : token);
+    await ModelCatalogBootstrap.refreshNpuCatalog();
     if (showFeedback && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -739,23 +741,16 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
           children: [
             Text('HuggingFace token', style: AppTypography.subheadline(context)),
             const SizedBox(height: AppSpacing.xSmall),
-            Focus(
-              onFocusChange: (hasFocus) {
-                if (!hasFocus) {
-                  unawaited(_saveHfToken(_hfTokenController.text));
-                }
-              },
-              child: TextField(
-                controller: _hfTokenController,
-                decoration: const InputDecoration(
-                  hintText: 'hf_…',
-                  border: OutlineInputBorder(),
-                ),
-                autocorrect: false,
-                obscureText: true,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (value) => unawaited(_saveHfToken(value)),
+            TextField(
+              controller: _hfTokenController,
+              decoration: const InputDecoration(
+                hintText: 'hf_…',
+                border: OutlineInputBorder(),
               ),
+              autocorrect: false,
+              obscureText: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (value) => unawaited(_saveHfToken(value)),
             ),
             const SizedBox(height: AppSpacing.xSmall),
             Wrap(

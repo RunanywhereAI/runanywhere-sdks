@@ -197,6 +197,19 @@ rac_result_t maybe_resolve_qhexrt_logical_ref(
         return RAC_SUCCESS;
     }
 
+    if (policy == nullptr || policy->framework != RAC_FRAMEWORK_QHEXRT) {
+        return rac_proto_buffer_set_error(
+            out_proto, RAC_ERROR_BACKEND_UNAVAILABLE,
+            "QHexRT bundle policy is not registered; call QHexRT.register() before registering HNPU URLs");
+    }
+
+    const char* manifest_leaf_ext =
+        (policy->manifest_leaf_names_bundle == RAC_TRUE) ? policy->manifest_extension : nullptr;
+    if (!rac::infra::model_management::hf::is_logical_arch_folder_ref(request->url(),
+                                                                      manifest_leaf_ext)) {
+        return RAC_SUCCESS;
+    }
+
     std::string arch;
     std::string error;
     const rac_result_t arch_rc = qhexrt_current_arch(&arch, &error);
@@ -204,15 +217,7 @@ rac_result_t maybe_resolve_qhexrt_logical_ref(
         return rac_proto_buffer_set_error(out_proto, arch_rc, error.c_str());
     }
 
-    if (policy == nullptr || policy->framework != RAC_FRAMEWORK_QHEXRT) {
-        return rac_proto_buffer_set_error(
-            out_proto, RAC_ERROR_BACKEND_UNAVAILABLE,
-            "QHexRT bundle policy is not registered; call QHexRT.register() before registering HNPU URLs");
-    }
-
     std::string arch_ref;
-    const char* manifest_leaf_ext =
-        (policy->manifest_leaf_names_bundle == RAC_TRUE) ? policy->manifest_extension : nullptr;
     if (rac::infra::model_management::hf::make_arch_folder_ref(request->url(), arch,
                                                                manifest_leaf_ext, &arch_ref)) {
         RAC_LOG_INFO(LOG_CAT, "Resolved logical QHexRT bundle for arch %s", arch.c_str());

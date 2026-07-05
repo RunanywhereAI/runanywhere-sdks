@@ -616,6 +616,11 @@ abstract final class ModelCatalogBootstrap {
     debugPrint('QHexRT logical NPU bundles registered: 40');
   }
 
+  static Future<void> refreshNpuCatalog() async {
+    await _registerNpuBundles();
+    await RunAnywhere.refreshModelRegistry();
+  }
+
   /// Seed the curated LoRA adapter catalog. `registerArtifact` registers the
   /// catalog entry plus its downloadable artifact record (no bytes fetched);
   /// safe to re-run on every cold launch.

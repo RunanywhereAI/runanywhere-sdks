@@ -96,8 +96,19 @@ run_one() { # $1=model-id  $2..=extra `-e k v` pairs
   # -w blocks until the test finishes; the NPU_E2E result lands in logcat.
   "${ADB[@]}" shell am instrument -w -r "$@" "${extra[@]}" "$TEST_PKG/$RUNNER" 2>&1 \
     | sed 's/^/  [instr] /' || true
-  "${ADB[@]}" logcat -d -s NPU_E2E:I 2>/dev/null | grep "NPU_E2E id=" | tail -1 | tee -a "$OUT/lines.txt" || true
-  if ! "${ADB[@]}" pull "$EXT/npu_e2e_${id}.json" "$OUT/" 2>/dev/null; then
+  local line report_id
+  line="$("${ADB[@]}" logcat -d -s NPU_E2E:I 2>/dev/null | grep "NPU_E2E id=" | tail -1 || true)"
+  [ -n "$line" ] && printf '%s\n' "$line" | tee -a "$OUT/lines.txt" || true
+  report_id="$id"
+  if [[ "$line" =~ NPU_E2E[[:space:]]id=([^[:space:]]+) ]]; then
+    report_id="${BASH_REMATCH[1]}"
+  fi
+  if ! "${ADB[@]}" pull "$EXT/npu_e2e_${report_id}.json" "$OUT/" 2>/dev/null; then
+    if [ "$report_id" != "$id" ]; then
+      "${ADB[@]}" pull "$EXT/npu_e2e_${id}.json" "$OUT/" 2>/dev/null || true
+    fi
+  fi
+  if [ ! -f "$OUT/npu_e2e_${report_id}.json" ] && [ ! -f "$OUT/npu_e2e_${id}.json" ]; then
     # No report => the app process died (native crash) before the test could write it. Record a CRASH
     # row so the summary stays complete + honest, with the top native frame for triage.
     local sig
@@ -108,7 +119,7 @@ run_one() { # $1=model-id  $2..=extra `-e k v` pairs
       "$id" "$ARCH" "$sig" > "$OUT/npu_e2e_${id}.json"
   fi
   # pull any TTS wavs this model produced
-  for w in $("${ADB[@]}" shell "ls $EXT/tts_${id}_*.wav 2>/dev/null" | tr -d '\r'); do
+  for w in $("${ADB[@]}" shell "ls $EXT/tts_${report_id}_*.wav $EXT/tts_${id}_*.wav 2>/dev/null" | tr -d '\r' | sort -u); do
     "${ADB[@]}" pull "$w" "$OUT/" 2>/dev/null || true
   done
 }

@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.data.settings.AppSettings
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.state.GlobalState
@@ -54,8 +55,19 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun commitHfToken() {
-        // Empty clears the token (public no-auth behavior); never logged.
-        RunAnywhere.setHfToken(settings.hfToken.ifBlank { "" })
+        viewModelScope.launch {
+            // Empty clears the token (public no-auth behavior); never logged.
+            RunAnywhere.setHfToken(settings.hfToken.ifBlank { "" })
+            ModelBootstrap.refreshNpuCatalog()
+            storage = storage.copy(
+                message = if (settings.hfToken.isBlank()) {
+                    "Hugging Face token cleared"
+                } else {
+                    "Hugging Face token saved"
+                },
+            )
+            refreshStorage()
+        }
     }
 
     fun clearHfToken() {

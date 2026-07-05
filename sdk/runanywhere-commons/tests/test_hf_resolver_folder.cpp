@@ -84,6 +84,24 @@ void test_is_folder_ref(std::vector<TestResult>& results) {
 
 void test_arch_folder_ref(std::vector<TestResult>& results) {
     std::string out;
+    results.push_back(expect("logical arch ref: parent repo",
+                             hf::is_logical_arch_folder_ref("hf.co/org/repo", ".json")));
+    results.push_back(expect("logical arch ref: root manifest",
+                             hf::is_logical_arch_folder_ref("hf.co/org/repo/lfm.json", ".json")));
+    results.push_back(expect("logical arch ref: query manifest",
+                             hf::is_logical_arch_folder_ref("hf.co/org/repo?manifest=vlm.json",
+                                                            ".json")));
+    results.push_back(expect(
+        "logical arch ref: arch-pinned ref stays normal folder",
+        !hf::is_logical_arch_folder_ref("hf.co/org/repo/v81/lfm.json", ".json")));
+    results.push_back(expect(
+        "logical arch ref: resolve URL stays explicit file",
+        !hf::is_logical_arch_folder_ref(
+            "https://huggingface.co/org/repo/resolve/main/v81/lfm.json", ".json")));
+    results.push_back(expect(
+        "logical arch ref: conflicting manifest names rejected",
+        !hf::is_logical_arch_folder_ref("hf.co/org/repo/foo.json?manifest=bar.json",
+                                        ".json")));
     results.push_back(expect(
         "arch ref: parent repo",
         hf::make_arch_folder_ref("hf.co/org/repo", "v81", ".json", &out) &&
@@ -107,6 +125,10 @@ void test_arch_folder_ref(std::vector<TestResult>& results) {
         "arch ref: resolve URL untouched",
         !hf::make_arch_folder_ref("https://huggingface.co/org/repo/resolve/main/v81/lfm.json",
                                   "v79", ".json", &out)));
+    results.push_back(expect(
+        "arch ref: conflicting manifest names rejected",
+        !hf::make_arch_folder_ref("hf.co/org/repo/foo.json?manifest=bar.json", "v81",
+                                  ".json", &out)));
     results.push_back(expect(
         "arch ref: unknown arch rejected",
         !hf::make_arch_folder_ref("hf.co/org/repo/lfm.json", "unknown", ".json", &out)));

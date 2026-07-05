@@ -784,3 +784,8 @@ async function registerNpuBundles(): Promise<void> {
   ]);
   logDiagnostic('[App] QHexRT logical NPU bundles registered: 40');
 }
+
+export async function refreshNpuCatalog(): Promise<void> {
+  await registerNpuBundles();
+  await RunAnywhere.refreshModelRegistry();
+}

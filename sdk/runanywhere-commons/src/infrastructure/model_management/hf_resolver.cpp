@@ -275,11 +275,10 @@ bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext) {
     return has_extension(leaf, manifest_leaf_ext);
 }
 
-bool make_arch_folder_ref(const std::string& ref, const std::string& arch,
-                          const char* manifest_leaf_ext, std::string* out_ref) {
-    if (out_ref == nullptr || arch.empty() || arch == "unknown" || !is_arch_segment(arch)) {
-        return false;
-    }
+namespace {
+
+bool logical_arch_folder_parts(const std::string& ref, const char* manifest_leaf_ext,
+                               ParsedRef* parsed_out, std::string* manifest_out) {
     std::string rest = strip_prefix(ref);
     if (rest.empty() || rest.find("/resolve/") != std::string::npos ||
         rest.find("/blob/") != std::string::npos) {
@@ -307,7 +306,9 @@ bool make_arch_folder_ref(const std::string& ref, const std::string& arch,
         if (path.find('/') != std::string::npos || !has_extension(path, manifest_leaf_ext)) {
             return false;
         }
-        if (manifest.empty()) {
+        if (!manifest.empty() && manifest != path) {
+            return false;
+        } else if (manifest.empty()) {
             manifest = path;
         }
     }
@@ -317,6 +318,33 @@ bool make_arch_folder_ref(const std::string& ref, const std::string& arch,
         if (manifest.find('/') != std::string::npos || !has_extension(manifest, manifest_leaf_ext)) {
             return false;
         }
+    }
+
+    if (parsed_out != nullptr) {
+        *parsed_out = parsed;
+    }
+    if (manifest_out != nullptr) {
+        *manifest_out = manifest;
+    }
+    return true;
+}
+
+}  // namespace
+
+bool is_logical_arch_folder_ref(const std::string& ref, const char* manifest_leaf_ext) {
+    return logical_arch_folder_parts(ref, manifest_leaf_ext, nullptr, nullptr);
+}
+
+bool make_arch_folder_ref(const std::string& ref, const std::string& arch,
+                          const char* manifest_leaf_ext, std::string* out_ref) {
+    if (out_ref == nullptr || arch.empty() || arch == "unknown" || !is_arch_segment(arch)) {
+        return false;
+    }
+
+    ParsedRef parsed;
+    std::string manifest;
+    if (!logical_arch_folder_parts(ref, manifest_leaf_ext, &parsed, &manifest)) {
+        return false;
     }
 
     *out_ref = "https://huggingface.co/" + parsed.org + "/" + parsed.repo + "/" + arch;

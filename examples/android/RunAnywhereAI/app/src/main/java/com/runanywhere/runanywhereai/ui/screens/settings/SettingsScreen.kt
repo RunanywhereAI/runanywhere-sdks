@@ -26,7 +26,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -129,11 +128,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 OutlinedTextField(
                     value = settings.hfToken,
                     onValueChange = viewModel::setHfToken,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { state ->
-                            if (!state.isFocused) viewModel.commitHfToken()
-                        },
+                    modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("hf_…") },
                     supportingText = {
                         Text("Used to download private Hugging Face model repos, including HNPU/QHexRT NPU bundles")
