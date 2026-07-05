@@ -15,12 +15,12 @@
 #
 # Usage:
 #   scripts/run_npu_e2e.sh [flags] [modelId ...]
-#     modelId ...        catalog ids to run (default: the per-modality v81 sweep)
+#     modelId ...        logical catalog ids to run (default: a per-modality sweep)
 #   Flags:
 #     --serial <adb>     device serial (default: the only connected device)
 #     --token <hf_...>   HF token for PRIVATE runanywhere/*_HNPU repos (never stored)
 #     --build            stage AARs + assemble & install app + androidTest APKs first
-#     --arch <v81>       arch filter used only to pick the default model set
+#     --arch <v81>       expected device arch for the default/ad-hoc sweep
 #     --max-new <n>      override LLM/VLM max new tokens
 #     --repo/--modality/--files  run ONE ad-hoc HF repo instead of a catalog id
 set -euo pipefail
@@ -57,11 +57,12 @@ done
 
 ADB=(adb); [ -n "$SERIAL" ] && ADB=(adb -s "$SERIAL")
 
-# default per-modality sweep by arch (the small public bundles)
+# Default per-modality sweeps use logical catalog ids. --arch is still passed
+# into the test runner so it can assert the connected device matches the sweep.
 if [ ${#MODELS[@]} -eq 0 ] && [ -z "$REPO" ]; then
   case "$ARCH" in
-    v81) MODELS=(lfm2_5_230m_v81 moonshine_tiny_v81 melotts_en_v81 kokoro_en_v81 internvl3_5_1b_v81);;  # kokoro is private → needs --token
-    v79) MODELS=(lfm2_5_230m_v79 whisper_base_v79 melotts_en_v79 internvl3_5_1b_v79);;
+    v81) MODELS=(lfm2_5_230m moonshine_tiny melotts_en kokoro_en internvl3_5_1b);;  # kokoro is private → needs --token
+    v79) MODELS=(lfm2_5_230m whisper_base melotts_en internvl3_5_1b);;
     *)   echo "no default model set for arch=$ARCH; pass model ids explicitly"; exit 2;;
   esac
 fi
@@ -118,7 +119,7 @@ if [ -n "$REPO" ]; then
   [ -n "$MODALITY" ] && [ -n "$FILES" ] || { echo "--repo needs --modality and --files"; exit 2; }
   run_one "$(basename "$REPO")_${ARCH}" -e hfRepo "$REPO" -e arch "$ARCH" -e modality "$MODALITY" -e files "$FILES"
 else
-  for id in "${MODELS[@]}"; do run_one "$id" -e modelId "$id"; done
+  for id in "${MODELS[@]}"; do run_one "$id" -e modelId "$id" -e arch "$ARCH"; done
 fi
 
 echo "=== aggregating -> $OUT/summary.md ==="

@@ -135,12 +135,18 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                             if (!state.isFocused) viewModel.commitHfToken()
                         },
                     placeholder = { Text("hf_…") },
-                    supportingText = { Text("Used to download private Hugging Face model repos") },
+                    supportingText = {
+                        Text("Used to download private Hugging Face model repos, including HNPU/QHexRT NPU bundles")
+                    },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { viewModel.commitHfToken() }),
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
+                    TextButton(onClick = viewModel::commitHfToken) { Text("Save token") }
+                    TextButton(onClick = viewModel::clearHfToken) { Text("Clear") }
+                }
             }
         }
 

@@ -58,6 +58,11 @@ class SettingsViewModel : ViewModel() {
         RunAnywhere.setHfToken(settings.hfToken.ifBlank { "" })
     }
 
+    fun clearHfToken() {
+        SettingsRepository.setHfToken("")
+        commitHfToken()
+    }
+
     fun refreshStorage() {
         viewModelScope.launch {
             val info = runCatching {
