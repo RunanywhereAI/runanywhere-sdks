@@ -28,6 +28,33 @@ export declare enum AccelerationPreference {
 }
 export declare function accelerationPreferenceFromJSON(object: any): AccelerationPreference;
 export declare function accelerationPreferenceToJSON(object: AccelerationPreference): string;
+/**
+ * Logical hardware service contract. Mirrors the C ABI in
+ * sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
+ *   - rac_hardware_profile_get → GetProfile
+ *   - rac_hardware_get_accelerators → GetAccelerators
+ *   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
+ *
+ * Native device probes (chip detection, neural engine queries, GPU
+ * discovery, memory/cores) remain platform-adapter owned. C++ caches and
+ * serves the normalized HardwareProfile/AcceleratorInfo messages.
+ * Pre-flight Qualcomm Hexagon NPU probe. Mirrors the C ABI struct
+ * rac_npu_info_t (rac/infrastructure/device/rac_npu_capability.h); served
+ * over the proto-buffer ABI by rac_npu_probe_proto(). Enum values equal the
+ * Hexagon HTP version number to stay in lock-step with rac_hexagon_arch_t.
+ */
+export declare enum HexagonArch {
+    HEXAGON_ARCH_UNKNOWN = 0,
+    HEXAGON_ARCH_V68 = 68,
+    HEXAGON_ARCH_V69 = 69,
+    HEXAGON_ARCH_V73 = 73,
+    HEXAGON_ARCH_V75 = 75,
+    HEXAGON_ARCH_V79 = 79,
+    HEXAGON_ARCH_V81 = 81,
+    UNRECOGNIZED = -1
+}
+export declare function hexagonArchFromJSON(object: any): HexagonArch;
+export declare function hexagonArchToJSON(object: HexagonArch): string;
 export interface HardwareProfile {
     chip: string;
     hasNeuralEngine: boolean;
@@ -76,6 +103,23 @@ export interface HardwareAcceleratorPreferenceResult {
     success: boolean;
     errorMessage: string;
 }
+export interface NpuCapability {
+    /** Vendor SoC model (e.g. "SM8750"); empty when unknown. */
+    socModel: string;
+    /** /sys/devices/soc0/soc_id value; -1 when unavailable. */
+    socId: number;
+    hexagonArch: HexagonArch;
+    /** True iff hexagon_arch is in the QHexRT-supported set (v75/v79/v81 today). */
+    qhexrtSupported: boolean;
+    /**
+     * rac_hexagon_arch_name(): "v68" ... "v81", "unknown". Materialized so
+     * SDKs never re-derive the display name from the enum.
+     */
+    archName: string;
+}
+/** Empty request for the NPU probe; mirrors HardwareProfileRequest. */
+export interface NpuProbeRequest {
+}
 export declare const HardwareProfile: MessageFns<HardwareProfile>;
 export declare const AcceleratorInfo: MessageFns<AcceleratorInfo>;
 export declare const HardwareProfileResult: MessageFns<HardwareProfileResult>;
@@ -83,6 +127,8 @@ export declare const HardwareProfileRequest: MessageFns<HardwareProfileRequest>;
 export declare const HardwareAcceleratorsRequest: MessageFns<HardwareAcceleratorsRequest>;
 export declare const HardwareAcceleratorPreferenceRequest: MessageFns<HardwareAcceleratorPreferenceRequest>;
 export declare const HardwareAcceleratorPreferenceResult: MessageFns<HardwareAcceleratorPreferenceResult>;
+export declare const NpuCapability: MessageFns<NpuCapability>;
+export declare const NpuProbeRequest: MessageFns<NpuProbeRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

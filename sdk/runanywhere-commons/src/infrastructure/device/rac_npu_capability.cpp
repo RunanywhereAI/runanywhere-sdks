@@ -7,9 +7,14 @@
 
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 #if defined(__ANDROID__)
 #include <sys/system_properties.h>
+#endif
+
+#ifdef RAC_HAVE_PROTOBUF
+#include "hardware_profile.pb.h"
 #endif
 
 namespace {
@@ -147,6 +152,43 @@ const char* rac_hexagon_arch_name(rac_hexagon_arch_t arch) {
         default:
             return "unknown";
     }
+}
+
+rac_result_t rac_npu_probe_proto(rac_proto_buffer_t* out_capability) {
+    if (out_capability == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+#ifdef RAC_HAVE_PROTOBUF
+    rac_npu_info_t info;
+    const rac_result_t rc = rac_npu_probe(&info);
+    if (rc != RAC_SUCCESS) {
+        rac_proto_buffer_set_error(out_capability, rc, "rac_npu_probe failed");
+        return rc;
+    }
+
+    ::runanywhere::v1::NpuCapability capability;
+    capability.set_soc_model(info.soc_model);
+    capability.set_soc_id(info.soc_id);
+    // The proto enum values are pinned to the HTP version number, identical
+    // to rac_hexagon_arch_t — a straight cast keeps them in lock-step.
+    capability.set_hexagon_arch(
+        static_cast<::runanywhere::v1::HexagonArch>(static_cast<int>(info.hexagon_arch)));
+    capability.set_qhexrt_supported(info.qhexrt_supported == RAC_TRUE);
+    capability.set_arch_name(rac_hexagon_arch_name(info.hexagon_arch));
+
+    const size_t size = capability.ByteSizeLong();
+    std::vector<uint8_t> bytes(size);
+    if (size > 0 && !capability.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        rac_proto_buffer_set_error(out_capability, RAC_ERROR_ENCODING_ERROR,
+                                   "Failed to serialize NpuCapability proto");
+        return RAC_ERROR_ENCODING_ERROR;
+    }
+    return rac_proto_buffer_copy(bytes.data(), size, out_capability);
+#else
+    rac_proto_buffer_set_error(out_capability, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "rac_npu_probe_proto requires RAC_HAVE_PROTOBUF");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#endif
 }
 
 }  // extern "C"

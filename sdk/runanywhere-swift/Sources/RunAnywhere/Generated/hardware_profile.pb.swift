@@ -90,6 +90,73 @@ public nonisolated enum RAAccelerationPreference: SwiftProtobuf.Enum, Swift.Case
 
 }
 
+/// Logical hardware service contract. Mirrors the C ABI in
+/// sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
+///   - rac_hardware_profile_get → GetProfile
+///   - rac_hardware_get_accelerators → GetAccelerators
+///   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
+///
+/// Native device probes (chip detection, neural engine queries, GPU
+/// discovery, memory/cores) remain platform-adapter owned. C++ caches and
+/// serves the normalized HardwareProfile/AcceleratorInfo messages.
+/// Pre-flight Qualcomm Hexagon NPU probe. Mirrors the C ABI struct
+/// rac_npu_info_t (rac/infrastructure/device/rac_npu_capability.h); served
+/// over the proto-buffer ABI by rac_npu_probe_proto(). Enum values equal the
+/// Hexagon HTP version number to stay in lock-step with rac_hexagon_arch_t.
+public nonisolated enum RAHexagonArch: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unknown // = 0
+  case v68 // = 68
+  case v69 // = 69
+  case v73 // = 73
+  case v75 // = 75
+  case v79 // = 79
+  case v81 // = 81
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unknown
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unknown
+    case 68: self = .v68
+    case 69: self = .v69
+    case 73: self = .v73
+    case 75: self = .v75
+    case 79: self = .v79
+    case 81: self = .v81
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unknown: return 0
+    case .v68: return 68
+    case .v69: return 69
+    case .v73: return 73
+    case .v75: return 75
+    case .v79: return 79
+    case .v81: return 81
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAHexagonArch] = [
+    .unknown,
+    .v68,
+    .v69,
+    .v73,
+    .v75,
+    .v79,
+    .v81,
+  ]
+
+}
+
 public nonisolated struct RAHardwareProfile: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -215,12 +282,52 @@ public nonisolated struct RAHardwareAcceleratorPreferenceResult: Sendable {
   public init() {}
 }
 
+public nonisolated struct RANpuCapability: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Vendor SoC model (e.g. "SM8750"); empty when unknown.
+  public var socModel: String = String()
+
+  /// /sys/devices/soc0/soc_id value; -1 when unavailable.
+  public var socID: Int32 = 0
+
+  public var hexagonArch: RAHexagonArch = .unknown
+
+  /// True iff hexagon_arch is in the QHexRT-supported set (v75/v79/v81 today).
+  public var qhexrtSupported: Bool = false
+
+  /// rac_hexagon_arch_name(): "v68" ... "v81", "unknown". Materialized so
+  /// SDKs never re-derive the display name from the enum.
+  public var archName: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// Empty request for the NPU probe; mirrors HardwareProfileRequest.
+public nonisolated struct RANpuProbeRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
 nonisolated extension RAAccelerationPreference: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ACCELERATION_PREFERENCE_UNSPECIFIED\0\u{1}ACCELERATION_PREFERENCE_AUTO\0\u{1}ACCELERATION_PREFERENCE_CPU\0\u{1}ACCELERATION_PREFERENCE_GPU\0\u{1}ACCELERATION_PREFERENCE_NPU\0\u{1}ACCELERATION_PREFERENCE_WEBGPU\0\u{1}ACCELERATION_PREFERENCE_METAL\0\u{1}ACCELERATION_PREFERENCE_VULKAN\0")
+}
+
+nonisolated extension RAHexagonArch: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0HEXAGON_ARCH_UNKNOWN\0\u{2}D\u{1}HEXAGON_ARCH_V68\0\u{1}HEXAGON_ARCH_V69\0\u{2}\u{4}HEXAGON_ARCH_V73\0\u{2}\u{2}HEXAGON_ARCH_V75\0\u{2}\u{4}HEXAGON_ARCH_V79\0\u{2}\u{2}HEXAGON_ARCH_V81\0")
 }
 
 nonisolated extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -475,6 +582,75 @@ nonisolated extension RAHardwareAcceleratorPreferenceResult: SwiftProtobuf.Messa
   public static func ==(lhs: RAHardwareAcceleratorPreferenceResult, rhs: RAHardwareAcceleratorPreferenceResult) -> Bool {
     if lhs.success != rhs.success {return false}
     if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RANpuCapability: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".NpuCapability"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}soc_model\0\u{3}soc_id\0\u{3}hexagon_arch\0\u{3}qhexrt_supported\0\u{3}arch_name\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.socModel) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.socID) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.hexagonArch) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.qhexrtSupported) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.archName) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.socModel.isEmpty {
+      try visitor.visitSingularStringField(value: self.socModel, fieldNumber: 1)
+    }
+    if self.socID != 0 {
+      try visitor.visitSingularInt32Field(value: self.socID, fieldNumber: 2)
+    }
+    if self.hexagonArch != .unknown {
+      try visitor.visitSingularEnumField(value: self.hexagonArch, fieldNumber: 3)
+    }
+    if self.qhexrtSupported != false {
+      try visitor.visitSingularBoolField(value: self.qhexrtSupported, fieldNumber: 4)
+    }
+    if !self.archName.isEmpty {
+      try visitor.visitSingularStringField(value: self.archName, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RANpuCapability, rhs: RANpuCapability) -> Bool {
+    if lhs.socModel != rhs.socModel {return false}
+    if lhs.socID != rhs.socID {return false}
+    if lhs.hexagonArch != rhs.hexagonArch {return false}
+    if lhs.qhexrtSupported != rhs.qhexrtSupported {return false}
+    if lhs.archName != rhs.archName {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RANpuProbeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".NpuProbeRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RANpuProbeRequest, rhs: RANpuProbeRequest) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

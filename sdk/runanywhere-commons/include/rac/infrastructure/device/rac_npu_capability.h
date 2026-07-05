@@ -5,8 +5,8 @@
  * Detects the on-device Hexagon DSP architecture from the SoC identity WITHOUT
  * loading QNN or the QHexRT engine, so an SDK can decide up front whether the
  * QHexRT (Qualcomm NPU) backend will run and warn the user otherwise. The
- * QHexRT engine requires a Hexagon v79 or v81 part; older parts (v68..v75) and
- * non-Snapdragon devices fall back to CPU inference.
+ * QHexRT engine requires a Hexagon v75, v79 or v81 part; older parts
+ * (v68/v69/v73) and non-Snapdragon devices fall back to CPU inference.
  *
  * Detection is best-effort and pre-flight only: it reads the Android SoC model
  * (`ro.soc.model`, API 31+) and the soc0 sysfs node. The authoritative arch is
@@ -23,6 +23,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,7 +48,7 @@ typedef struct rac_npu_info {
     int32_t soc_id;
     /** Detected Hexagon architecture, or RAC_HEXAGON_ARCH_UNKNOWN. */
     rac_hexagon_arch_t hexagon_arch;
-    /** RAC_TRUE iff hexagon_arch is one the QHexRT engine supports (v79/v81). */
+    /** RAC_TRUE iff hexagon_arch is one the QHexRT engine supports (v75/v79/v81). */
     rac_bool_t qhexrt_supported;
 } rac_npu_info_t;
 
@@ -61,6 +62,16 @@ RAC_API rac_result_t rac_npu_probe(rac_npu_info_t* out);
 
 /** @return Lowercase arch name ("v79", "v81", ..., "unknown"). Never NULL. */
 RAC_API const char* rac_hexagon_arch_name(rac_hexagon_arch_t arch);
+
+/**
+ * @brief Probe the NPU and serialize the result as
+ *        `runanywhere.v1.NpuCapability` proto bytes — the single wire shape
+ *        every SDK bridge decodes with its generated types (no hand-rolled
+ *        JSON/struct mirrors). Never fails on unknown/unsupported parts.
+ * @param out_capability Receives the serialized bytes; release with
+ *        rac_proto_buffer_free(). MUST NOT be NULL.
+ */
+RAC_API rac_result_t rac_npu_probe_proto(rac_proto_buffer_t* out_capability);
 
 #ifdef __cplusplus
 }

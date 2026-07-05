@@ -551,15 +551,153 @@ class HardwareAcceleratorPreferenceResult extends $pb.GeneratedMessage {
   void clearErrorMessage() => $_clearField(2);
 }
 
-/// Logical hardware service contract. Mirrors the C ABI in
-/// sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
-///   - rac_hardware_profile_get → GetProfile
-///   - rac_hardware_get_accelerators → GetAccelerators
-///   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
-///
-/// Native device probes (chip detection, neural engine queries, GPU
-/// discovery, memory/cores) remain platform-adapter owned. C++ caches and
-/// serves the normalized HardwareProfile/AcceleratorInfo messages.
+class NpuCapability extends $pb.GeneratedMessage {
+  factory NpuCapability({
+    $core.String? socModel,
+    $core.int? socId,
+    HexagonArch? hexagonArch,
+    $core.bool? qhexrtSupported,
+    $core.String? archName,
+  }) {
+    final result = create();
+    if (socModel != null) result.socModel = socModel;
+    if (socId != null) result.socId = socId;
+    if (hexagonArch != null) result.hexagonArch = hexagonArch;
+    if (qhexrtSupported != null) result.qhexrtSupported = qhexrtSupported;
+    if (archName != null) result.archName = archName;
+    return result;
+  }
+
+  NpuCapability._();
+
+  factory NpuCapability.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory NpuCapability.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'NpuCapability',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'socModel')
+    ..aI(2, _omitFieldNames ? '' : 'socId')
+    ..aE<HexagonArch>(3, _omitFieldNames ? '' : 'hexagonArch',
+        enumValues: HexagonArch.values)
+    ..aOB(4, _omitFieldNames ? '' : 'qhexrtSupported')
+    ..aOS(5, _omitFieldNames ? '' : 'archName')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NpuCapability clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NpuCapability copyWith(void Function(NpuCapability) updates) =>
+      super.copyWith((message) => updates(message as NpuCapability))
+          as NpuCapability;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static NpuCapability create() => NpuCapability._();
+  @$core.override
+  NpuCapability createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static NpuCapability getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<NpuCapability>(create);
+  static NpuCapability? _defaultInstance;
+
+  /// Vendor SoC model (e.g. "SM8750"); empty when unknown.
+  @$pb.TagNumber(1)
+  $core.String get socModel => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set socModel($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSocModel() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSocModel() => $_clearField(1);
+
+  /// /sys/devices/soc0/soc_id value; -1 when unavailable.
+  @$pb.TagNumber(2)
+  $core.int get socId => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set socId($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSocId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSocId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  HexagonArch get hexagonArch => $_getN(2);
+  @$pb.TagNumber(3)
+  set hexagonArch(HexagonArch value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasHexagonArch() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearHexagonArch() => $_clearField(3);
+
+  /// True iff hexagon_arch is in the QHexRT-supported set (v75/v79/v81 today).
+  @$pb.TagNumber(4)
+  $core.bool get qhexrtSupported => $_getBF(3);
+  @$pb.TagNumber(4)
+  set qhexrtSupported($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasQhexrtSupported() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearQhexrtSupported() => $_clearField(4);
+
+  /// rac_hexagon_arch_name(): "v68" ... "v81", "unknown". Materialized so
+  /// SDKs never re-derive the display name from the enum.
+  @$pb.TagNumber(5)
+  $core.String get archName => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set archName($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasArchName() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearArchName() => $_clearField(5);
+}
+
+/// Empty request for the NPU probe; mirrors HardwareProfileRequest.
+class NpuProbeRequest extends $pb.GeneratedMessage {
+  factory NpuProbeRequest() => create();
+
+  NpuProbeRequest._();
+
+  factory NpuProbeRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory NpuProbeRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'NpuProbeRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NpuProbeRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NpuProbeRequest copyWith(void Function(NpuProbeRequest) updates) =>
+      super.copyWith((message) => updates(message as NpuProbeRequest))
+          as NpuProbeRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static NpuProbeRequest create() => NpuProbeRequest._();
+  @$core.override
+  NpuProbeRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static NpuProbeRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<NpuProbeRequest>(create);
+  static NpuProbeRequest? _defaultInstance;
+}
+
 class HardwareApi {
   final $pb.RpcClient _client;
 
@@ -582,6 +720,12 @@ class HardwareApi {
           'SetAcceleratorPreference',
           request,
           HardwareAcceleratorPreferenceResult());
+
+  /// Pre-flight Hexagon NPU capability (rac_npu_probe_proto).
+  $async.Future<NpuCapability> probeNpu(
+          $pb.ClientContext? ctx, NpuProbeRequest request) =>
+      _client.invoke<NpuCapability>(
+          ctx, 'Hardware', 'ProbeNpu', request, NpuCapability());
 }
 
 const $core.bool _omitFieldNames =
