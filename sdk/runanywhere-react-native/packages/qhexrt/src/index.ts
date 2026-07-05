@@ -19,7 +19,7 @@
  * // Warn unsupported devices up front (no QNN load).
  * const npu = await QHexRT.probeNpu();
  * if (!npu.qhexrtSupported) {
- *   console.warn(`Hexagon ${npu.archName} not supported (needs v75/v79/v81)`);
+ *   console.warn(`Hexagon ${npu.archName} not supported (needs v75+)`);
  * }
  *
  * // Register the QHexRT backend (covers LLM, VLM, STT, TTS).

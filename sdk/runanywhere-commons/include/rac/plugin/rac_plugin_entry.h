@@ -82,8 +82,11 @@ extern "C" {
  *                 RAC_PRIMITIVE_RERANK primitive (wire value 6 retired). All
  *                 engines rebuild against v4; v3 plugins are rejected at
  *                 register time with RAC_ERROR_ABI_VERSION_MISMATCH.
+ *   5u — rac_llm_options_t grew across the engine service boundary. Engines
+ *                 compiled against v4 may read a shorter options layout, so
+ *                 they are rejected at register time until rebuilt.
  */
-#define RAC_PLUGIN_API_VERSION 4u
+#define RAC_PLUGIN_API_VERSION 5u
 
 /* ===========================================================================
  * Plugin entry-point signature

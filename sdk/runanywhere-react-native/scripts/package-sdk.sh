@@ -29,6 +29,7 @@ RN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 source "${REPO_ROOT}/scripts/setup/detect-mode.sh"
 
 NATIVES_FROM=""
+SKIP_QHEXRT_PACKAGE=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -93,16 +94,20 @@ if [ -n "$NATIVES_FROM" ]; then
             librac_backend_onnx.so librac_backend_onnx_jni.so librac_backend_sherpa.so \
             libonnxruntime.so libsherpa-onnx-c-api.so libsherpa-onnx-cxx-api.so \
             libsherpa-onnx-jni.so libc++_shared.so
-        # QHexRT (Qualcomm Hexagon NPU) is private + arm64-only: the backend .so
-        # plus the QAIRT runtime/skel set (libQnn*) are bundled directly in the
-        # package, not fetched from a public release. They are copied only when
-        # present in --natives-from (otherwise silently skipped by stage_android).
-        stage_android "$RN_ROOT/packages/qhexrt" \
-            librac_backend_qhexrt.so libc++_shared.so \
-            libQnnHtp.so libQnnHtpNetRunExtensions.so libQnnHtpPrepare.so libQnnSystem.so \
-            libQnnHtpV75CalculatorStub.so libQnnHtpV75Skel.so libQnnHtpV75Stub.so \
-            libQnnHtpV79CalculatorStub.so libQnnHtpV79Skel.so libQnnHtpV79Stub.so \
-            libQnnHtpV81CalculatorStub.so libQnnHtpV81Skel.so libQnnHtpV81Stub.so
+        # QHexRT (Qualcomm Hexagon NPU) is private + arm64-only. Do not wipe a
+        # package-local staged tree or emit an empty tarball when the private
+        # backend is absent from the native input.
+        if [ -f "$NATIVES_FROM/arm64-v8a/librac_backend_qhexrt.so" ]; then
+            stage_android "$RN_ROOT/packages/qhexrt" \
+                librac_backend_qhexrt.so libc++_shared.so \
+                libQnnHtp.so libQnnHtpNetRunExtensions.so libQnnHtpPrepare.so libQnnSystem.so \
+                libQnnHtpV75CalculatorStub.so libQnnHtpV75Skel.so libQnnHtpV75Stub.so \
+                libQnnHtpV79CalculatorStub.so libQnnHtpV79Skel.so libQnnHtpV79Stub.so \
+                libQnnHtpV81CalculatorStub.so libQnnHtpV81Skel.so libQnnHtpV81Stub.so
+        else
+            SKIP_QHEXRT_PACKAGE=1
+            echo "::warning::missing QHexRT private native backend in --natives-from; skipping @runanywhere/qhexrt package"
+        fi
     fi
 fi
 
@@ -186,6 +191,13 @@ mkdir -p "$DIST_DIR"
 for pkg_dir in "$RN_ROOT/packages"/*/; do
     pkg=$(basename "$pkg_dir")
     if [ -f "$pkg_dir/package.json" ]; then
+        if [ "$pkg" = "qhexrt" ]; then
+            qhexrt_backend="$pkg_dir/android/src/main/jniLibs/arm64-v8a/librac_backend_qhexrt.so"
+            if [ "$SKIP_QHEXRT_PACKAGE" = "1" ] || [ ! -f "$qhexrt_backend" ]; then
+                echo "::warning::skipping npm pack qhexrt because librac_backend_qhexrt.so is not staged"
+                continue
+            fi
+        fi
         echo ">> npm pack $pkg"
         (cd "$pkg_dir" && npm pack --pack-destination "$DIST_DIR" >/dev/null) || echo "::warning::npm pack failed for $pkg"
     fi

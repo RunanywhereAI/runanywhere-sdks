@@ -241,7 +241,8 @@ for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-react-native/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/package.json" \
-    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/package.json"; do
+    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/package.json" \
+    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/package.json"; do
     bump_json_version "$pkg"
     bump_npm_proto_ts_dep "$pkg"
 done
@@ -269,7 +270,8 @@ for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_genie/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml" \
-    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml"; do
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml"; do
     bump_pubspec_version "$pkg"
 done
 
@@ -278,7 +280,8 @@ done
 for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_genie/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml" \
-    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml"; do
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml"; do
     bump_pubspec_runanywhere_dep "$pkg"
 done
 
@@ -288,6 +291,17 @@ bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/lib/foundat
     "static const String version = '[^']+'" \
     "static const String version = '${NEW_VERSION}'"
 
+# Flutter QHexRT carries native metadata outside pubspec.yaml.
+bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/lib/qhexrt.dart" \
+    "static const String version = '[^']+'" \
+    "static const String version = '${NEW_VERSION}'"
+bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/build.gradle" \
+    "version '[^']+'" \
+    "version '${NEW_VERSION}'"
+bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/kotlin/ai/runanywhere/sdk/qhexrt/QhexrtPlugin.kt" \
+    'private const val BACKEND_VERSION = "[^"]+"' \
+    "        private const val BACKEND_VERSION = \"${NEW_VERSION}\""
+
 # Flutter iOS podspecs — must be bumped in lockstep with pubspec.yaml.
 # Unlike RN podspecs (which derive s.version from package.json at eval time),
 # Flutter podspecs hardcode s.version and require an explicit bump here.
@@ -295,7 +309,8 @@ for podspec in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere.podspec" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_genie/ios/runanywhere_genie.podspec" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp.podspec" \
-    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx.podspec"; do
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx.podspec" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/ios/runanywhere_qhexrt.podspec"; do
     bump_line "$podspec" \
         "s\.version[[:space:]]*=[[:space:]]*'[^']+'" \
         "s.version          = '${NEW_VERSION}'"

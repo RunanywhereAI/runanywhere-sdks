@@ -101,6 +101,7 @@ function buildLLMGenerateRequest(
     requestId: '',
     modelId: '',
     conversationId: '',
+    history: [],
     seed: options.seed ?? 0,
     frequencyPenalty: options.frequencyPenalty ?? 0,
     presencePenalty: options.presencePenalty ?? 0,

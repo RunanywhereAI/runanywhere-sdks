@@ -42,16 +42,21 @@ rac_result_t rac_backend_qhexrt_register(void) {
     // metadata, so it registers BEFORE the arch gate — deterministic on
     // stub builds and unsupported devices alike.
     rac_bundle_policy_register(qhexrt_bundle_policy());
-    // Arch gate: only register on a Hexagon v75/v79/v81 part. On unsupported
+    // Arch gate: only register on a Hexagon v75+ part. On unsupported
     // devices QHexRT cannot run, and registering its providers would make the
     // router select QHexRT for *all* LLM/VLM/STT/TTS loads (intercepting
     // llamacpp / onnx / genie models and failing them). Refuse here so the
     // platform SDKs fall back to the CPU engines. (qhexrt_supported is false on
     // non-Snapdragon / non-Android and on older Hexagon parts.)
     rac_npu_info_t npu;
-    if (rac_npu_probe(&npu) == RAC_SUCCESS && npu.qhexrt_supported != RAC_TRUE) {
+    const rac_result_t probe_rc = rac_npu_probe(&npu);
+    if (probe_rc != RAC_SUCCESS) {
+        RAC_LOG_WARNING(LOG_CAT, "QHexRT not registered: NPU probe failed (%d)", probe_rc);
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
+    if (npu.qhexrt_supported != RAC_TRUE) {
         RAC_LOG_WARNING(LOG_CAT,
-                        "QHexRT not registered: Hexagon %s is unsupported (requires v75/v79/v81)",
+                        "QHexRT not registered: Hexagon %s is unsupported (requires v75+)",
                         rac_hexagon_arch_name(npu.hexagon_arch));
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }

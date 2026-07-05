@@ -1499,17 +1499,39 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     options.num_stop_sequences = stop_ptrs.size();
 
     // Prior conversation turns (idl-chat: LLMGenerateRequest.history, repeated
-    // ChatMessage). Flatten each turn's content into the alternating string
-    // array the C ABI carries; an engine that owns its chat template renders
-    // {system_prompt, history, prompt} from it. history_storage keeps the
-    // strings alive for the lifetime of `options` (mirrors stop_storage).
+    // ChatMessage). The C ABI still carries a role-less alternating string
+    // array, so normalize the proto roles before flattening: keep only
+    // user/assistant turns, drop leading assistant turns, coalesce duplicate
+    // same-role turns, and drop a trailing user turn so the current prompt
+    // remains the next user message.
     history_storage.clear();
     history_ptrs.clear();
     const int history_count = request.history_size();
     if (history_count > 0) {
         history_storage.reserve(static_cast<size_t>(history_count));
+        runanywhere::v1::MessageRole last_role =
+            runanywhere::v1::MESSAGE_ROLE_UNSPECIFIED;
         for (const auto& msg : request.history()) {
-            history_storage.push_back(msg.content());
+            const auto role = msg.role();
+            if (role != runanywhere::v1::MESSAGE_ROLE_USER &&
+                role != runanywhere::v1::MESSAGE_ROLE_ASSISTANT) {
+                continue;
+            }
+            if (msg.content().empty()) {
+                continue;
+            }
+            if (history_storage.empty() && role != runanywhere::v1::MESSAGE_ROLE_USER) {
+                continue;
+            }
+            if (role == last_role) {
+                history_storage.back().append("\n\n").append(msg.content());
+            } else {
+                history_storage.push_back(msg.content());
+                last_role = role;
+            }
+        }
+        if (last_role == runanywhere::v1::MESSAGE_ROLE_USER && !history_storage.empty()) {
+            history_storage.pop_back();
         }
         history_ptrs.reserve(history_storage.size());
         for (const auto& turn : history_storage) {

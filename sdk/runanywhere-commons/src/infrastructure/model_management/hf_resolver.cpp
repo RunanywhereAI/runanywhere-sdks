@@ -487,6 +487,8 @@ rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
         return RAC_ERROR_NOT_FOUND;
     }
     std::ranges::sort(bundle, {}, &TreeFile::path);
+    const bool bundle_has_top_level_config =
+        std::ranges::any_of(bundle, [](const TreeFile& file) { return file.path == "config.json"; });
 
     // Pick the primary: the manifest named by the ref, else the
     // alphabetically-first file the framework's bundle policy recognizes as a
@@ -525,7 +527,12 @@ rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
     out->has_vision_projector = false;
     out->total_size_bytes = 0;
     const std::string url_base = "https://huggingface.co/" + org + "/" + repo + "/resolve/main/";
+    std::vector<std::string> emitted_filenames;
     auto append = [&](const TreeFile& part, const std::string& full_path) {
+        if (std::ranges::find(emitted_filenames, part.path) != emitted_filenames.end()) {
+            return;
+        }
+        emitted_filenames.push_back(part.path);
         ResolvedFile file;
         file.url = url_base + full_path;
         file.filename = part.path;
@@ -540,7 +547,7 @@ rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
             append(bundle[i], prefix + bundle[i].path);
         }
     }
-    if (root_config) {
+    if (root_config && !bundle_has_top_level_config) {
         append(*root_config, root_config->path);
     }
 

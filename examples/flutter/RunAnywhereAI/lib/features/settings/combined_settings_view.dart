@@ -122,7 +122,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     }
   }
 
-  /// Persist the HuggingFace token and apply it to the SDK immediately
+  /// Persist the HuggingFace token and apply it to the SDK after editing.
   Future<void> _saveHfToken(String value) async {
     final token = value.trim();
     final prefs = await SharedPreferences.getInstance();
@@ -723,14 +723,23 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
           children: [
             Text('HuggingFace token', style: AppTypography.subheadline(context)),
             const SizedBox(height: AppSpacing.xSmall),
-            TextField(
-              controller: _hfTokenController,
-              decoration: const InputDecoration(
-                hintText: 'hf_…',
-                border: OutlineInputBorder(),
+            Focus(
+              onFocusChange: (hasFocus) {
+                if (!hasFocus) {
+                  unawaited(_saveHfToken(_hfTokenController.text));
+                }
+              },
+              child: TextField(
+                controller: _hfTokenController,
+                decoration: const InputDecoration(
+                  hintText: 'hf_…',
+                  border: OutlineInputBorder(),
+                ),
+                autocorrect: false,
+                obscureText: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (value) => unawaited(_saveHfToken(value)),
               ),
-              autocorrect: false,
-              onChanged: (value) => unawaited(_saveHfToken(value)),
             ),
             const SizedBox(height: AppSpacing.xSmall),
             Text(

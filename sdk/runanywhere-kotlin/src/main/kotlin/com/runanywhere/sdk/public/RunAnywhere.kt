@@ -34,12 +34,11 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.generated.convenience.wireString
 import com.runanywhere.sdk.infrastructure.logging.Logging
-import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
 import com.runanywhere.sdk.public.events.EventBus
-import java.net.URL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,6 +47,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.net.URL
 
 /**
  * The RunAnywhere SDK - Single entry point for on-device AI

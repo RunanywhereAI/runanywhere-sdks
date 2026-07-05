@@ -99,7 +99,7 @@
     {
       "label": "Pinned: react (centralized in dependencies/versions.json) — kept aligned with supported RN range (dev/prod only; peer ranges handled above)",
       "dependencies": ["react"],
-      "pinVersion": "19.2.7"
+      "pinVersion": "19.2.3"
     },
     {
       "label": "Pinned: @eslint/js (centralized in dependencies/versions.json) — tracks eslint major, prevents drift across web SDK packages",

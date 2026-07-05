@@ -109,7 +109,7 @@ message NpuCapability {
   // /sys/devices/soc0/soc_id value; -1 when unavailable.
   int32 soc_id = 2;
   HexagonArch hexagon_arch = 3;
-  // True iff hexagon_arch is in the QHexRT-supported set (v75/v79/v81 today).
+  // True iff hexagon_arch is in the QHexRT-supported set (v75+ today).
   bool qhexrt_supported = 4;
   // rac_hexagon_arch_name(): "v68" ... "v81", "unknown". Materialized so
   // SDKs never re-derive the display name from the enum.

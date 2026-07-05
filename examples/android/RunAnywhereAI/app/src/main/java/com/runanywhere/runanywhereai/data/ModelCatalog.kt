@@ -12,7 +12,7 @@ import ai.runanywhere.proto.v1.ModelCategory
  * engine's bundle policy resolve the full file set (sizes, checksums, nested
  * paths, and the repo-root `config.json` when present) from the Hub tree at
  * registration — no file lists in the app. Context binaries are arch-exact
- * ([arch] is the Hexagon architecture they were compiled for: v75/v79/v81),
+ * ([arch] is the Hexagon architecture they were compiled for: v75+),
  * so registration filters to the arch probed on the running device.
  */
 internal data class NpuBundle(

@@ -105,8 +105,8 @@ static const rac_engine_manifest_t k_qhexrt_manifest = {
     .package_owner = "runanywhere",
     .package_name = "runanywhere_qhexrt",
     .availability = RAC_ENGINE_AVAILABILITY_PRIVATE,
-    // Above llamacpp (100) so the NPU runtime wins for QNN-context models when
-    // both are registered; falls back to llamacpp for formats QHexRT rejects.
+    // Above llamacpp (100). Safe only because lifecycle pins QNN-context models
+    // to framework QHEXRT; generic primitive selection remains plain priority.
     .priority = 150,
     .capability_flags = 0,
     .primitives = k_qhexrt_primitives,

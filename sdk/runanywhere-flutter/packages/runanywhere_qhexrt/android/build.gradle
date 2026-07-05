@@ -1,5 +1,5 @@
 group 'ai.runanywhere.sdk.qhexrt'
-version '0.1.5'
+version '0.19.13'
 
 buildscript {
     ext.kotlin_version = '1.9.10'

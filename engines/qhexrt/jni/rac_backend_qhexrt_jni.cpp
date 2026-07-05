@@ -11,7 +11,7 @@
  * the shared RAC_DEFINE_ENGINE_JNI_BRIDGE macro. nativeProbeNpuProto is
  * hand-written: it surfaces the pre-flight Hexagon-arch detection
  * (rac_npu_probe_proto) so the app can warn before loading QNN. The probe lives
- * in commons and works on any device, including non-v75/v79/v81 parts.
+ * in commons and works on any device, including parts older than v75.
  */
 
 #include <jni.h>

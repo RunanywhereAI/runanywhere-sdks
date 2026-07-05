@@ -81,7 +81,7 @@ try {
 }
 
 // QHexRT (Qualcomm Hexagon NPU) — Android arm64 only. On other platforms the
-// native hybrid is absent, so register() returns false and the app falls back.
+// native hybrid is absent, so the app falls back.
 // probeNpu() resolves to the generated runanywhere.v1.NpuCapability proto
 // message (archName is provided by commons — no local arch mapping needed).
 let QHexRT: OptionalBackend | null = null;
@@ -154,27 +154,26 @@ async function registerBackends(): Promise<BackendRegistrationState> {
     );
   }
 
-  // QHexRT registers all NPU modalities (LLM/VLM/STT/TTS) in one call. No-op /
-  // false on non-Snapdragon devices and non-Android platforms. The probed
-  // Hexagon arch gates which NPU bundles the catalog registers (context
-  // binaries are arch-exact), so unsupported devices never see NPU models.
+  // QHexRT registers all NPU modalities (LLM/VLM/STT/TTS) in one call. Probe
+  // first so unsupported devices never install a higher-priority private
+  // backend, and so the catalog only sees arch-exact NPU bundles.
   let npuArch: string | null = null;
-  if (QHexRT) {
-    const qhexrtRegistered = (await QHexRT.register()) !== false;
-    logDiagnostic(
-      qhexrtRegistered
-        ? '[App] QHexRT (NPU) backend registered'
-        : '[App] QHexRT.register() returned false - NPU unavailable on this device'
-    );
-    if (qhexrtRegistered && qhexrtProbe) {
-      try {
-        const npu = await qhexrtProbe();
-        if (npu.qhexrtSupported) {
+  if (QHexRT && qhexrtProbe) {
+    try {
+      const npu = await qhexrtProbe();
+      if (npu.qhexrtSupported) {
+        const qhexrtRegistered = (await QHexRT.register()) !== false;
+        if (qhexrtRegistered) {
           npuArch = npu.archName;
+          logDiagnostic('[App] QHexRT (NPU) backend registered');
+        } else {
+          logDiagnostic('[App] QHexRT.register() returned false - NPU unavailable on this device');
         }
-      } catch (error) {
-        logDiagnostic(`[App] NPU probe failed: ${String(error)}`);
+      } else {
+        logDiagnostic('[App] Skipping QHexRT registration - unsupported Hexagon NPU');
       }
+    } catch (error) {
+      logDiagnostic(`[App] NPU probe failed: ${String(error)}`);
     }
   }
 

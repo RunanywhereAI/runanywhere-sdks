@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { Icon, useTheme } from '../theme/system';
 
 // Optional dependency — same pattern as App.tsx: the package (and its native
@@ -28,22 +28,30 @@ try {
  */
 export const HexagonNpuCard: React.FC = () => {
   const { colors, typography } = useTheme();
+  const [visible, setVisible] = useState(Platform.OS === 'android' && qhexrt !== null);
   const [line, setLine] = useState('Detecting…');
   const [supported, setSupported] = useState(false);
 
   useEffect(() => {
+    if (!visible || !qhexrt) return undefined;
     let cancelled = false;
     (async () => {
-      let text = 'Requires Hexagon v75/v79/v81 — NPU models hidden';
+      let text = 'Requires Hexagon v75+ — NPU models hidden';
       let ok = false;
       if (qhexrt) {
         try {
           const npu = await qhexrt.probeNpu();
+          const isUnknownFallback =
+            !npu.socModel && npu.socId < 0 && (npu.archName === '' || npu.archName === 'unknown');
+          if (isUnknownFallback) {
+            if (!cancelled) setVisible(false);
+            return;
+          }
           ok = npu.qhexrtSupported;
           const soc = npu.socModel || 'Snapdragon';
           text = ok
             ? `${soc} · Hexagon ${npu.archName} — NPU models available`
-            : `Requires Hexagon v75/v79/v81 — NPU models hidden${
+            : `Requires Hexagon v75+ — NPU models hidden${
                 npu.socModel ? ` (${npu.socModel})` : ''
               }`;
         } catch {
@@ -58,7 +66,11 @@ export const HexagonNpuCard: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [visible]);
+
+  if (!visible) {
+    return null;
+  }
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh }]}>

@@ -17,7 +17,7 @@ class HexagonNpuCard extends StatelessWidget {
     final subtitle = supported
         ? '${npu.socModel.isEmpty ? 'Snapdragon' : npu.socModel} · '
               'Hexagon ${npu.archName} — NPU models available'
-        : 'Requires Hexagon v75/v79/v81 — NPU models hidden'
+        : 'Requires Hexagon v75+ — NPU models hidden'
               '${npu.socModel.isEmpty ? '' : ' (${npu.socModel})'}';
 
     return Card(

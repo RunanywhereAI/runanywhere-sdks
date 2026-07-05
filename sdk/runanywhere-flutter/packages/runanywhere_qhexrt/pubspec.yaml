@@ -1,6 +1,6 @@
 name: runanywhere_qhexrt
-description: Private Android-only Qualcomm Hexagon NPU (QHexRT) backend for RunAnywhere. Runs prebuilt QNN context binaries on Snapdragon v79/v81 NPUs.
-version: 0.1.5
+description: Private Android-only Qualcomm Hexagon NPU (QHexRT) backend for RunAnywhere. Runs prebuilt QNN context binaries on Snapdragon v75+ NPUs.
+version: 0.19.13
 homepage: https://runanywhere.ai
 repository: https://github.com/RunanywhereAI/runanywhere-sdks
 issue_tracker: https://github.com/RunanywhereAI/runanywhere-sdks/issues

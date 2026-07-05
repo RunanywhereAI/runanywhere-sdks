@@ -63,7 +63,7 @@ function decodeNpuCapability(buffer: ArrayBuffer | null): NpuCapability {
  *
  * const npu = await QHexRT.probeNpu();
  * if (!npu.qhexrtSupported) {
- *   // warn: this device's Hexagon part is not v75/v79/v81
+ *   // warn: this device's Hexagon part is older than v75
  * }
  * await QHexRT.register();
  * ```

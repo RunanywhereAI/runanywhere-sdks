@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -24,16 +26,19 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.BuildConfig
 import com.runanywhere.runanywhereai.ui.screens.models.formatModelSize
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
-import com.runanywhere.runanywhereai.util.readableWidth
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
+import com.runanywhere.runanywhereai.util.readableWidth
 import com.runanywhere.sdk.public.types.RAModelInfo
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -124,10 +129,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 OutlinedTextField(
                     value = settings.hfToken,
                     onValueChange = viewModel::setHfToken,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { state ->
+                            if (!state.isFocused) viewModel.commitHfToken()
+                        },
                     placeholder = { Text("hf_…") },
                     supportingText = { Text("Used to download private Hugging Face model repos") },
                     singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { viewModel.commitHfToken() }),
                 )
             }
         }

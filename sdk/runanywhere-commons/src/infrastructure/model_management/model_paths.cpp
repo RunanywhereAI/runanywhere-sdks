@@ -240,6 +240,17 @@ static bool matches_model_format(const fs::path& path, rac_model_format_t format
     }
 }
 
+static bool is_common_non_model_root_file(const fs::path& path) {
+    const std::string name = to_lower(filename_of(path));
+    if (name_equals_any(name, {"readme", "readme.txt", "readme.md", "license", "license.txt",
+                               "license.md", "notice", "notice.txt", "notice.md", "changelog",
+                               "changelog.txt", "changelog.md"})) {
+        return true;
+    }
+    return has_extension(path, "md") || has_extension(path, "txt") || has_extension(path, "sha256") ||
+           has_extension(path, "sha256sum") || has_extension(path, "jsonl");
+}
+
 static rac_resolved_model_file_role_t infer_file_role(const fs::path& path,
                                                       rac_model_format_t format) {
     std::string name = to_lower(filename_of(path));
@@ -473,9 +484,11 @@ static fs::path effective_model_root(const fs::path& root, rac_model_format_t fo
             continue;
         }
         if (it->is_regular_file(ec)) {
-            has_regular_file = true;
             if (matches_model_format(child, format)) {
+                has_regular_file = true;
                 has_direct_model_file = true;
+            } else if (!is_common_non_model_root_file(child)) {
+                has_regular_file = true;
             }
         } else if (it->is_directory(ec)) {
             child_dirs.push_back(child);

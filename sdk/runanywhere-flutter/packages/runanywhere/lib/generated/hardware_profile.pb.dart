@@ -637,7 +637,7 @@ class NpuCapability extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearHexagonArch() => $_clearField(3);
 
-  /// True iff hexagon_arch is in the QHexRT-supported set (v75/v79/v81 today).
+  /// True iff hexagon_arch is in the QHexRT-supported set (v75+ today).
   @$pb.TagNumber(4)
   $core.bool get qhexrtSupported => $_getBF(3);
   @$pb.TagNumber(4)

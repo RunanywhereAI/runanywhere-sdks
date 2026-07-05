@@ -13,9 +13,9 @@
  *
  * The token is attached as `Authorization: Bearer <token>` ONLY to requests
  * whose URL host is exactly `huggingface.co` or `hf.co` (no subdomains), and
- * never when the caller already supplied an Authorization header. Redirects
- * to CDN hosts are followed by the platform transports, which drop the
- * Authorization header on cross-host redirects per their default policies.
+ * never when the caller already supplied an Authorization header. Platform
+ * transports must not forward that Authorization header to cross-host
+ * redirects; the Swift URLSession adapter enforces this explicitly.
  *
  * NOT part of the public C ABI. C++-only.
  */

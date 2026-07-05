@@ -62,6 +62,7 @@ struct StreamCtx {
     rac_stt_stream_callback_t cb;
     void* user;
     Session* session;
+    bool cancelled = false;
     std::string acc;  // cumulative transcript forwarded as partial text
 };
 
@@ -71,6 +72,7 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
         return 1;
     }
     if (c->session != nullptr && c->session->cancel.load(std::memory_order_relaxed)) {
+        c->cancelled = true;
         return 0;
     }
     if (is_final != 0 || utf8 == nullptr) {
@@ -84,6 +86,20 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
     }
     if (c->cb != nullptr) {
         c->cb(c->acc.c_str(), RAC_FALSE, c->user);
+    }
+    return 1;
+}
+
+struct StopCtx {
+    Session* session;
+};
+
+int stop_trampoline(void* user, const char* /*utf8*/, int /*len*/, int /*token_id*/,
+                    int /*is_final*/) {
+    auto* c = static_cast<StopCtx*>(user);
+    if (c != nullptr && c->session != nullptr &&
+        c->session->cancel.load(std::memory_order_relaxed)) {
+        return 0;
     }
     return 1;
 }
@@ -133,9 +149,13 @@ rac_result_t qhexrt_stt_transcribe(void* impl, const void* audio_data, size_t au
         }
         qhx_gen_cfg cfg;
         qhx_gen_cfg_default(&cfg);
+        StopCtx stop_ctx{c};
         qhx_output out{};
-        qhx_status st = qhx_generate(c->sess, &in, &cfg, nullptr, nullptr, &out);
+        qhx_status st = qhx_generate(c->sess, &in, &cfg, stop_trampoline, &stop_ctx, &out);
         if (st != 0) {
+            if (c->cancel.load(std::memory_order_relaxed)) {
+                return RAC_ERROR_CANCELLED;
+            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(stt) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
@@ -162,10 +182,13 @@ rac_result_t qhexrt_stt_transcribe_stream(void* impl, const void* audio_data, si
         }
         qhx_gen_cfg cfg;
         qhx_gen_cfg_default(&cfg);
-        StreamCtx ctx{callback, user_data, c, std::string()};
+        StreamCtx ctx{callback, user_data, c, false, std::string()};
         qhx_output out{};
         qhx_status st = qhx_generate(c->sess, &in, &cfg, stream_trampoline, &ctx, &out);
         if (st != 0) {
+            if (ctx.cancelled || c->cancel.load(std::memory_order_relaxed)) {
+                return RAC_ERROR_CANCELLED;
+            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(stt stream) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }

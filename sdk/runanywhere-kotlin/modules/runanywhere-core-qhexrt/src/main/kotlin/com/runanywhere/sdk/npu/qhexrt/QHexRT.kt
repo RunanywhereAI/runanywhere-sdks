@@ -7,10 +7,14 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+// RunAnywhereBridge doesn't expose this one; derived the same way as its
+// RAC_ERROR_* constants (signed C ABI value = negated proto-enum magnitude).
+private val RAC_ERROR_BACKEND_UNAVAILABLE = -ErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE.value
+
 /**
  * QHexRT module — RunAnywhere's private Qualcomm Hexagon NPU backend.
  *
- * Runs prebuilt QNN context binaries on Snapdragon NPUs (v75/v79/v81), serving
+ * Runs prebuilt QNN context binaries on Snapdragon NPUs (v75+), serving
  * LLM, VLM, STT and TTS through the standard SDK APIs once registered. A thin
  * wrapper over C++ backend registration; all inference lives in the C++
  * commons layer.
@@ -23,16 +27,11 @@ import kotlinx.coroutines.sync.withLock
  *
  * ## Registration
  * ```kotlin
- * QHexRT.register()   // once during bootstrap, on a v75/v79/v81 device
+ * QHexRT.register()   // once during bootstrap, on a v75+ device
  * ```
  */
 object QHexRT {
     private val logger = SDKLogger("QHexRT")
-
-    // RunAnywhereBridge doesn't expose this one; derived the same way as its
-    // RAC_ERROR_* constants (signed C ABI value = negated proto-enum
-    // magnitude — see the "Result codes" block in RunAnywhereBridge).
-    private val RAC_ERROR_BACKEND_UNAVAILABLE = -ErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE.value
 
     /** Current version of the QHexRT module, as reported by the native bridge. */
     val version: String
@@ -62,7 +61,7 @@ object QHexRT {
     fun probeNpu(): NpuCapability {
         RunAnywhereBridge.ensureNativeLibraryLoaded()
         if (!QHexRTBridge.ensureNativeLibraryLoaded()) {
-            logger.error("QHexRT native library unavailable; reporting unsupported NPU")
+            logger.info("QHexRT native library unavailable; reporting unsupported NPU")
             return NpuCapability()
         }
         return try {
@@ -129,10 +128,15 @@ private val logger = SDKLogger("QHexRT")
 internal fun QHexRT.registerNative(): Int {
     RunAnywhereBridge.ensureNativeLibraryLoaded()
     if (!QHexRTBridge.ensureNativeLibraryLoaded()) {
-        logger.error("Failed to load QHexRT native library")
-        throw UnsatisfiedLinkError("Failed to load QHexRT native library")
+        logger.info("QHexRT native library unavailable; skipping backend registration")
+        return RAC_ERROR_BACKEND_UNAVAILABLE
     }
     return QHexRTBridge.nativeRegister()
 }
 
-internal fun QHexRT.unregisterNative(): Int = QHexRTBridge.nativeUnregister()
+internal fun QHexRT.unregisterNative(): Int =
+    if (QHexRTBridge.ensureNativeLibraryLoaded()) {
+        QHexRTBridge.nativeUnregister()
+    } else {
+        RAC_ERROR_BACKEND_UNAVAILABLE
+    }

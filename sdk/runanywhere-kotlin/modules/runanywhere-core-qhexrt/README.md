@@ -1,10 +1,10 @@
 # runanywhere-core-qhexrt
 
 Private QHexRT backend for the RunAnywhere Kotlin SDK. Runs prebuilt QNN context
-binaries on Qualcomm Snapdragon Hexagon NPUs (v79/v81), serving LLM, VLM, STT and
+binaries on Qualcomm Snapdragon Hexagon NPUs (v75+), serving LLM, VLM, STT and
 TTS through the standard SDK APIs.
 
-Android only, `arm64-v8a` only. On non-v79/v81 devices the backend declines to
+Android only, `arm64-v8a` only. On parts older than v75, the backend declines to
 register and the SDK falls back to CPU engines.
 
 ## Bundled native libraries

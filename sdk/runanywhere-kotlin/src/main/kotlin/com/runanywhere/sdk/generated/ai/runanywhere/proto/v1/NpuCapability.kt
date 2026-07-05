@@ -61,7 +61,7 @@ public class NpuCapability(
   )
   public val hexagon_arch: HexagonArch = HexagonArch.HEXAGON_ARCH_UNKNOWN,
   /**
-   * True iff hexagon_arch is in the QHexRT-supported set (v75/v79/v81 today).
+   * True iff hexagon_arch is in the QHexRT-supported set (v75+ today).
    */
   @field:WireField(
     tag = 4,

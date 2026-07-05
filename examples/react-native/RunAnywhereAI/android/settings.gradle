@@ -23,5 +23,11 @@ project(':runanywhere_llamacpp').projectDir = new File(rootProject.projectDir, '
 include ':runanywhere_onnx'
 project(':runanywhere_onnx').projectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/onnx/android')
 
-include ':runanywhere_qhexrt'
-project(':runanywhere_qhexrt').projectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/qhexrt/android')
+def qhexrtProjectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/qhexrt/android')
+def qhexrtBackend = new File(qhexrtProjectDir, 'src/main/jniLibs/arm64-v8a/librac_backend_qhexrt.so')
+if (qhexrtProjectDir.exists() && qhexrtBackend.exists()) {
+    include ':runanywhere_qhexrt'
+    project(':runanywhere_qhexrt').projectDir = qhexrtProjectDir
+} else {
+    println("[RunAnywhereAI] Skipping :runanywhere_qhexrt - private QHexRT native backend is not staged")
+}

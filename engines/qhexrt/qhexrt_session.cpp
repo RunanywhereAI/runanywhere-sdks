@@ -7,7 +7,7 @@
  * bundle directory (not a file); a published bundle is laid out with a per-arch
  * subdirectory holding `<model>.json` plus the `.bin` graphs. session_open()
  * therefore selects the manifest in the subdirectory matching the device's arch
- * (v79/v81), falling back to a flat layout, and accepts a direct manifest path.
+ * (v75+), falling back to a flat layout, and accepts a direct manifest path.
  */
 
 #include "qhexrt_session.h"
@@ -43,7 +43,7 @@ std::size_t g_rt_refs = 0;
 
 #if defined(__ANDROID__)
 // QNN's HTP stub dlopens libcdsprpc.so and the per-arch DSP skel
-// (libQnnHtpV75/V79/V81Skel.so) via ADSP_LIBRARY_PATH; this must be set before
+// (for example, libQnnHtpV75/V79/V81Skel.so) via ADSP_LIBRARY_PATH; this must be set before
 // the first qhx_runtime_create in every host (Kotlin/Flutter/RN) — engine-owned
 // so platform glue never re-implements it. The skels ship next to this engine
 // .so in the app's nativeLibraryDir, which dladdr on one of our own symbols

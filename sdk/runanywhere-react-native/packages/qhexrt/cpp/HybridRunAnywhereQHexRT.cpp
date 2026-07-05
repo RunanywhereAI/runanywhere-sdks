@@ -26,10 +26,15 @@
 #include <stdexcept>
 #include <string>
 
+#ifndef RAC_QHEXRT_BACKEND_AVAILABLE
+#define RAC_QHEXRT_BACKEND_AVAILABLE 0
+#endif
+
 // ============================================================================
 // QHexRT backend C symbols (resolved at link/runtime from the staged
 // librac_backend_qhexrt.so).
 // ============================================================================
+#if RAC_QHEXRT_BACKEND_AVAILABLE
 extern "C" {
 
 // engines/qhexrt/rac_backend_qhexrt_register.cpp
@@ -37,6 +42,7 @@ rac_result_t rac_backend_qhexrt_register(void);
 rac_result_t rac_backend_qhexrt_unregister(void);
 
 } // extern "C"
+#endif
 
 // Log category for this module
 #define LOG_CATEGORY "NPU.QHexRT"
@@ -49,6 +55,11 @@ bool isRegistrationSuccess(rac_result_t result) {
   return result == RAC_SUCCESS ||
          result == RAC_ERROR_MODULE_ALREADY_REGISTERED ||
          result == RAC_ERROR_PLUGIN_DUPLICATE;
+}
+
+bool isBackendUnavailable(rac_result_t result) {
+  return result == RAC_ERROR_BACKEND_UNAVAILABLE ||
+         result == RAC_ERROR_CAPABILITY_UNSUPPORTED;
 }
 
 } // namespace
@@ -76,7 +87,17 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereQHexRT::registerBackend() {
     // Note: ADSP_LIBRARY_PATH (Hexagon DSP skel discovery) is set by the QHexRT
     // engine itself before its first runtime create — no platform glue needed.
 
+#if !RAC_QHEXRT_BACKEND_AVAILABLE
+    RAC_LOG_WARNING(LOG_CATEGORY, "QHexRT private native backend is not staged; registration skipped");
+    isRegistered_ = false;
+    return false;
+#else
     rac_result_t result = rac_backend_qhexrt_register();
+    if (isBackendUnavailable(result)) {
+      RAC_LOG_WARNING(LOG_CATEGORY, "QHexRT backend unavailable on this device or build: %d", result);
+      isRegistered_ = false;
+      return false;
+    }
     if (!isRegistrationSuccess(result)) {
       RAC_LOG_ERROR(LOG_CATEGORY, "QHexRT registration failed with code: %d", result);
       throw std::runtime_error("QHexRT registration failed with error: " + std::to_string(result));
@@ -85,6 +106,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereQHexRT::registerBackend() {
     RAC_LOG_INFO(LOG_CATEGORY, "QHexRT backend registered successfully (LLM, VLM, STT, TTS)");
     isRegistered_ = true;
     return true;
+#endif
   });
 }
 
@@ -92,6 +114,10 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereQHexRT::unregisterBackend() {
   return Promise<bool>::async([this]() {
     RAC_LOG_DEBUG(LOG_CATEGORY, "Unregistering QHexRT backend");
 
+#if !RAC_QHEXRT_BACKEND_AVAILABLE
+    isRegistered_ = false;
+    return true;
+#else
     rac_result_t result = rac_backend_qhexrt_unregister();
     isRegistered_ = false;
     if (result != RAC_SUCCESS) {
@@ -99,6 +125,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereQHexRT::unregisterBackend() {
       throw std::runtime_error("QHexRT unregistration failed with error: " + std::to_string(result));
     }
     return true;
+#endif
   });
 }
 

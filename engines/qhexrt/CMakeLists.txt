@@ -75,7 +75,7 @@ set(QHEXRT_INCLUDE_DIRS
 set(QHEXRT_CORE_LIB "${QHEXRT_ROOT}/lib/${_qhexrt_abi}/libqhexrt_core.a")
 set(QHEXRT_HOST_LIB "${QHEXRT_ROOT}/lib/${_qhexrt_abi}/libqhexrt_host.a")
 
-if(EXISTS "${QHEXRT_CORE_LIB}" AND EXISTS "${QHEXRT_HOST_LIB}" AND
+if(RAC_PLATFORM_ANDROID AND EXISTS "${QHEXRT_CORE_LIB}" AND EXISTS "${QHEXRT_HOST_LIB}" AND
    EXISTS "${QHEXRT_ROOT}/include/qhexrt/qhexrt_c.h")
     set(RAC_QHEXRT_ENGINE_AVAILABLE 1)
     message(STATUS "  QHexRT engine discovered:")
@@ -102,7 +102,11 @@ if(EXISTS "${QHEXRT_CORE_LIB}" AND EXISTS "${QHEXRT_HOST_LIB}" AND
 else()
     set(RAC_QHEXRT_ENGINE_AVAILABLE 0)
     list(APPEND QHEXRT_COMPILE_DEFS RAC_QHEXRT_ENGINE_AVAILABLE=0)
-    message(STATUS "  QHexRT engine archive absent under QHEXRT_ROOT=${QHEXRT_ROOT}")
+    if(NOT RAC_PLATFORM_ANDROID)
+        message(STATUS "  QHexRT engine is Android-only on Snapdragon; building shell for ${RAC_PLATFORM_NAME}")
+    else()
+        message(STATUS "  QHexRT engine archive absent under QHEXRT_ROOT=${QHEXRT_ROOT}")
+    endif()
     message(STATUS "  -> building not-routable shell (rejects with RAC_ERROR_BACKEND_UNAVAILABLE)")
 endif()
 

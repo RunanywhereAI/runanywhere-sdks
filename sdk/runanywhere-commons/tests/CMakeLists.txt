@@ -1260,7 +1260,7 @@ add_test(NAME download_orchestrator_tests COMMAND test_download_orchestrator --r
 # (which owns the speech ops) and depend on rac_backend_onnx only for the
 # ONNX-named typedefs used in their config defaults. The engines/sherpa/
 # include path exposes the public sherpa function declarations.
-if(RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA)
+if(RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA AND RAC_SHERPA_ONNX_AVAILABLE)
     # VAD test
     add_executable(test_vad test_vad.cpp)
     target_include_directories(test_vad PRIVATE
@@ -1312,7 +1312,7 @@ if(RAC_BACKEND_LLAMACPP)
 endif()
 
 # --- Voice Agent real-inference test: Requires LlamaCPP + Sherpa/ONNX backends ---
-if(RAC_BACKEND_LLAMACPP AND RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA)
+if(RAC_BACKEND_LLAMACPP AND RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA AND RAC_SHERPA_ONNX_AVAILABLE)
     add_executable(test_voice_agent test_voice_agent.cpp)
     target_include_directories(test_voice_agent PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}

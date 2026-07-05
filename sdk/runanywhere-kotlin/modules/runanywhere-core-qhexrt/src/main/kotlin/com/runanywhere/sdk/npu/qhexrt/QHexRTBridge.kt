@@ -80,7 +80,7 @@ internal object QHexRTBridge {
      * `runanywhere.v1.NpuCapability` proto bytes (decode with the generated
      * Wire adapter); empty on failure, which decodes to the all-default
      * (unknown/unsupported) capability. Works on any device (no QNN load),
-     * including non-v75/v79/v81 parts.
+     * including parts older than v75.
      */
     @JvmStatic
     external fun nativeProbeNpuProto(): ByteArray

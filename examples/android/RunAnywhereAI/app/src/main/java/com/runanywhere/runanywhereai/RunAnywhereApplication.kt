@@ -75,7 +75,7 @@ class RunAnywhereApplication : Application() {
         LlamaCPP.register()
         ONNX.register()
         // QHexRT (Qualcomm Hexagon NPU). Registration is rejected internally on
-        // unsupported parts, so this is a safe no-op on non-v75/v79/v81 devices.
+        // unsupported parts, so this is a safe no-op on parts older than v75.
         QHexRT.register()
         val hasBackendConfig =
             BuildConfig.RUNANYWHERE_API_KEY.isNotBlank() &&

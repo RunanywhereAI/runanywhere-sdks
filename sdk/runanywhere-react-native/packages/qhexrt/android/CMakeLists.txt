@@ -26,19 +26,20 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size
 set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 
 # =============================================================================
-# RABackendQHexRT - Qualcomm Hexagon NPU backend (PRIVATE, bundled, REQUIRED)
+# RABackendQHexRT - Qualcomm Hexagon NPU backend (PRIVATE, bundled, optional)
 # =============================================================================
-if(NOT EXISTS "${JNILIB_DIR}/librac_backend_qhexrt.so")
-    message(FATAL_ERROR "[RunAnywhereQHexRT] librac_backend_qhexrt.so not found for ${ANDROID_ABI} at ${JNILIB_DIR}.\n"
-                        "QHexRT ships arm64-v8a only; set reactNativeArchitectures=arm64-v8a.")
+set(RAC_QHEXRT_BACKEND_AVAILABLE OFF)
+if(EXISTS "${JNILIB_DIR}/librac_backend_qhexrt.so")
+    set(RAC_QHEXRT_BACKEND_AVAILABLE ON)
+    add_library(rac_backend_qhexrt SHARED IMPORTED)
+    set_target_properties(rac_backend_qhexrt PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_qhexrt.so"
+        IMPORTED_NO_SONAME TRUE
+    )
+    message(STATUS "[RunAnywhereQHexRT] Found RABackendQHexRT at ${JNILIB_DIR}/librac_backend_qhexrt.so")
+else()
+    message(WARNING "[RunAnywhereQHexRT] librac_backend_qhexrt.so not found for ${ANDROID_ABI} at ${JNILIB_DIR}; building unavailable provider shell")
 endif()
-
-add_library(rac_backend_qhexrt SHARED IMPORTED)
-set_target_properties(rac_backend_qhexrt PROPERTIES
-    IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_qhexrt.so"
-    IMPORTED_NO_SONAME TRUE
-)
-message(STATUS "[RunAnywhereQHexRT] Found RABackendQHexRT at ${JNILIB_DIR}/librac_backend_qhexrt.so")
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
@@ -125,8 +126,14 @@ target_link_libraries(
     android
     c++_shared
     rac_commons
-    rac_backend_qhexrt
 )
+
+if(RAC_QHEXRT_BACKEND_AVAILABLE)
+    target_compile_definitions(${PACKAGE_NAME} PRIVATE RAC_QHEXRT_BACKEND_AVAILABLE=1)
+    target_link_libraries(${PACKAGE_NAME} rac_backend_qhexrt)
+else()
+    target_compile_definitions(${PACKAGE_NAME} PRIVATE RAC_QHEXRT_BACKEND_AVAILABLE=0)
+endif()
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance
 target_link_options(${PACKAGE_NAME} PRIVATE

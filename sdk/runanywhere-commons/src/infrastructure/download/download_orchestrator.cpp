@@ -282,6 +282,20 @@ static std::string get_filename(const char* url) {
     return filename;
 }
 
+static std::string safe_filename_stem(std::string value) {
+    for (char& c : value) {
+        const bool alpha_num = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                               (c >= '0' && c <= '9');
+        if (!alpha_num && c != '-' && c != '_' && c != '.') {
+            c = '_';
+        }
+    }
+    while (!value.empty() && (value.front() == '.' || value.front() == '_')) {
+        value.erase(value.begin());
+    }
+    return value.empty() ? "model" : value;
+}
+
 /**
  * Check if a file extension is a known model extension.
  */
@@ -2749,7 +2763,10 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
                 if (stem.empty()) {
                     stem = model_id;
                 }
-                snprintf(destination, sizeof(destination), "%s/%s.%s", downloads_dir, stem.c_str(),
+                const std::string model_stem = safe_filename_stem(model_id);
+                const std::string archive_stem = safe_filename_stem(stem);
+                snprintf(destination, sizeof(destination), "%s/%s-%s.%s", downloads_dir,
+                         model_stem.c_str(), archive_stem.c_str(),
                          rac_archive_type_extension(registered_archive_type));
                 needs_extraction = RAC_TRUE;
             }

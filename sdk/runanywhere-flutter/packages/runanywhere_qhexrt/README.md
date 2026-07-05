@@ -1,10 +1,10 @@
 # runanywhere_qhexrt
 
 Private QHexRT backend for the RunAnywhere Flutter SDK — runs prebuilt QNN
-context binaries on Qualcomm Snapdragon Hexagon NPUs (v75/v79/v81), serving
+context binaries on Qualcomm Snapdragon Hexagon NPUs (v75+), serving
 LLM, VLM, STT and TTS through the standard SDK APIs.
 
-Android only, `arm64-v8a` only. On non-v75/v79/v81 devices the backend
+Android only, `arm64-v8a` only. On parts older than v75, the backend
 declines to register and inference stays disabled (NPU-only — no CPU fallback
 in this package).
 

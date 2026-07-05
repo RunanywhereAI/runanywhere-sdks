@@ -471,10 +471,16 @@ export const SettingsScreen: React.FC = () => {
   const handleHfTokenChange = useCallback(
     (value: string) => {
       setHfTokenInput(value);
-      // eslint-disable-next-line no-void
-      void saveHfToken(value);
     },
-    [saveHfToken]
+    []
+  );
+
+  const handleHfTokenCommit = useCallback(
+    () => {
+      // eslint-disable-next-line no-void
+      void saveHfToken(hfToken);
+    },
+    [hfToken, saveHfToken]
   );
 
   const loadGenerationSettings = async () => {
@@ -952,10 +958,15 @@ export const SettingsScreen: React.FC = () => {
               ]}
               value={hfToken}
               onChangeText={handleHfTokenChange}
+              onBlur={handleHfTokenCommit}
+              onSubmitEditing={handleHfTokenCommit}
               placeholder="hf_…"
               placeholderTextColor={colors.onSurfaceVariant}
               autoCapitalize="none"
               autoCorrect={false}
+              returnKeyType="done"
+              secureTextEntry
+              textContentType="password"
             />
             <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
               Used to download private Hugging Face model repos

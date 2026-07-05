@@ -5,7 +5,7 @@
  * Detects the on-device Hexagon DSP architecture from the SoC identity WITHOUT
  * loading QNN or the QHexRT engine, so an SDK can decide up front whether the
  * QHexRT (Qualcomm NPU) backend will run and warn the user otherwise. The
- * QHexRT engine requires a Hexagon v75, v79 or v81 part; older parts
+ * QHexRT engine requires a Hexagon v75+ part; older parts
  * (v68/v69/v73) and non-Snapdragon devices fall back to CPU inference.
  *
  * Detection is best-effort and pre-flight only: it reads the Android SoC model
@@ -48,7 +48,7 @@ typedef struct rac_npu_info {
     int32_t soc_id;
     /** Detected Hexagon architecture, or RAC_HEXAGON_ARCH_UNKNOWN. */
     rac_hexagon_arch_t hexagon_arch;
-    /** RAC_TRUE iff hexagon_arch is one the QHexRT engine supports (v75/v79/v81). */
+    /** RAC_TRUE iff hexagon_arch is one the QHexRT engine supports (v75+). */
     rac_bool_t qhexrt_supported;
 } rac_npu_info_t;
 

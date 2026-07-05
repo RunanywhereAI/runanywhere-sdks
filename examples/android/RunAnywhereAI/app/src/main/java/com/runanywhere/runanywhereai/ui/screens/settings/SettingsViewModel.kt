@@ -51,8 +51,11 @@ class SettingsViewModel : ViewModel() {
 
     fun setHfToken(value: String) {
         SettingsRepository.setHfToken(value)
+    }
+
+    fun commitHfToken() {
         // Empty clears the token (public no-auth behavior); never logged.
-        RunAnywhere.setHfToken(value.ifBlank { "" })
+        RunAnywhere.setHfToken(settings.hfToken.ifBlank { "" })
     }
 
     fun refreshStorage() {

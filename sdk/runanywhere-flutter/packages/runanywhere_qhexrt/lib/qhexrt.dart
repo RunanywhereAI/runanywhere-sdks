@@ -15,12 +15,12 @@ export 'package:runanywhere/generated/hardware_profile.pbenum.dart'
     show HexagonArch;
 
 /// QHexRT NPU module — runs prebuilt QNN context binaries on Snapdragon
-/// v75/v79/v81 NPUs. Android/Snapdragon only; on unsupported parts it stays
+/// v75+ NPUs. Android/Snapdragon only; on unsupported parts it stays
 /// unavailable.
 class QHexRT {
   QHexRT._();
 
-  static const String version = '0.1.5';
+  static const String version = '0.19.13';
 
   static bool _isRegistered = false;
   static QhexrtBindings? _bindings;
@@ -67,7 +67,7 @@ class QHexRT {
       if (result == RacResultCode.errorBackendUnavailable ||
           result == RacResultCode.errorCapabilityUnsupported) {
         _logger.error(
-            'QHexRT unavailable; a Hexagon v75/v79/v81 NPU is required.');
+            'QHexRT unavailable; a Hexagon v75+ NPU is required.');
         return;
       }
       if (result != RacResultCode.success &&

@@ -62,17 +62,24 @@ void fill_cfg(qhx_gen_cfg* cfg, const rac_llm_options_t* o) {
     if (o->grammar != nullptr && o->grammar[0] != '\0') {
         const char* g = o->grammar;
         auto spec_after = [](const char* s, size_t n) -> const char* { return (s[n] == ':') ? s + n + 1 : ""; };
-        if (std::strncmp(g, "toolcall_opt", 12) == 0) {
+        auto matches_prefix = [](const char* s, const char* prefix) -> bool {
+            const size_t n = std::strlen(prefix);
+            return std::strncmp(s, prefix, n) == 0 && (s[n] == '\0' || s[n] == ':');
+        };
+        if (matches_prefix(g, "toolcall_opt")) {
             cfg->grammar_kind = 3;  // GrammarKind::ToolCallOptional
             cfg->grammar = spec_after(g, 12);
-        } else if (std::strncmp(g, "toolcall", 8) == 0) {
+        } else if (matches_prefix(g, "toolcall")) {
             cfg->grammar_kind = 2;  // GrammarKind::ToolCall
             cfg->grammar = spec_after(g, 8);
-        } else if (std::strncmp(g, "json", 4) == 0) {
+        } else if (matches_prefix(g, "json")) {
             cfg->grammar_kind = 1;  // GrammarKind::JsonObject
             cfg->grammar = spec_after(g, 4);
+        } else {
+            RAC_LOG_WARNING(LOG_CAT,
+                            "Ignoring unsupported QHexRT grammar payload; expected json:, "
+                            "toolcall:, or toolcall_opt:");
         }
-        // Unknown prefix => grammar_kind stays 0 (off): plain, unconstrained generation.
     }
 }
 
@@ -97,6 +104,7 @@ struct StreamCtx {
     rac_llm_stream_callback_fn cb;
     void* user;
     Session* session;
+    bool cancelled = false;
     std::string buf;  // reused per chunk to NUL-terminate
 };
 
@@ -110,13 +118,32 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
         return 1;  // nothing to forward on the terminal call
     }
     if (c->session != nullptr && c->session->cancel.load(std::memory_order_relaxed)) {
+        c->cancelled = true;
         return 0;  // barge-in
     }
     if (c->cb == nullptr) {
         return 1;
     }
     c->buf.assign(utf8, static_cast<size_t>(len < 0 ? 0 : len));
-    return c->cb(c->buf.c_str(), c->user) == RAC_FALSE ? 0 : 1;
+    if (c->cb(c->buf.c_str(), c->user) == RAC_FALSE) {
+        c->cancelled = true;
+        return 0;
+    }
+    return 1;
+}
+
+struct StopCtx {
+    Session* session;
+};
+
+int stop_trampoline(void* user, const char* /*utf8*/, int /*len*/, int /*token_id*/,
+                    int /*is_final*/) {
+    auto* c = static_cast<StopCtx*>(user);
+    if (c != nullptr && c->session != nullptr &&
+        c->session->cancel.load(std::memory_order_relaxed)) {
+        return 0;
+    }
+    return 1;
 }
 
 void fill_result(rac_llm_result_t* out, const qhx_output& o) {
@@ -165,9 +192,13 @@ rac_result_t qhexrt_llm_generate(void* impl, const char* prompt, const rac_llm_o
         fill_inputs(&in, prompt, options);
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
+        StopCtx stop_ctx{c};
         qhx_output out{};
-        qhx_status st = qhx_generate(c->sess, &in, &cfg, nullptr, nullptr, &out);
+        qhx_status st = qhx_generate(c->sess, &in, &cfg, stop_trampoline, &stop_ctx, &out);
         if (st != 0) {
+            if (c->cancel.load(std::memory_order_relaxed)) {
+                return RAC_ERROR_CANCELLED;
+            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
@@ -191,10 +222,13 @@ rac_result_t qhexrt_llm_generate_stream(void* impl, const char* prompt,
         fill_inputs(&in, prompt, options);
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
-        StreamCtx ctx{callback, user_data, c, std::string()};
+        StreamCtx ctx{callback, user_data, c, false, std::string()};
         qhx_output out{};
         qhx_status st = qhx_generate(c->sess, &in, &cfg, stream_trampoline, &ctx, &out);
         if (st != 0) {
+            if (ctx.cancelled || c->cancel.load(std::memory_order_relaxed)) {
+                return RAC_ERROR_CANCELLED;
+            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(stream) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }

@@ -82,6 +82,7 @@ struct StreamCtx {
     rac_vlm_stream_callback_fn cb;
     void* user;
     Session* session;
+    bool cancelled = false;
     std::string buf;
 };
 
@@ -91,13 +92,32 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
         return 1;
     }
     if (c->session != nullptr && c->session->cancel.load(std::memory_order_relaxed)) {
+        c->cancelled = true;
         return 0;
     }
     if (c->cb == nullptr) {
         return 1;
     }
     c->buf.assign(utf8, static_cast<size_t>(len < 0 ? 0 : len));
-    return c->cb(c->buf.c_str(), c->user) == RAC_FALSE ? 0 : 1;
+    if (c->cb(c->buf.c_str(), c->user) == RAC_FALSE) {
+        c->cancelled = true;
+        return 0;
+    }
+    return 1;
+}
+
+struct StopCtx {
+    Session* session;
+};
+
+int stop_trampoline(void* user, const char* /*utf8*/, int /*len*/, int /*token_id*/,
+                    int /*is_final*/) {
+    auto* c = static_cast<StopCtx*>(user);
+    if (c != nullptr && c->session != nullptr &&
+        c->session->cancel.load(std::memory_order_relaxed)) {
+        return 0;
+    }
+    return 1;
 }
 
 // ───────────────────────────────── vtable ops ───────────────────────────────
@@ -138,9 +158,13 @@ rac_result_t qhexrt_vlm_process(void* impl, const rac_vlm_image_t* image, const 
         }
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
+        StopCtx stop_ctx{c};
         qhx_output out{};
-        qhx_status st = qhx_generate(c->sess, &in, &cfg, nullptr, nullptr, &out);
+        qhx_status st = qhx_generate(c->sess, &in, &cfg, stop_trampoline, &stop_ctx, &out);
         if (st != 0) {
+            if (c->cancel.load(std::memory_order_relaxed)) {
+                return RAC_ERROR_CANCELLED;
+            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(vlm) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
@@ -166,10 +190,13 @@ rac_result_t qhexrt_vlm_process_stream(void* impl, const rac_vlm_image_t* image,
         }
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
-        StreamCtx ctx{callback, user_data, c, std::string()};
+        StreamCtx ctx{callback, user_data, c, false, std::string()};
         qhx_output out{};
         qhx_status st = qhx_generate(c->sess, &in, &cfg, stream_trampoline, &ctx, &out);
         if (st != 0) {
+            if (ctx.cancelled || c->cancel.load(std::memory_order_relaxed)) {
+                return RAC_ERROR_CANCELLED;
+            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(vlm stream) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
