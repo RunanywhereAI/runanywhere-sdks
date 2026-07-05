@@ -67,12 +67,8 @@ class RunAnywhereApplication : Application() {
 
         //Starting Setup Work
         AndroidPlatformContext.initialize(this@RunAnywhereApplication)
-        // QHexRT (QNN) loads the per-arch Hexagon DSP skel (e.g. libQnnHtpV81Skel.so)
-        // over fastRPC; the DSP only finds it when ADSP_LIBRARY_PATH includes the dir
-        // it ships in. The skel is bundled in the app's native lib dir, so point the
-        // DSP loader there (plus the standard vendor search paths) before any backend
-        // creates a QNN context.
-        configureQnnDspLibraryPath()
+        // Note: ADSP_LIBRARY_PATH (Hexagon DSP skel discovery for QHexRT/QNN) is set
+        // automatically by the engine before its first runtime create — no app glue needed.
         // Register backends with the C++ registry BEFORE initialize(): once initialize() runs,
         // a concurrent caller can hit loadModel() while only the platform backend is registered
         // and fail with -422 "No provider could handle the request" (same ordering as iOS).
@@ -110,18 +106,5 @@ class RunAnywhereApplication : Application() {
         BuiltInTools.register(applicationContext)
         val initTime = System.currentTimeMillis() - startTime
         RACLog.i("SDK setup completed in ${initTime}ms")
-    }
-
-    private fun configureQnnDspLibraryPath() {
-        runCatching {
-            val nativeLibDir = applicationInfo.nativeLibraryDir ?: return
-            val existing = System.getenv("ADSP_LIBRARY_PATH").orEmpty()
-            val path =
-                listOf(nativeLibDir, existing, "/vendor/dsp/cdsp", "/vendor/lib/rfsa/adsp")
-                    .filter { it.isNotBlank() }
-                    .joinToString(";")
-            android.system.Os.setenv("ADSP_LIBRARY_PATH", path, true)
-            RACLog.i("ADSP_LIBRARY_PATH set to $path")
-        }.onFailure { RACLog.e("Failed to set ADSP_LIBRARY_PATH", it) }
     }
 }

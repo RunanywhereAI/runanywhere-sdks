@@ -21,6 +21,12 @@
 #include <string>
 #include <vector>
 
+#if defined(__ANDROID__)
+#include <dlfcn.h>
+
+#include <cstdlib>
+#endif
+
 #include "qhexrt_bundle_policy.h"
 #include "rac/core/rac_logger.h"
 
@@ -35,9 +41,45 @@ std::mutex g_rt_mutex;
 qhx_runtime* g_rt = nullptr;
 std::size_t g_rt_refs = 0;
 
+#if defined(__ANDROID__)
+// QNN's HTP stub dlopens libcdsprpc.so and the per-arch DSP skel
+// (libQnnHtpV75/V79/V81Skel.so) via ADSP_LIBRARY_PATH; this must be set before
+// the first qhx_runtime_create in every host (Kotlin/Flutter/RN) — engine-owned
+// so platform glue never re-implements it. The skels ship next to this engine
+// .so in the app's nativeLibraryDir, which dladdr on one of our own symbols
+// yields. Composition order mirrors the retired Kotlin example-app helper:
+// native lib dir first, then any existing value, then the two vendor fallbacks
+// (blank segments skipped).
+void configure_adsp_library_path() {
+    Dl_info info{};
+    if (dladdr(reinterpret_cast<void*>(&configure_adsp_library_path), &info) == 0 ||
+        info.dli_fname == nullptr) {
+        return;
+    }
+    std::string lib_path(info.dli_fname);
+    auto slash = lib_path.find_last_of('/');
+    if (slash == std::string::npos) {
+        return;
+    }
+    std::string path = lib_path.substr(0, slash);
+    const char* existing = std::getenv("ADSP_LIBRARY_PATH");
+    if (existing != nullptr && existing[0] != '\0') {
+        path += ";";
+        path += existing;
+    }
+    path += ";/vendor/dsp/cdsp;/vendor/lib/rfsa/adsp";
+    setenv("ADSP_LIBRARY_PATH", path.c_str(), 1);
+    RAC_LOG_INFO(LOG_CAT, "ADSP_LIBRARY_PATH set to %s", path.c_str());
+}
+#endif
+
 qhx_runtime* runtime_acquire() {
     std::lock_guard<std::mutex> lock(g_rt_mutex);
     if (g_rt == nullptr) {
+#if defined(__ANDROID__)
+        static std::once_flag adsp_once;
+        std::call_once(adsp_once, configure_adsp_library_path);
+#endif
         g_rt = qhx_runtime_create(nullptr, nullptr);  // default libQnnHtp.so / libQnnSystem.so
         if (g_rt == nullptr) {
             RAC_LOG_ERROR(LOG_CAT, "qhx_runtime_create failed (QNN libs unavailable?)");

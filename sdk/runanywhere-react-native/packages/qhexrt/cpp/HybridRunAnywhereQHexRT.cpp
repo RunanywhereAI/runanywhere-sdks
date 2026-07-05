@@ -51,39 +51,6 @@ bool isRegistrationSuccess(rac_result_t result) {
          result == RAC_ERROR_PLUGIN_DUPLICATE;
 }
 
-// Point Hexagon fastRPC at the app's native library dir so it can dlopen the
-// bundled QNN DSP skels (libQnnHtpV75Skel.so / libQnnHtpV79Skel.so /
-// libQnnHtpV81Skel.so). The skels
-// ship alongside librac_backend_qhexrt.so in the APK's nativeLibraryDir, which
-// we resolve at runtime via dladdr on the backend's register symbol — keeping
-// this SDK-owned (no Android Context / example-app glue needed). Mirrors the
-// iOS/Android source-of-truth that sets ADSP_LIBRARY_PATH before QNN loads.
-void configureDspLibraryPath() {
-  void* sym = dlsym(RTLD_DEFAULT, "rac_backend_qhexrt_register");
-  if (sym == nullptr) {
-    return;
-  }
-  Dl_info info;
-  if (dladdr(sym, &info) == 0 || info.dli_fname == nullptr) {
-    return;
-  }
-  std::string libPath(info.dli_fname);
-  auto slash = libPath.find_last_of('/');
-  if (slash == std::string::npos) {
-    return;
-  }
-  std::string dir = libPath.substr(0, slash);
-  std::string path = dir;
-  const char* existing = std::getenv("ADSP_LIBRARY_PATH");
-  if (existing != nullptr && existing[0] != '\0') {
-    path += ";";
-    path += existing;
-  }
-  path += ";/vendor/dsp/cdsp;/vendor/lib/rfsa/adsp";
-  setenv("ADSP_LIBRARY_PATH", path.c_str(), 1);
-  RAC_LOG_INFO(LOG_CATEGORY, "ADSP_LIBRARY_PATH set to %s", path.c_str());
-}
-
 } // namespace
 
 // ============================================================================
@@ -106,7 +73,8 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereQHexRT::registerBackend() {
   return Promise<bool>::async([this]() {
     RAC_LOG_DEBUG(LOG_CATEGORY, "Registering QHexRT backend with C++ registry");
 
-    configureDspLibraryPath();
+    // Note: ADSP_LIBRARY_PATH (Hexagon DSP skel discovery) is set by the QHexRT
+    // engine itself before its first runtime create — no platform glue needed.
 
     rac_result_t result = rac_backend_qhexrt_register();
     if (!isRegistrationSuccess(result)) {
