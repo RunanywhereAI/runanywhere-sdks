@@ -2,6 +2,7 @@ package com.runanywhere.runanywhereai.data
 
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.hybrid.Cloud
+import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.lora
 import com.runanywhere.sdk.public.extensions.refreshModelRegistry
@@ -32,9 +33,14 @@ object ModelBootstrap {
     // merges on re-save, preserving runtime fields (is_downloaded, per-file local paths,
     // checksums), so catalog metadata fixes reach existing installs without losing downloads.
     private suspend fun seedCatalog() {
+        // Register NPU bundles only for the probed Hexagon arch (context binaries are
+        // arch-exact); unsupported devices get none, keeping every picker naturally clean.
+        val npuArch = runCatching {
+            QHexRT.probeNpu().takeIf { it.qhexrt_supported }?.arch_name
+        }.getOrNull()
         var ok = 0
         var fail = 0
-        for (model in ModelCatalog.models) {
+        for (model in ModelCatalog.models + ModelCatalog.npuModels(npuArch)) {
             try {
                 model.register()
                 ok++

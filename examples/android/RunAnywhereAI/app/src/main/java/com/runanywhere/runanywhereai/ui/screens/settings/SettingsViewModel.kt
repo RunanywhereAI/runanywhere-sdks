@@ -49,6 +49,12 @@ class SettingsViewModel : ViewModel() {
     fun setSystemPrompt(value: String) = SettingsRepository.setSystemPrompt(value)
     fun setStreaming(value: Boolean) = SettingsRepository.setStreaming(value)
 
+    fun setHfToken(value: String) {
+        SettingsRepository.setHfToken(value)
+        // Empty clears the token (public no-auth behavior); never logged.
+        RunAnywhere.setHfToken(value.ifBlank { "" })
+    }
+
     fun refreshStorage() {
         viewModelScope.launch {
             val info = runCatching {

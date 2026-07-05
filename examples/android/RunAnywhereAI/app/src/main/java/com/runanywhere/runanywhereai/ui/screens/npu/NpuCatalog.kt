@@ -3,14 +3,21 @@ package com.runanywhere.runanywhereai.ui.screens.npu
 import ai.runanywhere.proto.v1.ModelCategory
 
 /**
- * NPU (QHexRT) model catalog.
+ * NPU (QHexRT) model catalog — DATA ONLY.
+ *
+ * This file carries no UI. It is consumed by two clients:
+ *  - [com.runanywhere.runanywhereai.data.ModelCatalog.npuModels], which maps the
+ *    entries matching the probed device arch into the main curated catalog
+ *    (framework = QHEXRT) so they surface in the standard model pickers; and
+ *  - the androidTest NPU E2E harness (`NpuModelE2ETest`), which builds
+ *    [NpuModel]s directly.
  *
  * Every entry is tagged with both a [NpuModality] (which inference screen it
  * belongs to) and an [NpuModel.arch] (the Hexagon architecture its context
- * binaries were compiled for — `v75` / `v79` / `v81`). The NPU section filters
- * this list to the modality of the open screen *and* the architecture probed on
- * the running device, so a v81 phone only ever sees v81 bundles, etc. QHexRT
- * context binaries are arch-exact, so loading a mismatched bundle would fail.
+ * binaries were compiled for — `v75` / `v79` / `v81`). Registration filters
+ * this list to the architecture probed on the running device, so a v81 phone
+ * only ever sees v81 bundles, etc. QHexRT context binaries are arch-exact, so
+ * loading a mismatched bundle would fail.
  *
  * Sources are all header-free (no auth):
  *  - **HF public multi-file** ([hfFiles]) — the canonical host. Bundles live in
@@ -363,7 +370,6 @@ val NPU_MODELS = listOf(
             "voices.bin",
             "kokoro_lexicon.txt",
             "kokoro_vocab.txt",
-            "voices.bin",
             "host_weights/asr_res_bias.bin",
             "host_weights/asr_res_weight.bin",
             "host_weights/embeddings_LayerNorm_bias.bin",

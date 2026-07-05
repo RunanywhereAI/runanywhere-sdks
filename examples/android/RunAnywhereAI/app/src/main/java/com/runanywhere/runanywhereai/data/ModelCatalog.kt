@@ -5,6 +5,8 @@ import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.ModelCategory
+import com.runanywhere.runanywhereai.ui.screens.npu.NPU_MODELS
+import com.runanywhere.runanywhereai.ui.screens.npu.category
 
 // Curated catalog, kept in lockstep with the iOS / Flutter / RN example apps.
 internal object ModelCatalog {
@@ -12,6 +14,7 @@ internal object ModelCatalog {
     private val LLAMA = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
     private val SHERPA = InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
     private val ONNX = InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+    private val QHEXRT = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
 
     private val LANGUAGE = ModelCategory.MODEL_CATEGORY_LANGUAGE
     private val MULTIMODAL = ModelCategory.MODEL_CATEGORY_MULTIMODAL
@@ -23,6 +26,34 @@ internal object ModelCatalog {
             addAll(vlm)
             addAll(speech)
             addAll(misc)
+        }
+    }
+
+    /**
+     * QHexRT (Hexagon NPU) bundles for the probed device architecture,
+     * registered like every other catalog entry — one URL through the SDK's
+     * canonical from-url path. The URL is an HF folder-bundle ref pinned to
+     * the bundle's manifest (`huggingface.co/<repo>/<arch>/<manifest>.json`);
+     * commons + the engine-registered QHexRT bundle policy resolve the full
+     * file set (sizes, checksums, nested paths) from the Hub tree — the app
+     * carries no file lists. Returns an empty list when the NPU is
+     * unsupported ([arch] == null), so pickers on other devices never see
+     * QHEXRT entries. Source data: `NpuCatalog.NPU_MODELS` (index 0 is the
+     * manifest; its resolve/main URL is rewritten to the folder-ref form).
+     */
+    fun npuModels(arch: String?): List<CatalogModel> {
+        if (arch == null) return emptyList()
+        return NPU_MODELS.filter { it.arch == arch && it.files.isNotEmpty() }.map { npu ->
+            SingleFileModel(
+                id = npu.id,
+                name = npu.name,
+                // Manifest-pinned folder ref, e.g.
+                // https://huggingface.co/runanywhere/x_HNPU/v81/x.json
+                url = npu.files.first().url.replace("/resolve/main/", "/"),
+                framework = QHEXRT,
+                category = npu.modality.category(),
+                memoryBytes = npu.sizeBytes,
+            )
         }
     }
 

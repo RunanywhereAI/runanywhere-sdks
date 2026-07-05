@@ -30,6 +30,7 @@ fun InferenceFramework.shortLabel(): String = when (this) {
     InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> "ONNX"
     InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "Apple"
     InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> "System"
+    InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> "NPU"
     else -> displayName
 }
 

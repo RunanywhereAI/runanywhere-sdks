@@ -1,4 +1,4 @@
-package com.runanywhere.runanywhereai.ui.screens.npu.screens
+package com.runanywhere.runanywhereai.ui.screens.vision
 
 import android.Manifest
 import android.content.Context
@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -44,15 +45,13 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.runanywhere.runanywhereai.ui.screens.npu.MetricStrip
-import com.runanywhere.runanywhereai.ui.screens.npu.SectionCard
-import com.runanywhere.runanywhereai.ui.screens.npu.theme.Spacing
+import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
-import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -60,21 +59,24 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
-/** Live mirror of the iOS `VLMCameraView`: a back-camera preview that samples the
- * latest frame every [LIVE_INTERVAL_MS] and streams a one-sentence caption from the
- * loaded VLM. The NPU (QHexRT) VLM ABI consumes images by file path, so each sampled
- * frame is spooled to a cache JPEG before inference — the same route the static path uses. */
+/** Live mode: a back-camera preview that samples the latest frame every
+ * [LIVE_INTERVAL_MS] and captions it with the loaded VLM. The VLM ABI consumes
+ * images by file path, so each sampled frame is spooled to a cache JPEG before
+ * inference — the same route the static Describe path uses. */
 private const val LIVE_INTERVAL_MS = 2_500L
 
 @Composable
-fun VlmLiveView(loadedModelId: String?, modifier: Modifier = Modifier) {
+fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
+    val dimens = LocalDimens.current
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val latestFrame = remember { AtomicReference<Bitmap?>(null) }
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    val cameraProvider = remember { AtomicReference<ProcessCameraProvider?>(null) }
 
     var hasPermission by remember {
         mutableStateOf(
@@ -95,8 +97,8 @@ fun VlmLiveView(loadedModelId: String?, modifier: Modifier = Modifier) {
     var tps by remember { mutableStateOf("—") }
     var error by remember { mutableStateOf<String?>(null) }
 
-    // Auto-caption loop — mirrors the iOS auto-stream cadence: run one inference,
-    // wait for it to finish (collect suspends), then pause LIVE_INTERVAL_MS.
+    // Auto-caption loop: run one inference, wait for it to finish, then pause
+    // LIVE_INTERVAL_MS so the cadence stays responsive.
     LaunchedEffect(hasPermission, loadedModelId) {
         if (!hasPermission || loadedModelId == null) return@LaunchedEffect
         while (isActive) {
@@ -110,26 +112,22 @@ fun VlmLiveView(loadedModelId: String?, modifier: Modifier = Modifier) {
                         file.absolutePath
                     }
                     val image = RAVLMImage.fromFilePath(path)
-                    // Live view honors the app-wide system prompt (More → Settings) for
-                    // persona, but keeps a tight token cap so each frame analyzes quickly
-                    // and the live cadence stays responsive (a large global max_tokens
-                    // would make captions long and stall the loop).
+                    // Honor the app-wide system prompt for persona, but keep a tight
+                    // token cap so each frame analyzes quickly.
                     val s = SettingsRepository.settings
                     val opts = RAVLMGenerationOptions(
                         prompt = "Describe what you see in one sentence.",
                         max_tokens = minOf(s.maxTokens, 100),
                         system_prompt = s.systemPrompt.ifBlank { null },
                     )
-                    // Use the non-streaming process() — the same path the static
-                    // "Describe" button uses. The QHexRT VLM streaming token path
-                    // can complete with 0 tokens (the engine doesn't fan out
-                    // incremental tokens for VLM), which left the caption blank;
+                    // Non-streaming process(): some VLM engines complete the stream
+                    // path with 0 incremental tokens, which leaves the caption blank;
                     // process() returns the full result text reliably.
                     val result = withContext(Dispatchers.Default) {
                         RunAnywhere.processImage(image, opts)
                     }
                     if (result.text.isNotBlank()) caption = result.text
-                    tps = "%.1f".format(result.tokens_per_second)
+                    tps = String.format(Locale.US, "%.1f", result.tokens_per_second)
                     error = null
                 } catch (e: CancellationException) {
                     throw e
@@ -144,13 +142,26 @@ fun VlmLiveView(loadedModelId: String?, modifier: Modifier = Modifier) {
     }
 
     DisposableEffect(Unit) {
-        onDispose { analysisExecutor.shutdown() }
+        onDispose {
+            // Release the camera when leaving Live mode — without unbindAll() the
+            // preview/analyzer stay bound to the screen's lifecycle and keep the
+            // camera busy in the background.
+            cameraProvider.getAndSet(null)?.unbindAll()
+            analysisExecutor.shutdown()
+        }
     }
 
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
         if (!hasPermission) {
-            SectionCard(title = "Camera") {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(dimens.radiusLg),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(dimens.spacingLg),
+                    verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                ) {
                     Text(
                         "Camera access is needed for the live view.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -167,14 +178,14 @@ fun VlmLiveView(loadedModelId: String?, modifier: Modifier = Modifier) {
             Modifier
                 .fillMaxWidth()
                 .height(300.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(dimens.radiusLg))
                 .background(Color.Black),
         ) {
             AndroidView(
                 factory = { ctx ->
                     PreviewView(ctx).also { view ->
                         view.scaleType = PreviewView.ScaleType.FILL_CENTER
-                        bindCamera(ctx, lifecycleOwner, view, latestFrame, analysisExecutor)
+                        bindCamera(ctx, lifecycleOwner, view, latestFrame, analysisExecutor, cameraProvider)
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
@@ -184,7 +195,7 @@ fun VlmLiveView(loadedModelId: String?, modifier: Modifier = Modifier) {
             Row(
                 Modifier
                     .align(Alignment.TopStart)
-                    .padding(Spacing.sm)
+                    .padding(dimens.spacingSm)
                     .clip(RoundedCornerShape(6.dp))
                     .background(Color(0xCC000000))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -199,7 +210,7 @@ fun VlmLiveView(loadedModelId: String?, modifier: Modifier = Modifier) {
                 Row(
                     Modifier
                         .align(Alignment.BottomStart)
-                        .padding(Spacing.sm)
+                        .padding(dimens.spacingSm)
                         .clip(RoundedCornerShape(6.dp))
                         .background(Color(0xCC000000))
                         .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -212,16 +223,31 @@ fun VlmLiveView(loadedModelId: String?, modifier: Modifier = Modifier) {
             }
         }
 
-        MetricStrip(listOf("tokens/s" to tps, "mode" to "live"))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                "tokens/s",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(tps, style = MaterialTheme.typography.bodyMedium)
+        }
 
         error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         }
 
-        SectionCard(title = "Live description") {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(dimens.radiusLg),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text(
-                caption.ifBlank {
-                    if (loadedModelId == null) "Load a VLM model to start the live view." else "Point the camera at a scene…"
+                text = caption.ifBlank {
+                    if (loadedModelId == null) {
+                        "Load a vision model to start the live view."
+                    } else {
+                        "Point the camera at a scene…"
+                    }
                 },
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (caption.isBlank()) {
@@ -229,19 +255,22 @@ fun VlmLiveView(loadedModelId: String?, modifier: Modifier = Modifier) {
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },
+                modifier = Modifier.padding(dimens.spacingLg),
             )
         }
     }
 }
 
 /** Binds a back-camera [Preview] + [ImageAnalysis] to [lifecycleOwner]. The analyzer
- * keeps only the latest frame (rotation-corrected) in [latestFrame] for the caption loop. */
+ * keeps only the latest frame (rotation-corrected) in [latestFrame] for the caption
+ * loop; the bound provider lands in [providerOut] so the caller can unbind on dispose. */
 private fun bindCamera(
     context: Context,
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
     previewView: PreviewView,
     latestFrame: AtomicReference<Bitmap?>,
     executor: java.util.concurrent.Executor,
+    providerOut: AtomicReference<ProcessCameraProvider?>,
 ) {
     val future = ProcessCameraProvider.getInstance(context)
     future.addListener({
@@ -277,6 +306,7 @@ private fun bindCamera(
                 preview,
                 analysis,
             )
+            providerOut.set(provider)
         } catch (_: Exception) {
             // Camera unavailable (e.g. emulator without a camera) — preview stays black.
         }

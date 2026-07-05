@@ -118,6 +118,20 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             }
         }
 
+        Section("Downloads") {
+            Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+                Text("HuggingFace token", style = MaterialTheme.typography.bodyLarge)
+                OutlinedTextField(
+                    value = settings.hfToken,
+                    onValueChange = viewModel::setHfToken,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("hf_…") },
+                    supportingText = { Text("Used to download private Hugging Face model repos") },
+                    singleLine = true,
+                )
+            }
+        }
+
         Section("About") {
             InfoRow("SDK version", viewModel.sdkVersion)
             InfoRow("App version", BuildConfig.VERSION_NAME)

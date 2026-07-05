@@ -138,13 +138,13 @@ class NpuModelE2ETest {
                 // ---- NPU capability + arch match (a v79 bundle will not load on v81) ----
                 phase = "probe"
                 val npu = QHexRT.probeNpu()
-                report.put("soc_model", npu.socModel).put("soc_id", npu.socId)
-                    .put("probe_arch", npu.arch).put("npu_supported", npu.supported)
-                report.gate("npu_supported", npu.supported)
-                report.gate("arch_match", npu.arch.equals(model.arch, ignoreCase = true))
-                if (!npu.supported) throw AssertionError("device NPU not supported (arch=${npu.arch})")
-                if (!npu.arch.equals(model.arch, ignoreCase = true)) {
-                    throw AssertionError("arch mismatch: bundle=${model.arch} device=${npu.arch} (context binaries are arch-pinned)")
+                report.put("soc_model", npu.soc_model).put("soc_id", npu.soc_id)
+                    .put("probe_arch", npu.arch_name).put("npu_supported", npu.qhexrt_supported)
+                report.gate("npu_supported", npu.qhexrt_supported)
+                report.gate("arch_match", npu.arch_name.equals(model.arch, ignoreCase = true))
+                if (!npu.qhexrt_supported) throw AssertionError("device NPU not supported (arch=${npu.arch_name})")
+                if (!npu.arch_name.equals(model.arch, ignoreCase = true)) {
+                    throw AssertionError("arch mismatch: bundle=${model.arch} device=${npu.arch_name} (context binaries are arch-pinned)")
                 }
 
                 if (hfToken != null) RunAnywhere.setHfToken(hfToken)   // private repos; never logged/committed

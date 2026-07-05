@@ -39,6 +39,7 @@ class PreferenceKeys {
   static const String thinkingModeEnabled = 'thinkingModeEnabled';
   static const String toolCallingEnabled = 'toolCallingEnabled';
   static const String deviceRegistered = 'com.runanywhere.sdk.deviceRegistered';
+  static const String hfToken = 'hf_token';
 }
 
 /// Default system prompt applied across every chat surface (main Chat + NPU

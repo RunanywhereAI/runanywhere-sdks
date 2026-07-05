@@ -6,4 +6,5 @@ data class AppSettings(
     val systemPrompt: String = "",
     val streaming: Boolean = true,
     val toolCallingEnabled: Boolean = false,
+    val hfToken: String = "",
 )

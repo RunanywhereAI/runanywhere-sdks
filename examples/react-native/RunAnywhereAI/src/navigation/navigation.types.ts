@@ -31,7 +31,6 @@ export type RootStackParamList = {
   Storage: undefined;
   Solutions: undefined;
   Benchmarks: undefined;
-  Npu: undefined;
   Settings: undefined;
 
   // Modals.

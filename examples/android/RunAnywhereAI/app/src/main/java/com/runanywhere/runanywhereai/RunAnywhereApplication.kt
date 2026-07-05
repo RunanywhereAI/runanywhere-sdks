@@ -79,7 +79,7 @@ class RunAnywhereApplication : Application() {
         LlamaCPP.register()
         ONNX.register()
         // QHexRT (Qualcomm Hexagon NPU). Registration is rejected internally on
-        // unsupported parts, so this is a safe no-op on non-v79/v81 devices.
+        // unsupported parts, so this is a safe no-op on non-v75/v79/v81 devices.
         QHexRT.register()
         val hasBackendConfig =
             BuildConfig.RUNANYWHERE_API_KEY.isNotBlank() &&
@@ -102,6 +102,9 @@ class RunAnywhereApplication : Application() {
         // issues (voice/STT/VLM) undiagnosable.
         if (BuildConfig.DEBUG) RunAnywhere.setDebugMode(true)
         HybridDeviceState.setProvider(AndroidDeviceStateProvider(applicationContext))
+        // Re-apply the persisted HuggingFace token (Settings screen) so private
+        // model repos (e.g. gated NPU bundles) download across app restarts.
+        SettingsRepository.settings.hfToken.takeIf { it.isNotBlank() }?.let { RunAnywhere.setHfToken(it) }
         ModelBootstrap.setupModels()
         CloudProviderRepository.registerAll()
         BuiltInTools.register(applicationContext)

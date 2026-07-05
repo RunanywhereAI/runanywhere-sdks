@@ -86,6 +86,14 @@ export const getStoredBaseURL = async (): Promise<string | null> => {
   }
 };
 
+export const getStoredHfToken = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem(STORAGE_KEYS.HF_TOKEN);
+  } catch {
+    return null;
+  }
+};
+
 export const hasCustomConfiguration = async (): Promise<boolean> => {
   const apiKey = await getStoredApiKey();
   const baseURL = await getStoredBaseURL();
@@ -382,6 +390,7 @@ export const SettingsScreen: React.FC = () => {
 
   const [apiKey, setApiKey] = useState('');
   const [baseURL, setBaseURL] = useState('');
+  const [hfToken, setHfTokenInput] = useState('');
   const [isBaseURLConfigured, setIsBaseURLConfigured] = useState(false);
   const [showApiConfigModal, setShowApiConfigModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -412,6 +421,7 @@ export const SettingsScreen: React.FC = () => {
   useEffect(() => {
     loadData();
     loadApiConfiguration();
+    loadHfToken();
     loadGenerationSettings();
     loadToolCallingSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -438,6 +448,34 @@ export const SettingsScreen: React.FC = () => {
       console.error('[Settings] Failed to load API configuration:', error);
     }
   };
+
+  const loadHfToken = async () => {
+    try {
+      const storedHfToken = await AsyncStorage.getItem(STORAGE_KEYS.HF_TOKEN);
+      setHfTokenInput(storedHfToken || '');
+    } catch (error) {
+      console.error('[Settings] Failed to load HuggingFace token:', error);
+    }
+  };
+
+  const saveHfToken = useCallback(async (value: string) => {
+    const trimmed = value.trim();
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.HF_TOKEN, trimmed);
+      await RunAnywhere.setHfToken(trimmed);
+    } catch (error) {
+      console.error('[Settings] Failed to save HuggingFace token:', error);
+    }
+  }, []);
+
+  const handleHfTokenChange = useCallback(
+    (value: string) => {
+      setHfTokenInput(value);
+      // eslint-disable-next-line no-void
+      void saveHfToken(value);
+    },
+    [saveHfToken]
+  );
 
   const loadGenerationSettings = async () => {
     try {
@@ -892,6 +930,36 @@ export const SettingsScreen: React.FC = () => {
             <TouchableOpacity onPress={handleClearAllData}>
               <Text style={[typography.labelLarge, { color: colors.error }]}>Clear all data</Text>
             </TouchableOpacity>
+          </View>
+        </Section>
+
+        {/* Downloads (matches Android SettingsScreen "Downloads") */}
+        <Section title="Downloads">
+          <View style={{ gap: dimens.spacing.xs }}>
+            <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>
+              HuggingFace token
+            </Text>
+            <TextInput
+              style={[
+                styles.inputField,
+                typography.bodyMedium,
+                {
+                  color: colors.onSurface,
+                  backgroundColor: colors.surfaceContainerHighest,
+                  borderColor: colors.outline,
+                  borderRadius: dimens.radius.sm,
+                },
+              ]}
+              value={hfToken}
+              onChangeText={handleHfTokenChange}
+              placeholder="hf_…"
+              placeholderTextColor={colors.onSurfaceVariant}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+              Used to download private Hugging Face model repos
+            </Text>
           </View>
         </Section>
 

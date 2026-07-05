@@ -98,7 +98,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.pdfbox.android)
 
-    // CameraX — NPU VLM live camera view
+    // CameraX — Vision screen Live mode
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)

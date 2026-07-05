@@ -13,6 +13,7 @@ import 'package:runanywhere_genie/runanywhere_genie.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// RunAnywhereAIApp
 ///
@@ -83,6 +84,15 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       } else {
         await RunAnywhere.initialize();
         debugPrint('✅ SDK initialized in DEVELOPMENT mode');
+      }
+
+      // Re-apply the persisted HuggingFace token (Settings screen) so private
+      // HF model repos stay downloadable across app restarts.
+      final prefs = await SharedPreferences.getInstance();
+      final hfToken = prefs.getString(PreferenceKeys.hfToken)?.trim() ?? '';
+      if (hfToken.isNotEmpty) {
+        RunAnywhere.setHfToken(hfToken);
+        debugPrint('🔑 Applied persisted HuggingFace token');
       }
 
       // Model paths + registry must be ready before catalog registration.

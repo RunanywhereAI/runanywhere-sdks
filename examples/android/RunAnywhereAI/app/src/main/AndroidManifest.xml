@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Vision screen Live mode (in-app CameraX preview). NOTE: because CAMERA is
+         declared, the system-camera intent (TakePicturePreview) also requires the
+         runtime grant — VisionScreen requests it before either capture path. -->
     <uses-permission android:name="android.permission.CAMERA" />
 
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
