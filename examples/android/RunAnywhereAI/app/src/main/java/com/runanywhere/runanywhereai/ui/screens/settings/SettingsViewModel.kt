@@ -29,6 +29,9 @@ data class StorageUiState(
     val modelsBytes: Long = 0,
     val downloaded: List<RAModelInfo> = emptyList(),
     val isLoading: Boolean = true,
+    val hfTokenBusy: Boolean = false,
+    val hfTokenMessage: String? = null,
+    val hfTokenMessageIsError: Boolean = false,
     val busyId: String? = null,
     val message: String? = null,
 )
@@ -56,17 +59,36 @@ class SettingsViewModel : ViewModel() {
 
     fun commitHfToken() {
         viewModelScope.launch {
-            // Empty clears the token (public no-auth behavior); never logged.
-            RunAnywhere.setHfToken(settings.hfToken.ifBlank { "" })
-            ModelBootstrap.refreshNpuCatalog()
-            storage = storage.copy(
-                message = if (settings.hfToken.isBlank()) {
-                    "Hugging Face token cleared"
-                } else {
-                    "Hugging Face token saved"
-                },
-            )
-            refreshStorage()
+            val clearing = settings.hfToken.isBlank()
+            storage = storage.copy(hfTokenBusy = true, hfTokenMessage = null, hfTokenMessageIsError = false)
+            try {
+                // Empty clears the token (public no-auth behavior); never logged.
+                RunAnywhere.setHfToken(settings.hfToken.ifBlank { "" })
+                ModelBootstrap.refreshNpuCatalog()
+                storage = storage.copy(
+                    hfTokenBusy = false,
+                    hfTokenMessage = if (clearing) {
+                        "Hugging Face token cleared"
+                    } else {
+                        "Hugging Face token saved"
+                    },
+                    hfTokenMessageIsError = false,
+                )
+                refreshStorage()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RACLog.e("Hugging Face token update failed", e)
+                storage = storage.copy(
+                    hfTokenBusy = false,
+                    hfTokenMessage = if (clearing) {
+                        "Could not clear Hugging Face token"
+                    } else {
+                        "Could not save Hugging Face token"
+                    },
+                    hfTokenMessageIsError = true,
+                )
+            }
         }
     }
 
@@ -132,6 +154,6 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun clearMessage() {
-        storage = storage.copy(message = null)
+        storage = storage.copy(message = null, hfTokenMessage = null, hfTokenMessageIsError = false)
     }
 }

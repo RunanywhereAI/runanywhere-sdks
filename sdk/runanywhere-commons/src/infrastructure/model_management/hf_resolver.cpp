@@ -691,10 +691,7 @@ rac_result_t resolve_repo_folder(const std::string& ref, const char* manifest_le
         *error = "not a folder-level Hugging Face reference: " + ref;
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    std::string path = parsed.file_path;
-    while (!path.empty() && path.back() == '/') {
-        path.pop_back();
-    }
+    std::string path = trim_trailing_slashes(parsed.file_path);
     std::string subdir = path;
     std::string primary_rel;
     if (manifest_leaf_ext != nullptr && manifest_leaf_ext[0] != '\0' &&

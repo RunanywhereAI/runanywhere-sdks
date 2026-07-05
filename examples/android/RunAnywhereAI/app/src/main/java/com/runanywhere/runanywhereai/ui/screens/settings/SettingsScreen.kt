@@ -138,9 +138,33 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { viewModel.commitHfToken() }),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
-                    TextButton(onClick = viewModel::commitHfToken) { Text("Save token") }
-                    TextButton(onClick = viewModel::clearHfToken) { Text("Clear") }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = viewModel::commitHfToken, enabled = !storage.hfTokenBusy) {
+                        Text("Save token")
+                    }
+                    TextButton(onClick = viewModel::clearHfToken, enabled = !storage.hfTokenBusy) {
+                        Text("Clear")
+                    }
+                    if (storage.hfTokenBusy) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(dimens.iconSm),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                }
+                storage.hfTokenMessage?.let { message ->
+                    Text(
+                        message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (storage.hfTokenMessageIsError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                    )
                 }
             }
         }

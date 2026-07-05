@@ -113,8 +113,12 @@ class NpuModelE2ETest {
     fun runOne() {
         val args = InstrumentationRegistry.getArguments()
         val selection = resolveModel(args) ?: run {
-            Log.i(tag, "NPU_E2E status=FAIL phase=lookup detail=\"no -e modelId / -e hfRepo\"")
-            assertTrue("missing -e modelId <id> or -e hfRepo <repo> -e modality <m> -e manifest <m.json>", false)
+            val requestedModelId = args.getString("modelId")?.takeIf { it.isNotBlank() }
+            val message = requestedModelId?.let {
+                "unknown -e modelId '$it' (expected a ModelCatalog.npuCatalog id, optionally suffixed with _v75/_v79/_v81/_v83)"
+            } ?: "missing -e modelId <id> or -e hfRepo <repo> -e modality <m> -e manifest <m.json>"
+            Log.i(tag, "NPU_E2E status=FAIL phase=lookup detail=\"$message\"")
+            assertTrue(message, false)
             return
         }
         val (model, requestedArch) = selection
@@ -417,13 +421,13 @@ class NpuModelE2ETest {
     private suspend fun register(bundle: SingleFileModel) =
         RunAnywhere.registerModel(
             id = bundle.id, name = bundle.name, url = bundle.url,
-            framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+            framework = bundle.framework,
             modality = bundle.category,
         )
 
     /** Catalog id, or an ad-hoc bundle synthesized from -e hfRepo/arch/modality/manifest. */
     private fun resolveModel(args: Bundle): Pair<SingleFileModel, String?>? {
-        args.getString("modelId")?.let { rawId ->
+        args.getString("modelId")?.takeIf { it.isNotBlank() }?.let { rawId ->
             val (logicalId, requestedArch) = logicalIdAndArch(rawId)
             val model = ModelCatalog.npuCatalog.firstOrNull { it.id == rawId }
                 ?: ModelCatalog.npuCatalog.firstOrNull { it.id == logicalId }

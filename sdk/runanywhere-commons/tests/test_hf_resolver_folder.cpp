@@ -118,6 +118,20 @@ void test_arch_folder_ref(std::vector<TestResult>& results) {
         hf::make_arch_folder_ref("hf.co/org/repo?manifest=vlm.json", "v79", ".json", &out) &&
             out == "https://huggingface.co/org/repo/v79/vlm.json",
         out));
+    results.push_back(expect("arch ref: parent repo without manifest extension",
+                             hf::make_arch_folder_ref("hf.co/org/repo", "v81", nullptr, &out) &&
+                                 out == "https://huggingface.co/org/repo/v81",
+                             out));
+    results.push_back(expect(
+        "arch ref: manifest leaf requires extension policy",
+        !hf::make_arch_folder_ref("hf.co/org/repo/lfm.json", "v81", nullptr, &out)));
+    results.push_back(expect(
+        "arch ref: nested manifest path rejected",
+        !hf::make_arch_folder_ref("hf.co/org/repo/manifests/lfm.json", "v81", ".json", &out)));
+    results.push_back(expect(
+        "arch ref: nested query manifest rejected",
+        !hf::make_arch_folder_ref("hf.co/org/repo?manifest=manifests/lfm.json", "v81",
+                                  ".json", &out)));
     results.push_back(expect(
         "arch ref: old explicit arch stays untouched",
         !hf::make_arch_folder_ref("hf.co/org/repo/v81/lfm.json", "v79", ".json", &out)));

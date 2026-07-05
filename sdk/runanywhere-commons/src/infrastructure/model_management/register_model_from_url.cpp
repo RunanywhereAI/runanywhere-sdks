@@ -138,33 +138,37 @@ rac_result_t register_from_hf_repo(const runanywhere::v1::RegisterModelFromUrlRe
     return register_multi_file_model(multi_file, out_proto);
 }
 
-// Looks up the registered bundle policy for the request's framework (NULL
-// when the request carries no framework or no engine registered one). The
-// registry is keyed by the C enum, so the proto value converts first.
-const rac_bundle_policy_t*
-bundle_policy_for(const runanywhere::v1::RegisterModelFromUrlRequest& request) {
-    if (!request.has_framework()) {
-        return nullptr;
-    }
-    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
-    if (rac_inference_framework_from_proto(static_cast<int32_t>(request.framework()),
-                                           &framework) != RAC_SUCCESS) {
+// Looks up the registered bundle policy for an already-derived framework.
+// RAC_FRAMEWORK_UNKNOWN covers missing/invalid request framework values.
+const rac_bundle_policy_t* bundle_policy_for(rac_inference_framework_t framework) {
+    if (framework == RAC_FRAMEWORK_UNKNOWN) {
         return nullptr;
     }
     return rac_bundle_policy_find(framework);
 }
 
-bool is_qhexrt_request(const runanywhere::v1::RegisterModelFromUrlRequest& request) {
+// Convert the optional proto framework once so downstream helpers can stay on
+// the structured C enum instead of re-parsing the request.
+rac_inference_framework_t
+framework_for(const runanywhere::v1::RegisterModelFromUrlRequest& request) {
     if (!request.has_framework()) {
-        return false;
+        return RAC_FRAMEWORK_UNKNOWN;
     }
     rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
-    return rac_inference_framework_from_proto(static_cast<int32_t>(request.framework()), &framework) ==
-               RAC_SUCCESS &&
-           framework == RAC_FRAMEWORK_QHEXRT;
+    if (rac_inference_framework_from_proto(static_cast<int32_t>(request.framework()), &framework) !=
+        RAC_SUCCESS) {
+        return RAC_FRAMEWORK_UNKNOWN;
+    }
+    return framework;
 }
 
-rac_result_t qhexrt_current_arch(std::string* out_arch, std::string* error) {
+const char* manifest_leaf_ext_for(const rac_bundle_policy_t* policy) {
+    return (policy != nullptr && policy->manifest_leaf_names_bundle == RAC_TRUE)
+               ? policy->manifest_extension
+               : nullptr;
+}
+
+rac_result_t qhexrt_current_arch(rac_hexagon_arch_t* out_arch, std::string* error) {
     if (out_arch == nullptr) {
         if (error) {
             *error = "output arch is required";
@@ -186,31 +190,31 @@ rac_result_t qhexrt_current_arch(std::string* out_arch, std::string* error) {
         }
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
-    *out_arch = rac_hexagon_arch_name(npu.hexagon_arch);
+    *out_arch = npu.hexagon_arch;
     return RAC_SUCCESS;
 }
 
-rac_result_t maybe_resolve_qhexrt_logical_ref(
-    const rac_bundle_policy_t* policy, runanywhere::v1::RegisterModelFromUrlRequest* request,
-    rac_proto_buffer_t* out_proto) {
-    if (request == nullptr || !is_qhexrt_request(*request)) {
+rac_result_t maybe_resolve_qhexrt_logical_ref(rac_inference_framework_t framework,
+                                              const rac_bundle_policy_t* policy,
+                                              runanywhere::v1::RegisterModelFromUrlRequest* request,
+                                              rac_proto_buffer_t* out_proto) {
+    if (request == nullptr || framework != RAC_FRAMEWORK_QHEXRT) {
         return RAC_SUCCESS;
     }
 
     if (policy == nullptr || policy->framework != RAC_FRAMEWORK_QHEXRT) {
-        return rac_proto_buffer_set_error(
-            out_proto, RAC_ERROR_BACKEND_UNAVAILABLE,
-            "QHexRT bundle policy is not registered; call QHexRT.register() before registering HNPU URLs");
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_BACKEND_UNAVAILABLE,
+                                          "QHexRT bundle policy is not registered; call "
+                                          "QHexRT.register() before registering HNPU URLs");
     }
 
-    const char* manifest_leaf_ext =
-        (policy->manifest_leaf_names_bundle == RAC_TRUE) ? policy->manifest_extension : nullptr;
+    const char* manifest_leaf_ext = manifest_leaf_ext_for(policy);
     if (!rac::infra::model_management::hf::is_logical_arch_folder_ref(request->url(),
                                                                       manifest_leaf_ext)) {
         return RAC_SUCCESS;
     }
 
-    std::string arch;
+    rac_hexagon_arch_t arch = RAC_HEXAGON_ARCH_UNKNOWN;
     std::string error;
     const rac_result_t arch_rc = qhexrt_current_arch(&arch, &error);
     if (arch_rc != RAC_SUCCESS) {
@@ -218,9 +222,10 @@ rac_result_t maybe_resolve_qhexrt_logical_ref(
     }
 
     std::string arch_ref;
-    if (rac::infra::model_management::hf::make_arch_folder_ref(request->url(), arch,
+    const char* arch_name = rac_hexagon_arch_name(arch);
+    if (rac::infra::model_management::hf::make_arch_folder_ref(request->url(), arch_name,
                                                                manifest_leaf_ext, &arch_ref)) {
-        RAC_LOG_INFO(LOG_CAT, "Resolved logical QHexRT bundle for arch %s", arch.c_str());
+        RAC_LOG_INFO(LOG_CAT, "Resolved logical QHexRT bundle for arch %s", arch_name);
         request->set_url(arch_ref);
     }
     return RAC_SUCCESS;
@@ -241,10 +246,7 @@ rac_result_t register_from_hf_folder(const runanywhere::v1::RegisterModelFromUrl
     hf::ResolvedModel resolved;
     std::string error;
     const rac_result_t resolve_rc = hf::resolve_repo_folder(
-        request.url(),
-        (policy != nullptr && policy->manifest_leaf_names_bundle == RAC_TRUE)
-            ? policy->manifest_extension
-            : nullptr,
+        request.url(), manifest_leaf_ext_for(policy),
         policy != nullptr ? policy->is_bundle_manifest : nullptr, &resolved, &error);
     if (resolve_rc != RAC_SUCCESS) {
         return rac_proto_buffer_set_error(out_proto, resolve_rc, error.c_str());
@@ -382,16 +384,14 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
             // framework, plus manifest-leaf refs when the framework's
             // engine-registered bundle policy allows them. All framework
             // specifics live in the policy — none here.
-            const rac_bundle_policy_t* policy = bundle_policy_for(request);
+            const rac_inference_framework_t framework = framework_for(request);
+            const rac_bundle_policy_t* policy = bundle_policy_for(framework);
             const rac_result_t qhexrt_rc =
-                maybe_resolve_qhexrt_logical_ref(policy, &request, out_proto);
+                maybe_resolve_qhexrt_logical_ref(framework, policy, &request, out_proto);
             if (qhexrt_rc != RAC_SUCCESS) {
                 return qhexrt_rc;
             }
-            const char* manifest_leaf_ext =
-                (policy != nullptr && policy->manifest_leaf_names_bundle == RAC_TRUE)
-                    ? policy->manifest_extension
-                    : nullptr;
+            const char* manifest_leaf_ext = manifest_leaf_ext_for(policy);
             if (hf::is_folder_ref(request.url(), manifest_leaf_ext)) {
                 return register_from_hf_folder(request, policy, out_proto);
             }

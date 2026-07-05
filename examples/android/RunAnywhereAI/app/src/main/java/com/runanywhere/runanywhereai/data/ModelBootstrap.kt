@@ -62,8 +62,16 @@ object ModelBootstrap {
                 RACLog.e("npu catalog: ${model.id} failed", e)
             }
         }
-        RunAnywhere.refreshModelRegistry()
-        RACLog.i("npu catalog refreshed: ok=$ok failed=$fail")
+        val registryRefreshed = try {
+            RunAnywhere.refreshModelRegistry()
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            RACLog.e("npu catalog registry refresh failed", e)
+            false
+        }
+        RACLog.i("npu catalog refreshed: ok=$ok failed=$fail registryRefreshed=$registryRefreshed")
     }
 
     private suspend fun seedLora() {

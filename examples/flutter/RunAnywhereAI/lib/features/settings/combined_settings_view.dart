@@ -83,7 +83,9 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         _maxTokens = (prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000)
             .clamp(500, 20000)
             .toInt();
-        final storedPrompt = prefs.getString(PreferenceKeys.defaultSystemPrompt);
+        final storedPrompt = prefs.getString(
+          PreferenceKeys.defaultSystemPrompt,
+        );
         // Prefill a meaningful default the first time (null) so it's applied and
         // editable everywhere; respect an explicit empty string the user saved.
         _systemPrompt = storedPrompt ?? kDefaultSystemPrompt;
@@ -112,10 +114,9 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     }
   }
 
-  /// Load the persisted HuggingFace token from SharedPreferences
+  /// Load the persisted HuggingFace token from secure storage.
   Future<void> _loadHfToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(PreferenceKeys.hfToken) ?? '';
+    final token = await _loadSecureHfToken();
     if (mounted) {
       setState(() {
         _hfTokenController.text = token;
@@ -123,12 +124,37 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     }
   }
 
+  Future<String> _loadSecureHfToken() async {
+    final storedToken = await KeychainHelper.loadString(KeychainKeys.hfToken);
+    if (storedToken != null) {
+      return storedToken.trim();
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final legacyToken = prefs.getString(PreferenceKeys.hfToken);
+    if (legacyToken == null) {
+      return '';
+    }
+
+    final token = legacyToken.trim();
+    if (token.isNotEmpty) {
+      await KeychainHelper.saveString(key: KeychainKeys.hfToken, data: token);
+    }
+    await prefs.remove(PreferenceKeys.hfToken);
+    return token;
+  }
+
   /// Persist the HuggingFace token and apply it to the SDK after editing.
   Future<void> _saveHfToken(String value, {bool showFeedback = false}) async {
     final token = value.trim();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(PreferenceKeys.hfToken, token);
-    RunAnywhere.setHfToken(token.isEmpty ? '' : token);
+    if (token.isEmpty) {
+      await KeychainHelper.delete(KeychainKeys.hfToken);
+    } else {
+      await KeychainHelper.saveString(key: KeychainKeys.hfToken, data: token);
+    }
+    await prefs.remove(PreferenceKeys.hfToken);
+    RunAnywhere.setHfToken(token);
     await ModelCatalogBootstrap.refreshNpuCatalog();
     if (showFeedback && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -739,7 +765,10 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('HuggingFace token', style: AppTypography.subheadline(context)),
+            Text(
+              'HuggingFace token',
+              style: AppTypography.subheadline(context),
+            ),
             const SizedBox(height: AppSpacing.xSmall),
             TextField(
               controller: _hfTokenController,
@@ -759,10 +788,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
               children: [
                 FilledButton.icon(
                   onPressed: () => unawaited(
-                    _saveHfToken(
-                      _hfTokenController.text,
-                      showFeedback: true,
-                    ),
+                    _saveHfToken(_hfTokenController.text, showFeedback: true),
                   ),
                   icon: const Icon(Icons.check, size: 18),
                   label: const Text('Save token'),

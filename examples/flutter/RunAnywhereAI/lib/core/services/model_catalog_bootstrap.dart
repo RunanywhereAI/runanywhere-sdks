@@ -1,6 +1,8 @@
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
+import 'package:runanywhere_ai/core/utilities/constants.dart';
+import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 
 /// ModelCatalogBootstrap
 ///
@@ -21,6 +23,8 @@ abstract final class ModelCatalogBootstrap {
       return;
     }
     debugPrint('Registering modules with their models...');
+
+    await _applyPersistedHfToken();
 
     // --- LLM models (LlamaCpp backend) ------------------------------------
     await _registerLLM(
@@ -295,7 +299,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'lfm2_5_230m',
         name: 'LFM2.5 230M (HNPU)',
-        url: 'https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json',
+        url:
+            'https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -303,7 +308,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'lfm2_5_350m',
         name: 'LFM2.5 350M (HNPU)',
-        url: 'https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json',
+        url:
+            'https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -311,7 +317,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'qwen3_5_0_8b',
         name: 'Qwen3.5 0.8B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
+        url:
+            'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -319,7 +326,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'qwen3_5_2b',
         name: 'Qwen3.5 2B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json',
+        url:
+            'https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -327,7 +335,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'qwen3_5_4b',
         name: 'Qwen3.5 4B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json',
+        url:
+            'https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -335,7 +344,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'qwen3_0_6b',
         name: 'Qwen3 0.6B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json',
+        url:
+            'https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -343,7 +353,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'llama3_2_1b',
         name: 'Llama 3.2 1B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json',
+        url:
+            'https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -351,7 +362,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'ternary_bonsai_1_7b',
         name: 'Ternary Bonsai 1.7B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json',
+        url:
+            'https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -367,7 +379,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'gemma3n_e4b',
         name: 'Gemma 3n E4B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json',
+        url:
+            'https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -375,7 +388,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'gemma4_e2b',
         name: 'Gemma 4 E2B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
+        url:
+            'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -383,7 +397,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'gemma4_e4b',
         name: 'Gemma 4 E4B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json',
+        url:
+            'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -391,7 +406,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'deepseek_r1_distill_qwen_1_5b',
         name: 'DeepSeek R1 Distill Qwen 1.5B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json',
+        url:
+            'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -399,7 +415,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'deepseek_r1_distill_qwen_7b',
         name: 'DeepSeek R1 Distill Qwen 7B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json',
+        url:
+            'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -407,7 +424,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'nemotron_nano_8b',
         name: 'Llama 3.1 Nemotron Nano 8B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json',
+        url:
+            'https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -415,7 +433,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'nemoguard_content_8b',
         name: 'NemoGuard 8B Content Safety (HNPU)',
-        url: 'https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json',
+        url:
+            'https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -423,7 +442,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'nemoguard_topic_8b',
         name: 'NemoGuard 8B Topic Control (HNPU)',
-        url: 'https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json',
+        url:
+            'https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -431,7 +451,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'qwen3_vl_2b_text',
         name: 'Qwen3-VL 2B Text (HNPU)',
-        url: 'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json',
+        url:
+            'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         memoryRequirement: 0,
@@ -439,7 +460,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'qwen3_vl',
         name: 'Qwen3-VL 2B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json',
+        url:
+            'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         memoryRequirement: 0,
@@ -455,7 +477,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'gemma4_e2b_vlm',
         name: 'Gemma 4 E2B Image (HNPU)',
-        url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json',
+        url:
+            'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         memoryRequirement: 0,
@@ -463,7 +486,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'nemotron_nano_vl_8b',
         name: 'Llama 3.1 Nemotron Nano VL 8B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json',
+        url:
+            'https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         memoryRequirement: 0,
@@ -471,7 +495,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'whisper_base',
         name: 'Whisper Base (HNPU)',
-        url: 'https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json',
+        url:
+            'https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirement: 0,
@@ -479,7 +504,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'whisper_small',
         name: 'Whisper Small (HNPU)',
-        url: 'https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json',
+        url:
+            'https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirement: 0,
@@ -487,7 +513,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'moonshine_tiny',
         name: 'Moonshine Tiny (HNPU)',
-        url: 'https://huggingface.co/runanywhere/moonshine_tiny_HNPU/moonshine-tiny.json',
+        url:
+            'https://huggingface.co/runanywhere/moonshine_tiny_HNPU/moonshine-tiny.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirement: 0,
@@ -495,7 +522,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'moonshine_base',
         name: 'Moonshine Base (HNPU)',
-        url: 'https://huggingface.co/runanywhere/moonshine_base_HNPU/moonshine-base.json',
+        url:
+            'https://huggingface.co/runanywhere/moonshine_base_HNPU/moonshine-base.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirement: 0,
@@ -503,7 +531,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'parakeet_tdt_0_6b_v2',
         name: 'Parakeet TDT 0.6B v2 (HNPU)',
-        url: 'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json',
+        url:
+            'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirement: 0,
@@ -511,7 +540,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'parakeet_tdt_0_6b_v3',
         name: 'Parakeet TDT 0.6B v3 (HNPU)',
-        url: 'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json',
+        url:
+            'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirement: 0,
@@ -519,7 +549,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'parakeet_rnnt_1_1b',
         name: 'Parakeet RNNT 1.1B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json',
+        url:
+            'https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirement: 0,
@@ -527,7 +558,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'canary_qwen_2_5b',
         name: 'Canary Qwen 2.5B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json',
+        url:
+            'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirement: 0,
@@ -535,7 +567,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'canary_1b_flash',
         name: 'Canary-1B-flash (HNPU)',
-        url: 'https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json',
+        url:
+            'https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirement: 0,
@@ -543,7 +576,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'nemotron_asr_streaming',
         name: 'Nemotron ASR Streaming 0.6B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json',
+        url:
+            'https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirement: 0,
@@ -551,7 +585,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'melotts_en',
         name: 'MeloTTS EN (HNPU)',
-        url: 'https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json',
+        url:
+            'https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         memoryRequirement: 0,
@@ -567,7 +602,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'kitten_nano_0_8',
         name: 'Kitten-nano-0.8-fp32 (HNPU)',
-        url: 'https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json',
+        url:
+            'https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         memoryRequirement: 0,
@@ -575,7 +611,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'kitten_mini_0_1',
         name: 'Kitten-mini-0.1 (HNPU)',
-        url: 'https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json',
+        url:
+            'https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         memoryRequirement: 0,
@@ -583,7 +620,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'kitten_mini_0_8',
         name: 'Kitten-mini-0.8 (HNPU)',
-        url: 'https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json',
+        url:
+            'https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         memoryRequirement: 0,
@@ -591,7 +629,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'kitten_micro_0_8',
         name: 'Kitten-micro-0.8 (HNPU)',
-        url: 'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
+        url:
+            'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         memoryRequirement: 0,
@@ -599,7 +638,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'kitten_nano_0_2',
         name: 'Kitten-nano-0.2 (HNPU)',
-        url: 'https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json',
+        url:
+            'https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         memoryRequirement: 0,
@@ -607,7 +647,8 @@ abstract final class ModelCatalogBootstrap {
       _registerLLM(
         id: 'kitten_nano_0_1',
         name: 'Kitten-nano-0.1 (HNPU)',
-        url: 'https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json',
+        url:
+            'https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         memoryRequirement: 0,
@@ -617,8 +658,19 @@ abstract final class ModelCatalogBootstrap {
   }
 
   static Future<void> refreshNpuCatalog() async {
+    await _applyPersistedHfToken();
     await _registerNpuBundles();
     await RunAnywhere.refreshModelRegistry();
+  }
+
+  static Future<void> _applyPersistedHfToken() async {
+    final token = (await KeychainHelper.loadString(
+      KeychainKeys.hfToken,
+    ))?.trim();
+    if (token == null || token.isEmpty) {
+      return;
+    }
+    RunAnywhere.setHfToken(token);
   }
 
   /// Seed the curated LoRA adapter catalog. `registerArtifact` registers the
