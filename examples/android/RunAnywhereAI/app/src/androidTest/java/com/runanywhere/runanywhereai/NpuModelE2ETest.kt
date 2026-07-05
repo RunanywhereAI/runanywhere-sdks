@@ -206,7 +206,7 @@ class NpuModelE2ETest {
             } catch (e: Exception) {
                 line = report.finish("FAIL", phase, "${e.javaClass.simpleName}: ${e.message}", outDir)
             } finally {
-                runCatching { RunAnywhere.deleteModel(model.id) }   // keep only one bundle on device
+                if (args.getString("keepModel") != "true") runCatching { RunAnywhere.deleteModel(model.id) }   // keep only one bundle on device
             }
         }
         Log.i(tag, line)
@@ -309,8 +309,11 @@ class NpuModelE2ETest {
             val (asset, prompt, kws) = cc
             val f = File(ctx.cacheDir, "vlm_$i.jpg").apply { writeBytes(testAsset(asset)) }
             val r = withTimeout(INFER_TIMEOUT_MS) {
+                // Greedy (temperature=0, no top-p/top-k) — the parity setting: the device caption must
+                // match the fp32 gold deterministically, not a sampled variant. (0f is also the option
+                // default, but pin it explicitly so a future default change can't silently un-greedy the gate.)
                 RunAnywhere.processImage(RAVLMImage.fromFilePath(f.absolutePath),
-                    RAVLMGenerationOptions(prompt = prompt, max_tokens = maxNew))
+                    RAVLMGenerationOptions(prompt = prompt, max_tokens = maxNew, temperature = 0f, top_p = 0f, top_k = 0))
             }
             val text = r.text.trim()
             val pass = text.isNotBlank() && kws.any { text.contains(it, ignoreCase = true) }
@@ -430,7 +433,13 @@ class NpuModelE2ETest {
         val names = (args.getString("files") ?: return null).split(",").map { it.trim() }.filter { it.isNotEmpty() }
         if (names.isEmpty()) return null
         val base = "https://huggingface.co/$repo/resolve/main"
-        val files = names.map { NpuFile(it, "$base/$arch/$it") } + NpuFile("config.json", "$base/config.json")
+        // The manifest + context bins + tokenizer are the runnable bundle; the HF repo-root config.json is
+        // metadata the qhexrt runtime does not read. Many private repos (the NVIDIA/NeMo batch) ship NO root
+        // config.json, and appending it unconditionally made the whole ad-hoc download 404. So append it only
+        // when the caller explicitly opts in (`-e addConfig true`), off by default.
+        val addConfig = args.getString("addConfig")?.equals("true", ignoreCase = true) == true
+        val files = names.map { NpuFile(it, "$base/$arch/$it") } +
+            (if (addConfig) listOf(NpuFile("config.json", "$base/config.json")) else emptyList())
         return NpuModel(
             id = "${repo.substringAfterLast('/')}_$arch", name = repo, detail = "$modality - $arch",
             modality = modality, arch = arch, files = files,
