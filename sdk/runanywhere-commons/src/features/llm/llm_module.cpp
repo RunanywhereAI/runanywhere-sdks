@@ -2353,12 +2353,11 @@ rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event) {
 #endif
 }
 
-/** Seed the lifecycle-owned LLM's adaptive context with a system prompt. */
-rac_result_t rac_llm_inject_system_prompt_lifecycle(const char* prompt) {
-    if (!prompt) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
+namespace {
+template <typename Op, typename... Args>
+rac_result_t call_lifecycle_op(Op op, Args&&... args) {
 #if !defined(RAC_HAVE_PROTOBUF)
+    (void)op;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
     rac::llm::LifecycleLlmRef ref;
@@ -2367,12 +2366,21 @@ rac_result_t rac_llm_inject_system_prompt_lifecycle(const char* prompt) {
         return rc;
     }
 
-    rc = (ref.ops && ref.ops->inject_system_prompt)
-             ? ref.ops->inject_system_prompt(ref.impl, prompt)
+    rc = (ref.ops && (ref.ops->*op))
+             ? (ref.ops->*op)(ref.impl, std::forward<Args>(args)...)
              : RAC_ERROR_NOT_SUPPORTED;
     rac::llm::release_lifecycle_llm(&ref);
     return rc;
 #endif
+}
+}  // namespace
+
+/** Seed the lifecycle-owned LLM's adaptive context with a system prompt. */
+rac_result_t rac_llm_inject_system_prompt_lifecycle(const char* prompt) {
+    if (!prompt) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    return call_lifecycle_op(&rac_llm_service_ops_t::inject_system_prompt, prompt);
 }
 
 /** Append text to the lifecycle-owned LLM's adaptive context. */
@@ -2380,20 +2388,7 @@ rac_result_t rac_llm_append_context_lifecycle(const char* text) {
     if (!text) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-#if !defined(RAC_HAVE_PROTOBUF)
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#else
-    rac::llm::LifecycleLlmRef ref;
-    rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
-
-    rc = (ref.ops && ref.ops->append_context) ? ref.ops->append_context(ref.impl, text)
-                                              : RAC_ERROR_NOT_SUPPORTED;
-    rac::llm::release_lifecycle_llm(&ref);
-    return rc;
-#endif
+    return call_lifecycle_op(&rac_llm_service_ops_t::append_context, text);
 }
 
 /** Generate a protobuf result from the lifecycle-owned LLM's adaptive context. */
@@ -2484,20 +2479,7 @@ rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_by
 
 /** Clear adaptive context retained by the lifecycle-owned LLM. */
 rac_result_t rac_llm_clear_context_lifecycle(void) {
-#if !defined(RAC_HAVE_PROTOBUF)
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#else
-    rac::llm::LifecycleLlmRef ref;
-    rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
-
-    rc = (ref.ops && ref.ops->clear_context) ? ref.ops->clear_context(ref.impl)
-                                             : RAC_ERROR_NOT_SUPPORTED;
-    rac::llm::release_lifecycle_llm(&ref);
-    return rc;
-#endif
+    return call_lifecycle_op(&rac_llm_service_ops_t::clear_context);
 }
 
 }  // extern "C"
