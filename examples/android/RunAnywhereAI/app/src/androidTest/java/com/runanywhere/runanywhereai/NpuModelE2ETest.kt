@@ -1,22 +1,15 @@
 package com.runanywhere.runanywhereai
 
-import ai.runanywhere.proto.v1.ArchiveStructure
-import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.ModelFileDescriptor
-import ai.runanywhere.proto.v1.ModelFileRole
-import ai.runanywhere.proto.v1.ModelSource
+import ai.runanywhere.proto.v1.ModelCategory
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.runanywhere.runanywhereai.data.ModelCatalog
+import com.runanywhere.runanywhereai.data.NpuBundle
 import com.runanywhere.runanywhereai.state.GlobalState
-import com.runanywhere.runanywhereai.ui.screens.npu.NPU_MODELS
-import com.runanywhere.runanywhereai.ui.screens.npu.NpuFile
-import com.runanywhere.runanywhereai.ui.screens.npu.NpuModality
-import com.runanywhere.runanywhereai.ui.screens.npu.NpuModel
-import com.runanywhere.runanywhereai.ui.screens.npu.category
 import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.aggregateStream
@@ -60,8 +53,9 @@ import java.io.File
  * (one bundle on device at a time). NOT product code — androidTest only.
  *
  * Selection (instrumentation args, `-e key value`):
- *   -e modelId <catalog-id>                          a row from NpuCatalog.NPU_MODELS
- *   OR -e hfRepo <org/repo> -e arch <v81> -e modality <llm|vlm|stt|tts> -e files "m.json,a.bin,..."
+ *   -e modelId <catalog-id>                          a row from ModelCatalog.npuBundles
+ *   OR -e hfRepo <org/repo> -e arch <v81> -e modality <llm|vlm|stt|tts> -e manifest <m.json>
+ *      (legacy: -e files "m.json,..." — only the first name, the manifest, is used)
  *   -e hfToken <hf_...>   download private runanywhere/<name>_HNPU repos (never committed/logged)
  *   -e maxNew <n>         override VLM max new tokens (default 48)
  *
@@ -117,7 +111,7 @@ class NpuModelE2ETest {
         val args = InstrumentationRegistry.getArguments()
         val model = resolveModel(args) ?: run {
             Log.i(tag, "NPU_E2E status=FAIL phase=lookup detail=\"no -e modelId / -e hfRepo\"")
-            assertTrue("missing -e modelId <id> or -e hfRepo <repo> -e modality <m> -e files <csv>", false)
+            assertTrue("missing -e modelId <id> or -e hfRepo <repo> -e modality <m> -e manifest <m.json>", false)
             return
         }
         val maxNew = args.getString("maxNew")?.toIntOrNull() ?: 48
@@ -125,7 +119,7 @@ class NpuModelE2ETest {
         val outDir = InstrumentationRegistry.getInstrumentation().targetContext
             .getExternalFilesDir(null)?.let { File(it, "npu_e2e") }
 
-        val report = RunReport(model.id, hfRepoOf(model), model.modality.name.lowercase(), model.arch)
+        val report = RunReport(model.id, hfRepoOf(model), modalityName(model.category), model.arch)
         report.put("device_model", "${Build.MANUFACTURER} ${Build.MODEL}")
 
         var phase = "init"
@@ -185,11 +179,12 @@ class NpuModelE2ETest {
                 phase = "infer"
                 val suite = NpuSuite.load(InstrumentationRegistry.getInstrumentation().context.assets, model.id)
                 report.put("suite", if (suite != null) "npu_suite/v1:${suite.metric}:${suite.cases.size}cases" else "heuristic")
-                when (model.modality) {
-                    NpuModality.LLM -> runLlm(report, suite)
-                    NpuModality.VLM -> runVlm(report, maxNew, suite)
-                    NpuModality.STT -> runStt(report, suite)
-                    NpuModality.TTS -> runTts(report, model, outDir, suite)
+                when (model.category) {
+                    ModelCategory.MODEL_CATEGORY_LANGUAGE -> runLlm(report, suite)
+                    ModelCategory.MODEL_CATEGORY_MULTIMODAL -> runVlm(report, maxNew, suite)
+                    ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> runStt(report, suite)
+                    ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> runTts(report, model, outDir, suite)
+                    else -> throw AssertionError("unsupported NPU modality: ${model.category}")
                 }
 
                 report.put("peak_rss_mb", round2(NpuMetrics.peakRssKb() / 1024.0))
@@ -361,7 +356,7 @@ class NpuModelE2ETest {
     }
 
     // ---------------------------------------------------------------- TTS ----
-    private suspend fun runTts(report: RunReport, model: NpuModel, outDir: File?, suite: NpuSuite?) {
+    private suspend fun runTts(report: RunReport, model: NpuBundle, outDir: File?, suite: NpuSuite?) {
         val texts = suite?.cases?.mapNotNull { it.text }?.takeIf { it.isNotEmpty() } ?: ttsTexts
         val expectedRate = suite?.cases?.firstOrNull { it.expectedRate > 0 }?.expectedRate
             ?: NpuRubric.expectedTtsRate(model.id)
@@ -395,59 +390,46 @@ class NpuModelE2ETest {
     }
 
     // ---------------------------------------------------------------- helpers ----
-    private suspend fun register(model: NpuModel) =
-        if (model.files.isNotEmpty()) {
-            RunAnywhere.registerModel(
-                multiFile = model.files.mapIndexed { idx, f ->
-                    ModelFileDescriptor(
-                        url = f.url, filename = f.filename, is_required = true,
-                        role = if (idx == 0) ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
-                        else ModelFileRole.MODEL_FILE_ROLE_COMPANION,
-                    )
-                },
-                id = model.id, name = model.name,
-                framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-                modality = model.modality.category(), source = ModelSource.MODEL_SOURCE_REMOTE,
-            )
-        } else {
-            RunAnywhere.registerModel(
-                archiveUrl = model.resolvedArchiveUrl, structure = ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED,
-                id = model.id, name = model.name,
-                framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-                modality = model.modality.category(), archiveType = ArchiveType.ARCHIVE_TYPE_ZIP,
-            )
-        }
+    private suspend fun register(bundle: NpuBundle) =
+        RunAnywhere.registerModel(
+            id = bundle.id, name = bundle.name, url = bundle.url,
+            framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+            modality = bundle.category,
+        )
 
-    /** Catalog id, or an ad-hoc model synthesized from -e hfRepo/arch/modality/files. */
-    private fun resolveModel(args: Bundle): NpuModel? {
-        args.getString("modelId")?.let { id -> return NPU_MODELS.firstOrNull { it.id == id } }
+    /** Catalog id, or an ad-hoc bundle synthesized from -e hfRepo/arch/modality/manifest. */
+    private fun resolveModel(args: Bundle): NpuBundle? {
+        args.getString("modelId")?.let { id -> return ModelCatalog.npuBundles.firstOrNull { it.id == id } }
         val repo = args.getString("hfRepo") ?: return null
         val arch = args.getString("arch") ?: "v81"
-        val modality = when (args.getString("modality")?.lowercase()) {
-            "llm" -> NpuModality.LLM
-            "vlm" -> NpuModality.VLM
-            "stt", "asr" -> NpuModality.STT
-            "tts" -> NpuModality.TTS
+        val category = when (args.getString("modality")?.lowercase()) {
+            "llm" -> ModelCategory.MODEL_CATEGORY_LANGUAGE
+            "vlm" -> ModelCategory.MODEL_CATEGORY_MULTIMODAL
+            "stt", "asr" -> ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+            "tts" -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
             else -> return null
         }
-        val names = (args.getString("files") ?: return null).split(",").map { it.trim() }.filter { it.isNotEmpty() }
-        if (names.isEmpty()) return null
-        val base = "https://huggingface.co/$repo/resolve/main"
-        // The manifest + context bins + tokenizer are the runnable bundle; the HF repo-root config.json is
-        // metadata the qhexrt runtime does not read. Many private repos (the NVIDIA/NeMo batch) ship NO root
-        // config.json, and appending it unconditionally made the whole ad-hoc download 404. So append it only
-        // when the caller explicitly opts in (`-e addConfig true`), off by default.
-        val addConfig = args.getString("addConfig")?.equals("true", ignoreCase = true) == true
-        val files = names.map { NpuFile(it, "$base/$arch/$it") } +
-            (if (addConfig) listOf(NpuFile("config.json", "$base/config.json")) else emptyList())
-        return NpuModel(
-            id = "${repo.substringAfterLast('/')}_$arch", name = repo, detail = "$modality - $arch",
-            modality = modality, arch = arch, files = files,
+        // Only the manifest is named; commons + the engine bundle policy resolve the rest of the
+        // file set from the HF tree (incl. the repo-root config.json automatically when present).
+        val manifest = args.getString("manifest")?.trim()?.takeIf { it.isNotEmpty() }
+            ?: args.getString("files")?.split(",")?.map { it.trim() }?.firstOrNull { it.isNotEmpty() }
+            ?: return null
+        return NpuBundle(
+            id = "${repo.substringAfterLast('/')}_$arch", name = repo, category = category,
+            arch = arch, url = "https://huggingface.co/$repo/$arch/$manifest",
         )
     }
 
-    private fun hfRepoOf(model: NpuModel): String =
-        model.files.firstOrNull()?.url?.substringAfter("huggingface.co/")?.substringBefore("/resolve") ?: model.name
+    private fun modalityName(category: ModelCategory): String = when (category) {
+        ModelCategory.MODEL_CATEGORY_LANGUAGE -> "llm"
+        ModelCategory.MODEL_CATEGORY_MULTIMODAL -> "vlm"
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> "stt"
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> "tts"
+        else -> category.name.lowercase()
+    }
+
+    private fun hfRepoOf(bundle: NpuBundle): String =
+        bundle.url.removePrefix("https://huggingface.co/").split("/").take(2).joinToString("/")
 
     private fun testAsset(name: String): ByteArray =
         InstrumentationRegistry.getInstrumentation().context.assets.open(name).use { it.readBytes() }
