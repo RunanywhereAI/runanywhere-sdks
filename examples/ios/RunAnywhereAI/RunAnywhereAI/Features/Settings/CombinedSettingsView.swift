@@ -74,21 +74,16 @@ private struct IOSSettingsContent: View {
 
     var body: some View {
         Form {
-            // Generation Settings
-            Section("Generation Settings") {
+            Section {
+                TextField("How should RunAnywhere respond?", text: $viewModel.systemPrompt, axis: .vertical)
+                    .lineLimit(3...8)
+
                 VStack(alignment: .leading) {
-                    Text("Temperature: \(String(format: "%.2f", viewModel.temperature))")
+                    Text("Creativity: \(String(format: "%.2f", viewModel.temperature))")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.textSecondary)
                     Slider(value: $viewModel.temperature, in: 0...2, step: 0.1)
                 }
-
-                Stepper(
-                    "Max Tokens: \(viewModel.maxTokens)",
-                    value: $viewModel.maxTokens,
-                    in: 500...20000,
-                    step: 500
-                )
 
                 Toggle("Thinking Mode", isOn: $viewModel.thinkingModeEnabled)
                     .disabled(!viewModel.loadedModelSupportsThinking)
@@ -96,24 +91,83 @@ private struct IOSSettingsContent: View {
                 Text(thinkingModeDescription(for: viewModel))
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.textSecondary)
-            }
-
-            // System Prompt
-            Section {
-                TextField("Enter system prompt...", text: $viewModel.systemPrompt, axis: .vertical)
-                    .lineLimit(3...8)
             } header: {
-                Text("System Prompt")
+                Text("Personalization")
             } footer: {
-                Text("Optional instructions that define AI behavior and response style.")
+                Text("Customize tone, reasoning, and default assistant behavior.")
                     .font(AppTypography.caption)
             }
 
-            // Tool Calling Settings
-            ToolSettingsSection(viewModel: toolViewModel)
-
-            // API Configuration (for testing custom backend)
             Section {
+                NavigationLink(destination: SimplifiedModelsView()) {
+                    SettingsNavigationRow(
+                        icon: "square.stack.3d.up",
+                        color: AppColors.primaryAccent,
+                        title: "Manage Downloads",
+                        subtitle: "Choose, download, and remove local models"
+                    )
+                }
+
+                HStack {
+                    Label("Max Response Length", systemImage: "text.line.last.and.arrowtriangle.forward")
+                    Spacer()
+                    Stepper(
+                        "\(viewModel.maxTokens)",
+                        value: $viewModel.maxTokens,
+                        in: 500...20000,
+                        step: 500
+                    )
+                    .labelsHidden()
+                }
+            } header: {
+                Text("Models")
+            } footer: {
+                Text("RunAnywhere supports multiple backends. Model labels explain which engine powers each capability.")
+                    .font(AppTypography.caption)
+            }
+
+            Section("Voice & Input") {
+                NavigationLink(destination: VoiceAssistantView()) {
+                    SettingsNavigationRow(
+                        icon: "mic.circle",
+                        color: AppColors.primaryAccent,
+                        title: "Talk Mode",
+                        subtitle: "Set up speech, conversation, and voice models"
+                    )
+                }
+
+                #if os(iOS)
+                NavigationLink(destination: VoiceDictationManagementView()) {
+                    SettingsNavigationRow(
+                        icon: "keyboard",
+                        color: .indigo,
+                        title: "Private Dictation Keyboard",
+                        subtitle: "Dictate into other apps on-device"
+                    )
+                }
+                #endif
+            }
+
+            Section("Privacy") {
+                Label("Chats and downloads stay on this device", systemImage: "lock.shield")
+                    .foregroundColor(AppColors.textPrimary)
+                Toggle("Log Analytics Locally", isOn: $viewModel.analyticsLogToLocal)
+
+                Text("When enabled, analytics events are saved locally on your device.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+
+            Section {
+                NavigationLink(destination: ConsumerAdvancedHubView()) {
+                    SettingsNavigationRow(
+                        icon: "slider.horizontal.3",
+                        color: AppColors.primaryPurple,
+                        title: "SDK Workbench",
+                        subtitle: "RAG, Vision, STT, TTS, VAD, tools, storage, and benchmarks"
+                    )
+                }
+
                 Button(
                     action: { viewModel.showApiKeySheet() },
                     label: {
@@ -161,27 +215,13 @@ private struct IOSSettingsContent: View {
                     )
                 }
             } header: {
-                Text("API Configuration (Testing)")
+                Text("Advanced")
             } footer: {
-                Text("Configure custom API key and base URL for testing. Requires app restart to take effect.")
+                Text("Developer controls are kept here so the main app stays assistant-first.")
                     .font(AppTypography.caption)
             }
 
-            // Logging Configuration
-            Section("Logging Configuration") {
-                Toggle("Log Analytics Locally", isOn: $viewModel.analyticsLogToLocal)
-
-                Text("When enabled, analytics events will be saved locally on your device.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
-            }
-
-            // Performance
-            Section("Performance") {
-                NavigationLink(destination: BenchmarkDashboardView()) {
-                    Label("Benchmarks", systemImage: "gauge.with.dots.needle.33percent")
-                }
-            }
+            ToolSettingsSection(viewModel: toolViewModel)
 
             // About
             Section {
@@ -207,6 +247,34 @@ private struct IOSSettingsContent: View {
     }
 }
 
+private struct SettingsNavigationRow: View {
+    let icon: String
+    let color: Color
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(spacing: AppSpacing.mediumLarge) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(color)
+                .frame(width: 32, height: 32)
+                .background(color.opacity(0.12))
+                .cornerRadius(AppSpacing.cornerRadiusRegular)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .foregroundColor(AppColors.textPrimary)
+                Text(subtitle)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.vertical, AppSpacing.xSmall)
+    }
+}
+
 // MARK: - macOS Layout
 
 private struct MacOSSettingsContent: View {
@@ -220,6 +288,7 @@ private struct MacOSSettingsContent: View {
                     .font(AppTypography.largeTitleBold)
                     .padding(.bottom, AppSpacing.medium)
 
+                AssistantSettingsCard()
                 GenerationSettingsCard(viewModel: viewModel)
                 ToolSettingsCard(viewModel: toolViewModel)
                 APIConfigurationCard(viewModel: viewModel)
@@ -238,6 +307,52 @@ private struct MacOSSettingsContent: View {
 }
 
 // MARK: - macOS Settings Cards
+
+private struct AssistantSettingsCard: View {
+    var body: some View {
+        SettingsCard(title: "Assistant") {
+            VStack(alignment: .leading, spacing: AppSpacing.large) {
+                NavigationLink(destination: SimplifiedModelsView()) {
+                    SettingsNavigationRow(
+                        icon: "square.stack.3d.up",
+                        color: AppColors.primaryAccent,
+                        title: "Manage Downloads",
+                        subtitle: "Choose and identify models across all local backends"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink(destination: VoiceAssistantView()) {
+                    SettingsNavigationRow(
+                        icon: "mic.circle",
+                        color: AppColors.primaryAccent,
+                        title: "Talk Mode",
+                        subtitle: "Configure speech, conversation, and voice models"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink(destination: ConsumerAdvancedHubView()) {
+                    SettingsNavigationRow(
+                        icon: "slider.horizontal.3",
+                        color: AppColors.primaryPurple,
+                        title: "SDK Workbench",
+                        subtitle: "RAG, Vision, STT, TTS, VAD, storage, tools, and benchmarks"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                HStack {
+                    Image(systemName: "lock.shield")
+                        .foregroundColor(AppColors.statusGreen)
+                    Text("Chats and downloads stay on this Mac unless you export or delete them.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+            }
+        }
+    }
+}
 
 private struct GenerationSettingsCard: View {
     @ObservedObject var viewModel: SettingsViewModel

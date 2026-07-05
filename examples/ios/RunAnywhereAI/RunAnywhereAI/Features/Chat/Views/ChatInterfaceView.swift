@@ -2,7 +2,7 @@
 //  ChatInterfaceView.swift
 //  RunAnywhereAI
 //
-//  Chat interface shell + toolbar — all logic lives in LLMViewModel.
+//  Chat interface shell + toolbar - all logic lives in LLMViewModel.
 //
 
 import SwiftUI
@@ -23,6 +23,11 @@ struct ChatInterfaceView: View {
     @State private var showingConversationList = false
     @State private var showingModelSelection = false
     @State private var showingChatDetails = false
+    @State private var showingSettings = false
+    @State private var showingAdvancedHub = false
+    @State private var showingTalkMode = false
+    @State private var showingVisionWorkbench = false
+    @State private var showingDocuments = false
     @State private var showDebugAlert = false
     @State private var debugMessage = ""
     @State private var showModelLoadedToast = false
@@ -46,19 +51,67 @@ struct ChatInterfaceView: View {
     }
 
     var body: some View {
-        Group {
-            #if os(macOS)
-            macOSView
-            #else
-            iOSView
-            #endif
-        }
-        .adaptiveSheet(isPresented: $showingConversationList) {
-            ConversationListView()
+        ZStack(alignment: .leading) {
+            Group {
+                #if os(macOS)
+                macOSView
+                #else
+                iOSView
+                #endif
+            }
+
+            if showingConversationList {
+                conversationDrawerOverlay
+                    .transition(.opacity)
+                    .zIndex(10)
+            }
         }
         .adaptiveSheet(isPresented: $showingModelSelection) {
             ModelSelectionSheet(context: .llm) { model in
                 await handleModelSelected(model)
+            }
+        }
+        .adaptiveSheet(isPresented: $showingSettings) {
+            NavigationStack {
+                CombinedSettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close") { showingSettings = false }
+                        }
+                    }
+            }
+        }
+        .adaptiveSheet(isPresented: $showingAdvancedHub) {
+            NavigationStack {
+                ConsumerAdvancedHubView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close") { showingAdvancedHub = false }
+                        }
+                    }
+            }
+        }
+        .adaptiveSheet(isPresented: $showingTalkMode) {
+            VoiceAssistantView()
+        }
+        .adaptiveSheet(isPresented: $showingVisionWorkbench) {
+            NavigationStack {
+                VLMCameraView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close") { showingVisionWorkbench = false }
+                        }
+                    }
+            }
+        }
+        .adaptiveSheet(isPresented: $showingDocuments) {
+            NavigationStack {
+                DocumentRAGView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close") { showingDocuments = false }
+                        }
+                    }
             }
         }
         .adaptiveSheet(isPresented: $showingChatDetails) {
@@ -114,6 +167,7 @@ struct ChatInterfaceView: View {
         .sheet(isPresented: $showingLoRAManagement, onDismiss: handleLoRAManagementDismiss) {
             loraManagementSheet
         }
+        .animation(.easeInOut(duration: AppLayout.animationRegular), value: showingConversationList)
     }
 
     // Chain the file picker off the management sheet's dismissal instead of
@@ -157,71 +211,16 @@ extension ChatInterfaceView {
     }
 
     var iOSView: some View {
-        NavigationView {
+        VStack(spacing: 0) {
+            consumerTopBar
+
             ZStack {
                 VStack(spacing: 0) {
                     contentArea
                 }
                 modelRequiredOverlayIfNeeded
             }
-            .navigationTitle(hasModelSelected ? "Chat" : "")
-            #if os(iOS)
-            .navigationBarTitleDisplayModeCompat(.inline)
-            .navigationBarHidden(!hasModelSelected)
-            #endif
-            .toolbar {
-                if hasModelSelected {
-                    #if os(iOS)
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button {
-                            showingConversationList = true
-                        } label: {
-                            Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                        }
-                    }
-
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button {
-                            showingChatDetails = true
-                        } label: {
-                            Image(systemName: "info.circle")
-                                .foregroundColor(viewModel.messages.isEmpty ? .gray : AppColors.primaryAccent)
-                        }
-                        .disabled(viewModel.messages.isEmpty)
-                    }
-
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        modelButton
-                    }
-                    #else
-                    ToolbarItem(placement: .automatic) {
-                        Button {
-                            showingConversationList = true
-                        } label: {
-                            Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                        }
-                    }
-
-                    ToolbarItem(placement: .automatic) {
-                        Button {
-                            showingChatDetails = true
-                        } label: {
-                            Image(systemName: "info.circle")
-                                .foregroundColor(viewModel.messages.isEmpty ? .gray : AppColors.primaryAccent)
-                        }
-                        .disabled(viewModel.messages.isEmpty)
-                    }
-
-                    ToolbarItem(placement: .automatic) {
-                        modelButton
-                    }
-                    #endif
-                }
-            }
         }
-        #if os(iOS)
-        .navigationViewStyle(.stack)
-        #endif
     }
 }
 
@@ -249,12 +248,25 @@ extension ChatInterfaceView {
 
             Spacer()
 
-            Text("Chat")
-                .font(AppTypography.headline)
+            modelButton
 
             Spacer()
 
-            modelButton
+            Button {
+                showingAdvancedHub = true
+            } label: {
+                Label("Advanced", systemImage: "slider.horizontal.3")
+            }
+            .buttonStyle(.bordered)
+            .tint(AppColors.primaryAccent)
+
+            Button {
+                showingSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.bordered)
+            .tint(AppColors.primaryAccent)
         }
         .padding(.horizontal, AppSpacing.large)
         .padding(.vertical, AppSpacing.smallMedium)
@@ -276,6 +288,7 @@ extension ChatInterfaceView {
                 showingLoRAManagement: $showingLoRAManagement,
                 settingsViewModel: settingsViewModel,
                 toolSettingsViewModel: toolSettingsViewModel,
+                onComposerAction: handleComposerAction,
                 onSend: sendMessage
             )
         } else {
@@ -313,15 +326,15 @@ extension ChatInterfaceView {
                             .lineLimit(1)
 
                         HStack(spacing: 3) {
-                            Image(systemName: viewModel.modelSupportsStreaming ? "bolt.fill" : "square.fill")
+                            Image(systemName: viewModel.selectedFramework?.consumerBackendIcon ?? "cube")
                                 .font(.system(size: 7))
-                            Text(viewModel.modelSupportsStreaming ? "Streaming" : "Batch")
+                            Text(viewModel.selectedFramework?.consumerBackendShortLabel ?? "Ready")
                                 .font(.system(size: 8, weight: .medium))
                         }
-                        .foregroundColor(viewModel.modelSupportsStreaming ? .green : .orange)
+                        .foregroundColor(viewModel.selectedFramework?.consumerBackendColor ?? AppColors.primaryAccent)
                     }
                 } else {
-                    Text("Select Model")
+                    Text("Choose Model")
                         .font(AppTypography.caption)
                 }
             }
@@ -336,6 +349,93 @@ extension ChatInterfaceView {
 // MARK: - Helper Methods
 
 extension ChatInterfaceView {
+    private var consumerTopBar: some View {
+        HStack(spacing: AppSpacing.mediumLarge) {
+            iconCircleButton(systemImage: "line.3.horizontal") {
+                showingConversationList = true
+            }
+            .accessibilityLabel("Chats")
+
+            Spacer()
+
+            modelButton
+
+            Spacer()
+
+            iconCircleButton(systemImage: "square.and.pencil") {
+                viewModel.createNewConversation()
+            }
+            .accessibilityLabel("New Chat")
+
+            iconCircleButton(systemImage: "gearshape") {
+                showingSettings = true
+            }
+            .accessibilityLabel("Settings")
+        }
+        .padding(.horizontal, AppSpacing.large)
+        .padding(.vertical, AppSpacing.mediumLarge)
+        .background(AppColors.backgroundPrimary.opacity(0.96))
+    }
+
+    private func iconCircleButton(systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
+                .frame(width: 44, height: 44)
+                .background(AppColors.backgroundSecondary)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var conversationDrawerOverlay: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                AppColors.overlayLight
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        showingConversationList = false
+                    }
+
+                ConversationDrawerView(
+                    onSelectConversation: selectConversation,
+                    onCreateConversation: {
+                        viewModel.createNewConversation()
+                        showingConversationList = false
+                    },
+                    onOpenSettings: {
+                        showingConversationList = false
+                        showingSettings = true
+                    },
+                    onClose: {
+                        showingConversationList = false
+                    }
+                )
+                .frame(width: min(geometry.size.width * 0.86, DeviceFormFactor.current == .desktop ? 360 : 330))
+                .frame(maxHeight: .infinity)
+                .shadow(color: AppColors.shadowDark, radius: 18, x: 8, y: 0)
+            }
+        }
+    }
+
+    private func selectConversation(_ conversation: Conversation) {
+        let selected = conversationStore.loadConversation(conversation.id) ?? conversation
+        NotificationCenter.default.post(name: Notification.Name("ConversationSelected"), object: selected)
+        showingConversationList = false
+    }
+
+    private func handleComposerAction(_ action: ComposerAction) {
+        switch action {
+        case .attachFile:
+            showingDocuments = true
+        case .takePhoto, .attachPhoto:
+            showingVisionWorkbench = true
+        case .talk:
+            showingTalkMode = true
+        }
+    }
+
     func sendMessage() {
         guard viewModel.canSend else { return }
 

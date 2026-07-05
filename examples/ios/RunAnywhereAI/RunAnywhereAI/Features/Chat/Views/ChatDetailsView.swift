@@ -2,7 +2,7 @@
 //  ChatDetailsView.swift
 //  RunAnywhereAI
 //
-//  Chat analytics and details views - Native iOS Design
+//  Conversation details and generation analytics.
 //
 
 import SwiftUI
@@ -16,37 +16,25 @@ struct ChatDetailsView: View {
     @Environment(\.dismiss)
     private var dismiss
 
-    @State private var selectedTab = 0
+    private var analytics: [MessageAnalytics] {
+        messages.compactMap { $0.analytics }
+    }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                Picker("", selection: $selectedTab) {
-                    Text("Overview").tag(0)
-                    Text("Messages").tag(1)
-                    Text("Performance").tag(2)
-                }
-                .pickerStyle(.segmented)
-                .padding()
-
-                TabView(selection: $selectedTab) {
-                    OverviewTab(messages: messages, conversation: conversation)
-                        .tag(0)
-                    MessagesTab(messages: messages)
-                        .tag(1)
-                    PerformanceTab(messages: messages)
-                        .tag(2)
-                }
-                #if os(iOS)
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                #endif
+            List {
+                conversationSection
+                performanceSummarySection
+                modelSection
+                responseDetailsSection
+                thinkingSection
             }
             #if os(iOS)
             .background(Color(.systemGroupedBackground))
             #else
             .background(Color(nsColor: .controlBackgroundColor))
             #endif
-            .navigationTitle("Analytics")
+            .navigationTitle("Conversation Details")
             #if os(iOS)
             .navigationBarTitleDisplayModeCompat(.inline)
             #endif
@@ -65,70 +53,114 @@ struct ChatDetailsView: View {
             maxHeight: 700
         )
     }
-}
 
-// MARK: - Overview Tab
+    private var conversationSection: some View {
+        Section("Conversation") {
+            detailRow("message", "Messages", "\(messages.count)")
+            detailRow("person", "From You", "\(messages.filter { $0.role == .user }.count)")
+            detailRow("sparkles", "From RunAnywhere", "\(messages.filter { $0.role == .assistant }.count)")
 
-private struct OverviewTab: View {
-    let messages: [Message]
-    let conversation: Conversation?
-
-    private var analytics: [MessageAnalytics] {
-        messages.compactMap { $0.analytics }
+            if let conversation {
+                detailRow("clock", "Created", conversation.createdAt.formatted(date: .abbreviated, time: .shortened))
+            }
+        }
     }
 
-    var body: some View {
-        List {
-            // Conversation Section
-            Section {
-                row("message", "Messages", "\(messages.count)")
-                row("person", "From You", "\(messages.filter { $0.role == .user }.count)")
-                row("sparkles", "From AI", "\(messages.filter { $0.role == .assistant }.count)")
-
-                if let conv = conversation {
-                    row("clock", "Created", conv.createdAt.formatted(date: .abbreviated, time: .shortened))
-                }
+    @ViewBuilder private var performanceSummarySection: some View {
+        if analytics.isEmpty {
+            Section("Performance") {
+                ContentUnavailableView(
+                    "No responses yet",
+                    systemImage: "chart.line.uptrend.xyaxis",
+                    description: Text("Generation analytics appear after the assistant responds.")
+                )
             }
+        } else {
+            Section("Performance") {
+                detailRow("timer", "Average Response", String(format: "%.1fs", averageResponseTime))
+                detailRow("bolt", "Token Speed", "\(Int(averageTokenSpeed)) tok/s")
+                detailRow("number", "Total Tokens", "\(totalTokens)")
+                detailRow("checkmark.circle", "Success Rate", "\(Int(successRate * 100))%")
+            }
+        }
+    }
 
-            // Performance Section
-            if !analytics.isEmpty {
-                Section("Performance") {
-                    row("timer", "Avg Response", String(format: "%.1fs", avgTime))
-                    row("bolt", "Token Speed", "\(Int(avgSpeed)) tok/s")
-                    row("number", "Total Tokens", "\(totalTokens)")
-                    row("checkmark.circle", "Success Rate", "\(Int(successRate * 100))%")
-                }
+    @ViewBuilder private var modelSection: some View {
+        if !analytics.isEmpty {
+            Section("Models") {
+                let groups = Dictionary(grouping: analytics) { $0.modelName }
+                ForEach(groups.keys.sorted(), id: \.self) { name in
+                    if let items = groups[name] {
+                        let averageTime = items.map { $0.totalGenerationTime }.reduce(0, +) / Double(items.count)
+                        let averageSpeed = items.map { $0.averageTokensPerSecond }.reduce(0, +) / Double(items.count)
 
-                Section("Model") {
-                    let models = Set(analytics.map { $0.modelName })
-                    ForEach(Array(models), id: \.self) { model in
-                        row("cpu", model, "\(analytics.filter { $0.modelName == model }.count) responses")
+                        VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
+                            Text(name)
+                                .font(AppTypography.subheadlineMedium)
+
+                            HStack(spacing: AppSpacing.smallMedium) {
+                                Text("\(items.count) responses")
+                                Text(String(format: "%.1fs avg", averageTime))
+                                Text("\(Int(averageSpeed)) tok/s")
+                            }
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                        }
+                        .padding(.vertical, AppSpacing.xSmall)
                     }
                 }
             }
         }
     }
 
-    private func row(_ icon: String, _ title: String, _ value: String) -> some View {
+    @ViewBuilder private var responseDetailsSection: some View {
+        let responseItems = messages.compactMap { message in
+            message.analytics.map { (message, $0) }
+        }
+
+        if !responseItems.isEmpty {
+            Section("Responses") {
+                ForEach(responseItems.indices, id: \.self) { index in
+                    let (message, stats) = responseItems[index]
+                    ResponseDetailRow(index: index + 1, message: message, stats: stats)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var thinkingSection: some View {
+        if analytics.contains(where: { $0.wasThinkingMode }) {
+            Section("Thinking") {
+                let count = analytics.filter { $0.wasThinkingMode }.count
+                let percentage = Int((Double(count) / Double(analytics.count)) * 100)
+
+                detailRow("lightbulb", "Responses", "\(count)")
+                detailRow("percent", "Usage", "\(percentage)%")
+            }
+        }
+    }
+
+    private func detailRow(_ icon: String, _ title: String, _ value: String) -> some View {
         HStack {
             Label {
                 Text(title)
             } icon: {
                 Image(systemName: icon)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(AppColors.primaryAccent)
             }
             Spacer()
             Text(value)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
         }
     }
 
-    private var avgTime: Double {
+    private var averageResponseTime: Double {
         guard !analytics.isEmpty else { return 0 }
         return analytics.map { $0.totalGenerationTime }.reduce(0, +) / Double(analytics.count)
     }
 
-    private var avgSpeed: Double {
+    private var averageTokenSpeed: Double {
         guard !analytics.isEmpty else { return 0 }
         return analytics.map { $0.averageTokensPerSecond }.reduce(0, +) / Double(analytics.count)
     }
@@ -143,150 +175,42 @@ private struct OverviewTab: View {
     }
 }
 
-// MARK: - Messages Tab
-
-private struct MessagesTab: View {
-    let messages: [Message]
-
-    private var items: [(Message, MessageAnalytics)] {
-        messages.compactMap { msg in
-            msg.analytics.map { (msg, $0) }
-        }
-    }
+private struct ResponseDetailRow: View {
+    let index: Int
+    let message: Message
+    let stats: MessageAnalytics
 
     var body: some View {
-        List {
-            ForEach(items.indices, id: \.self) { i in
-                let (msg, stats) = items[i]
+        VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
+            Text("Response \(index)")
+                .font(AppTypography.subheadlineMedium)
 
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(msg.content.prefix(150))
-                            .font(.subheadline)
-                    }
+            if !message.content.isEmpty {
+                Text(String(message.content.prefix(150)))
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                    .lineLimit(3)
+            }
 
-                    HStack {
-                        Label {
-                            Text("Time")
-                        } icon: {
-                            Image(systemName: "clock")
-                                .foregroundStyle(.orange)
-                        }
-                        Spacer()
-                        Text(String(format: "%.1fs", stats.totalGenerationTime))
-                            .foregroundStyle(.secondary)
-                    }
+            HStack(spacing: AppSpacing.mediumLarge) {
+                metric("clock", String(format: "%.1fs", stats.totalGenerationTime))
+                metric("bolt", "\(Int(stats.averageTokensPerSecond)) tok/s")
+                metric("cpu", stats.modelName)
+            }
 
-                    HStack {
-                        Label {
-                            Text("Speed")
-                        } icon: {
-                            Image(systemName: "bolt")
-                                .foregroundStyle(.orange)
-                        }
-                        Spacer()
-                        Text("\(Int(stats.averageTokensPerSecond)) tok/s")
-                            .foregroundStyle(.secondary)
-                    }
-
-                    HStack {
-                        Label {
-                            Text("Model")
-                        } icon: {
-                            Image(systemName: "cpu")
-                                .foregroundStyle(.orange)
-                        }
-                        Spacer()
-                        Text(stats.modelName)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if stats.wasThinkingMode {
-                        Label {
-                            Text("Used Thinking Mode")
-                                .foregroundStyle(.orange)
-                        } icon: {
-                            Image(systemName: "lightbulb")
-                                .foregroundStyle(.orange)
-                        }
-                    }
-                } header: {
-                    Text("Response \(i + 1)")
-                }
+            if stats.wasThinkingMode {
+                Label("Thinking used", systemImage: "lightbulb")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.primaryAccent)
             }
         }
-    }
-}
-
-// MARK: - Performance Tab
-
-private struct PerformanceTab: View {
-    let messages: [Message]
-
-    private var analytics: [MessageAnalytics] {
-        messages.compactMap { $0.analytics }
+        .padding(.vertical, AppSpacing.xSmall)
     }
 
-    var body: some View {
-        List {
-            if !analytics.isEmpty {
-                Section("Models") {
-                    let groups = Dictionary(grouping: analytics) { $0.modelName }
-                    ForEach(groups.keys.sorted(), id: \.self) { name in
-                        if let items = groups[name] {
-                            let avg = items.map { $0.totalGenerationTime }.reduce(0, +) / Double(items.count)
-                            let speed = items.map { $0.averageTokensPerSecond }.reduce(0, +) / Double(items.count)
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(name)
-                                    .font(.headline)
-
-                                HStack {
-                                    Text("\(items.count) responses")
-                                    Text("•")
-                                    Text(String(format: "%.1fs avg", avg))
-                                    Text("•")
-                                    Text("\(Int(speed)) tok/s")
-                                }
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                }
-
-                if analytics.contains(where: { $0.wasThinkingMode }) {
-                    Section("Thinking Mode") {
-                        let count = analytics.filter { $0.wasThinkingMode }.count
-                        let pct = Int((Double(count) / Double(analytics.count)) * 100)
-
-                        HStack {
-                            Label {
-                                Text("Responses")
-                            } icon: {
-                                Image(systemName: "lightbulb")
-                                    .foregroundStyle(.orange)
-                            }
-                            Spacer()
-                            Text("\(count)")
-                                .foregroundStyle(.secondary)
-                        }
-
-                        HStack {
-                            Label {
-                                Text("Usage")
-                            } icon: {
-                                Image(systemName: "percent")
-                                    .foregroundStyle(.orange)
-                            }
-                            Spacer()
-                            Text("\(pct)%")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-        }
+    private func metric(_ icon: String, _ value: String) -> some View {
+        Label(value, systemImage: icon)
+            .font(AppTypography.caption2)
+            .foregroundColor(AppColors.textSecondary)
+            .lineLimit(1)
     }
 }

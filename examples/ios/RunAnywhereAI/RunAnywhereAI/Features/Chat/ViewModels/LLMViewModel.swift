@@ -202,6 +202,8 @@ final class LLMViewModel {
         // Reconcile against the SDK's authoritative model snapshot in case a
         // model was loaded before this ViewModel subscribed.
         await checkModelStatusFromSDK()
+        await ModelListViewModel.shared.loadDefaultChatModelIfAvailable()
+        await checkModelStatusFromSDK()
 
         if isModelLoaded {
             addSystemMessage()

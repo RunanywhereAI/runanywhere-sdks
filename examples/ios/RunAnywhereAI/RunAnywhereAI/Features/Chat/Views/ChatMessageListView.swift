@@ -11,6 +11,13 @@ import os.log
 import UIKit
 #endif
 
+enum ComposerAction {
+    case attachFile
+    case takePhoto
+    case attachPhoto
+    case talk
+}
+
 // MARK: - Chat Messages View
 
 struct ChatMessageListView: View {
@@ -73,27 +80,53 @@ struct ChatMessageListView: View {
     // MARK: - Empty State
 
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AppSpacing.xLarge) {
             Spacer()
 
             Image("runanywhere_logo")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 80, height: 80)
+                .frame(width: 76, height: 76)
 
             VStack(spacing: 8) {
-                Text("Start a conversation")
+                Text("Ask anything privately")
                     .font(AppTypography.title2Semibold)
                     .foregroundColor(AppColors.textPrimary)
 
-                Text("Type a message below to get started")
+                Text("Chat with local models, attach context, or switch into Talk mode when you want to speak.")
                     .font(AppTypography.subheadline)
                     .foregroundColor(AppColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 360)
             }
+
+            starterPrompts
 
             Spacer()
         }
+        .padding(.horizontal, AppSpacing.xLarge)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var starterPrompts: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: AppSpacing.mediumLarge) {
+                StarterPromptChip(title: "Explain", subtitle: "a complex topic simply") {
+                    viewModel.currentInput = "Explain a complex topic simply"
+                    isTextFieldFocused = true
+                }
+
+                StarterPromptChip(title: "Summarize", subtitle: "my notes or document") {
+                    viewModel.currentInput = "Summarize this clearly:"
+                    isTextFieldFocused = true
+                }
+
+                StarterPromptChip(title: "Draft", subtitle: "a polished response") {
+                    viewModel.currentInput = "Draft a polished response for:"
+                    isTextFieldFocused = true
+                }
+            }
+        }
     }
 
     // MARK: - Message List
@@ -105,7 +138,7 @@ struct ChatMessageListView: View {
 
             ForEach(viewModel.messages) { message in
                 MessageBubbleView(message: message, isGenerating: viewModel.isGenerating)
-                    .id(message.id)
+                    .id(message.id.uuidString)
                     .transition(messageTransition)
                     .animation(nil, value: message.content)
             }
@@ -169,6 +202,7 @@ struct ChatInputAreaView: View {
     @Binding var showingLoRAManagement: Bool
     @ObservedObject var settingsViewModel: SettingsViewModel
     @ObservedObject var toolSettingsViewModel: ToolSettingsViewModel
+    let onComposerAction: (ComposerAction) -> Void
     let onSend: () -> Void
 
     var hasModelSelected: Bool {
@@ -205,6 +239,8 @@ struct ChatInputAreaView: View {
             )
 
             HStack(spacing: AppSpacing.mediumLarge) {
+                attachmentMenu
+
                 TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(1...4)
@@ -213,6 +249,21 @@ struct ChatInputAreaView: View {
                         onSend()
                     }
                     .submitLabel(.send)
+
+                Button {
+                    onComposerAction(.talk)
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(AppColors.primaryAccent.opacity(0.12))
+                        Image(systemName: "waveform")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppColors.primaryAccent)
+                    }
+                    .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Talk")
 
                 Button(action: onSend) {
                     Image(systemName: "arrow.up.circle.fill")
@@ -234,6 +285,33 @@ struct ChatInputAreaView: View {
             .background(AppColors.backgroundPrimary)
             .animation(.easeInOut(duration: AppLayout.animationFast), value: isTextFieldFocused)
         }
+    }
+
+    private var attachmentMenu: some View {
+        Menu {
+            Button {
+                onComposerAction(.attachFile)
+            } label: {
+                Label("Attach file", systemImage: "folder")
+            }
+
+            Button {
+                onComposerAction(.takePhoto)
+            } label: {
+                Label("Take photo", systemImage: "camera")
+            }
+
+            Button {
+                onComposerAction(.attachPhoto)
+            } label: {
+                Label("Attach photo", systemImage: "photo")
+            }
+        } label: {
+            Image(systemName: "plus.circle.fill")
+                .font(AppTypography.system28)
+                .foregroundColor(AppColors.textSecondary)
+        }
+        .accessibilityLabel("Attach")
     }
 
     // MARK: - Badges
@@ -306,5 +384,33 @@ struct ChatInputAreaView: View {
             .background(AppColors.backgroundSecondary)
             .cornerRadius(6)
         }
+    }
+}
+
+private struct StarterPromptChip: View {
+    let title: String
+    let subtitle: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(AppTypography.subheadlineMedium)
+                    .foregroundColor(AppColors.textPrimary)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 160, alignment: .leading)
+            .padding(.horizontal, AppSpacing.large)
+            .padding(.vertical, AppSpacing.mediumLarge)
+            .background(AppColors.backgroundPrimary)
+            .cornerRadius(AppSpacing.cornerRadiusRegular)
+            .shadow(color: AppColors.shadowLight, radius: 6, x: 0, y: 3)
+        }
+        .buttonStyle(.plain)
     }
 }
