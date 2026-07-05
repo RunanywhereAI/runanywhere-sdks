@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <utility>
 
+// =============================================================================
 // Platform HTTP transport registration
 //
 // On iOS, rn_register_urlsession_transport() installs a URLSession-backed
@@ -23,6 +24,7 @@
 // HTTP call. C++ side is a no-op.
 //
 // Both registrations are idempotent.
+// =============================================================================
 #if defined(__APPLE__)
 extern "C" void rn_register_urlsession_transport(void);
 #endif
@@ -32,7 +34,9 @@ namespace margelo::nitro::runanywhere {
 using namespace ::runanywhere::bridges;
 
 // Constructor / Destructor
+// ============================================================================
 // Constructor / Destructor
+// ============================================================================
 
 HybridRunAnywhereCore::HybridRunAnywhereCore() : HybridObject(TAG) {
     LOGI("HybridRunAnywhereCore constructor - core module");
@@ -47,7 +51,9 @@ HybridRunAnywhereCore::~HybridRunAnywhereCore() {
 }
 
 // SDK Lifecycle
+// ============================================================================
 // SDK Lifecycle
+// ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
     const std::string& configJson) {
@@ -385,7 +391,9 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isInitialized() {
     });
 }
 
+// ============================================================================
 // Helper Methods
+// ============================================================================
 
 void HybridRunAnywhereCore::setLastError(const std::string& error) {
     {

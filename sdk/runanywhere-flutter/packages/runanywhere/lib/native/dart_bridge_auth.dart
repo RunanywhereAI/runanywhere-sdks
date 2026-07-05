@@ -13,11 +13,15 @@ import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
+// =============================================================================
 // Secure Storage Callbacks
+// =============================================================================
 
 const int _exceptionalReturnInt = -1;
 
+// =============================================================================
 // Auth Manager Bridge
+// =============================================================================
 
 /// Authentication bridge for C++ auth operations.
 /// Matches Swift's `CppBridge+Auth.swift`.
@@ -41,7 +45,9 @@ class DartBridgeAuth {
   /// Secure storage callbacks pointer
   static Pointer<RacSecureStorageCallbacksStruct>? _storagePtr;
 
+  // ============================================================================
   // Initialization
+  // ============================================================================
 
   /// Initialize auth manager with secure storage callbacks
   static Future<void> initialize({
@@ -125,7 +131,9 @@ class DartBridgeAuth {
     _isInitialized = false;
   }
 
+  // ============================================================================
   // Authentication Flow
+  // ============================================================================
 
   /// Auth request construction, HTTP POSTs, response parsing, and token refresh
   /// are owned by commons via `rac_sdk_init_phase2_proto` and
@@ -147,7 +155,9 @@ class DartBridgeAuth {
     }
   }
 
+  // ============================================================================
   // Token Accessors
+  // ============================================================================
 
   /// Check if authenticated
   bool isAuthenticated() {
@@ -244,7 +254,9 @@ class DartBridgeAuth {
     }
   }
 
+  // ============================================================================
   // HTTP Client Integration
+  // ============================================================================
 
   /// Token resolver consumed by [HTTPClientAdapter] to attach a valid
   /// bearer on `requiresAuth: true` requests. Returns null when no
@@ -279,7 +291,9 @@ class DartBridgeAuth {
     return _retryHTTPViaCommons();
   }
 
+  // ============================================================================
   // Internal Helpers
+  // ============================================================================
 
   Future<String?> _retryHTTPViaCommons() async {
     try {
@@ -359,7 +373,9 @@ class DartBridgeAuth {
   }
 }
 
+// =============================================================================
 // Secure Storage Callbacks
+// =============================================================================
 
 /// Cached secure storage values for sync access
 final Map<String, String> _secureCache = {};
@@ -474,7 +490,9 @@ Future<void> _deleteFromSecureStorage(String key) async {
   }
 }
 
+// =============================================================================
 // FFI Types
+// =============================================================================
 
 /// Secure storage store callback
 typedef RacSecureStoreCallbackNative =

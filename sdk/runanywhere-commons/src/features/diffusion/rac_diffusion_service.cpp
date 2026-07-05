@@ -30,7 +30,9 @@ const rac_diffusion_service_ops_t* diffusion_ops(const rac_engine_vtable_t* vt) 
 
 }  // namespace
 
+// =============================================================================
 // INTERNAL HELPERS
+// =============================================================================
 
 /**
  * Detect model format from path. Only Apple CoreML diffusion is supported.
@@ -138,7 +140,9 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // SERVICE CREATION - Routes through Service Registry
+// =============================================================================
 
 extern "C" {
 
@@ -152,7 +156,9 @@ rac_result_t rac_diffusion_create_with_config(const char* model_id,
     return diffusion_create_service_internal(model_id, config, out_handle);
 }
 
+// =============================================================================
 // GENERIC API - Simple vtable dispatch
+// =============================================================================
 
 rac_result_t rac_diffusion_initialize(rac_handle_t handle, const char* model_path,
                                       const rac_diffusion_config_t* config) {

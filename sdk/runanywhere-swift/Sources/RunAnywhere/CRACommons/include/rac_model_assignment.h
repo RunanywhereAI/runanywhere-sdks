@@ -20,7 +20,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // CALLBACK TYPES
+// =============================================================================
 
 /**
  * @brief HTTP response for model assignment fetch
@@ -59,7 +61,9 @@ typedef struct rac_assignment_callbacks {
     rac_bool_t auto_fetch;
 } rac_assignment_callbacks_t;
 
+// =============================================================================
 // MODEL ASSIGNMENT API
+// =============================================================================
 
 /**
  * @brief Set callbacks for model assignment operations

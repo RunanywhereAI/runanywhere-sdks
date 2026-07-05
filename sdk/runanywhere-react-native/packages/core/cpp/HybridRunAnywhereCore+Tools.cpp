@@ -312,6 +312,7 @@ double doubleFromHandle(rac_handle_t handle) {
 } // namespace
 
 // Tool Calling and RAG
+// ============================================================================
 // Tool Calling
 //
 // ARCHITECTURE:
@@ -320,6 +321,7 @@ double doubleFromHandle(rac_handle_t handle) {
 // - Nitro proto-byte methods expose generated request/result envelopes to TS.
 // - TypeScript (RunAnywhere+ToolCalling.ts): Registry, executor storage,
 //   orchestration. Executors stay in TS because they need JS APIs (fetch, etc.).
+// ============================================================================
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::toolParseProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
@@ -560,7 +562,9 @@ HybridRunAnywhereCore::structuredOutputSchemaToJsonProto(
     });
 }
 
+// =============================================================================
 // RAG Pipeline
+// =============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragCreatePipelineProto(
     const std::shared_ptr<ArrayBuffer>& configBytes) {

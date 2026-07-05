@@ -39,7 +39,9 @@
 #include <unistd.h>
 #endif
 
+// =============================================================================
 // Test helpers
+// =============================================================================
 
 /** Create a unique temporary directory for test artifacts. */
 static std::string create_temp_dir(const std::string& suffix) {
@@ -89,7 +91,9 @@ static void write_dummy_file(const std::string& path, const std::string& content
     f << content;
 }
 
+// =============================================================================
 // Tests: rac_download_requires_extraction
+// =============================================================================
 
 static TestResult test_requires_extraction_tar_gz() {
     TestResult r;
@@ -159,7 +163,9 @@ static TestResult test_requires_extraction_url_with_query() {
     return r;
 }
 
+// =============================================================================
 // Tests: rac_find_model_path_after_extraction
+// =============================================================================
 
 static TestResult test_find_model_single_gguf() {
     TestResult r;
@@ -368,7 +374,9 @@ static TestResult test_find_model_null_args() {
     return r;
 }
 
+// =============================================================================
 // Tests: rac_download_compute_destination
+// =============================================================================
 
 static TestResult test_compute_destination_needs_base_dir() {
     TestResult r;
@@ -445,7 +453,9 @@ static TestResult test_compute_destination_null_args() {
 }
 
 #ifdef RAC_HAVE_PROTOBUF
+// =============================================================================
 // Tests: proto-byte download workflow ABI
+// =============================================================================
 
 namespace {
 namespace rav1 = ::runanywhere::v1;
@@ -1215,7 +1225,9 @@ static TestResult test_proto_failed_transfer_no_stale_completion() {
 }
 #endif
 
+// =============================================================================
 // Test runner
+// =============================================================================
 
 int main(int argc, char** argv) {
     try {

@@ -7,7 +7,7 @@ wasm/third_party/
 wasm/node_modules/
 wasm/a.out.*
 
-# Built WASM artifacts emitted into packages by scripts/build/wasm/bundle.sh.
+# Built WASM artifacts emitted into packages by wasm/scripts/build.sh.
 packages/core/wasm/*.js
 packages/core/wasm/*.wasm
 packages/llamacpp/wasm/*.js

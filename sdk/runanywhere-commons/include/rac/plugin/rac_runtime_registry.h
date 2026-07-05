@@ -127,14 +127,14 @@ RAC_API rac_result_t rac_runtime_load(const char* path);
  */
 RAC_API rac_result_t rac_runtime_unload(rac_runtime_id_t id);
 
-/*
+/* ===========================================================================
  * Static registration helper (parallel to RAC_STATIC_PLUGIN_REGISTER).
  *
  * Use at namespace scope in a runtime plugin's .cpp:
  *   RAC_STATIC_RUNTIME_REGISTER(cpu);
  * Expects `rac_runtime_entry_<name>()` to be defined in the same TU (via
  * `RAC_RUNTIME_ENTRY_DEF(<name>)`).
- */
+ * =========================================================================== */
 
 #ifdef __cplusplus
 

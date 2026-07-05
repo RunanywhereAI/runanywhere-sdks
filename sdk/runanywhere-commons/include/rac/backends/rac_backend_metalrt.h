@@ -19,7 +19,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // EXPORT MACRO
+// =============================================================================
 
 #if defined(RAC_METALRT_BUILDING)
 #if defined(__GNUC__) || defined(__clang__)
@@ -31,7 +33,9 @@ extern "C" {
 #define RAC_METALRT_API
 #endif
 
+// =============================================================================
 // BACKEND REGISTRATION
+// =============================================================================
 
 /**
  * Registers the MetalRT backend with the commons module and service registries.

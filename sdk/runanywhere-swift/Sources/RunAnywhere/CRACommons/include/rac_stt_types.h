@@ -22,8 +22,10 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // CONSTANTS - Single Source of Truth for STT
 // Swift references these via CRACommons import
+// =============================================================================
 
 // Audio Format Constants
 #define RAC_STT_DEFAULT_SAMPLE_RATE 16000
@@ -44,7 +46,9 @@ extern "C" {
 // Language
 #define RAC_STT_DEFAULT_LANGUAGE "en"
 
+// =============================================================================
 // AUDIO FORMAT - Mirrors Swift's AudioFormat
+// =============================================================================
 
 /**
  * @brief Audio format enumeration
@@ -59,7 +63,9 @@ typedef enum rac_audio_format_enum {
     RAC_AUDIO_FORMAT_FLAC = 5
 } rac_audio_format_enum_t;
 
+// =============================================================================
 // CONFIGURATION - Mirrors Swift's STTConfiguration
+// =============================================================================
 
 /**
  * @brief STT component configuration
@@ -111,7 +117,9 @@ static const rac_stt_config_t RAC_STT_CONFIG_DEFAULT = {.model_id = RAC_NULL,
                                                         .max_alternatives = 1,
                                                         .enable_timestamps = RAC_TRUE};
 
+// =============================================================================
 // OPTIONS - Mirrors Swift's STTOptions
+// =============================================================================
 
 /**
  * @brief STT transcription options
@@ -157,7 +165,9 @@ static const rac_stt_options_t RAC_STT_OPTIONS_DEFAULT = {.language = "en",
                                                           .audio_format = RAC_AUDIO_FORMAT_PCM,
                                                           .sample_rate = 16000};
 
+// =============================================================================
 // RESULT - Mirrors Swift's STTTranscriptionResult
+// =============================================================================
 
 /**
  * @brief Word timestamp information
@@ -196,7 +206,9 @@ typedef struct rac_stt_result {
     int64_t processing_time_ms;
 } rac_stt_result_t;
 
+// =============================================================================
 // INFO - Mirrors Swift's STTService properties
+// =============================================================================
 
 /**
  * @brief STT service info
@@ -212,7 +224,9 @@ typedef struct rac_stt_info {
     rac_bool_t supports_streaming;
 } rac_stt_info_t;
 
+// =============================================================================
 // CALLBACKS
+// =============================================================================
 
 /**
  * @brief STT streaming callback
@@ -226,7 +240,9 @@ typedef struct rac_stt_info {
 typedef void (*rac_stt_stream_callback_t)(const char* partial_text, rac_bool_t is_final,
                                           void* user_data);
 
+// =============================================================================
 // INPUT - Mirrors Swift's STTInput
+// =============================================================================
 
 /**
  * @brief STT input data
@@ -268,7 +284,9 @@ static const rac_stt_input_t RAC_STT_INPUT_DEFAULT = {.audio_data = RAC_NULL,
                                                       .sample_rate = RAC_STT_DEFAULT_SAMPLE_RATE,
                                                       .options = RAC_NULL};
 
+// =============================================================================
 // TRANSCRIPTION METADATA - Mirrors Swift's TranscriptionMetadata
+// =============================================================================
 
 /**
  * @brief Transcription metadata
@@ -290,7 +308,9 @@ typedef struct rac_transcription_metadata {
     float real_time_factor;
 } rac_transcription_metadata_t;
 
+// =============================================================================
 // TRANSCRIPTION ALTERNATIVE - Mirrors Swift's TranscriptionAlternative
+// =============================================================================
 
 /**
  * @brief Alternative transcription
@@ -305,7 +325,9 @@ typedef struct rac_transcription_alternative {
     float confidence;
 } rac_transcription_alternative_t;
 
+// =============================================================================
 // OUTPUT - Mirrors Swift's STTOutput
+// =============================================================================
 
 /**
  * @brief STT output data
@@ -338,7 +360,9 @@ typedef struct rac_stt_output {
     int64_t timestamp_ms;
 } rac_stt_output_t;
 
+// =============================================================================
 // TRANSCRIPTION RESULT - Alias for compatibility
+// =============================================================================
 
 /**
  * @brief STT transcription result (alias for rac_stt_output_t)
@@ -347,7 +371,9 @@ typedef struct rac_stt_output {
  */
 typedef rac_stt_output_t rac_stt_transcription_result_t;
 
+// =============================================================================
 // MEMORY MANAGEMENT
+// =============================================================================
 
 /**
  * @brief Free STT result resources

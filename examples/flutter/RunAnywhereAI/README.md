@@ -36,8 +36,8 @@ flutter pub get
 
 # Build or refresh local native artifacts when the checkout has no staged binaries.
 cd ../../..
-./scripts/build/android.sh arm64-v8a
-./scripts/build/ios-xcframework.sh
+./scripts/build/build-core-android.sh arm64-v8a
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 cd examples/flutter/RunAnywhereAI
 
 flutter analyze
@@ -47,11 +47,11 @@ flutter build ios --simulator --debug
 
 Notes:
 
-- `scripts/build/android.sh` stages JNI libraries into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs`.
-- `scripts/build/ios-xcframework.sh` stages `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, and `RABackendSherpa.xcframework` into the Flutter plugin `ios/Frameworks` directories.
+- `scripts/build/build-core-android.sh` stages JNI libraries into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs`.
+- `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` stages `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, and `RABackendSherpa.xcframework` into the Flutter plugin `ios/Frameworks` directories.
 - `runanywhere_genie` is Android/Snapdragon-only; iOS builds do not expect a Genie XCFramework.
 - If the iOS build reports stale Pods or generated Flutter config, run `cd ios && pod install && cd ..` after `flutter pub get`.
-- `scripts/examples/flutter/verify.sh` runs `pub get`, analysis, APK build, and optional iOS/native artifact refresh gates.
+- `scripts/verify.sh` runs `pub get`, analysis, APK build, and optional iOS/native artifact refresh gates.
 
 ### How It Works
 
@@ -62,12 +62,12 @@ This Sample App → Local Flutter SDK packages (sdk/runanywhere-flutter/packages
                           ↓
               Local XCFrameworks/JNI libs (in each package's ios/Frameworks/ and android/src/main/jniLibs/)
                           ↑
-           Built by: ./scripts/build/ios-xcframework.sh + ./scripts/build/android.sh
+           Built by: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh + ./scripts/build/build-core-android.sh
 ```
 
 Repo-root native build scripts (called from project root):
-1. `./scripts/build/ios-xcframework.sh` — builds iOS XCFrameworks and stages them into `sdk/runanywhere-flutter/packages/*/ios/Frameworks/`.
-2. `./scripts/build/android.sh <ABI>` — builds Android `.so` libraries and stages them into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs/<ABI>/`.
+1. `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` — builds iOS XCFrameworks and stages them into `sdk/runanywhere-flutter/packages/*/ios/Frameworks/`.
+2. `./scripts/build/build-core-android.sh <ABI>` — builds Android `.so` libraries and stages them into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs/<ABI>/`.
 
 Local consumption is enabled by the `runanywhere.useLocalNatives=true` Gradle property (default for development checkouts).
 
@@ -77,8 +77,8 @@ Local consumption is enabled by the `runanywhere.useLocalNatives=true` Gradle pr
 - **C++ code changes** (in `runanywhere-commons`):
   ```bash
   # From repo root
-  ./scripts/build/android.sh arm64-v8a
-  ./scripts/build/ios-xcframework.sh
+  ./scripts/build/build-core-android.sh arm64-v8a
+  ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
   ```
 
 ---

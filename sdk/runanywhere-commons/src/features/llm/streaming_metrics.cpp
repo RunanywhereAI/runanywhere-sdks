@@ -23,7 +23,9 @@
 
 // Note: rac_strdup is declared in rac_types.h and implemented in rac_memory.cpp
 
+// =============================================================================
 // STREAMING METRICS COLLECTOR INTERNAL STRUCTURE
+// =============================================================================
 
 struct rac_streaming_metrics_collector {
     // Configuration
@@ -53,7 +55,9 @@ struct rac_streaming_metrics_collector {
     rac_streaming_metrics_collector() = default;
 };
 
+// =============================================================================
 // GENERATION TRACKER (Internal)
+// =============================================================================
 
 struct GenerationTracker {
     std::string model_id{};
@@ -65,7 +69,9 @@ struct GenerationTracker {
     GenerationTracker() = default;
 };
 
+// =============================================================================
 // GENERATION ANALYTICS SERVICE INTERNAL STRUCTURE
+// =============================================================================
 
 struct rac_generation_analytics {
     // Active generations
@@ -89,7 +95,9 @@ struct rac_generation_analytics {
     rac_generation_analytics() { start_time_ms = rac_get_current_time_ms(); }
 };
 
+// =============================================================================
 // STREAMING METRICS COLLECTOR API
+// =============================================================================
 
 rac_result_t rac_streaming_metrics_create(const char* model_id, const char* generation_id,
                                           int32_t prompt_length,
@@ -284,7 +292,9 @@ rac_result_t rac_streaming_metrics_set_token_counts(rac_streaming_metrics_handle
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // GENERATION ANALYTICS SERVICE API
+// =============================================================================
 
 rac_result_t rac_generation_analytics_create(rac_generation_analytics_handle_t* out_handle) {
     if (!out_handle) {
@@ -514,7 +524,9 @@ rac_result_t rac_generation_analytics_reset(rac_generation_analytics_handle_t ha
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // MEMORY MANAGEMENT
+// =============================================================================
 
 void rac_streaming_result_free(rac_streaming_result_t* result) {
     if (!result) {

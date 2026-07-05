@@ -1,4 +1,6 @@
+# ========================================================================================
 # RunAnywhere Core ONNX Module - ProGuard Rules
+# ========================================================================================
 
 # Keep ALL SDK classes (inherited from main SDK rules, but explicit for safety)
 -keep class com.runanywhere.sdk.** { *; }

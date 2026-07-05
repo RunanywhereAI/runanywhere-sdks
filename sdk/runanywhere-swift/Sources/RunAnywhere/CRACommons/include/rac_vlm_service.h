@@ -17,7 +17,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // SERVICE VTABLE - Backend implementations provide this
+// =============================================================================
 
 /**
  * VLM Service operations vtable.
@@ -114,7 +116,9 @@ typedef struct rac_vlm_service {
     const char* model_id;
 } rac_vlm_service_t;
 
+// =============================================================================
 // PUBLIC API - Generic service functions
+// =============================================================================
 
 /**
  * @brief Create a VLM service

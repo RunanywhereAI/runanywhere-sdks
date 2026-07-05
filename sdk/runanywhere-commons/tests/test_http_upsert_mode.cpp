@@ -32,7 +32,9 @@
 
 namespace {
 
+// =============================================================================
 // Capture struct — every adapter call writes the inputs it observed here.
+// =============================================================================
 
 struct CaptureState {
     std::string url;
@@ -48,7 +50,9 @@ void reset_capture() {
     g_capture = CaptureState{};
 }
 
+// =============================================================================
 // Stub adapter — records inputs, returns a synthetic 200 response.
+// =============================================================================
 
 void copy_request(const rac_http_request_t* req) {
     g_capture.method = req->method ? req->method : "";
@@ -94,7 +98,9 @@ const rac_http_transport_ops_t kStubOps = {
     /*destroy=*/nullptr,
 };
 
+// =============================================================================
 // Tiny assert machinery (mirrors test_http_client.cpp).
+// =============================================================================
 
 int g_failures = 0;
 int g_passes = 0;
@@ -146,7 +152,9 @@ bool find_header(const std::string& name, std::string* value_out) {
     return false;
 }
 
+// =============================================================================
 // Helpers: build a stock POST request descriptor.
+// =============================================================================
 
 rac_http_request_t make_request(const char* url, const rac_http_header_kv_t* headers,
                                 size_t header_count, const char* body) {
@@ -163,7 +171,9 @@ rac_http_request_t make_request(const char* url, const rac_http_header_kv_t* hea
     return req;
 }
 
+// =============================================================================
 // Tests
+// =============================================================================
 
 void test_passthrough_when_not_armed() {
     reset_capture();

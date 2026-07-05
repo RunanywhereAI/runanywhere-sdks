@@ -18,8 +18,10 @@
 
 namespace runanywhere::rag {
 
+// =============================================================================
 // Tokenizer — split on whitespace, strip leading/trailing punctuation, lowercase
 // Preserves compound tokens: "v2.15.2", "user_id", "192.168.1.1"
+// =============================================================================
 
 std::vector<std::string> BM25Index::tokenize(const std::string& text) const {
     std::vector<std::string> tokens;
@@ -68,7 +70,9 @@ std::vector<std::string> BM25Index::tokenize(const std::string& text) const {
     return tokens;
 }
 
+// =============================================================================
 // Add / Remove
+// =============================================================================
 
 void BM25Index::add_chunk(const std::string& chunk_id, const std::string& text) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -185,7 +189,9 @@ size_t BM25Index::size() const {
     return total_chunks_;
 }
 
+// =============================================================================
 // Search — standard BM25 scoring
+// =============================================================================
 
 std::vector<std::pair<std::string, float>> BM25Index::search(const std::string& query,
                                                              size_t top_k) const {

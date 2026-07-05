@@ -67,7 +67,9 @@ namespace {
         }                                                                                       \
     } while (0)
 
+// ---------------------------------------------------------------------------
 // 1. parse: default <tool_call>JSON</tool_call>
+// ---------------------------------------------------------------------------
 int test_parse_default_structured() {
     const char* input =
         "let me help "
@@ -84,7 +86,9 @@ int test_parse_default_structured() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 2. parse: LFM2 Pythonic format
+// ---------------------------------------------------------------------------
 int test_parse_lfm2_structured() {
     const char* input =
         "sure <|tool_call_start|>[get_weather(location=\"San Francisco\")]<|tool_call_end|>";
@@ -100,7 +104,9 @@ int test_parse_lfm2_structured() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 3. parse: free-form text -> parsed=false, no tool_name, clean_text = input
+// ---------------------------------------------------------------------------
 int test_parse_free_form_returns_false() {
     const char* input = "Just a plain conversational answer, nothing to invoke.";
     rac_tool_call_t result;
@@ -114,7 +120,9 @@ int test_parse_free_form_returns_false() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 4a. format_prompt with 2 tools (default format)
+// ---------------------------------------------------------------------------
 int test_format_prompt_default_two_tools() {
     rac_tool_parameter_t loc_param = {"location", RAC_TOOL_PARAM_STRING, "City name", RAC_TRUE,
                                       nullptr};
@@ -136,7 +144,9 @@ int test_format_prompt_default_two_tools() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 4b. format_prompt JSON with format name = "lfm2"
+// ---------------------------------------------------------------------------
 int test_format_prompt_json_lfm2() {
     const char* tools_json =
         "[{\"name\":\"get_weather\",\"description\":\"Weather\",\"parameters\":[]},"
@@ -152,7 +162,9 @@ int test_format_prompt_json_lfm2() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 5. build_initial_prompt end-to-end
+// ---------------------------------------------------------------------------
 int test_build_initial_prompt_end_to_end() {
     const char* tools_json = R"([{"name":"get_weather","description":"Weather","parameters":[]}])";
     rac_tool_calling_options_t options = RAC_TOOL_CALLING_OPTIONS_DEFAULT;
@@ -169,7 +181,9 @@ int test_build_initial_prompt_end_to_end() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 6a. build_followup_prompt — keep_tools_available = false
+// ---------------------------------------------------------------------------
 int test_build_followup_prompt_no_tools() {
     char* prompt = nullptr;
     rac_result_t rc = rac_tool_call_build_followup_prompt(
@@ -185,7 +199,9 @@ int test_build_followup_prompt_no_tools() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 6b. build_followup_prompt — keep_tools_available = true (tools_prompt echoed)
+// ---------------------------------------------------------------------------
 int test_build_followup_prompt_keep_tools() {
     const char* tools_prompt = "PRE-RENDERED TOOLS PROMPT BLOCK";
     char* prompt = nullptr;
@@ -201,7 +217,9 @@ int test_build_followup_prompt_keep_tools() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 7. normalize_json: unquoted keys become quoted
+// ---------------------------------------------------------------------------
 int test_normalize_json_unquoted_keys() {
     const char* input = R"({tool: "get_weather", arguments: {location: "Tokyo"}})";
     char* out = nullptr;
@@ -215,8 +233,10 @@ int test_normalize_json_unquoted_keys() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 8. Free functions: repeated allocate/free never leaks into caller
 //    (exercises the matching allocator + idempotent free)
+// ---------------------------------------------------------------------------
 int test_free_functions_idempotent() {
     for (int i = 0; i < 100; ++i) {
         rac_tool_call_t result;
@@ -232,7 +252,9 @@ int test_free_functions_idempotent() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 9. format_from_name + detect_format
+// ---------------------------------------------------------------------------
 int test_format_name_round_trip() {
     ASSERT_EQ_INT(rac_tool_call_format_from_name("default"), RAC_TOOL_FORMAT_DEFAULT);
     ASSERT_EQ_INT(rac_tool_call_format_from_name("DEFAULT"), RAC_TOOL_FORMAT_DEFAULT);
@@ -248,7 +270,9 @@ int test_format_name_round_trip() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 10. parse -> tool result JSON -> follow-up prompt loop
+// ---------------------------------------------------------------------------
 int test_tool_result_loop() {
     const char* input =
         "checking "
@@ -285,7 +309,9 @@ int test_tool_result_loop() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 11. validate parsed call against local definitions
+// ---------------------------------------------------------------------------
 int test_validate_tool_call_definitions() {
     rac_tool_parameter_t params[2] = {
         {"location", RAC_TOOL_PARAM_STRING, "City name", RAC_TRUE, nullptr},
@@ -326,7 +352,9 @@ int test_validate_tool_call_definitions() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 12. validate parsed call against generated-style JSON definitions
+// ---------------------------------------------------------------------------
 int test_validate_tool_call_json_definitions() {
     const char* tools_json =
         "[{\"name\":\"set_mode\",\"description\":\"Set mode\",\"parameters\":["
@@ -364,7 +392,9 @@ int test_validate_tool_call_json_definitions() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // 13. generated proto ABI: parse ToolParseRequest -> ToolParseResult
+// ---------------------------------------------------------------------------
 int test_parse_proto_round_trip() {
 #if !defined(RAC_HAVE_PROTOBUF)
     return 0;
@@ -400,7 +430,9 @@ int test_parse_proto_round_trip() {
 #endif
 }
 
+// ---------------------------------------------------------------------------
 // 14. generated proto ABI: format ToolPromptFormatRequest -> Result
+// ---------------------------------------------------------------------------
 int test_format_prompt_proto_round_trip() {
 #if !defined(RAC_HAVE_PROTOBUF)
     return 0;
@@ -441,7 +473,9 @@ int test_format_prompt_proto_round_trip() {
 #endif
 }
 
+// ---------------------------------------------------------------------------
 // 15. generated proto ABI: validate ToolCallValidationRequest -> Result
+// ---------------------------------------------------------------------------
 int test_validate_proto_round_trip() {
 #if !defined(RAC_HAVE_PROTOBUF)
     return 0;

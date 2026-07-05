@@ -26,7 +26,9 @@
 
 namespace {
 
+// =============================================================================
 // Mock platform adapter shared state
+// =============================================================================
 
 struct MockAdapterState {
     std::mutex mutex;
@@ -161,7 +163,9 @@ bool looks_like_uuid(const std::string& s) {
     return true;
 }
 
+// =============================================================================
 // Test cases
+// =============================================================================
 
 TestResult test_secure_get_hit() {
     prepare(/*with_vendor_id=*/true);

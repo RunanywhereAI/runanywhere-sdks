@@ -28,7 +28,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // SERVICE VTABLE - Backend implementations provide this
+// =============================================================================
 
 /**
  * Diffusion Service operations vtable.
@@ -93,7 +95,9 @@ typedef rac_bool_t (*rac_diffusion_progress_proto_callback_fn)(const uint8_t* pr
                                                                size_t progress_proto_size,
                                                                void* user_data);
 
+// =============================================================================
 // PUBLIC API - Generic service functions
+// =============================================================================
 
 /**
  * @brief Create a diffusion service

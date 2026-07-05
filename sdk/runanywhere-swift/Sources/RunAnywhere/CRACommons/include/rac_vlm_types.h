@@ -18,7 +18,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // CHAT TEMPLATE - Abstraction for VLM prompt formatting
+// =============================================================================
 
 /**
  * @brief Known VLM model families for chat template selection
@@ -84,7 +86,9 @@ typedef struct rac_vlm_chat_template {
  */
 RAC_API const rac_vlm_chat_template_t* rac_vlm_get_builtin_template(rac_vlm_model_family_t family);
 
+// =============================================================================
 // IMAGE INPUT - Supports multiple input formats
+// =============================================================================
 
 /**
  * @brief VLM image input format enumeration
@@ -126,7 +130,9 @@ typedef struct rac_vlm_image {
     size_t data_size;
 } rac_vlm_image_t;
 
+// =============================================================================
 // OPTIONS - VLM Generation Options
+// =============================================================================
 
 /**
  * @brief VLM generation options
@@ -135,7 +141,7 @@ typedef struct rac_vlm_image {
  * Combines standard LLM options with VLM-specific parameters.
  */
 typedef struct rac_vlm_options {
-    // Standard Generation Parameters
+    // ── Standard Generation Parameters ──
     /** Maximum number of tokens to generate (default: 2048) */
     int32_t max_tokens;
 
@@ -157,7 +163,7 @@ typedef struct rac_vlm_options {
     /** System prompt (can be NULL, uses template default if available) */
     const char* system_prompt;
 
-    // VLM-Specific Parameters
+    // ── VLM-Specific Parameters ──
     /** Max image dimension for resize (0 = model default) */
     int32_t max_image_size;
 
@@ -167,7 +173,7 @@ typedef struct rac_vlm_options {
     /** Use GPU for vision encoding */
     rac_bool_t use_gpu;
 
-    // Chat Template Configuration
+    // ── Chat Template Configuration ──
     /**
      * Model family for automatic chat template selection.
      * Set to RAC_VLM_MODEL_FAMILY_AUTO (default) to auto-detect from model metadata.
@@ -206,7 +212,9 @@ typedef struct rac_vlm_options {
      .custom_chat_template = RAC_NULL,          \
      .image_marker_override = RAC_NULL}
 
+// =============================================================================
 // CONFIGURATION - VLM Component Configuration
+// =============================================================================
 
 /**
  * @brief VLM component configuration
@@ -248,7 +256,9 @@ static const rac_vlm_config_t RAC_VLM_CONFIG_DEFAULT = {.model_id = RAC_NULL,
                                                         .system_prompt = RAC_NULL,
                                                         .streaming_enabled = RAC_TRUE};
 
+// =============================================================================
 // RESULTS - VLM Generation Results
+// =============================================================================
 
 /**
  * @brief VLM generation result
@@ -284,7 +294,9 @@ typedef struct rac_vlm_result {
     float tokens_per_second;
 } rac_vlm_result_t;
 
+// =============================================================================
 // SERVICE INFO - VLM Service Information
+// =============================================================================
 
 /**
  * @brief VLM service handle info
@@ -311,7 +323,9 @@ typedef struct rac_vlm_info {
     const char* vision_encoder_type;
 } rac_vlm_info_t;
 
+// =============================================================================
 // CALLBACKS - Streaming Callbacks
+// =============================================================================
 
 /**
  * @brief Simple VLM streaming callback
@@ -353,7 +367,9 @@ typedef struct rac_vlm_token_event {
 typedef rac_bool_t (*rac_vlm_token_event_callback_fn)(const rac_vlm_token_event_t* event,
                                                       void* user_data);
 
+// =============================================================================
 // COMPONENT CALLBACKS - For component-level streaming
+// =============================================================================
 
 /**
  * @brief VLM component token callback
@@ -387,7 +403,9 @@ typedef void (*rac_vlm_component_complete_callback_fn)(const rac_vlm_result_t* r
 typedef void (*rac_vlm_component_error_callback_fn)(rac_result_t error_code,
                                                     const char* error_message, void* user_data);
 
+// =============================================================================
 // MEMORY MANAGEMENT
+// =============================================================================
 
 /**
  * @brief Free VLM result resources

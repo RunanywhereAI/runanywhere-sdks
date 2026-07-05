@@ -81,7 +81,9 @@ bool parse_artifact_result(const rac_proto_buffer_t& buffer,
     return out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
 }
 
+// ---------------------------------------------------------------------------
 // Test: format_from_url covers the single-file formats.
+// ---------------------------------------------------------------------------
 int test_format_from_url_single_file_formats() {
     struct Case {
         const char* url;
@@ -119,8 +121,10 @@ int test_format_from_url_single_file_formats() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Test: format_from_url on archive URLs reports the archive wrapper (ZIP)
 // plus an inferred inner_format when the public catalog naming is well-known.
+// ---------------------------------------------------------------------------
 int test_format_from_url_archives() {
     // .tar.gz wrapping ONNX content → format UNSPECIFIED, inner ONNX.
     {
@@ -153,7 +157,9 @@ int test_format_from_url_archives() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Test: format_from_url returns UNSPECIFIED for unknown extensions.
+// ---------------------------------------------------------------------------
 int test_format_from_url_unknown() {
     auto req = serialize_format_request("https://example.test/model.xyz");
     rac_proto_buffer_t out;
@@ -168,7 +174,9 @@ int test_format_from_url_unknown() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Test: format_from_url tolerates query strings and fragments.
+// ---------------------------------------------------------------------------
 int test_format_from_url_with_query_string() {
     auto req = serialize_format_request(
         "https://example.test/llama-7b.gguf?download=1&token=abc#fragment");
@@ -183,7 +191,9 @@ int test_format_from_url_with_query_string() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Test: artifact_infer_from_url on single-file URLs → SINGLE_FILE.
+// ---------------------------------------------------------------------------
 int test_artifact_single_file() {
     auto req = serialize_artifact_request("https://example.test/llama-7b.Q4_K_M.gguf", "llama-7b");
     rac_proto_buffer_t out;
@@ -200,7 +210,9 @@ int test_artifact_single_file() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Test: artifact_infer_from_url on .tar.gz URLs → TAR_GZ_ARCHIVE.
+// ---------------------------------------------------------------------------
 int test_artifact_tar_gz_archive() {
     struct Case {
         const char* url;
@@ -231,7 +243,9 @@ int test_artifact_tar_gz_archive() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Test: artifact_infer_from_url on .zip URLs → ZIP_ARCHIVE.
+// ---------------------------------------------------------------------------
 int test_artifact_zip_archive() {
     auto req = serialize_artifact_request("https://example.test/llama-7b-gguf.zip");
     rac_proto_buffer_t out;
@@ -249,7 +263,9 @@ int test_artifact_zip_archive() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Test: artifact_infer_from_url on .tar.bz2 URLs → TAR_BZ2_ARCHIVE.
+// ---------------------------------------------------------------------------
 int test_artifact_tar_bz2_archive() {
     auto req = serialize_artifact_request("https://example.test/piper-en-amy.tar.bz2");
     rac_proto_buffer_t out;
@@ -266,7 +282,9 @@ int test_artifact_tar_bz2_archive() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Test: empty request serializes and parses to the default result.
+// ---------------------------------------------------------------------------
 int test_empty_request_default_result() {
     // Empty request → default SINGLE_FILE artifact + UNSPECIFIED format.
     rac_proto_buffer_t out;
@@ -291,7 +309,9 @@ int test_empty_request_default_result() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Test: null out-pointer returns RAC_ERROR_NULL_POINTER.
+// ---------------------------------------------------------------------------
 int test_null_out_pointer() {
     auto req = serialize_format_request("https://example.test/llama-7b.gguf");
     rac_result_t rc = rac_model_format_from_url_proto(req.data(), req.size(), nullptr);
@@ -302,7 +322,9 @@ int test_null_out_pointer() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Test: invalid input bytes (size>0 with null data) are rejected.
+// ---------------------------------------------------------------------------
 int test_invalid_input_bytes() {
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);

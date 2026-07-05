@@ -62,7 +62,9 @@ std::string build_upsert_url(const char* original_url, const std::string& on_con
 
 }  // namespace
 
+// =============================================================================
 // Public C ABI — set_upsert_mode
+// =============================================================================
 
 extern "C" rac_result_t rac_http_request_set_upsert_mode(rac_http_request_t* req,
                                                          const char* on_conflict_field) {
@@ -86,7 +88,9 @@ extern "C" rac_result_t rac_http_request_set_upsert_mode(rac_http_request_t* req
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // Internal helpers — consume_upsert_transform
+// =============================================================================
 
 namespace rac::http {
 

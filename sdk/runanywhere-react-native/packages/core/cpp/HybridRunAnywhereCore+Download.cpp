@@ -128,8 +128,11 @@ void downloadProtoProgressTrampoline(const uint8_t* protoBytes,
 
 }  // namespace
 
+// =============================================================================
 // Download Service
+// =============================================================================
 // Requests/results/progress are serialized `runanywhere.v1` proto messages.
+// =============================================================================
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::downloadPlanProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {

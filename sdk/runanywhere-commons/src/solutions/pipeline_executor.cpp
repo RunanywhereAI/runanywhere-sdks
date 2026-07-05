@@ -283,7 +283,7 @@ std::unique_ptr<rac::graph::GraphScheduler> PipelineExecutor::build(rac_result_t
         return nullptr;
     };
 
-    // 1. Validate operator uniqueness + factory availability
+    // ---- 1. Validate operator uniqueness + factory availability -----------
     std::unordered_map<std::string, std::string> op_types;
     op_types.reserve(spec_.operators_size());
 
@@ -335,7 +335,7 @@ std::unique_ptr<rac::graph::GraphScheduler> PipelineExecutor::build(rac_result_t
         op_types.emplace(op.name(), op.type());
     }
 
-    // 2. Validate and resolve edge endpoints/options
+    // ---- 2. Validate and resolve edge endpoints/options -------------------
     std::vector<ResolvedEdge> resolved_edges;
     resolved_edges.reserve(spec_.edges_size());
 
@@ -408,7 +408,7 @@ std::unique_ptr<rac::graph::GraphScheduler> PipelineExecutor::build(rac_result_t
                                   to_overflow_policy(edge.policy())});
     }
 
-    // 3. Materialize nodes
+    // ---- 3. Materialize nodes ---------------------------------------------
     std::unordered_map<std::string, std::shared_ptr<OperatorAdapter>> nodes;
     nodes.reserve(spec_.operators_size());
 
@@ -421,7 +421,7 @@ std::unique_ptr<rac::graph::GraphScheduler> PipelineExecutor::build(rac_result_t
         nodes.emplace(op.name(), std::move(node));
     }
 
-    // 4. Build split/merge adapters
+    // ---- 4. Build split/merge adapters ------------------------------------
     std::vector<std::size_t> split_output_index(resolved_edges.size(), 0);
     std::vector<std::size_t> merge_input_index(resolved_edges.size(), 0);
 
@@ -509,7 +509,7 @@ std::unique_ptr<rac::graph::GraphScheduler> PipelineExecutor::build(rac_result_t
             edge.policy));
     }
 
-    // 5. Wire the graph
+    // ---- 5. Wire the graph -------------------------------------------------
     //
     // Track per-operator in/out degree so we can identify the root
     // input (the operator with zero inbound edges) and root output
@@ -569,7 +569,7 @@ std::unique_ptr<rac::graph::GraphScheduler> PipelineExecutor::build(rac_result_t
         ++in_degree[edge.to.op];
     }
 
-    // 6. Pick root input / root output
+    // ---- 6. Pick root input / root output ---------------------------------
     std::shared_ptr<OperatorAdapter> root_input_node;
     std::shared_ptr<OperatorAdapter> root_output_node;
     std::string root_input_type;
@@ -588,7 +588,7 @@ std::unique_ptr<rac::graph::GraphScheduler> PipelineExecutor::build(rac_result_t
         }
     }
 
-    // 7. Strict validation: no orphaned / unreferenced operators
+    // ---- 7. Strict validation: no orphaned / unreferenced operators -------
     if (spec_.options().strict_validation()) {
         for (const auto& op : spec_.operators()) {
             const bool is_source = in_degree[op.name()] == 0;

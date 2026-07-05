@@ -24,7 +24,7 @@ public class SystemFoundationModelsService {
     // Type-erased wrapper for FoundationModels session. Presence of a non-nil
     // `session` is the canonical "ready" signal — the C++ lifecycle manager
     // (`rac_lifecycle_t` / `LifecycleManager`) is the single source of truth
-    // for overall component readiness, so the Swift service does not track
+    // for overall component readiness, so the Swift service no longer tracks
     // a duplicate `_isReady` / `_currentModel` mirror.
     private var session: LanguageSessionWrapper?
 

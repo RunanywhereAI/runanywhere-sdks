@@ -1,8 +1,10 @@
+# =============================================================================
 # RAG Pipeline — Orchestrates LLM + Embeddings services for RAG
 #
 # This is a pipeline (like Voice Agent), NOT a standalone backend.
 # It calls through the LLM and Embeddings service vtables — it does NOT
 # link llama.cpp or ONNX Runtime directly.
+# =============================================================================
 
 message(STATUS "Configuring RAG pipeline...")
 
@@ -10,7 +12,9 @@ if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)
 endif()
 
+# =============================================================================
 # Dependencies (RAG-specific only — USearch for vector search)
+# =============================================================================
 
 include(FetchContent)
 
@@ -45,10 +49,12 @@ if(NOT TARGET nlohmann_json::nlohmann_json)
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
+# =============================================================================
 # RAG Pipeline Library (OBJECT — folded into rac_commons at link time)
 #
 # Built as OBJECT so all RAG symbols end up inside librac_commons.{a,so}.
 # There is no separate librac_backend_rag binary to distribute.
+# =============================================================================
 
 set(RAG_PIPELINE_SOURCES
     rag_backend.cpp
@@ -136,7 +142,9 @@ target_compile_definitions(rac_backend_rag PRIVATE
     USEARCH_USE_SIMSIMD=0
 )
 
+# =============================================================================
 # Platform-specific configuration
+# =============================================================================
 
 if(RAC_PLATFORM_IOS)
     message(STATUS "Configuring RAG pipeline for iOS")
@@ -158,13 +166,21 @@ elseif(RAC_PLATFORM_MACOS)
     )
 endif()
 
+# =============================================================================
 # Summary
+# =============================================================================
 
 message(STATUS "RAG Pipeline Configuration:")
 message(STATUS "  USearch: ${USEARCH_VERSION} (HNSW vector search)")
 message(STATUS "  Architecture: Pipeline (calls LLM + Embeddings via vtables)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")
 
-# RAG has no dedicated Android JNI library. Kotlin uses the proto-byte
-# `rac_rag_*_proto` surface, served by the main `librunanywhere_jni.so` via
-# `racRag*Proto` methods in `runanywhere_commons_jni.cpp`.
+# =============================================================================
+# JNI Bridge for Android (DELETED — legacy non-proto RAG pipeline JNI)
+#
+# The previous rac_backend_rag_jni target and `jni/rac_rag_jni.cpp` exposed
+# the struct/JSON `rac_rag_pipeline_*` path to Kotlin. All SDK callers
+# moved to the proto-byte `rac_rag_*_proto` surface (served by the main
+# `librunanywhere_jni.so` via `racRag*Proto` methods in
+# `runanywhere_commons_jni.cpp`). The dedicated JNI library is gone.
+# =============================================================================

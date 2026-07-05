@@ -9,7 +9,9 @@
 // Re-attempt once the Swift 6 strict-concurrency migration lands.
 import PackageDescription
 
+// =============================================================================
 // RunAnywhere Swift SDK — LOCAL development Package.swift
+// =============================================================================
 //
 // This Package.swift lives inside `sdk/runanywhere-swift/` and uses LOCAL
 // XCFrameworks from the sibling `Binaries/` directory. It is the counterpart
@@ -22,16 +24,18 @@ import PackageDescription
 // `sdk/runanywhere-swift/Sources/RunAnywhere`.
 //
 // Min platforms: iOS 17.5 / macOS 14.5 (matches the root package).
+// =============================================================================
 
 let package = Package(
     name: "RunAnywhere",
     platforms: [
-        // iOS 17.5 / macOS 14.5 — latest minor of the LTS line, matches the
-        // Xcode 15.4 baseline.
+        // Floor bumped from iOS 17.0 / macOS 14.0 → iOS 17.5 / macOS 14.5
+        // (latest minor of the same LTS line, matches Xcode 15.4 baseline).
         .iOS("17.5"),
         .macOS("14.5"),
     ],
     products: [
+        // -------------------------------------------------------------------
         // Core SDK — always needed. The `RunAnywhere` library vends only the
         // core target. Consumers that need backend runtimes must import
         // `RunAnywhereLlamaCPP` / `RunAnywhereONNX` separately so the linker
@@ -40,6 +44,7 @@ let package = Package(
         // surface — keeping the local and root manifests in sync ensures the
         // local example apps exercise the same selective-linking shape that
         // external consumers see.
+        // -------------------------------------------------------------------
         .library(
             name: "RunAnywhere",
             targets: ["RunAnywhere"]
@@ -56,18 +61,26 @@ let package = Package(
         // a Package.swift edit. Version floors are mirrored in
         // Sources/RunAnywhere/Generated/Versions.swift (RAVersions) — keep
         // both in sync via scripts/release/sync-versions.sh.
+        // Floor bumped 3.0.0 → 3.15.1 (latest stable 3.x at bump time).
         .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMinor(from: "3.15.1")),
         .package(url: "https://github.com/JohnSundell/Files.git", .upToNextMinor(from: "4.3.0")),
+        // Floor bumped 5.6.0 → 5.8.0 (latest stable at bump time).
         .package(url: "https://github.com/devicekit/DeviceKit.git", .upToNextMinor(from: "5.8.0")),
+        // Floor bumped 8.40.0 → 8.58.2 (latest stable 8.x at bump time).
         .package(url: "https://github.com/getsentry/sentry-cocoa", .upToNextMinor(from: "8.58.2")),
         // swift-protobuf is consumed by the pb.swift files generated from
         // idl/*.proto in Sources/RunAnywhere/Generated/.
-        // Floor must stay >= 1.28.0: generated code uses
-        // SwiftProtobuf._NameMap(bytecode:).
+        // Floor bumped 1.27.0 → 1.38.0 (latest stable). The earlier
+        // .upToNextMajor exception (needed because generated code uses
+        // SwiftProtobuf._NameMap(bytecode:) from 1.28.0+) is now resolved by
+        // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
+        // the dep-version policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
     ],
     targets: [
+        // -------------------------------------------------------------------
         // C Bridge Module — Core Commons
+        // -------------------------------------------------------------------
         .target(
             name: "CRACommons",
             dependencies: ["RACommonsBinary"],
@@ -75,11 +88,13 @@ let package = Package(
             publicHeadersPath: "include"
         ),
 
+        // -------------------------------------------------------------------
         // C Bridge Module — LlamaCPP Backend Headers
         //
         // Depends on CRACommons so the backend registration header can pull
         // `rac_types.h` / `rac_error.h` / `rac_llm.h` from the single source
         // of truth instead of carrying drifting local copies.
+        // -------------------------------------------------------------------
         .target(
             name: "LlamaCPPBackend",
             dependencies: [
@@ -90,12 +105,14 @@ let package = Package(
             publicHeadersPath: "."
         ),
 
+        // -------------------------------------------------------------------
         // C Bridge Module — ONNX Backend Headers
         //
         // Depends on CRACommons so the registration header pulls `rac_types.h`
         // / `rac_result_t` from the single source of truth. The xcframework
         // dependencies (RABackendONNX + RABackendSherpa) carry the actual
         // symbol bodies.
+        // -------------------------------------------------------------------
         .target(
             name: "ONNXBackend",
             dependencies: [
@@ -107,7 +124,9 @@ let package = Package(
             publicHeadersPath: "."
         ),
 
+        // -------------------------------------------------------------------
         // Core SDK target
+        // -------------------------------------------------------------------
         .target(
             name: "RunAnywhere",
             dependencies: [
@@ -125,11 +144,19 @@ let package = Package(
                 // exclude from this target's source list to avoid a double
                 // compile.
                 "CRACommons",
-                // The two proto schemas below are emitted by codegen but have
-                // zero consumers in the Swift SDK. Excluding them avoids
-                // compiling ~2154 lines of dead generated code. Keep
-                // `pipeline.pb.swift` and `solutions.pb.swift` — those are
-                // consumed via the Solutions facade.
+                // The previously-excluded
+                // `Generated/{voice_agent_service,llm_service,download_service}.grpc.swift`
+                // files are no longer emitted by `idl/codegen/generate_swift.sh` and
+                // have been removed from the repo. The hand-written VoiceAgentStreamAdapter /
+                // LLMStreamAdapter expose the same AsyncStream surface over the
+                // in-process C callback, so no compilation target needs them.
+                //
+                // The two proto
+                // schemas below are still emitted by codegen but have zero
+                // consumers in the Swift SDK. Excluding them avoids compiling
+                // ~2154 lines of dead generated code. Keep `pipeline.pb.swift`
+                // and `solutions.pb.swift` — those are consumed via the
+                // Solutions facade.
                 "Generated/router.pb.swift",
                 "Generated/diffusion_options.pb.swift",
             ],
@@ -146,7 +173,9 @@ let package = Package(
             ]
         ),
 
+        // -------------------------------------------------------------------
         // LlamaCPP Runtime Backend
+        // -------------------------------------------------------------------
         .target(
             name: "LlamaCPPRuntime",
             dependencies: [
@@ -169,7 +198,9 @@ let package = Package(
             ]
         ),
 
+        // -------------------------------------------------------------------
         // ONNX Runtime Backend (STT/TTS/VAD)
+        // -------------------------------------------------------------------
         .target(
             name: "ONNXRuntime",
             dependencies: [
@@ -194,6 +225,7 @@ let package = Package(
             ]
         ),
 
+        // -------------------------------------------------------------------
         // Unit tests: HandleStreamAdapter lifecycle, proto helpers
         // (LoRA / model-import / lifecycle / structured-output / tool-calling),
         // error mapping.
@@ -202,6 +234,7 @@ let package = Package(
         // HandleStreamAdapter coverage in Tests/RunAnywhereTests/Adapters/
         // calls `Message.serializedData()` directly to drive synthetic
         // proto-byte payloads through the C trampoline.
+        // -------------------------------------------------------------------
         .testTarget(
             name: "RunAnywhereTests",
             dependencies: [
@@ -211,7 +244,9 @@ let package = Package(
             path: "Tests/RunAnywhereTests"
         ),
 
+        // -------------------------------------------------------------------
         // Binary targets (local XCFrameworks under Binaries/)
+        // -------------------------------------------------------------------
         .binaryTarget(
             name: "RACommonsBinary",
             path: "Binaries/RACommons.xcframework"

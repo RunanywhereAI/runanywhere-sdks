@@ -42,7 +42,7 @@ cd examples/ios/RunAnywhereAI
 
 # Build or refresh local Swift SDK binary targets.
 cd ../../..
-./scripts/build/ios-xcframework.sh
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 cd examples/ios/RunAnywhereAI
 
 # Resolve local Swift package dependencies.
@@ -66,7 +66,7 @@ Notes:
 
 - The expected local XCFrameworks are `sdk/runanywhere-swift/Binaries/RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, and `RABackendSherpa.xcframework`.
 - If Xcode shows stale package errors, use **File > Packages > Reset Package Caches**, then rerun package resolution.
-- `scripts/examples/ios/verify.sh` checks package resolution, local XCFramework presence, and the simulator build gate.
+- `scripts/verify.sh` checks package resolution, local XCFramework presence, and the simulator build gate.
 
 ### How It Works
 
@@ -77,10 +77,10 @@ This Sample App → Local Swift SDK (sdk/runanywhere-swift/)
                           ↓
               Local XCFrameworks (sdk/runanywhere-swift/Binaries/)
                           ↑
-           Built by: ./scripts/build/ios-xcframework.sh
+           Built by: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 ```
 
-The `scripts/build/ios-xcframework.sh` script:
+The `build-core-xcframework.sh` script:
 1. Builds the native C++ frameworks from `runanywhere-commons`
 2. Copies them to `sdk/runanywhere-swift/Binaries/`
 
@@ -89,7 +89,7 @@ The `scripts/build/ios-xcframework.sh` script:
 - **Swift SDK code changes**: Xcode picks them up automatically
 - **C++ code changes** (in `runanywhere-commons`):
   ```bash
-  ./scripts/build/ios-xcframework.sh
+  ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
   ```
 
 ---
@@ -248,6 +248,8 @@ RunAnywhereAI/
 ├── RunAnywhereAITests/                   # Unit tests
 ├── RunAnywhereAIUITests/                 # UI tests
 ├── docs/screenshots/                     # App screenshots
+├── scripts/
+│   └── build_and_run_ios_sample.sh       # Build automation
 ├── Package.swift                         # SPM dependency manifest
 └── README.md                             # This file
 ```
@@ -286,10 +288,10 @@ open RunAnywhereAI.xcodeproj
 
 ```bash
 # Build and run on simulator
-../../../scripts/examples/ios/build-and-run.sh simulator "iPhone 16 Pro"
+./scripts/build_and_run_ios_sample.sh simulator "iPhone 16 Pro"
 
 # Build and run on device
-../../../scripts/examples/ios/build-and-run.sh device
+./scripts/build_and_run_ios_sample.sh device
 ```
 
 ---

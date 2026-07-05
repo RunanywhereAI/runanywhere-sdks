@@ -5,19 +5,18 @@ name: IDL drift check
 # a generated file, this job fails with ::error::IDL-generated code is out of
 # sync with .proto sources. Fixing the PR is a one-liner locally:
 #
-#   ./scripts/codegen/generate_all.sh && (cd sdk/shared/proto-ts && npm install --package-lock=false && npm run build) && git add -A && git commit --amend --no-edit
+#   ./idl/codegen/generate_all.sh && (cd sdk/shared/proto-ts && npm install --package-lock=false && npm run build) && git add -A && git commit --amend --no-edit
 
 on:
   pull_request:
     paths:
       - 'idl/**'
-      - 'scripts/codegen/**'
       - 'sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**'
       - 'sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/shared/proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
-      - 'scripts/setup/toolchain.sh'
+      - 'scripts/setup/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
   push:
     # Include long-lived integration branches so a
@@ -26,13 +25,12 @@ on:
     branches: [main, feat/v2-architecture]
     paths:
       - 'idl/**'
-      - 'scripts/codegen/**'
       - 'sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**'
       - 'sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/shared/proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
-      - 'scripts/setup/toolchain.sh'
+      - 'scripts/setup/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
 
 permissions:
@@ -61,7 +59,7 @@ jobs:
             /usr/local/Homebrew
             /opt/homebrew
             ~/Library/Caches/Homebrew
-          key: ${{ runner.os }}-brew-protoc-${{ hashFiles('scripts/setup/toolchain.sh') }}
+          key: ${{ runner.os }}-brew-protoc-${{ hashFiles('scripts/setup/setup-toolchain.sh') }}
 
       - name: Install protoc + swift-protobuf (Homebrew)
         run: |
@@ -145,7 +143,7 @@ jobs:
           npm install -g ts-proto@2.11.8 protobufjs
 
       - name: Install Python protobuf + pyyaml runtime
-        # scripts/codegen/generate_*_convenience.py drivers import
+        # idl/codegen/generate_*_convenience.py drivers import
         # `google.protobuf.descriptor_pb2` and the swift modality
         # ABI generator parses YAML schemas, so the system Python
         # needs both packages available before generate_all.sh runs.
@@ -173,11 +171,11 @@ jobs:
         # Guards the int64/float/double/bool/enum + wire-string generator paths
         # that the production IDL barely exercises, and catches rotted goldens.
         # Sandboxes its own generation (does not touch the working tree), so it
-        # is independent of the drift check below. See scripts/codegen/tests/README.md.
-        run: python3 scripts/codegen/tests/test_convenience_generators.py
+        # is independent of the drift check below. See idl/codegen/tests/README.md.
+        run: python3 idl/codegen/tests/test_convenience_generators.py
 
       - name: Regenerate all bindings
-        run: ./scripts/codegen/generate_all.sh
+        run: ./idl/codegen/generate_all.sh
 
       - name: Build shared TypeScript proto package
         run: |
@@ -194,8 +192,8 @@ jobs:
             echo "::error::IDL-generated code is out of sync with .proto sources."
             echo ""
             echo "To fix locally:"
-            echo "  ./scripts/setup/toolchain.sh"
-            echo "  ./scripts/codegen/generate_all.sh"
+            echo "  ./scripts/setup/setup-toolchain.sh"
+            echo "  ./idl/codegen/generate_all.sh"
             echo "  (cd sdk/shared/proto-ts && npm install --package-lock=false && npm run build)"
             echo "  git add -A && git commit -m 'chore(codegen): regenerate bindings'"
             exit 1

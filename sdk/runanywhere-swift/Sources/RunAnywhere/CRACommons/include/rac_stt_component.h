@@ -22,7 +22,9 @@ extern "C" {
 
 // NOTE: rac_stt_config_t is defined in rac_stt_types.h (included above)
 
+// =============================================================================
 // STT COMPONENT API - Mirrors Swift's STTCapability
+// =============================================================================
 
 /**
  * @brief Create an STT capability component

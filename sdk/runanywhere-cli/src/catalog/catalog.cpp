@@ -56,7 +56,7 @@ constexpr int64_t MB = 1024LL * 1024LL;
 
 // ids/URLs verbatim from: examples/ios ModelCatalogBootstrap.swift, Android
 // ModelCatalog.kt, web model-catalog.ts and
-// scripts/tests/download-test-models.sh (qwen3-0.6b Q8_0 matches the Linux test
+// tests/scripts/download-test-models.sh (qwen3-0.6b Q8_0 matches the Linux test
 // rig's LlamaCpp/qwen3-0.6b layout).
 constexpr CatalogEntry kCatalog[] = {
     // --- LLM (LlamaCpp / GGUF) ---

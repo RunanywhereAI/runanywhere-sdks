@@ -178,7 +178,9 @@ static void logAndClearException(JNIEnv* env, const char* context) {
     }
 }
 
+// =============================================================================
 // HTTP Download Callback Reporting (from Kotlin to C++)
+// =============================================================================
 
 static std::string jstringToStdString(JNIEnv* env, jstring value) {
     if (value == nullptr) {

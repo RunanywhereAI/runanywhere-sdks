@@ -10,11 +10,11 @@
     "packages/onnx"
   ],
   "scripts": {
-    "build:wasm": "../../scripts/build/wasm/bundle.sh",
-    "build:wasm:debug": "../../scripts/build/wasm/bundle.sh --debug",
-    "build:wasm:clean": "../../scripts/build/wasm/bundle.sh --clean",
-    "vendor:wasm:onnxruntime": "RAC_WASM_BUILD_FROM_SOURCE=1 ../../scripts/build/wasm/vendor-onnxruntime.sh",
-    "vendor:wasm:sherpa": "RAC_WASM_BUILD_FROM_SOURCE=1 ../../scripts/build/wasm/vendor-sherpa-onnx.sh",
+    "build:wasm": "cd wasm && ./scripts/build.sh",
+    "build:wasm:debug": "cd wasm && ./scripts/build.sh --debug",
+    "build:wasm:clean": "cd wasm && ./scripts/build.sh --clean",
+    "vendor:wasm:onnxruntime": "RAC_WASM_BUILD_FROM_SOURCE=1 wasm/scripts/vendor-onnxruntime-wasm.sh",
+    "vendor:wasm:sherpa": "RAC_WASM_BUILD_FROM_SOURCE=1 wasm/scripts/vendor-sherpa-onnx-wasm.sh",
     "vendor:wasm:speech": "npm run vendor:wasm:onnxruntime && npm run vendor:wasm:sherpa",
     "build:ts": "npm run build -w @runanywhere/proto-ts && npm run build -w packages/core && npm run build -w packages/llamacpp && npm run build -w packages/onnx",
     "build": "npm run build:ts",

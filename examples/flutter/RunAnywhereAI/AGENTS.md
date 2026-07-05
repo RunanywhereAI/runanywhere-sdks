@@ -1,48 +1,149 @@
-# Flutter Example App (RunAnywhereAI)
+# AGENTS.md
 
-## Info
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Flutter reference app for the RunAnywhere SDK: LLM chat (streaming), STT, TTS, voice pipeline, VLM camera, tool calling, RAG with PDF ingestion, structured output, solutions YAML runner. Eight tabs via `NavigationBar` + `IndexedStack` in `ContentView`; startup/init lives in `runanywhere_ai_app.dart`.
+## What This App Is
 
-Example apps are UI-only: thin `RunAnywhere.*` SDK calls, no business logic, no workarounds, no SDK-internal knowledge. Global rules: see repo-root AGENTS.md.
+A Flutter reference app demonstrating the RunAnywhere on-device AI SDK. It mirrors the native iOS app's feature set: LLM chat (streaming + non-streaming), speech-to-text, text-to-speech, voice assistant pipeline (STT→LLM→TTS), vision/VLM with live camera, tool calling, RAG with PDF ingestion, structured JSON output, and a solutions YAML runner. Eight tabs: Chat, Vision, STT, Speak, Voice, Tools, Solutions, Settings.
 
-- Depends on 4 local SDK packages via `path:` in `pubspec.yaml` → `../../../sdk/runanywhere-flutter/packages/{runanywhere,runanywhere_llamacpp,runanywhere_onnx,runanywhere_genie}` (Dart FFI, no platform channels).
-- State: singleton `ChangeNotifier` + `ListenableBuilder` for feature state; local `setState` for per-screen UI.
-- Core services in `core/services/`: audio recording/playback, `ConversationStore` (JSON under Documents/), keychain/secure storage, permissions.
-
-## Build Info
+## Common Commands
 
 ```bash
-# From examples/flutter/RunAnywhereAI/
-flutter pub get                 # must run first
-flutter analyze                 # strict: dead_code/unused_import are errors
-flutter run                     # or: flutter run -d "iPhone 16 Pro"
+# From this directory (examples/flutter/RunAnywhereAI/)
+
+# Resolve packages (must run first)
+flutter pub get
+
+# Static analysis (strict mode — dead_code/unused_import are errors)
+flutter analyze
+
+# Run on connected device or emulator
+flutter run
+
+# Run on specific iOS simulator
+flutter run -d "iPhone 16 Pro"
+
+# Build debug APK (no device needed)
 flutter build apk --debug
+
+# Build iOS simulator app
 flutter build ios --simulator --debug
+
+# Format
 dart format lib/ test/
 
-# Verification (scripts live under repo-root scripts/)
-../../../scripts/examples/flutter/smoke.sh     # SDK API coverage grep + analyze
-../../../scripts/examples/flutter/verify.sh    # pub get + analyze + APK build
-RUN_IOS=1 ../../../scripts/examples/flutter/verify.sh
-# verify.sh env: RUN_ANDROID / RUN_IOS / REFRESH_ANDROID_NATIVE / REFRESH_IOS_NATIVE
+# Run tests (only one smoke test exists)
+flutter test
 
-# From repo root
-./run example flutter build     # flutter build apk
-./run example flutter clean
+# Quick smoke check (greps for SDK API coverage + runs flutter analyze)
+./scripts/smoke.sh
 
-# Rebuild native binaries after C++ changes (repo root)
-./run sdk commons build-android     # scripts/build/android.sh
-./run sdk commons build-ios         # scripts/build/ios-xcframework.sh (macOS only)
+# Full verification (pub get + analyze + APK build)
+./scripts/verify.sh
+
+# Full verification including iOS
+RUN_IOS=1 ./scripts/verify.sh
+
+# Rebuild native binaries if C++ layer changed (run from repo root)
+# Android:
+../../../scripts/build/build-core-android.sh arm64-v8a
+# iOS:
+../../../sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 ```
 
-iOS: after `pub get`, `cd ios && pod install` if Pods are stale. Requires Flutter 3.10+, iOS 15.1+ (Podfile-enforced), arm64 device recommended.
+For iOS, after `flutter pub get`, you may need `cd ios && pod install && cd ..` if Pods are stale.
 
-## Work Ground
+## SDK Dependency Chain
 
-Short dated notes for other agents. Add gotchas here; prune stale ones.
+The app depends on four local Flutter SDK packages via `path:` dependencies in `pubspec.yaml`:
 
-- 2026-07-05: Android needs `pickFirst '**/libc++_shared.so'` and `'**/libomp.so'` (each SDK plugin bundles them) plus `extractNativeLibs="true"` + optional `libcdsprpc.so` for Genie NPU — don't remove.
-- 2026-07-05: iOS Podfile post_install forces `EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64` (local xcframeworks are arm64-sim only) and sets `PERMISSION_MICROPHONE/SPEECH_RECOGNIZER/CAMERA=1` for permission_handler.
-- 2026-07-05: Never re-query `currentModel()` inside a modelLifecycle event handler — infinite event loop (past ANR).
-- 2026-07-05: Android 15/16 — Flutter `statusBarColor` is a no-op; set bar color natively in styles.xml.
+```
+runanywhere           → ../../../sdk/runanywhere-flutter/packages/runanywhere
+runanywhere_llamacpp  → ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
+runanywhere_genie     → ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
+runanywhere_onnx      → ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
+```
+
+These packages wrap pre-built native C++ libraries via Dart FFI (`dart:ffi`), not method channels. AI inference calls go directly from Dart → native `.so`/xcframework without any platform channel hop.
+
+- **Android**: `.so` files live in each SDK package's `android/src/main/jniLibs/` dirs. The Gradle property `runanywhere.useLocalNatives=true` (in `android/gradle.properties`) tells the build to use these local files instead of downloading from GitHub releases.
+- **iOS**: xcframeworks (`RACommons`, `RABackendLLAMACPP`, `RABackendONNX`, `RABackendSherpa`) are vendored in each SDK package's `ios/Frameworks/` dirs. Static linkage (`use_frameworks! :linkage => :static` in Podfile) is required so `DynamicLibrary.executable()` can find the symbols at runtime.
+
+If native binaries are missing (fresh clone), they must be staged first — see README's "Clean-Clone Bring-Up" or use `scripts/verify.sh` with `REFRESH_ANDROID_NATIVE=1` / `REFRESH_IOS_NATIVE=1`.
+
+## Architecture
+
+### Initialization (runanywhere_ai_app.dart)
+
+App startup runs a multi-phase sequence in `initState` via `addPostFrameCallback`:
+
+1. **Eager .so loading** (Android only) — `DynamicLibrary.open()` on 6 `.so` files to preload before any SDK call
+2. **SDK init** — reads API key / base URL from secure storage (`KeychainHelper`); calls `RunAnywhere.initialize(...)` with or without credentials
+3. **Module registration** — guarded by a static `_modulesRegistered` flag to survive hot-reload. Registers: LlamaCpp (9 GGUF models), Genie NPU (Android/Snapdragon only, chip-conditional models), VLM (SmolVLM 500M), Sherpa STT/TTS (Whisper + Piper models), RAG embeddings (MiniLM), ONNX backend, RAG backend
+
+### State Management
+
+Two patterns coexist:
+
+1. **Singleton ChangeNotifier + ListenableBuilder** (feature-level) — `ModelListViewModel.shared`, `ToolSettingsViewModel.shared`, `ConversationStore.shared`, `DeviceInfoService.shared` are accessed directly
+2. **Local setState** (per-screen UI state) — recording flags, streaming text buffers, error messages, voice setup state
+
+### Navigation
+
+`ContentView` uses `Scaffold` + `NavigationBar` + `IndexedStack` (all 8 tabs stay mounted). No named routes or GoRouter. Secondary screens (`RagDemoView`, `StructuredOutputView`, `VLMCameraView`) use `Navigator.push(MaterialPageRoute(...))`. Model pickers use `showModalBottomSheet`.
+
+### Core Services (singletons in core/services/)
+
+- **AudioRecordingService** — wraps `record` package; 16kHz mono WAV; emits normalized dB levels on a broadcast stream
+- **AudioPlayerService** — wraps `audioplayers`; constructs WAV headers from raw PCM16 bytes; writes temp files for playback
+- **ConversationStore** — file-based JSON persistence under `<documents>/Conversations/<id>.json`; messages carry optional `thinkingContent` and `MessageAnalytics`
+- **KeychainService / KeychainHelper** — wraps `flutter_secure_storage`; iOS Keychain with `first_unlock_this_device`, Android `EncryptedSharedPreferences`; keys prefixed with `com.runanywhere.RunAnywhereAI_`
+- **PermissionService** — wraps `permission_handler`; requests microphone + speech (iOS only) for STT, camera for VLM
+
+### SDK API Surface Used
+
+All AI calls go through `RunAnywhere`:
+- `.llm.generate()` / `.llm.generateStream()` / `.llm.load()` / `.llm.unload()`
+- `.stt.transcribe()` / `.stt.load()`
+- `.tts.synthesize()` / `.tts.loadVoice()`
+- `.vlm.processImageStream()` / `.vlm.load()`
+- `.voice.eventStream()` / `.voice.initializeWithLoadedModels()`
+- `.tools.register()` / `.tools.generateWithTools()`
+- `.rag.createPipeline()` / `.rag.ingest()` / `.rag.query()` / `.rag.destroyPipeline()`
+- `.solutions.run(yaml:)`
+- `.downloads.start()` / `.downloads.delete()` / `.downloads.list()` / `.downloads.getStorageInfo()`
+- `.models.register()` / `.models.registerMultiFile()` / `.models.available()`
+- `.hardware.getChipEnum()`
+
+### Feature-Specific Notes
+
+- **Chat**: streaming generation appends tokens to a placeholder message at a fixed list index via `setState`. Tool calling detects `lfm2`+`tool` in the model name to select `ToolCallFormatNames.lfm2`. Thinking content parsed from `<think>...</think>` blocks.
+- **VLM**: `VLMViewModel` (non-singleton, created per view) uses a `Timer.periodic` at 2.5s for auto-streaming mode. Camera frames are BGRA→file→`VLMImage(filePath:)`.
+- **Voice Assistant**: subscribes to `voice.eventStream()` which emits protobuf `VoiceEvent` messages. Event payload types: `state`, `vad`, `userSaid`, `assistantToken`, `audio`, `error`.
+- **RAG**: `DocumentService` uses `syncfusion_flutter_pdf` for PDF text extraction. The RAG model selection flow does NOT pre-load models into memory — it only passes paths to `RAGConfiguration`.
+- **Tools**: three demo tools registered (`get_weather`, `calculate`, `get_current_time`). Weather tool uses Open-Meteo free API via `package:http`.
+- **Structured Output**: uses `LLMGenerationOptions(jsonSchema:)` with predefined schemas.
+- **Remaining SDK-owned cleanup**: the large model catalog still lives in app startup because moving it safely requires shared SDK/package ownership beyond this example-app lane.
+
+## Build Configuration Gotchas
+
+- **Android `packagingOptions`** (`android/app/build.gradle`): `pickFirst '**/libc++_shared.so'` and `pickFirst '**/libomp.so'` — required because multiple SDK plugin packages each bundle these shared libs
+- **Android `extractNativeLibs="true"`** and `<uses-native-library android:name="libcdsprpc.so" android:required="false"/>` in `AndroidManifest.xml` — required for Genie NPU (Qualcomm FastRPC)
+- **iOS Podfile post_install**: forces `EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64` on all pods and Runner — locally built xcframeworks only contain arm64 simulator slices
+- **iOS Podfile permission flags**: `PERMISSION_MICROPHONE=1`, `PERMISSION_SPEECH_RECOGNIZER=1`, `PERMISSION_CAMERA=1` must be set for `permission_handler` to compile those capabilities
+- **Gradle heap**: `-Xmx6g` in `gradle.properties` — native compilation is memory-intensive
+- **Kotlin 2.1.21 / AGP 8.9.1 / Gradle 8.11.1** — these versions must stay in sync; mismatches cause build failures
+
+## Analysis Options
+
+`analysis_options.yaml` enables strict Dart analysis:
+- `strict-casts`, `strict-inference`, `strict-raw-types` all enabled
+- `dead_code`, `unused_import`, `unused_local_variable`, `unused_element`, `unused_field` are **errors** (not warnings)
+- Generated files (`*.g.dart`, `*.freezed.dart`, `lib/generated/**`) are excluded
+
+## Platform Requirements
+
+- Flutter `>=3.10.0`, Dart `>=3.0.0 <4.0.0`
+- Android: compileSdk 36, targetSdk 34, minSdk from Flutter default, JVM 17
+- iOS: deployment target 15.1 (enforced by Podfile), Xcode 15+
+- Physical ARM64 device recommended — native libs are optimized for arm64

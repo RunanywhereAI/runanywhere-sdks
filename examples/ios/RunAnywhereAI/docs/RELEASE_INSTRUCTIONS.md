@@ -82,12 +82,12 @@ Apple requires all embedded frameworks to have specific keys in their Info.plist
 
 We've created a script to automatically fix framework Info.plist files in DerivedData.
 
-**Location:** `scripts/examples/ios/patch-framework-plist.sh`
+**Location:** `scripts/patch-framework-plist.sh`
 
 **Usage:**
 ```bash
-# Run from the repo root
-./scripts/examples/ios/patch-framework-plist.sh
+# Run from the RunAnywhereAI app directory
+./scripts/patch-framework-plist.sh
 ```
 
 **What it does:**
@@ -129,7 +129,7 @@ Cmd+B (or Product > Build)
 
 ```bash
 cd sdks/examples/ios/RunAnywhereAI
-../../../scripts/examples/ios/patch-framework-plist.sh
+./scripts/patch-framework-plist.sh
 ```
 
 ### 3. Archive (Without Cleaning!)
@@ -184,7 +184,7 @@ Invalid Bundle. The bundle RunAnywhereAI.app/Frameworks/onnxruntime.framework do
 
 **Solution:**
 1. Verify app deployment target is `17.5` (not higher!)
-2. Run the patch script: `./scripts/examples/ios/patch-framework-plist.sh`
+2. Run the patch script: `./scripts/patch-framework-plist.sh`
 3. Re-archive **without cleaning**
 
 ### Error: "Invalid MinimumOSVersion - is ''"
@@ -197,7 +197,7 @@ Invalid MinimumOSVersion. Apps that only support 64-bit devices must specify a d
 **Cause:** The ONNX Runtime binary downloaded via SPM from Microsoft's servers (`download.onnxruntime.ai`) doesn't include the `MinimumOSVersion` key in its Info.plist.
 
 **Solution:**
-1. Run the patch script: `./scripts/examples/ios/patch-framework-plist.sh`
+1. Run the patch script: `./scripts/patch-framework-plist.sh`
 2. Re-archive **without cleaning**
 
 ### dSYM Upload Warnings
@@ -219,7 +219,7 @@ If build fails after cleaning SPM cache:
 
 1. Resolve packages: File > Packages > Resolve Package Versions
 2. Build the project once (Cmd+B)
-3. Run the patch script: `./scripts/examples/ios/patch-framework-plist.sh`
+3. Run the patch script: `./scripts/patch-framework-plist.sh`
 4. Archive the app (Product > Archive)
 
 ### Code Signing Issues
@@ -236,7 +236,7 @@ Ensure your Apple Developer account has:
 [ ] 2. Verify deployment target is iOS 17.5 (NOT higher!)
 [ ] 3. Bump MARKETING_VERSION
 [ ] 4. Build project (Cmd+B)
-[ ] 5. Run patch script: ./scripts/examples/ios/patch-framework-plist.sh
+[ ] 5. Run patch script: ./scripts/patch-framework-plist.sh
 [ ] 6. Archive (Product > Archive) - DO NOT CLEAN!
 [ ] 7. Validate in Organizer
 [ ] 8. Upload to App Store Connect

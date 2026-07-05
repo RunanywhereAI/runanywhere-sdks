@@ -39,7 +39,7 @@ set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_backend_llamacpp.so")
     message(FATAL_ERROR "[RunAnywhereLlama] RABackendLlamaCPP not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_llamacpp.so\n"
-                        "Run ./scripts/build/android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
+                        "Run ./scripts/build/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
 endif()
 
 add_library(rac_backend_llamacpp SHARED IMPORTED)

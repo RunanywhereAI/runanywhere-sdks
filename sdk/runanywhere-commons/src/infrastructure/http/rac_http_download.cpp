@@ -105,7 +105,9 @@ bool iequals(const std::string& a, const std::string& b) {
     return true;
 }
 
+// =============================================================================
 // Chunk-callback context.
+// =============================================================================
 
 struct dl_ctx {
     std::ofstream* out_file;
@@ -164,7 +166,9 @@ rac_bool_t on_chunk(const uint8_t* chunk, size_t chunk_len, uint64_t /*total_wri
     return RAC_TRUE;
 }
 
+// =============================================================================
 // Error mapping.
+// =============================================================================
 
 rac_http_download_status_t map_rac_error(rac_result_t rc, int32_t http_status) {
     if (rc == RAC_SUCCESS) {
@@ -209,7 +213,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     // diagnostics are not appropriate here. Errors and progress are
     // reported via the SDK logger / return codes below.
 
-    // Ensure destination directory exists
+    // ---- Ensure destination directory exists -----------------------
     std::error_code ec;
     fs::path dest(req->destination_path);
     if (dest.has_parent_path()) {
@@ -294,7 +298,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         }
     }
 
-    // Open destination file
+    // ---- Open destination file --------------------------------------
     std::ios::openmode mode = std::ios::binary | std::ios::out;
     if (effective_resume_from > 0) {
         mode |= std::ios::app;
@@ -307,13 +311,13 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         return RAC_HTTP_DL_FILE_ERROR;
     }
 
-    // Create http client
+    // ---- Create http client ----------------------------------------
     HttpClientGuard cg;
     if (rac_http_client_create(&cg.c) != RAC_SUCCESS) {
         return RAC_HTTP_DL_UNKNOWN;
     }
 
-    // Rehydrate resume-prefix hash if needed
+    // ---- Rehydrate resume-prefix hash if needed --------------------
     //
     // When resuming and verifying the checksum, we need to feed the
     // SHA-256 context with the bytes already on disk BEFORE streaming
@@ -342,7 +346,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         }
     }
 
-    // Build request descriptor
+    // ---- Build request descriptor ----------------------------------
     rac_http_request_t http_req{};
     http_req.method = "GET";
     http_req.url = req->url;
@@ -351,7 +355,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     http_req.timeout_ms = req->timeout_ms;
     http_req.follow_redirects = RAC_TRUE;
 
-    // Drive the transfer
+    // ---- Drive the transfer ----------------------------------------
     dl_ctx ctx{};
     ctx.out_file = &out;
     ctx.hasher = do_hash ? &hasher : nullptr;
@@ -460,7 +464,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         return RAC_HTTP_DL_CANCELLED;
     }
 
-    // strict body validation
+    // ---- strict body validation -----
     //
     // An earlier change (commit d0a5885b6) gated the shift-left fallback on
     // status == 200 || (206 + Range-Honored:false), which prevents HTTP 416
@@ -494,7 +498,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     //      download would trip this guard during the next finalize.
     const bool status_is_416 = http_status == 416;
 
-    // 416 already-complete short-circuit
+    // ---- 416 already-complete short-circuit ------------------------
     //
     // A resume whose offset equals the server-reported total payload size
     // (Content-Range: bytes */<total> on the 416) means the file on disk IS
@@ -692,7 +696,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         }
     }
 
-    // Checksum verification (final pass over the hasher)
+    // ---- Checksum verification (final pass over the hasher) --------
     if (do_hash) {
         uint8_t digest[32];
         sha256_final(&hasher, digest);

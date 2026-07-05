@@ -31,7 +31,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // TOOL CALLING FORMATS - Different models use different formats
+// =============================================================================
 
 /**
  * @brief Tool calling format identifiers
@@ -61,7 +63,9 @@ typedef enum rac_tool_call_format {
     RAC_TOOL_FORMAT_COUNT
 } rac_tool_call_format_t;
 
+// =============================================================================
 // TYPES - Canonical definitions used by all SDKs
+// =============================================================================
 
 /**
  * @brief Parameter types for tool arguments
@@ -137,7 +141,9 @@ typedef struct rac_tool_calling_options {
         RAC_TOOL_FORMAT_DEFAULT /* format */                        \
     }
 
+// =============================================================================
 // PARSING API - Single Source of Truth (NO FALLBACKS)
+// =============================================================================
 
 /**
  * @brief Parse LLM output for tool calls (auto-detect format)
@@ -226,7 +232,9 @@ RAC_API rac_tool_call_format_t rac_tool_call_format_from_name(const char* name);
  */
 RAC_API const char* rac_tool_call_format_hint_from_format_name(int32_t format_name);
 
+// =============================================================================
 // PROMPT FORMATTING API - All prompt building happens here
+// =============================================================================
 
 /**
  * @brief Format tool definitions into system prompt (default format)
@@ -332,7 +340,9 @@ RAC_API rac_result_t rac_tool_call_build_followup_prompt(
     const char* original_user_prompt, const char* tools_prompt, const char* tool_name,
     const char* tool_result_json, rac_bool_t keep_tools_available, char** out_prompt);
 
+// =============================================================================
 // JSON UTILITY API - All JSON handling happens here
+// =============================================================================
 
 /**
  * @brief Normalize JSON by adding quotes around unquoted keys
@@ -370,7 +380,9 @@ RAC_API rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_boo
                                                   const char* result_json,
                                                   const char* error_message, char** out_json);
 
+// =============================================================================
 // TOOL VALUE JSON BRIDGE - Replaces hand-written per-SDK JSON serializers
+// =============================================================================
 
 /**
  * @brief Serialize a runanywhere.v1.ToolValue proto to its JSON string.
@@ -396,7 +408,9 @@ RAC_API rac_result_t rac_tool_value_from_json_proto(
     size_t in_size,
     rac_proto_buffer_t* out_tool_value);
 
+// =============================================================================
 // TOOL CALLING RUN LOOP - Single-call native orchestration
+// =============================================================================
 //
 // Collapses the per-SDK generate -> parse -> validate -> execute -> follow-up
 // loop into a single C ABI call. Caller provides:

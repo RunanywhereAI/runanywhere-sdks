@@ -172,8 +172,10 @@ public extension RunAnywhere {
         do {
             parsedArgs = try RAToolValue.parseObjectJSON(toolCall.argumentsJson)
         } catch {
-            // Surface parse failure as success=false so callers can
-            // distinguish parse errors from genuine empty-argument calls.
+            // Parse failure used to be swallowed into an empty dict, which made
+            // bad-JSON inputs look like success with no arguments. Surface the
+            // failure as success=false so callers can distinguish parse errors
+            // from genuine empty-argument calls.
             return makeToolResult(
                 name: toolName,
                 success: false,

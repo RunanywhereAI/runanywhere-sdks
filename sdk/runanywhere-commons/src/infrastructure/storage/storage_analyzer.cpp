@@ -44,7 +44,9 @@
 #include "storage_types.pb.h"
 #endif
 
+// =============================================================================
 // INTERNAL STRUCTURES
+// =============================================================================
 
 struct rac_storage_analyzer {
     rac_storage_callbacks_t callbacks;
@@ -493,7 +495,9 @@ rac_result_t finish_delete_result(const runanywhere::v1::StorageDeleteResult& re
 
 }  // namespace
 
+// =============================================================================
 // LIFECYCLE
+// =============================================================================
 
 rac_result_t rac_storage_analyzer_create(const rac_storage_callbacks_t* callbacks,
                                          rac_storage_analyzer_handle_t* out_handle) {
@@ -521,7 +525,9 @@ void rac_storage_analyzer_destroy(rac_storage_analyzer_handle_t handle) {
     delete handle;
 }
 
+// =============================================================================
 // STORAGE ANALYSIS
+// =============================================================================
 
 rac_result_t rac_storage_analyzer_analyze(rac_storage_analyzer_handle_t handle,
                                           rac_model_registry_handle_t registry_handle,
@@ -1293,7 +1299,9 @@ rac_result_t rac_storage_analyzer_calculate_size(rac_storage_analyzer_handle_t h
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // CLEANUP
+// =============================================================================
 
 void rac_storage_info_free(rac_storage_info_t* info) {
     if (!info)

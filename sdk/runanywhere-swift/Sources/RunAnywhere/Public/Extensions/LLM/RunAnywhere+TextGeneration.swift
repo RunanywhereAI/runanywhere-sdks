@@ -106,11 +106,13 @@ public extension RunAnywhere {
     /// Build a canonical `RALLMGenerationResult` from a stream of
     /// `RALLMStreamEvent`s and the currently-loaded LLM model.
     ///
-    /// The aggregation logic (concatenating `event.token` text, counting
-    /// tokens, computing TTFT/throughput from timestamps) is owned by the
-    /// SDK; the framework string is resolved from
-    /// `currentModel(_:).framework.analyticsKey` so callers stay aligned
-    /// with the registry's canonical framework label.
+    /// Example apps previously synthesised this struct themselves with a
+    /// hardcoded `framework = "llamacpp"` literal because the SDK exposed
+    /// only the per-token stream. The aggregation logic (concatenating
+    /// `event.token` text, counting tokens, computing TTFT/throughput from
+    /// timestamps) is now owned by the SDK and the framework string is
+    /// resolved from `currentModel(_:).framework.analyticsKey` so callers
+    /// stay aligned with the registry's canonical framework label.
     ///
     /// - Parameters:
     ///   - prompt: Prompt text used to estimate `inputTokens` when the

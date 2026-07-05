@@ -56,7 +56,9 @@ class DartBridge {
 
   static final _logger = SDKLogger('DartBridge');
 
+  // -------------------------------------------------------------------------
   // State
+  // -------------------------------------------------------------------------
 
   static SDKEnvironment _environment =
       SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
@@ -106,7 +108,9 @@ class DartBridge {
     return _lib!;
   }
 
+  // -------------------------------------------------------------------------
   // Phase 1: Core Initialization (Sync)
+  // -------------------------------------------------------------------------
 
   /// Initialize the core bridge layer.
   ///
@@ -220,7 +224,9 @@ class DartBridge {
     _logger.info('Phase 1 initialization complete');
   }
 
+  // -------------------------------------------------------------------------
   // Phase 2: Services Initialization (Async)
+  // -------------------------------------------------------------------------
 
   /// Initialize service bridges.
   ///
@@ -352,7 +358,9 @@ class DartBridge {
     return phase2Result;
   }
 
+  // -------------------------------------------------------------------------
   // Shutdown
+  // -------------------------------------------------------------------------
 
   /// Shutdown all bridges and release resources.
   ///
@@ -396,7 +404,9 @@ class DartBridge {
     _logger.info('DartBridge shutdown complete');
   }
 
+  // -------------------------------------------------------------------------
   // Bridge Extensions (static accessors matching Swift pattern)
+  // -------------------------------------------------------------------------
 
   /// Authentication bridge
   static DartBridgeAuth get auth => DartBridgeAuth.instance;
@@ -472,7 +482,9 @@ class DartBridge {
   static DartBridgeLoraRegistry get loraRegistry =>
       DartBridgeLoraRegistry.shared;
 
+  // -------------------------------------------------------------------------
   // Private Helpers
+  // -------------------------------------------------------------------------
 
   /// Configure C++ logging based on environment.
   ///

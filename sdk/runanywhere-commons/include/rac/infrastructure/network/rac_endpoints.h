@@ -15,13 +15,17 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // Authentication & Health Endpoints
+// =============================================================================
 
 #define RAC_ENDPOINT_AUTHENTICATE "/api/v1/auth/sdk/authenticate"
 #define RAC_ENDPOINT_REFRESH "/api/v1/auth/sdk/refresh"
 #define RAC_ENDPOINT_HEALTH "/v1/health"
 
+// =============================================================================
 // Device Management - Production/Staging
+// =============================================================================
 
 #define RAC_ENDPOINT_DEVICE_REGISTER "/api/v1/devices/register"
 
@@ -30,15 +34,21 @@ extern "C" {
 // "model"), e.g. "/api/v2/sdk/telemetry/llm".
 #define RAC_ENDPOINT_TELEMETRY_V2_PREFIX "/api/v2/sdk/telemetry/"
 
+// =============================================================================
 // Device Management - Development (Supabase REST API)
+// =============================================================================
 
 #define RAC_ENDPOINT_DEV_DEVICE_REGISTER "/rest/v1/sdk_devices"
 
+// =============================================================================
 // Model Management
+// =============================================================================
 
 #define RAC_ENDPOINT_MODELS_AVAILABLE "/api/v1/models/available"
 
+// =============================================================================
 // Environment-Based Endpoint Selection
+// =============================================================================
 
 /**
  * @brief Get device registration endpoint for environment
@@ -53,7 +63,9 @@ const char* rac_endpoint_device_registration(rac_environment_t env);
  */
 const char* rac_endpoint_model_assignments(void);
 
+// =============================================================================
 // Full URL Building
+// =============================================================================
 
 /**
  * @brief Build full URL from base URL and endpoint

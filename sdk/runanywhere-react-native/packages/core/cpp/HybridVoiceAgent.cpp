@@ -4,18 +4,28 @@
  * Implementation for the Nitro
  * VoiceAgent HybridObject defined in VoiceAgent.nitro.ts.
  *
- * Lifecycle of one subscription: TS calls
- * NitroVoiceAgent.subscribeProtoEvents(handle, onBytes, onDone, onError).
- * HybridVoiceAgent::subscribeProtoEvents heap-allocates a Registration
- * (shared_ptr), publishes it into a process-global registry keyed by the raw
- * Registration address used as C `user_data`, calls
- * rac_voice_agent_set_proto_callback(handle, trampoline, ud), and returns an
- * unsubscribe closure that unsets the callback then erases the registry entry
- * (dropping the registry's strong ref). Each C-ABI event fires
- * trampoline(bytes, size, user_data); the trampoline looks up the strong
- * shared_ptr<Registration> under a mutex, copies it locally, and dispatches
- * with that local ref keeping the Registration alive for the call. The Nitro
- * JSI onBytes callback then re-enters the JS runtime with the buffer.
+ * Lifecycle of one subscription:
+ *
+ *   TS: NitroVoiceAgent.subscribeProtoEvents(handle, onBytes, onDone, onError)
+ *                                   │
+ *                                   ▼
+ *   C++: HybridVoiceAgent::subscribeProtoEvents
+ *          1. heap-allocates Registration (via shared_ptr) and publishes
+ *             it into a process-global registry keyed by the raw
+ *             Registration address used as C `user_data`.
+ *          2. rac_voice_agent_set_proto_callback(handle, trampoline, ud)
+ *          3. returns unsubscribe closure that calls unset, then erases
+ *             the registry entry (drops the registry's strong ref).
+ *                                   │
+ *                                   ▼
+ *   C ABI: each event fires trampoline(bytes, size, user_data)
+ *          trampoline looks up the strong shared_ptr<Registration> in
+ *          the registry under a mutex, copies it locally, then
+ *          dispatches with the local strong ref keeping the
+ *          Registration alive for the duration of the call.
+ *                                   │
+ *                                   ▼
+ *   Nitro JSI: onBytes callback re-enters the JS runtime with the buffer.
  *
  * ABI limitation: the C ABI keeps ONE proto callback slot per handle.
  * Multiple concurrent subscribeProtoEvents() calls with the same handle
@@ -24,7 +34,7 @@
  * wins; earlier ones go silent). This matches the Kotlin + Dart
  * adapters' behavior and is documented on the spec interface.
  *
- * Lifetime / concurrency protocol:
+ * --- Lifetime / concurrency protocol --------------------------------
  *
  * Commons voice_event dispatch (`rac_voice_event_abi.cpp`) copies the
  * registered slot {fn, user_data} under its lock, RELEASES the lock,

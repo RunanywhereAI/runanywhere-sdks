@@ -40,7 +40,9 @@ bool isRegistrationSuccess(rac_result_t result) {
 
 } // namespace
 
+// ============================================================================
 // Constructor / Destructor
+// ============================================================================
 
 HybridRunAnywhereLlama::HybridRunAnywhereLlama() : HybridObject(TAG) {
   RAC_LOG_DEBUG(LOG_CATEGORY, "HybridRunAnywhereLlama constructor - Llama backend module");
@@ -50,7 +52,9 @@ HybridRunAnywhereLlama::~HybridRunAnywhereLlama() {
   RAC_LOG_DEBUG(LOG_CATEGORY, "HybridRunAnywhereLlama destructor");
 }
 
+// ============================================================================
 // Backend Registration
+// ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::registerBackend() {
   return Promise<bool>::async([this]() {

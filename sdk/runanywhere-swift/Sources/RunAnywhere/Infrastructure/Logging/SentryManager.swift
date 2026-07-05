@@ -34,7 +34,7 @@ public final class SentryManager: @unchecked Sendable {
             // NOTE: Do NOT use SDKLogger here - it would cause a deadlock during Logging.shared initialization
             #if DEBUG
             // swiftlint:disable:next no_print_statements
-            print("[Sentry] DSN not configured. Crash reporting disabled.")
+            print("🔍 [Sentry] DSN not configured. Crash reporting disabled.")
             #endif
             return
         }

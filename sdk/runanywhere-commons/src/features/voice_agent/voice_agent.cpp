@@ -55,7 +55,9 @@
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
 
+// =============================================================================
 // LIFECYCLE API
+// =============================================================================
 
 rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle) {
     if (!out_handle) {

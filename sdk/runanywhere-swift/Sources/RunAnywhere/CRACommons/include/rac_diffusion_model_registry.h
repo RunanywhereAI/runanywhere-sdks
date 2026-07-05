@@ -22,7 +22,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // BACKEND AND PLATFORM TYPES
+// =============================================================================
 
 /**
  * @brief Supported inference backends for diffusion models
@@ -65,7 +67,9 @@ typedef enum rac_diffusion_hardware {
     RAC_DIFFUSION_HW_DSP = (1 << 4), /**< Android DSP */
 } rac_diffusion_hardware_t;
 
+// =============================================================================
 // MODEL DEFINITION STRUCTURE
+// =============================================================================
 
 /**
  * @brief Default generation parameters for a model
@@ -171,7 +175,9 @@ typedef struct rac_diffusion_model_def {
 
 } rac_diffusion_model_def_t;
 
+// =============================================================================
 // MODEL STRATEGY INTERFACE
+// =============================================================================
 
 /**
  * @brief Model strategy - allows custom model handling
@@ -234,7 +240,9 @@ typedef struct rac_diffusion_model_strategy {
 
 } rac_diffusion_model_strategy_t;
 
+// =============================================================================
 // REGISTRY API
+// =============================================================================
 
 /**
  * @brief Initialize the diffusion model registry

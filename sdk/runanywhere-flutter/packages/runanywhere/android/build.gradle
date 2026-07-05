@@ -192,7 +192,7 @@ task downloadNativeLibs {
                 throw new GradleException("""
                     ⚠️  Native libraries not found in src/main/jniLibs/!
                     For local mode, please build and copy the libraries:
-                      1. ./scripts/build/android.sh (from repo root)
+                      1. cd runanywhere-commons && ./scripts/build-android.sh
                       2. Copy the .so files to packages/runanywhere/android/src/main/jniLibs/
                     Or switch to remote mode by editing binary_config.gradle:
                       testLocal = false

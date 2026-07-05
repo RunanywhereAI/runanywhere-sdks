@@ -11,7 +11,9 @@
 #ifndef CRACOMMONS_H
 #define CRACOMMONS_H
 
+// =============================================================================
 // CORE - Types, Error, Logging, Platform, State
+// =============================================================================
 
 #include "rac_audio_utils.h"
 #include "rac_component_types.h"
@@ -32,7 +34,9 @@
 // SDK State (centralized state management)
 #include "rac_sdk_state.h"
 
+// =============================================================================
 // FEATURES - LLM, STT, TTS, VAD, VLM, Diffusion, Voice Agent
+// =============================================================================
 
 // LLM (Large Language Model)
 #include "rac_llm.h"
@@ -100,7 +104,9 @@
 // Solutions — proto/YAML driven L5 solution runtime
 #include "rac_solution.h"
 
+// =============================================================================
 // INFRASTRUCTURE - Events, Download, Model Management
+// =============================================================================
 
 // Event system
 #include "rac_sdk_event_stream.h"
@@ -125,13 +131,17 @@
 #include "rac_device_identity.h" // rac_device_get_or_create_persistent_id
 #include "rac_device_manager.h"
 
+// =============================================================================
 // PLATFORM BACKEND - Apple Foundation Models, System TTS, CoreML Diffusion
+// =============================================================================
 
 #include "rac_diffusion_platform.h"
 #include "rac_llm_platform.h"
 #include "rac_tts_platform.h"
 
+// =============================================================================
 // NETWORK - Environment, Auth, API Types, Dev Config
+// =============================================================================
 
 #include "rac_api_types.h"
 #include "rac_auth_manager.h"
@@ -142,12 +152,16 @@
 #include "rac_http_download.h"
 #include "rac_http_transport.h"
 
+// =============================================================================
 // TELEMETRY - Event payloads, batching, manager
+// =============================================================================
 
 #include "rac_telemetry_manager.h"
 #include "rac_telemetry_types.h"
 
+// =============================================================================
 // PLUGIN REGISTRY + ROUTER (replaces rac_service_* legacy)
+// =============================================================================
 
 #include "rac_cpu_runtime_provider.h"
 #include "rac_engine_vtable.h"
@@ -158,6 +172,7 @@
 #include "rac_runtime_registry.h" // explicit-module mode requirement
 #include "rac_runtime_vtable.h"
 
+// =============================================================================
 // HYBRID ROUTER (cross-SDK STT offline ↔ online dispatch)
 //
 // Capability-agnostic filter/cascade/rank types + the STT hybrid router and
@@ -166,6 +181,7 @@
 // (src/routing/*.cpp, part of rac_commons core → RACommons.xcframework); the
 // Swift binding (Sources/RunAnywhere/Hybrid/) only marshals the policy proto,
 // installs callbacks, and calls the router.
+// =============================================================================
 
 #include "rac_cloud_stt_provider.h"
 #include "rac_hybrid_custom_filter.h"

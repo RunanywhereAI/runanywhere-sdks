@@ -36,7 +36,9 @@ const rac_llm_service_ops_t* llm_ops(const rac_engine_vtable_t* vt) {
 
 }  // namespace
 
+// =============================================================================
 // SERVICE CREATION - Routes through Service Registry
+// =============================================================================
 
 extern "C" {
 
@@ -82,7 +84,9 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // GENERIC API - Simple vtable dispatch
+// =============================================================================
 
 rac_result_t rac_llm_initialize(rac_handle_t handle, const char* model_path) {
     if (!handle)
@@ -211,7 +215,9 @@ void rac_llm_result_free(rac_llm_result_t* result) {
     }
 }
 
+// =============================================================================
 // ADAPTIVE CONTEXT API - VTable dispatch
+// =============================================================================
 
 rac_result_t rac_llm_inject_system_prompt(rac_handle_t handle, const char* prompt) {
     if (!handle || !prompt)

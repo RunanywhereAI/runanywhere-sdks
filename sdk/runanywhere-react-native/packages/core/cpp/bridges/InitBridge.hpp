@@ -164,8 +164,10 @@ public:
      */
     rac_environment_t getEnvironment() const { return environment_; }
 
+    // =========================================================================
     // Secure Storage Methods
     // Matches Swift: KeychainManager
+    // =========================================================================
 
     /**
      * @brief Store a value in secure storage (Keychain/Keystore)
@@ -208,8 +210,10 @@ public:
      */
     std::string getPersistentDeviceUUID();
 
+    // =========================================================================
     // Device Info (Synchronous)
     // For device registration callback which must be synchronous
+    // =========================================================================
 
     /**
      * @brief Get device model name (e.g., "iPhone 16 Pro Max")
@@ -258,7 +262,9 @@ public:
      */
     bool isTablet();
 
+    // =========================================================================
     // Configuration Getters (for HTTP requests in production mode)
+    // =========================================================================
 
     /**
      * @brief Get configured API key
@@ -288,8 +294,10 @@ public:
 
     // Note: getEnvironment() already defined above in "SDK Environment" section
 
+    // =========================================================================
     // HTTP Methods for Device Registration / Telemetry
     // Matches Swift: CppBridge+Device.swift http_post callback
+    // =========================================================================
 
     /**
      * @brief Synchronous HTTP POST for device registration / telemetry

@@ -1,0 +1,150 @@
+{
+  "$schema": "https://unpkg.com/syncpack@13/dist/schema.json",
+  "source": [
+    "package.json",
+    "sdk/shared/proto-ts/package.json",
+    "sdk/runanywhere-web-next/package.json",
+    "sdk/runanywhere-web-next/packages/*/package.json",
+    "sdk/runanywhere-react-native/package.json",
+    "sdk/runanywhere-react-native/packages/*/package.json",
+    "examples/web-next/RunAnywhereAI/package.json",
+    "examples/react-native/RunAnywhereAI/package.json"
+  ],
+  "dependencyTypes": ["dev", "prod", "peer"],
+  "versionGroups": [
+    {
+      "label": "Local workspace packages: ignore (managed by workspaces protocol / peer ranges). @runanywhere/proto-ts lives in sdk/shared/proto-ts and is consumed via workspace:* by all TS SDK packages — it is not published to npm.",
+      "dependencies": [
+        "@runanywhere/core",
+        "@runanywhere/llamacpp",
+        "@runanywhere/onnx",
+        "@runanywhere/web",
+        "@runanywhere/web-llamacpp",
+        "@runanywhere/web-onnx",
+        "@runanywhere/proto-ts"
+      ],
+      "isIgnored": true
+    },
+    {
+      "label": "react + react-native peer ranges: SDK packages declare open ranges (>=0.83.1 / >=19.0.0) so published packages accept any compatible host app version. Intentionally not pinned exact.",
+      "dependencies": ["react", "react-native"],
+      "dependencyTypes": ["peer"],
+      "isIgnored": true
+    },
+    {
+      "label": "Pinned: long (centralized in dependencies/versions.json)",
+      "dependencies": ["long"],
+      "pinVersion": "^5.3.2"
+    },
+    {
+      "label": "Pinned: protobufjs (centralized in dependencies/versions.json)",
+      "dependencies": ["protobufjs"],
+      "pinVersion": "^7.5.8"
+    },
+    {
+      "label": "Pinned: typescript (centralized in dependencies/versions.json)",
+      "dependencies": ["typescript"],
+      "pinVersion": "^5.9.3"
+    },
+    {
+      "label": "Pinned: eslint (centralized in dependencies/versions.json) — monorepo-wide",
+      "dependencies": ["eslint"],
+      "pinVersion": "^9.39.4"
+    },
+    {
+      "label": "Pinned: typescript-eslint unified meta-package (centralized in dependencies/versions.json)",
+      "dependencies": ["typescript-eslint"],
+      "pinVersion": "^8.59.3"
+    },
+    {
+      "label": "Pinned: vitest (centralized in dependencies/versions.json)",
+      "dependencies": ["vitest"],
+      "pinVersion": "^3.2.4"
+    },
+    {
+      "label": "Pinned: react-native-nitro-modules (centralized in dependencies/versions.json)",
+      "dependencies": ["react-native-nitro-modules"],
+      "pinVersion": "^0.33.9"
+    },
+    {
+      "label": "Pinned: nitrogen (centralized in dependencies/versions.json)",
+      "dependencies": ["nitrogen"],
+      "pinVersion": "^0.34.1"
+    },
+    {
+      "label": "Pinned: lerna (centralized in dependencies/versions.json)",
+      "dependencies": ["lerna"],
+      "pinVersion": "^8.2.4"
+    },
+    {
+      "label": "Pinned: prettier (centralized in dependencies/versions.json)",
+      "dependencies": ["prettier"],
+      "pinVersion": "^3.8.3"
+    },
+    {
+      "label": "Pinned: @playwright/test (centralized in dependencies/versions.json)",
+      "dependencies": ["@playwright/test"],
+      "pinVersion": "^1.60.0"
+    },
+    {
+      "label": "Pinned: vite (centralized in dependencies/versions.json) — examples/web scope",
+      "dependencies": ["vite"],
+      "pinVersion": "^6.4.2"
+    },
+    {
+      "label": "Pinned: react-native (centralized in dependencies/versions.json) — Hermes/JSI/NitroModules ABI tracks this version (dev/prod only; peer ranges handled above)",
+      "dependencies": ["react-native"],
+      "pinVersion": "0.85.3"
+    },
+    {
+      "label": "Pinned: react (centralized in dependencies/versions.json) — kept aligned with supported RN range (dev/prod only; peer ranges handled above)",
+      "dependencies": ["react"],
+      "pinVersion": "19.2.7"
+    },
+    {
+      "label": "Pinned: @eslint/js (centralized in dependencies/versions.json) — tracks eslint major, prevents drift across web SDK packages",
+      "dependencies": ["@eslint/js"],
+      "pinVersion": "^9.39.4"
+    },
+    {
+      "label": "Pinned: tsd (centralized in dependencies/versions.json) — type-definition test runner, kept reproducible across packages",
+      "dependencies": ["tsd"],
+      "pinVersion": "^0.33.0"
+    },
+    {
+      "label": "Catch-all: dependencies not centralized in dependencies/versions.json (left to each package). Add to versions.json to enforce.",
+      "dependencies": ["**"],
+      "isIgnored": true
+    }
+  ],
+  "semverGroups": [
+    {
+      "label": "Default range: prefer caret across all centrally-pinned deps that use caret ranges",
+      "range": "^",
+      "dependencies": [
+        "long",
+        "protobufjs",
+        "typescript",
+        "eslint",
+        "typescript-eslint",
+        "vitest",
+        "react-native-nitro-modules",
+        "nitrogen",
+        "lerna",
+        "prettier",
+        "@playwright/test",
+        "vite",
+        "@eslint/js",
+        "tsd"
+      ],
+      "packages": ["**"]
+    },
+    {
+      "label": "Exact range: react + react-native dev/prod deps are pinned to exact versions (RN ABI lockstep with native bridges); peer ranges stay open",
+      "range": "",
+      "dependencies": ["react", "react-native"],
+      "dependencyTypes": ["dev", "prod"],
+      "packages": ["**"]
+    }
+  ]
+}

@@ -50,7 +50,9 @@
 #include "model_types.pb.h"
 #endif
 
+// =============================================================================
 // Registry handle layout (shared by every TU that locks handle->mutex)
+// =============================================================================
 
 struct rac_model_registry {
     // Model storage (model_id -> model_info)
@@ -68,7 +70,9 @@ struct rac_model_registry {
 
 namespace rac::infra::model_registry::detail {
 
+// -----------------------------------------------------------------------------
 // Conversion / memory helpers (defined in model_registry_convert.cpp)
+// -----------------------------------------------------------------------------
 
 rac_model_info_t* deep_copy_model(const rac_model_info_t* src);
 void free_model_info(rac_model_info_t* model);
@@ -195,7 +199,9 @@ rac_result_t parse_proto_message_bytes(const uint8_t* proto_bytes, size_t proto_
     return RAC_SUCCESS;
 }
 
+// -----------------------------------------------------------------------------
 // Download-state normalization (defined in model_registry.cpp slim core)
+// -----------------------------------------------------------------------------
 
 bool has_nonempty_local_path(const ModelInfo& model);
 bool registry_status_is_downloaded(ModelRegistryStatus status);
@@ -221,7 +227,9 @@ bool get_model_snapshot_by_id(rac_model_registry_handle_t handle, const std::str
                               ModelInfo* out);
 int64_t imported_size_for_request(const ModelImportRequest& request, const ModelInfo& model);
 
+// -----------------------------------------------------------------------------
 // Query / sort helpers (defined in model_registry_proto.cpp)
+// -----------------------------------------------------------------------------
 
 bool model_is_downloaded_proto(const ModelInfo& model);
 bool model_is_available_proto(const ModelInfo& model);
@@ -235,7 +243,9 @@ std::vector<ModelInfo> query_model_snapshots_locked(rac_model_registry_handle_t 
 void move_models_to_list(std::vector<ModelInfo>* models, ModelInfoList* out);
 ModelCounts count_models(const std::vector<ModelInfo>& models);
 
+// -----------------------------------------------------------------------------
 // Filesystem discovery / reconciliation (defined in model_registry_discovery.cpp)
+// -----------------------------------------------------------------------------
 
 bool model_is_built_in(const ModelInfo& model);
 bool path_matches_roots(const std::string& path,
@@ -248,7 +258,9 @@ int32_t reconcile_registry_with_filesystem_locked(rac_model_registry_handle_t ha
 bool try_reconcile_model_local_path_locked(rac_model_registry_handle_t handle,
                                            const std::string& model_id, rac_model_info_t* model);
 
+// -----------------------------------------------------------------------------
 // Model-folder manifest sidecar (defined in model_registry_manifest.cpp)
+// -----------------------------------------------------------------------------
 
 // True when the entry carries explicit artifact descriptors (expected_files or
 // multi-file descriptors) — i.e. completeness can be validated strictly.
@@ -275,7 +287,9 @@ int32_t restore_models_from_folder_manifests(rac_model_registry_handle_t handle)
 bool try_restore_model_manifest_by_id(rac_model_registry_handle_t handle,
                                       const std::string& model_id);
 
+// -----------------------------------------------------------------------------
 // Adapter directory listing (defined in model_registry_refresh.cpp)
+// -----------------------------------------------------------------------------
 
 // Enumerate a directory through the platform adapter using the POSIX two-call
 // contract. Shared by the discovery reconcile path and the refresh rescan path.

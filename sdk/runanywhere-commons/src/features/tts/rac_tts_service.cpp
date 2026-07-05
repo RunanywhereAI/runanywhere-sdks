@@ -27,7 +27,9 @@ const rac_tts_service_ops_t* tts_ops(const rac_engine_vtable_t* vt) {
 
 }  // namespace
 
+// =============================================================================
 // SERVICE CREATION - Routes through Service Registry
+// =============================================================================
 
 extern "C" {
 
@@ -74,7 +76,9 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // GENERIC API - Simple vtable dispatch
+// =============================================================================
 
 rac_result_t rac_tts_initialize(rac_handle_t handle) {
     if (!handle)

@@ -12,7 +12,9 @@
 #include "rac/infrastructure/model_management/rac_model_compatibility.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
+// =============================================================================
 // COMPATIBILITY CHECK IMPLEMENTATION
+// =============================================================================
 
 rac_result_t rac_model_check_compatibility(rac_model_registry_handle_t registry_handle,
                                            const char* model_id, int64_t available_ram,

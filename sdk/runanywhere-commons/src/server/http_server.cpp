@@ -16,7 +16,9 @@
 namespace rac {
 namespace server {
 
+// =============================================================================
 // UTILITY FUNCTIONS
+// =============================================================================
 
 std::string generateRequestId() {
     static std::atomic<uint64_t> counter{0};
@@ -37,7 +39,9 @@ std::string extractModelIdFromPath(const std::string& path) {
     return fsPath.stem().string();
 }
 
+// =============================================================================
 // HTTP SERVER IMPLEMENTATION
+// =============================================================================
 
 HttpServer& HttpServer::instance() {
     static HttpServer instance;
@@ -345,7 +349,9 @@ void HttpServer::serverThread() {
 }  // namespace server
 }  // namespace rac
 
+// =============================================================================
 // C API IMPLEMENTATION
+// =============================================================================
 
 extern "C" {
 

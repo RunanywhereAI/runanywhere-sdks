@@ -66,7 +66,9 @@ namespace {
 
 #ifdef RAC_HAVE_PROTOBUF
 
+// ---------------------------------------------------------------------------
 // Mock platform adapter for the disk probe paths.
+// ---------------------------------------------------------------------------
 struct MockAdapterState {
     // Behaviour of is_non_empty_directory: 0=NULL, 1=returns RAC_TRUE,
     //                                       2=returns RAC_FALSE.
@@ -114,7 +116,9 @@ void mock_clear_adapter() {
     g_mock_state = {};
 }
 
+// ---------------------------------------------------------------------------
 // Helper: serialize a make-request and dispatch the proto API.
+// ---------------------------------------------------------------------------
 struct MakeArgs {
     std::string url;
     std::string name;
@@ -164,7 +168,9 @@ bool make_proto(const MakeArgs& args, runanywhere::v1::ModelInfo* out) {
     return parsed;
 }
 
+// ---------------------------------------------------------------------------
 // Test cases — representative URLs.
+// ---------------------------------------------------------------------------
 int test_make_gguf_single_file() {
     MakeArgs args;
     args.url = "https://example.test/llama-7b.Q4_K_M.gguf";
@@ -320,10 +326,12 @@ int test_make_request_overrides() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Disk-probe tests — exercise rac_path_is_non_empty_directory directly.
 // The make() factory itself never sets local_path so the probe wouldn't
 // fire there, but the helper is reachable as a public API for SDKs and
 // future make() variants that accept localPath.
+// ---------------------------------------------------------------------------
 int test_path_probe_with_callback() {
     mock_install_adapter(/*with_dir_probe=*/true, /*with_list_dir=*/false);
     g_mock_state.dir_probe_mode = 1;  // Returns RAC_TRUE.
@@ -387,7 +395,9 @@ int test_path_probe_null_path() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Negative paths.
+// ---------------------------------------------------------------------------
 int test_null_out_pointer() {
     rac_result_t rc = rac_model_info_make_proto(nullptr, 0, nullptr);
     ASSERT_EQ(rc, RAC_ERROR_NULL_POINTER);

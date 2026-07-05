@@ -33,7 +33,9 @@ extern "C" {
 
 // NOTE: rac_stt_config_t is defined in rac_stt_types.h (included above)
 
+// =============================================================================
 // STT COMPONENT API - Mirrors Swift's STTCapability
+// =============================================================================
 
 /**
  * @brief Create an STT capability component
@@ -197,7 +199,9 @@ RAC_API rac_result_t rac_stt_component_get_supported_languages(rac_handle_t hand
 RAC_API rac_result_t rac_stt_component_detect_language(rac_handle_t handle, const void* audio_data,
                                                        size_t audio_size, char** out_language);
 
+// =============================================================================
 // GENERATED-PROTO C ABI
+// =============================================================================
 
 /**
  * @brief Callback fired for serialized runanywhere.v1.STTStreamEvent bytes.
@@ -226,6 +230,7 @@ RAC_API rac_result_t rac_stt_component_transcribe_stream_proto(
     const uint8_t* options_proto_bytes, size_t options_proto_size,
     rac_stt_proto_stream_event_callback_fn callback, void* user_data);
 
+// =============================================================================
 // Persistent per-session streaming handles.
 //
 // Commons exposes these thin wrappers so `rac_stt_stream.cpp` can reach the
@@ -233,6 +238,7 @@ RAC_API rac_result_t rac_stt_component_transcribe_stream_proto(
 // Each returns RAC_ERROR_NOT_SUPPORTED if the loaded backend does not
 // implement the matching vtable slot; the commons stream dispatcher then
 // falls back to the per-chunk transcribe_stream path.
+// =============================================================================
 
 /**
  * @brief Allocate a backend-specific streaming session bound to the loaded STT model.

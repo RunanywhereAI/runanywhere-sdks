@@ -201,7 +201,9 @@ rac_result_t publish_with_session(runanywhere::v1::SDKComponent component,
 
 }  // namespace rac::events
 
+// ---------------------------------------------------------------------------
 // C ABI: telemetry sink registration for the destination router.
+// ---------------------------------------------------------------------------
 extern "C" void rac_events_set_telemetry_sink(void* telemetry_manager) {
     std::lock_guard<std::mutex> lock(rac::events::telemetry_sink_mutex());
     rac::events::telemetry_sink() = static_cast<rac_telemetry_manager_t*>(telemetry_manager);

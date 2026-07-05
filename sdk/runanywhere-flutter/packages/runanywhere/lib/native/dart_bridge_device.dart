@@ -17,11 +17,15 @@ import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+// =============================================================================
 // Exceptional return constants for FFI callbacks
+// =============================================================================
 
 const int _exceptionalReturnInt32 = -1;
 
+// =============================================================================
 // Device Manager Bridge
+// =============================================================================
 
 /// Device bridge for C++ device manager operations.
 /// Matches Swift's `CppBridge+Device.swift`.
@@ -57,7 +61,9 @@ class DartBridgeDevice {
   /// Access token for authenticated requests
   static String? _accessToken;
 
+  // ============================================================================
   // Captured HTTP Request (for deferred async execution)
+  // ============================================================================
   //
   // Dart FFI callbacks cannot block for async work (no semaphore equivalent).
   // Swift uses DispatchSemaphore, Kotlin uses blocking HttpURLConnection —
@@ -72,7 +78,9 @@ class DartBridgeDevice {
   static String? _pendingBody;
   static bool _pendingRequiresAuth = false;
 
+  // ============================================================================
   // Public API
+  // ============================================================================
 
   /// Register device callbacks synchronously (Phase 1).
   /// Matches Swift: Device.register() in CppBridge.initialize()
@@ -350,7 +358,9 @@ class DartBridgeDevice {
   /// Get the cached device ID synchronously (null if not yet cached)
   static String? get cachedDeviceId => _cachedDeviceId;
 
+  // ============================================================================
   // Internal Helpers
+  // ============================================================================
 
   /// Key for storing persistent device UUID in Keychain/EncryptedSharedPreferences
   /// Matches Swift KeychainManager.KeychainKey.deviceUUID and React Native SecureStorageKeys.deviceUUID
@@ -462,7 +472,9 @@ class DartBridgeDevice {
   }
 }
 
+// =============================================================================
 // FFI Callback Functions
+// =============================================================================
 
 /// Get device info callback
 void _getDeviceInfoCallback(
@@ -633,7 +645,9 @@ int _httpPostCallback(
   }
 }
 
+// =============================================================================
 // FFI Types
+// =============================================================================
 
 /// Callback type: void (*get_device_info)(rac_device_registration_info_t*, void*)
 typedef RacDeviceGetInfoCallbackNative =

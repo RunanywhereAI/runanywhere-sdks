@@ -18,7 +18,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // TYPES
+// =============================================================================
 
 /**
  * @brief Opaque handle for VAD analytics service
@@ -52,7 +54,9 @@ typedef struct rac_vad_metrics {
     rac_inference_framework_t framework;
 } rac_vad_metrics_t;
 
+// =============================================================================
 // LIFECYCLE
+// =============================================================================
 
 /**
  * @brief Create a VAD analytics service instance
@@ -69,7 +73,9 @@ RAC_API rac_result_t rac_vad_analytics_create(rac_vad_analytics_handle_t* out_ha
  */
 RAC_API void rac_vad_analytics_destroy(rac_vad_analytics_handle_t handle);
 
+// =============================================================================
 // LIFECYCLE TRACKING
+// =============================================================================
 
 /**
  * @brief Track VAD initialization
@@ -102,7 +108,9 @@ RAC_API rac_result_t rac_vad_analytics_track_initialization_failed(
  */
 RAC_API rac_result_t rac_vad_analytics_track_cleaned_up(rac_vad_analytics_handle_t handle);
 
+// =============================================================================
 // DETECTION TRACKING
+// =============================================================================
 
 /**
  * @brief Track VAD started
@@ -152,7 +160,9 @@ RAC_API rac_result_t rac_vad_analytics_track_paused(rac_vad_analytics_handle_t h
  */
 RAC_API rac_result_t rac_vad_analytics_track_resumed(rac_vad_analytics_handle_t handle);
 
+// =============================================================================
 // MODEL LIFECYCLE (for model-based VAD)
+// =============================================================================
 
 /**
  * @brief Track model load started
@@ -205,7 +215,9 @@ RAC_API rac_result_t rac_vad_analytics_track_model_load_failed(rac_vad_analytics
 RAC_API rac_result_t rac_vad_analytics_track_model_unloaded(rac_vad_analytics_handle_t handle,
                                                             const char* model_id);
 
+// =============================================================================
 // METRICS
+// =============================================================================
 
 /**
  * @brief Get current analytics metrics

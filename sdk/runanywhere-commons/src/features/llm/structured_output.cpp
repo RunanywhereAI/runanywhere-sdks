@@ -32,7 +32,9 @@
 
 using nlohmann::json;
 
+// =============================================================================
 // HELPER FUNCTIONS
+// =============================================================================
 
 /**
  * @brief Trim whitespace from the beginning and end of a string
@@ -829,7 +831,9 @@ static void dispatch_structured_terminal_once(StructuredStreamContext* ctx,
 }
 #endif
 
+// =============================================================================
 // FIND MATCHING BRACE - Ported from Swift lines 179-212
+// =============================================================================
 
 extern "C" rac_bool_t rac_structured_output_find_matching_brace(const char* text, size_t start_pos,
                                                                 size_t* out_end_pos) {
@@ -880,7 +884,9 @@ extern "C" rac_bool_t rac_structured_output_find_matching_brace(const char* text
     return RAC_FALSE;
 }
 
+// =============================================================================
 // FIND MATCHING BRACKET - Ported from Swift lines 215-248
+// =============================================================================
 
 extern "C" rac_bool_t rac_structured_output_find_matching_bracket(const char* text,
                                                                   size_t start_pos,
@@ -932,7 +938,9 @@ extern "C" rac_bool_t rac_structured_output_find_matching_bracket(const char* te
     return RAC_FALSE;
 }
 
+// =============================================================================
 // FIND COMPLETE JSON - Ported from Swift lines 135-176
+// =============================================================================
 
 extern "C" rac_bool_t rac_structured_output_find_complete_json(const char* text, size_t* out_start,
                                                                size_t* out_end) {
@@ -964,7 +972,9 @@ extern "C" rac_bool_t rac_structured_output_find_complete_json(const char* text,
     return RAC_FALSE;
 }
 
+// =============================================================================
 // EXTRACT JSON - Ported from Swift lines 102-132
+// =============================================================================
 
 extern "C" rac_result_t rac_structured_output_extract_json(const char* text, char** out_json,
                                                            size_t* out_length) {
@@ -1025,7 +1035,9 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
     return RAC_ERROR_INVALID_FORMAT;
 }
 
+// =============================================================================
 // GET SYSTEM PROMPT - Ported from Swift lines 10-30
+// =============================================================================
 
 // Small base models (e.g. SmolLM2-360M)
 // cannot reliably produce structured JSON from a free-form prompt because
@@ -1096,7 +1108,9 @@ extern "C" rac_result_t rac_structured_output_get_system_prompt(const char* json
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // PREPARE PROMPT - Ported from Swift lines 43-82
+// =============================================================================
 
 extern "C" rac_result_t rac_structured_output_prepare_prompt(
     const char* original_prompt, const rac_structured_output_config_t* config, char** out_prompt) {
@@ -1162,7 +1176,9 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt(
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // VALIDATE STRUCTURED OUTPUT - Ported from Swift lines 264-282
+// =============================================================================
 
 static void init_parse_result(rac_structured_output_parse_result_t* result) {
     result->is_valid = RAC_FALSE;
@@ -1717,7 +1733,9 @@ rac_structured_output_validate(const char* text, const rac_structured_output_con
     return RAC_SUCCESS;  // Function succeeded, validation just returned false
 }
 
+// =============================================================================
 // MEMORY MANAGEMENT
+// =============================================================================
 
 extern "C" void
 rac_structured_output_validation_free(rac_structured_output_validation_t* validation) {

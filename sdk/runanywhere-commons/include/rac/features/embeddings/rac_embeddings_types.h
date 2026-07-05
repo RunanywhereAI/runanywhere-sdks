@@ -28,13 +28,17 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // CONSTANTS
+// =============================================================================
 
 #define RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE 512
 #define RAC_EMBEDDINGS_MAX_BATCH_SIZE 8192
 #define RAC_EMBEDDINGS_DEFAULT_MAX_TOKENS 512
 
+// =============================================================================
 // ENUMS
+// =============================================================================
 
 /**
  * @brief Embedding normalization mode
@@ -54,7 +58,9 @@ typedef enum rac_embeddings_pooling {
     RAC_EMBEDDINGS_POOLING_LAST = 2, /**< Use last token embedding */
 } rac_embeddings_pooling_t;
 
+// =============================================================================
 // CONFIGURATION
+// =============================================================================
 
 /**
  * @brief Embeddings component configuration
@@ -86,7 +92,9 @@ static const rac_embeddings_config_t RAC_EMBEDDINGS_CONFIG_DEFAULT = {
     .normalize = RAC_EMBEDDINGS_NORMALIZE_L2,
     .pooling = RAC_EMBEDDINGS_POOLING_MEAN};
 
+// =============================================================================
 // OPTIONS
+// =============================================================================
 
 /**
  * @brief Embedding generation options
@@ -108,7 +116,9 @@ typedef struct rac_embeddings_options {
 static const rac_embeddings_options_t RAC_EMBEDDINGS_OPTIONS_DEFAULT = {
     .normalize = -1, .pooling = -1, .n_threads = 0};
 
+// =============================================================================
 // RESULT
+// =============================================================================
 
 /**
  * @brief Single embedding result
@@ -141,7 +151,9 @@ typedef struct rac_embeddings_result {
     int32_t total_tokens;
 } rac_embeddings_result_t;
 
+// =============================================================================
 // INFO
+// =============================================================================
 
 /**
  * @brief Embeddings service information
@@ -160,7 +172,9 @@ typedef struct rac_embeddings_info {
     int32_t max_tokens;
 } rac_embeddings_info_t;
 
+// =============================================================================
 // MEMORY MANAGEMENT
+// =============================================================================
 
 /**
  * @brief Free embeddings result resources

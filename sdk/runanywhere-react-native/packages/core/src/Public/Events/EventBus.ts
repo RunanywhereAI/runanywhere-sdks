@@ -143,7 +143,9 @@ export class EventBus {
     }
   }
 
+  // ==========================================================================
   // Category shortcuts (Swift EventBus.swift:138-173)
+  // ==========================================================================
 
   /** LLM events. Mirrors Swift `EventBus.llmEvents`. */
   get llmEvents(): AsyncIterable<SDKEventMessage> {
@@ -180,7 +182,9 @@ export class EventBus {
     return this.eventsFor(EventCategory.EVENT_CATEGORY_RAG);
   }
 
+  // ==========================================================================
   // Typed payload streams (Swift EventBus.swift:106-136)
+  // ==========================================================================
 
   /** `RAVoiceEvent` payloads (voice-agent pipeline events). */
   get voiceEventPayloads(): AsyncIterable<VoiceEvent> {
@@ -202,7 +206,9 @@ export class EventBus {
     return this.payloadStream((event) => event.modelRegistry);
   }
 
+  // ==========================================================================
   // Unified model-lifecycle stream (Swift EventBus+ModelLifecycle.swift)
+  // ==========================================================================
 
   /**
    * Unified model load/unload stream across all native signal channels
@@ -312,7 +318,9 @@ export class EventBus {
   }
 }
 
+// ============================================================================
 // Typed model-lifecycle change (Swift EventBus+ModelLifecycle.swift)
+// ============================================================================
 
 /** One model load/unload transition, decoded from the raw event bus. */
 export interface ModelLifecycleChange {

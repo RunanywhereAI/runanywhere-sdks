@@ -3,6 +3,7 @@
 //  LlamaCPPRuntime Module
 //
 //  Unified LlamaCPP module - thin wrapper that calls C++ backend registration.
+//  This replaces both LlamaCPPRuntime.swift and LlamaCPPServiceProvider.swift.
 //
 
 import CRACommons

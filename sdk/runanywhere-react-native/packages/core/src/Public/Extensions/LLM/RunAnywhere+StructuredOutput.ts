@@ -41,7 +41,9 @@ import { generate as generateText } from './RunAnywhere+TextGeneration';
 // Re-export the wire types consumers need to discriminate the stream.
 export { StructuredOutputStreamEvent, StructuredOutputStreamEventKind };
 
+// ============================================================================
 // Types re-exported for callers
+// ============================================================================
 
 // StructuredOutputResult and JSONSchema come from `@runanywhere/proto-ts`;
 // no RN-local duplicates.

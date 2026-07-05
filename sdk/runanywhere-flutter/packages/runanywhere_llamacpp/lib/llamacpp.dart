@@ -40,7 +40,9 @@ import 'package:runanywhere_llamacpp/native/llamacpp_bindings.dart';
 class LlamaCpp {
   LlamaCpp._();
 
+  // ============================================================================
   // Module Info (matches Swift exactly)
+  // ============================================================================
 
   /// Current version of the LlamaCPP Runtime module
   static const String version = '2.0.0';
@@ -48,13 +50,17 @@ class LlamaCpp {
   /// LlamaCPP library version (underlying C++ library)
   static const String llamaCppVersion = 'b7199';
 
+  // ============================================================================
   // Registration State
+  // ============================================================================
 
   static bool _isRegistered = false;
   static LlamaCppBindings? _bindings;
   static final _logger = SDKLogger('LlamaCpp');
 
+  // ============================================================================
   // Registration (matches Swift LlamaCPP.register() exactly)
+  // ============================================================================
 
   /// Register LlamaCPP backend with the C++ service registry.
   ///
@@ -117,7 +123,9 @@ class LlamaCpp {
   /// On Android: Checks if librac_backend_llamacpp_jni.so can be loaded
   static bool get isAvailable => LlamaCppBindings.checkAvailability();
 
+  // ============================================================================
   // Cleanup
+  // ============================================================================
 
   /// Dispose of resources
   static void dispose() {
@@ -126,7 +134,9 @@ class LlamaCpp {
     _logger.info('LlamaCpp disposed');
   }
 
+  // ============================================================================
   // Auto-Registration (matches Swift exactly)
+  // ============================================================================
 
   /// Enable auto-registration for this module.
   /// Call this method to trigger C++ backend registration.

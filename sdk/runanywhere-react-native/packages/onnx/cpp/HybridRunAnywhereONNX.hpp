@@ -36,7 +36,9 @@ public:
   HybridRunAnywhereONNX();
   ~HybridRunAnywhereONNX();
 
+  // ============================================================================
   // Backend Registration
+  // ============================================================================
 
   std::shared_ptr<Promise<bool>> registerBackend() override;
   std::shared_ptr<Promise<bool>> unregisterBackend() override;

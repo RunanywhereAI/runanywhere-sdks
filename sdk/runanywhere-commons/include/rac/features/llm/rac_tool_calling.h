@@ -43,7 +43,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // TOOL CALLING FORMATS - Different models use different formats
+// =============================================================================
 
 /**
  * @brief Tool calling format identifiers
@@ -73,7 +75,9 @@ typedef enum rac_tool_call_format {
     RAC_TOOL_FORMAT_COUNT
 } rac_tool_call_format_t;
 
+// =============================================================================
 // TYPES - Canonical definitions used by all SDKs
+// =============================================================================
 
 /**
  * @brief Parameter types for tool arguments
@@ -164,7 +168,9 @@ typedef struct rac_tool_calling_options {
         RAC_TOOL_FORMAT_DEFAULT /* format */                        \
     }
 
+// =============================================================================
 // PARSING API - Single Source of Truth (NO FALLBACKS)
+// =============================================================================
 
 /**
  * @brief Parse LLM output for tool calls (auto-detect format)
@@ -371,7 +377,9 @@ RAC_API const char* rac_tool_call_format_hint_from_format_name(int32_t format_na
 RAC_API rac_result_t rac_tool_call_format_from_model_info_proto(
     const uint8_t* model_info_proto_bytes, size_t size, rac_tool_call_format_t* out_format);
 
+// =============================================================================
 // PROMPT FORMATTING API - All prompt building happens here
+// =============================================================================
 
 /**
  * @brief Format tool definitions into system prompt (default format)
@@ -512,7 +520,9 @@ RAC_API rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request_pr
                                                        size_t request_proto_size,
                                                        rac_proto_buffer_t* out_result);
 
+// =============================================================================
 // JSON UTILITY API - All JSON handling happens here
+// =============================================================================
 
 /**
  * @brief Normalize JSON by adding quotes around unquoted keys
@@ -560,7 +570,9 @@ rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t succ
                                           const char* result_json, const char* error_message,
                                           char** out_json);
 
+// =============================================================================
 // TOOL VALUE JSON BRIDGE - Replaces hand-written per-SDK JSON serializers
+// =============================================================================
 //
 // SDKs treat ToolValue (the recursive JSON-typed carrier defined in
 // idl/tool_calling.proto) as JSON when crossing the user-facing surface:
@@ -599,7 +611,9 @@ RAC_API rac_result_t rac_tool_value_to_json_proto(const uint8_t* in_tool_value_b
 RAC_API rac_result_t rac_tool_value_from_json_proto(const uint8_t* in_string_bytes, size_t in_size,
                                                     rac_proto_buffer_t* out_tool_value);
 
+// =============================================================================
 // TOOL CALLING SESSION - Native orchestration state machine
+// =============================================================================
 
 typedef void (*rac_tool_calling_session_event_callback_fn)(const uint8_t* event_bytes,
                                                            size_t event_size, void* user_data);
@@ -654,7 +668,9 @@ RAC_API rac_result_t rac_tool_calling_session_cancel_proto(uint64_t session_hand
  */
 RAC_API void rac_tool_calling_session_proto_quiesce(void);
 
+// =============================================================================
 // TOOL CALLING RUN LOOP - Single-call native orchestration
+// =============================================================================
 //
 // Collapses the per-SDK generate -> parse -> validate -> execute -> follow-up
 // loop into a single C ABI call. Caller provides:

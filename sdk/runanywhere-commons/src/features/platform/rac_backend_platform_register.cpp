@@ -27,7 +27,9 @@ namespace fs = std::filesystem;
 
 static const char* LOG_CAT = "Platform";
 
+// =============================================================================
 // LLM VTABLE IMPLEMENTATION - Foundation Models
+// =============================================================================
 
 namespace {
 
@@ -189,7 +191,9 @@ extern "C" const rac_llm_service_ops_t g_platform_llm_ops = {
 
 namespace {
 
+// =============================================================================
 // TTS VTABLE IMPLEMENTATION - System TTS
+// =============================================================================
 
 // Initialize (no-op - System TTS is always ready)
 static rac_result_t platform_tts_vtable_initialize(void* impl) {
@@ -338,7 +342,9 @@ extern "C" const rac_tts_service_ops_t g_platform_tts_ops = {
 
 namespace {
 
+// =============================================================================
 // DIFFUSION VTABLE IMPLEMENTATION - ml-stable-diffusion
+// =============================================================================
 
 // Initialize
 static rac_result_t platform_diffusion_vtable_initialize(void* impl, const char* model_path,
@@ -550,7 +556,9 @@ extern "C" const rac_diffusion_service_ops_t g_platform_diffusion_ops = {
 
 namespace {
 
+// =============================================================================
 // REGISTRY STATE
+// =============================================================================
 
 struct PlatformRegistryState {
     std::mutex mutex;
@@ -574,7 +582,9 @@ PlatformRegistryState& get_state() {
 // is now redundant because the router picks via model format — .mlmodelc
 // maps to coreml, .onnx maps to onnx, so the two plugins don't collide.
 
+// =============================================================================
 // BUILT-IN MODEL REGISTRATION
+// =============================================================================
 
 #if defined(__APPLE__)
 void register_coreml_diffusion_entry() {
@@ -720,7 +730,9 @@ void register_system_tts_entry() {
 
 }  // namespace
 
+// =============================================================================
 // REGISTRATION API
+// =============================================================================
 
 extern "C" {
 

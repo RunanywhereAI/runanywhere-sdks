@@ -8,7 +8,9 @@ import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
+// =============================================================================
 // Environment Bridge
+// =============================================================================
 
 /// Environment bridge for C++ environment validation and configuration.
 /// Matches Swift's `CppBridge+Environment.swift`.
@@ -24,7 +26,9 @@ class DartBridgeEnvironment {
   static final _logger = SDKLogger('DartBridge.Environment');
   static final DartBridgeEnvironment instance = DartBridgeEnvironment._();
 
+  // ============================================================================
   // Environment Queries
+  // ============================================================================
 
   /// Check if environment requires API authentication
   bool requiresAuth(SDKEnvironment environment) {
@@ -161,7 +165,9 @@ class DartBridgeEnvironment {
     }
   }
 
+  // ============================================================================
   // Validation
+  // ============================================================================
 
   /// Validate API key for environment
   ValidationResult validateApiKey(String? apiKey, SDKEnvironment environment) {
@@ -284,7 +290,9 @@ class DartBridgeEnvironment {
     }
   }
 
+  // ============================================================================
   // Internal Helpers
+  // ============================================================================
 
   int _environmentToInt(SDKEnvironment env) {
     switch (env) {
@@ -300,7 +308,9 @@ class DartBridgeEnvironment {
   }
 }
 
+// =============================================================================
 // SDK Config Struct for FFI
+// =============================================================================
 
 /// SDK config struct for validation (simplified)
 base class RacSdkConfigStruct extends Struct {
@@ -314,7 +324,9 @@ base class RacSdkConfigStruct extends Struct {
   external Pointer<Utf8> sdkVersion;
 }
 
+// =============================================================================
 // Validation Result
+// =============================================================================
 
 /// Validation result enum matching rac_validation_result_t
 class ValidationResult {
@@ -368,7 +380,9 @@ class ValidationResult {
   }
 }
 
+// =============================================================================
 // Development Config Bridge
+// =============================================================================
 
 /// Development configuration bridge
 ///

@@ -19,7 +19,7 @@ WORKDIR /src
 COPY . /src
 
 # Download Sherpa-ONNX Linux prebuilts (needed for ONNX backend)
-RUN ./scripts/build/deps/download-sherpa-onnx.sh linux
+RUN ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
 
 # Build from the monorepo root so engine targets are available.
 # RAC_BUILD_CLI + RAC_DESKTOP_ADAPTER add the rcli binary (CLI e2e suite);

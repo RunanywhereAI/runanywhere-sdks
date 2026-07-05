@@ -123,7 +123,9 @@ object PlatformAdapterBridge {
         return path
     }
 
+    // ========================================================================
     // HTTP Download (Async, Platform Adapter Fallback)
+    // ========================================================================
 
     /**
      * Start an HTTP download for RACommons platform-adapter-only callers.
@@ -287,8 +289,10 @@ object PlatformAdapterBridge {
         downloadedPath: String?,
     ): Int
 
+    // ========================================================================
     // Device Info (Synchronous)
     // For device registration callback which must be synchronous
+    // ========================================================================
 
     /**
      * Get device model name (e.g., "Pixel 8 Pro")
@@ -524,6 +528,7 @@ object PlatformAdapterBridge {
         return false
     }
 
+    // ========================================================================
     // Directory Enumeration (Platform Adapter Slots)
     //
     // Cross-SDK parity with the Kotlin SDK sibling and Swift / Flutter /
@@ -531,6 +536,7 @@ object PlatformAdapterBridge {
     // model-registry refresh path (rescan_local) and
     // rac_model_info_make_proto's is_downloaded probe for multi-file
     // artifacts read these via JNI from InitBridge.cpp.
+    // ========================================================================
 
     /**
      * Directory entry surface mirroring `rac_directory_entry_t` field-for-field

@@ -19,7 +19,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // SERVICE VTABLE - Backend implementations provide this
+// =============================================================================
 
 /**
  * VAD Service operations vtable.
@@ -80,7 +82,9 @@ typedef struct rac_vad_service {
     const char* model_id;
 } rac_vad_service_t;
 
+// =============================================================================
 // SERVICE INTERFACE - Mirrors Swift's VADService protocol
+// =============================================================================
 
 /**
  * @brief Create a VAD service

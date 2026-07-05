@@ -105,7 +105,7 @@ import 'package:runanywhere/public/extensions/runanywhere_structured_output.dart
 /// Each capability class owns its own implementation. This type only
 /// coordinates lifecycle, state, events, and cross-SDK flat forwarding methods.
 abstract final class RunAnywhere {
-  // Lifecycle
+  // --- Lifecycle -----------------------------------------------------------
 
   /// True after [initialize] has succeeded. Sourced from the C++ commons
   /// (`rac_state_is_initialized`); Dart does not maintain a parallel flag.
@@ -494,7 +494,7 @@ abstract final class RunAnywhere {
         deviceId: phase1DeviceId,
       );
 
-      // Phase 1: Core init (sync after Flutter async device-id lookup)
+      // --- Phase 1: Core init (sync after Flutter async device-id lookup) ---
       // Phase-1 failures (invalid env, library load) propagate to the
       // caller via the surrounding try / rethrow.
       DartBridge.initialize(
@@ -518,7 +518,7 @@ abstract final class RunAnywhere {
         'Phase 2 dispatched in background',
       );
 
-      // Phase 2: Detached background services
+      // --- Phase 2: Detached background services ---
       // Mirrors Swift `Task.detached(priority: .userInitiated) { ... }`.
       // _dispatchPhase2 stores the Future first so concurrent callers of
       // `completeServicesInitialization()` see it before the detach
@@ -676,7 +676,7 @@ abstract final class RunAnywhere {
     await DartBridge.shutdown();
   }
 
-  // Capability surfaces
+  // --- Capability surfaces -------------------------------------------------
   //
   // The flat `RunAnywhere.*` static methods are the canonical surface — they
   // mirror the Swift SDK (the cross-SDK source of truth) one-to-one. The
@@ -791,7 +791,7 @@ abstract final class RunAnywhere {
     SDKComponent component,
   ) => RunAnywhereModelLifecycle.shared.componentSnapshot(component);
 
-  // Canonical flat methods (§3-§10 of spec)
+  // --- Canonical flat methods (§3-§10 of spec) --------------------------------
 
   /// Canonical flat method — cancel any in-flight LLM generation.
   /// Mirrors Swift / RN / Web `RunAnywhere.cancelGeneration()`.

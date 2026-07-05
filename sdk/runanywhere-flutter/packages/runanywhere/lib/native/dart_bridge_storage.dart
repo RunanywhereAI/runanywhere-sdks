@@ -122,7 +122,9 @@ class DartBridgeStorage {
     }
   }
 
+  // =========================================================================
   // Stable storage analyzer proto-byte API
+  // =========================================================================
 
   Future<storage_pb.StorageInfoResult> infoProto([
     storage_pb.StorageInfoRequest? request,

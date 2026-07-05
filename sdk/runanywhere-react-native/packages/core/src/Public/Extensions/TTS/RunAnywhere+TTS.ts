@@ -289,7 +289,9 @@ export async function stopSynthesis(): Promise<void> {
   playback.stop();
 }
 
+// ============================================================================
 // Speak (Simple Playback API)
+// ============================================================================
 
 /**
  * Speak text aloud — the simplest way to use TTS.

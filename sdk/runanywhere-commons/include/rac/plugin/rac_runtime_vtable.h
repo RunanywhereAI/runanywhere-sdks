@@ -74,9 +74,9 @@ extern "C" {
  */
 #define RAC_RUNTIME_ABI_VERSION_MIN RAC_RUNTIME_ABI_VERSION_V2
 
-/*
+/* ===========================================================================
  * Device + capability descriptors (by-value POD, safe to include-only).
- */
+ * =========================================================================== */
 
 /** Coarse device class the runtime targets. Mirrors `rac_runtime_id_t` but
  *  kept separate so a runtime can target multiple device classes (CoreML
@@ -139,24 +139,24 @@ typedef struct rac_runtime_capabilities {
  *  on `rac_runtime_vtable` below. */
 #define RAC_RUNTIME_CAP_SESSION_EXECUTION (1ull << 10)
 
-/*
+/* ===========================================================================
  * Opaque session + buffer handles.
  *
  * Runtimes define the concrete struct privately; callers pass the pointer
  * back unchanged through run_session / destroy_session.
- */
+ * =========================================================================== */
 
 typedef struct rac_runtime_session rac_runtime_session_t;
 typedef struct rac_runtime_buffer rac_runtime_buffer_t;
 
-/*
+/* ===========================================================================
  * ABI v2 tensor and buffer descriptors.
  *
  * These types are runtime-only: generic tensor execution, buffer ownership,
  * device memory selection, and buffer transfer. Platform services such as OS
  * permissions, file pickers, HTTP, secure storage, battery/thermal, and app
  * lifecycle APIs intentionally do not belong here.
- */
+ * =========================================================================== */
 
 /** Stable tensor element type. Values 0-16 intentionally match ONNX tensor
  *  element enum values where there is overlap, preserving existing Float32=1
@@ -383,9 +383,9 @@ typedef struct rac_runtime_io {
     size_t rank;
 } rac_runtime_io_t;
 
-/*
+/* ===========================================================================
  * Metadata + vtable layout.
- */
+ * =========================================================================== */
 
 /**
  * @brief Runtime plugin metadata — carried in every vtable.
@@ -498,7 +498,7 @@ typedef struct rac_runtime_vtable {
      *  is the authoritative answer. */
     rac_result_t (*capabilities)(rac_runtime_capabilities_t* out);
 
-    /* Reserved slot pool (6 slots) */
+    /* ─────────── Reserved slot pool (6 slots) ─────────── */
     /*
      * Keeps layout binary-stable as new runtime ops land. ABI v2 uses
      * reserved_slot_0 as `const rac_runtime_vtable_v2_t*`.
@@ -525,9 +525,9 @@ rac_runtime_vtable_get_v2(const rac_runtime_vtable_t* vtable) {
     return v2;
 }
 
-/*
+/* ===========================================================================
  * Dynamic-loader symbol convention (parallel to rac_plugin_entry_<name>).
- */
+ * =========================================================================== */
 
 typedef const rac_runtime_vtable_t* (*rac_runtime_entry_fn)(void);
 

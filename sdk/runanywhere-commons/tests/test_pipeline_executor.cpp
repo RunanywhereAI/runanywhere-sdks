@@ -243,7 +243,9 @@ PipelineSpec make_source_window_spec(const std::string& size = {}, const std::st
     return spec;
 }
 
+// ---------------------------------------------------------------------------
 // 1. Linear pipeline compiles + drains cleanly.
+// ---------------------------------------------------------------------------
 TEST(linear_pipeline_drains) {
     PipelineSpec spec = make_linear_spec();
     PipelineExecutor exec(spec);
@@ -268,7 +270,9 @@ TEST(linear_pipeline_drains) {
     // node worker threads have all joined by the time wait() returns.
 }
 
+// ---------------------------------------------------------------------------
 // 2. Unknown operator type fails validation.
+// ---------------------------------------------------------------------------
 TEST(unknown_operator_type_is_rejected) {
     PipelineSpec spec;
     spec.set_name("bad");
@@ -282,7 +286,9 @@ TEST(unknown_operator_type_is_rejected) {
     CHECK(st == RAC_ERROR_INVALID_CONFIGURATION);
 }
 
+// ---------------------------------------------------------------------------
 // 3. Edge that references an unknown operator fails validation.
+// ---------------------------------------------------------------------------
 TEST(dangling_edge_is_rejected) {
     PipelineSpec spec;
     spec.set_name("dangling");
@@ -299,7 +305,9 @@ TEST(dangling_edge_is_rejected) {
     CHECK(st == RAC_ERROR_INVALID_CONFIGURATION);
 }
 
+// ---------------------------------------------------------------------------
 // 4. Custom operator factory registration drives payload transformation.
+// ---------------------------------------------------------------------------
 class UpperCaseNode : public OperatorNode {
    public:
     explicit UpperCaseNode(std::string n) : PipelineNode(std::move(n)) {}
@@ -627,7 +635,9 @@ TEST(registered_factory_transforms_payload) {
     scheduler->wait();
 }
 
+// ---------------------------------------------------------------------------
 // 5. The built-in window operator runs without a stand-in factory.
+// ---------------------------------------------------------------------------
 TEST(built_in_window_operator_emits_joined_windows) {
     CHECK(OperatorRegistry::instance().has_factory("window"));
 
@@ -685,7 +695,9 @@ TEST(window_bad_params_fall_back_to_single_item_windows) {
     CHECK(!done.has_value());
 }
 
+// ---------------------------------------------------------------------------
 // 6. YAML → PipelineSpec → compile round-trip.
+// ---------------------------------------------------------------------------
 TEST(yaml_roundtrip_compiles) {
     const std::string yaml = R"YAML(
 name: "sample"
@@ -726,7 +738,9 @@ options:
     scheduler->wait();
 }
 
+// ---------------------------------------------------------------------------
 // 7. Proto-bytes round-trip.
+// ---------------------------------------------------------------------------
 TEST(proto_bytes_roundtrip_compiles) {
     PipelineSpec original = make_linear_spec();
     std::string bytes;
@@ -746,7 +760,9 @@ TEST(proto_bytes_roundtrip_compiles) {
     CHECK(scheduler != nullptr);
 }
 
+// ---------------------------------------------------------------------------
 // 8. Duplicate operator name is rejected.
+// ---------------------------------------------------------------------------
 TEST(duplicate_operator_name_is_rejected) {
     PipelineSpec spec;
     spec.set_name("dup");
@@ -762,7 +778,9 @@ TEST(duplicate_operator_name_is_rejected) {
     CHECK(st == RAC_ERROR_INVALID_CONFIGURATION);
 }
 
+// ---------------------------------------------------------------------------
 // 9. Bare edge endpoints are rejected; ports are part of the contract.
+// ---------------------------------------------------------------------------
 TEST(bare_endpoint_is_rejected) {
     PipelineSpec spec = make_linear_spec();
     spec.mutable_edges(0)->set_from("src");
@@ -774,7 +792,9 @@ TEST(bare_endpoint_is_rejected) {
     CHECK(st == RAC_ERROR_INVALID_CONFIGURATION);
 }
 
+// ---------------------------------------------------------------------------
 // 10. Empty and unknown ports are rejected.
+// ---------------------------------------------------------------------------
 TEST(empty_endpoint_port_is_rejected) {
     PipelineSpec spec = make_linear_spec();
     spec.mutable_edges(0)->set_from("src.");
@@ -797,7 +817,9 @@ TEST(unknown_endpoint_port_is_rejected) {
     CHECK(st == RAC_ERROR_INVALID_CONFIGURATION);
 }
 
+// ---------------------------------------------------------------------------
 // 11. Duplicate edges are rejected.
+// ---------------------------------------------------------------------------
 TEST(duplicate_edge_is_rejected) {
     PipelineSpec spec = make_linear_spec();
     auto* dup = spec.add_edges();
@@ -811,7 +833,9 @@ TEST(duplicate_edge_is_rejected) {
     CHECK(st == RAC_ERROR_INVALID_CONFIGURATION);
 }
 
+// ---------------------------------------------------------------------------
 // 12. Edge options with invalid capacity or enum policy are rejected.
+// ---------------------------------------------------------------------------
 TEST(edge_capacity_limit_is_enforced) {
     PipelineSpec spec = make_linear_spec();
     spec.mutable_edges(0)->set_capacity(std::numeric_limits<std::uint32_t>::max());
@@ -835,7 +859,9 @@ TEST(invalid_edge_policy_is_rejected) {
     CHECK(st == RAC_ERROR_INVALID_CONFIGURATION);
 }
 
+// ---------------------------------------------------------------------------
 // 13. Engine-backed primitive names require explicit factories.
+// ---------------------------------------------------------------------------
 TEST(real_primitive_without_factory_is_rejected) {
     OperatorRegistry::instance().unregister_factory("generate_text");
 
@@ -865,7 +891,9 @@ TEST(real_primitive_with_explicit_factory_compiles) {
     CHECK(st == RAC_SUCCESS);
 }
 
+// ---------------------------------------------------------------------------
 // 14. Typed port payload metadata accepts matching payload contracts.
+// ---------------------------------------------------------------------------
 TEST(typed_port_payload_match_compiles) {
     OperatorPortSchema producer_ports;
     producer_ports.output_ports = {"audio"};
@@ -904,7 +932,9 @@ TEST(typed_port_payload_match_compiles) {
     CHECK(scheduler->node_count() == 3);
 }
 
+// ---------------------------------------------------------------------------
 // 15. Edges with incompatible typed payload contracts are rejected.
+// ---------------------------------------------------------------------------
 TEST(typed_port_payload_mismatch_is_rejected) {
     OperatorPortSchema producer_ports;
     producer_ports.output_ports = {"audio"};
@@ -945,8 +975,10 @@ TEST(typed_port_payload_mismatch_is_rejected) {
     CHECK(last_error_detail_contains("text.utf8"));
 }
 
+// ---------------------------------------------------------------------------
 // 16. Legacy opaque payload metadata is rejected, even when both endpoints
 //     use the same legacy type string.
+// ---------------------------------------------------------------------------
 TEST(legacy_opaque_payload_metadata_is_rejected) {
     OperatorPortSchema producer_ports;
     producer_ports.output_ports = {"bytes"};
@@ -1246,7 +1278,9 @@ TEST(operator_emitted_embedding_type_with_raw_bytes_body_is_rejected_at_runtime)
     CHECK(root->is_cancelled());
 }
 
+// ---------------------------------------------------------------------------
 // 17. Same-endpoint fan-out/fan-in is wired with SplitNode/MergeNode.
+// ---------------------------------------------------------------------------
 TEST(fanout_and_fanin_same_ports_use_split_merge_nodes) {
     auto seen = std::make_shared<std::atomic<int>>(0);
     ScopedFactory counting_sink(
@@ -1305,7 +1339,9 @@ TEST(fanout_and_fanin_same_ports_use_split_merge_nodes) {
     CHECK(seen->load(std::memory_order_acquire) == 6);
 }
 
+// ---------------------------------------------------------------------------
 // 17. True named multi-port operators wire distinct input/output edges.
+// ---------------------------------------------------------------------------
 TEST(two_input_operator_wires_distinct_named_inputs) {
     ScopedAdapterFactory join_factory(
         "cpp_graph_01e_join_text_audio",
@@ -1554,7 +1590,9 @@ TEST(fanout_with_nonuniform_branch_options_is_rejected) {
     CHECK(last_error_detail_contains("uniform branch"));
 }
 
+// ---------------------------------------------------------------------------
 // 18. Executor-built graphs propagate root cancellation into blocking nodes.
+// ---------------------------------------------------------------------------
 TEST(executor_built_graph_root_cancel_stops_blocking_operator) {
     auto state = std::make_shared<BlockingUntilCancelState>();
     ScopedFactory blocking(
@@ -1608,7 +1646,9 @@ TEST(executor_built_graph_root_cancel_stops_blocking_operator) {
     CHECK(elapsed < std::chrono::milliseconds(750));
 }
 
+// ---------------------------------------------------------------------------
 // Runner harness
+// ---------------------------------------------------------------------------
 }  // namespace
 
 int main() {

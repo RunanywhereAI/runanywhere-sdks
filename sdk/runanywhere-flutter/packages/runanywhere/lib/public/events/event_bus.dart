@@ -58,7 +58,7 @@ class EventBus {
 
   Stream<SDKEvent> get allEvents => _allEventsController.stream;
 
-  // Typed payload streams (Swift EventBus.swift:106-136)
+  // --- Typed payload streams (Swift EventBus.swift:106-136) ----------------
 
   /// `VoiceEvent` payloads (voice-agent pipeline events).
   Stream<VoiceEvent> get voiceEventPayloads => allEvents

@@ -20,7 +20,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // EXPORT MACRO
+// =============================================================================
 
 #if defined(RAC_LLAMACPP_BUILDING)
 #if defined(_WIN32)
@@ -34,7 +36,9 @@ extern "C" {
 #define RAC_LLAMACPP_API
 #endif
 
+// =============================================================================
 // CONFIGURATION - Mirrors Swift's LlamaCPPGenerationConfig
+// =============================================================================
 
 /**
  * LlamaCPP-specific configuration.
@@ -64,7 +68,9 @@ static const rac_llm_llamacpp_config_t RAC_LLM_LLAMACPP_CONFIG_DEFAULT = {
     .gpu_layers = -1,   // All layers on GPU
     .batch_size = 512};
 
+// =============================================================================
 // LLAMACPP-SPECIFIC API
+// =============================================================================
 
 /**
  * Creates a LlamaCPP LLM service.
@@ -169,7 +175,9 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_model_info(rac_handle_t handl
  */
 RAC_LLAMACPP_API void rac_llm_llamacpp_destroy(rac_handle_t handle);
 
+// =============================================================================
 // LORA ADAPTER API
+// =============================================================================
 
 /**
  * Load a LoRA adapter from a GGUF file and apply it.
@@ -217,7 +225,9 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_lora(rac_handle_t handle);
  */
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle, char** out_json);
 
+// =============================================================================
 // ADAPTIVE CONTEXT API (for RAG pipelines)
+// =============================================================================
 
 /**
  * Inject a system prompt into the KV cache at position 0.
@@ -263,7 +273,9 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_from_context(
  */
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_context(rac_handle_t handle);
 
+// =============================================================================
 // BACKEND REGISTRATION
+// =============================================================================
 
 /**
  * Registers the LlamaCPP backend with the commons module and service registries.

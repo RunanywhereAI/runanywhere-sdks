@@ -19,7 +19,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // Auth State
+// =============================================================================
 
 /**
  * @brief Authentication state structure
@@ -36,7 +38,9 @@ typedef struct {
     bool is_authenticated;
 } rac_auth_state_t;
 
+// =============================================================================
 // Platform Callbacks
+// =============================================================================
 
 /**
  * @brief Callback for secure storage operations
@@ -74,7 +78,9 @@ typedef struct {
     void* context;
 } rac_secure_storage_t;
 
+// =============================================================================
 // Keychain Keys (for platform implementations)
+// =============================================================================
 
 #define RAC_KEY_ACCESS_TOKEN "com.runanywhere.sdk.accessToken"
 #define RAC_KEY_REFRESH_TOKEN "com.runanywhere.sdk.refreshToken"
@@ -82,7 +88,9 @@ typedef struct {
 #define RAC_KEY_USER_ID "com.runanywhere.sdk.userId"
 #define RAC_KEY_ORGANIZATION_ID "com.runanywhere.sdk.organizationId"
 
+// =============================================================================
 // Initialization
+// =============================================================================
 
 /**
  * @brief Initialize auth manager
@@ -95,7 +103,9 @@ RAC_API void rac_auth_init(const rac_secure_storage_t* storage);
  */
 RAC_API void rac_auth_reset(void);
 
+// =============================================================================
 // Token State
+// =============================================================================
 
 /**
  * @brief Check if currently authenticated
@@ -148,7 +158,9 @@ RAC_API const char* rac_auth_get_user_id(void);
  */
 RAC_API const char* rac_auth_get_organization_id(void);
 
+// =============================================================================
 // Request Building
+// =============================================================================
 
 /**
  * @brief Build authentication request JSON
@@ -169,7 +181,9 @@ RAC_API char* rac_auth_build_authenticate_request(const rac_sdk_config_t* config
  */
 RAC_API char* rac_auth_build_refresh_request(void);
 
+// =============================================================================
 // Response Handling
+// =============================================================================
 
 /**
  * @brief Parse and store authentication response
@@ -191,7 +205,9 @@ RAC_API int rac_auth_handle_authenticate_response(const char* json);
  */
 RAC_API int rac_auth_handle_refresh_response(const char* json);
 
+// =============================================================================
 // Token Management
+// =============================================================================
 
 /**
  * @brief Get valid access token, triggering refresh if needed
@@ -219,7 +235,9 @@ RAC_API int rac_auth_get_valid_token(const char** out_token, bool* out_needs_ref
  */
 RAC_API void rac_auth_clear(void);
 
+// =============================================================================
 // Persistence
+// =============================================================================
 
 /**
  * @brief Load tokens from secure storage

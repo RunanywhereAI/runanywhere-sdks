@@ -1,4 +1,6 @@
+# =============================================================================
 # RunAnywhere Server Module
+# =============================================================================
 # OpenAI-compatible HTTP server for LLM inference
 #
 # This module provides:
@@ -9,6 +11,7 @@
 # Dependencies (fetched by parent CMakeLists.txt):
 #   - cpp-httplib (header-only HTTP library)
 #   - nlohmann_json (header-only JSON library)
+# =============================================================================
 
 # Server implementation sources
 set(RAC_SERVER_SOURCES

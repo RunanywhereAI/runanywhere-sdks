@@ -605,7 +605,9 @@ preferred_category_for(const runanywhere::v1::ModelLoadRequest& request,
 
 }  // namespace rac::core::model_lifecycle::detail
 
+// =============================================================================
 // PUBLIC C ABI — resolve artifact paths without loading an engine
+// =============================================================================
 
 extern "C" rac_result_t
 rac_model_lifecycle_resolve_paths_proto(rac_model_registry_handle_t registry,

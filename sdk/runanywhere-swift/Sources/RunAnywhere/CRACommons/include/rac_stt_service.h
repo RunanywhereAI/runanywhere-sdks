@@ -18,7 +18,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // SERVICE VTABLE - Backend implementations provide this
+// =============================================================================
 
 /**
  * STT Service operations vtable.
@@ -88,7 +90,9 @@ typedef struct rac_stt_service {
     const char* model_id;
 } rac_stt_service_t;
 
+// =============================================================================
 // PUBLIC API - Generic service functions
+// =============================================================================
 
 /**
  * @brief Create an STT service
@@ -200,7 +204,9 @@ RAC_API rac_result_t rac_stt_detect_language(rac_handle_t handle, const void* au
                                              const rac_stt_options_t* options,
                                              char** out_language);
 
+// =============================================================================
 // CANONICAL DEFAULTS
+// =============================================================================
 
 /**
  * @brief Populate a default-initialised runanywhere.v1.STTConfiguration.

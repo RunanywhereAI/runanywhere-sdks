@@ -49,7 +49,9 @@ namespace {
 
 namespace v1 = runanywhere::v1;
 
+// ---------------------------------------------------------------------------
 // Generation parameters shared by one-shot and REPL turns.
+// ---------------------------------------------------------------------------
 struct RunParams {
     std::string system_prompt;
     float temperature = 0.0f;  // 0 = engine default

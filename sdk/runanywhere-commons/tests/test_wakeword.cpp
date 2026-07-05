@@ -16,7 +16,9 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
 
+// =============================================================================
 // Minimal test platform adapter
+// =============================================================================
 
 static void test_log_callback(rac_log_level_t /*level*/, const char* /*category*/,
                               const char* /*message*/, void* /*ctx*/) {
@@ -81,7 +83,9 @@ static rac_config_t make_test_config() {
     return config;
 }
 
+// =============================================================================
 // Setup / Teardown
+// =============================================================================
 
 static bool setup() {
     rac_config_t config = make_test_config();
@@ -95,8 +99,10 @@ static void teardown() {
     rac_shutdown();
 }
 
+// =============================================================================
 // Helper: full wakeword setup (create + init shared + load model)
 // Returns true on success, fills result as SKIPPED on missing models.
+// =============================================================================
 
 struct WakewordSetup {
     rac_handle_t handle = nullptr;
@@ -158,7 +164,9 @@ static bool full_wakeword_setup(WakewordSetup& ws, TestResult& result,
     return true;
 }
 
+// =============================================================================
 // Test: create and destroy with default config
+// =============================================================================
 
 static TestResult test_create_destroy() {
     if (!setup()) {
@@ -180,7 +188,9 @@ static TestResult test_create_destroy() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: init shared models (embedding + melspectrogram)
+// =============================================================================
 
 static TestResult test_init_shared_models() {
     TestResult result;
@@ -213,7 +223,9 @@ static TestResult test_init_shared_models() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: load and unload a wake word model
+// =============================================================================
 
 static TestResult test_load_unload_model() {
     TestResult result;
@@ -255,7 +267,9 @@ static TestResult test_load_unload_model() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: process silence (2s) - expect no detection
+// =============================================================================
 
 static TestResult test_process_silence() {
     TestResult result;
@@ -290,7 +304,9 @@ static TestResult test_process_silence() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: process white noise (2s, low amplitude) - expect no false positive
+// =============================================================================
 
 static TestResult test_process_noise() {
     TestResult result;
@@ -331,7 +347,9 @@ static TestResult test_process_noise() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: set threshold
+// =============================================================================
 
 static TestResult test_set_threshold() {
     if (!setup()) {
@@ -355,7 +373,9 @@ static TestResult test_set_threshold() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: reset detector state
+// =============================================================================
 
 static TestResult test_reset() {
     TestResult result;
@@ -371,7 +391,9 @@ static TestResult test_reset() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Helper: test wake word detection on a real WAV file
+// =============================================================================
 
 static TestResult test_wakeword_wav(const std::string& wav_path, bool expect_detection) {
     TestResult result;
@@ -443,7 +465,9 @@ static TestResult test_wakeword_wav(const std::string& wav_path, bool expect_det
     return result;
 }
 
+// =============================================================================
 // Real WAV file tests
+// =============================================================================
 
 static TestResult test_detect_real_wakeword() {
     TestResult result;
@@ -557,7 +581,9 @@ static TestResult test_reject_tone() {
     return result;
 }
 
+// =============================================================================
 // Main: register tests and dispatch via CLI args
+// =============================================================================
 
 int main(int argc, char** argv) {
     TestSuite suite("wakeword");

@@ -37,7 +37,9 @@ extern "C" {
  */
 #define RAC_PLATFORM_ADAPTER_ABI_VERSION 1u
 
+// =============================================================================
 // CALLBACK TYPES (defined outside struct for C compatibility)
+// =============================================================================
 
 /**
  * HTTP download progress callback type.
@@ -66,7 +68,9 @@ typedef void (*rac_http_complete_callback_fn)(rac_result_t result, const char* d
 typedef void (*rac_extract_progress_callback_fn)(int32_t files_extracted, int32_t total_files,
                                                  void* callback_user_data);
 
+// =============================================================================
 // DIRECTORY LISTING (for model registry rescan)
+// =============================================================================
 
 /**
  * Maximum length (including null terminator) of a directory entry name written
@@ -128,7 +132,9 @@ typedef rac_result_t (*rac_file_list_directory_fn)(const char* dir_path,
                                                    rac_directory_entry_t* out_entries,
                                                    size_t* in_out_count, void* user_data);
 
+// =============================================================================
 // PLATFORM ADAPTER STRUCTURE
+// =============================================================================
 
 /**
  * Platform adapter structure.
@@ -155,7 +161,9 @@ typedef rac_result_t (*rac_file_list_directory_fn)(const char* dir_path,
  *   WASM offset table.
  */
 typedef struct rac_platform_adapter {
+    // -------------------------------------------------------------------------
     // ABI guard (MUST be first two fields — see RAC_PLATFORM_ADAPTER_ABI_VERSION)
+    // -------------------------------------------------------------------------
 
     /** Set to RAC_PLATFORM_ADAPTER_ABI_VERSION by the SDK populator.
      *  rac_init rejects a mismatch with RAC_ERROR_ABI_VERSION_MISMATCH. */
@@ -165,7 +173,9 @@ typedef struct rac_platform_adapter {
      *  rac_init rejects a mismatch with RAC_ERROR_ABI_VERSION_MISMATCH. */
     uint32_t struct_size;
 
+    // -------------------------------------------------------------------------
     // File System Operations
+    // -------------------------------------------------------------------------
 
     /**
      * Check if a file exists.
@@ -203,7 +213,9 @@ typedef struct rac_platform_adapter {
      */
     rac_result_t (*file_delete)(const char* path, void* user_data);
 
+    // -------------------------------------------------------------------------
     // Secure Storage (Keychain/KeyStore)
+    // -------------------------------------------------------------------------
 
     /**
      * Get a value from secure storage.
@@ -249,7 +261,9 @@ typedef struct rac_platform_adapter {
      */
     rac_result_t (*secure_delete)(const char* key, void* user_data);
 
+    // -------------------------------------------------------------------------
     // Logging
+    // -------------------------------------------------------------------------
 
     /**
      * Log a message.
@@ -260,7 +274,9 @@ typedef struct rac_platform_adapter {
      */
     void (*log)(rac_log_level_t level, const char* category, const char* message, void* user_data);
 
+    // -------------------------------------------------------------------------
     // Clock
+    // -------------------------------------------------------------------------
 
     /**
      * Get current time in milliseconds since Unix epoch.
@@ -269,7 +285,9 @@ typedef struct rac_platform_adapter {
      */
     int64_t (*now_ms)(void* user_data);
 
+    // -------------------------------------------------------------------------
     // Memory Info
+    // -------------------------------------------------------------------------
 
     /**
      * Get memory information.
@@ -279,7 +297,9 @@ typedef struct rac_platform_adapter {
      */
     rac_result_t (*get_memory_info)(rac_memory_info_t* out_info, void* user_data);
 
+    // -------------------------------------------------------------------------
     // HTTP Download (Optional - can be NULL)
+    // -------------------------------------------------------------------------
 
     /**
      * Start an HTTP download.
@@ -309,7 +329,9 @@ typedef struct rac_platform_adapter {
      */
     rac_result_t (*http_download_cancel)(const char* task_id, void* user_data);
 
+    // -------------------------------------------------------------------------
     // Archive Extraction (Optional - can be NULL)
+    // -------------------------------------------------------------------------
 
     /**
      * Extract an archive (ZIP or TAR).
@@ -326,7 +348,9 @@ typedef struct rac_platform_adapter {
                                     rac_extract_progress_callback_fn progress_callback,
                                     void* callback_user_data, void* user_data);
 
+    // -------------------------------------------------------------------------
     // Directory Enumeration (Optional - can be NULL)
+    // -------------------------------------------------------------------------
 
     /**
      * Enumerate the entries in a directory.
@@ -362,7 +386,9 @@ typedef struct rac_platform_adapter {
      */
     rac_file_list_directory_fn file_list_directory;
 
+    // -------------------------------------------------------------------------
     // Directory Probe (Optional - can be NULL)
+    // -------------------------------------------------------------------------
 
     /**
      * Check whether a path is a directory containing at least one entry.
@@ -415,7 +441,9 @@ typedef struct rac_platform_adapter {
      */
     rac_bool_t (*is_non_empty_directory)(const char* path, void* user_data);
 
+    // -------------------------------------------------------------------------
     // Vendor ID (Optional - can be NULL)
+    // -------------------------------------------------------------------------
 
     /**
      * Apple-specific: returns the platform's persistent vendor ID
@@ -456,14 +484,18 @@ typedef struct rac_platform_adapter {
      */
     rac_result_t (*get_vendor_id)(char* out_buffer, size_t buffer_size, void* user_data);
 
+    // -------------------------------------------------------------------------
     // User Data
+    // -------------------------------------------------------------------------
 
     /** Platform-specific context passed to all callbacks */
     void* user_data;
 
 } rac_platform_adapter_t;
 
+// =============================================================================
 // PLATFORM ADAPTER API
+// =============================================================================
 
 /**
  * Sets the platform adapter.
@@ -483,7 +515,9 @@ RAC_API rac_result_t rac_set_platform_adapter(const rac_platform_adapter_t* adap
  */
 RAC_API const rac_platform_adapter_t* rac_get_platform_adapter(void);
 
+// =============================================================================
 // CONVENIENCE FUNCTIONS (use platform adapter internally)
+// =============================================================================
 
 /**
  * Log a message using the platform adapter.

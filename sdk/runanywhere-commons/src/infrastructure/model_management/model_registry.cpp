@@ -60,7 +60,9 @@ using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 
 namespace rac::infra::model_registry::detail {
 
+// -----------------------------------------------------------------------------
 // Download-state normalization
+// -----------------------------------------------------------------------------
 
 bool has_nonempty_local_path(const ModelInfo& model) {
     return !model.local_path().empty();
@@ -135,7 +137,9 @@ void overwrite_download_state_from_local_path(ModelInfo* model) {
     }
 }
 
+// -----------------------------------------------------------------------------
 // Proto snapshot helpers
+// -----------------------------------------------------------------------------
 
 rac_result_t store_proto_snapshot_locked(rac_model_registry_handle_t handle,
                                          const std::string& model_id, const rac_model_info_t* model,
@@ -249,7 +253,9 @@ bool get_model_snapshot_by_id(rac_model_registry_handle_t handle, const std::str
 
 #endif  // RAC_HAVE_PROTOBUF
 
+// =============================================================================
 // PUBLIC API - LIFECYCLE
+// =============================================================================
 
 rac_result_t rac_model_registry_create(rac_model_registry_handle_t* out_handle) {
     if (!out_handle) {
@@ -282,7 +288,9 @@ void rac_model_registry_destroy(rac_model_registry_handle_t handle) {
     RAC_LOG_DEBUG("ModelRegistry", "Model registry destroyed");
 }
 
+// =============================================================================
 // PUBLIC API - MODEL INFO
+// =============================================================================
 
 namespace rac::infra::model_registry::detail {
 

@@ -666,11 +666,15 @@ extern "C" {
 namespace runanywhere {
 namespace bridges {
 
+// =============================================================================
 // Static storage for callbacks (needed for C function pointers)
+// =============================================================================
 
 static PlatformCallbacks* g_platformCallbacks = nullptr;
 
+// =============================================================================
 // HTTP download callback state (platform adapter)
+// =============================================================================
 
 struct http_download_context {
     rac_http_progress_callback_fn progress_callback;
@@ -746,7 +750,9 @@ static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
     return {success, statusCode, responseBody, errorMessage};
 }
 
+// =============================================================================
 // SDK init proto helpers
+// =============================================================================
 
 struct SdkInitResultSummary {
     bool hasSuccess = false;
@@ -1094,7 +1100,9 @@ static rac_result_t callSdkRetryHttpProto(SdkInitResultSummary* outSummary,
 #endif
 }
 
+// =============================================================================
 // C Callback Implementations (called by RACommons)
+// =============================================================================
 
 static rac_bool_t platformFileExistsCallback(const char* path, void* userData) {
     if (!path || !g_platformCallbacks || !g_platformCallbacks->fileExists) {
@@ -1366,6 +1374,7 @@ static rac_result_t platformGetMemoryInfoCallback(rac_memory_info_t* outInfo, vo
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // Directory Enumeration + Vendor ID Callbacks (Platform Adapter)
 //
 // Cross-SDK parity with Swift (CppBridge+PlatformAdapter), Kotlin
@@ -1374,6 +1383,7 @@ static rac_result_t platformGetMemoryInfoCallback(rac_memory_info_t* outInfo, vo
 // these three slots being populated for rescan_local to succeed and for the
 // is_downloaded gating on multi-file artifacts (mmproj + GGUF pairs,
 // tokenizer + ONNX bundles) to report TRUE. See rac_platform_adapter.h.
+// =============================================================================
 
 static rac_result_t platformFileListDirectoryCallback(const char* dir_path,
                                                       rac_directory_entry_t* out_entries,
@@ -1446,7 +1456,9 @@ static rac_result_t platformGetVendorIdCallback(char* out_buffer,
 }
 #endif
 
+// =============================================================================
 // HTTP Download Callbacks (Platform Adapter)
+// =============================================================================
 
 static int reportHttpDownloadProgressInternal(const char* task_id,
                                               int64_t downloaded_bytes,
@@ -1572,7 +1584,9 @@ static rac_result_t platformHttpDownloadCancelCallback(const char* task_id, void
     return cancelled ? RAC_SUCCESS : RAC_ERROR_CANCELLED;
 }
 
+// =============================================================================
 // InitBridge Implementation
+// =============================================================================
 
 InitBridge& InitBridge::shared() {
     static InitBridge instance;
@@ -2036,8 +2050,10 @@ void InitBridge::shutdown() {
     LOGI("SDK shutdown complete");
 }
 
+// =============================================================================
 // Secure Storage Methods
 // Matches Swift: KeychainManager
+// =============================================================================
 
 bool InitBridge::secureSet(const std::string& key, const std::string& value) {
 #if defined(__APPLE__)
@@ -2180,8 +2196,10 @@ std::string InitBridge::getPersistentDeviceUUID() {
     return std::string(buffer);
 }
 
+// =============================================================================
 // Device Info (Synchronous)
 // For device registration callback which must be synchronous
+// =============================================================================
 
 std::string InitBridge::getDeviceModel() {
 #if defined(__APPLE__)
@@ -2303,8 +2321,10 @@ bool InitBridge::isTablet() {
 #endif
 }
 
+// =============================================================================
 // HTTP POST for Device Registration / Telemetry (Synchronous)
 // Matches Swift: CppBridge+Device.swift http_post callback
+// =============================================================================
 
 std::tuple<bool, int, std::string, std::string> InitBridge::httpPostSync(
     const std::string& url,
@@ -2320,7 +2340,9 @@ std::tuple<bool, int, std::string, std::string> InitBridge::httpPostSync(
 } // namespace bridges
 } // namespace runanywhere
 
+// =============================================================================
 // Global C API for platform download reporting
+// =============================================================================
 
 extern "C" int RunAnywhereHttpDownloadReportProgress(const char* task_id,
                                                      int64_t downloaded_bytes,

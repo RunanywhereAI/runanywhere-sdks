@@ -17,7 +17,9 @@
 #include "rac/core/rac_error_model.h"
 #include "rac/core/rac_platform_adapter.h"
 
+// =============================================================================
 // INTERNAL STATE
+// =============================================================================
 
 namespace {
 
@@ -182,7 +184,9 @@ void log_to_stderr(rac_log_level_t level, const char* category, const char* mess
 
 }  // anonymous namespace
 
+// =============================================================================
 // PUBLIC API IMPLEMENTATION
+// =============================================================================
 
 extern "C" {
 

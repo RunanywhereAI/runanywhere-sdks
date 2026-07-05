@@ -24,7 +24,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // CONFIGURATION
+// =============================================================================
 
 /**
  * @brief Set the base directory for model storage.
@@ -46,7 +48,9 @@ RAC_API rac_result_t rac_model_paths_set_base_dir(const char *base_dir);
  */
 RAC_API const char *rac_model_paths_get_base_dir(void);
 
+// =============================================================================
 // BASE DIRECTORIES - Mirrors ModelPathUtils base directory methods
+// =============================================================================
 
 /**
  * @brief Get the base RunAnywhere directory.
@@ -72,7 +76,9 @@ RAC_API rac_result_t rac_model_paths_get_base_directory(char *out_path,
 RAC_API rac_result_t rac_model_paths_get_models_directory(char *out_path,
                                                           size_t path_size);
 
+// =============================================================================
 // FRAMEWORK-SPECIFIC PATHS - Mirrors ModelPathUtils framework methods
+// =============================================================================
 
 /**
  * @brief Get the directory for a specific framework.
@@ -104,7 +110,9 @@ RAC_API rac_result_t rac_model_paths_get_model_folder(
     const char *model_id, rac_inference_framework_t framework, char *out_path,
     size_t path_size);
 
+// =============================================================================
 // MODEL FILE PATHS - Mirrors ModelPathUtils file path methods
+// =============================================================================
 
 /**
  * @brief Get the full path to a model file.
@@ -155,7 +163,9 @@ RAC_API rac_result_t rac_model_paths_get_expected_model_path(
 RAC_API rac_result_t rac_model_paths_get_model_path(
     const rac_model_info_t *model_info, char *out_path, size_t path_size);
 
+// =============================================================================
 // OTHER DIRECTORIES - Mirrors ModelPathUtils other directory methods
+// =============================================================================
 
 /**
  * @brief Get the cache directory.
@@ -196,7 +206,9 @@ RAC_API rac_result_t rac_model_paths_get_temp_directory(char *out_path,
 RAC_API rac_result_t rac_model_paths_get_downloads_directory(char *out_path,
                                                              size_t path_size);
 
+// =============================================================================
 // PATH ANALYSIS - Mirrors ModelPathUtils analysis methods
+// =============================================================================
 
 /**
  * @brief Extract model ID from a file path.
@@ -232,7 +244,9 @@ RAC_API rac_result_t rac_model_paths_extract_framework(
  */
 RAC_API rac_bool_t rac_model_paths_is_model_path(const char *path);
 
+// =============================================================================
 // MODEL FILE ROLE INFERENCE
+// =============================================================================
 
 /**
  * @brief Infer the canonical descriptor role for a single sidecar filename.
@@ -255,7 +269,9 @@ RAC_API rac_result_t rac_infer_model_file_role(const char *filename,
                                                int32_t modality_proto,
                                                int32_t *out_role_proto);
 
+// =============================================================================
 // PATH UTILITIES
+// =============================================================================
 
 // NOTE: rac_model_format_extension is declared in rac_model_types.h
 

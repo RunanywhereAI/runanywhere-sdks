@@ -15,7 +15,9 @@
 extern "C" {
 #endif
 
+// ============================================================================
 // Secure Storage (Keychain)
+// ============================================================================
 
 /**
  * Set a value in the Keychain
@@ -54,7 +56,9 @@ bool PlatformAdapter_secureExists(const char* key);
  */
 bool PlatformAdapter_getPersistentDeviceUUID(char** outValue);
 
+// ============================================================================
 // Native Directories
+// ============================================================================
 
 /**
  * Get the native model base directory.
@@ -64,7 +68,9 @@ bool PlatformAdapter_getPersistentDeviceUUID(char** outValue);
  */
 bool PlatformAdapter_getModelBaseDirectory(char** outValue);
 
+// ============================================================================
 // Device Info (Synchronous)
+// ============================================================================
 
 /**
  * Get device model name (e.g., "iPhone 16 Pro Max")
@@ -126,7 +132,9 @@ bool PlatformAdapter_getGPUFamily(char** outValue);
  */
 bool PlatformAdapter_isTablet(void);
 
+// ============================================================================
 // HTTP Download (Async Platform Adapter Fallback)
+// ============================================================================
 
 /**
  * Start an HTTP download for RACommons platform-adapter-only callers.
@@ -149,7 +157,9 @@ int PlatformAdapter_httpDownload(
  */
 bool PlatformAdapter_httpDownloadCancel(const char* taskId);
 
+// ============================================================================
 // Directory Enumeration (Platform Adapter Slots)
+// ============================================================================
 
 #include <stddef.h>
 

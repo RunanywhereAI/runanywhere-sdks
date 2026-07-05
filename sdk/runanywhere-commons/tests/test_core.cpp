@@ -23,7 +23,9 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 
+// =============================================================================
 // Minimal test platform adapter
+// =============================================================================
 
 static void test_log_callback(rac_log_level_t /*level*/, const char* /*category*/,
                               const char* /*message*/, void* /*ctx*/) {
@@ -95,7 +97,9 @@ static rac_config_t make_test_config() {
     return config;
 }
 
+// =============================================================================
 // Test: init / shutdown lifecycle
+// =============================================================================
 
 static TestResult test_init_shutdown() {
     rac_config_t config = make_test_config();
@@ -110,7 +114,9 @@ static TestResult test_init_shutdown() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: double init returns error
+// =============================================================================
 
 static TestResult test_double_init() {
     rac_config_t config = make_test_config();
@@ -126,7 +132,9 @@ static TestResult test_double_init() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: version info
+// =============================================================================
 
 static TestResult test_get_version() {
     rac_config_t config = make_test_config();
@@ -144,7 +152,9 @@ static TestResult test_get_version() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: platform adapter ABI / mandatory-slot validation in rac_init
+// =============================================================================
 
 static TestResult test_init_wrong_abi_version() {
     rac_platform_adapter_t adapter = make_valid_test_adapter();
@@ -212,7 +222,9 @@ static TestResult test_init_valid_adapter_succeeds() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: error messages for known codes
+// =============================================================================
 
 static TestResult test_error_message_known() {
     const char* msg_success = rac_error_message(RAC_SUCCESS);
@@ -234,7 +246,9 @@ static TestResult test_error_message_known() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: error message for unknown code
+// =============================================================================
 
 static TestResult test_error_message_unknown() {
     const char* msg = rac_error_message(static_cast<rac_result_t>(-9999));
@@ -243,7 +257,9 @@ static TestResult test_error_message_unknown() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: error classification helpers
+// =============================================================================
 
 static TestResult test_error_classification() {
     // -100 to -999 are commons errors
@@ -261,7 +277,9 @@ static TestResult test_error_classification() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: error details (set / get / clear)
+// =============================================================================
 
 static TestResult test_error_details() {
     rac_error_set_details("test detail");
@@ -277,7 +295,9 @@ static TestResult test_error_details() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: logger level management
+// =============================================================================
 
 static TestResult test_logger_levels() {
     rac_result_t rc = rac_logger_init(RAC_LOG_DEBUG);
@@ -291,7 +311,9 @@ static TestResult test_logger_levels() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: logger macros do not crash
+// =============================================================================
 
 static TestResult test_logger_no_crash() {
     rac_result_t rc = rac_logger_init(RAC_LOG_DEBUG);
@@ -311,7 +333,9 @@ static TestResult test_logger_no_crash() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: rac_alloc / rac_free / rac_strdup
+// =============================================================================
 
 static TestResult test_alloc_free() {
     void* ptr = rac_alloc(100);
@@ -326,7 +350,9 @@ static TestResult test_alloc_free() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: float32 PCM -> WAV conversion
+// =============================================================================
 
 static TestResult test_audio_float32_to_wav() {
     // Generate 0.1s sine wave at 16 kHz = 1600 samples
@@ -356,7 +382,9 @@ static TestResult test_audio_float32_to_wav() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: int16 PCM -> WAV conversion
+// =============================================================================
 
 static TestResult test_audio_int16_to_wav() {
     // Generate 0.1s sine wave as int16 at 16 kHz = 1600 samples
@@ -381,7 +409,9 @@ static TestResult test_audio_int16_to_wav() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Main: register tests and dispatch via CLI args
+// =============================================================================
 
 int main(int argc, char** argv) {
     try {

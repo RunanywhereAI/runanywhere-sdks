@@ -133,7 +133,9 @@ static const char* JNI_LOG_TAG = "JNI.Commons";
 #define LOGw(...) RAC_LOG_WARNING(JNI_LOG_TAG, __VA_ARGS__)
 #define LOGd(...) RAC_LOG_DEBUG(JNI_LOG_TAG, __VA_ARGS__)
 
+// =============================================================================
 // JNI AttachCurrentThread signature shim
+// =============================================================================
 // The `AttachCurrentThread` parameter type differs between JVM headers:
 //   - Android NDK jni.h (r27+):  AttachCurrentThread(JNIEnv**, void*)
 //   - Oracle / Temurin  jni.h:   AttachCurrentThread(void**,   void*)
@@ -147,7 +149,9 @@ static const char* JNI_LOG_TAG = "JNI.Commons";
 #define RAC_JNI_ATTACH_ENVPP(envpp) (reinterpret_cast<void**>(envpp))
 #endif
 
+// =============================================================================
 // Global State for Platform Adapter JNI Callbacks
+// =============================================================================
 
 static JavaVM* g_jvm = nullptr;
 static jobject g_platform_adapter = nullptr;
@@ -174,7 +178,9 @@ static jmethodID g_method_now_ms = nullptr;
 static jmethodID g_method_file_list_directory = nullptr;
 static jmethodID g_method_is_non_empty_directory = nullptr;
 
+// =============================================================================
 // JNI OnLoad/OnUnload
+// =============================================================================
 
 // NOLINTNEXTLINE(misc-unused-parameters): `reserved` is part of the JNI ABI.
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
@@ -226,7 +232,9 @@ JNIEXPORT void JNI_OnUnload(JavaVM* vm, void* reserved) {
     g_jvm = nullptr;
 }
 
+// =============================================================================
 // Helper Functions
+// =============================================================================
 
 // Helpers below share the same JNI patterns documented at the extern "C"
 // block lower in this file: jboolean -> bool implicit conversion when
@@ -796,7 +804,9 @@ static bool jniClearPendingException(JNIEnv* env) {
     return false;
 }
 
+// =============================================================================
 // Platform Adapter C Callbacks (called by C++ library)
+// =============================================================================
 
 // Forward declaration of the adapter struct
 static rac_platform_adapter_t g_c_adapter;
@@ -1196,7 +1206,9 @@ static rac_bool_t jni_is_non_empty_directory_callback(const char* path, void* us
 }
 // NOLINTEND(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
 
+// =============================================================================
 // JNI FUNCTIONS - Core Initialization
+// =============================================================================
 
 // JNI thunks must accept JNIEnv*, jclass/jobject parameters to satisfy the
 // JNI calling convention. Many thunks ignore one or more of those — that is
@@ -1323,7 +1335,9 @@ void dispatchHandleListener(HandleListenerRegistry& reg, const uint8_t* proto_by
 }
 }  // namespace
 
+// =============================================================================
 // commons-056: JNI exception-safety macros.
+// =============================================================================
 // Per JNI Spec §13.1, a C++ exception that escapes a native method invocation
 // is undefined behavior: ART's exception slot is left in an inconsistent
 // state and subsequent ExceptionCheck calls either silently miss the throw or
@@ -1579,7 +1593,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racResultToProtoError(J
     return makeProtoCallResult(env, rc, &buffer, "racResultToProtoError");
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Model Paths (canonical Swift-aligned schema)
+// =============================================================================
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsSetBaseDir(JNIEnv* env,
@@ -1612,7 +1628,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetModelFo
     return env->NewStringUTF(buf);
 }
 
+// =============================================================================
 // JNI FUNCTIONS - LLM Component
+// =============================================================================
 
 JNIEXPORT jlong JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentCreate(JNIEnv* env,
@@ -1678,7 +1696,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentCancel(J
     }
 }
 
+// =============================================================================
 // JNI FUNCTIONS - STT Component
+// =============================================================================
 
 JNIEXPORT jlong JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentCreate(JNIEnv* env,
@@ -1745,7 +1765,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentCancel(J
     (void)handle;
 }
 
+// =============================================================================
 // JNI FUNCTIONS - TTS Component
+// =============================================================================
 
 JNIEXPORT jlong JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentCreate(JNIEnv* env,
@@ -1811,7 +1833,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentCancel(J
     }
 }
 
+// =============================================================================
 // JNI FUNCTIONS - VAD Component
+// =============================================================================
 
 JNIEXPORT jlong JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentCreate(JNIEnv* env,
@@ -1877,12 +1901,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentReset(JN
     }
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Model Registry (mirrors Swift CppBridge+ModelRegistry.swift)
 //
 // The legacy struct/JSON pipeline (javaModelInfoToC, modelInfoToJson,
 // racModelRegistrySave / Get / GetAll / GetDownloaded / Remove /
 // UpdateDownloadStatus) was deleted. Kotlin
 // has migrated to the `racModelRegistry*Proto` family below.
+// =============================================================================
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRegisterProto(
@@ -2076,7 +2102,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelInfoMakeProto(
     return callProtoBufferFn(env, requestBytes, rac_model_info_make_proto, "racModelInfoMakeProto");
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Model Lifecycle Proto ABI (rac_model_lifecycle.h)
+// =============================================================================
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelLifecycleLoadProto(
@@ -2111,6 +2139,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racComponentLifecycleSn
     return makeProtoBufferByteArray(env, &snapshot, "racComponentLifecycleSnapshotProto");
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Model Assignment (rac_model_assignment.h)
 //
 // No JNI callback wiring is needed: when no per-SDK
@@ -2119,8 +2148,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racComponentLifecycleSn
 // platform HTTP transport registered via `rac_http_transport_register`
 // (OkHttp on Android). The racModelAssignment* thunks live further down in
 // this file.
+// =============================================================================
 
+// =============================================================================
 // JNI FUNCTIONS - Audio Utils (rac_audio_utils.h)
+// =============================================================================
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioFloat32ToWav(JNIEnv* env,
@@ -2244,7 +2276,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioWavHeaderSize(J
     return static_cast<jint>(rac_audio_wav_header_size());
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Device Manager (rac_device_manager.h)
+// =============================================================================
 // Mirrors Swift SDK's CppBridge+Device.swift
 
 // Global state for device callbacks
@@ -2653,7 +2687,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerGetDevi
     return nullptr;
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Telemetry Manager (rac_telemetry_manager.h)
+// =============================================================================
 // Mirrors Swift SDK's CppBridge+Telemetry.swift
 
 // Global state for telemetry
@@ -2812,7 +2848,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTelemetryManagerFlus
         rac_telemetry_manager_flush(reinterpret_cast<rac_telemetry_manager_t*>(handle)));
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Telemetry sink + SDK event emission (canonical proto stream)
+// =============================================================================
 //
 // The legacy struct-based analytics callback was removed. Telemetry is now fed
 // by the C++ destination router: the SDK registers the telemetry manager once
@@ -2875,7 +2913,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEventsSetTelemetrySi
     rac_events_set_telemetry_sink(reinterpret_cast<void*>(telemetryHandle));
 }
 
+// =============================================================================
 // JNI FUNCTIONS - SDK Event Emission (Kotlin-originated)
+// =============================================================================
 // These functions let Kotlin emit SDK events (e.g. lifecycle/model/download
 // events originating from Kotlin). They build the canonical proto payload and
 // publish it via rac::events::emit_*, so they reach telemetry through the same
@@ -3198,8 +3238,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitVa
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // DEV CONFIG API (rac_dev_config.h)
 // Mirrors Swift SDK's CppBridge+Environment.swift DevConfig
+// =============================================================================
 
 JNIEXPORT jboolean JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigIsAvailable(JNIEnv* env,
@@ -3263,7 +3305,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigIsUsableHtt
     return result;
 }
 
+// =============================================================================
 // SDK Configuration Initialization
+// =============================================================================
 
 /**
  * Initialize SDK configuration with version and platform info.
@@ -3311,6 +3355,7 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     return static_cast<jint>(result);
 }
 
+// =============================================================================
 // TOOL CALLING API (rac_tool_calling.h)
 // Mirrors Swift SDK's CppBridge+ToolCalling.swift
 //
@@ -3320,6 +3365,7 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
 // Kotlin now calls the proto-byte entries
 // (`racToolCallParseProto`, `racToolCallFormatPromptProto`,
 // `racToolCallValidateProto`).
+// =============================================================================
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallParseProto(
@@ -3341,7 +3387,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallValidateProt
                              "racToolCallValidateProto");
 }
 
+// =============================================================================
 // File Manager JNI Wrappers
+// =============================================================================
 
 // Global reference for file callbacks object
 static jobject g_file_callbacks_obj = nullptr;
@@ -3811,7 +3859,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadProgressPoll
                              "racDownloadProgressPollProto");
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Auth Manager (rac_auth_*)
+// =============================================================================
 //
 // F3 fix: racAuthInit now installs a rac_secure_storage_t vtable backed by
 // the existing platform-adapter secure-storage callbacks (secureGet/
@@ -3825,7 +3875,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadProgressPoll
 //
 // All thunks here are JvmStatic on RunAnywhereBridge (jclass receiver).
 
+// =============================================================================
 // rac_secure_storage_t adapter over the JNI platform adapter
+// =============================================================================
 //
 // The rac_platform_adapter_t secure-storage callbacks (jni_secure_*_callback
 // above) use base64-encoded bytes via the Kotlin secureGet/secureSet/
@@ -4103,7 +4155,9 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     return static_cast<jint>(rac_auth_save_tokens());
 }
 
+// =============================================================================
 // JNI FUNCTIONS - VoiceAgentStreamAdapter (rac_voice_agent_set_proto_callback)
+// =============================================================================
 //
 // Closes the broken Kotlin streaming path
 // the 3-agent audit flagged: VoiceAgentStreamAdapter.kt declared
@@ -4247,7 +4301,9 @@ Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_00024JniBridge_nativeQ
     rac_voice_agent_proto_quiesce();
 }
 
+// =============================================================================
 // JNI FUNCTIONS - LLMStreamAdapter (rac_llm_set_stream_proto_callback)
+// =============================================================================
 //
 // commons-161. Mirrors the VoiceAgentStreamAdapter thunks above so the
 // generic HandleStreamAdapter can fan one C callback slot out to N Kotlin
@@ -4387,7 +4443,9 @@ Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeQuiesce(
     rac_llm_proto_quiesce();
 }
 
+// =============================================================================
 // Generated-proto modality ABI thunks
+// =============================================================================
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmGenerateProto(
@@ -4630,10 +4688,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsSynthesizeStreamL
     return static_cast<jint>(rc);
 }
 
+// =============================================================================
 // BEGIN R7.A — Swift-aligned lifecycle-proto thunks for VLM cancel + VAD
 // configure/start/stop/reset. Mirror iOS Swift which uses the lifecycle-only
 // ABI (no handle) — Kotlin SDK is lifecycle-only matching Swift. Underlying
 // C ABI lives in rac_vlm_service.h and rac_vad_service.h.
+// =============================================================================
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmCancelLifecycleProto(JNIEnv* env,
@@ -4702,6 +4762,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadProcessLifecycleP
 }
 
 // END R7.A
+// =============================================================================
 
 // Swift-aligned: rac_tts_component_{list_voices,synthesize,synthesize_stream}
 // _proto JNI thunks deleted — Kotlin SDK uses the lifecycle proto path
@@ -4780,7 +4841,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentSetActiv
     RAC_JNI_CATCH_INT()
 }
 
+// =============================================================================
 // VAD STREAM PROTO ABI (rac_vad_stream.h)
+// =============================================================================
 
 static void vad_stream_proto_callback(const uint8_t* proto_bytes, size_t proto_size,
                                       void* user_data) {
@@ -5522,9 +5585,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegistryGetRegistere
     return arr;
 }
 
+// =============================================================================
 // Voice Agent Handle API (Android sample needs a voice agent
 // handle to feed VoiceAgentStreamAdapter. Mirrors Swift's
 // CppBridge.VoiceAgent.shared.getHandle() pattern.)
+// =============================================================================
 
 JNIEXPORT jlong JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentCreateStandalone(
@@ -5688,7 +5753,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentSynthesize
     return makeProtoCallResult(env, rc, &result, "racVoiceAgentSynthesizeSpeechProto");
 }
 
+// =============================================================================
 // Tool-calling session ABI (native orchestration loop).
+// =============================================================================
 //
 // Commons owns the full generate → parse → validate → execute → loop
 // cycle. Kotlin keeps only the tool registry + executor callback pipe.
@@ -5789,7 +5856,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionCa
         rac_tool_calling_session_cancel_proto(static_cast<uint64_t>(sessionHandle)));
 }
 
+// =============================================================================
 // Tool-calling run loop — single-call native orchestration.
+// =============================================================================
 //
 // Mirrors Swift's RunAnywhere+ToolCalling.swift, which drives
 // rac_tool_calling_run_loop_with_handle_proto. Kotlin uses the
@@ -5924,9 +5993,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingRunLoopCa
         rac_tool_calling_run_loop_cancel_proto(static_cast<uint64_t>(runLoopHandle)));
 }
 
+// =============================================================================
 // Tool-value JSON bridge (G3) — rac_tool_value_{to,from}_json_proto.
 // Replaces the per-SDK recursive ToolValue<->JSON walk. Mirrors Swift's
 // ToolCallingTypes.swift which loads the same two symbols.
+// =============================================================================
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolValueToJsonProto(
@@ -5942,7 +6013,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolValueFromJsonPro
                              "racToolValueFromJsonProto");
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Solutions (rac/solutions/rac_solution.h)
+// =============================================================================
 //
 // Proto-byte / YAML driven L5 solution runtime. One-to-one
 // mapping over `rac_solution_*`; the Kotlin handle is the C handle cast
@@ -6064,7 +6137,9 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     rac_solution_destroy(reinterpret_cast<rac_solution_handle_t>(handle));
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Native HTTP download
+// =============================================================================
 //
 // Single synchronous entrypoint that Kotlin's CppBridgeDownload shim calls
 // from its own worker thread. The JNI call blocks until the download
@@ -6161,7 +6236,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadExecute(
     return static_cast<jint>(status);
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Native HTTP request/response
+// =============================================================================
 //
 // Single blocking entrypoint for buffered HTTP request/response. Wraps
 // rac_http_client_create + rac_http_request_send + rac_http_response_free
@@ -6339,7 +6416,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpRequestExecute(
     return result;
 }
 
+// =============================================================================
 // JNI FUNCTIONS - HTTP default headers (R7.C)
+// =============================================================================
 //
 // Thunk for `rac_http_default_headers`. Marshals commons' canonical SDK
 // header list (X-SDK-Client / X-SDK-Version / Content-Type / Accept — the
@@ -6431,12 +6510,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racApiErrorFromResponse
     return arr;
 }
 
+// =============================================================================
 // JNI FUNCTIONS - Engine Router Capabilities
 //
 // `rac_router_frameworks_for_capability_proto` consumes a serialized
 // FrameworksForCapabilityRequest and returns a serialized
 // FrameworksForCapabilityResponse. Kotlin replaces the local when-mapping
 // in RunAnywhere+Frameworks.jvmAndroid.kt with one call here.
+// =============================================================================
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterFrameworksForCapabilityProto(
@@ -6524,22 +6605,28 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputGene
     return static_cast<jint>(rc);
 }
 
+// =============================================================================
 // JNI FUNCTIONS - VAD Statistics
 // Swift's setVADStatisticsCallback needs ambientLevel, recentAvg, recentMax.
+// =============================================================================
 
+// =============================================================================
 // JNI FUNCTIONS - Model Registry Fetch Assignments
 //
 // The JSON-stringy shim (`racModelRegistryFetchAssignments` returning an
 // array of model IDs) was deleted. Kotlin and Web both call
 // `racModelRegistryFetchAssignmentsProto` which returns a serialized
 // `runanywhere.v1.ModelInfoList`.
+// =============================================================================
 
+// =============================================================================
 // JNI FUNCTIONS — Swift-alignment
 //
 // Bulk thunk bootstrap added to unblock the Kotlin SDK's Swift-alignment
 // effort. Each thunk is a thin wrapper over the matching rac_* C ABI.
+// =============================================================================
 
-// Component metadata getters
+// ---------- Component metadata getters --------------------------------
 
 JNIEXPORT jboolean JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentIsInitialized(
@@ -6621,7 +6708,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentConfigur
     return static_cast<jint>(rac_stt_component_configure(handleFromJLong(handle), &config));
 }
 
-// Voice agent composite + lifecycle
+// ---------- Voice agent composite + lifecycle -------------------------
 
 JNIEXPORT jlong JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentCreate(JNIEnv* env,
@@ -6652,7 +6739,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentCleanup(JN
         rac_voice_agent_cleanup(reinterpret_cast<rac_voice_agent_handle_t>(handle)));
 }
 
-// Proto bridges (lifecycle + registry + structured output)
+// ---------- Proto bridges (lifecycle + registry + structured output) --
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventClearQueue(JNIEnv* env,
@@ -6731,7 +6818,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmUnsetStreamProtoC
     return static_cast<jint>(rac_llm_unset_stream_proto_callback(handleFromJLong(handle)));
 }
 
-// SDK state accessors
+// ---------- SDK state accessors ---------------------------------------
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStateGetEnvironment(JNIEnv* env,
@@ -6801,7 +6888,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceGetOrCreatePer
     return env->NewStringUTF(buf);
 }
 
-// Archive enum mappers
+// ---------- Archive enum mappers --------------------------------------
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveTypeFromProto(JNIEnv* env,
@@ -6848,7 +6935,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveStructureToPr
     return rc == RAC_SUCCESS ? static_cast<jint>(out) : -1;
 }
 
-// Model paths
+// ---------- Model paths -----------------------------------------------
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsSetBaseDirectory(
@@ -6996,7 +7083,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelIdFromUrl(JNIEn
     return env->NewStringUTF(buf);
 }
 
-// File manager (Swift-aligned aliases)
+// ---------- File manager (Swift-aligned aliases) ----------------------
 //
 // These call the rac_file_manager_* C ABI using Swift-aligned naming and a
 // model-id-only (framework-implicit) signature, matching how Swift's
@@ -7129,7 +7216,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFileManagerCheckStor
     return ok ? JNI_TRUE : JNI_FALSE;
 }
 
-// Environment validation + endpoints
+// ---------- Environment validation + endpoints ------------------------
 
 JNIEXPORT jboolean JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEnvIsProduction(JNIEnv* env,
@@ -7263,7 +7350,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointModelAssignm
     return path != nullptr ? env->NewStringUTF(path) : nullptr;
 }
 
-// Model assignment
+// ---------- Model assignment ------------------------------------------
 //
 // Kotlin registers no rac_assignment_callbacks_t: commons'
 // model_assignment.cpp default routes the fetch through the registered
@@ -7337,11 +7424,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentGetBy
     return empty;
 }
 
+// =============================================================================
 // INFERENCE FRAMEWORK display / analytics / raw tables (web-024).
 // Replaces the hand-written 22-entry switch tables in Kotlin ModelTypes.kt
 // with the canonical commons tables Swift consumes via cWireString. Each
 // thunk takes the proto InferenceFramework int, converts to the C enum via
 // rac_inference_framework_from_proto, then reads the static literal.
+// =============================================================================
 
 namespace {
 rac_inference_framework_t frameworkFromProtoInt(int32_t protoValue) {
@@ -7427,9 +7516,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelCategoryDefault
     return static_cast<jint>(proto);
 }
 
+// =============================================================================
 // ARCHIVE TYPE helpers — rac_archive_type_from_path /
 // rac_archive_type_extension. Detection returns the proto ArchiveType int
 // (>=0), or -1 when no archive is detected so the Kotlin caller maps to null.
+// =============================================================================
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveTypeFromPath(JNIEnv* env,
@@ -7464,9 +7555,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveTypeExtension
     return out != nullptr ? env->NewStringUTF(out) : nullptr;
 }
 
+// =============================================================================
 // ARTIFACT expected-files — rac_artifact_expected_files_proto.
 // Resolves the canonical ExpectedModelFiles manifest from a
 // serialized ModelInfo, mirroring Swift's expectedArtifactFiles.
+// =============================================================================
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArtifactExpectedFilesProto(
@@ -7475,10 +7568,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArtifactExpectedFile
                              "racArtifactExpectedFilesProto");
 }
 
+// =============================================================================
 // TWO-PHASE SDK INIT — rac_sdk_init_phase1_proto /
 // rac_sdk_init_phase2_proto / rac_sdk_retry_http_proto. Mirrors Swift's
 // CppBridge.SdkInit. phase1/phase2 take a serialized request and return a
 // serialized SdkInitResult; retryHTTP takes no input.
+// =============================================================================
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkInitPhase1Proto(
@@ -7574,6 +7669,7 @@ void rac_jni_erase_vad_listeners(JNIEnv* env, uintptr_t handle_key) {
 }
 }  // namespace
 
+// =============================================================================
 // NOTE: Backend registration functions have been MOVED to their respective
 // backend JNI libraries:
 //
@@ -7585,6 +7681,7 @@ void rac_jni_erase_vad_listeners(JNIEnv* env, uintptr_t handle_key) {
 //
 // This mirrors the Swift SDK architecture where each backend has its own
 // XCFramework (RABackendLlamaCPP, RABackendONNX).
+// =============================================================================
 
 // NOTE: this and racPlatformUnregister live AFTER the file's `extern "C"` block
 // (closed at the platform-TTS section), so they must declare C linkage

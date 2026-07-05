@@ -17,7 +17,9 @@
 
 static const char* LOG_CAT = "Platform.TTS";
 
+// =============================================================================
 // CALLBACK STORAGE
+// =============================================================================
 
 namespace {
 
@@ -46,7 +48,9 @@ bool snapshot_callbacks(rac_platform_tts_callbacks_t* out) {
 
 }  // namespace
 
+// =============================================================================
 // CALLBACK REGISTRATION
+// =============================================================================
 
 extern "C" {
 
@@ -78,7 +82,9 @@ rac_bool_t rac_platform_tts_is_available(void) {
                : RAC_FALSE;
 }
 
+// =============================================================================
 // SERVICE API
+// =============================================================================
 
 rac_result_t rac_tts_platform_create(const rac_tts_platform_config_t* config,
                                      rac_tts_platform_handle_t* out_handle) {

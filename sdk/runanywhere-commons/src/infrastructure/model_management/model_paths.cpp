@@ -27,7 +27,9 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 
+// =============================================================================
 // STATIC STATE
+// =============================================================================
 
 static std::mutex g_paths_mutex{};
 static std::string g_base_dir{};
@@ -45,7 +47,9 @@ bool is_safe_model_id_segment(const char* model_id) {
 }
 }  // namespace
 
+// =============================================================================
 // CONFIGURATION
+// =============================================================================
 
 rac_result_t rac_model_paths_set_base_dir(const char* base_dir) {
     if (!base_dir) {
@@ -75,7 +79,9 @@ const char* rac_model_paths_get_base_dir(void) {
     return tl_base_dir.c_str();
 }
 
+// =============================================================================
 // HELPER FUNCTIONS
+// =============================================================================
 
 static rac_result_t copy_string_to_buffer(const std::string& src, char* out_path,
                                           size_t path_size) {
@@ -805,7 +811,9 @@ static bool file_sha256_hex(const std::string& path, std::string* out_hex) {
     return true;
 }
 
+// =============================================================================
 // FORMAT AND FRAMEWORK UTILITIES
+// =============================================================================
 
 // NOTE: rac_model_format_extension is defined in model_types.cpp
 
@@ -847,7 +855,9 @@ const char* rac_model_folder_manifest_filename(void) {
     return ".rac-manifest.binpb";
 }
 
+// =============================================================================
 // BASE DIRECTORIES
+// =============================================================================
 
 rac_result_t rac_model_paths_get_base_directory(char* out_path, size_t path_size) {
     // Mirrors Swift's ModelPathUtils.getBaseDirectory()
@@ -877,7 +887,9 @@ rac_result_t rac_model_paths_get_models_directory(char* out_path, size_t path_si
     return copy_string_to_buffer(path, out_path, path_size);
 }
 
+// =============================================================================
 // FRAMEWORK-SPECIFIC PATHS
+// =============================================================================
 
 rac_result_t rac_model_paths_get_framework_directory(rac_inference_framework_t framework,
                                                      char* out_path, size_t path_size) {
@@ -918,7 +930,9 @@ rac_result_t rac_model_paths_get_model_folder(const char* model_id,
     return copy_string_to_buffer(path, out_path, path_size);
 }
 
+// =============================================================================
 // MODEL FILE PATHS
+// =============================================================================
 
 rac_result_t rac_model_paths_get_model_file_path(const char* model_id,
                                                  rac_inference_framework_t framework,
@@ -991,7 +1005,9 @@ rac_result_t rac_model_paths_get_model_path(const rac_model_info_t* model_info, 
                                                model_info->format, out_path, path_size);
 }
 
+// =============================================================================
 // MODEL ARTIFACT RESOLUTION
+// =============================================================================
 
 void rac_model_path_resolution_free(rac_model_path_resolution_t* resolution) {
     if (!resolution)
@@ -1235,7 +1251,9 @@ rac_result_t rac_model_paths_resolve_artifact(const rac_model_info_t* model_info
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // OTHER DIRECTORIES
+// =============================================================================
 
 rac_result_t rac_model_paths_get_cache_directory(char* out_path, size_t path_size) {
     // Mirrors Swift's ModelPathUtils.getCacheDirectory()
@@ -1279,7 +1297,9 @@ rac_result_t rac_model_paths_get_downloads_directory(char* out_path, size_t path
     return copy_string_to_buffer(path, out_path, path_size);
 }
 
+// =============================================================================
 // PATH ANALYSIS
+// =============================================================================
 
 rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_id,
                                               size_t model_id_size) {

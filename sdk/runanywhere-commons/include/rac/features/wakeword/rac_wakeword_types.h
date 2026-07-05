@@ -26,7 +26,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // WAKE WORD EVENT
+// =============================================================================
 
 /**
  * @brief Wake word detection event
@@ -53,7 +55,9 @@ typedef struct rac_wakeword_event {
     int32_t duration_ms;
 } rac_wakeword_event_t;
 
+// =============================================================================
 // CONFIGURATION
+// =============================================================================
 
 /**
  * @brief Wake word detection configuration
@@ -92,7 +96,9 @@ static const rac_wakeword_config_t RAC_WAKEWORD_CONFIG_DEFAULT = {.sample_rate =
                                                                   .min_detection_interval_ms = 500,
                                                                   .refractory_period_ms = 2000};
 
+// =============================================================================
 // MODEL INFO
+// =============================================================================
 
 /**
  * @brief Information about a loaded wake word model
@@ -117,7 +123,9 @@ typedef struct rac_wakeword_model_info {
     float threshold_override;
 } rac_wakeword_model_info_t;
 
+// =============================================================================
 // SERVICE INFO
+// =============================================================================
 
 /**
  * @brief Wake word service status information
@@ -148,7 +156,9 @@ typedef struct rac_wakeword_info {
     float threshold;
 } rac_wakeword_info_t;
 
+// =============================================================================
 // CALLBACKS
+// =============================================================================
 
 /**
  * @brief Wake word detection callback
@@ -171,7 +181,9 @@ typedef void (*rac_wakeword_callback_fn)(const rac_wakeword_event_t* event, void
 typedef void (*rac_wakeword_vad_callback_fn)(rac_bool_t is_speech, float confidence,
                                              void* user_data);
 
+// =============================================================================
 // RESULT TYPES
+// =============================================================================
 
 /**
  * @brief Result of processing a single audio frame
@@ -193,7 +205,9 @@ typedef struct rac_wakeword_frame_result {
     rac_bool_t vad_is_speech;
 } rac_wakeword_frame_result_t;
 
+// =============================================================================
 // ERROR CODES
+// =============================================================================
 
 /** Wake word specific error codes (range: -850 to -860, per rac_error.h convention) */
 #define RAC_ERROR_WAKEWORD_BASE ((rac_result_t) - 850)

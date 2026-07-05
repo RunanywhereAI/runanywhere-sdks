@@ -123,7 +123,9 @@ class SDKLogger(
         @Volatile
         private var logForwarder: NativeLogForwarder? = null
 
+        // ==================================================================
         // Configuration
+        // ==================================================================
 
         /**
          * Set the minimum log level.
@@ -173,7 +175,9 @@ class SDKLogger(
         @JvmStatic
         fun isForwardingConfigured(): Boolean = logForwarder != null && forwardingEnabled
 
+        // ==================================================================
         // Convenience Loggers (Static)
+        // ==================================================================
 
         /** Shared logger for general SDK operations. Category: "RunAnywhere" */
         @JvmField
@@ -224,7 +228,9 @@ class SDKLogger(
         val audioDecoder = SDKLogger("AudioDecoder")
     }
 
+    // ==================================================================
     // Logging Methods
+    // ==================================================================
 
     /**
      * Log a debug message.
@@ -276,7 +282,9 @@ class SDKLogger(
         log(LogLevel.Fatal, message, metadata)
     }
 
+    // ==================================================================
     // Error Logging
+    // ==================================================================
 
     /**
      * Log a Throwable with full context.
@@ -307,7 +315,9 @@ class SDKLogger(
         }
     }
 
+    // ==================================================================
     // Core Logging
+    // ==================================================================
 
     /**
      * Log a message with the specified level.

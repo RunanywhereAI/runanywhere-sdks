@@ -65,7 +65,7 @@ typedef enum rac_primitive {
  */
 const char* rac_primitive_name(rac_primitive_t p);
 
-/*
+/* ===========================================================================
  * Runtime identifier (which compute target an engine uses)
  *
  * Distinct from rac_primitive_t (which models WHAT the engine does) and from
@@ -77,7 +77,7 @@ const char* rac_primitive_name(rac_primitive_t p);
  *
  * Order is wire-stable. Add new runtimes in the reserved range only and bump
  * RAC_PLUGIN_API_VERSION when promoting a reserved value.
- */
+ * =========================================================================== */
 typedef enum rac_runtime_id {
     RAC_RUNTIME_UNSPECIFIED = 0,
 

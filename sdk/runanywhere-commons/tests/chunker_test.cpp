@@ -22,7 +22,9 @@ class ChunkerTest : public ::testing::Test {
     DocumentChunker chunker_;
 };
 
+// ============================================================================
 // Basic Functionality Tests
+// ============================================================================
 
 TEST_F(ChunkerTest, EmptyTextProducesNoChunks) {
     std::string empty_text;
@@ -66,7 +68,9 @@ TEST_F(ChunkerTest, PositionMetadataIsCorrect) {
     EXPECT_LE(chunks[0].end_position, text.length());
 }
 
+// ============================================================================
 // Token Estimation Tests
+// ============================================================================
 
 TEST_F(ChunkerTest, TokenEstimationIsPositive) {
     std::string text = "This is a sample text for token estimation.";
@@ -91,7 +95,9 @@ TEST_F(ChunkerTest, TokenEstimationProportionalToLength) {
     EXPECT_LT(short_tokens, long_tokens);
 }
 
+// ============================================================================
 // Configuration Tests
+// ============================================================================
 
 TEST_F(ChunkerTest, CustomChunkSize) {
     ChunkerConfig config;
@@ -135,7 +141,9 @@ TEST_F(ChunkerTest, CustomChunkOverlap) {
     }
 }
 
+// ============================================================================
 // Boundary Condition Tests
+// ============================================================================
 
 TEST_F(ChunkerTest, SentenceWithExclamationMark) {
     std::string text = "Wow! Amazing text here.";
@@ -175,7 +183,9 @@ TEST_F(ChunkerTest, WhitespaceTrimmingInChunks) {
     }
 }
 
+// ============================================================================
 // Memory Efficiency Tests
+// ============================================================================
 
 TEST_F(ChunkerTest, NoExcessiveMemoryAllocationForSmallText) {
     std::string small_text = "Small.";
@@ -208,7 +218,9 @@ TEST_F(ChunkerTest, LargeTextProcessing) {
     EXPECT_GT(total_text_length, 0ul);
 }
 
+// ============================================================================
 // Move Semantics and Performance Tests
+// ============================================================================
 
 TEST_F(ChunkerTest, ChunksAreMovable) {
     std::string text = "Test sentence. Another test. Final test.";
@@ -235,7 +247,9 @@ TEST_F(ChunkerTest, MoveSemanticForLargeChunks) {
     }
 }
 
+// ============================================================================
 // Edge Cases and Error Conditions
+// ============================================================================
 
 TEST_F(ChunkerTest, VeryLongSentenceWithoutPeriod) {
     std::string text;
@@ -266,7 +280,9 @@ TEST_F(ChunkerTest, OnlyPunctuation) {
     EXPECT_LE(chunks.size(), 10ul);
 }
 
+// ============================================================================
 // Thread Safety - Basic Const Correctness Tests
+// ============================================================================
 
 TEST_F(ChunkerTest, ConstMethodsDoNotModifyState) {
     std::string text = "Test sentence.";

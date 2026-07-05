@@ -16,7 +16,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // EXPORT MACRO
+// =============================================================================
 
 #if defined(RAC_ONNX_BUILDING)
 #if defined(_WIN32)
@@ -30,7 +32,9 @@ extern "C" {
 #define RAC_ONNX_API
 #endif
 
+// =============================================================================
 // CONFIGURATION
+// =============================================================================
 
 typedef struct rac_vad_onnx_config {
     int32_t sample_rate;
@@ -42,7 +46,9 @@ typedef struct rac_vad_onnx_config {
 static const rac_vad_onnx_config_t RAC_VAD_ONNX_CONFIG_DEFAULT = {
     .sample_rate = 16000, .energy_threshold = 0.5f, .frame_length = 0.032f, .num_threads = 0};
 
+// =============================================================================
 // ONNX VAD API
+// =============================================================================
 
 RAC_ONNX_API rac_result_t rac_vad_onnx_create(const char* model_path,
                                               const rac_vad_onnx_config_t* config,
@@ -63,7 +69,9 @@ RAC_ONNX_API rac_bool_t rac_vad_onnx_is_speech_active(rac_handle_t handle);
 
 RAC_ONNX_API void rac_vad_onnx_destroy(rac_handle_t handle);
 
+// =============================================================================
 // BACKEND REGISTRATION
+// =============================================================================
 
 RAC_ONNX_API rac_result_t rac_backend_onnx_register(void);
 

@@ -16,7 +16,9 @@
 #include "rac/infrastructure/network/rac_api_types.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 
+// =============================================================================
 // Global State
+// =============================================================================
 
 // commons-005: every read/write of g_auth_state, g_storage, g_storage_available
 // must hold g_auth_mutex. Refresh fires asynchronously from a timer; sign-out
@@ -28,7 +30,9 @@ static rac_auth_state_t g_auth_state = {};
 static rac_secure_storage_t g_storage = {};
 static bool g_storage_available = false;
 
+// =============================================================================
 // Helpers
+// =============================================================================
 
 // Caller must hold g_auth_mutex.
 static void free_auth_state_strings_locked() {
@@ -139,7 +143,9 @@ static int save_tokens_locked() {
     return result;
 }
 
+// =============================================================================
 // Initialization
+// =============================================================================
 
 void rac_auth_init(const rac_secure_storage_t* storage) {
     std::lock_guard<std::mutex> lock(g_auth_mutex);
@@ -159,7 +165,9 @@ void rac_auth_reset(void) {
     reset_auth_state_locked();
 }
 
+// =============================================================================
 // Token State
+// =============================================================================
 
 bool rac_auth_is_authenticated(void) {
     std::lock_guard<std::mutex> lock(g_auth_mutex);
@@ -241,7 +249,9 @@ const char* rac_auth_get_organization_id(void) {
     return tl_organization_id.c_str();
 }
 
+// =============================================================================
 // Request Building
+// =============================================================================
 
 char* rac_auth_build_authenticate_request(const rac_sdk_config_t* config) {
     if (!config)
@@ -277,7 +287,9 @@ char* rac_auth_build_refresh_request(void) {
     return rac_refresh_request_to_json(&request);
 }
 
+// =============================================================================
 // Response Handling
+// =============================================================================
 
 // Caller must hold g_auth_mutex.
 static int update_auth_state_from_response_locked(const rac_auth_response_t* response) {
@@ -363,7 +375,9 @@ int rac_auth_handle_refresh_response(const char* json) {
     return handle_auth_response(json, true);
 }
 
+// =============================================================================
 // Token Management
+// =============================================================================
 
 int rac_auth_get_valid_token(const char** out_token, bool* out_needs_refresh) {
     if (!out_token || !out_needs_refresh)
@@ -409,7 +423,9 @@ void rac_auth_clear(void) {
     }
 }
 
+// =============================================================================
 // Persistence
+// =============================================================================
 
 int rac_auth_load_stored_tokens(void) {
     std::lock_guard<std::mutex> lock(g_auth_mutex);

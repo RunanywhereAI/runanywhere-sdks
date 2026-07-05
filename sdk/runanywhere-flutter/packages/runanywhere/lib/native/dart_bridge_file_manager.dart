@@ -9,7 +9,9 @@ import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/native/types/tools_storage_types.dart';
 
+// =============================================================================
 // Exception Return Constants (must be compile-time constants for FFI)
+// =============================================================================
 
 const int _errorDirectoryCreationFailed = -189;
 const int _errorDeleteFailed = -187;
@@ -17,7 +19,9 @@ const int _errorFileNotFound = -183;
 const int _falseReturn = 0;
 const int _negativeReturn = -1;
 
+// =============================================================================
 // File Manager Bridge
+// =============================================================================
 
 /// File manager bridge to C++ rac_file_manager.
 /// C++ owns business logic; Dart provides thin I/O callbacks.
@@ -70,7 +74,9 @@ class DartBridgeFileManager {
     _isRegistered = false;
   }
 
+  // =========================================================================
   // Public API
+  // =========================================================================
 
   /// Create directory structure (Models, Cache, Temp, Downloads).
   static bool createDirectoryStructure() {
@@ -326,7 +332,9 @@ class DartBridgeFileManager {
     }
   }
 
+  // =========================================================================
   // Private helpers
+  // =========================================================================
 
   static DynamicLibrary? _lib() {
     try {
@@ -338,7 +346,9 @@ class DartBridgeFileManager {
   }
 }
 
+// =============================================================================
 // Storage Info Data Class
+// =============================================================================
 
 /// Storage availability result from C++ rac_file_manager_check_storage.
 class NativeStorageAvailability {
@@ -376,7 +386,9 @@ class NativeStorageInfo {
   });
 }
 
+// =============================================================================
 // C Callbacks (Platform I/O)
+// =============================================================================
 
 int _createDirectoryCallback(
     Pointer<Utf8> path, int recursive, Pointer<Void> userData) {

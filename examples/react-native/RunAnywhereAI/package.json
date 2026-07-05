@@ -2,6 +2,9 @@
   "name": "runanywhere-ai-example",
   "version": "0.1.0",
   "private": true,
+  "installConfig": {
+    "hoistingLimits": "workspaces"
+  },
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
@@ -9,13 +12,13 @@
     "test": "jest",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"App.tsx\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"App.tsx\" --fix",
-    "typecheck": "node ../../../scripts/examples/react-native/sync-solutions-yamls.js && tsc --noEmit",
+    "typecheck": "node scripts/sync-solutions-yamls.js && tsc --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --check",
     "format:fix": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --write",
     "unused": "knip",
-    "pod-install": "bash ../../../scripts/examples/react-native/pod-install.sh",
-    "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && yarn install --ignore-scripts && patch-package && bash ../../../scripts/examples/react-native/pod-install.sh",
-    "postinstall": "node ../../../scripts/examples/react-native/postinstall.js"
+    "pod-install": "bash scripts/pod-install.sh",
+    "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && yarn install --ignore-scripts && patch-package && bash scripts/pod-install.sh",
+    "postinstall": "node scripts/postinstall.js"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.12.0",
@@ -27,10 +30,10 @@
     "@react-navigation/bottom-tabs": "^7.12.0",
     "@react-navigation/native": "^7.2.4",
     "@react-navigation/native-stack": "^7.12.0",
-    "@runanywhere/core": "portal:../../../sdk/runanywhere-react-native/packages/core",
-    "@runanywhere/llamacpp": "portal:../../../sdk/runanywhere-react-native/packages/llamacpp",
-    "@runanywhere/onnx": "portal:../../../sdk/runanywhere-react-native/packages/onnx",
-    "@runanywhere/proto-ts": "portal:../../../sdk/shared/proto-ts",
+    "@runanywhere/core": "workspace:*",
+    "@runanywhere/llamacpp": "workspace:*",
+    "@runanywhere/onnx": "workspace:*",
+    "@runanywhere/proto-ts": "workspace:*",
     "lucide-react-native": "^1.21.0",
     "react": "19.2.7",
     "react-native": "0.85.3",
@@ -83,10 +86,5 @@
     "tabWidth": 2,
     "trailingComma": "es5",
     "useTabs": false
-  },
-  "packageManager": "yarn@3.6.1",
-  "resolutions": {
-    "react": "19.2.7",
-    "@runanywhere/proto-ts": "portal:../../../sdk/shared/proto-ts"
   }
 }

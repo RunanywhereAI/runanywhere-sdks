@@ -13,7 +13,9 @@ import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/native/types/memory_platform_types.dart';
 
+// =============================================================================
 // Exception Return Constants (must be compile-time constants for FFI)
+// =============================================================================
 
 /// Exceptional return value for file operations that return Int32
 const int _exceptionalReturnInt32 = -183; // RAC_ERROR_FILE_NOT_FOUND
@@ -41,7 +43,9 @@ typedef _SysctlByNameDart =
 typedef _PlatformServiceAvailabilityCallbackNative =
     Int32 Function(Int32 service, Pointer<Void> userData);
 
+// =============================================================================
 // Platform Adapter Bridge
+// =============================================================================
 
 /// Platform adapter bridge for fundamental C++ → Dart operations.
 ///
@@ -81,7 +85,9 @@ class DartBridgePlatform {
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 
+  // ---------------------------------------------------------------------------
   // Platform Services (Foundation Models + System TTS/STT) state
+  // ---------------------------------------------------------------------------
 
   /// Whether platform services availability callback has been registered.
   static bool _servicesRegistered = false;
@@ -283,7 +289,9 @@ class DartBridgePlatform {
   /// Check if the adapter is registered.
   static bool get isRegistered => _isRegistered;
 
+  // ---------------------------------------------------------------------------
   // Platform Services Registration (Foundation Models + System TTS/STT)
+  // ---------------------------------------------------------------------------
 
   /// Whether platform services availability callback has been registered.
   static bool get servicesRegistered => _servicesRegistered;
@@ -354,7 +362,9 @@ int _platformServiceAvailabilityCallback(int service, Pointer<Void> userData) {
   }
 }
 
+// =============================================================================
 // C Callback Functions (must be static top-level functions)
+// =============================================================================
 
 /// Maximum byte length to read from a C-owned log buffer.
 /// Matches `thread_local char formatted[2048]` in commons/src/core/rac_logger.cpp.
@@ -830,7 +840,9 @@ int _platformGetMemoryInfoCallback(
   return RacResultCode.success;
 }
 
+// =============================================================================
 // DIRECTORY ENUMERATION (Platform Adapter)
+// =============================================================================
 
 /// `rac_file_list_directory_fn` — enumerate directory entries into the
 /// caller-provided array. Implements the two-call semantics documented on
@@ -958,7 +970,9 @@ class _DartDirectoryEntry {
   final int sizeBytes;
 }
 
+// =============================================================================
 // HTTP DOWNLOAD (Platform Adapter)
+// =============================================================================
 
 int _httpDownloadCounter = 0;
 

@@ -10,12 +10,14 @@ namespace margelo::nitro::runanywhere {
 using namespace ::runanywhere::bridges;
 
 // Solutions Runtime
+// ============================================================================
 // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8
 //
 // Direct 1:1 mapping to the C ABI. Handles round-trip through a `double`
 // so the JS side can hold a stable reference (Nitro doesn't yet support
 // 64-bit integers in bridge types — the same pattern is used by
 // `getVoiceAgentHandle` / `getLLMHandle`).
+// ============================================================================
 
 namespace {
 

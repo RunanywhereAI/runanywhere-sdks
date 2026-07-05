@@ -65,12 +65,40 @@ RunAnywhere Commons is the shared C++ layer that sits between platform SDKs (Swi
 
 ## Architecture Overview
 
-Platform SDKs (Swift `RunAnywhere`, Kotlin `RunAnywhereKotlin`) call the RAC public C API (`rac_*`: `rac_llm_service.h`, `rac_stt_service.h`, `rac_tts_service.h`, `rac_vad_service.h`, `rac_voice_agent.h`). The C API dispatches through the Plugin Registry + Engine Router via `rac_engine_vtable_t`, which performs an ABI-versioned vtable handshake (`RAC_PLUGIN_API_VERSION`), hardware-aware routing (Metal/ANE/CUDA/QNN), and supports both static registration and dlopen loading (`rac_registry_load_plugin`). The registry selects among the engine plugins (`engines/`):
-
-- **llamacpp/** — LLM (GGUF), Metal GPU
-- **sherpa/ onnx/** — STT/TTS/VAD, embeddings
-- **cloud/** — STT (HTTP, cloud)
-- **platform/** — Apple Foundation Models (LLM) + System TTS (Swift callbacks, iOS/macOS only)
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Swift/Kotlin SDKs                        │
+│              (RunAnywhere, RunAnywhereKotlin)               │
+└────────────────────────────┬────────────────────────────────┘
+                             │ C API (rac_*)
+┌────────────────────────────▼────────────────────────────────┐
+│              RAC Public C API (rac_*)                       │
+│   rac_llm_service.h, rac_stt_service.h, rac_tts_service.h   │
+│   rac_vad_service.h, rac_voice_agent.h                      │
+└────────────────────────────┬────────────────────────────────┘
+                             │ rac_engine_vtable_t dispatch
+┌────────────────────────────▼────────────────────────────────┐
+│          Plugin Registry + Engine Router                     │
+│   - ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION)  │
+│   - Hardware-aware routing (Metal/ANE/CUDA/QNN)              │
+│   - Static register or dlopen-loaded (rac_registry_load_plugin) │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────┐
+│                   Engine Plugins (engines/)                  │
+│   ┌─────────────┐  ┌─────────────────┐  ┌───────────────┐   │
+│   │  llamacpp/  │  │  sherpa/ onnx/  │  │  cloud/       │   │
+│   │  LLM (GGUF) │  │ STT/TTS/VAD,    │  │  STT (HTTP,   │   │
+│   │  Metal GPU  │  │ embeddings      │  │  cloud)       │   │
+│   └─────────────┘  └─────────────────┘  └───────────────┘   │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │                  platform/                           │   │
+│   │   Apple Foundation Models (LLM) + System TTS         │   │
+│   │   (Swift callbacks, iOS/macOS only)                  │   │
+│   └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -155,7 +183,7 @@ printf("Transcription: %s\n", result.text);
 
 ```bash
 # Clone the repository
-cd runanywhere-sdks/sdk/runanywhere-commons
+cd runanywhere-all/sdks/sdk/runanywhere-commons
 
 # Configure and build (macOS/Linux)
 cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -221,20 +249,18 @@ rac_shutdown();
 
 #### iOS
 ```bash
-# From the repo root
-./scripts/build/ios-xcframework.sh                    # Full build
-./scripts/build/ios-xcframework.sh --skip-download    # Use cached dependencies
-./scripts/build/ios-xcframework.sh --backend llamacpp # Specific backend only
-./scripts/build/ios-xcframework.sh --package          # Create XCFramework ZIPs
+./scripts/build-ios.sh                    # Full build
+./scripts/build-ios.sh --skip-download    # Use cached dependencies
+./scripts/build-ios.sh --backend llamacpp # Specific backend only
+./scripts/build-ios.sh --package          # Create XCFramework ZIPs
 ```
 
 #### Android
 ```bash
-# From the repo root
-./scripts/build/android.sh                     # All backends, all ABIs
-./scripts/build/android.sh llamacpp            # LlamaCPP only
-./scripts/build/android.sh onnx arm64-v8a      # Specific backend + ABI
-./scripts/build/android.sh --check             # Verify 16KB alignment
+./scripts/build-android.sh                     # All backends, all ABIs
+./scripts/build-android.sh llamacpp            # LlamaCPP only
+./scripts/build-android.sh onnx arm64-v8a      # Specific backend + ABI
+./scripts/build-android.sh --check             # Verify 16KB alignment
 ```
 
 ### Build Outputs
@@ -242,20 +268,20 @@ rac_shutdown();
 #### iOS/macOS
 ```
 dist/
-  - RACommons.xcframework              # Core library
-  - RABackendLLAMACPP.xcframework      # LLM backend
-  - RABackendONNX.xcframework          # STT/TTS/VAD backend
+├── RACommons.xcframework              # Core library
+├── RABackendLLAMACPP.xcframework      # LLM backend
+└── RABackendONNX.xcframework          # STT/TTS/VAD backend
 ```
 
 #### Android
 ```
 dist/android/
-  - jni/{abi}/                         # JNI libraries
-    - librac_commons_jni.so
-    - librac_backend_llamacpp_jni.so
-    - librac_backend_onnx_jni.so
-  - onnx/{abi}/                        # ONNX runtime
-    - libonnxruntime.so
+├── jni/{abi}/                         # JNI libraries
+│   ├── librac_commons_jni.so
+│   ├── librac_backend_llamacpp_jni.so
+│   └── librac_backend_onnx_jni.so
+└── onnx/{abi}/                        # ONNX runtime
+    └── libonnxruntime.so
 ```
 
 ---
@@ -456,7 +482,7 @@ LLAMACPP_VERSION=b7650
 
 Load versions in scripts:
 ```bash
-source scripts/lib/load-versions.sh
+source scripts/load-versions.sh
 echo "Using llama.cpp version: $LLAMACPP_VERSION"
 ```
 
@@ -498,7 +524,7 @@ See the main repository [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines.
 ### Code Style
 
 - Follow Google C++ Style Guide with project customizations
-- Run `./scripts/validation/lint-cpp.sh --fix` (from the repo root) before committing
+- Run `./scripts/lint-cpp.sh --fix` before committing
 - All public symbols use `rac_` prefix
 
 ---

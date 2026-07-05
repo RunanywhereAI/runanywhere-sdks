@@ -31,7 +31,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // SCHEDULER TYPES
+// =============================================================================
 
 /**
  * @brief Diffusion scheduler/sampler types
@@ -73,7 +75,9 @@ typedef enum rac_diffusion_mode {
     RAC_DIFFUSION_MODE_INPAINTING = 2,     /**< Edit specific regions with mask */
 } rac_diffusion_mode_t;
 
+// =============================================================================
 // TOKENIZER CONFIGURATION
+// =============================================================================
 
 /**
  * @brief Tokenizer source presets
@@ -141,7 +145,9 @@ static const rac_diffusion_tokenizer_config_t RAC_DIFFUSION_TOKENIZER_CONFIG_DEF
     .custom_base_url = RAC_NULL,
     .auto_download = RAC_TRUE};
 
+// =============================================================================
 // CONFIGURATION - Component configuration
+// =============================================================================
 
 /**
  * @brief Diffusion component configuration
@@ -182,7 +188,9 @@ static const rac_diffusion_config_t RAC_DIFFUSION_CONFIG_DEFAULT = {
                   .custom_base_url = RAC_NULL,
                   .auto_download = RAC_TRUE}};
 
+// =============================================================================
 // OPTIONS - Generation options
+// =============================================================================
 
 /**
  * @brief Diffusion generation options
@@ -272,7 +280,9 @@ static const rac_diffusion_options_t RAC_DIFFUSION_OPTIONS_DEFAULT = {
     .report_intermediate_images = RAC_FALSE,
     .progress_stride = 1};
 
+// =============================================================================
 // PROGRESS - Generation progress
+// =============================================================================
 
 /**
  * @brief Diffusion generation progress
@@ -305,7 +315,9 @@ typedef struct rac_diffusion_progress {
     int32_t intermediate_image_height;
 } rac_diffusion_progress_t;
 
+// =============================================================================
 // RESULT - Generation result
+// =============================================================================
 
 /**
  * @brief Diffusion generation result
@@ -341,7 +353,9 @@ typedef struct rac_diffusion_result {
     char* error_message;
 } rac_diffusion_result_t;
 
+// =============================================================================
 // INFO - Service information
+// =============================================================================
 
 /**
  * @brief Diffusion service information
@@ -377,7 +391,9 @@ typedef struct rac_diffusion_info {
     int32_t max_height;
 } rac_diffusion_info_t;
 
+// =============================================================================
 // CALLBACKS
+// =============================================================================
 
 /**
  * @brief Diffusion progress callback
@@ -414,7 +430,9 @@ typedef void (*rac_diffusion_complete_callback_fn)(const rac_diffusion_result_t*
 typedef void (*rac_diffusion_error_callback_fn)(rac_result_t error_code, const char* error_message,
                                                 void* user_data);
 
+// =============================================================================
 // CAPABILITY FLAGS
+// =============================================================================
 
 /** Supports text-to-image generation */
 #define RAC_DIFFUSION_CAP_TEXT_TO_IMAGE (1 << 0)
@@ -431,7 +449,9 @@ typedef void (*rac_diffusion_error_callback_fn)(rac_result_t error_code, const c
 /** Has safety checker */
 #define RAC_DIFFUSION_CAP_SAFETY_CHECKER (1 << 4)
 
+// =============================================================================
 // MEMORY MANAGEMENT
+// =============================================================================
 
 /**
  * @brief Free diffusion result resources

@@ -25,7 +25,9 @@
 #include "rac/features/diffusion/rac_diffusion_model_registry.h"
 #endif
 
+// =============================================================================
 // STATIC STATE
+// =============================================================================
 
 static std::atomic<bool> s_initialized{false};
 static std::mutex s_init_mutex;
@@ -73,7 +75,9 @@ static rac_version_t make_version(void) {
 }
 static const rac_version_t s_version = make_version();
 
+// =============================================================================
 // INTERNAL LOGGING HELPER
+// =============================================================================
 
 static void internal_log(rac_log_level_t level, const char* message) {
     if (level < s_log_level.load(std::memory_order_acquire)) {
@@ -91,7 +95,9 @@ static void internal_log(rac_log_level_t level, const char* message) {
     }
 }
 
+// =============================================================================
 // PLATFORM ADAPTER
+// =============================================================================
 
 extern "C" {
 
@@ -114,7 +120,9 @@ void rac_log(rac_log_level_t level, const char* category, const char* message) {
     }
 }
 
+// =============================================================================
 // INITIALIZATION API
+// =============================================================================
 
 rac_result_t rac_init(const rac_config_t* config) {
     std::lock_guard<std::mutex> lock(s_init_mutex);
@@ -328,7 +336,9 @@ rac_result_t rac_configure_logging(rac_environment_t environment) {
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // HTTP DOWNLOAD CONVENIENCE FUNCTIONS
+// =============================================================================
 
 rac_result_t rac_http_download(const char* url, const char* destination_path,
                                rac_http_progress_callback_fn progress_callback,
@@ -368,7 +378,9 @@ rac_result_t rac_http_download_cancel(const char* task_id) {
     return adapter->http_download_cancel(task_id, adapter->user_data);
 }
 
+// =============================================================================
 // GLOBAL MODEL REGISTRY
+// =============================================================================
 
 // Persistence contract: the global model registry is IN-MEMORY ONLY. It is
 // not written to disk by commons and does not survive a process restart.
@@ -422,7 +434,9 @@ rac_result_t rac_get_model_by_path(const char* local_path, rac_model_info_t** ou
     return rac_model_registry_get_by_path(registry, local_path, out_model);
 }
 
+// =============================================================================
 // GLOBAL LORA REGISTRY
+// =============================================================================
 
 rac_lora_registry_handle_t rac_get_lora_registry(void) {
     std::lock_guard<std::mutex> lock(s_lora_registry_mutex);

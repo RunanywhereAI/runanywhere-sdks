@@ -51,12 +51,12 @@ yarn install --ignore-scripts --force
 
 # Build or refresh local SDK native artifacts when the checkout has no staged binaries.
 cd ../../..
-./scripts/build/android.sh arm64-v8a
-./scripts/build/ios-xcframework.sh
+./scripts/build/build-core-android.sh arm64-v8a
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 cd examples/react-native/RunAnywhereAI
 
 # Generate React Native/Nitro iOS codegen through the locked Bundler/CocoaPods graph.
-# scripts/examples/react-native/pod-install.sh runs `bundle install` if needed, then `bundle exec pod install`.
+# scripts/pod-install.sh runs `bundle install` if needed, then `bundle exec pod install`.
 yarn pod-install
 
 # Android build gate.
@@ -75,10 +75,10 @@ xcodebuild \
 Notes:
 
 - The default install command intentionally uses `--ignore-scripts` so `patch-package` postinstall hooks do not hide clean-clone issues. If you need to apply local patches, run `yarn postinstall` after inspecting them.
-- Local iOS XCFrameworks are staged by `scripts/build/ios-xcframework.sh` into the Swift SDK and synced into the React Native packages. Missing `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, or `RABackendSherpa.xcframework` usually means the root native artifact step has not run.
+- Local iOS XCFrameworks are staged by `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` into the Swift SDK and synced into the React Native packages. Missing `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, or `RABackendSherpa.xcframework` usually means the root native artifact step has not run.
 - Generated Nitro and React Native codegen files are produced during `pod install`; remove stale `ios/build/generated` output if schema changes are not reflected.
 - If formatting tools disagree after a dependency refresh, use the existing workaround: run `yarn format:fix` from this sample and review the diff before committing.
-- `scripts/examples/react-native/verify.sh` runs the reproducible build gates; set `RUN_IOS=1` to include the optional iOS build.
+- `scripts/verify.sh` runs the reproducible build gates; set `RUN_IOS=1` to include the optional iOS build.
 
 ### How It Works
 
@@ -89,7 +89,7 @@ This Sample App → Local RN SDK packages (sdk/runanywhere-react-native/packages
                           ↓
               Local XCFrameworks/JNI libs (in each package's ios/ and android/ directories)
                           ↑
-        Staged by: scripts/release/package-rn.sh --natives-from PATH
+        Staged by: sdk/runanywhere-react-native/scripts/package-sdk.sh --natives-from PATH
 ```
 
 `scripts/package-sdk.sh --natives-from PATH`:
@@ -108,11 +108,12 @@ If you do not need to rebuild commons from source, run the per-package download 
 - **C++ code changes** (in `runanywhere-commons`):
   ```bash
   # Rebuild natives in the owning layer
-  ./scripts/build/ios-xcframework.sh   # iOS
-  ./scripts/build/android.sh       # Android
+  ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh   # iOS
+  ./scripts/build/build-core-android.sh       # Android
 
   # Re-stage them into the RN packages
-  ./scripts/release/package-rn.sh --natives-from build/native-artifacts
+  cd sdk/runanywhere-react-native
+  ./scripts/package-sdk.sh --natives-from ../../build/native-artifacts
   ```
 
 ---

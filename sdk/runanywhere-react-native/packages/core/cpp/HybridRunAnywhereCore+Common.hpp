@@ -77,7 +77,9 @@ namespace margelo::nitro::runanywhere {
 
 using namespace ::runanywhere::bridges;
 
+// ============================================================================
 // Base64 Utilities
+// ============================================================================
 
 namespace {
 
@@ -146,7 +148,9 @@ std::string base64Encode(const uint8_t* data, size_t len) {
     return encoded;
 }
 
+// ============================================================================
 // ONNX Model Directory Resolution
+// ============================================================================
 
 // Mirrors TypeScript findModelPathAfterExtraction: given a directory path,
 // return the directory that actually contains model files (.onnx, tokens.txt, etc.).
@@ -207,7 +211,9 @@ std::string resolveOnnxModelDirectory(const std::string& path) {
     return dir;
 }
 
+// ============================================================================
 // JSON Utilities
+// ============================================================================
 
 int extractIntValue(const std::string& json, const std::string& key, int defaultValue) {
     std::string searchKey = "\"" + key + "\":";
@@ -374,7 +380,9 @@ std::string buildJsonObject(const std::vector<std::pair<std::string, std::string
     return result;
 }
 
+// =============================================================================
 // Native HTTP transport helpers (rac_http_client_* wrapper + cancel registry)
+// =============================================================================
 
 // Parse a JSON object of string → string headers. Deliberately minimal: we
 // expect TypeScript callers to hand us a plain `{"Key":"Value",...}` object.

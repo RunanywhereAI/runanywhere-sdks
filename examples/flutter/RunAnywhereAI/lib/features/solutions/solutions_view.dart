@@ -3,7 +3,7 @@
 //
 // Two buttons run the canonical voice_agent.yaml + rag.yaml solutions. The
 // YAML payloads come from `lib/generated/solutions_yaml.dart`, emitted by
-// `scripts/examples/flutter/sync-solutions-yamls.sh` from the canonical
+// `scripts/sync-solutions-yamls.sh` from the canonical
 // `sdk/runanywhere-commons/examples/solutions/*.yaml` — no inline copies,
 // no drift (mirrors the iOS / React Native example sync scripts).
 

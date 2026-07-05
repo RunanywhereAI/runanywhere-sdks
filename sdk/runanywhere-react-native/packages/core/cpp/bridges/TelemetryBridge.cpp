@@ -45,7 +45,9 @@ static void telemetryHttpCallback(
     rac_bool_t requiresAuth
 );
 
+// ============================================================================
 // Singleton
+// ============================================================================
 
 TelemetryBridge& TelemetryBridge::shared() {
     static TelemetryBridge instance;
@@ -56,7 +58,9 @@ TelemetryBridge::~TelemetryBridge() {
     shutdown();
 }
 
+// ============================================================================
 // Lifecycle
+// ============================================================================
 
 void TelemetryBridge::initialize(
     rac_environment_t environment,
@@ -133,7 +137,9 @@ bool TelemetryBridge::isInitialized() const {
     return manager_ != nullptr;
 }
 
+// ============================================================================
 // Event Tracking
+// ============================================================================
 
 void TelemetryBridge::flush() {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -146,7 +152,9 @@ void TelemetryBridge::flush() {
     rac_telemetry_manager_flush(manager_);
 }
 
+// ============================================================================
 // Events Callback Registration
+// ============================================================================
 
 void TelemetryBridge::registerEventsCallback() {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -183,7 +191,9 @@ void TelemetryBridge::unregisterEventsCallback() {
     LOGI("Telemetry sink unregistered");
 }
 
+// ============================================================================
 // HTTP Callback (Platform provides HTTP transport)
+// ============================================================================
 
 /**
  * HTTP callback invoked by C++ telemetry manager when it's time to send events.

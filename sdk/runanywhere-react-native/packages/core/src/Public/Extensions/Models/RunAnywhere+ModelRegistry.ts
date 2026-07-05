@@ -66,7 +66,9 @@ import {
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 
+// ---------------------------------------------------------------------------
 // Public types — match the Swift signatures.
+// ---------------------------------------------------------------------------
 
 /**
  * Single-file registration shorthand. Mirrors Swift's
@@ -109,7 +111,9 @@ export interface RegisterMultiFileModelInput {
   memoryRequirement?: number;
 }
 
+// ---------------------------------------------------------------------------
 // Registration
+// ---------------------------------------------------------------------------
 
 /**
  * Register a model in the native registry from a single download URL.
@@ -357,7 +361,9 @@ export async function registerMultiFileModel(
   return ModelInfoCodec.decode(saved);
 }
 
+// ---------------------------------------------------------------------------
 // Listing
+// ---------------------------------------------------------------------------
 
 /**
  * Get all registered models. Mirrors Swift's `RunAnywhere.listModels(_:)`:
@@ -531,7 +537,9 @@ function modelListResult(models: ModelInfoList): ModelListResult {
   });
 }
 
+// ---------------------------------------------------------------------------
 // Download progress multiplexer (HOTSPOT-RN-CORE-003)
+// ---------------------------------------------------------------------------
 //
 // The native side exposes a single process-wide
 // `setDownloadProgressCallbackProto` slot. Concurrent `downloadModel(id)`
@@ -612,7 +620,9 @@ async function unsubscribeFromDownloadProgress(
   await clearNativeDownloadCallbackIfIdle();
 }
 
+// ---------------------------------------------------------------------------
 // Download (canonical async iterable)
+// ---------------------------------------------------------------------------
 
 function isTerminalProgress(progress: DownloadProgress): boolean {
   return (

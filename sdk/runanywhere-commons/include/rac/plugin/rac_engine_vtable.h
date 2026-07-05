@@ -37,14 +37,14 @@
 extern "C" {
 #endif
 
-/*
+/* ===========================================================================
  * Forward declarations of existing per-domain ops structs.
  *
  * We intentionally do NOT include the per-domain headers here — those pull
  * in heavy service types (`rac_llm_options_t`, `rac_stt_config_t`, …) and
  * would force every plugin TU to compile all of them. Plugin authors include
  * the specific per-domain header for the primitive they implement.
- */
+ * =========================================================================== */
 
 struct rac_llm_service_ops;        /* rac/features/llm/rac_llm_service.h */
 struct rac_stt_service_ops;        /* rac/features/stt/rac_stt_service.h */
@@ -94,7 +94,7 @@ typedef struct rac_engine_metadata {
      * decoding, …). See rac_backend_caps.h. */
     uint64_t capability_flags;
 
-    /* routing extension */
+    /* ─────── routing extension ─────── */
 
     /** L1 runtimes this engine can consume (CPU / Metal / CoreML / CUDA /
      *  QNN / NNAPI / WebGPU / …). Descriptive metadata only — the registry
@@ -124,7 +124,7 @@ typedef struct rac_engine_metadata {
  * Slot groups are stable. NULL op-struct means "does not serve this primitive".
  */
 typedef struct rac_engine_vtable {
-    /* Identity + lifecycle */
+    /* ─────────── Identity + lifecycle ─────────── */
     rac_engine_metadata_t metadata;
 
     /**
@@ -143,7 +143,7 @@ typedef struct rac_engine_vtable {
      */
     void (*on_unload)(void);
 
-    /* Primitive slot groups (7 active) */
+    /* ─────────── Primitive slot groups (7 active) ─────────── */
 
     /** LLM text generation (`RAC_PRIMITIVE_GENERATE_TEXT`). */
     const struct rac_llm_service_ops* llm_ops;
@@ -166,7 +166,7 @@ typedef struct rac_engine_vtable {
     /** Diffusion / image generation (`RAC_PRIMITIVE_DIFFUSION`). */
     const struct rac_diffusion_service_ops* diffusion_ops;
 
-    /* Reserved slot pool (10 slots) */
+    /* ─────────── Reserved slot pool (10 slots) ─────────── */
     /*
      * Keeps the struct layout binary-stable as new primitives land. Each
      * reserved slot is a `const void*` so the compiler can fill with NULL
@@ -189,7 +189,7 @@ typedef struct rac_engine_vtable {
     const void* reserved_slot_9;
 } rac_engine_vtable_t;
 
-/*
+/* ===========================================================================
  * RAC_PRIMITIVE_TABLE — single source of truth for the primitive↔vtable-slot
  * mapping.
  *
@@ -213,7 +213,7 @@ typedef struct rac_engine_vtable {
  *   2. Promote the corresponding `RAC_PRIMITIVE_RESERVED_*` enumerator in
  *      rac_primitive.h to the named primitive.
  *   3. Bump `RAC_PLUGIN_API_VERSION` in rac_plugin_entry.h (ABI change).
- */
+ * =========================================================================== */
 #define RAC_PRIMITIVE_TABLE(X)                               \
     X(RAC_PRIMITIVE_GENERATE_TEXT, llm_ops, "generate_text") \
     X(RAC_PRIMITIVE_TRANSCRIBE, stt_ops, "transcribe")       \

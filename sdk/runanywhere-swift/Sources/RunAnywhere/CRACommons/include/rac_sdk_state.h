@@ -33,7 +33,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // State Structure (Opaque - internal structure hidden from C API)
+// =============================================================================
 
 /**
  * @brief Opaque handle to SDK state
@@ -43,7 +45,9 @@ extern "C" {
  */
 typedef struct rac_sdk_state* rac_sdk_state_handle_t;
 
+// =============================================================================
 // Singleton Access
+// =============================================================================
 
 /**
  * @brief Get the singleton SDK state instance
@@ -55,7 +59,9 @@ typedef struct rac_sdk_state* rac_sdk_state_handle_t;
  */
 RAC_API rac_sdk_state_handle_t rac_state_get_instance(void);
 
+// =============================================================================
 // Initialization & Lifecycle
+// =============================================================================
 
 /**
  * @brief Initialize SDK state with configuration
@@ -92,7 +98,9 @@ RAC_API void rac_state_reset(void);
  */
 RAC_API void rac_state_shutdown(void);
 
+// =============================================================================
 // Environment Queries
+// =============================================================================
 
 /**
  * @brief Get current environment
@@ -118,7 +126,9 @@ RAC_API const char* rac_state_get_api_key(void);
  */
 RAC_API const char* rac_state_get_device_id(void);
 
+// =============================================================================
 // Device State Management
+// =============================================================================
 
 /**
  * @brief Set device registration status

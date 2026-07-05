@@ -45,7 +45,9 @@ static inline int compat_mkdir(const char* path) {
 #endif
 }
 
+// =============================================================================
 // Test helpers
+// =============================================================================
 
 static std::string g_test_dir;
 
@@ -205,7 +207,9 @@ find_resolution_file(const rac_model_path_resolution_t& resolution, const char* 
     return nullptr;
 }
 
+// =============================================================================
 // Test: null pointer handling
+// =============================================================================
 
 static TestResult test_null_pointer() {
     rac_result_t rc =
@@ -223,7 +227,9 @@ static TestResult test_null_pointer() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: file not found
+// =============================================================================
 
 static TestResult test_file_not_found() {
     rac_result_t rc = rac_extract_archive_native("/nonexistent/path/archive.tar.gz", "/tmp/dest",
@@ -234,7 +240,9 @@ static TestResult test_file_not_found() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: detect archive type - null handling
+// =============================================================================
 
 static TestResult test_detect_null() {
     rac_archive_type_t type;
@@ -246,7 +254,9 @@ static TestResult test_detect_null() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: detect archive type - non-existent file
+// =============================================================================
 
 static TestResult test_detect_nonexistent() {
     rac_archive_type_t type;
@@ -256,7 +266,9 @@ static TestResult test_detect_nonexistent() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: detect ZIP magic bytes
+// =============================================================================
 
 static TestResult test_detect_zip() {
     std::string path = g_test_dir + "/magic_zip.bin";
@@ -271,7 +283,9 @@ static TestResult test_detect_zip() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: detect empty ZIP magic bytes
+// =============================================================================
 
 static TestResult test_detect_empty_zip() {
     std::string path = g_test_dir + "/magic_empty_zip.bin";
@@ -286,7 +300,9 @@ static TestResult test_detect_empty_zip() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: detect GZIP magic bytes
+// =============================================================================
 
 static TestResult test_detect_gzip() {
     std::string path = g_test_dir + "/magic_gzip.bin";
@@ -301,7 +317,9 @@ static TestResult test_detect_gzip() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: detect BZIP2 magic bytes
+// =============================================================================
 
 static TestResult test_detect_bzip2() {
     std::string path = g_test_dir + "/magic_bz2.bin";
@@ -316,7 +334,9 @@ static TestResult test_detect_bzip2() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: detect XZ magic bytes
+// =============================================================================
 
 static TestResult test_detect_xz() {
     std::string path = g_test_dir + "/magic_xz.bin";
@@ -331,7 +351,9 @@ static TestResult test_detect_xz() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: detect unknown format
+// =============================================================================
 
 static TestResult test_detect_unknown() {
     std::string path = g_test_dir + "/magic_unknown.bin";
@@ -345,7 +367,9 @@ static TestResult test_detect_unknown() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: detect empty file
+// =============================================================================
 
 static TestResult test_detect_empty_file() {
     std::string path = g_test_dir + "/empty.bin";
@@ -358,7 +382,9 @@ static TestResult test_detect_empty_file() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: extract tar.gz archive
+// =============================================================================
 
 static TestResult test_extract_tar_gz() {
     if (!has_tar()) {
@@ -412,7 +438,9 @@ static TestResult test_extract_tar_gz() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: extract uncompressed TAR archive
+// =============================================================================
 
 static TestResult test_extract_plain_tar() {
     if (!has_tar()) {
@@ -447,7 +475,9 @@ static TestResult test_extract_plain_tar() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: extract ZIP archive
+// =============================================================================
 
 static TestResult test_extract_zip() {
     if (!has_zip()) {
@@ -495,7 +525,9 @@ static TestResult test_extract_zip() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: progress callback is invoked
+// =============================================================================
 
 struct ProgressData {
     int callback_count;
@@ -541,7 +573,9 @@ static TestResult test_progress_callback_invoked() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: extraction result statistics
+// =============================================================================
 
 static TestResult test_extraction_result_stats() {
     if (!has_tar()) {
@@ -578,7 +612,9 @@ static TestResult test_extraction_result_stats() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: unsupported archive format
+// =============================================================================
 
 static TestResult test_unsupported_format() {
     std::string path = g_test_dir + "/not_an_archive.dat";
@@ -599,7 +635,9 @@ static TestResult test_unsupported_format() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: archive type hint mismatch is rejected
+// =============================================================================
 
 static TestResult test_archive_hint_mismatch_rejected() {
     if (!has_tar()) {
@@ -629,7 +667,9 @@ static TestResult test_archive_hint_mismatch_rejected() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: resolve single-file artifact and checksum
+// =============================================================================
 
 static TestResult test_resolve_single_file_with_checksum() {
     std::string model_path = g_test_dir + "/single.gguf";
@@ -652,7 +692,9 @@ static TestResult test_resolve_single_file_with_checksum() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: single-file artifact rejects wrong model extension
+// =============================================================================
 
 static TestResult test_resolve_single_file_wrong_format_rejected() {
     std::string model_path = g_test_dir + "/not-a-gguf.txt";
@@ -669,7 +711,9 @@ static TestResult test_resolve_single_file_wrong_format_rejected() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: resolve multi-file artifact companions
+// =============================================================================
 
 static TestResult test_resolve_companion_files() {
     std::string dir = create_temp_dir("resolve_companions");
@@ -707,7 +751,9 @@ static TestResult test_resolve_companion_files() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: expected patterns mark existing files and prefer tokenizer primary companion
+// =============================================================================
 
 static TestResult test_resolve_expected_marks_required_and_prefers_tokenizer() {
     std::string dir = create_temp_dir("resolve_required_flags");
@@ -744,7 +790,9 @@ static TestResult test_resolve_expected_marks_required_and_prefers_tokenizer() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: missing required file fails while optional file is allowed
+// =============================================================================
 
 static TestResult test_resolve_missing_required_optional_allowed() {
     std::string dir = create_temp_dir("resolve_missing");
@@ -777,7 +825,9 @@ static TestResult test_resolve_missing_required_optional_allowed() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: present file descriptor marks existing companion required
+// =============================================================================
 
 static TestResult test_resolve_file_descriptor_marks_existing_required() {
     std::string dir = create_temp_dir("resolve_descriptor_flags");
@@ -813,7 +863,9 @@ static TestResult test_resolve_file_descriptor_marks_existing_required() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: explicit descriptor roles override filename inference
+// =============================================================================
 
 static TestResult test_resolve_file_descriptor_roles() {
     std::string dir = create_temp_dir("resolve_descriptor_roles");
@@ -857,7 +909,9 @@ static TestResult test_resolve_file_descriptor_roles() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: file descriptors participate in required-file validation
+// =============================================================================
 
 static TestResult test_resolve_file_descriptor_required() {
     std::string dir = create_temp_dir("resolve_descriptors");
@@ -892,7 +946,9 @@ static TestResult test_resolve_file_descriptor_required() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: checksum mismatch fails validation
+// =============================================================================
 
 static TestResult test_resolve_checksum_mismatch() {
     std::string model_path = g_test_dir + "/checksum-mismatch.gguf";
@@ -912,7 +968,9 @@ static TestResult test_resolve_checksum_mismatch() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: extract archive and resolve model path in one native call
+// =============================================================================
 
 static TestResult test_extract_and_resolve_archive() {
     if (!has_tar()) {
@@ -967,8 +1025,10 @@ static TestResult test_extract_and_resolve_archive() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: archive extraction followed by canonical artifact resolution
 // (the same extract→resolve sequence the download orchestrator runs)
+// =============================================================================
 
 static TestResult test_archive_extract_then_resolve_artifact() {
     if (!has_tar()) {
@@ -1021,7 +1081,9 @@ static TestResult test_archive_extract_then_resolve_artifact() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: artifact resolution prefers the model-id-named file
+// =============================================================================
 
 static TestResult test_resolve_artifact_prefers_model_id_filename() {
     std::string dir = create_temp_dir("strategy_find");
@@ -1050,7 +1112,9 @@ static TestResult test_resolve_artifact_prefers_model_id_filename() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: extraction creates destination directory
+// =============================================================================
 
 static TestResult test_creates_dest_dir() {
     if (!has_tar()) {
@@ -1081,7 +1145,9 @@ static TestResult test_creates_dest_dir() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: default options (skip macOS resources)
+// =============================================================================
 
 static TestResult test_default_options_skip_macos() {
     if (!has_tar()) {
@@ -1131,7 +1197,9 @@ static TestResult test_default_options_skip_macos() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: extraction with custom options (don't skip macOS resources)
+// =============================================================================
 
 static TestResult test_custom_options_keep_macos() {
     if (!has_tar()) {
@@ -1179,7 +1247,9 @@ static TestResult test_custom_options_keep_macos() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: detect archive type from real tar.gz
+// =============================================================================
 
 static TestResult test_detect_real_tar_gz() {
     if (!has_tar()) {
@@ -1203,7 +1273,9 @@ static TestResult test_detect_real_tar_gz() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: detect archive type from real ZIP
+// =============================================================================
 
 static TestResult test_detect_real_zip() {
     if (!has_zip()) {
@@ -1227,7 +1299,9 @@ static TestResult test_detect_real_zip() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: archive_type_extension helper
+// =============================================================================
 
 static TestResult test_archive_type_extension() {
     ASSERT_TRUE(std::strcmp(rac_archive_type_extension(RAC_ARCHIVE_TYPE_ZIP), "zip") == 0,
@@ -1242,7 +1316,9 @@ static TestResult test_archive_type_extension() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: archive_type_from_path helper
+// =============================================================================
 
 static TestResult test_archive_type_from_path() {
     rac_archive_type_t type;
@@ -1269,7 +1345,9 @@ static TestResult test_archive_type_from_path() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Main: register tests and dispatch via CLI args
+// =============================================================================
 
 int main_impl(int argc, char** argv) {
     g_test_dir = create_temp_dir("extraction");

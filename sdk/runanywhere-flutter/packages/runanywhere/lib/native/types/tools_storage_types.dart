@@ -4,7 +4,9 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
+// =============================================================================
 // Tool Calling FFI Types (from rac_tool_calling.h)
+// =============================================================================
 
 /// Parsed tool call from LLM output - matches rac_tool_call_t
 base class RacToolCallStruct extends Struct {
@@ -50,7 +52,9 @@ base class RacToolCallingOptionsStruct extends Struct {
   external int format;
 }
 
+// =============================================================================
 // Structured Output FFI Types (from rac_llm_types.h)
+// =============================================================================
 
 /// Structured output config struct - matches rac_structured_output_config_t
 final class RacStructuredOutputConfigStruct extends Struct {
@@ -70,7 +74,9 @@ final class RacStructuredOutputValidationStruct extends Struct {
   external Pointer<Utf8> extractedJson;
 }
 
+// =============================================================================
 // RAG Pipeline API Types
+// =============================================================================
 
 // RAG Backend Registration
 // rac_result_t rac_backend_rag_register(void)
@@ -82,6 +88,7 @@ typedef RacBackendRagUnregisterNative = Int32 Function();
 typedef RacBackendRagUnregisterDart = int Function();
 
 // File Manager Types (from rac_file_manager.h)
+// =============================================================================
 
 /// Callback: create_directory(path, recursive, user_data) -> rac_result_t
 typedef RacFmCreateDirectoryNative = Int32 Function(

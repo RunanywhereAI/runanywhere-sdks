@@ -49,7 +49,9 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
 
 }  // namespace
 
+// =============================================================================
 // PUBLIC API
+// =============================================================================
 
 extern "C" rac_result_t
 rac_tts_configuration_defaults_proto(rac_proto_buffer_t* out_RATTSConfiguration) {

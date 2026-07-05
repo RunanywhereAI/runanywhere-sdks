@@ -15,7 +15,9 @@ import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
+// =============================================================================
 // HTTP Bridge
+// =============================================================================
 
 /// HTTP bridge — provides HTTP transport for C++ callbacks.
 /// Backed by the Phase H commons HTTP client (`rac_http_client_*`) via
@@ -97,7 +99,9 @@ class DartBridgeHTTP {
 
   Map<String, String> get headers => Map.unmodifiable(_defaultHeaders);
 
+  // ============================================================================
   // HTTP Methods
+  // ============================================================================
 
   Future<HTTPResult> get(
     String endpoint, {
@@ -318,7 +322,9 @@ class DartBridgeHTTP {
     }
   }
 
+  // ============================================================================
   // Internal Helpers
+  // ============================================================================
 
   String _getDefaultBaseURL(SDKEnvironment environment) {
     switch (environment) {
@@ -345,7 +351,9 @@ class DartBridgeHTTP {
   }
 }
 
+// =============================================================================
 // HTTP Result
+// =============================================================================
 
 /// HTTP request result
 class HTTPResult {

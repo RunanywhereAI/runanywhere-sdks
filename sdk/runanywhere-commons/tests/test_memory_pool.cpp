@@ -74,7 +74,9 @@ std::atomic<int> Buffer::alive{0};
 
 }  // namespace
 
+// ---------------------------------------------------------------------------
 // Pool reuse
+// ---------------------------------------------------------------------------
 
 TEST(pool_reuse) {
     auto pool = MemoryPool<Buffer>::create(2);
@@ -99,7 +101,9 @@ TEST(pool_reuse) {
     CHECK(h2.get() == raw_first);
 }
 
+// ---------------------------------------------------------------------------
 // try_acquire returns nullptr when empty
+// ---------------------------------------------------------------------------
 
 TEST(try_acquire_empty) {
     auto pool = MemoryPool<Buffer>::create(1);
@@ -110,7 +114,9 @@ TEST(try_acquire_empty) {
     CHECK(pool->try_acquire() != nullptr);  // refilled
 }
 
+// ---------------------------------------------------------------------------
 // acquire_for respects the deadline
+// ---------------------------------------------------------------------------
 
 TEST(acquire_timeout) {
     auto pool = MemoryPool<Buffer>::create(1);
@@ -126,7 +132,9 @@ TEST(acquire_timeout) {
     CHECK(elapsed < std::chrono::milliseconds(500));
 }
 
+// ---------------------------------------------------------------------------
 // A blocked acquire() returns nullptr when the cancel token fires.
+// ---------------------------------------------------------------------------
 
 TEST(acquire_cancel) {
     auto pool = MemoryPool<Buffer>::create(1);
@@ -150,7 +158,9 @@ TEST(acquire_cancel) {
     CHECK(!got_handle.load());  // cancel ⇒ nullptr
 }
 
+// ---------------------------------------------------------------------------
 // Handles outstanding at pool destruction time get plain-deleted; no leak.
+// ---------------------------------------------------------------------------
 
 TEST(leak_detection) {
     const int before = Buffer::alive.load();
@@ -168,7 +178,9 @@ TEST(leak_detection) {
     CHECK(Buffer::alive.load() == before);
 }
 
+// ---------------------------------------------------------------------------
 // N threads hammer the pool; after every worker exits, the free list is full.
+// ---------------------------------------------------------------------------
 
 TEST(concurrent_stress) {
     const size_t capacity = 8;
@@ -201,7 +213,9 @@ TEST(concurrent_stress) {
     CHECK(pool->in_flight() == 0);
 }
 
+// ---------------------------------------------------------------------------
 // Custom factory is invoked exactly `capacity` times.
+// ---------------------------------------------------------------------------
 
 TEST(custom_factory) {
     std::atomic<int> created{0};
@@ -218,7 +232,9 @@ TEST(custom_factory) {
     CHECK(h->id == -1);
 }
 
+// ---------------------------------------------------------------------------
 // Main
+// ---------------------------------------------------------------------------
 
 int main() {
     try {

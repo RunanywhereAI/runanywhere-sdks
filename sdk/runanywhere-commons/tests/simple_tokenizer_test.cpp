@@ -22,7 +22,9 @@ class SimpleTokenizerTest : public ::testing::Test {
     SimpleTokenizerTest() {}
 };
 
+// ============================================================================
 // Placeholder Tests - Will be implemented when SimpleTokenizer is public
+// ============================================================================
 
 TEST_F(SimpleTokenizerTest, PlaceholderTest) {
     // SimpleTokenizer is currently private to engines/onnx/onnx_embedding_provider.cpp

@@ -159,7 +159,9 @@ void translate_to_make_request(const runanywhere::v1::RegisterModelFromUrlReques
 
 }  // namespace
 
+// =============================================================================
 // PUBLIC API
+// =============================================================================
 
 extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_request_bytes,
                                                           size_t in_size,
@@ -193,11 +195,13 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
                                           "RegisterModelFromUrlRequest.url must not be empty");
     }
 
+    // -------------------------------------------------------------------------
     // 0) Hugging Face references (hf.co/org/repo[:quant], hf://..., explicit
     //    in-repo file paths). Explicit-file refs normalize to a direct
     //    /resolve/ URL and continue through the standard single-file path;
     //    repo-level refs resolve to a multi-file registration (quant
     //    selection, mmproj pairing, shard expansion, checksums).
+    // -------------------------------------------------------------------------
     {
         namespace hf = rac::infra::model_management::hf;
         if (hf::is_hf_ref(request.url())) {
@@ -210,7 +214,9 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
         }
     }
 
+    // -------------------------------------------------------------------------
     // 1) Build a ModelInfo via the canonical factory.
+    // -------------------------------------------------------------------------
     runanywhere::v1::ModelInfoMakeRequest make_request;
     translate_to_make_request(request, &make_request);
 
@@ -251,12 +257,14 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
     }
     rac_proto_buffer_free(&make_buffer);
 
+    // -------------------------------------------------------------------------
     // 1a) Overlay caller-supplied capability fields onto the made ModelInfo.
     //     rac_model_info_make_proto infers these from the URL/name and stamps
     //     conservative defaults (supports_lora=false, download_size=0). When the
     //     caller supplied an explicit value we honor it, so SDKs no longer need
     //     a post-register "patch + resave" pass. Done BEFORE the id-keyed
     //     merge below so an explicit id override is respected.
+    // -------------------------------------------------------------------------
     if (!request.id().empty()) {
         made_model.set_id(request.id());
     }
@@ -282,10 +290,12 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
         made_model.set_download_size_bytes(request.download_size_bytes());
     }
 
+    // -------------------------------------------------------------------------
     // 2) Persist via the existing registry save path.
     //    rac_model_registry_register_proto_buffer accepts serialized ModelInfo
     //    bytes and returns the saved (normalized) ModelInfo bytes — exactly
     //    the shape we want to forward to the caller.
+    // -------------------------------------------------------------------------
     rac_model_registry_handle_t registry = rac_get_model_registry();
     if (!registry) {
         return rac_proto_buffer_set_error(out_proto, RAC_ERROR_NOT_INITIALIZED,

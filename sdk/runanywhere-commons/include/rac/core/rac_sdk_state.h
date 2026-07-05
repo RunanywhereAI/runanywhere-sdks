@@ -32,9 +32,13 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // State Structure (Opaque - internal structure hidden from C API)
+// =============================================================================
 
+// =============================================================================
 // Initialization & Lifecycle
+// =============================================================================
 
 /**
  * @brief Initialize SDK state with configuration
@@ -74,7 +78,9 @@ RAC_API void rac_state_reset(void);
  */
 RAC_API void rac_state_shutdown(void);
 
+// =============================================================================
 // Environment Queries
+// =============================================================================
 
 /**
  * @brief Get current environment
@@ -100,7 +106,9 @@ RAC_API const char* rac_state_get_api_key(void);
  */
 RAC_API const char* rac_state_get_device_id(void);
 
+// =============================================================================
 // Device State Management
+// =============================================================================
 
 /**
  * @brief Set device registration status

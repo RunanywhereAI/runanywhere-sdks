@@ -126,7 +126,9 @@ inline const void* parse_data(const uint8_t* bytes, size_t size) {
 
 rac_result_t parse_error(rac_proto_buffer_t* out, const char* message);
 
+// =============================================================================
 // Translation helpers (defined in `model_lifecycle_translation.cpp`)
+// =============================================================================
 
 int64_t now_ms();
 std::string generate_event_id();
@@ -155,7 +157,9 @@ void publish_current_model_event(const runanywhere::v1::CurrentModelResult& resu
 
 std::string vlm_config_json(const std::string& mmproj_path);
 
+// =============================================================================
 // Resolution helpers (defined in `model_lifecycle_resolve.cpp`)
+// =============================================================================
 
 struct ModelArtifactResolution {
     std::string resolved_path;
@@ -190,7 +194,9 @@ runanywhere::v1::ModelCategory
 preferred_category_for(const runanywhere::v1::ModelLoadRequest& request,
                        const runanywhere::v1::ModelInfo& model);
 
+// =============================================================================
 // Auto-download helpers (defined in `model_lifecycle_download.cpp`)
+// =============================================================================
 
 bool model_artifact_present(const runanywhere::v1::ModelInfo& model);
 bool model_has_download_source(const runanywhere::v1::ModelInfo& model);

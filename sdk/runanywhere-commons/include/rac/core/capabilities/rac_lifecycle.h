@@ -19,7 +19,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // TYPES - Mirrors Swift's CapabilityLoadingState
+// =============================================================================
 
 /**
  * @brief Capability loading state
@@ -117,7 +119,9 @@ typedef rac_result_t (*rac_lifecycle_create_service_fn)(const char* model_id, vo
  */
 typedef void (*rac_lifecycle_destroy_service_fn)(rac_handle_t service, void* user_data);
 
+// =============================================================================
 // LIFECYCLE API - Mirrors Swift's ManagedLifecycle
+// =============================================================================
 
 /**
  * @brief Create a lifecycle manager
@@ -281,7 +285,9 @@ RAC_API rac_result_t rac_lifecycle_get_metrics(rac_handle_t handle,
  */
 RAC_API void rac_lifecycle_destroy(rac_handle_t handle);
 
+// =============================================================================
 // CONVENIENCE STATE HELPERS
+// =============================================================================
 
 /**
  * @brief Get state name string

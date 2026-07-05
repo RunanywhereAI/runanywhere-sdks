@@ -80,7 +80,9 @@ void sdkEventProtoTrampoline(const uint8_t* protoBytes,
 } // namespace
 
 // Events
+// ============================================================================
 // Events
+// ============================================================================
 
 std::shared_ptr<Promise<double>>
 HybridRunAnywhereCore::subscribeSDKEventsProto(

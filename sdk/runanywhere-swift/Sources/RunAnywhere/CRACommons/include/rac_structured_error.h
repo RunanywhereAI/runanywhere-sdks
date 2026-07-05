@@ -34,7 +34,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // ERROR CATEGORIES
+// =============================================================================
 
 /**
  * @brief Error categories matching Swift's ErrorCategory.
@@ -59,7 +61,9 @@ typedef enum rac_error_category {
     RAC_CATEGORY_RUNTIME = 14,            /**< Runtime/backend errors */
 } rac_error_category_t;
 
+// =============================================================================
 // STACK FRAME
+// =============================================================================
 
 /**
  * @brief A single frame in a stack trace.
@@ -71,7 +75,9 @@ typedef struct rac_stack_frame {
     void* address;        /**< Memory address (for symbolication) */
 } rac_stack_frame_t;
 
+// =============================================================================
 // STRUCTURED ERROR
+// =============================================================================
 
 /**
  * @brief Maximum number of stack frames to capture.
@@ -129,7 +135,9 @@ typedef struct rac_error {
     char custom_value3[RAC_MAX_METADATA_STRING];
 } rac_error_t;
 
+// =============================================================================
 // ERROR CREATION & DESTRUCTION
+// =============================================================================
 
 /**
  * @brief Creates a new structured error.
@@ -186,7 +194,9 @@ RAC_API void rac_error_destroy(rac_error_t* error);
  */
 RAC_API rac_error_t* rac_error_copy(const rac_error_t* error);
 
+// =============================================================================
 // ERROR CONFIGURATION
+// =============================================================================
 
 /**
  * @brief Sets the source location for an error.
@@ -238,7 +248,9 @@ RAC_API void rac_error_set_session(rac_error_t* error, const char* session_id);
 RAC_API void rac_error_set_custom(rac_error_t* error, int32_t index, const char* key,
                                   const char* value);
 
+// =============================================================================
 // STACK TRACE
+// =============================================================================
 
 /**
  * @brief Captures the current stack trace into the error.
@@ -264,7 +276,9 @@ RAC_API int32_t rac_error_capture_stack_trace(rac_error_t* error);
 RAC_API void rac_error_add_frame(rac_error_t* error, const char* function, const char* file,
                                  int32_t line);
 
+// =============================================================================
 // ERROR INFORMATION
+// =============================================================================
 
 /**
  * @brief Gets the error code name as a string.
@@ -302,7 +316,9 @@ RAC_API const char* rac_error_recovery_suggestion(rac_result_t code);
  */
 RAC_API rac_bool_t rac_error_is_expected_error(const rac_error_t* error);
 
+// =============================================================================
 // SERIALIZATION
+// =============================================================================
 
 /**
  * @brief Serializes error to JSON string for telemetry.
@@ -350,7 +366,9 @@ RAC_API char* rac_error_to_string(const rac_error_t* error);
  */
 RAC_API char* rac_error_to_debug_string(const rac_error_t* error);
 
+// =============================================================================
 // CONVENIENCE MACROS
+// =============================================================================
 
 /**
  * @brief Creates an error with automatic source location capture.
@@ -369,7 +387,9 @@ RAC_API char* rac_error_to_debug_string(const rac_error_t* error);
 #define RAC_ERROR_NETWORK(code, msg) RAC_ERROR(code, RAC_CATEGORY_NETWORK, msg)
 #define RAC_ERROR_DOWNLOAD(code, msg) RAC_ERROR(code, RAC_CATEGORY_DOWNLOAD, msg)
 
+// =============================================================================
 // GLOBAL ERROR (Thread-Local Last Error)
+// =============================================================================
 
 /**
  * @brief Sets the last error for the current thread.
@@ -409,7 +429,9 @@ RAC_API rac_result_t rac_set_error(rac_result_t code, rac_error_category_t categ
  */
 #define RAC_RETURN_ERROR(code, category, msg) return rac_set_error(code, category, msg)
 
+// =============================================================================
 // UNIFIED ERROR HANDLING (Log + Track)
+// =============================================================================
 
 /**
  * @brief Creates, logs, and tracks a structured error.
@@ -475,7 +497,9 @@ RAC_API rac_result_t rac_error_log_and_track_model(rac_result_t code, rac_error_
 }
 #endif
 
+// =============================================================================
 // C++ CONVENIENCE CLASS
+// =============================================================================
 
 #ifdef __cplusplus
 

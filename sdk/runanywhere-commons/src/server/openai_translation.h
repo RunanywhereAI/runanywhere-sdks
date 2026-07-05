@@ -25,7 +25,9 @@ namespace translation {
 
 using Json = nlohmann::json;
 
+// =============================================================================
 // OpenAI REQUEST -> Commons Format
+// =============================================================================
 
 /**
  * @brief Convert OpenAI tools array to Commons JSON format
@@ -56,7 +58,9 @@ std::string openaiToolsToCommonsJson(const Json& openaiTools);
 std::string buildPromptFromOpenAI(const Json& messages, const Json& tools,
                                   const rac_tool_calling_options_t* options = nullptr);
 
+// =============================================================================
 // Commons Format -> OpenAI RESPONSE
+// =============================================================================
 
 /**
  * @brief Convert Commons tool call to OpenAI response format
@@ -79,7 +83,9 @@ Json commonsToolCallToOpenAI(const rac_tool_call_t& toolCall);
  */
 std::string generateToolCallId();
 
+// =============================================================================
 // Message Formatting
+// =============================================================================
 
 /**
  * @brief Extract the last user message from OpenAI messages

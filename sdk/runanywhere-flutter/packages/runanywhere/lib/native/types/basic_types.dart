@@ -11,7 +11,9 @@ import 'package:runanywhere/generated/errors.pbenum.dart' as errors;
 /// from runanywhere-commons library.
 /// =============================================================================
 
+// =============================================================================
 // Basic Types (from rac_types.h)
+// =============================================================================
 
 /// Opaque handle for internal objects (rac_handle_t)
 typedef RacHandle = Pointer<Void>;
@@ -27,11 +29,13 @@ const int RAC_FALSE = 0;
 /// RAC success value
 const int RAC_SUCCESS = 0;
 
+// =============================================================================
 // Result Codes (from rac_error.h)
 //
 // C ABI returns negative rac_result_t values; the canonical error vocabulary is
 // generated from idl/errors.proto as positive ErrorCode values. Keep this class
 // only as the ABI sign-convention boundary for FFI callback return values.
+// =============================================================================
 
 /// Error codes matching rac_error.h
 abstract class RacResultCode {
@@ -295,7 +299,9 @@ abstract class RacResultCode {
   }
 }
 
+// =============================================================================
 // Log Levels (from rac_types.h)
+// =============================================================================
 
 /// Log level for the logging callback (rac_log_level_t), as the raw C-ABI
 /// integers the native layer expects.

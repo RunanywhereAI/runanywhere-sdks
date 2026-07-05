@@ -21,7 +21,9 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
+// =============================================================================
 // ARCHIVE TYPE FUNCTIONS
+// =============================================================================
 
 const char* rac_archive_type_extension(rac_archive_type_t type) {
     switch (type) {
@@ -68,7 +70,9 @@ rac_bool_t rac_archive_type_from_path(const char* url_path, rac_archive_type_t* 
     return RAC_FALSE;
 }
 
+// =============================================================================
 // MODEL CATEGORY FUNCTIONS
+// =============================================================================
 
 rac_bool_t rac_model_category_requires_context_length(rac_model_category_t category) {
     // Mirrors Swift's ModelCategory.requiresContextLength
@@ -132,7 +136,9 @@ rac_inference_framework_t rac_model_category_default_framework(rac_model_categor
     }
 }
 
+// =============================================================================
 // INFERENCE FRAMEWORK FUNCTIONS
+// =============================================================================
 
 static rac_result_t copy_supported_formats(const rac_model_format_t* formats, size_t count,
                                            rac_model_format_t** out_formats, size_t* out_count) {
@@ -324,7 +330,9 @@ const char* rac_framework_analytics_key(rac_inference_framework_t framework) {
     }
 }
 
+// =============================================================================
 // CANONICAL WIRE-STRING / DISPLAY / ANALYTICS ACCESSORS
+// =============================================================================
 //
 // Wire strings = proto enum names from idl/model_types.proto. Display names
 // and analytics keys mirror the existing Swift tables in ModelTypes.swift.
@@ -561,7 +569,9 @@ rac_result_t rac_inference_framework_from_string(const char* s, rac_inference_fr
     return RAC_ERROR_NOT_FOUND;
 }
 
+// =============================================================================
 // ARTIFACT FUNCTIONS
+// =============================================================================
 
 rac_bool_t rac_artifact_requires_extraction(const rac_model_artifact_info_t* artifact) {
     if (!artifact)
@@ -615,7 +625,9 @@ rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t* model) {
     return (model->local_path && strlen(model->local_path) > 0) ? RAC_TRUE : RAC_FALSE;
 }
 
+// =============================================================================
 // FORMAT DETECTION - Ported from Swift RegistryService.swift
+// =============================================================================
 
 rac_bool_t rac_model_detect_format_from_extension(const char* extension,
                                                   rac_model_format_t* out_format) {
@@ -744,7 +756,9 @@ const char* rac_model_format_extension(rac_model_format_t format) {
     }
 }
 
+// =============================================================================
 // FRAMEWORK ↔ EXTENSION MEMBERSHIP
+// =============================================================================
 //
 // Canonical commons-owned replacement for the per-SDK "is_model_file"
 // callbacks (e.g. Swift's racIsModelFile, previously wired through a platform
@@ -823,7 +837,9 @@ rac_result_t rac_model_format_for_framework(rac_inference_framework_t framework,
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // MODEL ID/NAME GENERATION - Ported from Swift RegistryService.swift
+// =============================================================================
 
 void rac_model_generate_id(const char* url, char* out_id, size_t max_len) {
     // Ported from Swift RegistryService.generateModelId(from:) (lines 311-318)
@@ -867,6 +883,7 @@ void rac_model_generate_id(const char* url, char* out_id, size_t max_len) {
     out_id[copy_len] = '\0';
 }
 
+// -----------------------------------------------------------------------------
 // rac_model_id_from_url — strict, return-coded port of Swift's
 // RunAnywhere.generateModelId(fromURL:)
 // (sdk/runanywhere-swift/.../Public/Extensions/Storage/RunAnywhere+Storage.swift).
@@ -878,6 +895,7 @@ void rac_model_generate_id(const char* url, char* out_id, size_t max_len) {
 //     trailing path component, matching Swift's URL(string:).lastPathComponent.
 //   - Falls back to the whole input as the filename when no '/' is present
 //     (mirrors Swift's `url.split("/").last ?? url` arm).
+// -----------------------------------------------------------------------------
 rac_result_t rac_model_id_from_url(const char* url, char* out, size_t out_size) {
     if (url == nullptr || out == nullptr) {
         return RAC_ERROR_NULL_POINTER;
@@ -979,7 +997,9 @@ void rac_model_generate_name(const char* url, char* out_name, size_t max_len) {
     out_name[copy_len] = '\0';
 }
 
+// =============================================================================
 // MODEL FILTERING - Ported from Swift RegistryService.swift
+// =============================================================================
 
 // Helper to check if string contains substring (case-insensitive)
 static bool contains_case_insensitive(const char* haystack, const char* needle) {
@@ -1062,7 +1082,9 @@ size_t rac_model_filter_models(const rac_model_info_t* models, size_t models_cou
     return matched_count;
 }
 
+// =============================================================================
 // MEMORY MANAGEMENT
+// =============================================================================
 
 // Note: rac_strdup is declared in rac_types.h and implemented in rac_memory.cpp
 

@@ -21,7 +21,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // ERROR CODE RANGES
+// =============================================================================
 //
 // runanywhere-core (ra_*):    0 to -99
 // runanywhere-commons (rac_*): -100 to -999
@@ -48,8 +50,10 @@ extern "C" {
 //   - Reserved:                 -830 to -899
 //   - Reserved (future):        -900 to -999
 
+// =============================================================================
 // INITIALIZATION ERRORS (-100 to -109)
 // Mirrors Swift's ErrorCode: Initialization Errors
+// =============================================================================
 
 /** Component or service has not been initialized */
 #define RAC_ERROR_NOT_INITIALIZED ((rac_result_t) - 100)
@@ -66,8 +70,10 @@ extern "C" {
 /** Invalid parameter value passed to a function */
 #define RAC_ERROR_INVALID_PARAMETER ((rac_result_t) - 106)
 
+// =============================================================================
 // MODEL ERRORS (-110 to -129)
 // Mirrors Swift's ErrorCode: Model Errors
+// =============================================================================
 
 /** Requested model was not found */
 #define RAC_ERROR_MODEL_NOT_FOUND ((rac_result_t) - 110)
@@ -84,8 +90,10 @@ extern "C" {
 /** Model not loaded (alias for backward compatibility) */
 #define RAC_ERROR_MODEL_NOT_LOADED ((rac_result_t) - 116)
 
+// =============================================================================
 // GENERATION ERRORS (-130 to -149)
 // Mirrors Swift's ErrorCode: Generation Errors
+// =============================================================================
 
 /** Text/audio generation failed */
 #define RAC_ERROR_GENERATION_FAILED ((rac_result_t) - 130)
@@ -102,8 +110,10 @@ extern "C" {
 /** Generation cancelled by the caller */
 #define RAC_ERROR_GENERATION_CANCELLED ((rac_result_t) - 136)
 
+// =============================================================================
 // NETWORK ERRORS (-150 to -179)
 // Mirrors Swift's ErrorCode: Network Errors
+// =============================================================================
 
 /** Network is unavailable */
 #define RAC_ERROR_NETWORK_UNAVAILABLE ((rac_result_t) - 150)
@@ -130,8 +140,10 @@ extern "C" {
 /** HTTP not supported */
 #define RAC_ERROR_HTTP_NOT_SUPPORTED ((rac_result_t) - 161)
 
+// =============================================================================
 // STORAGE ERRORS (-180 to -219)
 // Mirrors Swift's ErrorCode: Storage Errors
+// =============================================================================
 
 /** Insufficient storage space */
 #define RAC_ERROR_INSUFFICIENT_STORAGE ((rac_result_t) - 180)
@@ -164,8 +176,10 @@ extern "C" {
 /** File delete failed (alias) */
 #define RAC_ERROR_FILE_DELETE_FAILED ((rac_result_t) - 187)
 
+// =============================================================================
 // HARDWARE ERRORS (-220 to -229)
 // Mirrors Swift's ErrorCode: Hardware Errors
+// =============================================================================
 
 /** Hardware is unsupported */
 #define RAC_ERROR_HARDWARE_UNSUPPORTED ((rac_result_t) - 220)
@@ -174,8 +188,10 @@ extern "C" {
 /** Out of memory (alias) */
 #define RAC_ERROR_OUT_OF_MEMORY ((rac_result_t) - 221)
 
+// =============================================================================
 // COMPONENT STATE ERRORS (-230 to -249)
 // Mirrors Swift's ErrorCode: Component State Errors
+// =============================================================================
 
 /** Component is not ready */
 #define RAC_ERROR_COMPONENT_NOT_READY ((rac_result_t) - 230)
@@ -192,8 +208,10 @@ extern "C" {
 /** Feature/operation is not supported */
 #define RAC_ERROR_NOT_SUPPORTED ((rac_result_t) - 236)
 
+// =============================================================================
 // VALIDATION ERRORS (-250 to -279)
 // Mirrors Swift's ErrorCode: Validation Errors
+// =============================================================================
 
 /** Validation failed */
 #define RAC_ERROR_VALIDATION_FAILED ((rac_result_t) - 250)
@@ -225,8 +243,10 @@ extern "C" {
  *  data is written to the caller's buffer. */
 #define RAC_ERROR_OUTPUT_TRUNCATED ((rac_result_t) - 262)
 
+// =============================================================================
 // AUDIO ERRORS (-280 to -299)
 // Mirrors Swift's ErrorCode: Audio Errors
+// =============================================================================
 
 /** Audio format is not supported */
 #define RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED ((rac_result_t) - 280)
@@ -241,8 +261,10 @@ extern "C" {
 /** Audio session activation failed */
 #define RAC_ERROR_AUDIO_SESSION_ACTIVATION_FAILED ((rac_result_t) - 285)
 
+// =============================================================================
 // LANGUAGE/VOICE ERRORS (-300 to -319)
 // Mirrors Swift's ErrorCode: Language/Voice Errors
+// =============================================================================
 
 /** Language is not supported */
 #define RAC_ERROR_LANGUAGE_NOT_SUPPORTED ((rac_result_t) - 300)
@@ -253,8 +275,10 @@ extern "C" {
 /** Stream was cancelled */
 #define RAC_ERROR_STREAM_CANCELLED ((rac_result_t) - 303)
 
+// =============================================================================
 // AUTHENTICATION ERRORS (-320 to -329)
 // Mirrors Swift's ErrorCode: Authentication Errors
+// =============================================================================
 
 /** Authentication failed */
 #define RAC_ERROR_AUTHENTICATION_FAILED ((rac_result_t) - 320)
@@ -263,8 +287,10 @@ extern "C" {
 /** Access forbidden */
 #define RAC_ERROR_FORBIDDEN ((rac_result_t) - 322)
 
+// =============================================================================
 // SECURITY ERRORS (-330 to -349)
 // Mirrors Swift's ErrorCode: Security Errors
+// =============================================================================
 
 /** Keychain operation failed */
 #define RAC_ERROR_KEYCHAIN_ERROR ((rac_result_t) - 330)
@@ -275,8 +301,10 @@ extern "C" {
 /** Secure storage failed */
 #define RAC_ERROR_SECURE_STORAGE_FAILED ((rac_result_t) - 333)
 
+// =============================================================================
 // EXTRACTION ERRORS (-350 to -369)
 // Mirrors Swift's ErrorCode: Extraction Errors
+// =============================================================================
 
 /** Extraction failed (JSON, archive, etc.) */
 #define RAC_ERROR_EXTRACTION_FAILED ((rac_result_t) - 350)
@@ -285,21 +313,27 @@ extern "C" {
 /** Unsupported archive format */
 #define RAC_ERROR_UNSUPPORTED_ARCHIVE ((rac_result_t) - 352)
 
+// =============================================================================
 // CALIBRATION ERRORS (-370 to -379)
 // Mirrors Swift's ErrorCode: Calibration Errors
+// =============================================================================
 
 /** Calibration failed */
 #define RAC_ERROR_CALIBRATION_FAILED ((rac_result_t) - 370)
 /** Calibration timed out */
 #define RAC_ERROR_CALIBRATION_TIMEOUT ((rac_result_t) - 371)
 
+// =============================================================================
 // CANCELLATION (-380 to -389)
 // Mirrors Swift's ErrorCode: Cancellation
+// =============================================================================
 
 /** Operation was cancelled */
 #define RAC_ERROR_CANCELLED ((rac_result_t) - 380)
 
+// =============================================================================
 // MODULE/SERVICE ERRORS (-400 to -499)
+// =============================================================================
 
 /** Module not found */
 #define RAC_ERROR_MODULE_NOT_FOUND ((rac_result_t) - 400)
@@ -322,12 +356,16 @@ extern "C" {
 /** Generic not found */
 #define RAC_ERROR_NOT_FOUND ((rac_result_t) - 423)
 
+// =============================================================================
 // PLATFORM ADAPTER ERRORS (-500 to -599)
+// =============================================================================
 
 /** Adapter not set */
 #define RAC_ERROR_ADAPTER_NOT_SET ((rac_result_t) - 500)
 
+// =============================================================================
 // BACKEND ERRORS (-600 to -699)
+// =============================================================================
 
 /** Backend not found */
 #define RAC_ERROR_BACKEND_NOT_FOUND ((rac_result_t) - 600)
@@ -350,7 +388,9 @@ extern "C" {
 /** Invalid handle */
 #define RAC_ERROR_INVALID_HANDLE ((rac_result_t) - 610)
 
+// =============================================================================
 // EVENT ERRORS (-700 to -799)
+// =============================================================================
 
 /** Invalid event category */
 #define RAC_ERROR_EVENT_INVALID_CATEGORY ((rac_result_t) - 700)
@@ -359,8 +399,10 @@ extern "C" {
 /** Event publish failed */
 #define RAC_ERROR_EVENT_PUBLISH_FAILED ((rac_result_t) - 702)
 
+// =============================================================================
 // OTHER ERRORS (-800 to -899)
 // Mirrors Swift's ErrorCode: Other Errors
+// =============================================================================
 
 /** Feature is not implemented */
 #define RAC_ERROR_NOT_IMPLEMENTED ((rac_result_t) - 800)
@@ -375,14 +417,16 @@ extern "C" {
 /** Internal error */
 #define RAC_ERROR_INTERNAL ((rac_result_t) - 805)
 
+// =============================================================================
 // ENGINE PLUGIN ERRORS (-810 to -829)
 // Mirrors generated proto `ErrorCode` enum cases `abiVersionMismatch`,
 // `capabilityUnsupported`, `pluginDuplicate`, `pluginLoadFailed`, `pluginBusy`
 // (see `idl/errors.proto` and `errors.pb.swift`). The Swift / Kotlin / Dart /
 // Web SDKs surface these via the generated enum; `rac_error_message()` in
 // `src/core/rac_error.cpp` provides the human-readable strings.
+// =============================================================================
 
-/* engine plugin errors */
+/* ─────────── engine plugin errors ─────────── */
 /** Plugin's `metadata.abi_version` did not equal `RAC_PLUGIN_API_VERSION`. */
 #define RAC_ERROR_ABI_VERSION_MISMATCH ((rac_result_t) - 810)
 /** Plugin's `capability_check()` returned non-zero (silent reject; engine
@@ -391,7 +435,7 @@ extern "C" {
 /** Plugin registration rejected due to duplicate `metadata.name`. */
 #define RAC_ERROR_PLUGIN_DUPLICATE ((rac_result_t) - 812)
 
-/* dynamic plugin loader errors */
+/* ─────────── dynamic plugin loader errors ─────────── */
 /** dlopen / dlsym failed (file not found, missing entry symbol, arch mismatch,
  *  unresolved dependency). Use `dlerror()` for details on POSIX hosts. */
 #define RAC_ERROR_PLUGIN_LOAD_FAILED ((rac_result_t) - 820)
@@ -399,7 +443,9 @@ extern "C" {
  *  primitive. */
 #define RAC_ERROR_PLUGIN_BUSY ((rac_result_t) - 821)
 
+// =============================================================================
 // ERROR MESSAGE API
+// =============================================================================
 
 /**
  * Gets a human-readable error message for an error code.

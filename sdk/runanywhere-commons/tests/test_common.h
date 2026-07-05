@@ -21,7 +21,9 @@
 #include <string>
 #include <vector>
 
+// =============================================================================
 // Test Result
+// =============================================================================
 
 struct TestResult {
     std::string test_name;
@@ -68,7 +70,9 @@ inline int print_summary(const std::vector<TestResult>& results) {
     return (failed > 0) ? 1 : 0;
 }
 
+// =============================================================================
 // WAV File I/O
+// =============================================================================
 
 struct WavFile {
     std::vector<int16_t> samples;
@@ -221,7 +225,9 @@ inline bool write_wav(const std::string& path, const int16_t* samples, size_t co
     return file.good();
 }
 
+// =============================================================================
 // Audio Conversion Utilities
+// =============================================================================
 
 inline std::vector<float> int16_to_float(const std::vector<int16_t>& samples) {
     std::vector<float> out(samples.size());
@@ -248,7 +254,9 @@ inline std::vector<int16_t> float_to_int16(const std::vector<float>& samples) {
     return out;
 }
 
+// =============================================================================
 // Audio Generation Utilities
+// =============================================================================
 
 inline std::vector<float> generate_silence(size_t num_samples) {
     return std::vector<float>(num_samples, 0.0f);
@@ -275,7 +283,9 @@ inline std::vector<float> generate_white_noise(size_t num_samples, float amplitu
     return out;
 }
 
+// =============================================================================
 // Audio Resampling (linear interpolation)
+// =============================================================================
 
 /**
  * Resample float audio from one sample rate to another using linear interpolation.
@@ -302,7 +312,9 @@ inline std::vector<float> resample_linear(const float* input, size_t input_len, 
     return output;
 }
 
+// =============================================================================
 // Case-insensitive substring check
+// =============================================================================
 
 inline bool contains_ci(const std::string& haystack, const std::string& needle) {
     if (needle.empty())
@@ -313,7 +325,9 @@ inline bool contains_ci(const std::string& haystack, const std::string& needle) 
     return h.find(n) != std::string::npos;
 }
 
+// =============================================================================
 // Scoped Timer
+// =============================================================================
 
 class ScopedTimer {
    public:
@@ -334,7 +348,9 @@ class ScopedTimer {
     std::chrono::steady_clock::time_point start_;
 };
 
+// =============================================================================
 // Test Runner / Argument Parser
+// =============================================================================
 
 inline int parse_test_args(int argc, char** argv,
                            const std::map<std::string, std::function<TestResult()>>& tests) {
@@ -391,7 +407,9 @@ inline int parse_test_args(int argc, char** argv,
     return print_summary(results);
 }
 
+// =============================================================================
 // Assertion Macros (return early from test function on failure)
+// =============================================================================
 
 #define ASSERT_EQ(_a, _e, _m)                            \
     do {                                                 \
@@ -428,7 +446,9 @@ inline TestResult make_pass_result() {
 
 #define TEST_PASS() make_pass_result()
 
+// =============================================================================
 // TestSuite: ordered test runner with CLI arg parsing
+// =============================================================================
 
 class TestSuite {
    public:

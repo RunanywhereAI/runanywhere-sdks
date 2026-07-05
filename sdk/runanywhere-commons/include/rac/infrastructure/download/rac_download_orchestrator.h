@@ -36,7 +36,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // PROTO-BYTE DOWNLOAD WORKFLOW ABI
+// =============================================================================
 
 /**
  * @brief Callback for proto-encoded runanywhere.v1.DownloadProgress updates.
@@ -124,7 +126,9 @@ RAC_API rac_result_t rac_download_progress_poll_proto(const uint8_t* request_byt
  */
 RAC_API rac_result_t rac_download_cleanup_terminal_tasks_proto(size_t* out_purged_count);
 
+// =============================================================================
 // POST-EXTRACTION MODEL PATH FINDING
+// =============================================================================
 
 /**
  * @brief Find the actual model path after extraction.
@@ -151,7 +155,9 @@ RAC_API rac_result_t rac_find_model_path_after_extraction(const char* extracted_
                                                           rac_model_format_t format, char* out_path,
                                                           size_t path_size);
 
+// =============================================================================
 // UTILITY FUNCTIONS
+// =============================================================================
 
 /**
  * @brief Compute the download destination path for a model.

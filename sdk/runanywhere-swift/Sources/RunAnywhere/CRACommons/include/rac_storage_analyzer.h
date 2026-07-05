@@ -24,7 +24,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // DATA STRUCTURES
+// =============================================================================
 
 /**
  * @brief Storage metrics for a single model
@@ -123,7 +125,9 @@ typedef struct {
     int64_t total_models_size;
 } rac_storage_info_t;
 
+// =============================================================================
 // PLATFORM CALLBACKS - Swift/Kotlin implements these
+// =============================================================================
 
 /**
  * @brief Callback to calculate directory size
@@ -189,7 +193,9 @@ typedef struct {
     void* user_data;
 } rac_storage_callbacks_t;
 
+// =============================================================================
 // STORAGE ANALYZER API
+// =============================================================================
 
 /** Opaque handle to storage analyzer */
 typedef struct rac_storage_analyzer* rac_storage_analyzer_handle_t;
@@ -288,7 +294,9 @@ RAC_API rac_result_t rac_storage_analyzer_delete_proto(
 RAC_API rac_result_t rac_storage_analyzer_calculate_size(rac_storage_analyzer_handle_t handle,
                                                          const char* path, int64_t* out_size);
 
+// =============================================================================
 // CLEANUP
+// =============================================================================
 
 /**
  * @brief Free storage info returned by rac_storage_analyzer_analyze

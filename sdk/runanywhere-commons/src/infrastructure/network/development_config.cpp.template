@@ -20,7 +20,9 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 
+// =============================================================================
 // Configuration Values - FILL IN YOUR CREDENTIALS BELOW
+// =============================================================================
 
 namespace {
 
@@ -98,7 +100,9 @@ bool is_usable_http_url(const char* value) {
 
 }  // anonymous namespace
 
+// =============================================================================
 // Public API Implementation (DO NOT MODIFY BELOW)
+// =============================================================================
 
 extern "C" {
 

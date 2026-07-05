@@ -9,8 +9,8 @@
 # Build instructions:
 #   1. Build runanywhere-commons for Linux first:
 #      cd sdk/runanywhere-commons
-#      ../../scripts/build/deps/download-sherpa-onnx.sh linux
-#      ../../scripts/build/linux.sh --shared
+#      ./scripts/linux/download-sherpa-onnx.sh
+#      ./scripts/build-linux.sh --shared
 #
 #   2. Build this application:
 #      cd Playground/linux-voice-assistant
@@ -46,8 +46,8 @@ set(RAC_COMMONS_DIST "${RAC_COMMONS_DIR}/dist/linux/${CMAKE_SYSTEM_PROCESSOR}")
 if(NOT EXISTS "${RAC_COMMONS_DIST}/librac_commons.so")
     message(WARNING "runanywhere-commons not built. Build it first:")
     message(WARNING "  cd ${RAC_COMMONS_DIR}")
-    message(WARNING "  ../../scripts/build/deps/download-sherpa-onnx.sh linux")
-    message(WARNING "  ../../scripts/build/linux.sh --shared")
+    message(WARNING "  ./scripts/linux/download-sherpa-onnx.sh")
+    message(WARNING "  ./scripts/build-linux.sh --shared")
 endif()
 
 # =============================================================================

@@ -82,7 +82,9 @@ constexpr rac_inference_framework_t kAllFrameworks[] = {
     RAC_FRAMEWORK_UNKNOWN,
 };
 
+// ---------------------------------------------------------------------------
 // Every model format yields a non-empty proto-style wire string.
+// ---------------------------------------------------------------------------
 int test_model_format_wire_string_nonempty() {
     for (rac_model_format_t f : kAllFormats) {
         const char* s = nullptr;
@@ -94,7 +96,9 @@ int test_model_format_wire_string_nonempty() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Spot-check the canonical proto enum names for a few formats.
+// ---------------------------------------------------------------------------
 int test_model_format_wire_string_canonical_names() {
     const char* s = nullptr;
     EXPECT_RC(rac_model_format_wire_string(RAC_MODEL_FORMAT_GGUF, &s), RAC_SUCCESS);
@@ -112,9 +116,11 @@ int test_model_format_wire_string_canonical_names() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Every inference framework value yields non-empty wire/display/analytics.
 // Spot-check the canonical proto wire string mapping
 // (RAC_FRAMEWORK_LLAMACPP → "INFERENCE_FRAMEWORK_LLAMA_CPP").
+// ---------------------------------------------------------------------------
 int test_inference_framework_strings_nonempty() {
     for (rac_inference_framework_t fw : kAllFrameworks) {
         const char* wire = nullptr;
@@ -161,8 +167,10 @@ int test_inference_framework_canonical_names() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Round-trip: wire_string(value) → from_string yields the original value, for
 // every framework value.
+// ---------------------------------------------------------------------------
 int test_inference_framework_wire_round_trip() {
     for (rac_inference_framework_t fw : kAllFrameworks) {
         const char* wire = nullptr;
@@ -176,7 +184,9 @@ int test_inference_framework_wire_round_trip() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // from_string also accepts analytics keys and display names (case-insensitive).
+// ---------------------------------------------------------------------------
 int test_inference_framework_from_string_alias_inputs() {
     rac_inference_framework_t parsed = RAC_FRAMEWORK_UNKNOWN;
 
@@ -200,7 +210,9 @@ int test_inference_framework_from_string_alias_inputs() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Unknown / nonsense input → NOT_FOUND, out-param reset to UNKNOWN.
+// ---------------------------------------------------------------------------
 int test_inference_framework_from_string_unknown() {
     rac_inference_framework_t parsed = RAC_FRAMEWORK_LLAMACPP;  // sentinel
 
@@ -214,7 +226,9 @@ int test_inference_framework_from_string_unknown() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // NULL out-pointer rejection.
+// ---------------------------------------------------------------------------
 int test_null_out_pointer_rejection() {
     EXPECT_RC(rac_model_format_wire_string(RAC_MODEL_FORMAT_GGUF, nullptr), RAC_ERROR_NULL_POINTER);
     EXPECT_RC(rac_inference_framework_wire_string(RAC_FRAMEWORK_LLAMACPP, nullptr),

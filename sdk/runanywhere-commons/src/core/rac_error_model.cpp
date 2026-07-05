@@ -4,7 +4,9 @@
 
 #include "rac/core/rac_error.h"
 
+// ------------------------------------------------------------
 // Internal Helper: Determine Category from Error Code Range
+// ------------------------------------------------------------
 const char* rac_error_category(rac_result_t code) {
     if (code >= -109 && code <= -100)
         return "Initialization";
@@ -53,7 +55,9 @@ const char* rac_error_category(rac_result_t code) {
     return "Unknown";
 }
 
+// ------------------------------------------------------------
 // Public API: Create Structured Error Model
+// ------------------------------------------------------------
 rac_error_model_t rac_make_error_model(rac_result_t code) {
     rac_error_model_t model;
     model.code = code;

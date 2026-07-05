@@ -49,8 +49,10 @@ namespace {
         }                                                                                      \
     } while (0)
 
+// ---------------------------------------------------------------------------
 // Reference proto integer values (mirrors idl/model_types.proto).
 // Kept locally so the test file does not depend on the generated *.pb.h.
+// ---------------------------------------------------------------------------
 
 // InferenceFramework — proto range 0..23 minus the retired values 8
 // (WHISPERKIT_COREML), 17 (WHISPERKIT), and 18 (OPENAI_WHISPER), which are no
@@ -150,6 +152,7 @@ constexpr rac_archive_structure_t kCAllArchiveStructures[] = {
     RAC_ARCHIVE_STRUCTURE_UNKNOWN,
 };
 
+// ---------------------------------------------------------------------------
 // InferenceFramework: round-trip every proto value through C and back.
 //
 // For values 11..16 and 19 (TFLITE/EXECUTORCH/MEDIAPIPE/MLC/PICO_LLM/
@@ -157,6 +160,7 @@ constexpr rac_archive_structure_t kCAllArchiveStructures[] = {
 // from-proto path folds those into RAC_FRAMEWORK_UNKNOWN. The forward direction
 // therefore lands on the proto UNKNOWN (=22). We assert that explicitly rather
 // than expecting strict identity.
+// ---------------------------------------------------------------------------
 int test_inference_framework_proto_round_trip() {
     for (int32_t proto : kProtoIfwAll) {
         rac_inference_framework_t c = RAC_FRAMEWORK_UNKNOWN;
@@ -192,8 +196,10 @@ int test_inference_framework_c_round_trip() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // ModelCategory: every proto value has a 1:1 C correspondence; round-trip
 // in both directions must hit the identity.
+// ---------------------------------------------------------------------------
 int test_model_category_proto_round_trip() {
     for (int32_t proto : kProtoMcAll) {
         rac_model_category_t c = RAC_MODEL_CATEGORY_UNKNOWN;
@@ -227,9 +233,11 @@ int test_model_category_c_round_trip() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // ModelFormat: values are 1:1 with proto by construction
 // (RAC_MODEL_FORMAT_ID_* matches proto integers). The mappers should be
 // exact identity for every defined value.
+// ---------------------------------------------------------------------------
 int test_model_format_proto_round_trip() {
     for (int32_t proto : kProtoMfAll) {
         rac_model_format_t c = RAC_MODEL_FORMAT_UNSPECIFIED;
@@ -256,11 +264,13 @@ int test_model_format_c_round_trip() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // ModelSource: proto has UNSPECIFIED / REMOTE / LOCAL / BUILT_IN.
 //   - UNSPECIFIED (0) → C.REMOTE → proto.REMOTE (1).
 //   - REMOTE (1)      → C.REMOTE → proto.REMOTE (1).
 //   - LOCAL  (2)      → C.LOCAL  → proto.LOCAL  (2).
 //   - BUILT_IN (3)    → C.LOCAL  → proto.LOCAL  (2).
+// ---------------------------------------------------------------------------
 int test_model_source_proto_round_trip() {
     for (int32_t proto : kProtoMsAll) {
         rac_model_source_t c = RAC_MODEL_SOURCE_REMOTE;
@@ -290,8 +300,10 @@ int test_model_source_c_round_trip() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // ArchiveType: proto UNSPECIFIED (0) corresponds to C RAC_ARCHIVE_TYPE_NONE
 // (-1) — both represent "no archive". Every other value round-trips 1:1.
+// ---------------------------------------------------------------------------
 int test_archive_type_proto_round_trip() {
     for (int32_t proto : kProtoAtAll) {
         rac_archive_type_t c = RAC_ARCHIVE_TYPE_NONE;
@@ -316,10 +328,12 @@ int test_archive_type_c_round_trip() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // ArchiveStructure: proto UNSPECIFIED (0) and proto UNKNOWN (4) both fold into
 // the C RAC_ARCHIVE_STRUCTURE_UNKNOWN sentinel. The single C UNKNOWN value
 // canonicalises forward to proto UNKNOWN (4), not back to UNSPECIFIED. Every
 // other value round-trips 1:1.
+// ---------------------------------------------------------------------------
 int test_archive_structure_proto_round_trip() {
     for (int32_t proto : kProtoAsAll) {
         rac_archive_structure_t c = RAC_ARCHIVE_STRUCTURE_UNKNOWN;
@@ -350,8 +364,10 @@ int test_archive_structure_c_round_trip() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Invalid / out-of-range proto values must fail with INVALID_ARGUMENT and
 // reset the out parameter to a safe default.
+// ---------------------------------------------------------------------------
 int test_invalid_proto_values() {
     constexpr int32_t kBad[] = {-1, 1000, INT32_MAX};
 
@@ -383,7 +399,9 @@ int test_invalid_proto_values() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Invalid C enum values (cast from junk ints) must fail with INVALID_ARGUMENT.
+// ---------------------------------------------------------------------------
 int test_invalid_c_values() {
     int32_t out = -1;
 
@@ -425,7 +443,9 @@ int test_invalid_c_values() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // NULL out-pointer rejection across all 10 mappers.
+// ---------------------------------------------------------------------------
 int test_null_out_pointer_rejection() {
     EXPECT_RC(rac_inference_framework_from_proto(1, nullptr), RAC_ERROR_NULL_POINTER);
     EXPECT_RC(rac_inference_framework_to_proto(RAC_FRAMEWORK_ONNX, nullptr),
@@ -451,7 +471,9 @@ int test_null_out_pointer_rejection() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Spot-check a few specific known mappings.
+// ---------------------------------------------------------------------------
 int test_canonical_mappings() {
     rac_inference_framework_t ifw = RAC_FRAMEWORK_UNKNOWN;
     EXPECT_RC(rac_inference_framework_from_proto(2, &ifw), RAC_SUCCESS);

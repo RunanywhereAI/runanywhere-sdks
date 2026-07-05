@@ -22,7 +22,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // TYPES
+// =============================================================================
 
 /**
  * @brief Opaque handle for TTS analytics service
@@ -62,7 +64,9 @@ typedef struct rac_tts_metrics {
     int64_t total_audio_size_bytes;
 } rac_tts_metrics_t;
 
+// =============================================================================
 // LIFECYCLE
+// =============================================================================
 
 /**
  * @brief Create a TTS analytics service instance
@@ -79,7 +83,9 @@ RAC_API rac_result_t rac_tts_analytics_create(rac_tts_analytics_handle_t* out_ha
  */
 RAC_API void rac_tts_analytics_destroy(rac_tts_analytics_handle_t handle);
 
+// =============================================================================
 // SYNTHESIS TRACKING
+// =============================================================================
 
 /**
  * @brief Start tracking a synthesis
@@ -154,7 +160,9 @@ RAC_API rac_result_t rac_tts_analytics_track_error(rac_tts_analytics_handle_t ha
                                                    const char* error_message, const char* operation,
                                                    const char* model_id, const char* synthesis_id);
 
+// =============================================================================
 // METRICS
+// =============================================================================
 
 /**
  * @brief Get current analytics metrics

@@ -22,7 +22,9 @@ import 'package:runanywhere/native/types/basic_types.dart';
 abstract class NativeFunctions {
   static final _lib = PlatformLoader.loadCommons();
 
+  // ---------------------------------------------------------------------------
   // LLM Component
+  // ---------------------------------------------------------------------------
 
   static final int Function(Pointer<RacHandle>) llmCreate = _lib.lookupFunction<
       Int32 Function(Pointer<RacHandle>),
@@ -48,7 +50,9 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Void Function(RacHandle), void Function(RacHandle)>(
           'rac_llm_component_destroy');
 
+  // ---------------------------------------------------------------------------
   // STT Component
+  // ---------------------------------------------------------------------------
 
   static final int Function(Pointer<RacHandle>) sttCreate = _lib.lookupFunction<
       Int32 Function(Pointer<RacHandle>),
@@ -72,7 +76,9 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Void Function(RacHandle), void Function(RacHandle)>(
           'rac_stt_component_destroy');
 
+  // ---------------------------------------------------------------------------
   // TTS Component
+  // ---------------------------------------------------------------------------
 
   static final int Function(Pointer<RacHandle>) ttsCreate = _lib.lookupFunction<
       Int32 Function(Pointer<RacHandle>),
@@ -90,7 +96,9 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Void Function(RacHandle), void Function(RacHandle)>(
           'rac_tts_component_destroy');
 
+  // ---------------------------------------------------------------------------
   // VAD Component
+  // ---------------------------------------------------------------------------
 
   static final int Function(Pointer<RacHandle>) vadCreate = _lib.lookupFunction<
       Int32 Function(Pointer<RacHandle>),
@@ -118,7 +126,9 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Void Function(RacHandle), void Function(RacHandle)>(
           'rac_vad_component_destroy');
 
+  // ---------------------------------------------------------------------------
   // VoiceAgent Component
+  // ---------------------------------------------------------------------------
 
   static final int Function(RacHandle, Pointer<Int32>) voiceAgentIsReady =
       _lib.lookupFunction<Int32 Function(RacHandle, Pointer<Int32>),
@@ -142,6 +152,7 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Void Function(RacHandle), void Function(RacHandle)>(
           'rac_voice_agent_destroy');
 
+  // ---------------------------------------------------------------------------
   // Voice Agent Proto-Byte Callback ABI
   //
   // `rac_voice_agent_set_proto_callback` is the canonical streaming entry
@@ -149,6 +160,7 @@ abstract class NativeFunctions {
   // `lib/core/native/rac_native.dart`; this `Function` alias is exposed
   // here for callers that use the `NativeFunctions.voiceAgentSetProtoCallback`
   // pattern consistent with the rest of this file.
+  // ---------------------------------------------------------------------------
 
   static final int Function(
     RacHandle,
@@ -177,6 +189,7 @@ abstract class NativeFunctions {
     }
   })();
 
+  // ---------------------------------------------------------------------------
   // Solutions runtime (rac/solutions/rac_solution.h).
   //
   // Proto-byte / YAML driven L5 solution runtime. `solutionCreateFromProto`
@@ -184,6 +197,7 @@ abstract class NativeFunctions {
   // their out-pointer; the lifecycle verbs (start/stop/cancel/feed/
   // closeInput/destroy) take that handle directly. Every entry point is
   // wrapped by the higher-level `RunAnywhereSolutions` capability.
+  // ---------------------------------------------------------------------------
 
   static final int Function(Pointer<Void>, int, Pointer<RacHandle>)
       solutionCreateFromProto = _lib.lookupFunction<

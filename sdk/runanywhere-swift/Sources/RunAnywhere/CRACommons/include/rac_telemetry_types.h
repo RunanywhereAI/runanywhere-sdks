@@ -18,7 +18,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // TELEMETRY EVENT PAYLOAD
+// =============================================================================
 
 /**
  * @brief Complete telemetry event payload
@@ -132,7 +134,9 @@ RAC_API rac_telemetry_payload_t rac_telemetry_payload_default(void);
  */
 RAC_API void rac_telemetry_payload_free(rac_telemetry_payload_t* payload);
 
+// =============================================================================
 // TELEMETRY BATCH REQUEST
+// =============================================================================
 
 /**
  * @brief Batch telemetry request for API
@@ -167,7 +171,9 @@ typedef struct rac_telemetry_batch_response {
  */
 RAC_API void rac_telemetry_batch_response_free(rac_telemetry_batch_response_t* response);
 
+// =============================================================================
 // DEVICE REGISTRATION TYPES
+// =============================================================================
 
 /**
  * @brief Device information for registration (telemetry-specific)

@@ -28,7 +28,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // ARCHIVE TYPES - From ModelArtifactType.swift
+// =============================================================================
 
 /**
  * @brief Supported archive formats for model packaging.
@@ -55,7 +57,9 @@ typedef enum rac_archive_structure {
   RAC_ARCHIVE_STRUCTURE_UNKNOWN = 99 /**< Unknown - detected after extraction */
 } rac_archive_structure_t;
 
+// =============================================================================
 // EXPECTED MODEL FILES - From ModelArtifactType.swift
+// =============================================================================
 
 /**
  * @brief Expected model files after extraction/download.
@@ -129,7 +133,9 @@ typedef struct rac_model_file_descriptor {
   const char *checksum_sha256;
 } rac_model_file_descriptor_t;
 
+// =============================================================================
 // MODEL ARTIFACT TYPE - From ModelArtifactType.swift
+// =============================================================================
 
 /**
  * @brief Model artifact type enumeration.
@@ -168,7 +174,9 @@ typedef struct rac_model_artifact_info {
   const char *strategy_id;
 } rac_model_artifact_info_t;
 
+// =============================================================================
 // MODEL CATEGORY - From ModelCategory.swift
+// =============================================================================
 
 /**
  * @brief Model category based on input/output modality.
@@ -190,7 +198,9 @@ typedef enum rac_model_category {
   RAC_MODEL_CATEGORY_UNKNOWN = 99 /**< Unknown category */
 } rac_model_category_t;
 
+// =============================================================================
 // MODEL FORMAT
+// =============================================================================
 
 /**
  * @brief Supported model file formats.
@@ -223,7 +233,9 @@ typedef enum rac_model_format {
   RAC_MODEL_FORMAT_UNKNOWN = RAC_MODEL_FORMAT_ID_UNKNOWN /**< Unknown format */
 } rac_model_format_t;
 
+// =============================================================================
 // INFERENCE FRAMEWORK - From InferenceFramework.swift
+// =============================================================================
 
 /**
  * @brief Supported inference frameworks/runtimes.
@@ -249,7 +261,9 @@ typedef enum rac_inference_framework {
   RAC_FRAMEWORK_UNKNOWN = 99 /**< Unknown framework */
 } rac_inference_framework_t;
 
+// =============================================================================
 // MODEL SOURCE
+// =============================================================================
 
 /**
  * @brief Model source enumeration.
@@ -260,7 +274,9 @@ typedef enum rac_model_source {
   RAC_MODEL_SOURCE_LOCAL = 1   /**< Model provided locally */
 } rac_model_source_t;
 
+// =============================================================================
 // MODEL INFO - From ModelInfo.swift
+// =============================================================================
 
 /**
  * @brief Complete model information structure.
@@ -329,7 +345,9 @@ typedef struct rac_model_info {
   int32_t usage_count;
 } rac_model_info_t;
 
+// =============================================================================
 // HELPER FUNCTIONS
+// =============================================================================
 
 /**
  * @brief Get file extension for archive type.
@@ -479,7 +497,9 @@ rac_framework_display_name(rac_inference_framework_t framework);
 RAC_API const char *
 rac_framework_analytics_key(rac_inference_framework_t framework);
 
+// =============================================================================
 // CANONICAL WIRE-STRING / DISPLAY / ANALYTICS ACCESSORS
+// =============================================================================
 //
 // Result-code-returning accessors that expose the canonical maps used by
 // platform SDKs. The Swift typealiases over RAModelFormat /
@@ -619,7 +639,9 @@ rac_artifact_infer_from_url(const char *url, rac_model_format_t format,
  */
 RAC_API rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t *model);
 
+// =============================================================================
 // FORMAT DETECTION - From RegistryService.swift
+// =============================================================================
 
 /**
  * @brief Detect model format from file extension.
@@ -683,7 +705,9 @@ RAC_API rac_result_t
 rac_model_format_for_framework(rac_inference_framework_t framework,
                                const char *extension, rac_bool_t *out);
 
+// =============================================================================
 // MODEL ID/NAME GENERATION - From RegistryService.swift
+// =============================================================================
 
 /**
  * @brief Generate model ID from URL by stripping known extensions.
@@ -746,7 +770,9 @@ RAC_API rac_result_t rac_model_id_from_url(const char *url, char *out,
 RAC_API void rac_model_generate_name(const char *url, char *out_name,
                                      size_t max_len);
 
+// =============================================================================
 // MODEL FILTERING - From RegistryService.swift
+// =============================================================================
 
 /**
  * @brief Model filtering criteria.
@@ -795,7 +821,9 @@ RAC_API size_t rac_model_filter_models(const rac_model_info_t *models,
 RAC_API rac_bool_t rac_model_matches_filter(const rac_model_info_t *model,
                                             const rac_model_filter_t *filter);
 
+// =============================================================================
 // MEMORY MANAGEMENT
+// =============================================================================
 
 /**
  * @brief Allocate expected model files structure.
@@ -861,7 +889,9 @@ RAC_API void rac_model_info_array_free(rac_model_info_t **models, size_t count);
  */
 RAC_API rac_model_info_t *rac_model_info_copy(const rac_model_info_t *model);
 
+// =============================================================================
 // CANONICAL RAModelInfo FACTORY
+// =============================================================================
 //
 // Commons-owned implementation of Swift's RAModelInfo.make(...). Consumes a
 // serialized runanywhere.v1.ModelInfoMakeRequest and produces a fully
@@ -939,7 +969,9 @@ RAC_API rac_result_t rac_model_info_make_proto(const uint8_t *in_request_bytes,
  */
 RAC_API rac_bool_t rac_path_is_non_empty_directory(const char *path);
 
+// =============================================================================
 // CANONICAL ARTIFACT EXPECTED-FILES HELPER
+// =============================================================================
 //
 // Commons-owned port of Swift's RAModelInfo.expectedArtifactFiles and the
 // underlying RAModelInfo.OneOf_Artifact.expectedFiles computed property
@@ -954,7 +986,9 @@ RAC_API rac_bool_t rac_path_is_non_empty_directory(const char *path);
 // runanywhere.v1.ModelInfo. Output is the same
 // `runanywhere.v1.ExpectedModelFiles` shape every SDK already consumes.
 
+// =============================================================================
 // PROTO ENUM ↔ C ENUM MAPPERS
+// =============================================================================
 //
 // Bidirectional mappers between the proto-wire `int32` enum values declared in
 // `idl/model_types.proto` and the corresponding `rac_*_t` C enum values.
@@ -1190,7 +1224,9 @@ RAC_API rac_result_t rac_artifact_expected_files_proto(
     const uint8_t *in_model_bytes, size_t in_model_size,
     rac_proto_buffer_t *out_proto);
 
+// =============================================================================
 // MODEL HEURISTICS — DERIVED FROM RAModelInfo
+// =============================================================================
 //
 // Commons-owned accessors that derive cross-SDK display state from a
 // serialized `runanywhere.v1.ModelInfo`. Centralizes the model-naming

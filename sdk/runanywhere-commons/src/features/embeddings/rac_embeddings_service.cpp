@@ -41,7 +41,9 @@ const rac_embeddings_service_ops_t* embedding_ops(const rac_engine_vtable_t* vt)
 
 }  // namespace
 
+// =============================================================================
 // SERVICE CREATION - Routes through Service Registry
+// =============================================================================
 
 extern "C" {
 
@@ -113,7 +115,9 @@ rac_result_t rac_embeddings_create_with_config(const char* model_id, const char*
     return embeddings_create_internal(model_id, config_json, out_handle);
 }
 
+// =============================================================================
 // GENERIC API - Simple vtable dispatch
+// =============================================================================
 
 rac_result_t rac_embeddings_initialize(rac_handle_t handle, const char* model_path) {
     if (!handle)

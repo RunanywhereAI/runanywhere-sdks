@@ -6,6 +6,7 @@
 // include/rac/graph/pipeline_node.hpp.
 //
 // Cases
+// -----
 //   linear_pipeline           — producer → primitive → consumer, 3-node DAG.
 //   primitive_with_pool       — pool-acquired output buffers recycle correctly.
 //   split_fanout              — 1 input fans out to N consumers.
@@ -63,10 +64,12 @@ static int g_passed = 0;
     }                                                   \
     static void test_##name()
 
+// ---------------------------------------------------------------------------
 // 3-node linear pipeline: producer thread → PrimitiveNode (doubler) → consumer
 // thread. This is the canonical shape of every DAG that real consumers (STT,
 // LLM, RAG) will build — a chain of streaming primitives terminated by an
 // application sink.
+// ---------------------------------------------------------------------------
 
 TEST(linear_pipeline) {
     auto doubler = make_primitive_node<int, int>(
@@ -98,9 +101,11 @@ TEST(linear_pipeline) {
         CHECK(received[i] == i * 2);
 }
 
+// ---------------------------------------------------------------------------
 // PrimitiveNode capture a MemoryPool in the lambda and emits pool-backed
 // buffers. Verifies the pool + node compose correctly and that every buffer
 // is returned to the pool once the consumer drops its handle.
+// ---------------------------------------------------------------------------
 
 struct Frame {
     int seq{0};
@@ -150,7 +155,9 @@ TEST(primitive_with_pool) {
     CHECK(pool->available() == pool->capacity());
 }
 
+// ---------------------------------------------------------------------------
 // SplitNode: every pushed item is copied to each of N output edges.
+// ---------------------------------------------------------------------------
 
 TEST(split_fanout) {
     const size_t N_OUTS = 3;
@@ -189,8 +196,10 @@ TEST(split_fanout) {
     }
 }
 
+// ---------------------------------------------------------------------------
 // MergeNode: N producers drain into one output; output closes exactly once,
 // after the last producer-drain worker exits.
+// ---------------------------------------------------------------------------
 
 TEST(merge_fanin) {
     const size_t N_INS = 3;
@@ -236,8 +245,10 @@ TEST(merge_fanin) {
         CHECK(count[k] == per_producer);
 }
 
+// ---------------------------------------------------------------------------
 // Cancel mid-stream: producer is slow, consumer never drains, cancel wakes
 // every blocked push/pop within ~50 ms.
+// ---------------------------------------------------------------------------
 
 TEST(cancel_mid_stream) {
     // Share the node's output-edge cancel with the processing lambda so the
@@ -288,8 +299,10 @@ TEST(cancel_mid_stream) {
     CHECK(node->cancel_token()->is_cancelled());
 }
 
+// ---------------------------------------------------------------------------
 // start() / stop() / join() are idempotent — GraphScheduler relies on this to
 // be resilient to shutdown races.
+// ---------------------------------------------------------------------------
 
 TEST(idempotent_start_stop) {
     auto node = make_primitive_node<int, int>("identity",
@@ -303,7 +316,9 @@ TEST(idempotent_start_stop) {
     node->join();  // join after join is fine
 }
 
+// ---------------------------------------------------------------------------
 // Main
+// ---------------------------------------------------------------------------
 
 int main() {
     try {

@@ -26,7 +26,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // CONSTANTS - Voice Agent Timing Defaults
+// =============================================================================
 
 /** Default timeout for waiting for speech input (seconds) */
 #define RAC_VOICE_AGENT_DEFAULT_SPEECH_TIMEOUT_SEC 10.0
@@ -43,7 +45,9 @@ extern "C" {
 /** Maximum time to wait for TTS synthesis (seconds) */
 #define RAC_VOICE_AGENT_TTS_RESPONSE_TIMEOUT_SEC 15.0
 
+// =============================================================================
 // TYPES - Mirrors Swift's VoiceAgentConfiguration and VoiceAgentResult
+// =============================================================================
 
 /**
  * @brief Audio pipeline state - Mirrors Swift's AudioPipelineState enum
@@ -219,7 +223,9 @@ static const rac_voice_agent_config_t RAC_VOICE_AGENT_CONFIG_DEFAULT = {
                         .embedding_model_path = RAC_NULL,
                         .vad_model_path = RAC_NULL}};
 
+// =============================================================================
 // AUDIO PIPELINE STATE MANAGER CONFIG - Mirrors Swift's AudioPipelineStateManager.Configuration
+// =============================================================================
 
 /**
  * @brief Audio pipeline state manager configuration
@@ -246,7 +252,9 @@ static const rac_audio_pipeline_config_t RAC_AUDIO_PIPELINE_CONFIG_DEFAULT = {
     .strict_transitions = RAC_TRUE,
     .max_tts_duration = 30.0f};
 
+// =============================================================================
 // AUDIO PIPELINE STATE MANAGER API
+// =============================================================================
 
 /**
  * @brief Check if microphone can be activated in current state
@@ -347,14 +355,18 @@ typedef struct rac_voice_agent_event {
 typedef void (*rac_voice_agent_event_callback_fn)(const rac_voice_agent_event_t* event,
                                                   void* user_data);
 
+// =============================================================================
 // OPAQUE HANDLE
+// =============================================================================
 
 /**
  * @brief Opaque handle for voice agent instance.
  */
 typedef struct rac_voice_agent* rac_voice_agent_handle_t;
 
+// =============================================================================
 // LIFECYCLE API
+// =============================================================================
 
 /**
  * @brief Create a standalone voice agent that owns its component handles.
@@ -397,7 +409,9 @@ RAC_API rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
  */
 RAC_API void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
 
+// =============================================================================
 // MODEL LOADING API (for standalone voice agent)
+// =============================================================================
 
 /**
  * @brief Load an STT model into the voice agent.
@@ -538,7 +552,9 @@ RAC_API rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle);
 RAC_API rac_result_t rac_voice_agent_is_ready(rac_voice_agent_handle_t handle,
                                               rac_bool_t* out_is_ready);
 
+// =============================================================================
 // VOICE PROCESSING API
+// =============================================================================
 
 /**
  * @brief Process a complete voice turn: audio → transcription → LLM response → synthesized speech.
@@ -574,7 +590,9 @@ RAC_API rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t han
                                                     rac_voice_agent_event_callback_fn callback,
                                                     void* user_data);
 
+// =============================================================================
 // INDIVIDUAL COMPONENT ACCESS API
+// =============================================================================
 
 /**
  * @brief Transcribe audio only (without LLM/TTS).
@@ -634,7 +652,9 @@ RAC_API rac_result_t rac_voice_agent_detect_speech(rac_voice_agent_handle_t hand
                                                    const float* samples, size_t sample_count,
                                                    rac_bool_t* out_speech_detected);
 
+// =============================================================================
 // MEMORY MANAGEMENT
+// =============================================================================
 
 /**
  * @brief Free a voice agent result.

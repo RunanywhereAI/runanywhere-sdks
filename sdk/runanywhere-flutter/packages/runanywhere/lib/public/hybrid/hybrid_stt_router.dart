@@ -216,7 +216,7 @@ class HybridSttRouter {
     _handle = RacHandle.fromAddress(0);
   }
 
-  // Internals
+  // --- Internals -----------------------------------------------------------
 
   HybridServiceHandle _createService(HybridModel model) {
     final String? configJson;

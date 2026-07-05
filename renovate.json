@@ -12,8 +12,8 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Centralized JS/TS dep registry — only the `pinned` block in scripts/lib/versions.json is the source of truth. The outer matchString anchors on the `\"pinned\": { ... }` JSON object so doc fields ($schema, _comment, _notes) at the top level cannot produce bogus PRs. The inner matchString extracts each `\"depName\": \"version\"` pair. `npx syncpack fix-mismatches` propagates each bump to every package.json.",
-      "fileMatch": ["^scripts/lib/versions\\.json$"],
+      "description": "Centralized JS/TS dep registry — only the `pinned` block in dependencies/versions.json is the source of truth. The outer matchString anchors on the `\"pinned\": { ... }` JSON object so doc fields ($schema, _comment, _notes) at the top level cannot produce bogus PRs. The inner matchString extracts each `\"depName\": \"version\"` pair. `npx syncpack fix-mismatches` propagates each bump to every package.json.",
+      "fileMatch": ["^dependencies/versions\\.json$"],
       "matchStrings": [
         "\"pinned\"\\s*:\\s*\\{(?<pinnedBlock>[\\s\\S]*?)\\}",
         "\"(?<depName>(?:@[a-zA-Z0-9][-a-zA-Z0-9._]*\\/)?[a-zA-Z][-a-zA-Z0-9._]*)\"\\s*:\\s*\"(?<currentValue>[^\"]+)\""

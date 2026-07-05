@@ -104,7 +104,9 @@ rac_result_t errno_to_rac(int err, rac_result_t fallback) {
     }
 }
 
+// -----------------------------------------------------------------------------
 // File system
+// -----------------------------------------------------------------------------
 
 rac_bool_t desktop_file_exists(const char* path, void* /*user_data*/) {
     if (!path) {
@@ -191,7 +193,9 @@ rac_result_t desktop_file_delete(const char* path, void* /*user_data*/) {
     return RAC_SUCCESS;
 }
 
+// -----------------------------------------------------------------------------
 // Directory enumeration
+// -----------------------------------------------------------------------------
 
 bool entry_is_hidden(const char* name) {
     return name[0] == '.';
@@ -267,7 +271,9 @@ rac_bool_t desktop_is_non_empty_directory(const char* path, void* /*user_data*/)
     return non_empty;
 }
 
+// -----------------------------------------------------------------------------
 // Logging / clock / memory
+// -----------------------------------------------------------------------------
 
 const char* level_tag(rac_log_level_t level) {
     switch (level) {
@@ -368,7 +374,9 @@ rac_result_t desktop_get_memory_info(rac_memory_info_t* out_info, void* /*user_d
 
 }  // namespace
 
+// =============================================================================
 // PUBLIC API
+// =============================================================================
 
 extern "C" {
 

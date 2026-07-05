@@ -7,6 +7,7 @@
 // MergeNode) to assemble multi-node DAGs.
 //
 // Cases
+// -----
 //   streaming_correctness  — producer → n1 → n2 → consumer; output matches
 //                            expected transform and arrives in order.
 //   backpressure           — bounded edge forces the producer to wait on a
@@ -69,9 +70,11 @@ static int g_passed = 0;
     }                                                   \
     static void test_##name()
 
+// ---------------------------------------------------------------------------
 // Linear graph drains to completion — canonical streaming use case.
 // Pipeline: push i → (doubler) → (plus_one) → pop.
 // Expected: (i*2) + 1 for every input.
+// ---------------------------------------------------------------------------
 
 TEST(streaming_correctness) {
     auto doubler = make_primitive_node<int, int>(
@@ -112,10 +115,12 @@ TEST(streaming_correctness) {
         CHECK(received[i] == i * 2 + 1);
 }
 
+// ---------------------------------------------------------------------------
 // Backpressure: the producer's output edge has capacity 2; the downstream
 // consumer sleeps so the producer must block on push. We sample the queue
 // depth and assert it never exceeds capacity — proving BlockProducer actually
 // stalls instead of dropping or growing unbounded.
+// ---------------------------------------------------------------------------
 
 TEST(backpressure) {
     const size_t kCap = 2;
@@ -182,9 +187,11 @@ TEST(backpressure) {
     CHECK(max_depth.load() <= kCap);
 }
 
+// ---------------------------------------------------------------------------
 // Cancel mid-stream: producer keeps feeding; downstream node sleeps long
 // enough that cancel fires before the graph drains. Scheduler shutdown must
 // complete within a bounded window regardless of backlog.
+// ---------------------------------------------------------------------------
 
 TEST(cancel_all_mid_stream) {
     auto slow = make_primitive_node<int, int>(
@@ -238,6 +245,7 @@ TEST(cancel_all_mid_stream) {
     CHECK(pushed.load() < 10000);
 }
 
+// ---------------------------------------------------------------------------
 // Split + merge topology — proves the scheduler's overloaded connect() works
 // for the fan-out / fan-in shape that will back RAG query → embed × N →
 // rerank.
@@ -246,6 +254,7 @@ TEST(cancel_all_mid_stream) {
 //
 // Every input is duplicated into A and B by the split, then both copies hit
 // the merge, so the sink sees each input exactly twice.
+// ---------------------------------------------------------------------------
 
 TEST(split_merge_topology) {
     auto head =
@@ -300,7 +309,9 @@ TEST(split_merge_topology) {
         CHECK(counts[i] == 2);
 }
 
+// ---------------------------------------------------------------------------
 // An empty scheduler start/stop/wait is a no-op — don't hang, don't crash.
+// ---------------------------------------------------------------------------
 
 TEST(empty_scheduler) {
     GraphScheduler scheduler;
@@ -312,7 +323,9 @@ TEST(empty_scheduler) {
     CHECK(!scheduler.running());
 }
 
+// ---------------------------------------------------------------------------
 // Main
+// ---------------------------------------------------------------------------
 
 int main() {
     try {

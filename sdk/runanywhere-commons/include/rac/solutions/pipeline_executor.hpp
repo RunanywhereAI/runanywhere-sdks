@@ -16,6 +16,7 @@
 // validation + graph wiring — and makes it trivial to unit-test.
 //
 // Validation
+// ----------
 // `build()` returns `RAC_ERROR_INVALID_CONFIGURATION` and sets
 // `rac_error_set_details(...)` when:
 //   * any operator name appears twice

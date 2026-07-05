@@ -20,7 +20,9 @@ import 'package:runanywhere/public/extensions/model_category_extensions.dart';
 class RunAnywhereStorage {
   RunAnywhereStorage._();
 
+  // ===========================================================================
   // Model registration (Swift-parity URL / archive / multi-file overloads)
+  // ===========================================================================
 
   /// Register a remote model with the in-memory model registry from a
   /// download URL. Delegates the full build-and-save flow to the commons
@@ -241,7 +243,9 @@ class RunAnywhereStorage {
     return DartBridgeModelRegistry.instance.importModel(request);
   }
 
+  // ===========================================================================
   // Storage availability (existing Flutter-specific helpers)
+  // ===========================================================================
 
   /// Clear the SDK's Temp directory. Mirrors Swift's `cleanTempFiles()`.
   static Future<void> cleanTempFiles() async {

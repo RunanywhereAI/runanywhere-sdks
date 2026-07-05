@@ -17,7 +17,9 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
 
+// =============================================================================
 // Minimal test platform adapter
+// =============================================================================
 
 static void test_log_callback(rac_log_level_t /*level*/, const char* /*category*/,
                               const char* /*message*/, void* /*ctx*/) {
@@ -82,7 +84,9 @@ static rac_config_t make_test_config() {
     return config;
 }
 
+// =============================================================================
 // Setup / Teardown
+// =============================================================================
 
 static bool setup() {
     rac_config_t config = make_test_config();
@@ -96,7 +100,9 @@ static void teardown() {
     rac_shutdown();
 }
 
+// =============================================================================
 // Test: create and destroy with valid model path
+// =============================================================================
 
 static TestResult test_create_destroy() {
     TestResult result;
@@ -123,7 +129,9 @@ static TestResult test_create_destroy() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: create with invalid path returns error
+// =============================================================================
 
 static TestResult test_create_invalid_path() {
     if (!setup()) {
@@ -147,7 +155,9 @@ static TestResult test_create_invalid_path() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: is_model_loaded returns RAC_TRUE after create
+// =============================================================================
 
 static TestResult test_is_model_loaded() {
     TestResult result;
@@ -176,7 +186,9 @@ static TestResult test_is_model_loaded() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: simple synchronous generation
+// =============================================================================
 
 static TestResult test_generate_simple() {
     TestResult result;
@@ -221,7 +233,9 @@ static TestResult test_generate_simple() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: streaming generation
+// =============================================================================
 
 struct StreamCallbackData {
     int token_count = 0;
@@ -278,7 +292,9 @@ static TestResult test_generate_stream() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: cancel generation via callback returning RAC_FALSE
+// =============================================================================
 
 struct CancelCallbackData {
     int token_count = 0;
@@ -329,7 +345,9 @@ static TestResult test_cancel_generation() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: get model info as JSON
+// =============================================================================
 
 static TestResult test_get_model_info() {
     TestResult result;
@@ -364,7 +382,9 @@ static TestResult test_get_model_info() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Test: unload and reload model
+// =============================================================================
 
 static TestResult test_unload_reload() {
     TestResult result;
@@ -404,7 +424,9 @@ static TestResult test_unload_reload() {
     return TEST_PASS();
 }
 
+// =============================================================================
 // Main: register tests and dispatch via CLI args
+// =============================================================================
 
 int main(int argc, char** argv) {
     TestSuite suite("llm");

@@ -4,7 +4,7 @@
 //
 //  Audio-related type definitions used across audio components (STT, TTS, VAD).
 //
-//  BRIDGE: Maps to C++ rac_audio_format_enum_t
+//  🟢 BRIDGE: Maps to C++ rac_audio_format_enum_t
 //  C++ Source: include/rac/features/stt/rac_stt_types.h
 //
 //  `RAAudioFormat` is the proto3-generated enum (idl/model_types.proto);

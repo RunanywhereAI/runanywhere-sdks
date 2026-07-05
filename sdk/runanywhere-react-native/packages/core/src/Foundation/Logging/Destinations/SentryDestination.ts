@@ -20,7 +20,9 @@
 import { LogLevel } from '../Models/LogLevel';
 import type { LogDestination, LogEntry } from '../Services/LoggingManager';
 
+// ============================================================================
 // Sentry Types (minimal interface to avoid hard dependency)
+// ============================================================================
 
 /**
  * Minimal Sentry interface for logging
@@ -48,7 +50,9 @@ export interface SentryInterface {
   flush(timeout?: number): Promise<boolean>;
 }
 
+// ============================================================================
 // Sentry Destination
+// ============================================================================
 
 /**
  * Log destination that sends warning+ logs to Sentry.
@@ -72,7 +76,9 @@ export class SentryDestination implements LogDestination {
     }
   }
 
+  // ==========================================================================
   // Initialization
+  // ==========================================================================
 
   /**
    * Initialize with a Sentry instance
@@ -90,7 +96,9 @@ export class SentryDestination implements LogDestination {
     return this.initialized && this.sentry !== null;
   }
 
+  // ==========================================================================
   // LogDestination Implementation
+  // ==========================================================================
 
   /**
    * Write a log entry to Sentry
@@ -118,7 +126,9 @@ export class SentryDestination implements LogDestination {
     void this.sentry.flush(2000);
   }
 
+  // ==========================================================================
   // Private Helpers
+  // ==========================================================================
 
   /**
    * Add a breadcrumb for the log entry

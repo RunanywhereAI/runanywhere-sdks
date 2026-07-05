@@ -22,8 +22,10 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // CONSTANTS - Single Source of Truth for TTS
 // Swift references these via CRACommons import
+// =============================================================================
 
 // Audio Format Constants
 #define RAC_TTS_DEFAULT_SAMPLE_RATE 22050
@@ -41,7 +43,9 @@ extern "C" {
 // Streaming Constants
 #define RAC_TTS_DEFAULT_STREAMING_CHUNK_BYTES 4096
 
+// =============================================================================
 // CONFIGURATION - Mirrors Swift's TTSConfiguration
+// =============================================================================
 
 /**
  * @brief TTS component configuration
@@ -95,7 +99,9 @@ static const rac_tts_config_t RAC_TTS_CONFIG_DEFAULT = {.model_id = RAC_NULL,
                                                         .use_neural_voice = RAC_TRUE,
                                                         .enable_ssml = RAC_FALSE};
 
+// =============================================================================
 // OPTIONS - Mirrors Swift's TTSOptions
+// =============================================================================
 
 /**
  * @brief TTS synthesis options
@@ -142,7 +148,9 @@ static const rac_tts_options_t RAC_TTS_OPTIONS_DEFAULT = {.voice = RAC_NULL,
                                                               RAC_TTS_DEFAULT_SAMPLE_RATE,
                                                           .use_ssml = RAC_FALSE};
 
+// =============================================================================
 // INPUT - Mirrors Swift's TTSInput
+// =============================================================================
 
 /**
  * @brief TTS input data
@@ -176,7 +184,9 @@ static const rac_tts_input_t RAC_TTS_INPUT_DEFAULT = {.text = RAC_NULL,
                                                       .language = RAC_NULL,
                                                       .options = RAC_NULL};
 
+// =============================================================================
 // RESULT - Mirrors Swift's TTS result
+// =============================================================================
 
 /**
  * @brief TTS synthesis result
@@ -201,7 +211,9 @@ typedef struct rac_tts_result {
     int64_t processing_time_ms;
 } rac_tts_result_t;
 
+// =============================================================================
 // INFO - Mirrors Swift's TTSService properties
+// =============================================================================
 
 /**
  * @brief TTS service info
@@ -218,7 +230,9 @@ typedef struct rac_tts_info {
     size_t num_voices;
 } rac_tts_info_t;
 
+// =============================================================================
 // CALLBACKS
+// =============================================================================
 
 /**
  * @brief TTS streaming callback
@@ -232,7 +246,9 @@ typedef struct rac_tts_info {
 typedef void (*rac_tts_stream_callback_t)(const void* audio_data, size_t audio_size,
                                           void* user_data);
 
+// =============================================================================
 // PHONEME TIMESTAMP - Mirrors Swift's TTSPhonemeTimestamp
+// =============================================================================
 
 /**
  * @brief Phoneme timestamp information
@@ -251,7 +267,9 @@ typedef struct rac_tts_phoneme_timestamp {
     int64_t end_time_ms;
 } rac_tts_phoneme_timestamp_t;
 
+// =============================================================================
 // SYNTHESIS METADATA - Mirrors Swift's TTSSynthesisMetadata
+// =============================================================================
 
 /**
  * @brief Synthesis metadata
@@ -276,7 +294,9 @@ typedef struct rac_tts_synthesis_metadata {
     float characters_per_second;
 } rac_tts_synthesis_metadata_t;
 
+// =============================================================================
 // OUTPUT - Mirrors Swift's TTSOutput
+// =============================================================================
 
 /**
  * @brief TTS output data
@@ -308,7 +328,9 @@ typedef struct rac_tts_output {
     int64_t timestamp_ms;
 } rac_tts_output_t;
 
+// =============================================================================
 // SPEAK RESULT - Mirrors Swift's TTSSpeakResult
+// =============================================================================
 
 /**
  * @brief Speak result (metadata only, no audio data)
@@ -334,7 +356,9 @@ typedef struct rac_tts_speak_result {
     int64_t timestamp_ms;
 } rac_tts_speak_result_t;
 
+// =============================================================================
 // MEMORY MANAGEMENT
+// =============================================================================
 
 /**
  * @brief Free TTS result resources

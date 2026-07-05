@@ -348,19 +348,29 @@ A hybrid voice assistant that keeps latency-sensitive components on-device (wake
 
 ```
 runanywhere-sdks/
-  sdk/
-    runanywhere-commons/        Shared C++ core (CMake root; contains engines/ and runtimes/)
-    runanywhere-swift/          iOS/macOS SDK
-    runanywhere-kotlin/         Android SDK
-    runanywhere-web-next/       Web SDK (WebAssembly)
-    runanywhere-react-native/   React Native SDK
-    runanywhere-flutter/        Flutter SDK
-    runanywhere-cli/            rcli desktop CLI
-    shared/proto-ts/            Shared TypeScript proto bindings
-  idl/                          Protobuf schemas
-  scripts/                      All build/release/codegen/validation scripts (entry point: ./run)
-  examples/                     One sample app per SDK (ios, android, web-next, react-native, flutter)
-  Playground/                   Standalone demo projects
+├── sdk/
+│   ├── runanywhere-swift/          # iOS/macOS SDK
+│   ├── runanywhere-kotlin/         # Android SDK
+│   ├── runanywhere-web/            # Web SDK (WebAssembly)
+│   ├── runanywhere-react-native/   # React Native SDK
+│   ├── runanywhere-flutter/        # Flutter SDK
+│   └── runanywhere-commons/        # Shared C++ core
+│
+├── examples/
+│   ├── ios/RunAnywhereAI/          # iOS sample app
+│   ├── android/RunAnywhereAI/      # Android sample app
+│   ├── web/RunAnywhereAI/          # Web sample app
+│   ├── react-native/RunAnywhereAI/ # React Native sample app
+│   └── flutter/RunAnywhereAI/      # Flutter sample app
+│
+├── Playground/
+│   ├── swift-starter-app/          # iOS AI playground app
+│   ├── on-device-browser-agent/    # Chrome browser automation agent
+│   ├── android-use-agent/          # On-device autonomous Android agent
+│   ├── linux-voice-assistant/      # Linux on-device voice assistant
+│   └── openclaw-hybrid-assistant/  # Hybrid voice assistant (on-device + cloud)
+│
+└── docs/                           # Documentation
 ```
 
 ---
@@ -391,7 +401,7 @@ cd runanywhere-sdks
 
 # Build the native XCFrameworks (generates RACommons + RABackend* xcframeworks
 # into sdk/runanywhere-swift/Binaries/). Required for local Swift development.
-./scripts/build/ios-xcframework.sh
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 
 # Verify `let useLocalNatives = true` in Package.swift so SPM resolves
 # against the on-disk XCFrameworks instead of the remote release URLs.

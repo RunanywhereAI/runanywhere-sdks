@@ -19,7 +19,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // Environment Types
+// =============================================================================
 
 /**
  * @brief SDK environment mode
@@ -37,7 +39,9 @@ typedef enum {
 // Note: rac_log_level_t is defined in rac_types.h
 // We use the existing definition for consistency
 
+// =============================================================================
 // SDK Configuration
+// =============================================================================
 
 /**
  * @brief SDK initialization configuration
@@ -66,7 +70,9 @@ typedef struct {
     const char* build_token;  // SDK build token for validation
 } rac_dev_config_t;
 
+// =============================================================================
 // Environment Query Functions
+// =============================================================================
 
 /**
  * @brief Check if environment requires API authentication
@@ -148,7 +154,9 @@ RAC_API const char* rac_env_description(rac_environment_t env);
  */
 RAC_API int32_t rac_env_default_http_timeout_ms(rac_environment_t env);
 
+// =============================================================================
 // Validation Functions
+// =============================================================================
 
 /**
  * @brief Validation result codes
@@ -195,7 +203,9 @@ RAC_API rac_validation_result_t rac_validate_config(const rac_sdk_config_t* conf
  */
 RAC_API const char* rac_validation_error_message(rac_validation_result_t result);
 
+// =============================================================================
 // Global SDK State
+// =============================================================================
 
 /**
  * @brief Initialize SDK with configuration

@@ -169,11 +169,13 @@ bool replace_all(std::string& value, const std::string& needle, const std::strin
     return replaced;
 }
 
+// ---------------------------------------------------------------------------
 // Built-in operator nodes. These handle the "glue" topology that every
 // non-trivial pipeline needs — a source to inject items, a sink to
 // silently drain them, and an echo that forwards whatever it receives.
 // Real engines register richer operators ("transcribe", "generate_text",
 // …) explicitly before specs using them can compile.
+// ---------------------------------------------------------------------------
 
 class EchoNode final : public OperatorNode {
    public:

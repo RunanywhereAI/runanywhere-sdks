@@ -354,7 +354,36 @@ especially the folder tree, generated proto code, and build/deployment
 sections. React Native mirrors that native/proto-byte ownership instead of
 owning model downloads, registry state, or native HTTP routing in JavaScript.
 
-Your React Native app calls **@runanywhere/core** (the TypeScript API layer), which contains the `RunAnywhere` public API, the SDK event stream (proto bytes), and the native model APIs (registry/download). Beneath core sit the backend packages — **@runanywhere/llamacpp** (LLM/GGUF) and **@runanywhere/onnx** (STT/TTS/VAD). Both backends cross into native code through the **Nitrogen/Nitro JSI** native bridge layer, which lands in **runanywhere-commons** (C++): `RACommons` (core engine), `RABackendLLAMACPP`, and the ONNX + Sherpa backends.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Your React Native App                        │
+├─────────────────────────────────────────────────────────────────┤
+│              @runanywhere/core (TypeScript API)                  │
+│  ┌──────────────┐  ┌───────────────┐  ┌──────────────────────┐  │
+│  │ RunAnywhere  │  │ SDK Events    │  │ Native Model APIs    │  │
+│  │ (public API) │  │ (proto bytes) │  │ (registry/download)  │  │
+│  │              │  │               │  │                      │  │
+│  └──────────────┘  └───────────────┘  └──────────────────────┘  │
+├────────────┬─────────────────────────────────────┬──────────────┤
+│            │                                     │              │
+│  ┌─────────▼─────────┐             ┌────────────▼────────────┐ │
+│  │ @runanywhere/     │             │  @runanywhere/onnx      │ │
+│  │    llamacpp       │             │  (STT/TTS/VAD)          │ │
+│  │  (LLM/GGUF)       │             │                         │ │
+│  └─────────┬─────────┘             └────────────┬────────────┘ │
+├────────────┼─────────────────────────────────────┼──────────────┤
+│            │          Nitrogen/Nitro JSI         │              │
+│            │          (Native Bridge Layer)      │              │
+├────────────┼─────────────────────────────────────┼──────────────┤
+│  ┌─────────▼──────────────────────────────────────▼───────────┐ │
+│  │              runanywhere-commons (C++)                      │ │
+│  │  ┌────────────────┐  ┌────────────────┐  ┌───────────────┐ │ │
+│  │  │ RACommons      │  │ RABackend      │  │ ONNX + Sherpa │ │ │
+│  │  │ (Core Engine)  │  │ LLAMACPP       │  │ backends      │ │ │
+│  │  └────────────────┘  └────────────────┘  └───────────────┘ │ │
+│  └────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### Key Components
 
@@ -653,7 +682,7 @@ Contributions are welcome. This section explains how to set up your development 
 
 ### First-Time Setup (Build from Source)
 
-The SDK depends on native C++ libraries from `runanywhere-commons`. Native artifacts are built in the owning layer (`runanywhere-commons`) and then staged into each RN package by `scripts/release/package-rn.sh`.
+The SDK depends on native C++ libraries from `runanywhere-commons`. Native artifacts are built in the owning layer (`runanywhere-commons`) and then staged into each RN package by `scripts/package-sdk.sh`.
 
 ```bash
 # 1. Clone the repository
@@ -661,18 +690,18 @@ git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks
 
 # 2. Build native artifacts from runanywhere-commons (from repo root)
-./scripts/build/ios-xcframework.sh   # iOS XCFrameworks → build/ios/
-./scripts/build/android.sh           # Android .so files → build/android/
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh   # iOS XCFrameworks → build/ios/
+./scripts/build/build-core-android.sh       # Android .so files → build/android/
 
 # 3. Stage the freshly built natives into the React Native packages
 cd sdk/runanywhere-react-native
-../../scripts/release/package-rn.sh --natives-from ../../build/native-artifacts
+./scripts/package-sdk.sh --natives-from ../../build/native-artifacts
 
 # 4. Install JavaScript dependencies (yarn workspaces)
 yarn install
 ```
 
-`package-rn.sh --natives-from PATH` copies each binary into the package that owns it:
+`package-sdk.sh --natives-from PATH` copies each binary into the package that owns it:
 - `RACommons.xcframework` / `librac_commons.so` → `packages/core`
 - `RABackendLLAMACPP.xcframework` / `librac_backend_llamacpp.so` → `packages/llamacpp`
 - `RABackendONNX.xcframework` + `RABackendSherpa.xcframework` / matching `.so` files → `packages/onnx`
@@ -729,7 +758,7 @@ The sample app's `package.json` uses workspace dependencies to reference the loc
 ```
 Sample App → Local RN SDK Packages → Local Frameworks/JNI libs
                                            ↑
-        Staged by scripts/release/package-rn.sh --natives-from PATH
+                Staged by ./scripts/package-sdk.sh --natives-from PATH
 ```
 
 ### Development Workflow
@@ -751,20 +780,20 @@ yarn build
 
 ```bash
 # 1. Rebuild native artifacts in the owning layer (repo root)
-./scripts/build/ios-xcframework.sh   # iOS
-./scripts/build/android.sh           # Android
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh   # iOS
+./scripts/build/build-core-android.sh       # Android
 
 # 2. Re-stage them into the RN packages
 cd sdk/runanywhere-react-native
-../../scripts/release/package-rn.sh --natives-from ../../build/native-artifacts
+./scripts/package-sdk.sh --natives-from ../../build/native-artifacts
 ```
 
 ### Packaging Reference
 
 | Command | Description |
 |---------|-------------|
-| `scripts/release/package-rn.sh --natives-from PATH` | Stage iOS XCFrameworks + Android `.so` files from `PATH` into each owning package, type-check, and produce `dist/sdk-rn/*.tgz` + `.sha256` |
-| `scripts/release/package-rn.sh --mode local\|ci` | Override packaging mode (default: auto-detect from `$CI`) |
+| `./scripts/package-sdk.sh --natives-from PATH` | Stage iOS XCFrameworks + Android `.so` files from `PATH` into each owning package, type-check, and produce `dist/sdk-rn/*.tgz` + `.sha256` |
+| `./scripts/package-sdk.sh --mode local\|ci` | Override packaging mode (default: auto-detect from `$CI`) |
 | `yarn <core\|llamacpp\|onnx>:download-ios` | Download pre-built iOS natives from GitHub releases for that package |
 | `yarn <core\|llamacpp\|onnx>:download-android` | Download pre-built Android `.so` files from GitHub releases for that package |
 | `yarn native:local` / `yarn native:remote` | Toggle iOS `.testlocal` marker files for local-vs-published native consumption |

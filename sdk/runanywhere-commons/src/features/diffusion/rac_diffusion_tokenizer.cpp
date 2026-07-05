@@ -26,7 +26,9 @@
 #include <unistd.h>
 #endif
 
+// =============================================================================
 // CONSTANTS - Tokenizer base URLs for Apple Stable Diffusion models
+// =============================================================================
 // Used when ensuring tokenizer files (vocab.json, merges.txt) for text encoding.
 // Built-in Apple models: SD 1.5 CoreML and SD 2.1 CoreML use SD_1_5 and SD_2_X.
 
@@ -42,7 +44,9 @@ static const char* TOKENIZER_URL_SD_2_X =
 static const char* TOKENIZER_URL_SDXL =
     "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/tokenizer";
 
+// =============================================================================
 // URL RESOLUTION
+// =============================================================================
 
 extern "C" const char* rac_diffusion_tokenizer_get_base_url(rac_diffusion_tokenizer_source_t source,
                                                             const char* custom_url) {
@@ -82,7 +86,9 @@ rac_diffusion_tokenizer_get_file_url(rac_diffusion_tokenizer_source_t source,
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // FILE MANAGEMENT
+// =============================================================================
 
 extern "C" rac_result_t rac_diffusion_tokenizer_check_files(const char* model_dir,
                                                             rac_bool_t* out_has_vocab,
@@ -261,7 +267,9 @@ rac_diffusion_tokenizer_download_file(rac_diffusion_tokenizer_source_t source,
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // DEFAULT TOKENIZER SOURCE
+// =============================================================================
 
 extern "C" rac_diffusion_tokenizer_source_t
 rac_diffusion_tokenizer_default_for_variant(rac_diffusion_model_variant_t model_variant) {

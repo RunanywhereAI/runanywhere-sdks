@@ -3,6 +3,7 @@
 //  ONNXRuntime Module
 //
 //  Unified ONNX module - thin wrapper that calls C++ backend registration.
+//  This replaces both ONNXRuntime.swift and ONNXServiceProvider.swift.
 //
 
 import CRACommons

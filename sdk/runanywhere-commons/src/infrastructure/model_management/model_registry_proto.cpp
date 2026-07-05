@@ -25,7 +25,9 @@ using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 
 #ifdef RAC_HAVE_PROTOBUF
 
+// -----------------------------------------------------------------------------
 // Query / sort helpers
+// -----------------------------------------------------------------------------
 
 namespace {
 
@@ -299,7 +301,9 @@ ModelCounts count_models(const std::vector<ModelInfo>& models) {
 
 #endif  // RAC_HAVE_PROTOBUF
 
+// =============================================================================
 // PUBLIC API - PROTO-BYTE MODEL INFO
+// =============================================================================
 
 rac_result_t rac_model_registry_register_proto(rac_model_registry_handle_t handle,
                                                const uint8_t* proto_bytes, size_t proto_size) {

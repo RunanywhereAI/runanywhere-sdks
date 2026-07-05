@@ -34,12 +34,12 @@ WORKDIR /workspace/Playground/linux-voice-assistant
 # Step 1: Download Sherpa-ONNX
 RUN cd /workspace/sdk/runanywhere-commons && \
     chmod +x scripts/linux/*.sh && \
-    ./scripts/build/deps/download-sherpa-onnx.sh linux
+    ./scripts/linux/download-sherpa-onnx.sh
 
 # Step 2: Build runanywhere-commons
 RUN cd /workspace/sdk/runanywhere-commons && \
     chmod +x scripts/*.sh && \
-    ./scripts/build/linux.sh --shared
+    ./scripts/build-linux.sh --shared
 
 # Step 3: Build the voice assistant (compilation check)
 RUN mkdir -p build && cd build && \

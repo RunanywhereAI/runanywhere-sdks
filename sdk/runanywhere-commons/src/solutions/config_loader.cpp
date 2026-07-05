@@ -3,6 +3,7 @@
 // config_loader.cpp — T4.7 proto-bytes + minimal YAML loaders.
 //
 // YAML subset supported
+// ---------------------
 // The parser deliberately implements a small subset of YAML that is
 // nonetheless sufficient for every field in pipeline.proto and
 // solutions.proto. Supported features:
@@ -48,7 +49,9 @@ namespace rac::solutions {
 
 namespace {
 
+// ===========================================================================
 // YAML NODE MODEL
+// ===========================================================================
 
 struct YamlNode;
 using YamlNodePtr = std::shared_ptr<YamlNode>;
@@ -89,7 +92,9 @@ struct YamlNode {
     }
 };
 
+// ===========================================================================
 // YAML PARSER
+// ===========================================================================
 
 class YamlParser {
    public:
@@ -341,7 +346,9 @@ class YamlParser {
     }
 };
 
+// ===========================================================================
 // YAML → PROTO MAPPING
+// ===========================================================================
 
 static int to_int(const std::string& s, int fallback = 0) {
     try {
@@ -463,8 +470,10 @@ rac_result_t populate_pipeline(const YamlNode& root, runanywhere::v1::PipelineSp
     return RAC_SUCCESS;
 }
 
+// ---------------------------------------------------------------------------
 // Solution-specific populators. Each mirrors the fields declared in
 // solutions.proto for the corresponding oneof arm.
+// ---------------------------------------------------------------------------
 
 runanywhere::v1::AudioSource parse_audio_source(const std::string& s) {
     using runanywhere::v1::AudioSource;
@@ -580,7 +589,9 @@ rac_result_t populate_solution(const YamlNode& root, runanywhere::v1::SolutionCo
 
 }  // namespace
 
+// ===========================================================================
 // PUBLIC API
+// ===========================================================================
 
 rac_result_t load_pipeline_from_proto_bytes(const void* data, size_t len,
                                             runanywhere::v1::PipelineSpec* out_spec) {

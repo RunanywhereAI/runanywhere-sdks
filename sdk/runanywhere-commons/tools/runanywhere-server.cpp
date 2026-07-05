@@ -45,7 +45,9 @@
 #include <csignal>
 #include <string>
 
+// =============================================================================
 // SIGNAL HANDLING
+// =============================================================================
 
 static volatile sig_atomic_t g_shouldStop = 0;
 
@@ -56,7 +58,9 @@ static void signalHandler(int signum) {
     rac_server_stop();
 }
 
+// =============================================================================
 // ARGUMENT PARSING
+// =============================================================================
 
 struct ServerOptions {
     std::string modelPath;
@@ -157,7 +161,9 @@ static ServerOptions parseArgs(int argc, char* argv[]) {
     return opts;
 }
 
+// =============================================================================
 // MAIN
+// =============================================================================
 
 int main(int argc, char* argv[]) {
     // Parse arguments

@@ -25,7 +25,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // TYPES
+// =============================================================================
 
 /** Opaque handle to platform LLM service */
 typedef struct rac_llm_platform* rac_llm_platform_handle_t;
@@ -51,7 +53,9 @@ typedef struct rac_llm_platform_options {
     void* reserved;
 } rac_llm_platform_options_t;
 
+// =============================================================================
 // SWIFT CALLBACK TYPES
+// =============================================================================
 
 /**
  * Callback to check if platform LLM can handle a model ID.
@@ -111,7 +115,9 @@ typedef struct rac_platform_llm_callbacks {
     void* user_data;
 } rac_platform_llm_callbacks_t;
 
+// =============================================================================
 // CALLBACK REGISTRATION
+// =============================================================================
 
 /**
  * Sets the Swift callbacks for platform LLM operations.
@@ -136,7 +142,9 @@ RAC_API const rac_platform_llm_callbacks_t* rac_platform_llm_get_callbacks(void)
  */
 RAC_API rac_bool_t rac_platform_llm_is_available(void);
 
+// =============================================================================
 // SERVICE API
+// =============================================================================
 
 /**
  * Creates a platform LLM service.
@@ -170,7 +178,9 @@ RAC_API rac_result_t rac_llm_platform_generate(rac_llm_platform_handle_t handle,
                                                const rac_llm_platform_options_t* options,
                                                char** out_response);
 
+// =============================================================================
 // BACKEND REGISTRATION
+// =============================================================================
 
 /**
  * Registers the Platform backend with the module and service registries.

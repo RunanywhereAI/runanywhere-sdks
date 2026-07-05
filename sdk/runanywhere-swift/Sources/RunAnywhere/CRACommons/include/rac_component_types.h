@@ -18,7 +18,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // SDK COMPONENT - Mirrors Swift's SDKComponent enum
+// =============================================================================
 
 /**
  * @brief SDK component types for identification
@@ -53,7 +55,9 @@ RAC_API const char* rac_sdk_component_display_name(rac_sdk_component_t component
  */
 RAC_API const char* rac_sdk_component_raw_value(rac_sdk_component_t component);
 
+// =============================================================================
 // CAPABILITY RESOURCE TYPE - Mirrors Swift's CapabilityResourceType enum
+// =============================================================================
 
 /**
  * @brief Types of resources that can be loaded by capabilities
@@ -79,7 +83,9 @@ typedef enum rac_capability_resource_type {
  */
 RAC_API const char* rac_capability_resource_type_raw_value(rac_capability_resource_type_t type);
 
+// =============================================================================
 // COMPONENT CONFIGURATION - Mirrors Swift's ComponentConfiguration protocol
+// =============================================================================
 
 /**
  * @brief Base component configuration
@@ -105,7 +111,9 @@ static const rac_component_config_base_t RAC_COMPONENT_CONFIG_BASE_DEFAULT = {
     .model_id = RAC_NULL, .preferred_framework = -1 /* No preference */
 };
 
+// =============================================================================
 // COMPONENT INPUT/OUTPUT - Mirrors Swift's ComponentInput/ComponentOutput protocols
+// =============================================================================
 
 /**
  * @brief Base component output with timestamp
@@ -118,8 +126,10 @@ typedef struct rac_component_output_base {
     int64_t timestamp_ms;
 } rac_component_output_base_t;
 
+// =============================================================================
 // INFERENCE FRAMEWORK - Mirrors Swift's InferenceFramework enum
 // (Typically defined in model_types, but included here for completeness)
+// =============================================================================
 
 /**
  * @brief Get SDK component type from capability resource type

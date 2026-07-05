@@ -27,7 +27,9 @@ const rac_stt_service_ops_t* stt_ops(const rac_engine_vtable_t* vt) {
 
 }  // namespace
 
+// =============================================================================
 // SERVICE CREATION - Routes through Service Registry
+// =============================================================================
 
 extern "C" {
 
@@ -74,7 +76,9 @@ rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle) {
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // GENERIC API - Simple vtable dispatch
+// =============================================================================
 
 rac_result_t rac_stt_initialize(rac_handle_t handle, const char* model_path) {
     if (!handle)

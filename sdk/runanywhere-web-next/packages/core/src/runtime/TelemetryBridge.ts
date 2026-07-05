@@ -134,6 +134,8 @@ export class TelemetryBridge {
     }
   }
 
+  // ---------------------------------------------------------------------------
+
   private doInstall(): boolean {
     const m = this.m;
     const create = m._rac_telemetry_manager_create;

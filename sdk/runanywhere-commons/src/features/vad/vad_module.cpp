@@ -2,10 +2,12 @@
  * @file vad_module.cpp
  * @brief Unified VAD feature module.
  *
- * One TU owns both the handle-based dual-backend component path (always-on
- * energy VAD + optional model VAD, dispatched model-first with energy
- * fallback, plus the *_component_*_proto verbs) and the handle-less
- * rac_vad_process_lifecycle_proto + configure/start/stop/reset verbs.
+ * W4 component unification: merges the former vad_component.cpp (handle-based
+ * dual-backend component path — always-on energy VAD + optional model VAD —
+ * plus the *_component_*_proto verbs) with VAD's slice of
+ * rac_nonllm_lifecycle_proto_abi.cpp (the handle-less
+ * rac_vad_process_lifecycle_proto + configure/start/stop/reset verbs) into one
+ * TU. The dual-backend dispatch (model-first, energy-fallback) is preserved.
  *
  * The component section is a direct translation of Swift's VADCapability.swift;
  * do NOT add features not present in the Swift code.
@@ -55,7 +57,9 @@
 #include "infrastructure/events/sdk_event_publish.h"
 #endif
 
+// =============================================================================
 // INTERNAL STRUCTURES
+// =============================================================================
 
 struct rac_vad_component {
     /** Energy VAD service handle (built-in fallback) */
@@ -106,7 +110,9 @@ struct rac_vad_component {
     }
 };
 
+// =============================================================================
 // HELPER FUNCTIONS
+// =============================================================================
 
 namespace {
 
@@ -493,7 +499,9 @@ static void vad_speech_activity_callback(rac_speech_activity_event_t event, void
     }
 }
 
+// =============================================================================
 // LIFECYCLE API
+// =============================================================================
 
 extern "C" rac_result_t rac_vad_component_create(rac_handle_t* out_handle) {
     if (!out_handle) {
@@ -522,7 +530,9 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
+    // ==========================================================================
     // VALIDATION - Ported from Swift VADConfiguration.swift:62-110
+    // ==========================================================================
 
     // 1. Energy threshold range (Swift lines 64-69)
     if (config->energy_threshold < 0.0f || config->energy_threshold > 1.0f) {
@@ -558,6 +568,8 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
     // 6. Calibration multiplier validation (Swift lines 104-109)
     // Note: Check if calibration_multiplier exists in config
     // Swift validates calibrationMultiplier >= 1.5 && <= 5.0
+
+    // ==========================================================================
 
     component->config = *config;
 
@@ -694,7 +706,9 @@ extern "C" void rac_vad_component_destroy(rac_handle_t handle) {
     delete component;
 }
 
+// =============================================================================
 // CALLBACK API
+// =============================================================================
 
 extern "C" rac_result_t
 rac_vad_component_set_activity_callback(rac_handle_t handle, rac_vad_activity_callback_fn callback,
@@ -726,7 +740,9 @@ extern "C" rac_result_t rac_vad_component_set_audio_callback(rac_handle_t handle
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // CONTROL API
+// =============================================================================
 
 extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
     if (!handle)
@@ -803,7 +819,9 @@ extern "C" rac_result_t rac_vad_component_reset(rac_handle_t handle) {
     return rac_energy_vad_reset(component->vad_service);
 }
 
+// =============================================================================
 // MODEL LOADING API
+// =============================================================================
 
 extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const char* model_path,
                                                      const char* model_id, const char* model_name) {
@@ -918,7 +936,9 @@ extern "C" rac_result_t rac_vad_component_unload(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // PROCESSING API
+// =============================================================================
 
 extern "C" rac_result_t rac_vad_component_process(rac_handle_t handle, const float* samples,
                                                   size_t num_samples, rac_bool_t* out_is_speech) {
@@ -962,7 +982,9 @@ extern "C" rac_result_t rac_vad_component_process(rac_handle_t handle, const flo
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // STATE QUERY API
+// =============================================================================
 
 extern "C" rac_bool_t rac_vad_component_is_speech_active(rac_handle_t handle) {
     if (!handle)
@@ -1106,7 +1128,9 @@ extern "C" rac_result_t rac_vad_component_get_statistics(rac_handle_t handle,
     return RAC_SUCCESS;
 }
 
+// =============================================================================
 // GENERATED-PROTO C ABI
+// =============================================================================
 
 extern "C" rac_result_t rac_vad_component_configure_proto(rac_handle_t handle,
                                                           const uint8_t* config_proto_bytes,
@@ -1295,11 +1319,14 @@ extern "C" rac_result_t rac_vad_component_set_activity_proto_callback(
 #endif
 }
 
-// LIFECYCLE-OWNED GENERATED-PROTO C ABI
+// =============================================================================
+// LIFECYCLE-OWNED GENERATED-PROTO C ABI (formerly VAD slice of
+// rac_nonllm_lifecycle_proto_abi.cpp)
 //
 // Handle-less verbs that resolve the loaded model via the global registry
 // (rac::lifecycle::acquire_lifecycle_vad). Verb map: process=generate,
 // configure=load.
+// =============================================================================
 
 namespace {
 
@@ -1509,7 +1536,9 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
 #endif
 }
 
+// ---------------------------------------------------------------------------
 // VAD lifecycle configure / start / stop / reset ABIs (FLT-12)
+// ---------------------------------------------------------------------------
 
 rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_bytes,
                                                size_t request_proto_size,

@@ -28,7 +28,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // API VISIBILITY MACROS
+// =============================================================================
 //
 // RAC_API marks functions that must be visible to FFI (dlsym).
 //
@@ -39,6 +41,7 @@ extern "C" {
 // Without visibility("default"), static library symbols get "private external"
 // visibility (due to -fvisibility=hidden), which becomes "non-external" (local)
 // in the final binary - breaking FFI symbol lookup.
+// =============================================================================
 
 #if defined(_WIN32)
 #if defined(RAC_BUILDING_SHARED)
@@ -56,7 +59,9 @@ extern "C" {
 #define RAC_API
 #endif
 
+// =============================================================================
 // RESULT TYPE
+// =============================================================================
 
 /**
  * Result type for all RAC functions.
@@ -72,7 +77,9 @@ typedef int32_t rac_result_t;
 /** Success result */
 #define RAC_SUCCESS ((rac_result_t)0)
 
+// =============================================================================
 // BOOLEAN TYPE
+// =============================================================================
 
 /** Boolean type for C compatibility */
 typedef int32_t rac_bool_t;
@@ -80,7 +87,9 @@ typedef int32_t rac_bool_t;
 #define RAC_TRUE ((rac_bool_t)1)
 #define RAC_FALSE ((rac_bool_t)0)
 
+// =============================================================================
 // HANDLE TYPES
+// =============================================================================
 
 /**
  * Opaque handle for internal objects.
@@ -91,7 +100,9 @@ typedef void* rac_handle_t;
 /** Invalid handle value */
 #define RAC_INVALID_HANDLE ((rac_handle_t)NULL)
 
+// =============================================================================
 // STRING TYPES
+// =============================================================================
 
 /**
  * String view (non-owning reference to a string).
@@ -107,7 +118,9 @@ typedef struct rac_string_view {
  */
 #define RAC_STRING_VIEW(s) ((rac_string_view_t){(s), (s) ? strlen(s) : 0})
 
+// =============================================================================
 // AUDIO TYPES
+// =============================================================================
 
 /**
  * Audio buffer for STT/VAD operations.
@@ -129,7 +142,9 @@ typedef struct rac_audio_format {
     int32_t bits_per_sample; /**< Bits per sample (16 or 32) */
 } rac_audio_format_t;
 
+// =============================================================================
 // MEMORY INFO
+// =============================================================================
 
 /**
  * Memory information structure.
@@ -141,7 +156,9 @@ typedef struct rac_memory_info {
     uint64_t used_bytes;      /**< Used memory in bytes */
 } rac_memory_info_t;
 
+// =============================================================================
 // CAPABILITY TYPES
+// =============================================================================
 
 /**
  * Capability types supported by backends.
@@ -169,7 +186,9 @@ typedef enum rac_device {
     RAC_DEVICE_AUTO = 3,
 } rac_device_t;
 
+// =============================================================================
 // LOG LEVELS
+// =============================================================================
 
 /**
  * Log level for the logging callback.
@@ -183,7 +202,9 @@ typedef enum rac_log_level {
     RAC_LOG_FATAL = 5,
 } rac_log_level_t;
 
+// =============================================================================
 // VERSION INFO
+// =============================================================================
 
 /**
  * Version information structure.
@@ -195,7 +216,9 @@ typedef struct rac_version {
     const char* string; /**< Version string (e.g., "1.0.0") */
 } rac_version_t;
 
+// =============================================================================
 // UTILITY MACROS
+// =============================================================================
 
 /** Check if a result is a success */
 #define RAC_SUCCEEDED(result) ((result) >= 0)
@@ -206,7 +229,9 @@ typedef struct rac_version {
 /** Check if a handle is valid */
 #define RAC_IS_VALID_HANDLE(handle) ((handle) != RAC_INVALID_HANDLE)
 
+// =============================================================================
 // MEMORY MANAGEMENT
+// =============================================================================
 
 /**
  * Frees memory allocated by RAC functions.

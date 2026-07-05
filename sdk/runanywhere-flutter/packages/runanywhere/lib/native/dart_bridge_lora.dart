@@ -16,7 +16,9 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/lora_options.pb.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 
+// =============================================================================
 // LoRA Runtime Operations (via LLM Component)
+// =============================================================================
 
 /// LoRA adapter bridge for runtime operations.
 ///
@@ -109,7 +111,9 @@ class DartBridgeLora {
   }
 }
 
+// =============================================================================
 // LoRA Registry (Catalog Operations)
+// =============================================================================
 
 /// LoRA adapter registry bridge for catalog operations.
 ///

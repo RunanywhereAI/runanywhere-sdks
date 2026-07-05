@@ -54,7 +54,9 @@ public:
      */
     const rac_file_callbacks_t* getCallbacks() const { return &callbacks_; }
 
+    // =========================================================================
     // Public API (wraps rac_file_manager_* functions)
+    // =========================================================================
 
     /**
      * Create standard directory structure (Models/Cache/Temp/Downloads)

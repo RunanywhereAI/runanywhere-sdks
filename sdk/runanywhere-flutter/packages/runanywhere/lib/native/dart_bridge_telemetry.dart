@@ -15,7 +15,9 @@ import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
+// =============================================================================
 // Telemetry Manager Bridge
+// =============================================================================
 
 /// Telemetry bridge for C++ telemetry operations.
 /// Matches Swift's `CppBridge+Telemetry.swift`.
@@ -42,7 +44,9 @@ class DartBridgeTelemetry {
   static Pointer<Void>? _managerPtr;
   static NativeCallable<Void Function(Pointer<Void>)>? _httpWakeup;
 
+  // ============================================================================
   // Lifecycle
+  // ============================================================================
 
   /// Synchronous initialization - just stores environment.
   /// Matches Swift's Telemetry.initialize() in Phase 1 (minimal setup).
@@ -239,7 +243,9 @@ class DartBridgeTelemetry {
     }
   }
 
+  // ============================================================================
   // HTTP Callback Registration
+  // ============================================================================
 
   static void _registerHttpCallback() {
     if (_managerPtr == null) return;
@@ -315,7 +321,9 @@ class DartBridgeTelemetry {
     }
   }
 
+  // ============================================================================
   // Internal Helpers
+  // ============================================================================
 
   static Future<String> _getDeviceModel() async {
     try {
@@ -351,7 +359,9 @@ class DartBridgeTelemetry {
   }
 }
 
+// =============================================================================
 // HTTP Wake-up Function
+// =============================================================================
 
 /// Wake-up from commons (may be signalled from any isolate, e.g. the LLM
 /// streaming worker isolate). Registered as a `NativeCallable.listener` so the

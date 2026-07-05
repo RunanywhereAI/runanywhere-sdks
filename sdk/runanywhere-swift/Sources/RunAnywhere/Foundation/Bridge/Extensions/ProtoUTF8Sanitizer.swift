@@ -5,6 +5,7 @@
 //  Best-effort repair of invalid UTF-8 inside serialized protobuf payloads.
 //
 //  WHY THIS EXISTS
+//  ---------------
 //  Commons builds proto `string` fields from on-device model output and from
 //  byte-sliced document text. For RAG specifically, `RAGBackend::add_document`
 //  stores `text.substr(0, 100)` as a chunk's `source_text` preview
@@ -24,6 +25,7 @@
 //  while the same bytes decoded fine on Android/Flutter.
 //
 //  WHAT THIS DOES
+//  --------------
 //  `ProtoUTF8Sanitizer.repair(_:as:)` rewrites the offending `string` fields,
 //  replacing only invalid byte runs with U+FFFD and reproducing every other
 //  byte (varints, fixed32/64, valid strings, `bytes` fields, nested messages)

@@ -22,7 +22,9 @@ extern "C" {
 
 // NOTE: rac_vad_config_t is defined in rac_vad_types.h (included above)
 
+// =============================================================================
 // VAD COMPONENT API - Mirrors Swift's VADCapability
+// =============================================================================
 
 /**
  * @brief Create a VAD capability component

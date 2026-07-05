@@ -65,7 +65,9 @@ namespace {
 
 #ifdef RAC_HAVE_PROTOBUF
 
+// ---------------------------------------------------------------------------
 // Helper: serialize the model and dispatch the proto API.
+// ---------------------------------------------------------------------------
 bool dispatch_expected_files(const runanywhere::v1::ModelInfo& model,
                              runanywhere::v1::ExpectedModelFiles* out) {
     std::string bytes;
@@ -94,7 +96,9 @@ bool dispatch_expected_files(const runanywhere::v1::ModelInfo& model,
     return parsed;
 }
 
+// ---------------------------------------------------------------------------
 // Test cases — Swift parity matrix.
+// ---------------------------------------------------------------------------
 int test_top_level_expected_files_short_circuit() {
     // Swift's `if hasExpectedFiles { return expectedFiles }` short-circuit:
     // when the top-level model.expected_files manifest is set, return it
@@ -345,7 +349,9 @@ int test_empty_model_bytes_returns_empty_manifest() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
 // Negative paths.
+// ---------------------------------------------------------------------------
 int test_null_out_pointer() {
     rac_result_t rc = rac_artifact_expected_files_proto(nullptr, 0, nullptr);
     ASSERT_EQ(rc, RAC_ERROR_NULL_POINTER);

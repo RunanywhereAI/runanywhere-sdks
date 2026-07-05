@@ -25,7 +25,9 @@
 
 using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 
+// =============================================================================
 // REFRESH HELPERS — file_list_directory adapter rescan
+// =============================================================================
 //
 // When the proto refresh request asks for `rescan_local` and no platform
 // discovery callback is wired, we fall back to the platform adapter's
@@ -391,7 +393,9 @@ rac_artifact_type_kind_t rac_model_infer_artifact_type(const char* url, rac_mode
     }
 }
 
+// =============================================================================
 // FETCH ASSIGNMENTS — Unified cross-SDK entry point (Web WASM)
+// =============================================================================
 
 rac_result_t rac_model_registry_fetch_assignments(rac_bool_t force_refresh,
                                                   rac_model_info_t*** out_models,

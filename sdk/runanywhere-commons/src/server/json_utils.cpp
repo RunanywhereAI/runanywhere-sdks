@@ -14,7 +14,9 @@ namespace rac {
 namespace server {
 namespace json {
 
+// =============================================================================
 // SERIALIZATION (C types -> JSON)
+// =============================================================================
 
 Json serializeChatResponse(const rac_openai_chat_response_t& response) {
     Json json;
@@ -186,7 +188,9 @@ Json createErrorResponse(const std::string& message, const std::string& type, in
     return json;
 }
 
+// =============================================================================
 // STREAMING HELPERS
+// =============================================================================
 
 std::string formatSSE(const Json& chunk) {
     std::ostringstream ss;

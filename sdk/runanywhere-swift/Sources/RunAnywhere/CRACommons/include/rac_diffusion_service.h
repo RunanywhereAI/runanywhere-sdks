@@ -17,7 +17,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // SERVICE VTABLE - Backend implementations provide this
+// =============================================================================
 
 /**
  * Diffusion Service operations vtable.
@@ -75,7 +77,9 @@ typedef struct rac_diffusion_service {
     const char* model_id;
 } rac_diffusion_service_t;
 
+// =============================================================================
 // PUBLIC API - Generic service functions
+// =============================================================================
 
 /**
  * @brief Create a diffusion service

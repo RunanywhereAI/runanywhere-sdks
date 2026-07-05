@@ -37,7 +37,9 @@
 extern "C" {
 #endif
 
+// =============================================================================
 // PROTO-BYTE DOWNLOAD WORKFLOW ABI
+// =============================================================================
 
 typedef void (*rac_download_proto_progress_callback_fn)(const uint8_t* proto_bytes,
                                                         size_t proto_size,
@@ -66,7 +68,9 @@ RAC_API rac_result_t rac_download_progress_poll_proto(const uint8_t* request_byt
                                                       size_t request_size,
                                                       rac_proto_buffer_t* out_result);
 
+// =============================================================================
 // POST-EXTRACTION MODEL PATH FINDING
+// =============================================================================
 
 /**
  * @brief Find the actual model path after extraction.
@@ -93,7 +97,9 @@ RAC_API rac_result_t rac_find_model_path_after_extraction(const char* extracted_
                                                           rac_model_format_t format, char* out_path,
                                                           size_t path_size);
 
+// =============================================================================
 // UTILITY FUNCTIONS
+// =============================================================================
 
 /**
  * @brief Compute the download destination path for a model.

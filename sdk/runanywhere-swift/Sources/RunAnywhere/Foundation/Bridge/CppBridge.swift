@@ -10,13 +10,18 @@
  *
  * ## Initialization Order
  *
- * Phase 1 (sync, must run first): `CppBridge.initialize(environment:)` calls
- * PlatformAdapter.register() (file ops, logging, keychain), Events.register()
- * (analytics event callback), Telemetry.initialize() (telemetry HTTP callback),
- * and Device.register() (device registration callbacks).
+ * ```swift
+ * // Phase 1: Core init (sync) - must be called first
+ * CppBridge.initialize(environment: .production)
+ *   ├─ PlatformAdapter.register()  ← File ops, logging, keychain
+ *   ├─ Events.register()           ← Analytics event callback
+ *   ├─ Telemetry.initialize()      ← Telemetry HTTP callback
+ *   └─ Device.register()           ← Device registration callbacks
  *
- * Phase 2 (async, after HTTP is configured): `await CppBridge.initializeServices()`
- * calls Platform.register() (LLM/TTS service callbacks).
+ * // Phase 2: Services init (async) - after HTTP is configured
+ * await CppBridge.initializeServices()
+ *   └─ Platform.register()         ← LLM/TTS service callbacks
+ * ```
  *
  * ## Bridge Extensions (in Extensions/ folder)
  *
@@ -49,7 +54,8 @@ public enum CppBridge {
     // MARK: - Shared State
 
     /// Combined synchronously-readable bridge state, guarded by a single
-    /// `OSAllocatedUnfairLock` (not NSLock, per AGENTS.md).
+    /// `OSAllocatedUnfairLock`. Replaces the prior NSLock + 3 vars layout
+    /// per AGENTS.md "Do not use NSLock as it is outdated."
     private struct CppBridgeSharedState {
         var environment: SDKEnvironment = .development
         var isInitialized: Bool = false
