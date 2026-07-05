@@ -123,11 +123,27 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   }
 
   /// Persist the HuggingFace token and apply it to the SDK after editing.
-  Future<void> _saveHfToken(String value) async {
+  Future<void> _saveHfToken(String value, {bool showFeedback = false}) async {
     final token = value.trim();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(PreferenceKeys.hfToken, token);
     RunAnywhere.setHfToken(token.isEmpty ? '' : token);
+    if (showFeedback && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            token.isEmpty
+                ? 'Hugging Face token cleared'
+                : 'Hugging Face token saved',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _clearHfToken() async {
+    _hfTokenController.clear();
+    await _saveHfToken('', showFeedback: true);
   }
 
   /// Load API configuration from keychain
@@ -742,8 +758,30 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
               ),
             ),
             const SizedBox(height: AppSpacing.xSmall),
+            Wrap(
+              spacing: AppSpacing.small,
+              runSpacing: AppSpacing.xSmall,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => unawaited(
+                    _saveHfToken(
+                      _hfTokenController.text,
+                      showFeedback: true,
+                    ),
+                  ),
+                  icon: const Icon(Icons.check, size: 18),
+                  label: const Text('Save token'),
+                ),
+                TextButton.icon(
+                  onPressed: () => unawaited(_clearHfToken()),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Clear'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xSmall),
             Text(
-              'Used to download private Hugging Face model repos',
+              'Used to download private Hugging Face model repos, including HNPU/QHexRT NPU bundles',
               style: AppTypography.caption2(
                 context,
               ).copyWith(color: AppColors.textSecondary(context)),
