@@ -138,6 +138,17 @@ typedef struct rac_llm_options {
      * RAC_FALSE (thinking enabled).
      */
     rac_bool_t disable_thinking;
+
+    /**
+     * Prior conversation turns as alternating user,assistant strings in
+     * chronological order, EXCLUDING system_prompt and the current prompt. An
+     * engine that owns its chat template (e.g. QHexRT) renders {system_prompt,
+     * history, prompt} from the model's markers; engines that don't ignore it.
+     * NULL / 0 = single-turn. Appended at the end of the struct so
+     * zero-initialized callers default to no history.
+     */
+    const char* const* history;
+    int32_t n_history;
 } rac_llm_options_t;
 
 /**
@@ -163,7 +174,9 @@ static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {.max_tokens = 100,
                                                           .seed = 0,
                                                           .grammar = RAC_NULL,
                                                           .n_threads = 0,
-                                                          .disable_thinking = RAC_FALSE};
+                                                          .disable_thinking = RAC_FALSE,
+                                                          .history = RAC_NULL,
+                                                          .n_history = 0};
 
 // =============================================================================
 // RESULT - Mirrors Swift's LLMGenerationResult

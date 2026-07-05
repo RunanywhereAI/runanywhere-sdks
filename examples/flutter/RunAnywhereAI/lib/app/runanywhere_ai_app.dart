@@ -12,6 +12,8 @@ import 'package:runanywhere_ai/core/utilities/url_utils.dart';
 import 'package:runanywhere_genie/runanywhere_genie.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
+import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// RunAnywhereAIApp
 ///
@@ -82,6 +84,15 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       } else {
         await RunAnywhere.initialize();
         debugPrint('✅ SDK initialized in DEVELOPMENT mode');
+      }
+
+      // Re-apply the persisted HuggingFace token (Settings screen) so private
+      // HF model repos stay downloadable across app restarts.
+      final prefs = await SharedPreferences.getInstance();
+      final hfToken = prefs.getString(PreferenceKeys.hfToken)?.trim() ?? '';
+      if (hfToken.isNotEmpty) {
+        RunAnywhere.setHfToken(hfToken);
+        debugPrint('🔑 Applied persisted HuggingFace token');
       }
 
       // Model paths + registry must be ready before catalog registration.
@@ -167,6 +178,19 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugPrint('✅ ONNX backend registered (STT + TTS + VAD + Embeddings)');
     } catch (e) {
       debugPrint('⚠️ ONNX backend not available: $e');
+    }
+
+    // QHexRT (Qualcomm Hexagon NPU). Safe no-op on non-Snapdragon / non-Android;
+    // register() rejects internally on unsupported parts.
+    if (QHexRT.isAvailable) {
+      try {
+        await QHexRT.register();
+        debugPrint('✅ QHexRT NPU backend registered (LLM + VLM + STT + TTS)');
+      } catch (e) {
+        debugPrint('⚠️ QHexRT backend not available: $e');
+      }
+    } else {
+      debugPrint('ℹ️ QHexRT NPU not available (non-Snapdragon device)');
     }
 
     _backendsRegistered = true;

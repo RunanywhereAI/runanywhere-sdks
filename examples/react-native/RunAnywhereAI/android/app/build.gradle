@@ -28,6 +28,7 @@ def packageNameMap = [
     "core"    : "core",
     "llamacpp": "llamacpp",
     "onnx"    : "onnx",
+    "qhexrt"  : "qhexrt",
 ]
 
 task syncSdkNativeLibs {
@@ -96,7 +97,7 @@ afterEvaluate {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -138,6 +139,19 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            def keystorePath = System.getenv("KEYSTORE_PATH")
+            def keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+            def releaseKeyAlias = System.getenv("KEY_ALIAS")
+            def releaseKeyPassword = System.getenv("KEY_PASSWORD")
+
+            if (keystorePath && keystorePassword && releaseKeyAlias && releaseKeyPassword) {
+                storeFile file(keystorePath)
+                storePassword keystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
@@ -146,7 +160,7 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release.storeFile != null ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
@@ -171,11 +185,16 @@ android {
         ]
     }
 
-    // Use AGP's modern native packaging. The SDK Android modules also replace
-    // NDK runtime .so files with 16 KB ELF-aligned copies before merge.
+    // QHexRT (QNN) requires the Hexagon HTP skel .so files (libQnnHtpV*Skel.so)
+    // to exist as real files on disk: FastRPC fopen()s them to offload to the
+    // cDSP. With modern packaging (extractNativeLibs=false) the skels are
+    // page-mapped from the APK with no on-disk file, so the DSP load fails with
+    // "cannot open libQnnHtpV81Skel.so, errno 2" and model load fails. Legacy
+    // packaging extracts them to nativeLibraryDir, matching the working Kotlin
+    // app. The .so set is already 16 KB-aligned, so 16 KB-page devices are fine.
     packaging {
         jniLibs {
-            useLegacyPackaging = false
+            useLegacyPackaging = true
         }
     }
 }
@@ -194,6 +213,9 @@ dependencies {
     implementation project(':runanywhere_core')
     implementation project(':runanywhere_llamacpp')
     implementation project(':runanywhere_onnx')
+    if (rootProject.findProject(':runanywhere_qhexrt') != null) {
+        implementation project(':runanywhere_qhexrt')
+    }
 
     def isHermesEnabled = project.hasProperty("hermesEnabled") ? project.hermesEnabled.toBoolean() : true
     // Expose hermesEnabled for other modules (like react-native-worklets)

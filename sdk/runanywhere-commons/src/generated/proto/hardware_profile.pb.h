@@ -60,6 +60,8 @@ namespace runanywhere {
 namespace v1 {
 enum AccelerationPreference : int;
 extern const uint32_t AccelerationPreference_internal_data_[];
+enum HexagonArch : int;
+extern const uint32_t HexagonArch_internal_data_[];
 class AcceleratorInfo;
 struct AcceleratorInfoGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -116,6 +118,22 @@ extern const ::google::protobuf::internal::ClassDataFull HardwareProfileResult_c
 #else
 extern const HardwareProfileResultGlobalsTypeInternal HardwareProfileResult_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
+class NpuCapability;
+struct NpuCapabilityGlobalsTypeInternal;
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+extern NpuCapabilityGlobalsTypeInternal NpuCapability_globals_;
+extern const ::google::protobuf::internal::ClassDataFull NpuCapability_class_data_;
+#else
+extern const NpuCapabilityGlobalsTypeInternal NpuCapability_globals_;
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+class NpuProbeRequest;
+struct NpuProbeRequestGlobalsTypeInternal;
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+extern NpuProbeRequestGlobalsTypeInternal NpuProbeRequest_globals_;
+extern const ::google::protobuf::internal::ClassDataFull NpuProbeRequest_class_data_;
+#else
+extern const NpuProbeRequestGlobalsTypeInternal NpuProbeRequest_globals_;
+#endif  // PROTOBUF_MESSAGE_GLOBALS
 }  // namespace v1
 }  // namespace runanywhere
 namespace google {
@@ -123,6 +141,9 @@ namespace protobuf {
 template <>
 internal::EnumTraitsT<::runanywhere::v1::AccelerationPreference_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::AccelerationPreference>;
+template <>
+internal::EnumTraitsT<::runanywhere::v1::HexagonArch_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::HexagonArch>;
 }  // namespace protobuf
 }  // namespace google
 
@@ -174,12 +195,449 @@ template <>
   return ::google::protobuf::internal::ParseNamedEnum<AccelerationPreference>(AccelerationPreference_descriptor(), name,
                                            value);
 }
+enum HexagonArch : int {
+  HEXAGON_ARCH_UNKNOWN = 0,
+  HEXAGON_ARCH_V68 = 68,
+  HEXAGON_ARCH_V69 = 69,
+  HEXAGON_ARCH_V73 = 73,
+  HEXAGON_ARCH_V75 = 75,
+  HEXAGON_ARCH_V79 = 79,
+  HEXAGON_ARCH_V81 = 81,
+  HexagonArch_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  HexagonArch_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t HexagonArch_internal_data_[];
+inline constexpr HexagonArch HexagonArch_MIN =
+    static_cast<HexagonArch>(0);
+inline constexpr HexagonArch HexagonArch_MAX =
+    static_cast<HexagonArch>(81);
+[[nodiscard]] inline bool HexagonArch_IsValid(int value) {
+  return ::google::protobuf::internal::ValidateEnum(value, HexagonArch_internal_data_);
+}
+inline constexpr int HexagonArch_ARRAYSIZE = 81 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+HexagonArch_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(HexagonArch) {
+  return HexagonArch_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& HexagonArch_Name(T value) {
+  static_assert(::std::is_same<T, HexagonArch>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to HexagonArch_Name().");
+  return ::google::protobuf::internal::NameOfEnum(HexagonArch_descriptor(), value);
+}
+[[nodiscard]] inline bool HexagonArch_Parse(
+    ::absl::string_view name, HexagonArch* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<HexagonArch>(HexagonArch_descriptor(), name,
+                                           value);
+}
 using ::google::protobuf::internal::generated_enum::AbslParseFlag;
 using ::google::protobuf::internal::generated_enum::AbslUnparseFlag;
 
 // ===================================================================
 
 
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED NpuProbeRequest final : public ::google::protobuf::internal::ZeroFieldsBase
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.NpuProbeRequest) */ {
+ public:
+  inline NpuProbeRequest() : NpuProbeRequest(nullptr) {}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(NpuProbeRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(NpuProbeRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr NpuProbeRequest(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline NpuProbeRequest(const NpuProbeRequest& from) : NpuProbeRequest(nullptr, from) {}
+  inline NpuProbeRequest(NpuProbeRequest&& from) noexcept : NpuProbeRequest(nullptr, ::std::move(from)) {}
+  inline NpuProbeRequest& operator=(const NpuProbeRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline NpuProbeRequest& operator=(NpuProbeRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const NpuProbeRequest& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<NpuProbeRequest>(&NpuProbeRequest_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 8;
+  friend void swap(NpuProbeRequest& a, NpuProbeRequest& b) { a.Swap(&b); }
+  inline void Swap(NpuProbeRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(NpuProbeRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] NpuProbeRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::internal::ZeroFieldsBase::DefaultConstruct<NpuProbeRequest>(arena);
+  }
+  using ::google::protobuf::internal::ZeroFieldsBase::CopyFrom;
+  inline void CopyFrom(const NpuProbeRequest& from) { ::google::protobuf::internal::ZeroFieldsBase::CopyImpl(*this, from); }
+  using ::google::protobuf::internal::ZeroFieldsBase::MergeFrom;
+  void MergeFrom(const NpuProbeRequest& from) { ::google::protobuf::internal::ZeroFieldsBase::MergeImpl(*this, from); }
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.NpuProbeRequest"; }
+
+  explicit NpuProbeRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  NpuProbeRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const NpuProbeRequest& from);
+  NpuProbeRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, NpuProbeRequest&& from) noexcept
+      : NpuProbeRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.NpuProbeRequest)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<0, 0,
+                          0, 0,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  friend struct ::TableStruct_hardware_5fprofile_2eproto;
+};
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED NpuCapability final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.NpuCapability) */ {
+ public:
+  inline NpuCapability() : NpuCapability(nullptr) {}
+  ~NpuCapability() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(NpuCapability* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(NpuCapability));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr NpuCapability(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline NpuCapability(const NpuCapability& from) : NpuCapability(nullptr, from) {}
+  inline NpuCapability(NpuCapability&& from) noexcept : NpuCapability(nullptr, ::std::move(from)) {}
+  inline NpuCapability& operator=(const NpuCapability& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline NpuCapability& operator=(NpuCapability&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const NpuCapability& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<NpuCapability>(&NpuCapability_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 7;
+  friend void swap(NpuCapability& a, NpuCapability& b) { a.Swap(&b); }
+  inline void Swap(NpuCapability* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(NpuCapability* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] NpuCapability* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<NpuCapability>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const NpuCapability& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const NpuCapability& from) { NpuCapability::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(NpuCapability* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.NpuCapability"; }
+
+  explicit NpuCapability(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  NpuCapability(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const NpuCapability& from);
+  NpuCapability(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, NpuCapability&& from) noexcept
+      : NpuCapability(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kSocModelFieldNumber = 1,
+    kArchNameFieldNumber = 5,
+    kSocIdFieldNumber = 2,
+    kHexagonArchFieldNumber = 3,
+    kQhexrtSupportedFieldNumber = 4,
+  };
+  // string soc_model = 1;
+  void clear_soc_model() ;
+  [[nodiscard]] const ::std::string& soc_model() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_soc_model(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_soc_model();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_soc_model();
+  void set_allocated_soc_model(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_soc_model() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_soc_model(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_soc_model();
+
+  public:
+  // string arch_name = 5;
+  void clear_arch_name() ;
+  [[nodiscard]] const ::std::string& arch_name() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_arch_name(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_arch_name();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_arch_name();
+  void set_allocated_arch_name(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_arch_name() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_arch_name(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_arch_name();
+
+  public:
+  // int32 soc_id = 2;
+  void clear_soc_id() ;
+  [[nodiscard]] ::int32_t soc_id() const;
+  void set_soc_id(::int32_t value);
+
+  private:
+  ::int32_t _internal_soc_id() const;
+  void _internal_set_soc_id(::int32_t value);
+
+  public:
+  // .runanywhere.v1.HexagonArch hexagon_arch = 3;
+  void clear_hexagon_arch() ;
+  [[nodiscard]] ::runanywhere::v1::HexagonArch hexagon_arch() const;
+  void set_hexagon_arch(::runanywhere::v1::HexagonArch value);
+
+  private:
+  ::runanywhere::v1::HexagonArch _internal_hexagon_arch() const;
+  void _internal_set_hexagon_arch(::runanywhere::v1::HexagonArch value);
+
+  public:
+  // bool qhexrt_supported = 4;
+  void clear_qhexrt_supported() ;
+  [[nodiscard]] bool qhexrt_supported() const;
+  void set_qhexrt_supported(bool value);
+
+  private:
+  bool _internal_qhexrt_supported() const;
+  void _internal_set_qhexrt_supported(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.NpuCapability)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<3, 5,
+                          0, 55,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const NpuCapability& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr soc_model_;
+    ::google::protobuf::internal::ArenaStringPtr arch_name_;
+    ::int32_t soc_id_;
+    int hexagon_arch_;
+    bool qhexrt_supported_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_hardware_5fprofile_2eproto;
+};
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareProfileRequest final : public ::google::protobuf::internal::ZeroFieldsBase
@@ -2482,6 +2940,214 @@ inline void HardwareAcceleratorPreferenceResult::set_allocated_error_message(::s
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HardwareAcceleratorPreferenceResult.error_message)
 }
 
+// -------------------------------------------------------------------
+
+// NpuCapability
+
+// string soc_model = 1;
+inline void NpuCapability::clear_soc_model() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.soc_model_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+}
+inline const ::std::string& NpuCapability::soc_model() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.NpuCapability.soc_model)
+  return _internal_soc_model();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void NpuCapability::set_soc_model(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.soc_model_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.NpuCapability.soc_model)
+}
+inline ::std::string* PROTOBUF_NONNULL NpuCapability::mutable_soc_model()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_soc_model();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.NpuCapability.soc_model)
+  return _s;
+}
+inline const ::std::string& NpuCapability::_internal_soc_model() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.soc_model_.Get();
+}
+inline void NpuCapability::_internal_set_soc_model(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.soc_model_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL NpuCapability::_internal_mutable_soc_model() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.soc_model_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE NpuCapability::release_soc_model() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.NpuCapability.soc_model)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.soc_model_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.soc_model_.Set("", GetArena());
+  }
+  return released;
+}
+inline void NpuCapability::set_allocated_soc_model(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.soc_model_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.soc_model_.IsDefault()) {
+    _impl_.soc_model_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.NpuCapability.soc_model)
+}
+
+// int32 soc_id = 2;
+inline void NpuCapability::clear_soc_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.soc_id_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+}
+inline ::int32_t NpuCapability::soc_id() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.NpuCapability.soc_id)
+  return _internal_soc_id();
+}
+inline void NpuCapability::set_soc_id(::int32_t value) {
+  _internal_set_soc_id(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.NpuCapability.soc_id)
+}
+inline ::int32_t NpuCapability::_internal_soc_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.soc_id_;
+}
+inline void NpuCapability::_internal_set_soc_id(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.soc_id_ = value;
+}
+
+// .runanywhere.v1.HexagonArch hexagon_arch = 3;
+inline void NpuCapability::clear_hexagon_arch() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.hexagon_arch_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
+inline ::runanywhere::v1::HexagonArch NpuCapability::hexagon_arch() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.NpuCapability.hexagon_arch)
+  return _internal_hexagon_arch();
+}
+inline void NpuCapability::set_hexagon_arch(::runanywhere::v1::HexagonArch value) {
+  _internal_set_hexagon_arch(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.NpuCapability.hexagon_arch)
+}
+inline ::runanywhere::v1::HexagonArch NpuCapability::_internal_hexagon_arch() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::HexagonArch>(_impl_.hexagon_arch_);
+}
+inline void NpuCapability::_internal_set_hexagon_arch(::runanywhere::v1::HexagonArch value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.hexagon_arch_ = value;
+}
+
+// bool qhexrt_supported = 4;
+inline void NpuCapability::clear_qhexrt_supported() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.qhexrt_supported_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
+inline bool NpuCapability::qhexrt_supported() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.NpuCapability.qhexrt_supported)
+  return _internal_qhexrt_supported();
+}
+inline void NpuCapability::set_qhexrt_supported(bool value) {
+  _internal_set_qhexrt_supported(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.NpuCapability.qhexrt_supported)
+}
+inline bool NpuCapability::_internal_qhexrt_supported() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.qhexrt_supported_;
+}
+inline void NpuCapability::_internal_set_qhexrt_supported(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.qhexrt_supported_ = value;
+}
+
+// string arch_name = 5;
+inline void NpuCapability::clear_arch_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.arch_name_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+inline const ::std::string& NpuCapability::arch_name() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.NpuCapability.arch_name)
+  return _internal_arch_name();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void NpuCapability::set_arch_name(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.arch_name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.NpuCapability.arch_name)
+}
+inline ::std::string* PROTOBUF_NONNULL NpuCapability::mutable_arch_name()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_arch_name();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.NpuCapability.arch_name)
+  return _s;
+}
+inline const ::std::string& NpuCapability::_internal_arch_name() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.arch_name_.Get();
+}
+inline void NpuCapability::_internal_set_arch_name(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.arch_name_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL NpuCapability::_internal_mutable_arch_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.arch_name_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE NpuCapability::release_arch_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.NpuCapability.arch_name)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.arch_name_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.arch_name_.Set("", GetArena());
+  }
+  return released;
+}
+inline void NpuCapability::set_allocated_arch_name(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.arch_name_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.arch_name_.IsDefault()) {
+    _impl_.arch_name_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.NpuCapability.arch_name)
+}
+
+// -------------------------------------------------------------------
+
+// NpuProbeRequest
+
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif  // __GNUC__
@@ -2499,6 +3165,12 @@ struct is_proto_enum<::runanywhere::v1::AccelerationPreference> : std::true_type
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::AccelerationPreference>() {
   return ::runanywhere::v1::AccelerationPreference_descriptor();
+}
+template <>
+struct is_proto_enum<::runanywhere::v1::HexagonArch> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::HexagonArch>() {
+  return ::runanywhere::v1::HexagonArch_descriptor();
 }
 
 }  // namespace protobuf

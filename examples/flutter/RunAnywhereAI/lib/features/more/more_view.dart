@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/features/more/hexagon_npu_card.dart';
 import 'package:runanywhere_ai/features/rag/rag_demo_view.dart';
 import 'package:runanywhere_ai/features/settings/storage_view.dart';
 import 'package:runanywhere_ai/features/solutions/solutions_view.dart';
@@ -22,6 +23,7 @@ class MoreView extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.large),
         children: [
+          const HexagonNpuCard(),
           _MoreRow(
             icon: Icons.graphic_eq,
             title: 'Transcribe',

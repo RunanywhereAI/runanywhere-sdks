@@ -243,6 +243,7 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_METALRT = 10, /**< MetalRT (custom Metal GPU kernels, Apple only) */
     RAC_FRAMEWORK_GENIE = 11,   /**< Qualcomm Genie (Hexagon NPU LLM) */
     RAC_FRAMEWORK_SHERPA = 12,  /**< Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
+    RAC_FRAMEWORK_QHEXRT = 13,  /**< QHexRT (Qualcomm Hexagon NPU runtime) */
     RAC_FRAMEWORK_UNKNOWN = 99  /**< Unknown framework */
 } rac_inference_framework_t;
 

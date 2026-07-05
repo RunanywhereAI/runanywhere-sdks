@@ -23,11 +23,11 @@ import com.runanywhere.sdk.features.STT.Services.AudioCaptureManager
 import com.runanywhere.sdk.features.TTS.Services.AudioPlaybackManager
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Captures mic audio and feeds raw frames to the in-core voice agent bound to
@@ -39,8 +39,9 @@ import kotlinx.coroutines.isActive
  * arrive while a turn is processing are dropped by the bounded channel, which
  * also avoids transcribing the device's own TTS output.
  */
-internal class VoiceAgentMicDriver(private val handle: Long) {
-
+internal class VoiceAgentMicDriver(
+    private val handle: Long,
+) {
     private val logger = SDKLogger("VoiceAgentMic")
     private val capture = AudioCaptureManager()
     private val playback = AudioPlaybackManager()

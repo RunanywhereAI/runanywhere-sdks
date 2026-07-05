@@ -57,6 +57,7 @@
  */
 
 #include "rac_http_transport_ref.h"
+#include "rac_http_hf_auth.h"
 #include "rac_http_upsert_mode.h"
 
 #include <chrono>
@@ -84,6 +85,38 @@ constexpr const char* kTag = "rac_http_client_emscripten";
 
 bool method_is_head(const char* m) {
     return m != nullptr && std::strcmp(m, "HEAD") == 0;
+}
+
+bool ascii_equals_ignore_case(const char* lhs, const char* rhs) {
+    if (!lhs || !rhs) {
+        return false;
+    }
+    while (*lhs != '\0' && *rhs != '\0') {
+        char a = *lhs++;
+        char b = *rhs++;
+        if (a >= 'A' && a <= 'Z') {
+            a = static_cast<char>(a - 'A' + 'a');
+        }
+        if (b >= 'A' && b <= 'Z') {
+            b = static_cast<char>(b - 'A' + 'a');
+        }
+        if (a != b) {
+            return false;
+        }
+    }
+    return *lhs == '\0' && *rhs == '\0';
+}
+
+bool has_authorization_header(const rac_http_request_t* req) {
+    if (!req || !req->headers) {
+        return false;
+    }
+    for (size_t i = 0; i < req->header_count; ++i) {
+        if (ascii_equals_ignore_case(req->headers[i].name, "Authorization")) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /// Copy the user's method + headers into arrays owned by a helper
@@ -513,32 +546,47 @@ struct PreparedRequest {
     std::vector<rac_http_header_kv_t> header_storage;
     std::string url_storage;
     std::string prefer_value_storage;
+    std::string auth_value_storage;
     bool transformed = false;
 };
 
 PreparedRequest prepare_request(const rac_http_request_t* req) {
     PreparedRequest prepared;
-    auto transform = rac::http::consume_upsert_transform(req);
-    if (!transform.engaged) {
-        prepared.effective_request = *req;
-        return prepared;
-    }
-
-    prepared.transformed = true;
-    prepared.url_storage = std::move(transform.transformed_url);
-    prepared.prefer_value_storage = std::move(transform.prefer_header_value);
-
-    prepared.header_storage.reserve(req->header_count + 1);
-    for (size_t i = 0; i < req->header_count; ++i) {
-        prepared.header_storage.push_back(req->headers[i]);
-    }
-    prepared.header_storage.push_back(
-        rac_http_header_kv_t{"Prefer", prepared.prefer_value_storage.c_str()});
-
     prepared.effective_request = *req;
-    prepared.effective_request.url = prepared.url_storage.c_str();
-    prepared.effective_request.headers = prepared.header_storage.data();
-    prepared.effective_request.header_count = prepared.header_storage.size();
+
+    auto transform = rac::http::consume_upsert_transform(req);
+    if (transform.engaged) {
+        prepared.transformed = true;
+        prepared.url_storage = std::move(transform.transformed_url);
+        prepared.prefer_value_storage = std::move(transform.prefer_header_value);
+
+        prepared.header_storage.reserve(req->header_count + 2);
+        for (size_t i = 0; i < req->header_count; ++i) {
+            prepared.header_storage.push_back(req->headers[i]);
+        }
+        prepared.header_storage.push_back(
+            rac_http_header_kv_t{"Prefer", prepared.prefer_value_storage.c_str()});
+
+        prepared.effective_request.url = prepared.url_storage.c_str();
+        prepared.effective_request.headers = prepared.header_storage.data();
+        prepared.effective_request.header_count = prepared.header_storage.size();
+    }
+
+    auto bearer = rac::http::hf_bearer_for_url(prepared.effective_request.url,
+                                               has_authorization_header(&prepared.effective_request));
+    if (!bearer.empty()) {
+        if (prepared.header_storage.empty() && req->header_count > 0) {
+            prepared.header_storage.reserve(req->header_count + 1);
+            for (size_t i = 0; i < req->header_count; ++i) {
+                prepared.header_storage.push_back(req->headers[i]);
+            }
+        }
+        prepared.auth_value_storage = std::move(bearer);
+        prepared.header_storage.push_back(
+            rac_http_header_kv_t{"Authorization", prepared.auth_value_storage.c_str()});
+        prepared.effective_request.headers = prepared.header_storage.data();
+        prepared.effective_request.header_count = prepared.header_storage.size();
+    }
     return prepared;
 }
 

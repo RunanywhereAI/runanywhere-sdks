@@ -50,6 +50,15 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/genie/CMakeLists.txt")
     add_subdirectory(genie)
 endif()
 
+# QHexRT — RunAnywhere's PRIVATE Qualcomm Hexagon NPU runtime. OFF by default —
+# consumed as a prebuilt static archive under QHEXRT_ROOT (gitignored); compiles
+# a not-routable shell when the archive is absent (public repo builds clean),
+# and a routable LLM (GENERATE_TEXT) engine when -DRAC_BACKEND_QHEXRT=ON and the
+# archive is present on an Android build.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/qhexrt/CMakeLists.txt")
+    add_subdirectory(qhexrt)
+endif()
+
 # coreml engine — Apple-only engine that runs ON Apple CoreML (serves the
 # DIFFUSION modality today via MLModel). Named by the FRAMEWORK, not the
 # modality, mirroring the `cloud` engine. Self-gates to return() on non-Apple

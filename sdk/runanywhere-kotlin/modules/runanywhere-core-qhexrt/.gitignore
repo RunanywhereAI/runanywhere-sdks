@@ -1,0 +1,13 @@
+# Built/private native libraries (not committed)
+src/main/jniLibs/
+
+# Build artifacts
+build/
+.gradle/
+
+# IDE
+*.iml
+.idea/
+
+# Generated files
+.cxx/

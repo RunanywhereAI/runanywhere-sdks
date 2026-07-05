@@ -154,6 +154,15 @@ object RunAnywhereBridge {
     external fun racModelPathsGetBaseDir(): String?
 
     /**
+     * Set (or clear) the process-wide Hugging Face token used by the C++
+     * download/registration paths (`rac_http_hf_token_set`). Empty string
+     * clears the token and disables the HF_TOKEN env fallback; null restores
+     * the default env-fallback state.
+     */
+    @JvmStatic
+    external fun racHttpHfTokenSet(token: String?)
+
+    /**
      * Get the model folder path under the canonical schema:
      * `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/`
      *

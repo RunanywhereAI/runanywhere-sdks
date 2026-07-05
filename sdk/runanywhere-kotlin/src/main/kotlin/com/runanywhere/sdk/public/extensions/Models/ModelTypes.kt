@@ -104,6 +104,7 @@ val InferenceFramework.Companion.knownCases: List<InferenceFramework>
             InferenceFramework.INFERENCE_FRAMEWORK_MLX,
             InferenceFramework.INFERENCE_FRAMEWORK_METALRT,
             InferenceFramework.INFERENCE_FRAMEWORK_GENIE,
+            InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
             InferenceFramework.INFERENCE_FRAMEWORK_TFLITE,
             InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH,
             InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE,

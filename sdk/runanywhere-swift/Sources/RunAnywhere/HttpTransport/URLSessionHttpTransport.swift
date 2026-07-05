@@ -50,7 +50,11 @@ public enum URLSessionHttpTransport {
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         config.httpAdditionalHeaders = nil
         config.waitsForConnectivity = false
-        return URLSession(configuration: config)
+        return URLSession(
+            configuration: config,
+            delegate: RedirectSanitizingDelegate(),
+            delegateQueue: nil
+        )
     }()
 
     /// Caller-provided override for the streaming session. When non-nil,
@@ -340,6 +344,51 @@ private enum ResponseWriter {
             guard let name = key as? String else { return nil }
             return (name, String(describing: value))
         }
+    }
+}
+
+// MARK: - Redirect authorization policy
+
+private enum RedirectAuthorizationPolicy {
+    static func sanitizedRedirectRequest(
+        for task: URLSessionTask,
+        response: HTTPURLResponse,
+        newRequest request: URLRequest
+    ) -> URLRequest {
+        let sourceHost = response.url?.host?.lowercased()
+            ?? task.currentRequest?.url?.host?.lowercased()
+            ?? task.originalRequest?.url?.host?.lowercased()
+        let destinationHost = request.url?.host?.lowercased()
+
+        guard
+            let sourceHost,
+            let destinationHost,
+            sourceHost != destinationHost
+        else {
+            return request
+        }
+
+        var sanitized = request
+        sanitized.setValue(nil, forHTTPHeaderField: "Authorization")
+        return sanitized
+    }
+}
+
+private final class RedirectSanitizingDelegate: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(
+            RedirectAuthorizationPolicy.sanitizedRedirectRequest(
+                for: task,
+                response: response,
+                newRequest: request
+            )
+        )
     }
 }
 
@@ -666,6 +715,22 @@ private final class StreamDelegate: NSObject, URLSessionDataDelegate, @unchecked
             cancelled = true
             dataTask.cancel()
         }
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(
+            RedirectAuthorizationPolicy.sanitizedRedirectRequest(
+                for: task,
+                response: response,
+                newRequest: request
+            )
+        )
     }
 
     func urlSession(

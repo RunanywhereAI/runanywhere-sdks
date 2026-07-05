@@ -362,6 +362,22 @@ HybridRunAnywhereCore::resultToProtoErrorProto(double code) {
     });
 }
 
+// Process-wide Hugging Face token → commons rac_http_hf_token_set. Auth is
+// applied in the C++ dispatch layer (https HF hosts only, caller
+// Authorization wins), shared by every SDK. Empty string clears the token
+// and disables the HF_TOKEN env fallback.
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::setHfToken(const std::string& token) {
+    return Promise<void>::async([token]() {
+        using SetHfTokenFn = void (*)(const char*);
+        auto fn = reinterpret_cast<SetHfTokenFn>(dlsym(RTLD_DEFAULT, "rac_http_hf_token_set"));
+        if (!fn) {
+            LOGW("setHfToken: rac_http_hf_token_set unavailable");
+            return;
+        }
+        fn(token.c_str());
+    });
+}
+
 std::shared_ptr<Promise<void>> HybridRunAnywhereCore::destroy() {
     return Promise<void>::async([this]() {
         std::lock_guard<std::mutex> lock(initMutex_);

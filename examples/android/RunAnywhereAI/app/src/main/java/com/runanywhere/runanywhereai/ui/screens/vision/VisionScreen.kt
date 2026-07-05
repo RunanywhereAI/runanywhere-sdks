@@ -1,6 +1,8 @@
 package com.runanywhere.runanywhereai.ui.screens.vision
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
@@ -23,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -41,6 +44,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.screens.chat.MarkdownText
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
@@ -63,11 +67,24 @@ fun VisionScreen() {
 
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
 
+    var liveMode by remember { mutableStateOf(false) }
+
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { visionVm.onImagePicked(decodeBitmap(context, it)) }
     }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
         visionVm.onImagePicked(bitmap)
+    }
+    // CAMERA is declared in the manifest (for Live mode), which makes the runtime
+    // grant mandatory for the system-camera capture intent too.
+    val captureWithGrant = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) cameraLauncher.launch(null) }
+
+    fun onCapture() {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) cameraLauncher.launch(null) else captureWithGrant.launch(Manifest.permission.CAMERA)
     }
 
     val canDescribe = model != null && visionVm.image != null && !visionVm.isGenerating
@@ -82,13 +99,24 @@ fun VisionScreen() {
     ) {
         ModelCard(modelName = model?.name, onClick = { showSheet = true })
 
+        Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
+            FilterChip(selected = !liveMode, onClick = { liveMode = false }, label = { Text("Image") })
+            FilterChip(selected = liveMode, onClick = { liveMode = true }, label = { Text("Live") })
+        }
+
+        if (liveMode) {
+            // The model-selection sheet at the end of VisionScreen still composes.
+            VisionLiveMode(loadedModelId = model?.id)
+            return@Column
+        }
+
         ImagePreview(bitmap = visionVm.image)
 
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
             OutlinedButton(onClick = { galleryLauncher.launch("image/*") }, modifier = Modifier.weight(1f)) {
                 Text("Gallery")
             }
-            OutlinedButton(onClick = { cameraLauncher.launch(null) }, modifier = Modifier.weight(1f)) {
+            OutlinedButton(onClick = { onCapture() }, modifier = Modifier.weight(1f)) {
                 Text("Camera")
             }
         }

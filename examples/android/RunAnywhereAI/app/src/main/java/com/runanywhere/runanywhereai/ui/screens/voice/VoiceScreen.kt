@@ -71,7 +71,8 @@ fun VoiceScreen() {
     val sttName = sttVm.state.models.firstOrNull { it.id == sttVm.state.currentModelId }?.name
     val ttsVoice = ttsVm.state.models.firstOrNull { it.id == ttsVm.state.currentModelId }
     val vadName = vadVm.state.models.firstOrNull { it.id == vadVm.state.currentModelId }?.name
-    val ready = llmName != null && sttName != null && ttsVoice != null && vadName != null
+    // VAD is optional: the voice agent auto-ensures Silero VAD when none is picked.
+    val ready = llmName != null && sttName != null && ttsVoice != null
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -114,8 +115,13 @@ fun VoiceScreen() {
                 Divider()
                 SetupRow(RACIcons.Outline.Robot, "Voice", ttsVoice?.name, onClick = { sheet = ttsVm })
                 Divider()
-                SetupRow(RACIcons.Outline.Activity, "Voice activity (VAD)", vadName, onClick = { sheet = vadVm })
-}
+                SetupRow(
+                    RACIcons.Outline.Activity,
+                    "Voice activity (VAD) — optional, Silero auto-loads",
+                    vadName,
+                    onClick = { sheet = vadVm },
+                )
+            }
         }
 
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {

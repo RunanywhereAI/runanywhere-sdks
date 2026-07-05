@@ -79,15 +79,32 @@ try {
 } catch {
   logDiagnostic('[App] ONNX backend not available - speech features disabled');
 }
+
+// QHexRT (Qualcomm Hexagon NPU) — Android arm64 only. On other platforms the
+// native hybrid is absent, so the app falls back.
+// probeNpu() resolves to the generated runanywhere.v1.NpuCapability proto
+// message (archName is provided by commons — no local arch mapping needed).
+let QHexRT: OptionalBackend | null = null;
+let qhexrtProbe:
+  | (() => Promise<{ archName: string; qhexrtSupported: boolean }>)
+  | null = null;
+try {
+  const qhexrtModule = require('@runanywhere/qhexrt');
+  QHexRT = qhexrtModule.QHexRT as OptionalBackend;
+  qhexrtProbe = () => qhexrtModule.QHexRT.probeNpu();
+} catch {
+  logDiagnostic('[App] QHexRT backend not available - NPU disabled on this platform');
+}
 import {
   getStoredApiKey,
   getStoredBaseURL,
+  getStoredHfToken,
   hasCustomConfiguration,
 } from './src/screens/SettingsScreen';
 import { logDiagnostic } from './src/utils/diagnostics';
 
 // Default backend config for the development Railway backend (mirrors the
-// Android example's gitignored local.properties → BuildConfig.RUNANYWHERE_*).
+// Android example's gitignored local.properties -> BuildConfig.RUNANYWHERE_*).
 // Used when no custom configuration has been saved in Settings.
 const DEFAULT_BASE_URL = 'YOUR_PRODUCTION_BASE_URL';
 const DEFAULT_API_KEY = 'YOUR_PRODUCTION_API_KEY';
@@ -137,7 +154,30 @@ async function registerBackends(): Promise<BackendRegistrationState> {
     );
   }
 
-  return { llamaRegistered, onnxRegistered };
+  // QHexRT registers all NPU modalities (LLM/VLM/STT/TTS) in one call. Probe
+  // first so unsupported devices never install a higher-priority private
+  // backend, and so the catalog only sees arch-exact NPU bundles.
+  let npuArch: string | null = null;
+  if (QHexRT && qhexrtProbe) {
+    try {
+      const npu = await qhexrtProbe();
+      if (npu.qhexrtSupported) {
+        const qhexrtRegistered = (await QHexRT.register()) !== false;
+        if (qhexrtRegistered) {
+          npuArch = npu.archName;
+          logDiagnostic('[App] QHexRT (NPU) backend registered');
+        } else {
+          logDiagnostic('[App] QHexRT.register() returned false - NPU unavailable on this device');
+        }
+      } else {
+        logDiagnostic('[App] Skipping QHexRT registration - unsupported Hexagon NPU');
+      }
+    } catch (error) {
+      logDiagnostic(`[App] NPU probe failed: ${String(error)}`);
+    }
+  }
+
+  return { llamaRegistered, onnxRegistered, npuArch };
 }
 
 const App: React.FC = () => {
@@ -189,6 +229,14 @@ const App: React.FC = () => {
           environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
         });
         console.log('[App] SDK initialized in DEVELOPMENT mode');
+      }
+
+      // Re-apply the persisted HuggingFace token (Settings screen) so private
+      // HF model repos stay downloadable across app restarts.
+      const storedHfToken = (await getStoredHfToken())?.trim();
+      if (storedHfToken) {
+        await RunAnywhere.setHfToken(storedHfToken);
+        console.log('[App] Applied persisted HuggingFace token');
       }
 
       await registerAll(backendState);

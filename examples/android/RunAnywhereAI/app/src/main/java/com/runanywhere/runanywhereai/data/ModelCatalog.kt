@@ -6,15 +6,35 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.ModelCategory
 
+/**
+ * One NPU (QHexRT) bundle = one manifest-pinned hf.co folder ref
+ * (`https://huggingface.co/<repo>/<arch>/<manifest>.json`). Commons + the
+ * engine's bundle policy resolve the full file set (sizes, checksums, nested
+ * paths, and the repo-root `config.json` when present) from the Hub tree at
+ * registration — no file lists in the app. Context binaries are arch-exact
+ * ([arch] is the Hexagon architecture they were compiled for: v75+),
+ * so registration filters to the arch probed on the running device.
+ */
+internal data class NpuBundle(
+    val id: String,
+    val name: String,
+    val category: ModelCategory,
+    val arch: String,
+    val url: String,
+)
+
 // Curated catalog, kept in lockstep with the iOS / Flutter / RN example apps.
 internal object ModelCatalog {
 
     private val LLAMA = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
     private val SHERPA = InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
     private val ONNX = InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+    private val QHEXRT = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
 
     private val LANGUAGE = ModelCategory.MODEL_CATEGORY_LANGUAGE
     private val MULTIMODAL = ModelCategory.MODEL_CATEGORY_MULTIMODAL
+    private val STT = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+    private val TTS = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
     private val TAR_GZ = ArchiveType.ARCHIVE_TYPE_TAR_GZ
 
     val models: List<CatalogModel> by lazy {
@@ -25,6 +45,69 @@ internal object ModelCatalog {
             addAll(misc)
         }
     }
+
+    /**
+     * QHexRT (Hexagon NPU) bundles for the probed device architecture,
+     * registered like every other catalog entry — one URL through the SDK's
+     * canonical from-url path. The URL is an HF folder-bundle ref pinned to
+     * the bundle's manifest (`huggingface.co/<repo>/<arch>/<manifest>.json`);
+     * commons + the engine-registered QHexRT bundle policy resolve the full
+     * file set (sizes, checksums, nested paths) from the Hub tree — the app
+     * carries no file lists. Returns an empty list when the NPU is
+     * unsupported ([arch] == null), so pickers on other devices never see
+     * QHEXRT entries. Source data: [npuBundles].
+     */
+    fun npuModels(arch: String?): List<CatalogModel> {
+        if (arch == null) return emptyList()
+        return npuBundles.filter { it.arch == arch }.map { npu ->
+            SingleFileModel(
+                id = npu.id,
+                name = npu.name,
+                url = npu.url,
+                framework = QHEXRT,
+                category = npu.category,
+                memoryBytes = 0L,
+            )
+        }
+    }
+
+    /** The NPU (QHexRT) catalog — one manifest-pinned hf.co folder ref per bundle. */
+    val npuBundles: List<NpuBundle> = listOf(
+        NpuBundle("lfm2_5_230m_v79", "LFM2.5 230M (HNPU)", LANGUAGE, "v79",
+            "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/v79/lfm2-5-230m.json"),
+        NpuBundle("lfm2_5_230m_v81", "LFM2.5 230M (HNPU)", LANGUAGE, "v81",
+            "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/v81/lfm2-5-230m.json"),
+        NpuBundle("lfm2_5_350m_v79", "LFM2.5 350M (HNPU)", LANGUAGE, "v79",
+            "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/v79/lfm2-5-350m-2048.json"),
+        NpuBundle("lfm2_5_350m_v81", "LFM2.5 350M (HNPU)", LANGUAGE, "v81",
+            "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/v81/lfm2-5-350m-2048.json"),
+        NpuBundle("qwen3_5_0_8b_v81", "Qwen3.5 0.8B (HNPU)", LANGUAGE, "v81",
+            "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/v81/qwen3.5-0.8b-1024.json"),
+        NpuBundle("qwen3_vl_v79", "Qwen3-VL 2B (HNPU)", MULTIMODAL, "v79",
+            "https://huggingface.co/runanywhere/qwen3_vl_HNPU/v79/qwen3vl-2b-vlm-512.json"),
+        NpuBundle("internvl3_5_1b_v79", "InternVL3.5 1B (HNPU)", MULTIMODAL, "v79",
+            "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU/v79/internvl3_5-1b-512.json"),
+        NpuBundle("internvl3_5_1b_v81", "InternVL3.5 1B (HNPU)", MULTIMODAL, "v81",
+            "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU/v81/internvl3_5-1b.json"),
+        NpuBundle("whisper_base_v79", "Whisper Base (HNPU)", STT, "v79",
+            "https://huggingface.co/runanywhere/whisper_base_HNPU/v79/whisper-base.json"),
+        NpuBundle("whisper_small_v79", "Whisper Small (HNPU)", STT, "v79",
+            "https://huggingface.co/runanywhere/whisper_small_HNPU/v79/whisper-small.json"),
+        NpuBundle("moonshine_tiny_v81", "Moonshine Tiny (HNPU)", STT, "v81",
+            "https://huggingface.co/runanywhere/moonshine_tiny_HNPU/v81/moonshine-tiny.json"),
+        NpuBundle("moonshine_base_v81", "Moonshine Base (HNPU)", STT, "v81",
+            "https://huggingface.co/runanywhere/moonshine_base_HNPU/v81/moonshine-base.json"),
+        NpuBundle("melotts_en_v79", "MeloTTS EN (HNPU)", TTS, "v79",
+            "https://huggingface.co/runanywhere/melotts_en_HNPU/v79/melotts-en.json"),
+        NpuBundle("melotts_en_v81", "MeloTTS EN (HNPU)", TTS, "v81",
+            "https://huggingface.co/runanywhere/melotts_en_HNPU/v81/melotts-en.json"),
+        NpuBundle("kokoro_en_v81", "Kokoro-82M EN (HNPU)", TTS, "v81",
+            "https://huggingface.co/runanywhere/kokoro_en_HNPU/v81/kokoro-en.json"),
+        NpuBundle("kitten_nano_0_8_v81", "Kitten-nano-0.8-fp32 (HNPU)", TTS, "v81",
+            "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/v81/kitten_nano08_v81.json"),
+        NpuBundle("kitten_mini_0_1_v81", "Kitten-mini-0.1 (HNPU)", TTS, "v81",
+            "https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/v81/kitten_mini01_v81.json"),
+    )
 
     val loraAdapters = listOf(
         LoraAdapterCatalogEntry(

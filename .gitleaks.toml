@@ -49,6 +49,11 @@ paths = [
     '''thoughts/.*\.md$''',
 ]
 
+commits = [
+    "4315847341588d462f2b8ee07458117b1f9b7478",
+    "a3f9b289d5240055e472c59aaaea2e4c87efcd50",
+]
+
 regexTarget = "line"
 regexes = [
     '''YOUR_PRODUCTION_API_KEY''',

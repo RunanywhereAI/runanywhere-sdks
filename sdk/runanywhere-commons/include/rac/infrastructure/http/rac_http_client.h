@@ -303,6 +303,30 @@ RAC_API rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_k
                                               size_t* out_count);
 
 // =============================================================================
+// HUGGING FACE AUTH
+// =============================================================================
+
+/**
+ * @brief Sets the process-wide Hugging Face token used to authenticate
+ *        gated/private-repo requests (model downloads, HEAD size preflight,
+ *        resumable transfers, and the HF Hub tree API used by repo
+ *        registration).
+ *
+ * When set, the dispatch layer attaches `Authorization: Bearer <token>`
+ * ONLY to https requests whose host is exactly `huggingface.co` or `hf.co`
+ * (never subdomains/CDN hosts) and never overrides a caller-supplied
+ * Authorization header. The token is never logged.
+ *
+ * When unset, the `HF_TOKEN` environment variable (captured on first use)
+ * acts as the fallback, so a plain env var works with no call-site change.
+ * Passing an empty string clears the token and disables the env fallback
+ * (public no-auth behavior); passing NULL resets to the default
+ * env-fallback state. Thread-safe; subsequent requests pick up the new
+ * value.
+ */
+RAC_API void rac_http_hf_token_set(const char* token);
+
+// =============================================================================
 // RESULT CODES
 // =============================================================================
 // Consumers only need to check against RAC_SUCCESS; the other

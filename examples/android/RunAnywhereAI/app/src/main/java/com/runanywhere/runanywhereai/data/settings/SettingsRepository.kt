@@ -13,6 +13,7 @@ object SettingsRepository {
     private const val KEY_SYSTEM_PROMPT = "system_prompt"
     private const val KEY_STREAMING = "streaming"
     private const val KEY_TOOL_CALLING = "tool_calling_enabled"
+    private const val KEY_HF_TOKEN = "hf_token"
 
     private var prefs: SharedPreferences? = null
 
@@ -29,6 +30,7 @@ object SettingsRepository {
             systemPrompt = p.getString(KEY_SYSTEM_PROMPT, "").orEmpty(),
             streaming = p.getBoolean(KEY_STREAMING, true),
             toolCallingEnabled = p.getBoolean(KEY_TOOL_CALLING, false),
+            hfToken = p.getString(KEY_HF_TOKEN, "").orEmpty(),
         )
     }
 
@@ -55,5 +57,10 @@ object SettingsRepository {
     fun setToolCallingEnabled(value: Boolean) {
         settings = settings.copy(toolCallingEnabled = value)
         prefs?.edit()?.putBoolean(KEY_TOOL_CALLING, value)?.apply()
+    }
+
+    fun setHfToken(value: String) {
+        settings = settings.copy(hfToken = value)
+        prefs?.edit()?.putString(KEY_HF_TOKEN, value)?.apply()
     }
 }

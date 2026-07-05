@@ -9,6 +9,8 @@
  *   hf.co/{org}/{repo}:{quant}      -> quant tag matched against GGUF basenames
  *   hf.co/{org}/{repo}:{file.gguf}  -> exact filename match
  *   hf.co/{org}/{repo}/{path/file}  -> explicit file (normalized to /resolve/)
+ *   hf.co/{org}/{repo}/{subdir}     -> folder bundle: EVERY file under the
+ *                                      subfolder (see resolve_repo_folder)
  *   hf://..., huggingface.co/...    -> same grammar, alternate prefixes
  *
  * Repo resolution lists files through the HF Hub tree API
@@ -27,12 +29,15 @@
 #include <vector>
 
 #include "rac/core/rac_error.h"
+#include "rac/infrastructure/model_management/rac_bundle_policy.h"
 
 namespace rac::infra::model_management::hf {
 
 struct ResolvedFile {
     std::string url;       // https://huggingface.co/{org}/{repo}/resolve/main/{path}
-    std::string filename;  // storage basename inside the model folder
+    std::string filename;  // storage path inside the model folder; basename for
+                           // GGUF resolution, subfolder-relative (may contain
+                           // '/') for folder-bundle resolution
     int64_t size_bytes = 0;
     std::string sha256;  // lowercase hex from lfs.oid; empty when not LFS-backed
     bool is_vision_projector = false;
@@ -50,6 +55,18 @@ struct ResolvedModel {
 bool is_hf_ref(const std::string& ref);
 
 /**
+ * True when @p ref points INSIDE a repo at a folder rather than a file: the
+ * in-repo path's last segment has no extension (`hf.co/org/repo/v81`, which
+ * as a file ref would just 404). When @p manifest_leaf_ext is non-NULL (the
+ * registered bundle policy's manifest extension, e.g. ".json"), a leaf with
+ * that extension also counts — the ref then names the bundle's manifest and
+ * the PARENT folder is the bundle root
+ * (`hf.co/org/repo/v79/lfm2-5-350m-2048.json`). Full /resolve/ or /blob/
+ * URLs are never folder refs.
+ */
+bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext);
+
+/**
  * Normalize an explicit-file HF ref (org/repo/path/file or an hf-hosted
  * /resolve/ URL) to a direct https download URL. Returns "" when @p ref is a
  * repo-level reference that needs full resolution instead.
@@ -62,6 +79,36 @@ std::string normalize_explicit_file_ref(const std::string& ref);
  * error code and a human-actionable message in @p error_message.
  */
 rac_result_t resolve_repo(const std::string& ref, ResolvedModel* out, std::string* error_message);
+
+/**
+ * Resolve a folder ref (see is_folder_ref) into the COMPLETE file set under
+ * that subfolder: every tree entry below it (dotfiles and *.md excluded),
+ * `filename` carrying the path RELATIVE to the subfolder (nested paths like
+ * `host_weights/x.bin` preserved), plus the repo-root `config.json` appended
+ * as a trailing companion when present (the Hub's download-counter query
+ * file). The primary file — ordered first — is the manifest named by the ref
+ * when given, else the alphabetically-first top-level file matching
+ * @p is_manifest (the registered bundle policy's predicate — commons carries
+ * no per-framework manifest heuristics). @p manifest_leaf_ext splits a
+ * manifest-leaf ref into subdir + pinned primary. Requires a registered HTTP
+ * transport.
+ */
+rac_result_t resolve_repo_folder(const std::string& ref, const char* manifest_leaf_ext,
+                                 rac_bundle_manifest_predicate_fn is_manifest, ResolvedModel* out,
+                                 std::string* error_message);
+
+/**
+ * Pure resolution core behind resolve_repo_folder, exposed for offline tests:
+ * resolves @p tree_json_body (an HF tree-API response) for
+ * `org/repo/<subdir>` with optional @p primary_rel (manifest path relative to
+ * @p subdir) and optional @p is_manifest predicate. No network access.
+ */
+rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
+                                           const std::string& org, const std::string& repo,
+                                           const std::string& subdir,
+                                           const std::string& primary_rel,
+                                           rac_bundle_manifest_predicate_fn is_manifest,
+                                           ResolvedModel* out, std::string* error_message);
 
 }  // namespace rac::infra::model_management::hf
 

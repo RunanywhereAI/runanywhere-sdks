@@ -1,0 +1,78 @@
+group 'ai.runanywhere.sdk.qhexrt'
+version '0.19.13'
+
+buildscript {
+    ext.kotlin_version = '1.9.10'
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace 'ai.runanywhere.sdk.qhexrt'
+    compileSdk 36
+
+    ndkVersion rootProject.hasProperty("racFlutterNdkVersion") ? rootProject.property("racFlutterNdkVersion") : "27.0.12077973"
+
+    defaultConfig {
+        minSdk 24
+        targetSdk 34
+        // QHexRT is Qualcomm-only (Snapdragon Hexagon NPU): arm64-v8a exclusively.
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    packaging {
+        jniLibs {
+            // Shared libs also shipped by the core runanywhere plugin: keep one.
+            pickFirsts += ['**/libc++_shared.so', '**/librac_commons.so']
+        }
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+}
+
+// The private QHexRT natives (librac_backend_qhexrt*.so + the libQnn* set)
+// are STAGED into src/main/jniLibs/arm64-v8a by scripts/stage-natives.sh,
+// not committed to git. Warn — don't fail — when they are absent: a stub
+// build without the natives is legitimate (the plugin reports the NPU as
+// unavailable at runtime).
+def qhexrtJniLibsDir = file('src/main/jniLibs/arm64-v8a')
+if (!qhexrtJniLibsDir.isDirectory() || (qhexrtJniLibsDir.list() ?: new String[0]).length == 0) {
+    logger.warn("[runanywhere_qhexrt] WARNING: ${qhexrtJniLibsDir} is missing or empty — " +
+            "the private QHexRT native libraries are not staged. Run " +
+            "scripts/stage-natives.sh --natives-from <dir> to bundle them; without them " +
+            "this is a stub build and the Hexagon NPU backend will be unavailable at runtime.")
+}

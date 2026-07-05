@@ -208,6 +208,31 @@ bool is_hf_ref(const std::string& ref) {
     return org_end != std::string::npos && org_end > 0 && org_end + 1 < rest.size();
 }
 
+bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext) {
+    const std::string rest = strip_prefix(ref);
+    if (rest.empty() || rest.find("/resolve/") != std::string::npos ||
+        rest.find("/blob/") != std::string::npos) {
+        return false;
+    }
+    ParsedRef parsed;
+    if (!parse_ref(ref, &parsed) || parsed.file_path.empty()) {
+        return false;
+    }
+    std::string path = parsed.file_path;
+    while (!path.empty() && path.back() == '/') {
+        path.pop_back();
+    }
+    if (path.empty()) {
+        return false;
+    }
+    const std::string leaf = basename_of(path);
+    if (leaf.find('.') == std::string::npos) {
+        return true;
+    }
+    return manifest_leaf_ext != nullptr && manifest_leaf_ext[0] != '\0' &&
+           lowercase_copy(leaf).ends_with(lowercase_copy(manifest_leaf_ext));
+}
+
 std::string normalize_explicit_file_ref(const std::string& ref) {
     const std::string rest = strip_prefix(ref);
     if (rest.empty()) {
@@ -378,6 +403,215 @@ rac_result_t resolve_repo(const std::string& ref, ResolvedModel* out, std::strin
                  out->files.size(), static_cast<long long>(out->total_size_bytes),
                  out->has_vision_projector ? " (with vision projector)" : "");
     return RAC_SUCCESS;
+}
+
+namespace {
+
+// Repo housekeeping entries excluded from folder bundles.
+bool is_repo_housekeeping(const std::string& path) {
+    const std::string base_lower = lowercase_copy(basename_of(path));
+    if (base_lower.ends_with(".md")) {
+        return true;
+    }
+    // Any dotfile path segment (.gitattributes, .cache/...).
+    size_t start = 0;
+    while (start < path.size()) {
+        if (path[start] == '.') {
+            return true;
+        }
+        const size_t slash = path.find('/', start);
+        if (slash == std::string::npos) {
+            break;
+        }
+        start = slash + 1;
+    }
+    return false;
+}
+
+}  // namespace
+
+rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
+                                           const std::string& org, const std::string& repo,
+                                           const std::string& subdir,
+                                           const std::string& primary_rel,
+                                           rac_bundle_manifest_predicate_fn is_manifest,
+                                           ResolvedModel* out, std::string* error_message) {
+    std::string local_error;
+    std::string* error = error_message ? error_message : &local_error;
+    if (!out) {
+        *error = "output model is required";
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const nlohmann::json tree =
+        nlohmann::json::parse(tree_json_body, nullptr, /*allow_exceptions=*/false);
+    if (tree.is_discarded() || !tree.is_array()) {
+        *error = "unexpected response from the Hugging Face tree API";
+        return RAC_ERROR_DECODING_ERROR;
+    }
+
+    const std::string prefix = subdir.empty() ? "" : subdir + "/";
+    std::vector<TreeFile> bundle;  // TreeFile.path holds the SUBDIR-RELATIVE path
+    const TreeFile* root_config = nullptr;
+    TreeFile root_config_storage;
+    for (const nlohmann::json& entry : tree) {
+        if (!entry.is_object() || entry.value("type", "") != "file") {
+            continue;
+        }
+        TreeFile file;
+        const std::string full_path = entry.value("path", "");
+        if (entry.contains("lfs") && entry["lfs"].is_object()) {
+            file.sha256 = entry["lfs"].value("oid", "");
+            file.size_bytes = entry["lfs"].value("size", static_cast<int64_t>(0));
+        }
+        if (file.size_bytes == 0) {
+            file.size_bytes = entry.value("size", static_cast<int64_t>(0));
+        }
+        if (!prefix.empty() && full_path == "config.json") {
+            file.path = full_path;
+            file.basename_lower = "config.json";
+            root_config_storage = std::move(file);
+            root_config = &root_config_storage;
+            continue;
+        }
+        if (!full_path.starts_with(prefix) || full_path.size() <= prefix.size() ||
+            is_repo_housekeeping(full_path)) {
+            continue;
+        }
+        file.path = full_path.substr(prefix.size());
+        file.basename_lower = lowercase_copy(basename_of(file.path));
+        bundle.push_back(std::move(file));
+    }
+    if (bundle.empty()) {
+        *error = "no files under '" + subdir + "' in " + org + "/" + repo;
+        return RAC_ERROR_NOT_FOUND;
+    }
+    std::ranges::sort(bundle, {}, &TreeFile::path);
+    const bool bundle_has_top_level_config =
+        std::ranges::any_of(bundle, [](const TreeFile& file) { return file.path == "config.json"; });
+
+    // Pick the primary: the manifest named by the ref, else the
+    // alphabetically-first file the framework's bundle policy recognizes as a
+    // manifest. Commons carries no per-framework manifest heuristics.
+    size_t primary_index = bundle.size();
+    if (!primary_rel.empty()) {
+        for (size_t i = 0; i < bundle.size(); ++i) {
+            if (bundle[i].path == primary_rel) {
+                primary_index = i;
+                break;
+            }
+        }
+        if (primary_index == bundle.size()) {
+            *error = "manifest '" + primary_rel + "' not found under '" + subdir + "' in " + org +
+                     "/" + repo;
+            return RAC_ERROR_NOT_FOUND;
+        }
+    } else if (is_manifest != nullptr) {
+        for (size_t i = 0; i < bundle.size(); ++i) {
+            if (is_manifest(bundle[i].path.c_str()) == RAC_TRUE) {
+                primary_index = i;
+                break;
+            }
+        }
+    }
+    if (primary_index == bundle.size()) {
+        *error = "cannot choose a primary file under '" + subdir + "' in " + org + "/" + repo +
+                 " — name the manifest explicitly in the ref (hf.co/" + org + "/" + repo + "/" +
+                 (subdir.empty() ? "" : subdir + "/") +
+                 "<manifest>), or register the engine backend for this framework first (it "
+                 "installs the bundle policy)";
+        return RAC_ERROR_NOT_FOUND;
+    }
+
+    out->files.clear();
+    out->has_vision_projector = false;
+    out->total_size_bytes = 0;
+    const std::string url_base = "https://huggingface.co/" + org + "/" + repo + "/resolve/main/";
+    std::vector<std::string> emitted_filenames;
+    auto append = [&](const TreeFile& part, const std::string& full_path) {
+        if (std::ranges::find(emitted_filenames, part.path) != emitted_filenames.end()) {
+            return;
+        }
+        emitted_filenames.push_back(part.path);
+        ResolvedFile file;
+        file.url = url_base + full_path;
+        file.filename = part.path;
+        file.size_bytes = part.size_bytes;
+        file.sha256 = part.sha256;
+        out->files.push_back(std::move(file));
+        out->total_size_bytes += part.size_bytes;
+    };
+    append(bundle[primary_index], prefix + bundle[primary_index].path);
+    for (size_t i = 0; i < bundle.size(); ++i) {
+        if (i != primary_index) {
+            append(bundle[i], prefix + bundle[i].path);
+        }
+    }
+    if (root_config && !bundle_has_top_level_config) {
+        append(*root_config, root_config->path);
+    }
+
+    out->model_id = sanitize_model_id(repo + (subdir.empty() ? "" : "-" + subdir));
+    out->display_name = org + "/" + repo + (subdir.empty() ? "" : " (" + subdir + ")");
+    return RAC_SUCCESS;
+}
+
+rac_result_t resolve_repo_folder(const std::string& ref, const char* manifest_leaf_ext,
+                                 rac_bundle_manifest_predicate_fn is_manifest, ResolvedModel* out,
+                                 std::string* error_message) {
+    std::string local_error;
+    std::string* error = error_message ? error_message : &local_error;
+    if (!out) {
+        *error = "output model is required";
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    ParsedRef parsed;
+    if (!parse_ref(ref, &parsed) || parsed.file_path.empty()) {
+        *error = "not a folder-level Hugging Face reference: " + ref;
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    std::string path = parsed.file_path;
+    while (!path.empty() && path.back() == '/') {
+        path.pop_back();
+    }
+    std::string subdir = path;
+    std::string primary_rel;
+    if (manifest_leaf_ext != nullptr && manifest_leaf_ext[0] != '\0' &&
+        lowercase_copy(basename_of(path)).ends_with(lowercase_copy(manifest_leaf_ext))) {
+        const size_t slash = path.find_last_of('/');
+        subdir = slash == std::string::npos ? "" : path.substr(0, slash);
+        primary_rel = basename_of(path);
+    }
+
+    std::string body;
+    int32_t status = 0;
+    rac_result_t rc = fetch_repo_tree(parsed.org, parsed.repo, &body, &status, error);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    if (status == 401 || status == 403) {
+        *error = "Hugging Face repo " + parsed.org + "/" + parsed.repo +
+                 " is gated or private (HTTP " + std::to_string(status) +
+                 "); set a Hugging Face token or use a public repo";
+        return RAC_ERROR_PERMISSION_DENIED;
+    }
+    if (status == 404) {
+        *error = "Hugging Face repo not found: " + parsed.org + "/" + parsed.repo;
+        return RAC_ERROR_NOT_FOUND;
+    }
+    if (status != 200) {
+        *error = "Hugging Face tree listing failed for " + parsed.org + "/" + parsed.repo +
+                 " (HTTP " + std::to_string(status) + ")";
+        return RAC_ERROR_NETWORK_ERROR;
+    }
+
+    rc = resolve_folder_from_tree_json(body, parsed.org, parsed.repo, subdir, primary_rel,
+                                       is_manifest, out, error);
+    if (rc == RAC_SUCCESS) {
+        RAC_LOG_INFO(LOG_CAT, "Resolved folder %s -> %zu file(s), %lld bytes", ref.c_str(),
+                     out->files.size(), static_cast<long long>(out->total_size_bytes));
+    }
+    return rc;
 }
 
 }  // namespace rac::infra::model_management::hf

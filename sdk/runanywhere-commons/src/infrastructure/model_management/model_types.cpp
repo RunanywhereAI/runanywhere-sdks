@@ -103,6 +103,11 @@ rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t
         case RAC_FRAMEWORK_GENIE:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return RAC_MODEL_CATEGORY_LANGUAGE;
+        case RAC_FRAMEWORK_QHEXRT:
+            // QHexRT serves LLM/VLM/STT/TTS bundles alike — no single category
+            // is implied by the framework; the registered model's explicit
+            // category must drive.
+            return RAC_MODEL_CATEGORY_UNKNOWN;
         case RAC_FRAMEWORK_ONNX:
             return RAC_MODEL_CATEGORY_MULTIMODAL;
         case RAC_FRAMEWORK_SHERPA:
@@ -186,6 +191,7 @@ rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t frame
         case RAC_FRAMEWORK_METALRT:
             return copy_supported_formats(metalrt_formats, 1, out_formats, out_count);
         case RAC_FRAMEWORK_GENIE:
+        case RAC_FRAMEWORK_QHEXRT:
             return copy_supported_formats(genie_formats, 1, out_formats, out_count);
         default:
             return copy_supported_formats(nullptr, 0, out_formats, out_count);
@@ -204,6 +210,7 @@ rac_bool_t rac_framework_supports_format(rac_inference_framework_t framework,
             return (format == RAC_MODEL_FORMAT_GGUF || format == RAC_MODEL_FORMAT_GGML) ? RAC_TRUE
                                                                                         : RAC_FALSE;
         case RAC_FRAMEWORK_GENIE:
+        case RAC_FRAMEWORK_QHEXRT:
             return (format == RAC_MODEL_FORMAT_QNN_CONTEXT) ? RAC_TRUE : RAC_FALSE;
         case RAC_FRAMEWORK_COREML:
             return (format == RAC_MODEL_FORMAT_COREML || format == RAC_MODEL_FORMAT_MLMODEL ||
@@ -228,6 +235,7 @@ rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t f
         case RAC_FRAMEWORK_COREML:   // CoreML compiled models (.mlmodelc) are directories
         case RAC_FRAMEWORK_METALRT:  // MetalRT models are directories (config.json + .safetensors)
         case RAC_FRAMEWORK_GENIE:    // Genie models are directories (config.json + bin files)
+        case RAC_FRAMEWORK_QHEXRT:   // QHexRT models are directories (manifest.json + bin files)
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -239,6 +247,7 @@ rac_bool_t rac_framework_supports_llm(rac_inference_framework_t framework) {
     switch (framework) {
         case RAC_FRAMEWORK_LLAMACPP:
         case RAC_FRAMEWORK_GENIE:
+        case RAC_FRAMEWORK_QHEXRT:
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return RAC_TRUE;
@@ -289,6 +298,8 @@ const char* rac_framework_display_name(rac_inference_framework_t framework) {
             return "FluidAudio";
         case RAC_FRAMEWORK_GENIE:
             return "Qualcomm Genie";
+        case RAC_FRAMEWORK_QHEXRT:
+            return "QHexRT";
         case RAC_FRAMEWORK_BUILTIN:
             return "Built-in";
         case RAC_FRAMEWORK_NONE:
@@ -319,6 +330,8 @@ const char* rac_framework_analytics_key(rac_inference_framework_t framework) {
             return "fluid_audio";
         case RAC_FRAMEWORK_GENIE:
             return "genie";
+        case RAC_FRAMEWORK_QHEXRT:
+            return "qhexrt";
         case RAC_FRAMEWORK_BUILTIN:
             return "built_in";
         case RAC_FRAMEWORK_NONE:
@@ -403,6 +416,8 @@ const char* inference_framework_wire_string_value(rac_inference_framework_t f) {
             return "INFERENCE_FRAMEWORK_METALRT";
         case RAC_FRAMEWORK_GENIE:
             return "INFERENCE_FRAMEWORK_GENIE";
+        case RAC_FRAMEWORK_QHEXRT:
+            return "INFERENCE_FRAMEWORK_QHEXRT";
         case RAC_FRAMEWORK_SHERPA:
             return "INFERENCE_FRAMEWORK_SHERPA";
         case RAC_FRAMEWORK_BUILTIN:
@@ -439,6 +454,8 @@ const char* inference_framework_display_name_value(rac_inference_framework_t f) 
             return "MetalRT";
         case RAC_FRAMEWORK_GENIE:
             return "Genie";
+        case RAC_FRAMEWORK_QHEXRT:
+            return "QHexRT";
         case RAC_FRAMEWORK_BUILTIN:
             return "Built-in";
         case RAC_FRAMEWORK_NONE:
@@ -473,6 +490,8 @@ const char* inference_framework_analytics_key_value(rac_inference_framework_t f)
             return "metalrt";
         case RAC_FRAMEWORK_GENIE:
             return "genie";
+        case RAC_FRAMEWORK_QHEXRT:
+            return "qhexrt";
         case RAC_FRAMEWORK_BUILTIN:
             return "built_in";
         case RAC_FRAMEWORK_NONE:
@@ -509,8 +528,8 @@ constexpr rac_inference_framework_t kKnownFrameworks[] = {
     RAC_FRAMEWORK_ONNX,       RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_FOUNDATION_MODELS,
     RAC_FRAMEWORK_SYSTEM_TTS, RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_COREML,
     RAC_FRAMEWORK_MLX,        RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
-    RAC_FRAMEWORK_SHERPA,     RAC_FRAMEWORK_BUILTIN,     RAC_FRAMEWORK_NONE,
-    RAC_FRAMEWORK_UNKNOWN,
+    RAC_FRAMEWORK_QHEXRT,     RAC_FRAMEWORK_SHERPA,      RAC_FRAMEWORK_BUILTIN,
+    RAC_FRAMEWORK_NONE,       RAC_FRAMEWORK_UNKNOWN,
 };
 
 }  // namespace
@@ -824,6 +843,7 @@ rac_result_t rac_model_format_for_framework(rac_inference_framework_t framework,
             match = matches_any({"bin"});
             break;
         case RAC_FRAMEWORK_GENIE:
+        case RAC_FRAMEWORK_QHEXRT:
             match = matches_any({"bin"});
             break;
         default:

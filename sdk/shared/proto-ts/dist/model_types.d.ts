@@ -112,6 +112,8 @@ export declare enum InferenceFramework {
     INFERENCE_FRAMEWORK_UNKNOWN = 22,
     /** INFERENCE_FRAMEWORK_SHERPA - Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
     INFERENCE_FRAMEWORK_SHERPA = 23,
+    /** INFERENCE_FRAMEWORK_QHEXRT - Qualcomm Hexagon NPU (QHexRT runtime) */
+    INFERENCE_FRAMEWORK_QHEXRT = 24,
     UNRECOGNIZED = -1
 }
 export declare function inferenceFrameworkFromJSON(object: any): InferenceFramework;

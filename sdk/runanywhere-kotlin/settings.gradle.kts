@@ -25,3 +25,4 @@ rootProject.name = "RunAnywhereKotlinSDK"
 
 include(":modules:runanywhere-core-llamacpp")
 include(":modules:runanywhere-core-onnx")
+include(":modules:runanywhere-core-qhexrt")

@@ -63,6 +63,7 @@ fun MoreScreen(onNavigate: (Any) -> Unit) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
     ) {
+        HexagonNpuCard()
         entries.forEach { entry -> MoreRow(entry) { entry.route?.let(onNavigate) } }
     }
 }
