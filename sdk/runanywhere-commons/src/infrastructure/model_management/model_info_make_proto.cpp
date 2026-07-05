@@ -5,7 +5,7 @@
  * Commons-owned implementation of Swift's RAModelInfo.make(...) which lives
  * in sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/
  * ModelTypes+Artifacts.swift. Every field-set in this file mirrors the
- * Swift implementation 1:1 so the Swift extension can be deleted.
+ * Swift implementation 1:1.
  *
  * Field semantics summary:
  *   id, name             — derived from URL via rac_model_generate_id /
@@ -86,11 +86,9 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
     return rac::proto::copy_message(message, out, "failed to serialize ModelInfo result");
 }
 
-// ---------------------------------------------------------------------------
 // Enum converters (mirrors model_registry.cpp static helpers — duplicated
 // here to keep this TU self-contained and avoid touching model_registry.cpp
 // while another agent is working on it).
-// ---------------------------------------------------------------------------
 
 runanywhere::v1::ModelCategory model_category_to_proto(rac_model_category_t c) {
     switch (c) {
@@ -208,11 +206,9 @@ rac_inference_framework_t inference_framework_from_proto(runanywhere::v1::Infere
     }
 }
 
-// ---------------------------------------------------------------------------
 // URL → file extension helper. Strips query/fragment, then takes the suffix
 // after the LAST '.' in the last path component. Mirrors Swift URL.pathExtension
 // for the common case of HTTPS catalog URLs.
-// ---------------------------------------------------------------------------
 std::string strip_url_noise(const std::string& url) {
     size_t cut = url.find_first_of("?#");
     return cut == std::string::npos ? url : url.substr(0, cut);
@@ -244,9 +240,7 @@ bool ends_with(const std::string& s, const char* suffix) {
     return s.compare(s.size() - suffix_len, suffix_len, suffix) == 0;
 }
 
-// ---------------------------------------------------------------------------
 // ArchiveType.from(url:) — Swift parity. NONE → no archive detected.
-// ---------------------------------------------------------------------------
 rac_archive_type_t archive_type_from_url(const std::string& url) {
     std::string lower = strip_url_noise(url);
     std::transform(lower.begin(), lower.end(), lower.begin(),
@@ -305,9 +299,7 @@ int64_t now_unix_ms() {
 
 }  // namespace
 
-// =============================================================================
 // PUBLIC API
-// =============================================================================
 
 extern "C" rac_bool_t rac_path_is_non_empty_directory(const char* path) {
     if (!path || !*path) {
@@ -367,9 +359,7 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
 
     const std::string url = request.url();
 
-    // -------------------------------------------------------------------------
     // 1) Resolve format from URL extension.
-    // -------------------------------------------------------------------------
     rac_model_format_t format = RAC_MODEL_FORMAT_UNSPECIFIED;
     {
         const std::string ext = url_path_extension(url);
@@ -378,9 +368,7 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
         }
     }
 
-    // -------------------------------------------------------------------------
     // 2) Resolve framework — request override → format → UNKNOWN.
-    // -------------------------------------------------------------------------
     rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
     if (request.has_framework() &&
         request.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
@@ -392,9 +380,7 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
         }
     }
 
-    // -------------------------------------------------------------------------
     // 3) Resolve category — request override → framework default.
-    // -------------------------------------------------------------------------
     rac_model_category_t category = RAC_MODEL_CATEGORY_UNKNOWN;
     if (request.has_category() &&
         request.category() != runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED) {
@@ -403,17 +389,13 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
         category = rac_model_category_from_framework(framework);
     }
 
-    // -------------------------------------------------------------------------
     // 4) Resolve source — request override → REMOTE.
-    // -------------------------------------------------------------------------
     runanywhere::v1::ModelSource source = runanywhere::v1::MODEL_SOURCE_REMOTE;
     if (request.has_source() && request.source() != runanywhere::v1::MODEL_SOURCE_UNSPECIFIED) {
         source = request.source();
     }
 
-    // -------------------------------------------------------------------------
     // 5) Resolve id — strip known extensions from URL filename.
-    // -------------------------------------------------------------------------
     std::string id;
     {
         char buf[512];
@@ -421,9 +403,7 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
         id = buf;
     }
 
-    // -------------------------------------------------------------------------
     // 6) Resolve name — request.name when non-empty, else generate from URL.
-    // -------------------------------------------------------------------------
     std::string name = request.name();
     if (name.empty()) {
         char buf[512];
@@ -431,9 +411,7 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
         name = buf;
     }
 
-    // -------------------------------------------------------------------------
     // 7) Compose the ModelInfo proto.
-    // -------------------------------------------------------------------------
     runanywhere::v1::ModelInfo model;
     model.set_id(id);
     model.set_name(name);
@@ -473,11 +451,9 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
     model.set_created_at_unix_ms(now_ms);
     model.set_updated_at_unix_ms(now_ms);
 
-    // -------------------------------------------------------------------------
     // 8) Artifact inference. Swift: ArchiveType.from(url:) → archive() else
     //    singleFile(). artifact_type tracks the artifact branch for callers
     //    that consume the coarse classification.
-    // -------------------------------------------------------------------------
     const rac_archive_type_t archive =
         url.empty() ? RAC_ARCHIVE_TYPE_NONE : archive_type_from_url(url);
     if (archive != RAC_ARCHIVE_TYPE_NONE) {
@@ -493,7 +469,6 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
     // non-empty (`!expected.isEmptyManifest`). Default artifacts have empty
     // patterns, so isEmptyManifest is true.
 
-    // -------------------------------------------------------------------------
     // 9) Disk-state probe. Swift's RAModelInfo.make() does:
     //      model.isDownloaded = model.isDownloadedOnDisk
     //      model.isAvailable  = model.isAvailableForUse
@@ -503,7 +478,6 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
     //    rac_path_is_non_empty_directory() so the probe is exercised when
     //    callers later assign a non-empty local_path before re-calling the
     //    factory; this keeps the implementation forward-compatible.
-    // -------------------------------------------------------------------------
     const std::string& local_path = model.local_path();
     bool is_downloaded = false;
     if (!local_path.empty()) {

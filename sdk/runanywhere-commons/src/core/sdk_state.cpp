@@ -20,9 +20,7 @@
 #include "rac/core/rac_sdk_state.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
-// =============================================================================
 // Internal C++ State Class
-// =============================================================================
 
 class SDKState {
    public:
@@ -36,9 +34,7 @@ class SDKState {
     SDKState(const SDKState&) = delete;
     SDKState& operator=(const SDKState&) = delete;
 
-    // ==========================================================================
     // Initialization
-    // ==========================================================================
 
     // Lifecycle STARTED/COMPLETED/FAILED events are published by the sole
     // caller (rac_sdk_init_phase1_proto), which owns the whole Phase-1 span —
@@ -98,9 +94,7 @@ class SDKState {
         }
     }
 
-    // ==========================================================================
     // Environment Queries
-    // ==========================================================================
 
     rac_environment_t getEnvironment() const {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -134,9 +128,7 @@ class SDKState {
         return tl_device_id.c_str();
     }
 
-    // ==========================================================================
     // Device State
-    // ==========================================================================
 
     void setDeviceRegistered(bool registered) {
         {
@@ -172,9 +164,7 @@ class SDKState {
     bool is_device_registered_ = false;
 };
 
-// =============================================================================
 // C API Implementation
-// =============================================================================
 
 extern "C" {
 

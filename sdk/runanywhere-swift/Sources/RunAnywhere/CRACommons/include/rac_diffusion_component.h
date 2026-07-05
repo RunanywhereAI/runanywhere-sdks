@@ -23,9 +23,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // DIFFUSION COMPONENT API - Component lifecycle and generation
-// =============================================================================
 
 /**
  * @brief Create a diffusion capability component
@@ -133,9 +131,7 @@ RAC_API rac_result_t rac_diffusion_component_generate_with_callbacks(
     rac_diffusion_complete_callback_fn complete_callback,
     rac_diffusion_error_callback_fn error_callback, void* user_data);
 
-// =============================================================================
 // JSON CONVENIENCE HELPERS
-// =============================================================================
 
 /**
  * @brief Configure diffusion component from JSON

@@ -154,10 +154,8 @@ void free_model_info(rac_model_info_t* model) {
 
 namespace rac::infra::model_registry::detail {
 
-// -----------------------------------------------------------------------------
 // Single-TU enum / pattern mappers (internal linkage, used only by the proto<->C
 // conversion functions below).
-// -----------------------------------------------------------------------------
 
 namespace {
 
@@ -406,9 +404,7 @@ void add_file_descriptors_to_proto(const rac_model_artifact_info_t* artifact,
 
 }  // namespace
 
-// -----------------------------------------------------------------------------
 // Cross-TU conversion / parse helpers (declared in model_registry_internal.h).
-// -----------------------------------------------------------------------------
 
 char* dup_optional_proto_string(const std::string& value) {
     return value.empty() ? nullptr : rac_strdup(value.c_str());

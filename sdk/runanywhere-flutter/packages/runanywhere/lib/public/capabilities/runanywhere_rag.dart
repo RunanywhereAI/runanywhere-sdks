@@ -29,7 +29,7 @@ class RunAnywhereRAG {
   static final RunAnywhereRAG _instance = RunAnywhereRAG._();
   static RunAnywhereRAG get shared => _instance;
 
-  // -- pipeline lifecycle ---------------------------------------------------
+  // -- pipeline lifecycle
 
   /// Create the RAG pipeline. Throws `SDKError.invalidState` if
   /// creation fails. C++ commons auto-publishes the RAG SDKEvent.
@@ -96,7 +96,7 @@ class RunAnywhereRAG {
   /// Swift-shaped alias for pipeline destruction.
   Future<void> ragDestroyPipeline() => destroyPipeline();
 
-  // -- document management --------------------------------------------------
+  // -- document management
 
   /// Ingest a single document into the pipeline (chunk → embed → index).
   Future<void> ingest(String text, {String? metadataJSON}) async {
@@ -162,7 +162,7 @@ class RunAnywhereRAG {
   /// Swift-shaped alias for clearing documents.
   Future<void> ragClearDocuments() => clearDocuments();
 
-  // -- retrieval & stats ----------------------------------------------------
+  // -- retrieval & stats
 
   /// Number of indexed document chunks in the pipeline.
   Future<int> documentCount() async {
@@ -193,7 +193,7 @@ class RunAnywhereRAG {
   /// Swift-shaped alias for statistics.
   Future<RAGStatistics> ragGetStatistics() => getStatistics();
 
-  // -- query ----------------------------------------------------------------
+  // -- query
 
   /// Query the RAG pipeline with a natural-language question —
   /// retrieves relevant chunks and generates an answer.

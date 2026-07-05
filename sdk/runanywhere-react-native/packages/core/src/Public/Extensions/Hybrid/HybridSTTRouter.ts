@@ -276,7 +276,7 @@ export class HybridSTTRouter {
     this.handle = 0;
   }
 
-  // --- internals ------------------------------------------------------------
+  // internals
 
   private ensureOpen(): void {
     if (!this.handle) {

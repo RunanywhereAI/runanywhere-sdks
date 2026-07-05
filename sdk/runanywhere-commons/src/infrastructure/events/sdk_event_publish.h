@@ -38,7 +38,6 @@ namespace rac::events {
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-// ---------------------------------------------------------------------------
 // Core envelope-stamping publish. `event` already carries its oneof payload;
 // this fills the standard envelope metadata (id, timestamp_ms, source="cpp",
 // destination=ALL unless already set) plus the supplied component/category,
@@ -47,11 +46,9 @@ namespace rac::events {
 // Fields the caller already populated on `event` (severity, session_id,
 // operation_id, correlation_id, an explicit destination, an explicit error,
 // extra properties) are preserved.
-// ---------------------------------------------------------------------------
 rac_result_t publish(runanywhere::v1::SDKEvent& event, runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category);
 
-// ---------------------------------------------------------------------------
 // Publish an already-fully-populated SDKEvent. Unlike publish() above this does
 // NOT stamp envelope metadata — the caller owns id/timestamp/component/category/
 // destination. It serializes the event once, feeds the PUBLIC sink when the
@@ -62,16 +59,13 @@ rac_result_t publish(runanywhere::v1::SDKEvent& event, runanywhere::v1::SDKCompo
 // (LLM generation, VLM/RAG capability ops). Going through here is what gets the
 // event to the telemetry sink — calling rac_sdk_event_publish_proto directly
 // feeds the PUBLIC sink only and silently drops telemetry.
-// ---------------------------------------------------------------------------
 rac_result_t publish_prebuilt(const runanywhere::v1::SDKEvent& event);
 
-// ---------------------------------------------------------------------------
 // Typed overloads — one per SDKEvent oneof arm. Each moves the strongly-typed
 // per-component payload into the matching oneof arm, then stamps + publishes
 // via the core overload above. This is the canonical "publish(component,
 // category, <the oneof payload>)" entry point requested by the event-system
 // consolidation: callers never touch the SDKEvent envelope directly.
-// ---------------------------------------------------------------------------
 rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
                      runanywhere::v1::InitializationEvent payload);
@@ -139,12 +133,10 @@ rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
                      runanywhere::v1::FailureEvent payload);
 
-// ---------------------------------------------------------------------------
 // Destination bitmask helpers. The proto EventDestination values are powers of
 // two (PUBLIC=1, TELEMETRY=2, LOG=4) with ALL=PUBLIC|TELEMETRY=3. These mirror
 // the legacy rac_event_get_destination semantics in bitmask form so call sites
 // don't hardcode bits. (ALL is the publish() default; no helper needed.)
-// ---------------------------------------------------------------------------
 inline runanywhere::v1::EventDestination legacy_destination_public() {
     return runanywhere::v1::EVENT_DESTINATION_PUBLIC;
 }
@@ -152,12 +144,10 @@ inline runanywhere::v1::EventDestination legacy_destination_telemetry() {
     return runanywhere::v1::EVENT_DESTINATION_TELEMETRY;
 }
 
-// ---------------------------------------------------------------------------
 // Convert a rac_inference_framework_t (C enum) to the proto InferenceFramework
 // value as an int32, for the `framework` fields on GenerationEvent / ModelEvent
 // / VoiceLifecycleEvent. The two enums have different integer values, so this
 // maps explicitly (mirrors inference_framework_to_proto in the model layer).
-// ---------------------------------------------------------------------------
 inline int32_t framework_to_proto_int(rac_inference_framework_t f) {
     switch (f) {
         case RAC_FRAMEWORK_ONNX:
@@ -189,14 +179,12 @@ inline int32_t framework_to_proto_int(rac_inference_framework_t f) {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Convenience publishers for the per-operation voice/generation/model events
 // that carry a session/operation id on the SDKEvent envelope (telemetry groups
 // by envelope session_id). These set the oneof arm, the envelope session_id,
 // and an explicit destination, then delegate to the core publish(). Pass
 // session_id=nullptr to leave it unset and EVENT_DESTINATION_UNSPECIFIED to use
 // the publish() default (ALL).
-// ---------------------------------------------------------------------------
 rac_result_t publish_with_session(
     runanywhere::v1::SDKComponent component, runanywhere::v1::EventCategory category,
     runanywhere::v1::GenerationEvent payload, const char* session_id,
@@ -206,14 +194,12 @@ rac_result_t publish_with_session(
     runanywhere::v1::VoiceLifecycleEvent payload, const char* session_id,
     runanywhere::v1::EventDestination destination = runanywhere::v1::EVENT_DESTINATION_UNSPECIFIED);
 
-// ---------------------------------------------------------------------------
 // Destination router. Called by publish() after the PUBLIC proto stream has
 // been fed: routes the event to TELEMETRY (telemetry_manager_track_proto) and
 // LOG (structured log) sinks based on the envelope `destination` bitmask. The
 // PUBLIC bit is already satisfied by rac_sdk_event_publish_proto inside
 // publish(); this only handles the non-public sinks. `serialized_bytes` is the
 // already-serialized SDKEvent (so the router does not re-serialize).
-// ---------------------------------------------------------------------------
 void route(const runanywhere::v1::SDKEvent& event, const uint8_t* serialized_bytes,
            size_t serialized_size);
 

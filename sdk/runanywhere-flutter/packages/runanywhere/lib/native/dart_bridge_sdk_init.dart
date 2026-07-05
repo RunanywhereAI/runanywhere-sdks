@@ -39,9 +39,7 @@ import 'package:runanywhere/native/platform_loader.dart';
 class DartBridgeSdkInit {
   DartBridgeSdkInit._();
 
-  // ---------------------------------------------------------------------------
   // Phase 1 (synchronous core init)
-  // ---------------------------------------------------------------------------
 
   /// Drive Phase 1 (synchronous core init) through the canonical C ABI.
   ///
@@ -60,9 +58,7 @@ class DartBridgeSdkInit {
     return result;
   }
 
-  // ---------------------------------------------------------------------------
   // Phase 2 (async services init step list owned by C++)
-  // ---------------------------------------------------------------------------
 
   /// Drive Phase 2 (services init step list) through the canonical C ABI.
   ///
@@ -83,9 +79,7 @@ class DartBridgeSdkInit {
     return result;
   }
 
-  // ---------------------------------------------------------------------------
   // HTTP retry
-  // ---------------------------------------------------------------------------
 
   /// Re-attempt HTTP/auth setup after an offline initialization. Mirrors
   /// `rac_sdk_retry_http_proto` semantics: idempotent fast path when already
@@ -102,9 +96,7 @@ class DartBridgeSdkInit {
     return result;
   }
 
-  // ---------------------------------------------------------------------------
   // Internals
-  // ---------------------------------------------------------------------------
 
   /// Look up a `rac_sdk_init_phase{1,2}_proto`-style symbol — borrowed input
   /// bytes + owned output buffer.

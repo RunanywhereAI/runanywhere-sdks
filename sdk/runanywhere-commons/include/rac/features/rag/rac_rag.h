@@ -27,9 +27,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // MODULE REGISTRATION
-// =============================================================================
 
 /**
  * @brief Register the RAG pipeline module
@@ -48,9 +46,7 @@ RAC_API rac_result_t rac_backend_rag_register(void);
  */
 RAC_API rac_result_t rac_backend_rag_unregister(void);
 
-// =============================================================================
 // PROTO-BYTE SESSION API
-// =============================================================================
 
 /**
  * @brief Create a RAG session from serialized runanywhere.v1.RAGConfiguration bytes.

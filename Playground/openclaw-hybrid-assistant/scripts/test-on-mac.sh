@@ -144,10 +144,10 @@ set -e
 cd "${ROOT_DIR}"
 
 echo "=== Downloading Sherpa-ONNX ==="
-./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
+./scripts/build/deps/download-sherpa-onnx.sh linux
 
 echo "=== Building runanywhere-commons ==="
-./sdk/runanywhere-commons/scripts/build-linux.sh --shared
+./scripts/build/linux.sh --shared
 
 echo "=== Downloading models ==="
 cd Playground/openclaw-hybrid-assistant
@@ -199,8 +199,8 @@ test_with_orbstack() {
         cd ${ROOT_DIR}
 
         echo '=== Building ==='
-        ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
-        ./sdk/runanywhere-commons/scripts/build-linux.sh --shared
+        ./scripts/build/deps/download-sherpa-onnx.sh linux
+        ./scripts/build/linux.sh --shared
 
         cd Playground/openclaw-hybrid-assistant
         ./scripts/download-models.sh

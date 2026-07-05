@@ -20,9 +20,7 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
 
-// =============================================================================
 // Minimal Test Platform Adapter
-// =============================================================================
 
 static rac_bool_t test_file_exists(const char* /*path*/, void* /*user_data*/) {
     return RAC_FALSE;
@@ -117,9 +115,7 @@ static rac_platform_adapter_t make_test_adapter() {
     return adapter;
 }
 
-// =============================================================================
 // Setup / Teardown
-// =============================================================================
 
 static rac_platform_adapter_t g_adapter;
 
@@ -140,9 +136,7 @@ static void teardown() {
     rac_shutdown();
 }
 
-// =============================================================================
 // Tests
-// =============================================================================
 
 static TestResult test_create_destroy() {
     TestResult result;
@@ -816,9 +810,7 @@ static TestResult test_get_voices() {
     return result;
 }
 
-// =============================================================================
 // Main
-// =============================================================================
 
 int main(int argc, char** argv) {
     std::map<std::string, std::function<TestResult()>> tests = {

@@ -50,9 +50,7 @@ struct rac_http_client_impl {
 };
 }  // namespace
 
-// =============================================================================
 // Lifecycle
-// =============================================================================
 
 extern "C" rac_result_t rac_http_client_create(rac_http_client_t** out) {
     if (!out) {
@@ -74,9 +72,7 @@ extern "C" void rac_http_client_destroy(rac_http_client_t* c) {
     std::free(c);
 }
 
-// =============================================================================
 // Dispatch helpers
-// =============================================================================
 
 namespace {
 
@@ -169,9 +165,7 @@ rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from
 
 }  // namespace
 
-// =============================================================================
 // Public C ABI
-// =============================================================================
 
 extern "C" rac_result_t rac_http_request_send(rac_http_client_t* c, const rac_http_request_t* req,
                                               rac_http_response_t* out_resp) {

@@ -101,9 +101,7 @@ RAGBackend::~RAGBackend() {
     }
 }
 
-// =============================================================================
 // Embedding helper — calls through embeddings service vtable
-// =============================================================================
 
 std::vector<float> RAGBackend::embed_text(const std::string& text) const {
     if (!embeddings_service_)
@@ -155,9 +153,7 @@ RAGBackend::embed_texts_batch(const std::vector<std::string>& texts) const {
     return embeddings;
 }
 
-// =============================================================================
 // Document management
-// =============================================================================
 
 bool RAGBackend::add_document(const std::string& text, const nlohmann::json& metadata) {
     size_t embedding_dimension;
@@ -273,9 +269,7 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
     return true;
 }
 
-// =============================================================================
 // Search — retrieve top-k chunks from vector store
-// =============================================================================
 
 std::vector<SearchResult> RAGBackend::search(const std::string& query_text, size_t top_k) const {
     size_t embedding_dimension;
@@ -325,9 +319,7 @@ std::vector<SearchResult> RAGBackend::search_with_embedding(const std::string& q
     }
 }
 
-// =============================================================================
 // Reciprocal Rank Fusion (RRF) — merges dense + BM25 results
-// =============================================================================
 
 std::vector<SearchResult>
 RAGBackend::fuse_results(const std::vector<SearchResult>& dense_results,
@@ -425,9 +417,7 @@ RAGBackend::fuse_results(const std::vector<SearchResult>& dense_results,
     return fused;
 }
 
-// =============================================================================
 // Query — GraphScheduler-driven DAG
-// =============================================================================
 //
 // The entire orchestration (embed → retrieve → assemble →
 // generate) now lives in `run_rag_query()` which builds and runs a typed
@@ -524,9 +514,7 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // Utility
-// =============================================================================
 
 void RAGBackend::clear() {
     std::lock_guard<std::mutex> lock(mutex_);

@@ -23,9 +23,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // TYPES
-// =============================================================================
 
 /**
  * @brief Opaque handle for LLM analytics service
@@ -34,9 +32,7 @@ typedef struct rac_llm_analytics_s* rac_llm_analytics_handle_t;
 
 // Note: rac_generation_metrics_t is defined in rac_llm_metrics.h
 
-// =============================================================================
 // LIFECYCLE
-// =============================================================================
 
 /**
  * @brief Create an LLM analytics service instance
@@ -53,9 +49,7 @@ RAC_API rac_result_t rac_llm_analytics_create(rac_llm_analytics_handle_t* out_ha
  */
 RAC_API void rac_llm_analytics_destroy(rac_llm_analytics_handle_t handle);
 
-// =============================================================================
 // GENERATION TRACKING
-// =============================================================================
 
 /**
  * @brief Start tracking a non-streaming generation
@@ -167,9 +161,7 @@ RAC_API rac_result_t rac_llm_analytics_track_error(rac_llm_analytics_handle_t ha
                                                    const char* error_message, const char* operation,
                                                    const char* model_id, const char* generation_id);
 
-// =============================================================================
 // METRICS
-// =============================================================================
 
 /**
  * @brief Get current analytics metrics

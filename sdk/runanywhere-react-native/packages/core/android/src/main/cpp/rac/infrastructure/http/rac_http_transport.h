@@ -41,9 +41,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // VTABLE
-// =============================================================================
 
 /**
  * @brief Platform HTTP transport vtable.
@@ -119,9 +117,7 @@ typedef struct rac_http_transport_ops {
     void (*destroy)(void* user_data);
 } rac_http_transport_ops_t;
 
-// =============================================================================
 // REGISTRATION
-// =============================================================================
 
 /**
  * @brief Register a platform HTTP transport.

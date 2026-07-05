@@ -21,9 +21,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // BENCHMARK TIMING STRUCT
-// =============================================================================
 
 /**
  * Benchmark timing structure for LLM inference.
@@ -85,9 +83,7 @@ typedef struct rac_benchmark_timing {
 
 } rac_benchmark_timing_t;
 
-// =============================================================================
 // BENCHMARK STATUS CODES
-// =============================================================================
 
 /** Benchmark request completed successfully */
 #define RAC_BENCHMARK_STATUS_SUCCESS ((int32_t)0)
@@ -101,9 +97,7 @@ typedef struct rac_benchmark_timing {
 /** Benchmark request was cancelled */
 #define RAC_BENCHMARK_STATUS_CANCELLED ((int32_t)3)
 
-// =============================================================================
 // MONOTONIC TIME API
-// =============================================================================
 
 /**
  * Gets the current monotonic time in milliseconds.
@@ -118,9 +112,7 @@ typedef struct rac_benchmark_timing {
  */
 RAC_API int64_t rac_monotonic_now_ms(void);
 
-// =============================================================================
 // UTILITY FUNCTIONS
-// =============================================================================
 
 /**
  * Initializes a benchmark timing struct to zero values.

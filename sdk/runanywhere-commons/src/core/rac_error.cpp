@@ -26,9 +26,7 @@ const char* rac_error_message(rac_result_t error_code) {
     }
 
     switch (error_code) {
-        // =================================================================
         // INITIALIZATION ERRORS (-100 to -109)
-        // =================================================================
         case RAC_ERROR_NOT_INITIALIZED:
             return "Component or service has not been initialized";
         case RAC_ERROR_ALREADY_INITIALIZED:
@@ -44,9 +42,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_INVALID_PARAMETER:
             return "Invalid parameter value";
 
-        // =================================================================
         // MODEL ERRORS (-110 to -129)
-        // =================================================================
         case RAC_ERROR_MODEL_NOT_FOUND:
             return "Requested model was not found";
         case RAC_ERROR_MODEL_LOAD_FAILED:
@@ -62,9 +58,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_MODEL_NOT_LOADED:
             return "Model not loaded";
 
-        // =================================================================
         // GENERATION ERRORS (-130 to -149)
-        // =================================================================
         case RAC_ERROR_GENERATION_FAILED:
             return "Text/audio generation failed";
         case RAC_ERROR_GENERATION_TIMEOUT:
@@ -80,9 +74,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_GENERATION_CANCELLED:
             return "Generation cancelled";
 
-        // =================================================================
         // NETWORK ERRORS (-150 to -179)
-        // =================================================================
         case RAC_ERROR_NETWORK_UNAVAILABLE:
             return "Network is unavailable";
         case RAC_ERROR_NETWORK_ERROR:
@@ -108,9 +100,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_HTTP_NOT_SUPPORTED:
             return "HTTP not supported";
 
-        // =================================================================
         // STORAGE ERRORS (-180 to -219)
-        // =================================================================
         case RAC_ERROR_INSUFFICIENT_STORAGE:
             return "Insufficient storage space";
         case RAC_ERROR_STORAGE_FULL:
@@ -140,17 +130,13 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_TEMP_FILE_CREATION_FAILED:
             return "Failed to create temporary file";
 
-        // =================================================================
         // HARDWARE ERRORS (-220 to -229)
-        // =================================================================
         case RAC_ERROR_HARDWARE_UNSUPPORTED:
             return "Hardware is unsupported";
         case RAC_ERROR_INSUFFICIENT_MEMORY:
             return "Insufficient memory";
 
-        // =================================================================
         // COMPONENT STATE ERRORS (-230 to -249)
-        // =================================================================
         case RAC_ERROR_COMPONENT_NOT_READY:
             return "Component is not ready";
         case RAC_ERROR_INVALID_STATE:
@@ -166,9 +152,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_NOT_SUPPORTED:
             return "Feature/operation is not supported";
 
-        // =================================================================
         // VALIDATION ERRORS (-250 to -279)
-        // =================================================================
         case RAC_ERROR_VALIDATION_FAILED:
             return "Validation failed";
         case RAC_ERROR_INVALID_INPUT:
@@ -197,9 +181,7 @@ const char* rac_error_message(rac_result_t error_code) {
             return "Output truncated: caller buffer is too small; required byte "
                    "count written to output size field";
 
-        // =================================================================
         // AUDIO ERRORS (-280 to -299)
-        // =================================================================
         case RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED:
             return "Audio format is not supported";
         case RAC_ERROR_AUDIO_SESSION_FAILED:
@@ -213,9 +195,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_AUDIO_SESSION_ACTIVATION_FAILED:
             return "Audio session activation failed";
 
-        // =================================================================
         // LANGUAGE/VOICE ERRORS (-300 to -319)
-        // =================================================================
         case RAC_ERROR_LANGUAGE_NOT_SUPPORTED:
             return "Language is not supported";
         case RAC_ERROR_VOICE_NOT_AVAILABLE:
@@ -225,9 +205,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_STREAM_CANCELLED:
             return "Stream was cancelled";
 
-        // =================================================================
         // AUTHENTICATION ERRORS (-320 to -329)
-        // =================================================================
         case RAC_ERROR_AUTHENTICATION_FAILED:
             return "Authentication failed";
         case RAC_ERROR_UNAUTHORIZED:
@@ -235,9 +213,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_FORBIDDEN:
             return "Access forbidden";
 
-        // =================================================================
         // SECURITY ERRORS (-330 to -349)
-        // =================================================================
         case RAC_ERROR_KEYCHAIN_ERROR:
             return "Keychain operation failed";
         case RAC_ERROR_ENCODING_ERROR:
@@ -247,9 +223,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_SECURE_STORAGE_FAILED:
             return "Secure storage operation failed";
 
-        // =================================================================
         // EXTRACTION ERRORS (-350 to -369)
-        // =================================================================
         case RAC_ERROR_EXTRACTION_FAILED:
             return "Extraction failed";
         case RAC_ERROR_CHECKSUM_MISMATCH:
@@ -257,23 +231,17 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_UNSUPPORTED_ARCHIVE:
             return "Unsupported archive format";
 
-        // =================================================================
         // CALIBRATION ERRORS (-370 to -379)
-        // =================================================================
         case RAC_ERROR_CALIBRATION_FAILED:
             return "Calibration failed";
         case RAC_ERROR_CALIBRATION_TIMEOUT:
             return "Calibration timed out";
 
-        // =================================================================
         // CANCELLATION (-380 to -389)
-        // =================================================================
         case RAC_ERROR_CANCELLED:
             return "Operation was cancelled";
 
-        // =================================================================
         // MODULE/SERVICE ERRORS (-400 to -499)
-        // =================================================================
         case RAC_ERROR_MODULE_NOT_FOUND:
             return "Module not found";
         case RAC_ERROR_MODULE_ALREADY_REGISTERED:
@@ -295,15 +263,11 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_NOT_FOUND:
             return "Not found";
 
-        // =================================================================
         // PLATFORM ADAPTER ERRORS (-500 to -599)
-        // =================================================================
         case RAC_ERROR_ADAPTER_NOT_SET:
             return "Platform adapter not set";
 
-        // =================================================================
         // BACKEND ERRORS (-600 to -699)
-        // =================================================================
         case RAC_ERROR_BACKEND_NOT_FOUND:
             return "Backend not found";
         case RAC_ERROR_BACKEND_NOT_READY:
@@ -322,9 +286,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_INVALID_HANDLE:
             return "Invalid handle";
 
-        // =================================================================
         // EVENT ERRORS (-700 to -799)
-        // =================================================================
         case RAC_ERROR_EVENT_INVALID_CATEGORY:
             return "Invalid event category";
         case RAC_ERROR_EVENT_SUBSCRIPTION_FAILED:
@@ -332,9 +294,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_EVENT_PUBLISH_FAILED:
             return "Event publish failed";
 
-        // =================================================================
         // OTHER ERRORS (-800 to -899)
-        // =================================================================
         case RAC_ERROR_NOT_IMPLEMENTED:
             return "Feature is not implemented";
         case RAC_ERROR_FEATURE_NOT_AVAILABLE:
@@ -348,9 +308,7 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_INTERNAL:
             return "Internal error";
 
-        // =================================================================
         // PLUGIN ERRORS (-810 to -829)
-        // =================================================================
         case RAC_ERROR_ABI_VERSION_MISMATCH:
             return "Plugin ABI version mismatch";
         case RAC_ERROR_CAPABILITY_UNSUPPORTED:

@@ -85,14 +85,14 @@ extern "C" {
  */
 #define RAC_PLUGIN_API_VERSION 4u
 
-/* ===========================================================================
+/*
  * Plugin entry-point signature
  *
  * Every plugin MUST expose:
  *   const rac_engine_vtable_t* rac_plugin_entry_<name>(void);
  * The host looks up this symbol by name (static registration) or via dlsym
  * (dynamic loading).
- * =========================================================================== */
+ */
 
 typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
 
@@ -132,9 +132,9 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  */
 #define RAC_PLUGIN_ENTRY_DEF(name) RAC_PLUGIN_ENTRY_DECL(name)
 
-/* ===========================================================================
+/*
  * Static registration (iOS / Android / no-dlopen builds)
- * =========================================================================== */
+ */
 
 /**
  * @brief Register a plugin's vtable with the registry at process start.
@@ -260,7 +260,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
 #define RAC_STATIC_REGISTER_BACKEND(name)
 #endif
 
-/* ===========================================================================
+/*
  * Boilerplate "create" adapter helper
  *
  * Most backends' per-primitive `create` op is a 7-line forward onto the
@@ -284,7 +284,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *                                               void** out_impl);
  * `config_json` is currently ignored (passed as nullptr to the engine create);
  * bring-your-own-adapter if you need to thread config through.
- * =========================================================================== */
+ */
 
 #ifdef __cplusplus
 #define RAC_DEFINE_CREATE_ADAPTER(primitive, name)                                                 \
@@ -320,9 +320,9 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
     }
 #endif
 
-/* ===========================================================================
+/*
  * Registry operations (implemented in src/plugin/rac_plugin_registry.cpp)
- * =========================================================================== */
+ */
 
 /* All registry functions below are noexcept under C++ linkage: they cross
  * the C ABI into Swift / Kotlin (JNI) / Dart (FFI) / Hermes (NitroModules)

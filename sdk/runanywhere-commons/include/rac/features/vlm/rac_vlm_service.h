@@ -29,9 +29,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // SERVICE VTABLE - Backend implementations provide this
-// =============================================================================
 
 /**
  * VLM Service operations vtable.
@@ -138,9 +136,7 @@ typedef rac_bool_t (*rac_vlm_stream_event_proto_callback_fn)(const uint8_t* even
                                                              size_t event_proto_size,
                                                              void* user_data);
 
-// =============================================================================
 // PUBLIC API - Generic service functions
-// =============================================================================
 
 /**
  * @brief Create a VLM service
@@ -228,9 +224,7 @@ RAC_API rac_result_t rac_vlm_cancel(rac_handle_t handle);
  */
 RAC_API rac_result_t rac_vlm_cancel_proto(rac_handle_t handle);
 
-// =============================================================================
 // GENERATED-PROTO VLM ABI - lifecycle-owned model state
-// =============================================================================
 
 /**
  * @brief Generate text from serialized runanywhere.v1.VLMGenerationRequest bytes.

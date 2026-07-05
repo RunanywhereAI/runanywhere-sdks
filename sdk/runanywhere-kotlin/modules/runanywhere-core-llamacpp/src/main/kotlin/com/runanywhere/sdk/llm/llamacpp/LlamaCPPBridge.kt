@@ -77,9 +77,7 @@ internal object LlamaCPPBridge {
     val isLoaded: Boolean
         get() = nativeLibraryLoaded
 
-    // ==========================================================================
     // JNI Methods
-    // ==========================================================================
 
     /**
      * Register the LlamaCPP backend with the C++ service registry.

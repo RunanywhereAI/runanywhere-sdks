@@ -130,40 +130,10 @@ RunAnywhere.generateStream("Tell me a story about AI")
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Your Android App                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │            RunAnywhere Kotlin SDK (Public API)             │  │
-│  │                                                            │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │  │
-│  │  │   LLM    │  │   STT    │  │   TTS    │  │   VAD    │  │  │
-│  │  │ generate │  │transcribe│  │synthesize│  │  detect  │  │  │
-│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘  │  │
-│  │                                                            │  │
-│  │  ┌──────────────────────────────────────────────────────┐ │  │
-│  │  │              VoiceAgent (Orchestration)              │ │  │
-│  │  │         VAD → STT → LLM → TTS Pipeline               │ │  │
-│  │  └──────────────────────────────────────────────────────┘ │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                              ↓                                    │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │         runanywhere-commons (C++ Native Layer)            │  │
-│  │    JNI bridge to shared AI inference infrastructure       │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                              ↓                                    │
-│  ┌─────────────────────┐    ┌─────────────────────────────────┐ │
-│  │  runanywhere-core-  │    │   runanywhere-core-onnx        │ │
-│  │     llamacpp        │    │                                 │ │
-│  │  ┌───────────────┐  │    │ ┌───────────┐  ┌─────────────┐ │ │
-│  │  │  llama.cpp    │  │    │ │ONNX Runtime│  │Sherpa-ONNX  │ │ │
-│  │  │ LLM Inference │  │    │ └───────────┘  │(STT/TTS/VAD)│ │ │
-│  │  └───────────────┘  │    │                └─────────────┘ │ │
-│  └─────────────────────┘    └─────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-```
+Your Android app calls the **RunAnywhere Kotlin SDK (Public API)**, which exposes the per-feature entry points — LLM (`generate`), STT (`transcribe`), TTS (`synthesize`), VAD (`detect`) — plus the **VoiceAgent** orchestration layer that runs the VAD → STT → LLM → TTS pipeline. The public API sits on top of **runanywhere-commons** (the C++ native layer, reached via a JNI bridge to the shared AI inference infrastructure), which in turn dispatches to the backend modules:
+
+- **runanywhere-core-llamacpp** — bundles llama.cpp for LLM inference
+- **runanywhere-core-onnx** — bundles ONNX Runtime + Sherpa-ONNX for STT/TTS/VAD
 
 **Key Components:**
 - **Public API** - Kotlin extension functions for LLM, STT, TTS, VAD, VoiceAgent
@@ -465,14 +435,14 @@ git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks/sdk/runanywhere-kotlin
 
 # 2. Run first-time setup (~10-15 minutes)
-./scripts/build-kotlin.sh --setup
+./gradlew setupLocalDevelopment
 ```
 
-**What the setup script does:**
+**What the setup task does:**
 1. Downloads dependencies (Sherpa-ONNX, ~500MB)
-2. Builds `runanywhere-commons` for Android (arm64-v8a by default)
+2. Builds `runanywhere-commons` for Android via `scripts/build/android.sh`
 3. Copies JNI libraries (`.so` files) to module `jniLibs/` directories
-4. Sets `runanywhere.useLocalNatives=true` in `gradle.properties`
+4. Requires `runanywhere.useLocalNatives=true` in `gradle.properties`
 
 ### Understanding testLocal
 
@@ -483,7 +453,7 @@ The SDK has two modes controlled by `runanywhere.useLocalNatives` in `gradle.pro
 | **Local** | `runanywhere.useLocalNatives=true` | Uses JNI libs from `src/main/jniLibs/` (for development) |
 | **Remote** | `runanywhere.useLocalNatives=false` | Downloads JNI libs from GitHub releases (for end users) |
 
-When you run `--setup`, the script automatically sets `testLocal=true`.
+For end-user (remote) mode, pass `-Prunanywhere.useLocalNatives=false` to Gradle.
 
 ### Testing with the Android Sample App
 
@@ -504,7 +474,7 @@ The sample app's `settings.gradle.kts` references the local SDK via `includeBuil
 ```
 Sample App → Local Kotlin SDK → Local JNI Libraries (jniLibs/)
                                        ↑
-                          Built by build-kotlin.sh --setup
+                          Built by ./gradlew setupLocalDevelopment
 ```
 
 ### Development Workflow
@@ -516,38 +486,32 @@ Sample App → Local Kotlin SDK → Local JNI Libraries (jniLibs/)
 
 ```bash
 cd sdk/runanywhere-kotlin
-./scripts/build-kotlin.sh --local --rebuild-commons
+./gradlew rebuildCommons
 ```
 
-### Build Script Reference
+### Native Library Tasks
 
-| Command | Description |
+| Gradle task | Description |
 |---------|-------------|
-| `--setup` | First-time setup: downloads deps, builds all libs, sets `testLocal=true` |
-| `--local` | Use locally built libs from `jniLibs/` |
-| `--remote` | Use remote libs from GitHub releases |
-| `--rebuild-commons` | Force rebuild of runanywhere-commons |
-| `--clean` | Clean build directories before building |
-| `--abis=ABIS` | ABIs to build (default: `arm64-v8a`, use `arm64-v8a,armeabi-v7a` for 97% device coverage) |
-| `--skip-build` | Skip Gradle build (only setup native libs) |
+| `setupLocalDevelopment` | First-time setup: downloads deps, builds C++ JNI libs (runs `scripts/build/android.sh`) |
+| `rebuildCommons` | Rebuild C++ commons after source changes |
+| `downloadJniLibs` | Download pre-built .so from GitHub Releases (remote mode) |
 
 ### Project Structure
 
 ```
 sdk/runanywhere-kotlin/
-├── src/
-│   ├── main/
-│   │   ├── kotlin/          # Kotlin source
-│   │   ├── jniLibs/         # Per-ABI native .so files
-│   │   └── AndroidManifest.xml
-│   └── test/
-│       └── kotlin/          # Unit tests
-├── modules/
-│   ├── runanywhere-core-llamacpp/   # LLM backend module
-│   └── runanywhere-core-onnx/       # STT/TTS/VAD backend module
-├── scripts/
-│   └── build-kotlin.sh      # Build automation script
-└── gradle.properties        # testLocal flag controls local vs remote libs
+  - src/
+    - main/
+      - kotlin/          # Kotlin source
+      - jniLibs/         # Per-ABI native .so files
+      - AndroidManifest.xml
+    - test/
+      - kotlin/          # Unit tests
+  - modules/
+    - runanywhere-core-llamacpp/   # LLM backend module
+    - runanywhere-core-onnx/       # STT/TTS/VAD backend module
+  - gradle.properties    # testLocal flag controls local vs remote libs
 ```
 
 ### Code Quality

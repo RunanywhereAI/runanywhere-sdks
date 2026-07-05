@@ -42,9 +42,7 @@ namespace runanywhere::rag {
 
 using namespace unum::usearch;
 
-// =============================================================================
 // IMPLEMENTATION
-// =============================================================================
 
 class VectorStoreUSearch::Impl {
    public:
@@ -404,9 +402,7 @@ class VectorStoreUSearch::Impl {
     mutable std::mutex mutex_;
 };
 
-// =============================================================================
 // PUBLIC API
-// =============================================================================
 
 VectorStoreUSearch::VectorStoreUSearch(const VectorStoreConfig& config)
     : impl_(std::make_unique<Impl>(config)) {}

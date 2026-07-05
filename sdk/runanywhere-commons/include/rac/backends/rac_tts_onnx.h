@@ -16,9 +16,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // EXPORT MACRO
-// =============================================================================
 
 #if defined(RAC_ONNX_BUILDING)
 #if defined(_WIN32)
@@ -32,9 +30,7 @@ extern "C" {
 #define RAC_ONNX_API
 #endif
 
-// =============================================================================
 // CONFIGURATION
-// =============================================================================
 
 typedef struct rac_tts_onnx_config {
     int32_t num_threads;
@@ -45,9 +41,7 @@ typedef struct rac_tts_onnx_config {
 static const rac_tts_onnx_config_t RAC_TTS_ONNX_CONFIG_DEFAULT = {
     .num_threads = 0, .use_coreml = RAC_TRUE, .sample_rate = 22050};
 
-// =============================================================================
 // ONNX TTS API
-// =============================================================================
 
 RAC_ONNX_API rac_result_t rac_tts_onnx_create(const char* model_path,
                                               const rac_tts_onnx_config_t* config,

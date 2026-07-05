@@ -31,9 +31,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // PLATFORM I/O CALLBACKS
-// =============================================================================
 
 /**
  * @brief Platform-specific file I/O callbacks.
@@ -114,9 +112,7 @@ typedef struct {
     void* user_data;
 } rac_file_callbacks_t;
 
-// =============================================================================
 // DATA STRUCTURES
-// =============================================================================
 
 /**
  * @brief Combined storage information.
@@ -139,9 +135,7 @@ typedef struct {
     int64_t total_app_size;
 } rac_file_manager_storage_info_t;
 
-// =============================================================================
 // DIRECTORY STRUCTURE
-// =============================================================================
 
 /**
  * @brief Create the standard directory structure under the base directory.
@@ -159,9 +153,7 @@ typedef struct {
  */
 RAC_API rac_result_t rac_file_manager_create_directory_structure(const rac_file_callbacks_t* cb);
 
-// =============================================================================
 // MODEL FOLDER MANAGEMENT
-// =============================================================================
 
 /**
  * @brief Create a model folder and return its path.
@@ -212,9 +204,7 @@ RAC_API rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* c
                                                    const char* model_id,
                                                    rac_inference_framework_t framework);
 
-// =============================================================================
 // DIRECTORY SIZE CALCULATION
-// =============================================================================
 
 /**
  * @brief Calculate directory size recursively.
@@ -248,9 +238,7 @@ RAC_API rac_result_t rac_file_manager_calculate_dir_size(const rac_file_callback
 RAC_API rac_result_t rac_file_manager_models_storage_used(const rac_file_callbacks_t* cb,
                                                           int64_t* out_size);
 
-// =============================================================================
 // CACHE & TEMP MANAGEMENT
-// =============================================================================
 
 /**
  * @brief Clear the cache directory.
@@ -292,9 +280,7 @@ RAC_API rac_result_t rac_file_manager_clear_temp(const rac_file_callbacks_t* cb)
  */
 RAC_API rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb, int64_t* out_size);
 
-// =============================================================================
 // STORAGE INFO
-// =============================================================================
 
 /**
  * @brief Get combined storage information.
@@ -334,9 +320,7 @@ RAC_API rac_result_t rac_file_manager_check_storage(const rac_file_callbacks_t* 
                                                     int64_t required_bytes,
                                                     rac_storage_availability_t* out_availability);
 
-// =============================================================================
 // DIRECTORY CLEARING (INTERNAL HELPER)
-// =============================================================================
 
 /**
  * @brief Clear all contents of a directory (delete + recreate).

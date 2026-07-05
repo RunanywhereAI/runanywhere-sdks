@@ -24,9 +24,7 @@ import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart' show Utf8;
 import 'package:runanywhere/native/platform_loader.dart';
 
-// ============================================================================
 // Shared proto buffer ownership (rac_proto_buffer.h)
-// ============================================================================
 
 /// Matches `rac_proto_buffer_t`.
 base class RacProtoBuffer extends ffi.Struct {
@@ -55,9 +53,7 @@ typedef RacProtoBufferFreeDart = void Function(
   ffi.Pointer<RacProtoBuffer>,
 );
 
-// ============================================================================
 // Voice agent + LLM proto streaming
-// ============================================================================
 
 /// Matches `rac_voice_agent_proto_event_callback_fn` in
 /// `rac/features/voice_agent/rac_voice_event_abi.h`.
@@ -87,9 +83,7 @@ typedef RacLlmStreamProtoCallbackNative = ffi.Void Function(
   ffi.Pointer<ffi.Void>,
 );
 
-// ============================================================================
 // Generated-proto modality APIs
-// ============================================================================
 
 typedef RacLlmGenerateProtoNative = ffi.Int32 Function(
   ffi.Pointer<ffi.Uint8>,
@@ -467,9 +461,7 @@ typedef RacEmbeddingsInitializeDart = int Function(
   ffi.Pointer<Utf8>,
 );
 
-// ============================================================================
 // Tool-calling proto APIs
-// ============================================================================
 
 typedef RacToolCallProtoRequestNative = ffi.Int32 Function(
   ffi.Pointer<ffi.Uint8>,
@@ -525,9 +517,7 @@ typedef RacToolCallingSessionCancelProtoNative = ffi.Int32 Function(
 );
 typedef RacToolCallingSessionCancelProtoDart = int Function(int);
 
-// ============================================================================
 // Model format + artifact inference proto APIs
-// ============================================================================
 
 typedef RacModelFormatFromUrlProtoNative = ffi.Int32 Function(
   ffi.Pointer<ffi.Uint8>,
@@ -551,9 +541,7 @@ typedef RacArtifactInferFromUrlProtoDart = int Function(
   ffi.Pointer<RacProtoBuffer>,
 );
 
-// ============================================================================
 // STT stream lifecycle proto API
-// ============================================================================
 
 /// `void (*)(const uint8_t*, size_t, void*)` matching
 /// `rac_stt_stream_event_callback_fn`.
@@ -576,13 +564,11 @@ typedef RacSttTranscribeStreamLifecycleProtoDart = int Function(
   ffi.Pointer<ffi.Void>,
 );
 
-// ---------------------------------------------------------------------------
 // Chunk-feed streaming STT sessions (rac_stt_stream.h). Mirrors Swift
 // STTStreamSessionABI in CppBridge+STT.swift: register a per-handle proto
 // callback, start a session (serialized STTOptions in, session id out), feed
 // PCM frames, then stop (flush final) or cancel (drop). Teardown follows the
 // header contract: unset callback → rac_stt_proto_quiesce() → free user_data.
-// ---------------------------------------------------------------------------
 
 typedef RacSttComponentLoadModelNative = ffi.Int32 Function(
   ffi.Pointer<ffi.Void>,
@@ -642,9 +628,7 @@ typedef RacSttStreamFeedAudioProtoDart = int Function(
 typedef RacSttStreamFinishProtoNative = ffi.Int32 Function(ffi.Uint64);
 typedef RacSttStreamFinishProtoDart = int Function(int);
 
-// ============================================================================
 // Voice agent proto APIs (session + helpers + lifecycle-owned handle)
-// ============================================================================
 
 typedef RacVoiceAgentProcessTurnProto2Native = ffi.Int32 Function(
   ffi.Pointer<ffi.Void>,
@@ -692,9 +676,7 @@ typedef RacVoiceAgentComponentDestroyProtoDart = int Function(
   ffi.Pointer<ffi.Void>,
 );
 
-// ============================================================================
 // HTTP client (rac_http_client.h)
-// ============================================================================
 
 /// Matches `rac_http_header_kv_t`.
 base class RacHttpHeaderKv extends ffi.Struct {
@@ -779,9 +761,7 @@ typedef RacHttpDefaultHeadersDart = int Function(
   ffi.Pointer<ffi.Size>,
 );
 
-// ============================================================================
 // HTTP download (rac_http_download.h)
-// ============================================================================
 
 /// Matches `rac_http_download_request_t`.
 base class RacHttpDownloadRequest extends ffi.Struct {
@@ -827,9 +807,7 @@ typedef RacHttpDownloadExecuteDart = int Function(
   ffi.Pointer<ffi.Int32>,
 );
 
-// ============================================================================
 // Model registry proto-byte API (rac_model_registry.h)
-// ============================================================================
 //
 // Refresh is part of the proto-byte API: the only entry point is
 // `rac_model_registry_refresh_proto` (handle, ModelRegistryRefreshRequest
@@ -955,9 +933,7 @@ typedef RacModelRegistryImportProtoDart = int Function(
   ffi.Pointer<RacProtoBuffer>,
 );
 
-// ============================================================================
 // Model lifecycle proto-byte API (rac_model_lifecycle.h)
-// ============================================================================
 
 typedef RacModelLifecycleLoadProtoNative = ffi.Int32 Function(
   ffi.Pointer<ffi.Void>,
@@ -995,9 +971,7 @@ typedef RacComponentLifecycleSnapshotProtoDart = int Function(
 typedef RacModelLifecycleResetNative = ffi.Void Function();
 typedef RacModelLifecycleResetDart = void Function();
 
-// ============================================================================
 // Storage analyzer proto-byte API (rac_storage_analyzer.h)
-// ============================================================================
 
 typedef RacStorageCalculateDirSizeNative = ffi.Int64 Function(
   ffi.Pointer<Utf8>,
@@ -1088,9 +1062,7 @@ typedef RacStorageProtoDart = int Function(
   ffi.Pointer<RacProtoBuffer>,
 );
 
-// ============================================================================
 // Download proto-byte API (rac_download_orchestrator.h)
-// ============================================================================
 
 typedef RacDownloadProtoProgressCallbackNative = ffi.Void Function(
   ffi.Pointer<ffi.Uint8>,
@@ -1118,9 +1090,7 @@ typedef RacDownloadProtoDart = int Function(
   ffi.Pointer<RacProtoBuffer>,
 );
 
-// ============================================================================
 // SDK event stream proto-byte API (rac_sdk_event_stream.h)
-// ============================================================================
 
 typedef RacSdkEventCallbackNative = ffi.Void Function(
   ffi.Pointer<ffi.Uint8>,
@@ -1174,9 +1144,7 @@ typedef RacSdkEventPublishFailureDart = int Function(
   int,
 );
 
-// ============================================================================
 // Audio utils (rac_audio_utils.h)
-// ============================================================================
 
 /// Matches `rac_audio_compute_level_db(const float*, size_t, float*)` →
 /// `rac_result_t`. Centralises the RMS→dB DSP that used to be hand-rolled in
@@ -1192,10 +1160,8 @@ typedef RacAudioComputeLevelDbDart = int Function(
   ffi.Pointer<ffi.Float>,
 );
 
-// ============================================================================
 // SDK metadata + enum convenience helpers (rac_core.h / rac_environment.h /
 // rac_model_types.h / rac_tool_calling.h)
-// ============================================================================
 
 /// `const char* rac_sdk_get_version(void)` — canonical SDK semver string
 /// sourced from `sdk/runanywhere-commons/VERSION`.
@@ -1232,9 +1198,7 @@ typedef RacEnumToIntDart = int Function(int);
 typedef RacToolCallFormatHintNative = ffi.Pointer<Utf8> Function(ffi.Int32);
 typedef RacToolCallFormatHintDart = ffi.Pointer<Utf8> Function(int);
 
-// ============================================================================
 // Bindings facade
-// ============================================================================
 
 T? _lookupOptional<T extends Function>(T Function() lookup) {
   try {
@@ -2088,7 +2052,7 @@ class RacBindings {
               'rac_tool_call_format_hint_from_format_name'),
         );
 
-  // Shared proto buffers -----------------------------------------------------
+  // Shared proto buffers
 
   final RacProtoBufferInitDart rac_proto_buffer_init;
 
@@ -2100,11 +2064,11 @@ class RacBindings {
   /// translation lives in commons across every SDK.
   final RacResultToProtoErrorDart? rac_result_to_proto_error;
 
-  // Streaming callbacks ------------------------------------------------------
+  // Streaming callbacks
 
   final RacVoiceAgentSetProtoCallbackDart rac_voice_agent_set_proto_callback;
 
-  // Generated-proto modality APIs -------------------------------------------
+  // Generated-proto modality APIs
 
   final RacLlmGenerateProtoDart? rac_llm_generate_proto;
 
@@ -2233,7 +2197,7 @@ class RacBindings {
 
   final RacLifecycleRequestProtoDart? rac_lora_state_proto;
 
-  // HTTP client --------------------------------------------------------------
+  // HTTP client
 
   final RacHttpClientCreateDart rac_http_client_create;
 
@@ -2249,11 +2213,11 @@ class RacBindings {
   /// hard-coded defaults in adapters/http_client_adapter.dart when null.
   final RacHttpDefaultHeadersDart? rac_http_default_headers;
 
-  // HTTP download ------------------------------------------------------------
+  // HTTP download
 
   final RacHttpDownloadExecuteDart rac_http_download_execute;
 
-  // Model registry proto-byte API --------------------------------------------
+  // Model registry proto-byte API
 
   /// `rac_model_registry_refresh_proto` — the single refresh entry point.
   /// Takes a `ModelRegistryRefreshRequest` and returns a
@@ -2290,7 +2254,7 @@ class RacBindings {
 
   final RacHandleBytesToProtoDart? rac_model_registry_discover_proto;
 
-  // Model lifecycle proto-byte API ------------------------------------------
+  // Model lifecycle proto-byte API
 
   final RacModelLifecycleLoadProtoDart? rac_model_lifecycle_load_proto;
 
@@ -2304,7 +2268,7 @@ class RacBindings {
 
   final RacModelLifecycleResetDart? rac_model_lifecycle_reset;
 
-  // Storage analyzer proto-byte API -----------------------------------------
+  // Storage analyzer proto-byte API
 
   final RacStorageAnalyzerCreateDart? rac_storage_analyzer_create;
 
@@ -2318,7 +2282,7 @@ class RacBindings {
 
   final RacStorageProtoDart? rac_storage_analyzer_delete_proto;
 
-  // Download proto-byte API --------------------------------------------------
+  // Download proto-byte API
 
   final RacDownloadSetProgressProtoCallbackDart?
       rac_download_set_progress_proto_callback;
@@ -2333,7 +2297,7 @@ class RacBindings {
 
   final RacDownloadProtoDart? rac_download_progress_poll_proto;
 
-  // SDK event stream proto-byte API -----------------------------------------
+  // SDK event stream proto-byte API
 
   final RacSdkEventSubscribeDart? rac_sdk_event_subscribe;
 
@@ -2347,7 +2311,7 @@ class RacBindings {
 
   final RacSdkEventPublishFailureDart? rac_sdk_event_publish_failure;
 
-  // Tool-calling proto APIs --------------------------
+  // Tool-calling proto APIs
 
   final RacToolCallProtoRequestDart? rac_tool_call_parse_proto;
 
@@ -2368,18 +2332,18 @@ class RacBindings {
   final RacToolCallingSessionCancelProtoDart?
       rac_tool_calling_session_cancel_proto;
 
-  // Model format + artifact inference proto APIs -----------------
+  // Model format + artifact inference proto APIs
 
   final RacModelFormatFromUrlProtoDart? rac_model_format_from_url_proto;
 
   final RacArtifactInferFromUrlProtoDart? rac_artifact_infer_from_url_proto;
 
-  // STT stream lifecycle proto API -------------------------------
+  // STT stream lifecycle proto API
 
   final RacSttTranscribeStreamLifecycleProtoDart?
       rac_stt_transcribe_stream_lifecycle_proto;
 
-  // Chunk-feed streaming STT sessions (rac_stt_stream.h) ----------
+  // Chunk-feed streaming STT sessions (rac_stt_stream.h)
   // Null fields tolerate commons binaries that predate the exports.
 
   /// `rac_stt_component_load_model(handle, path, id, name)`.
@@ -2403,7 +2367,7 @@ class RacBindings {
   /// `rac_stt_stream_cancel_proto(session)` — immediate teardown.
   final RacSttStreamFinishProtoDart? rac_stt_stream_cancel_proto;
 
-  // Voice agent proto APIs -----------------------------------------
+  // Voice agent proto APIs
 
   final RacVoiceAgentProcessTurnProto2Dart? rac_voice_agent_process_turn_proto;
 
@@ -2445,14 +2409,14 @@ class RacBindings {
   final RacLifecycleRequestProtoDart?
       rac_structured_output_schema_to_json_proto;
 
-  // Audio utils (rac_audio_utils.h) -------------------------------
+  // Audio utils (rac_audio_utils.h)
 
   /// `rac_audio_compute_level_db` — RMS→dB DSP for level meters. Centralises
   /// the hand-rolled DSP that used to live in each platform SDK's audio
   /// capture manager. Null when the commons binary predates the export.
   final RacAudioComputeLevelDbDart? rac_audio_compute_level_db;
 
-  // Tool value ↔ JSON proto APIs (rac_tool_calling.h) -------------
+  // Tool value ↔ JSON proto APIs (rac_tool_calling.h)
 
   /// `rac_tool_value_to_json_proto` — serializes a `ToolValue` proto into a
   /// `ToolValueJSON` wrapper carrying the canonical JSON text. Null when the
@@ -2464,7 +2428,7 @@ class RacBindings {
   /// export.
   final RacLifecycleRequestProtoDart? rac_tool_value_from_json_proto;
 
-  // Per-modality proto-byte stream quiesce ABI ------------------------------
+  // Per-modality proto-byte stream quiesce ABI
   //
   // Each `rac_<modality>_proto_quiesce()` spin-waits until every in-flight
   // proto-byte stream dispatch on that modality has returned. Stream wrappers
@@ -2499,7 +2463,7 @@ class RacBindings {
   /// dispatches. Null when the loaded commons binary predates the export.
   final RacProtoQuiesceDart? rac_tool_calling_session_proto_quiesce;
 
-  // SDK metadata + enum convenience helpers ----------------------------------
+  // SDK metadata + enum convenience helpers
 
   /// `rac_sdk_get_version` — canonical SDK semver string from commons
   /// (mirrors Swift `SDKConstants.version`). Null on older binaries.

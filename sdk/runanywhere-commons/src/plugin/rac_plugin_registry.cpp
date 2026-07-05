@@ -167,9 +167,7 @@ void* take_dl_handle_locked(State& s, const std::string& name) {
 
 }  // namespace
 
-// =============================================================================
 // Public ABI
-// =============================================================================
 
 extern "C" {
 
@@ -619,9 +617,7 @@ size_t rac_plugin_count(void) noexcept {
     }
 }
 
-// =============================================================================
 // Internal: dl_handle bookkeeping (plugin_registry_internal.h)
-// =============================================================================
 
 void rac_plugin_registry_set_dl_handle(const char* name, void* handle) noexcept {
     /* C ABI boundary: noexcept. */
@@ -713,9 +709,7 @@ size_t rac_plugin_registry_snapshot_names(const char*** out_names) noexcept {
     }
 }
 
-// =============================================================================
 // Helpers from rac_primitive.h / rac_engine_vtable.h
-// =============================================================================
 
 const char* rac_primitive_name(rac_primitive_t p) {
     switch (p) {
@@ -751,9 +745,7 @@ const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt, rac_primitive_
     }
 }
 
-// =============================================================================
 // Legacy ABI shim — rac_service_register_provider
-// =============================================================================
 //
 // The unified plugin registry above replaces per-service provider
 // registration. However, older binaries (notably some Genie .so builds

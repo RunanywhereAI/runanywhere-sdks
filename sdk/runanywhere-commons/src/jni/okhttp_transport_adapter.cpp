@@ -49,9 +49,7 @@
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 
-// =============================================================================
 // AttachCurrentThread signature shim (same rationale as the core JNI file).
-// =============================================================================
 #ifdef __ANDROID__
 #define RAC_JNI_ATTACH_ENVPP(envpp) (envpp)
 #else
@@ -63,9 +61,7 @@ static const char* OKHTTP_TAG = "OkHttpTransport";
 #define LOGe(...) RAC_LOG_ERROR(OKHTTP_TAG, __VA_ARGS__)
 #define LOGw(...) RAC_LOG_WARNING(OKHTTP_TAG, __VA_ARGS__)
 
-// =============================================================================
 // Cached JVM handles. Populated in `okhttp_transport_register`.
-// =============================================================================
 namespace {
 
 struct OkHttpTransportGlobals {
@@ -336,9 +332,7 @@ inline uint64_t elapsed_ms_since(std::chrono::steady_clock::time_point start) {
         std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count());
 }
 
-// =============================================================================
 // Vtable callbacks
-// =============================================================================
 
 rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* req,
                                  rac_http_response_t* out_resp) {
@@ -834,9 +828,7 @@ rac_http_transport_ops_t kOps = {
 
 }  // namespace
 
-// =============================================================================
 // JNI entry points
-// =============================================================================
 //
 // Called from Kotlin's `RunAnywhereBridge.racHttpTransportRegisterOkHttp()`
 // during SDK init. Caches all the JVM handles we need, then installs the
@@ -1045,12 +1037,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportUnregis
     return static_cast<jint>(rc);
 }
 
-// -----------------------------------------------------------------------------
 // R3: deliverChunkNative — invoked by OkHttpTransport.executeStreamingRequest
 // for each chunk Okio reads off the wire. We translate the opaque jlongs
 // back into the real `rac_http_body_chunk_fn` + user-data pointers and
 // forward the bytes. Return false to tell Kotlin to cancel the call.
-// -----------------------------------------------------------------------------
 JNIEXPORT jboolean JNICALL
 Java_com_runanywhere_sdk_httptransport_OkHttpHttpTransport_deliverChunkNative(
     JNIEnv* env, jclass /*clazz*/, jlong native_callback, jlong native_user_data, jbyteArray chunk,

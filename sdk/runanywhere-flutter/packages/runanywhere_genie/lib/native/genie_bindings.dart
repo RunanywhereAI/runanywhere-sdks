@@ -154,9 +154,7 @@ class GenieBindings {
   }
 }
 
-// =============================================================================
 // FFI Type Definitions for Genie Backend
-// =============================================================================
 
 /// rac_result_t rac_backend_genie_register(void)
 typedef RacBackendGenieRegisterNative = Int32 Function();

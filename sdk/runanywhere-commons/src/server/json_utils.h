@@ -20,9 +20,7 @@ namespace json {
 
 using Json = nlohmann::json;
 
-// =============================================================================
 // SERIALIZATION (C types -> JSON)
-// =============================================================================
 
 /**
  * @brief Serialize a chat completion response to JSON
@@ -59,9 +57,7 @@ Json serializeToolCall(const rac_openai_tool_call_t& toolCall);
  */
 Json createErrorResponse(const std::string& message, const std::string& type, int code);
 
-// =============================================================================
 // STREAMING HELPERS
-// =============================================================================
 
 /**
  * @brief Format a chunk for SSE (Server-Sent Events)

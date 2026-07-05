@@ -89,7 +89,7 @@ State& state() {
     return s;
 }
 
-/* ===========================================================================
+/*
  * Plugin-callback exception barriers.
  *
  * `init`, `destroy`, and the dlsym'd `entry` symbol are all third-party
@@ -99,7 +99,7 @@ State& state() {
  * hierarchy doesn't round-trip) — a misbehaving plugin would otherwise abort
  * the entire host. Coerce any throw to a structured error / no-op log, the
  * same shape used by `rac_plugin_registry.cpp`'s capability_check guard.
- * =========================================================================== */
+ */
 
 /** Call a plugin callback that returns `rac_result_t`. On exception logs the
  *  failure and returns `on_throw` so the registry can map it to the caller-

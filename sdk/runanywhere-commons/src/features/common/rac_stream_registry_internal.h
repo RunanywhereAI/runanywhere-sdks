@@ -11,9 +11,6 @@
  *   - CallbackSlot<Fn>   (the per-handle callback record; Fn differs per modality)
  *   - SessionIdAllocator (one instance per TU keeps an independent id sequence)
  *   - InFlightGuard / ShutdownAwareInFlightGuard (quiesce-on-teardown counters)
- *
- * These collapse the byte-identical copies that previously lived inline in
- * rac_{llm,stt,tts,diffusion}_stream.cpp.
  */
 
 #ifndef RAC_FEATURES_COMMON_RAC_STREAM_REGISTRY_INTERNAL_H

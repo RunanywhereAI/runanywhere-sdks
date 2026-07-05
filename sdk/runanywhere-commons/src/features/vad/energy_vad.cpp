@@ -23,9 +23,7 @@
 #include "rac/core/rac_structured_error.h"
 #include "rac/features/vad/rac_vad_energy.h"
 
-// =============================================================================
 // INTERNAL STRUCTURE - Mirrors Swift's SimpleEnergyVADService properties
-// =============================================================================
 
 // Cache line size for alignment (64 bytes on most modern CPUs)
 static constexpr size_t CACHE_LINE_SIZE = 64;
@@ -94,9 +92,7 @@ struct rac_energy_vad {
 static_assert(sizeof(rac_energy_vad) <= 1024,
               "rac_energy_vad grew unexpectedly — check cache-line alignment groups");
 
-// =============================================================================
 // HELPER FUNCTIONS - Mirrors Swift's private methods
-// =============================================================================
 
 /**
  * Update threshold_sq whenever energy_threshold changes.
@@ -270,9 +266,7 @@ static void update_debug_statistics(rac_energy_vad* vad, const float energy) {
     }
 }
 
-// =============================================================================
 // PUBLIC API - Mirrors Swift's VADService methods
-// =============================================================================
 
 rac_result_t rac_energy_vad_create(const rac_energy_vad_config_t* config,
                                    rac_energy_vad_handle_t* out_handle) {

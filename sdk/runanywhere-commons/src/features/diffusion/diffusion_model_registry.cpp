@@ -24,9 +24,7 @@ namespace {
 
 const char* LOG_CAT = "DiffusionModelRegistry";
 
-// =============================================================================
 // BUILT-IN MODEL DEFINITIONS (CoreML only for now - iOS/macOS)
-// =============================================================================
 
 // SD 1.5 CoreML (iOS/macOS - uses Apple Neural Engine)
 static const rac_diffusion_model_def_t MODEL_SD15_COREML = {
@@ -87,9 +85,7 @@ static const rac_diffusion_model_def_t* BUILTIN_MODELS[] = {
 
 static const size_t BUILTIN_MODEL_COUNT = sizeof(BUILTIN_MODELS) / sizeof(BUILTIN_MODELS[0]);
 
-// =============================================================================
 // REGISTRY STATE
-// =============================================================================
 
 struct RegistryState {
     std::mutex mutex;
@@ -102,9 +98,7 @@ RegistryState& get_state() {
     return state;
 }
 
-// =============================================================================
 // PLATFORM DETECTION
-// =============================================================================
 
 uint32_t detect_current_platform() {
 #if defined(__APPLE__)
@@ -124,9 +118,7 @@ uint32_t detect_current_platform() {
 #endif
 }
 
-// =============================================================================
 // BUILT-IN STRATEGY IMPLEMENTATION
-// =============================================================================
 
 static rac_bool_t builtin_can_handle(const char* model_id, void* /*user_data*/) {
     if (!model_id)
@@ -228,9 +220,7 @@ static rac_diffusion_model_strategy_t BUILTIN_STRATEGY = {.name = "BuiltIn",
 
 }  // anonymous namespace
 
-// =============================================================================
 // PUBLIC API IMPLEMENTATION
-// =============================================================================
 
 extern "C" {
 

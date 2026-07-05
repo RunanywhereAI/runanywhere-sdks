@@ -166,7 +166,7 @@ SHERPA_DIR="${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux"
 if [ -d "${SHERPA_DIR}/lib" ] && [ "$CLEAN_BUILD" = false ]; then
     print_success "Sherpa-ONNX already downloaded"
 else
-    "${RAC_COMMONS_DIR}/scripts/linux/download-sherpa-onnx.sh"
+    "${RAC_COMMONS_DIR}/../../scripts/build/deps/download-sherpa-onnx.sh" linux
 fi
 
 # =============================================================================
@@ -181,7 +181,7 @@ RAC_DIST="${RAC_COMMONS_DIR}/dist/linux/${ARCH}"
 if [ -f "${RAC_DIST}/librac_commons.so" ] && [ "$CLEAN_BUILD" = false ]; then
     print_success "runanywhere-commons already built"
 else
-    "${RAC_COMMONS_DIR}/scripts/build-linux.sh" --shared
+    "${RAC_COMMONS_DIR}/../../scripts/build/linux.sh" --shared
 fi
 
 # Verify libraries exist

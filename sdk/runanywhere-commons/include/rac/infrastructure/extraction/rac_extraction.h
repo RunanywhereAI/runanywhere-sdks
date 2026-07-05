@@ -25,9 +25,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // EXTRACTION OPTIONS
-// =============================================================================
 
 /**
  * @brief Options for archive extraction.
@@ -63,9 +61,7 @@ static const rac_extraction_options_t RAC_EXTRACTION_OPTIONS_DEFAULT = {
 };
 #endif
 
-// =============================================================================
 // EXTRACTION RESULT
-// =============================================================================
 
 /**
  * @brief Result of an extraction operation.
@@ -93,9 +89,7 @@ typedef struct rac_model_extraction_result {
     rac_archive_type_t archive_type;
 } rac_model_extraction_result_t;
 
-// =============================================================================
 // EXTRACTION PROGRESS CALLBACK
-// =============================================================================
 
 /**
  * @brief Progress callback for extraction.
@@ -108,9 +102,7 @@ typedef struct rac_model_extraction_result {
 typedef void (*rac_extraction_progress_fn)(int32_t files_extracted, int32_t total_files,
                                            int64_t bytes_extracted, void* user_data);
 
-// =============================================================================
 // EXTRACTION API
-// =============================================================================
 
 /**
  * @brief Extract an archive using native libarchive.

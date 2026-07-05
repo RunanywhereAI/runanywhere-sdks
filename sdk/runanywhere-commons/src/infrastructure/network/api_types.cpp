@@ -14,9 +14,7 @@
 // Simple JSON building helpers (no external dependencies)
 // For production, consider using a proper JSON library like nlohmann/json
 
-// =============================================================================
 // Memory Management
-// =============================================================================
 
 void rac_auth_response_free(rac_auth_response_t* response) {
     if (!response)
@@ -40,9 +38,7 @@ void rac_api_error_free(rac_api_error_t* error) {
     memset(error, 0, sizeof(*error));
 }
 
-// =============================================================================
 // JSON Building Helpers
-// =============================================================================
 
 // Escape string for JSON
 static void json_escape_string(const char* src, char* dst, size_t dst_size) {
@@ -126,9 +122,7 @@ static int json_add_bool(char* buf, size_t buf_size, size_t* pos, const char* ke
     return 0;
 }
 
-// =============================================================================
 // JSON Parsing Helpers (Simple hand-rolled parser)
-// =============================================================================
 
 // Find value for key in JSON object (returns pointer to value start)
 static const char* json_find_value(const char* json, const char* key) {
@@ -228,9 +222,7 @@ static bool json_extract_bool(const char* json, const char* key, bool default_va
     return default_val;
 }
 
-// =============================================================================
 // Auth Request/Response Serialization
-// =============================================================================
 
 char* rac_auth_request_to_json(const rac_auth_request_t* request) {
     if (!request)
@@ -299,9 +291,7 @@ char* rac_refresh_request_to_json(const rac_refresh_request_t* request) {
     return rac_strdup(buf);
 }
 
-// =============================================================================
 // Error Parsing
-// =============================================================================
 
 int rac_api_error_from_response(int status_code, const char* body, const char* url,
                                 rac_api_error_t* out_error) {

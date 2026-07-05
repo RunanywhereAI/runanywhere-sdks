@@ -22,9 +22,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // MESSAGE ROLES
-// =============================================================================
 
 /**
  * @brief Message role in a conversation
@@ -54,9 +52,7 @@ static inline const char* rac_openai_role_to_string(rac_openai_role_t role) {
     }
 }
 
-// =============================================================================
 // CHAT MESSAGE
-// =============================================================================
 
 /**
  * @brief A single message in a chat conversation
@@ -77,9 +73,7 @@ typedef struct rac_openai_message {
     const char* name;
 } rac_openai_message_t;
 
-// =============================================================================
 // TOOL / FUNCTION CALLING
-// =============================================================================
 
 /**
  * @brief JSON Schema parameter definition
@@ -154,9 +148,7 @@ typedef struct rac_openai_tool_call {
     const char* function_arguments;
 } rac_openai_tool_call_t;
 
-// =============================================================================
 // CHAT COMPLETION REQUEST
-// =============================================================================
 
 /**
  * @brief Chat completion request
@@ -224,9 +216,7 @@ static const rac_openai_chat_request_t RAC_OPENAI_CHAT_REQUEST_DEFAULT = {
     .tool_choice = RAC_NULL,
     .user = RAC_NULL};
 
-// =============================================================================
 // CHAT COMPLETION RESPONSE
-// =============================================================================
 
 /**
  * @brief Finish reason for generation
@@ -329,9 +319,7 @@ typedef struct rac_openai_chat_response {
     const char* system_fingerprint;
 } rac_openai_chat_response_t;
 
-// =============================================================================
 // STREAMING CHUNK
-// =============================================================================
 
 /**
  * @brief Delta content in streaming chunk
@@ -385,9 +373,7 @@ typedef struct rac_openai_stream_chunk {
     size_t num_choices;
 } rac_openai_stream_chunk_t;
 
-// =============================================================================
 // MODELS ENDPOINT
-// =============================================================================
 
 /**
  * @brief Model information
@@ -420,9 +406,7 @@ typedef struct rac_openai_models_response {
     size_t num_data;
 } rac_openai_models_response_t;
 
-// =============================================================================
 // MEMORY MANAGEMENT
-// =============================================================================
 
 /**
  * @brief Free a chat response

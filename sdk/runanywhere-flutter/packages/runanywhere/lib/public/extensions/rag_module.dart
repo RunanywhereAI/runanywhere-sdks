@@ -40,16 +40,12 @@ import 'package:runanywhere/native/dart_bridge_rag.dart';
 class RAGModule {
   RAGModule._();
 
-  // ============================================================================
   // Registration State
-  // ============================================================================
 
   static bool _isRegistered = false;
   static final _logger = SDKLogger('RAGModule');
 
-  // ============================================================================
   // Registration (matches LlamaCpp.register() pattern)
-  // ============================================================================
 
   /// Register the RAG backend with the C++ service registry.
   ///

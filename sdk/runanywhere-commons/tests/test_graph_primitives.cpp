@@ -50,9 +50,7 @@ static int g_passed = 0;
     }                                                   \
     static void test_##name()
 
-// ---------------------------------------------------------------------------
 // CancelToken
-// ---------------------------------------------------------------------------
 
 TEST(cancel_token_basic) {
     auto t = std::make_shared<CancelToken>();
@@ -109,9 +107,7 @@ TEST(cancel_token_multithreaded_cancel) {
     CHECK(t->is_cancelled());
 }
 
-// ---------------------------------------------------------------------------
 // RingBuffer
-// ---------------------------------------------------------------------------
 
 TEST(ring_buffer_push_pop) {
     RingBuffer<int> rb(4);
@@ -173,9 +169,7 @@ TEST(ring_buffer_spsc_concurrent) {
     CHECK(rb.empty());
 }
 
-// ---------------------------------------------------------------------------
 // StreamEdge
-// ---------------------------------------------------------------------------
 
 TEST(stream_edge_drop_newest) {
     StreamEdge<int> edge(2, OverflowPolicy::DropNewest);
@@ -315,9 +309,7 @@ TEST(stream_edge_producer_consumer_parallel) {
         CHECK(received[i] == i);
 }
 
-// ---------------------------------------------------------------------------
 // Main
-// ---------------------------------------------------------------------------
 
 int main() {
     try {

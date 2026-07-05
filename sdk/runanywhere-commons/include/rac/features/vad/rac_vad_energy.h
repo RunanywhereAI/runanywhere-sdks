@@ -25,12 +25,10 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // CONSTANTS - Mirrors Swift's VADConstants
 // NOTE: Core constants (RAC_VAD_DEFAULT_SAMPLE_RATE, RAC_VAD_DEFAULT_FRAME_LENGTH,
 //       RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_CALIBRATION_MULTIPLIER)
 //       are defined in rac_vad_types.h
-// =============================================================================
 
 /** Frames of voice needed to start speech (normal mode) */
 #define RAC_VAD_VOICE_START_THRESHOLD 1
@@ -62,9 +60,7 @@ extern "C" {
 /** Maximum recent values for statistics */
 #define RAC_VAD_MAX_RECENT_VALUES 50
 
-// =============================================================================
 // TYPES
-// =============================================================================
 
 /**
  * @brief Opaque handle for energy VAD service.
@@ -145,9 +141,7 @@ typedef void (*rac_speech_activity_callback_fn)(rac_speech_activity_event_t even
 typedef void (*rac_audio_buffer_callback_fn)(const void* audio_data, size_t audio_size,
                                              void* user_data);
 
-// =============================================================================
 // LIFECYCLE API - Mirrors Swift's VADService protocol
-// =============================================================================
 
 /**
  * @brief Create an energy VAD service.
@@ -209,9 +203,7 @@ RAC_API rac_result_t rac_energy_vad_stop(rac_energy_vad_handle_t handle);
  */
 RAC_API rac_result_t rac_energy_vad_reset(rac_energy_vad_handle_t handle);
 
-// =============================================================================
 // PROCESSING API
-// =============================================================================
 
 /**
  * @brief Process raw audio data for voice activity detection.
@@ -239,9 +231,7 @@ RAC_API rac_result_t rac_energy_vad_process_audio(rac_energy_vad_handle_t handle
  */
 RAC_API float rac_energy_vad_calculate_rms(const float* __restrict audio_data, size_t sample_count);
 
-// =============================================================================
 // PAUSE/RESUME API
-// =============================================================================
 
 /**
  * @brief Pause VAD processing.
@@ -263,9 +253,7 @@ RAC_API rac_result_t rac_energy_vad_pause(rac_energy_vad_handle_t handle);
  */
 RAC_API rac_result_t rac_energy_vad_resume(rac_energy_vad_handle_t handle);
 
-// =============================================================================
 // CALIBRATION API
-// =============================================================================
 
 /**
  * @brief Start automatic calibration to determine ambient noise level.
@@ -300,9 +288,7 @@ RAC_API rac_result_t rac_energy_vad_is_calibrating(rac_energy_vad_handle_t handl
 RAC_API rac_result_t rac_energy_vad_set_calibration_multiplier(rac_energy_vad_handle_t handle,
                                                                float multiplier);
 
-// =============================================================================
 // TTS FEEDBACK PREVENTION API
-// =============================================================================
 
 /**
  * @brief Notify VAD that TTS is about to start playing.
@@ -338,9 +324,7 @@ RAC_API rac_result_t rac_energy_vad_notify_tts_finish(rac_energy_vad_handle_t ha
 RAC_API rac_result_t rac_energy_vad_set_tts_multiplier(rac_energy_vad_handle_t handle,
                                                        float multiplier);
 
-// =============================================================================
 // STATE QUERY API
-// =============================================================================
 
 /**
  * @brief Check if speech is currently active.
@@ -409,9 +393,7 @@ RAC_API rac_result_t rac_energy_vad_get_sample_rate(rac_energy_vad_handle_t hand
 RAC_API rac_result_t rac_energy_vad_get_frame_length_samples(rac_energy_vad_handle_t handle,
                                                              int32_t* out_frame_length);
 
-// =============================================================================
 // CALLBACK API
-// =============================================================================
 
 /**
  * @brief Set speech activity callback.

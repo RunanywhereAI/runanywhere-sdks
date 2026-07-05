@@ -33,11 +33,11 @@ set(SHERPA_DIR "${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux")
 
 # Verify directories exist
 if(NOT EXISTS "${RAC_DIST_DIR}")
-    message(FATAL_ERROR "runanywhere-commons not built. Run: cd ${RAC_COMMONS_DIR} && ./scripts/build-linux.sh --shared")
+    message(FATAL_ERROR "runanywhere-commons not built. Run: cd ${RAC_COMMONS_DIR}/../.. && ./scripts/build/linux.sh --shared")
 endif()
 
 if(NOT EXISTS "${SHERPA_DIR}")
-    message(FATAL_ERROR "Sherpa-ONNX not downloaded. Run: cd ${RAC_COMMONS_DIR} && ./scripts/linux/download-sherpa-onnx.sh")
+    message(FATAL_ERROR "Sherpa-ONNX not downloaded. Run: cd ${RAC_COMMONS_DIR}/../.. && ./scripts/build/deps/download-sherpa-onnx.sh linux")
 endif()
 
 # =============================================================================

@@ -1,0 +1,135 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Smoke fixture for the four convenience generators
+// (generate_{swift,kotlin,dart,ts}_convenience.py).
+//
+// pass2-syn-056: the live IDL only exercises rac_required against a single
+// string field and rac_min/max against int32 sample_rate fields, leaving
+// the int64, float, double, and bool code paths in the per-language
+// emitters dormant. This fixture deliberately applies every rac_* option
+// across every annotation-bearing scalar type (STRING / INT32 / INT64 /
+// FLOAT / DOUBLE / BOOL) plus an ENUM with rac_display_name /
+// rac_analytics_key / rac_wire_string so the generator output exercises
+// the full matrix.
+//
+// The fixture is loaded by scripts/codegen/tests/test_convenience_generators.py
+// which builds a FileDescriptorSet against this file (+ rac_options.proto)
+// and invokes each generator's emit functions, diffing the result against
+// the per-language goldens at scripts/codegen/tests/golden/*.expected.
+//
+// IMPORTANT: this proto is NOT part of the production IDL set — it lives
+// under scripts/codegen/tests/fixtures/ deliberately so that generate_all.sh
+// (which scans idl/*.proto) never sees it. Keeping it isolated avoids
+// polluting the real SDK convenience outputs with TestFoo / TestBar
+// symbols.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "rac_options.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "RacTestOptionsProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ----------------------------------------------------------------------------
+// Enum exercising rac_display_name + rac_analytics_key + rac_wire_string.
+// ----------------------------------------------------------------------------
+enum RacTestMode {
+    RAC_TEST_MODE_UNSPECIFIED = 0 [
+        (runanywhere.v1.rac_display_name)  = "Unspecified",
+        (runanywhere.v1.rac_analytics_key) = "unspecified",
+        (runanywhere.v1.rac_wire_string)   = "unspecified"
+    ];
+    RAC_TEST_MODE_FAST = 1 [
+        (runanywhere.v1.rac_display_name)  = "Fast",
+        (runanywhere.v1.rac_analytics_key) = "fast",
+        (runanywhere.v1.rac_wire_string)   = "fast"
+    ];
+    RAC_TEST_MODE_BALANCED = 2 [
+        (runanywhere.v1.rac_display_name)  = "Balanced",
+        (runanywhere.v1.rac_analytics_key) = "balanced",
+        (runanywhere.v1.rac_wire_string)   = "balanced"
+    ];
+    RAC_TEST_MODE_ACCURATE = 3 [
+        (runanywhere.v1.rac_display_name)  = "Accurate",
+        (runanywhere.v1.rac_analytics_key) = "accurate",
+        (runanywhere.v1.rac_wire_string)   = "accurate"
+    ];
+}
+
+// ----------------------------------------------------------------------------
+// Nested message used by RacTestConfig.embedded_message_field to exercise
+// the MESSAGE type path in defaults() / validate(). No annotations: this
+// is intentionally a plain message so the generators must skip emitting
+// validation/default literals against it.
+// ----------------------------------------------------------------------------
+message RacTestNested {
+    string label = 1;
+    int32  count = 2;
+}
+
+// ----------------------------------------------------------------------------
+// Single message that touches every relevant annotation × type combination.
+// ----------------------------------------------------------------------------
+message RacTestConfig {
+    // STRING — rac_default + rac_required.
+    string name_string = 1 [
+        (runanywhere.v1.rac_default)  = "default-name",
+        (runanywhere.v1.rac_required) = true
+    ];
+
+    // INT32 — rac_default + rac_min + rac_max.
+    int32 retries_int32 = 2 [
+        (runanywhere.v1.rac_default) = "3",
+        (runanywhere.v1.rac_min)     = 0,
+        (runanywhere.v1.rac_max)     = 10
+    ];
+
+    // INT64 — rac_default + rac_min + rac_max. Exercises the Int64 / Long
+    // / fixnum code paths in _convenience_common.to_default_literal (lines
+    // 492-512) that are otherwise dead until an int64 field adopts rac_*.
+    int64 limit_int64 = 3 [
+        (runanywhere.v1.rac_default) = "1024",
+        (runanywhere.v1.rac_min)     = 1,
+        (runanywhere.v1.rac_max)     = 65536
+    ];
+
+    // FLOAT — rac_default + rac_min_float + rac_max_float.
+    float threshold_float = 4 [
+        (runanywhere.v1.rac_default)   = "0.5",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
+
+    // DOUBLE — rac_default + rac_min_float + rac_max_float.
+    double precision_double = 5 [
+        (runanywhere.v1.rac_default)   = "0.7",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
+
+    // BOOL — rac_default + rac_required. The bool/required combo is the
+    // edge case behind hotspot-conv-003 (bool-validate divergence).
+    bool enable_feature_bool = 6 [
+        (runanywhere.v1.rac_default)  = "true",
+        (runanywhere.v1.rac_required) = true
+    ];
+
+    // ENUM — rac_default referencing an enum constant; exercises enum-case
+    // mapping in to_default_literal across the four target languages.
+    RacTestMode mode_enum = 7 [
+        (runanywhere.v1.rac_default) = "RAC_TEST_MODE_BALANCED"
+    ];
+
+    // MESSAGE — no rac_* annotations; the message-type path should NOT emit
+    // defaults/validate logic for this field (generators only touch
+    // annotated fields).
+    RacTestNested embedded_message_field = 8;
+}

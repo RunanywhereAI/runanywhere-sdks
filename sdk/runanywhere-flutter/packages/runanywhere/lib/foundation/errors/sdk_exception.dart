@@ -48,10 +48,8 @@ class SDKException implements Exception {
   @override
   String toString() => 'SDKException(${error.code.name}): ${error.message}';
 
-  // ---------------------------------------------------------------------------
   // Factory constructors mirroring the legacy hand-rolled `SDKError` API.
   // Call sites stay readable (`throw SDKException.notInitialized()`).
-  // ---------------------------------------------------------------------------
 
   static SDKException _build({
     required pb_enum.ErrorCode code,
@@ -421,9 +419,7 @@ class SDKException implements Exception {
         message: message ?? 'VLM generation was cancelled.',
       );
 
-  // ---------------------------------------------------------------------------
   // Swift-parity helpers
-  // ---------------------------------------------------------------------------
 
   /// Generic factory (mirrors Swift `SDKException.make`).
   ///

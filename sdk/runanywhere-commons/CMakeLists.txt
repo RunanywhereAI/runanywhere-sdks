@@ -13,20 +13,23 @@ project(RunAnywhereCommons
     DESCRIPTION "RunAnywhere Commons - Standalone infrastructure library for ML inference SDKs"
 )
 
-# =============================================================================
+# OBJC must be enabled at the root project (not in a subdirectory) or the
+# Makefiles/Ninja generators compile vendored llama.cpp ggml-metal *.m as
+# Objective-C++, which rejects its C-style implicit pointer conversions.
+if(APPLE)
+    enable_language(OBJC)
+    enable_language(OBJCXX)
+endif()
+
 # ABOUT THIS LIBRARY
-# =============================================================================
 #
 # rac_commons is a STANDALONE library that provides:
 #   - Logging, error handling, and event tracking
 #   - Service registry and provider infrastructure
 #   - Model management (download strategies, storage)
 #   - Platform backend (Apple Foundation Models, System TTS) on Apple platforms
-# =============================================================================
 
-# =============================================================================
 # OPTIONS
-# =============================================================================
 
 option(RAC_BUILD_JNI "Build JNI bridge for Android/JVM" OFF)
 option(RAC_BUILD_TESTS "Build unit tests" OFF)
@@ -43,6 +46,68 @@ option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, RAG)" OFF)
 # native case where the variable is otherwise unset.
 if(NOT DEFINED EMSCRIPTEN)
     set(EMSCRIPTEN "")
+endif()
+
+option(RAC_BUILD_CLI "Build the rcli desktop CLI (sdk/runanywhere-cli)" OFF)
+
+set(RAC_SANITIZER "" CACHE STRING "Enable a sanitizer: '', 'asan', 'tsan', 'ubsan'")
+set_property(CACHE RAC_SANITIZER PROPERTY STRINGS "" asan tsan ubsan)
+
+# WebAssembly knobs are cached here, before the engine subdirectories run,
+# so commons/engines see the final values.
+if(EMSCRIPTEN)
+    option(RAC_WASM_PTHREADS    "Enable pthreads in the WebAssembly target" OFF)
+    option(RAC_WASM_DEBUG       "Enable debug assertions/logging in the WebAssembly target" OFF)
+    option(RAC_WASM_BUILD_CORE  "Build the commons-only Web SDK WASM target" OFF)
+    option(RAC_WASM_LLAMACPP    "Build the WebAssembly target with llama.cpp (LLM + VLM)" OFF)
+    option(RAC_WASM_ONNX        "Build the WebAssembly target with ONNX/sherpa support" OFF)
+    option(RAC_WASM_WEBGPU      "Enable WebGPU acceleration for the WebAssembly target" OFF)
+
+    set(RAC_BUILD_JNI OFF CACHE BOOL "" FORCE)
+    set(RAC_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(RAC_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+    set(RAC_BUILD_PLATFORM OFF CACHE BOOL "" FORCE)
+
+    if(RAC_WASM_LLAMACPP OR RAC_WASM_ONNX)
+        set(RAC_BUILD_BACKENDS ON CACHE BOOL "" FORCE)
+    else()
+        set(RAC_BUILD_BACKENDS OFF CACHE BOOL "" FORCE)
+    endif()
+
+    set(RAC_BACKEND_LLAMACPP ${RAC_WASM_LLAMACPP} CACHE BOOL "" FORCE)
+    set(RAC_BACKEND_ONNX ${RAC_WASM_ONNX} CACHE BOOL "" FORCE)
+
+    if(RAC_WASM_LLAMACPP)
+        set(GGML_METAL OFF CACHE BOOL "" FORCE)
+        set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+        set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+        set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
+        set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
+        set(GGML_SYCL OFF CACHE BOOL "" FORCE)
+        set(GGML_KOMPUTE OFF CACHE BOOL "" FORCE)
+        set(GGML_RPC OFF CACHE BOOL "" FORCE)
+        set(GGML_ACCELERATE OFF CACHE BOOL "" FORCE)
+        set(GGML_NEON OFF CACHE BOOL "" FORCE)
+        set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+        set(GGML_LLAMAFILE OFF CACHE BOOL "" FORCE)
+        set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+        set(GGML_CPU_HBM OFF CACHE BOOL "" FORCE)
+        if(RAC_WASM_WEBGPU)
+            set(GGML_WEBGPU ON CACHE BOOL "" FORCE)
+            set(GGML_WEBGPU_JSPI ON CACHE BOOL "" FORCE)
+        else()
+            set(GGML_WEBGPU OFF CACHE BOOL "" FORCE)
+            set(GGML_WEBGPU_JSPI OFF CACHE BOOL "" FORCE)
+        endif()
+        set(LLAMA_WASM_MEM64 OFF CACHE BOOL "" FORCE)
+        set(LLAMA_BUILD_HTML OFF CACHE BOOL "" FORCE)
+        set(LLAMA_WASM_SINGLE_FILE OFF CACHE BOOL "" FORCE)
+    endif()
+
+    if(RAC_WASM_ONNX)
+        set(ORT_USE_COREML OFF CACHE BOOL "" FORCE)
+        set(ORT_USE_NNAPI OFF CACHE BOOL "" FORCE)
+    endif()
 endif()
 
 # Per-engine RAC_BACKEND_<name> options now live in engines/<name>/CMakeLists.txt.
@@ -87,15 +152,13 @@ option(RAC_DESKTOP_ADAPTER "Build desktop (macOS/Linux) platform adapter + libcu
 # canonical `.proto` sources live at repo-root `idl/*.proto`, and drift
 # between the two is a recurring problem.
 #
-# With RAC_REGENERATE_PROTO=ON, the build reruns `idl/codegen/generate_cpp.sh`
+# With RAC_REGENERATE_PROTO=ON, the build reruns `scripts/codegen/generate_cpp.sh`
 # whenever any `idl/*.proto` file is newer than `src/generated/proto/.gen-stamp`,
 # writing fresh `.pb.{cc,h}` back into the committed tree. Dev loop only —
 # CI stays OFF so it compiles exactly what is in git.
 option(RAC_REGENERATE_PROTO "Regenerate C++ proto sources from idl/*.proto when out of date (dev only)" OFF)
 
-# =============================================================================
 # C++ CONFIGURATION
-# =============================================================================
 
 # C++20 is required because MSVC does not implement C++17 designated initializers
 # (e.g. `struct S s = {.field = value};`) — the codebase uses them in several
@@ -126,9 +189,7 @@ include(LoadVersions)
 # Make project version available to subdirectories
 set(RAC_PROJECT_VERSION "${RAC_VERSION}" CACHE STRING "Project version" FORCE)
 
-# =============================================================================
 # PLATFORM DETECTION
-# =============================================================================
 
 if(EMSCRIPTEN)
     set(RAC_PLATFORM_WASM TRUE)
@@ -154,9 +215,7 @@ endif()
 
 message(STATUS "Platform: ${RAC_PLATFORM_NAME}")
 
-# =============================================================================
 # SHARED DEPENDENCIES (FetchContent)
-# =============================================================================
 
 include(FetchContent)
 
@@ -191,7 +250,6 @@ if(NOT DEFINED LIBARCHIVE_VERSION)
     set(LIBARCHIVE_VERSION "3.8.1")
 endif()
 
-# -----------------------------------------------------------------------------
 # Zlib: Bundle from source when system zlib is not available.
 # Windows (MSVC) and some cross-compilation targets don't ship zlib.
 # We try system first; if not found, build from source so libarchive gets it.
@@ -210,7 +268,6 @@ endif()
 # static zlib is on the libarchive include + link path, so its config.h
 # defines HAVE_ZLIB_H and the in-process inflate filter wins the bidder
 # competition before the program() fallback can register.
-# -----------------------------------------------------------------------------
 set(_RAC_FORCE_BUNDLED_ZLIB OFF)
 if(EMSCRIPTEN OR ANDROID OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(_RAC_FORCE_BUNDLED_ZLIB ON)
@@ -334,7 +391,6 @@ else()
     message(STATUS "Using system zlib: ${ZLIB_LIBRARIES}")
 endif()
 
-# -----------------------------------------------------------------------------
 # BZip2: Bundle from source for cross-compilation targets
 # Android NDK and Emscripten don't ship libbz2. macOS/iOS have it in the SDK.
 # We try system first; if not found, build from source so libarchive gets it.
@@ -346,7 +402,6 @@ endif()
 # bzlib decoder guarantees `HAVE_BZLIB_H` is defined in libarchive's config.h,
 # which keeps the bidder competition resolved to the in-process filter and
 # never registers the program() fallback.
-# -----------------------------------------------------------------------------
 set(_RAC_FORCE_BUNDLED_BZIP2 OFF)
 if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(_RAC_FORCE_BUNDLED_BZIP2 ON)
@@ -500,7 +555,6 @@ if(TARGET zlibstatic AND TARGET archive_static)
     target_include_directories(archive_static PRIVATE ${zlib_src_SOURCE_DIR} ${zlib_src_BINARY_DIR})
 endif()
 
-# -----------------------------------------------------------------------------
 # Configure-time assertion that libarchive's
 # generated config.h has HAVE_ZLIB_H defined on every cross-compile target
 # where the platform CANNOT fork+exec /usr/bin/gzip. Without this, an
@@ -519,7 +573,6 @@ endif()
 # state). Surface that class of regression here, while we still have a CMake
 # error path, rather than after the .wasm has shipped and OPFS extraction
 # fails inside the browser.
-# -----------------------------------------------------------------------------
 if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(_RAC_LIBARCHIVE_CONFIG_H "${libarchive_BINARY_DIR}/config.h")
     if(EXISTS "${_RAC_LIBARCHIVE_CONFIG_H}")
@@ -600,9 +653,7 @@ endif()
 
 message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
 
-# =============================================================================
 # HTTP transport (libcurl removed)
-# =============================================================================
 # The native `rac_http_client_*` C ABI no longer bundles libcurl or any
 # TLS backend. Every SDK registers a platform HTTP transport adapter
 # via `rac_http_transport_register` during init (OkHttp on Android,
@@ -615,9 +666,7 @@ message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
 # whatever stack the adapter uses (the OS system store on every native
 # target, the browser on WASM).
 
-# =============================================================================
 # SERVER DEPENDENCIES (FetchContent)
-# =============================================================================
 
 if(RAC_BUILD_SERVER)
     # cpp-httplib - header-only HTTP library (same as llama.cpp uses)
@@ -633,9 +682,7 @@ if(RAC_BUILD_SERVER)
     message(STATUS "Server dependencies ready")
 endif()
 
-# =============================================================================
 # COMPILER FLAGS
-# =============================================================================
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter)
@@ -662,19 +709,31 @@ elseif(MSVC)
     )
 endif()
 
-# =============================================================================
+if(RAC_SANITIZER)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        message(WARNING "RAC_SANITIZER=${RAC_SANITIZER} requires Clang or GCC; ignored on ${CMAKE_CXX_COMPILER_ID}")
+    elseif(NOT RAC_SANITIZER MATCHES "^(asan|tsan|ubsan)$")
+        message(FATAL_ERROR "RAC_SANITIZER='${RAC_SANITIZER}' is not one of: asan tsan ubsan")
+    else()
+        set(_rac_san_map_asan address)
+        set(_rac_san_map_tsan thread)
+        set(_rac_san_map_ubsan undefined)
+        set(_rac_san "-fsanitize=${_rac_san_map_${RAC_SANITIZER}}")
+        add_compile_options(${_rac_san} -fno-omit-frame-pointer)
+        add_link_options(${_rac_san})
+        message(STATUS "Sanitizer: ${RAC_SANITIZER} (${_rac_san})")
+    endif()
+endif()
+
 # 16KB Page Alignment for Android 15+ (API 35) Compliance
 # Required starting November 1, 2025 for Google Play submissions
 # All shared libraries must have PT_LOAD segments aligned to 16KB
-# =============================================================================
 if(ANDROID)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384")
     message(STATUS "Enabled 16KB page alignment for Android (Google Play requirement)")
 endif()
 
-# =============================================================================
 # AUTO-GENERATE DEVELOPMENT CONFIG IF MISSING
-# =============================================================================
 # development_config.cpp is git-ignored because it can contain secrets.
 # For CI builds or fresh checkouts, we auto-generate a stub from the template.
 
@@ -692,9 +751,7 @@ if(NOT EXISTS "${DEV_CONFIG_FILE}")
     endif()
 endif()
 
-# =============================================================================
 # SOURCE FILES
-# =============================================================================
 
 # Core sources - logging, errors, time, memory, events
 set(RAC_CORE_SOURCES
@@ -835,19 +892,6 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # non-templated GraphScheduler has a .cpp to compile here.
     src/graph/graph_scheduler.cpp
 )
-
-# Built-in CPU runtime. The runtime registry explicitly calls
-# rac_runtime_entry_cpu() during bootstrap. Standalone commons builds compile
-# the TU directly; root monorepo builds fold in the runtimes/cpu OBJECT target
-# after add_subdirectory(runtimes), so compiling it here as well duplicates
-# rac_runtime_entry_cpu and the CPU provider symbols.
-set(RAC_CPU_RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../runtimes/cpu")
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR
-   AND EXISTS "${RAC_CPU_RUNTIME_DIR}/rac_runtime_cpu.cpp")
-    list(APPEND RAC_INFRASTRUCTURE_SOURCES
-        "${RAC_CPU_RUNTIME_DIR}/rac_runtime_cpu.cpp"
-    )
-endif()
 
 # Feature sources - LLM, STT, TTS, VAD, Wake Word, VLM, Diffusion (iOS/Apple only)
 set(RAC_FEATURES_SOURCES
@@ -1035,9 +1079,7 @@ set(RAC_COMMONS_SOURCES
     ${RAC_SOLUTIONS_STUB_SOURCES}
 )
 
-# =============================================================================
 # RAC COMMONS LIBRARY
-# =============================================================================
 
 if(RAC_BUILD_SHARED)
     add_library(rac_commons SHARED ${RAC_COMMONS_SOURCES})
@@ -1255,15 +1297,12 @@ if(RAC_DESKTOP_ADAPTER)
     target_link_libraries(rac_commons PUBLIC CURL::libcurl)
 endif()
 
-# =============================================================================
 # Reproducible proto C++ codegen
-# =============================================================================
 # Committed `.pb.{cc,h}` pairs in `src/generated/proto/` must stay in sync with
 # `idl/*.proto`. When RAC_REGENERATE_PROTO=ON AND `protoc` is on-path, rerun
-# `idl/codegen/generate_cpp.sh` whenever any `.proto` is newer than the
+# `scripts/codegen/generate_cpp.sh` whenever any `.proto` is newer than the
 # `.gen-stamp` marker. CI / release builds leave RAC_REGENERATE_PROTO=OFF
 # (default) and use the committed files as-is — no protoc dependency.
-# =============================================================================
 
 if(RAC_REGENERATE_PROTO)
     find_program(RAC_PROTOC_EXE protoc)
@@ -1276,7 +1315,7 @@ if(RAC_REGENERATE_PROTO)
         # repo root = two levels up from sdk/runanywhere-commons/
         get_filename_component(_RAC_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
         set(_RAC_IDL_DIR "${_RAC_REPO_ROOT}/idl")
-        set(_RAC_IDL_CODEGEN "${_RAC_IDL_DIR}/codegen/generate_cpp.sh")
+        set(_RAC_IDL_CODEGEN "${_RAC_REPO_ROOT}/scripts/codegen/generate_cpp.sh")
         set(_RAC_PROTO_OUT "${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto")
         set(_RAC_PROTO_STAMP "${_RAC_PROTO_OUT}/.gen-stamp")
 
@@ -1302,7 +1341,6 @@ if(RAC_REGENERATE_PROTO)
     endif()
 endif()
 
-# =============================================================================
 # Protobuf runtime — gates RAC_HAVE_PROTOBUF
 #
 # Protobuf-backed native ABIs are used directly by Swift/Flutter/Kotlin/RN/Web
@@ -1310,7 +1348,6 @@ endif()
 # other serialized-byte calls. Keep this independent from the Solutions API:
 # Solutions consume protobuf too, but disabling Solutions must not silently turn
 # every exported proto ABI symbol into a RAC_ERROR_FEATURE_NOT_AVAILABLE stub.
-# =============================================================================
 
 if(EMSCRIPTEN)
     set(RAC_ENABLE_PROTOBUF_DEFAULT OFF)
@@ -1479,7 +1516,7 @@ if(RAC_ENABLE_PROTOBUF)
         if(NOT EXISTS "${_rac_proto_source}")
             message(FATAL_ERROR
                 "RAC_ENABLE_PROTOBUF=ON but generated proto source is missing: "
-                "${_rac_proto_source}. Run idl/codegen/generate_cpp.sh or disable "
+                "${_rac_proto_source}. Run scripts/codegen/generate_cpp.sh or disable "
                 "RAC_ENABLE_PROTOBUF.")
         endif()
     endforeach()
@@ -1604,9 +1641,7 @@ if(RAC_PLATFORM_WINDOWS)
     target_link_libraries(rac_commons PUBLIC ws2_32 shlwapi)
 endif()
 
-# =============================================================================
 # Plugin Loading Mode (static vs. dynamic)
-# =============================================================================
 # Two paths share one plugin entry-point convention:
 #   - STATIC: plugin TUs compiled directly into rac_commons; registration
 #     happens at process start via RAC_STATIC_PLUGIN_REGISTER(<name>).
@@ -1641,9 +1676,7 @@ set_target_properties(rac_commons PROPERTIES
     CXX_EXTENSIONS OFF
 )
 
-# =============================================================================
 # JNI BRIDGE (Android/JVM)
-# =============================================================================
 
 if(RAC_BUILD_JNI)
     # Make JNI headers available project-wide so CLion can resolve jni.h
@@ -1677,7 +1710,6 @@ if(RAC_BUILD_JNI)
     endif()
 endif()
 
-# =============================================================================
 # COMMONS-LOCAL BACKENDS (RAG)
 #
 # Engine plugins (LlamaCPP, ONNX, MetalRT)
@@ -1685,7 +1717,6 @@ endif()
 # add_subdirectory(engines) path. Commons no longer instantiates or forwards
 # engine targets — only commons-local OBJECT libraries (RAG) are folded into
 # rac_commons below.
-# =============================================================================
 
 # Decouple RAG from RAC_BUILD_BACKENDS so the proto C ABI symbols
 # (`rac_rag_query_proto` etc.) referenced from src/solutions/operators/
@@ -1715,9 +1746,7 @@ if(RAC_BACKEND_RAG
     target_compile_definitions(rac_commons PRIVATE RAC_HAVE_RAG=1)
 endif()
 
-# =============================================================================
 # SERVER (OpenAI-compatible HTTP Server)
-# =============================================================================
 
 if(RAC_BUILD_SERVER)
     message(STATUS "Building OpenAI-compatible HTTP server...")
@@ -1733,18 +1762,60 @@ if(RAC_BUILD_SERVER)
     endif()
 endif()
 
-# =============================================================================
 # TESTS
-# =============================================================================
 
 if(RAC_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
 
-# =============================================================================
+# RUNTIMES + ENGINES (plugin subdirectories)
+
+# L1 compute-runtime plugins (CPU always; Metal/CoreML/ONNXRT adapters).
+add_subdirectory(runtimes)
+
+# Engine plugins (llamacpp, sherpa, onnx, metalrt, genie, coreml, cloud).
+# Each engine self-gates on its RAC_BACKEND_<NAME> option.
+add_subdirectory(engines)
+
+# Fold the built-in CPU runtime's OBJECTs into rac_commons so there is no
+# separate librac_runtime_cpu to ship.
+if(TARGET rac_runtime_cpu)
+    target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_runtime_cpu>)
+endif()
+
+# MetalRT is an OBJECT library (closed-source engine); fold its objects into
+# rac_commons so Apple SDKs get a single commons archive.
+if(TARGET rac_backend_metalrt)
+    target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)
+    if(TARGET rac_runtime_metal)
+        target_link_libraries(rac_commons PUBLIC rac_runtime_metal)
+    endif()
+    if(APPLE)
+        target_link_libraries(rac_commons PUBLIC
+            "-framework Metal"
+            "-framework Foundation"
+            "-framework Accelerate"
+        )
+    endif()
+    if(DEFINED RAC_METALRT_ENGINE_LIB AND RAC_METALRT_ENGINE_LIB)
+        target_link_libraries(rac_commons PUBLIC ${RAC_METALRT_ENGINE_LIB})
+    endif()
+endif()
+
+# WASM wrapper — composes rac_commons + enabled engines into the JS/WASM
+# artifacts consumed by sdk/runanywhere-web-next.
+if(EMSCRIPTEN
+   AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../runanywhere-web-next/wasm/CMakeLists.txt")
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../runanywhere-web-next/wasm" wasm)
+endif()
+
+# rcli desktop CLI. Added after engines/ because it links rac_backend_* targets.
+if(RAC_BUILD_CLI)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../runanywhere-cli" rcli)
+endif()
+
 # INSTALLATION
-# =============================================================================
 
 install(TARGETS rac_commons
     LIBRARY DESTINATION lib
@@ -1756,9 +1827,7 @@ install(DIRECTORY include/
     FILES_MATCHING PATTERN "*.h"
 )
 
-# =============================================================================
 # CONFIGURATION SUMMARY
-# =============================================================================
 
 message(STATUS "")
 message(STATUS "====================================")

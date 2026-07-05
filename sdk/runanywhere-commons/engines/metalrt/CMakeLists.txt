@@ -1,0 +1,170 @@
+# MetalRT Backend — Apple-only (iOS/macOS)
+#
+# RESERVED / EXPERIMENTAL: metalrt is a reserved-for-future engine, not a live
+# boundary member. It wraps a private, CLOSED-SOURCE MetalRT lib, is OFF by
+# default (RAC_BACKEND_METALRT=OFF), and compiles to a not-routable stub when the
+# engine binary is absent (RAC_METALRT_ENGINE_AVAILABLE=0). Documented in
+# engines/AGENTS.md ("Stubs & reserved engines"); see there before wiring it.
+#
+# The MetalRT engine (libmetalrt_engine.a + metalrt_c_api.h) is a private,
+# closed-source dependency. This CMakeLists supports two modes:
+#
+#   1) Engine NOT available (default in the public repo):
+#      - RAC_METALRT_ENGINE_AVAILABLE is OFF.
+#      - The public stub header and stub source under stubs/ are compiled in.
+#      - Every metalrt_* symbol resolves to a no-op returning a sentinel.
+#      - The public repo links cleanly. At runtime, the wrappers + vtable
+#        registration short-circuit to RAC_ERROR_BACKEND_UNAVAILABLE before
+#        invoking these stubs. The plugin entry also rejects registration and
+#        exposes NULL primitive slots so routing never chooses a stub backend.
+#
+#   2) Engine IS available (internal / authorized builds):
+#      - RAC_METALRT_ENGINE_AVAILABLE=ON.
+#      - METALRT_ROOT must point at the private MetalRT project.
+#      - The real metalrt_c_api.h from METALRT_ROOT/src is used; stubs are
+#        skipped. libmetalrt_engine.a is linked via find_library (REQUIRED).
+#      - Configure fails hard if the engine is claimed-available but missing,
+#        consistent with how llamacpp/onnx handle missing deps.
+
+# MetalRT is an OBJECT library (folded into rac_commons), which
+# doesn't fit the rac_add_engine_plugin() macro's STATIC/SHARED branching.
+# We keep the hand-rolled add_library(... OBJECT) but emit the engine
+# metadata via GLOBAL properties directly (matching what the macro records
+# for the other engines).
+
+# Per-engine build toggle owned locally. Apple-only — force OFF
+# elsewhere so non-Apple builds don't accidentally enable it.
+if(APPLE)
+    option(RAC_BACKEND_METALRT "Build MetalRT backend (custom Metal GPU kernels, Apple only)" OFF)
+else()
+    set(RAC_BACKEND_METALRT OFF CACHE BOOL "" FORCE)
+endif()
+if(NOT RAC_BACKEND_METALRT)
+    return()
+endif()
+
+if(NOT TARGET rac_runtime_metal)
+    message(FATAL_ERROR "RAC_BACKEND_METALRT requires rac_runtime_metal.")
+endif()
+
+option(RAC_METALRT_ENGINE_AVAILABLE
+    "Link the private MetalRT engine (libmetalrt_engine.a). OFF = compile stubs only."
+    OFF)
+
+set(METALRT_WRAPPER_SOURCES
+    rac_llm_metalrt.cpp
+    rac_stt_metalrt.cpp
+    rac_tts_metalrt.cpp
+    rac_vlm_metalrt.cpp
+    rac_backend_metalrt_register.cpp
+    rac_plugin_entry_metalrt.cpp
+)
+
+add_library(rac_backend_metalrt OBJECT ${METALRT_WRAPPER_SOURCES})
+set_target_properties(rac_backend_metalrt PROPERTIES
+    CXX_STANDARD          17
+    CXX_STANDARD_REQUIRED ON
+)
+
+target_include_directories(rac_backend_metalrt PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..  # engines/ — for engines/common/rac_engine_unavailable.h
+)
+
+target_compile_definitions(rac_backend_metalrt PRIVATE RAC_METALRT_BUILDING)
+
+# Tooling metadata for `cmake -t graphviz/json` parity with
+# rac_add_engine_plugin()-managed engines. Runtimes/formats are NOT declared
+# here — the C manifest (k_metalrt_runtimes/formats[] in
+# rac_plugin_entry_metalrt.cpp) is the single source the router reads.
+set_property(GLOBAL APPEND PROPERTY RAC_REGISTERED_ENGINES metalrt)
+
+if(RAC_METALRT_ENGINE_AVAILABLE)
+    # Real engine path — MetalRT project must be present and built.
+    if(NOT DEFINED METALRT_ROOT)
+        # Default: assume MetalRT is sibling to runanywhere-sdks
+        set(METALRT_ROOT "${CMAKE_SOURCE_DIR}/../../../../../MetalRT" CACHE PATH "Path to MetalRT project root")
+    endif()
+
+    set(METALRT_INCLUDE_DIR "${METALRT_ROOT}/src" CACHE PATH "Path to metalrt_c_api.h")
+
+    if(DEFINED METALRT_LIB_DIR)
+        set(_metalrt_lib_dir "${METALRT_LIB_DIR}")
+    else()
+        set(_metalrt_lib_dir "${METALRT_ROOT}/build")
+    endif()
+
+    # NO_CMAKE_FIND_ROOT_PATH: the engine is built locally, not inside the iOS sysroot.
+    find_library(METALRT_ENGINE_LIB
+        NAMES metalrt_engine
+        PATHS ${_metalrt_lib_dir}
+        NO_DEFAULT_PATH
+        NO_CMAKE_FIND_ROOT_PATH
+        REQUIRED
+    )
+
+    message(STATUS "MetalRT: engine AVAILABLE, linking ${METALRT_ENGINE_LIB}")
+    target_include_directories(rac_backend_metalrt PRIVATE ${METALRT_INCLUDE_DIR})
+    target_compile_definitions(rac_backend_metalrt PRIVATE RAC_METALRT_ENGINE_AVAILABLE=1)
+
+    # The parent CMakeLists folds this target's objects into rac_commons; the
+    # engine .a needs to be linked onto rac_commons from the parent scope so
+    # that the OBJECT target's undefined symbols resolve in the final archive.
+    set(RAC_METALRT_ENGINE_LIB ${METALRT_ENGINE_LIB} PARENT_SCOPE)
+else()
+    # Stub path — public-repo default. Compile the stub .c file so every
+    # metalrt_* symbol resolves to a no-op. No external dependency.
+    message(STATUS "MetalRT: engine not available — compiling stubs")
+    target_sources(rac_backend_metalrt PRIVATE stubs/metalrt_c_api_stub.c)
+    target_include_directories(rac_backend_metalrt PRIVATE stubs)
+    target_compile_definitions(rac_backend_metalrt PRIVATE RAC_METALRT_ENGINE_AVAILABLE=0)
+endif()
+
+# Apple frameworks are always needed on this target (the wrappers reference
+# Metal-framework types in some paths even without the engine).
+target_link_libraries(rac_backend_metalrt PRIVATE
+    rac_runtime_metal
+    "-framework Metal"
+    "-framework Foundation"
+    "-framework Accelerate"
+)
+
+# Self-registration shim — installs the MetalRT vtable into the unified
+# plugin registry via a file-scope ctor. Without this,
+# `rac_backend_metalrt_register()` has zero call sites in the monorepo
+# and routes pinned to RAC_FRAMEWORK_METALRT for any of LLM / STT / TTS
+# / VLM cannot resolve. Mirrors the carrier pattern used by llamacpp /
+# the coreml engine.
+#
+# Static path only: when RAC_STATIC_PLUGINS=ON (iOS / WASM hosts), the
+# ctor lands inside rac_commons so it runs before main(). The MetalRT
+# OBJECT library above is also folded into rac_commons by the root
+# CMakeLists.txt, so by the time the ctor fires, the symbols backing
+# `rac_backend_metalrt_register()` are present in the same archive.
+#
+# Note: in stub-mode (RAC_METALRT_ENGINE_AVAILABLE=0) the register
+# function emits a single startup warning and marks the backend as
+# registered without installing a route, so the ctor is safe to fire
+# unconditionally.
+if(RAC_STATIC_PLUGINS)
+    if(NOT TARGET rac_commons)
+        message(FATAL_ERROR "engines/metalrt: rac_commons target not found. "
+                            "Did you call this before the commons root CMakeLists configured rac_commons?")
+    endif()
+    target_sources(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_metalrt.cpp
+    )
+    target_include_directories(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+endif()
+
+if(APPLE AND TARGET rac_backend_metalrt)
+    include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+    rac_add_plugin_entry_test(test_plugin_entry_metalrt
+        TEST_NAME plugin_entry_metalrt_tests
+        SOURCE ${CMAKE_SOURCE_DIR}/tests/test_plugin_entry_metalrt.cpp
+    )
+endif()

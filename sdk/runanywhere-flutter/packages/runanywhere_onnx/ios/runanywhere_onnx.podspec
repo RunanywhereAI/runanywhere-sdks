@@ -5,7 +5,7 @@
 # via ONNX Runtime + Sherpa-ONNX) into Flutter iOS apps.
 #
 # The xcframework is staged into this plugin's ios/Frameworks/ directory by
-# sdk/runanywhere-swift/scripts/build-core-xcframework.sh → sync_flutter_frameworks().
+# scripts/build/ios-xcframework.sh → sync_flutter_frameworks().
 #
 # Note: as of v0.19.0 the ONNX Runtime C library is statically linked
 # directly into RABackendONNX.a — no separate onnxruntime.xcframework is
@@ -37,7 +37,7 @@ RABackendONNX.xcframework.
   s.dependency 'runanywhere'
 
   # =============================================================================
-  # Vendored xcframeworks (built by sdk/runanywhere-swift/scripts/build-core-xcframework.sh)
+  # Vendored xcframeworks (built by scripts/build/ios-xcframework.sh)
   # =============================================================================
   # RABackendONNX provides the ONNX Runtime engine.
   # RABackendSherpa provides STT/TTS/VAD via sherpa-onnx — its plugin entry

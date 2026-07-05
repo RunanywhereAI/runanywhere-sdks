@@ -27,9 +27,7 @@
 #include "sdk_events.pb.h"
 #endif
 
-// =============================================================================
 // INTERNAL STRUCTURES
-// =============================================================================
 
 struct rac_telemetry_manager {
     // Configuration
@@ -72,9 +70,7 @@ struct rac_telemetry_manager {
     int64_t last_flush_time_ms = 0;                // Track last flush time for timeout
 };
 
-// =============================================================================
 // HELPER FUNCTIONS
-// =============================================================================
 
 namespace {
 
@@ -226,9 +222,7 @@ const char* component_to_modality(runanywhere::v1::SDKComponent component, bool 
 
 }  // namespace
 
-// =============================================================================
 // LIFECYCLE
-// =============================================================================
 
 rac_telemetry_manager_t* rac_telemetry_manager_create(rac_environment_t env, const char* device_id,
                                                       const char* platform,
@@ -342,9 +336,7 @@ rac_result_t rac_telemetry_manager_poll_http_request(rac_telemetry_manager_t* ma
     return rac_proto_buffer_copy(framed.data(), framed.size(), out);
 }
 
-// =============================================================================
 // EVENT TRACKING
-// =============================================================================
 
 rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
                                          const rac_telemetry_payload_t* payload) {
@@ -1317,9 +1309,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
 
 #endif  // RAC_HAVE_PROTOBUF
 
-// =============================================================================
 // FLUSH
-// =============================================================================
 
 rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
     if (!manager) {

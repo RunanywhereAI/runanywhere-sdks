@@ -34,9 +34,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // TYPES
-// =============================================================================
 
 /**
  * @brief Opaque handle preserving the create/destroy ABI.
@@ -150,9 +148,7 @@ typedef rac_bool_t (*rac_http_body_chunk_fn)(const uint8_t* chunk, size_t chunk_
                                              uint64_t total_written, uint64_t content_length,
                                              void* user_data);
 
-// =============================================================================
 // LIFECYCLE
-// =============================================================================
 
 /**
  * @brief Create a client instance. The handle preserves the stable ABI
@@ -169,9 +165,7 @@ RAC_API rac_result_t rac_http_client_create(rac_http_client_t** out);
  */
 RAC_API void rac_http_client_destroy(rac_http_client_t* c);
 
-// =============================================================================
 // REQUESTS
-// =============================================================================
 
 /**
  * @brief Send a blocking request, buffer full body into `out_resp`.
@@ -224,9 +218,7 @@ RAC_API rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_htt
  */
 RAC_API void rac_http_response_free(rac_http_response_t* resp);
 
-// =============================================================================
 // REQUEST OPTIONS — UPSERT MODE
-// =============================================================================
 
 /**
  * @brief Configures a request for Supabase-style upsert mode.
@@ -267,9 +259,7 @@ RAC_API void rac_http_response_free(rac_http_response_t* resp);
 RAC_API rac_result_t rac_http_request_set_upsert_mode(rac_http_request_t* req,
                                                       const char* on_conflict_field);
 
-// =============================================================================
 // CANONICAL DEFAULT HEADERS
-// =============================================================================
 
 /**
  * @brief Returns commons' canonical default header list.
@@ -302,9 +292,7 @@ RAC_API rac_result_t rac_http_request_set_upsert_mode(rac_http_request_t* req,
 RAC_API rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_kvs,
                                               size_t* out_count);
 
-// =============================================================================
 // RESULT CODES
-// =============================================================================
 // Consumers only need to check against RAC_SUCCESS; the other
 // result codes come from rac/core/rac_error.h. For convenience:
 //
@@ -317,7 +305,6 @@ RAC_API rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_k
 //   RAC_ERROR_CANCELLED             — chunk callback returned RAC_FALSE
 //   RAC_ERROR_FEATURE_NOT_AVAILABLE — no platform transport registered
 //   RAC_ERROR_INTERNAL              — adapter internal error
-// =============================================================================
 
 #ifdef __cplusplus
 }

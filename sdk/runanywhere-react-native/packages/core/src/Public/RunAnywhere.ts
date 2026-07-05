@@ -68,9 +68,7 @@ import { SDKException } from '../Foundation/Errors/SDKException';
 
 const logger = new SDKLogger('RunAnywhere');
 
-// ============================================================================
 // Internal State
-// ============================================================================
 
 let initState: InitializationState = createInitialState();
 let servicesInitPromise: Promise<void> | null = null;
@@ -140,23 +138,17 @@ function environmentToConfigString(environment: SDKEnvironment): string {
 // Lifecycle INITIALIZATION_STAGE_* events are published once by commons
 // (rac_sdk_init_phase1_proto); RN no longer hand-emits duplicates.
 
-// ============================================================================
 // RunAnywhere SDK
-// ============================================================================
 
 /**
  * The RunAnywhere SDK for React Native
  */
 export const RunAnywhere = {
-  // ============================================================================
   // Event Access
-  // ============================================================================
 
   events: EventBus.shared,
 
-  // ============================================================================
   // SDK State
-  // ============================================================================
 
   get isInitialized(): boolean {
     return initState.isCoreInitialized;
@@ -174,9 +166,7 @@ export const RunAnywhere = {
     return SDKConstants.version;
   },
 
-  // ============================================================================
   // SDK Initialization
-  // ============================================================================
 
   async initialize(options: SDKInitOptions = {}): Promise<void> {
     // Idempotency guard — mirrors Swift `guard !isInitializedFlag else { return }`.
@@ -376,7 +366,6 @@ export const RunAnywhere = {
     }
   },
 
-  // ============================================================================
   // Authentication Info (Production/Staging only)
   // Matches Swift SDK: RunAnywhere.getUserId(), getOrganizationId(), etc.
   //
@@ -396,7 +385,6 @@ export const RunAnywhere = {
   //
   // Swift reference:
   //   sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift:66,82-91
-  // ============================================================================
 
   /**
    * Get current user ID from authentication.
@@ -487,9 +475,7 @@ export const RunAnywhere = {
     return this.getDeviceId();
   },
 
-  // ============================================================================
   // Logging (Delegated to Extension)
-  // ============================================================================
 
   configureLogging: Logging.configureLogging,
   setLocalLoggingEnabled: Logging.setLocalLoggingEnabled,
@@ -499,31 +485,23 @@ export const RunAnywhere = {
   setDebugMode: Logging.setDebugMode,
   flushLogs: Logging.flushLogs,
 
-  // ============================================================================
   // Plugin Loader — canonical RunAnywhere.pluginLoader namespace
-  // ============================================================================
 
   pluginLoader: PluginLoaderCapability,
 
-  // ============================================================================
   // Text Generation - LLM (Swift-shaped public extension)
-  // ============================================================================
 
   generate: TextGeneration.generate,
   generateStream: TextGeneration.generateStream,
   aggregateStream: TextGeneration.aggregateStream,
   cancelGeneration: TextGeneration.cancelGeneration,
 
-  // ============================================================================
   // Speech-to-Text (Swift-shaped public extension)
-  // ============================================================================
 
   transcribe: STT.transcribe,
   transcribeStream: STT.transcribeStream,
 
-  // ============================================================================
   // Text-to-Speech (Swift-shaped public extension)
-  // ============================================================================
 
   synthesize: TTS.synthesize,
   synthesizeStream: TTS.synthesizeStream,
@@ -531,17 +509,13 @@ export const RunAnywhere = {
   speak: TTS.speak,
   stopSpeaking: TTS.stopSpeaking,
 
-  // ============================================================================
   // Voice Activity Detection (Swift-shaped public extension)
-  // ============================================================================
 
   detectVoiceActivity: VAD.detectVoiceActivity,
   streamVAD: VAD.streamVAD,
   resetVAD: VAD.resetVAD,
 
-  // ============================================================================
   // Voice Agent (Swift-shaped public extension)
-  // ============================================================================
 
   initializeVoiceAgent: VoiceAgent.initializeVoiceAgent,
   initializeVoiceAgentWithLoadedModels: VoiceAgent.initializeVoiceAgentWithLoadedModels,
@@ -552,18 +526,14 @@ export const RunAnywhere = {
   streamVoiceAgent: VoiceAgent.streamVoiceAgent,
   cleanupVoiceAgent: VoiceAgent.cleanupVoiceAgent,
 
-  // ============================================================================
   // Structured Output (Swift-shaped public extension)
-  // ============================================================================
 
   generateStructured: StructuredOutput.generateStructured,
   generateStructuredStream: StructuredOutput.generateStructuredStream,
   generateWithStructuredOutput: StructuredOutput.generateWithStructuredOutput,
   extractStructuredOutput: StructuredOutput.extractStructuredOutput,
 
-  // ============================================================================
   // Tool Calling (Swift-shaped public extension)
-  // ============================================================================
 
   registerTool: ToolCalling.registerTool,
   unregisterTool: ToolCalling.unregisterTool,
@@ -572,24 +542,18 @@ export const RunAnywhere = {
   executeTool: ToolCalling.executeTool,
   generateWithTools: ToolCalling.generateWithTools,
 
-  // ============================================================================
   // Vision Language Model (Swift-shaped public extension)
-  // ============================================================================
 
   processImage: VLM.processImage,
   processImageStream: VLM.processImageStream,
   cancelVLMGeneration: VLM.cancelVLMGeneration,
 
-  // ============================================================================
   // LoRA Adapters — canonical `RunAnywhere.lora.*` namespace
   // Matches Swift: RunAnywhere+LoRA.swift
-  // ============================================================================
 
   lora: LoRACapability,
 
-  // ============================================================================
   // RAG Pipeline (Delegated to Extension)
-  // ============================================================================
 
   ragCreatePipeline: RAG.ragCreatePipeline,
   ragDestroyPipeline: RAG.ragDestroyPipeline,
@@ -602,34 +566,26 @@ export const RunAnywhere = {
   ragGetStatistics: RAG.ragGetStatistics,
   ragResolvedConfiguration: RAG.ragResolvedConfiguration,
 
-  // ============================================================================
   // Solutions (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
   // Capability shape: `RunAnywhere.solutions.run({ config | configBytes | yaml })`
   // returns a `SolutionHandle` with start / stop / cancel / feed / closeInput /
   // destroy verbs. Mirrors the namespace exposed by every other RunAnywhere SDK.
-  // ============================================================================
 
   solutions: SolutionsCapability,
 
-  // ============================================================================
   // Embeddings — canonical `RunAnywhere.embeddings.*` namespace
   // Matches Swift: RunAnywhere+Embeddings.swift
-  // ============================================================================
 
   embeddings: EmbeddingsCapability,
 
-  // ============================================================================
   // Audio conversion helpers (PCM16 → Float32 / WAV)
   // Matches Swift: RAAudioConvert.swift
-  // ============================================================================
 
   pcm16ToFloat32: AudioConvert.pcm16ToFloat32,
   pcm16ToFloat32Samples: AudioConvert.pcm16ToFloat32Samples,
   pcm16ToWav: AudioConvert.pcm16ToWav,
 
-  // ============================================================================
   // Model Management (Delegated to Extension) — Swift parity
-  // ============================================================================
 
   registerModel: ModelManagement.registerModel,
   registerModelFromUrl: ModelManagement.registerModelFromUrl,
@@ -646,15 +602,11 @@ export const RunAnywhere = {
   getDefaultFramework: ModelManagement.getDefaultFramework,
   inferModelFileRole: ModelManagement.inferModelFileRole,
 
-  // ============================================================================
   // Display helpers (proxies for commons C ABI tables)
-  // ============================================================================
 
   formatFramework,
 
-  // ============================================================================
   // Storage Management (Delegated to Extension)
-  // ============================================================================
 
   getStorageInfo: Storage.getStorageInfo,
   deleteStorage: Storage.deleteStorage,
@@ -662,9 +614,7 @@ export const RunAnywhere = {
   clearCache: Storage.clearCache,
   cleanTempFiles: Storage.cleanTempFiles,
 
-  // ============================================================================
   // Canonical SDK Events / Lifecycle (proto-byte native truth)
-  // ============================================================================
 
   subscribeSDKEvents: SDKEvents.subscribeSDKEvents,
   publishSDKEvent: SDKEvents.publishSDKEvent,
@@ -678,7 +628,6 @@ export const RunAnywhere = {
 
 };
 
-// ============================================================================
 // Internal Phase-2 guard — mirrors Swift RunAnywhere.ensureServicesReady() and
 // Kotlin RunAnywhere.ensureServicesReady(). Three branches:
 //   1. Fast path: services + HTTP both done → return immediately (O(1)).
@@ -686,7 +635,6 @@ export const RunAnywhere = {
 //      without re-running Phase 2. Keeps local-model inference alive after an
 //      offline boot while re-authenticating transparently once online.
 //   3. Cold-start path: Phase 2 not yet run → completeServicesInitialization().
-// ============================================================================
 
 async function retryHTTPSetupInternal(): Promise<void> {
   if (!isNativeModuleAvailable()) {

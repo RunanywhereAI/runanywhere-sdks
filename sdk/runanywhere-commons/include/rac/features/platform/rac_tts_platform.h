@@ -25,9 +25,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // TYPES
-// =============================================================================
 
 /** Opaque handle to platform TTS service */
 typedef struct rac_tts_platform* rac_tts_platform_handle_t;
@@ -60,9 +58,7 @@ typedef struct rac_tts_platform_options {
     void* reserved;
 } rac_tts_platform_options_t;
 
-// =============================================================================
 // SWIFT CALLBACK TYPES
-// =============================================================================
 
 /**
  * Callback to check if platform TTS can handle a voice ID.
@@ -129,9 +125,7 @@ typedef struct rac_platform_tts_callbacks {
     void* user_data;
 } rac_platform_tts_callbacks_t;
 
-// =============================================================================
 // CALLBACK REGISTRATION
-// =============================================================================
 
 /**
  * Sets the Swift callbacks for platform TTS operations.
@@ -156,9 +150,7 @@ RAC_API const rac_platform_tts_callbacks_t* rac_platform_tts_get_callbacks(void)
  */
 RAC_API rac_bool_t rac_platform_tts_is_available(void);
 
-// =============================================================================
 // SERVICE API
-// =============================================================================
 
 /**
  * Creates a platform TTS service.

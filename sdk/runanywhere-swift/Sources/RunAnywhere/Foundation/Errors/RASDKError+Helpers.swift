@@ -46,9 +46,8 @@ extension RASDKError {
     /// Map a `rac_result_t` to a proto `RASDKError` via the canonical
     /// commons ABI `rac_result_to_proto_error`. Returns nil for `RAC_SUCCESS`.
     ///
-    /// Replaces the hand-written switch tables previously in
-    /// `CommonsErrorMapping.swift`; the commons implementation is the single
-    /// source of truth shared by every platform SDK.
+    /// The commons implementation is the single source of truth shared by
+    /// every platform SDK.
     public static func from(rcResult result: rac_result_t) -> RASDKError? {
         guard result != RAC_SUCCESS else { return nil }
         var outBuffer = rac_proto_buffer_t()

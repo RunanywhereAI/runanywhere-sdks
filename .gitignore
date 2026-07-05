@@ -91,48 +91,14 @@ iOSInjectionProject/
 # PR-local verification artifacts belong outside the repo.
 verification/
 
-# IDE - IntelliJ IDEA / Android Studio
-# User-specific stuff
-.idea/workspace.xml
-.idea/tasks.xml
-.idea/usage.statistics.xml
-.idea/dictionaries
-.idea/shelf
-.idea/ChatHistory*.xml
-.idea/discord.xml
-.idea/editor.xml
-.idea/deviceManager.xml
-
-# Generated files
-.idea/caches/
-.idea/libraries/
-.idea/artifacts/
-.idea/compiler.xml
-.idea/jarRepositories.xml
-.idea/modules.xml
-.idea/*.iml
-.idea/modules
+# IDE - IntelliJ IDEA / Android Studio (all .idea ignored; root keeps shared run configs)
+**/.idea/
+!/.idea/
+/.idea/*
+!/.idea/runConfigurations/
+!/.idea/vcs.xml
 *.iml
 *.ipr
-
-# Gradle and JDK specific (contain machine-specific paths)
-.idea/gradle.xml
-.idea/misc.xml
-
-# Keep shared configurations
-!.idea/runConfigurations/
-!.idea/vcs.xml
-
-# Android Studio specific
-.idea/.gitignore
-.idea/markdown.xml
-.idea/AndroidProjectSystem.xml
-.idea/appInsightsSettings.xml
-.idea/deploymentTargetSelector.xml
-.idea/kotlinc.xml
-.idea/migrations.xml
-.idea/inspectionProfiles/
-.idea/runConfigurations.xml
 
 # Local gradle properties (machine-specific)
 gradle.properties
@@ -430,3 +396,4 @@ sdk/runanywhere-commons/examples/solutions/README.md
 tests/streaming/README.md
 tests/streaming/cancel_parity/README.md
 tests/streaming/perf_bench/README.md
+/thoughts/

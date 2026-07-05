@@ -13,9 +13,7 @@
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_error.h"
 
-// -----------------------------------------------------------------------------
 // Test: silence -> -100 dB floor
-// -----------------------------------------------------------------------------
 
 static TestResult test_silence_floor() {
     std::vector<float> samples(1024, 0.0f);
@@ -26,9 +24,7 @@ static TestResult test_silence_floor() {
     return TEST_PASS();
 }
 
-// -----------------------------------------------------------------------------
 // Test: full-scale sine -> ~ -3 dB (RMS of a unit-amplitude sine is 1/sqrt(2))
-// -----------------------------------------------------------------------------
 
 static TestResult test_full_scale_sine() {
     // RMS of a sine with amplitude 1.0 is 1/sqrt(2) ~= 0.7071,
@@ -50,9 +46,7 @@ static TestResult test_full_scale_sine() {
     return TEST_PASS();
 }
 
-// -----------------------------------------------------------------------------
 // Test: constant DC at amplitude 1.0 -> 0 dB (RMS == 1.0 -> 20*log10(1)=0)
-// -----------------------------------------------------------------------------
 
 static TestResult test_full_scale_dc() {
     std::vector<float> samples(512, 1.0f);
@@ -63,9 +57,7 @@ static TestResult test_full_scale_dc() {
     return TEST_PASS();
 }
 
-// -----------------------------------------------------------------------------
 // Test: NULL / zero-count validation
-// -----------------------------------------------------------------------------
 
 static TestResult test_null_validation() {
     float db = 0.0f;
@@ -81,9 +73,7 @@ static TestResult test_null_validation() {
     return TEST_PASS();
 }
 
-// -----------------------------------------------------------------------------
 // Main
-// -----------------------------------------------------------------------------
 
 int main(int argc, char** argv) {
     TestSuite suite("audio_compute_level_db");

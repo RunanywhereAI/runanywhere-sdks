@@ -79,9 +79,7 @@ namespace {
 using rac::graph::OverflowPolicy;
 using rac::graph::PipelineNode;
 
-// ---------------------------------------------------------------------------
 // Param helpers — pull strongly-typed values out of `OperatorSpec.params`.
-// ---------------------------------------------------------------------------
 
 const std::string* find_param(const runanywhere::v1::OperatorSpec& spec, const std::string& key) {
     auto it = spec.params().find(key);
@@ -135,9 +133,7 @@ bool param_uint64(const runanywhere::v1::OperatorSpec& spec, const std::string& 
     }
 }
 
-// ---------------------------------------------------------------------------
 // Owned proto buffer wrapper — RAII free() of the rac_proto_buffer_t output.
-// ---------------------------------------------------------------------------
 
 class ProtoBufferGuard {
    public:
@@ -181,9 +177,7 @@ void cancel_graph(rac::graph::CancelToken* token) {
         token->cancel();
 }
 
-// ---------------------------------------------------------------------------
 // generate_text — text in (text.utf8) → text out (text.utf8) on port "token".
-// ---------------------------------------------------------------------------
 class GenerateTextNode final : public OperatorNode {
    public:
     GenerateTextNode(std::string name, const runanywhere::v1::OperatorSpec& spec)
@@ -260,9 +254,7 @@ class GenerateTextNode final : public OperatorNode {
     std::string system_prompt_;
 };
 
-// ---------------------------------------------------------------------------
 // transcribe — audio in (audio.pcm_s16le) → text out (text.utf8) on port "final".
-// ---------------------------------------------------------------------------
 class TranscribeNode final : public OperatorNode {
    public:
     TranscribeNode(std::string name, const runanywhere::v1::OperatorSpec& spec)
@@ -329,9 +321,7 @@ class TranscribeNode final : public OperatorNode {
     int sample_rate_;
 };
 
-// ---------------------------------------------------------------------------
 // synthesize — text in (text.utf8) → audio out (audio.pcm_s16le) on port "out".
-// ---------------------------------------------------------------------------
 class SynthesizeNode final : public OperatorNode {
    public:
     SynthesizeNode(std::string name, const runanywhere::v1::OperatorSpec& spec)
@@ -416,11 +406,9 @@ class SynthesizeNode final : public OperatorNode {
     std::string language_;
 };
 
-// ---------------------------------------------------------------------------
 // detect_voice — audio in (audio.pcm_s16le) → audio out (audio.pcm_s16le)
 //                on port "out". Frames are forwarded only when speech is
 //                detected; non-speech frames are silently dropped.
-// ---------------------------------------------------------------------------
 class DetectVoiceNode final : public OperatorNode {
    public:
     DetectVoiceNode(std::string name, const runanywhere::v1::OperatorSpec& spec)
@@ -490,10 +478,8 @@ class DetectVoiceNode final : public OperatorNode {
     float threshold_;
 };
 
-// ---------------------------------------------------------------------------
 // embed — text in (text.utf8) → embedding out (embedding.vector.float32)
 //         on port "vec".
-// ---------------------------------------------------------------------------
 class EmbedNode final : public OperatorNode {
    public:
     EmbedNode(std::string name, const runanywhere::v1::OperatorSpec& spec)
@@ -567,7 +553,6 @@ class EmbedNode final : public OperatorNode {
     std::string model_id_;
 };
 
-// ---------------------------------------------------------------------------
 // retrieve — text in (text.utf8) → text out (text.utf8) on port "results".
 //
 // The retrieve operator queries a host-provided RAG session
@@ -584,7 +569,6 @@ class EmbedNode final : public OperatorNode {
 // SolutionRunner sees a clean failure rather than silently dropping
 // items. Missing `session_handle_id` fails on the first input — the
 // operator never runs in mock mode.
-// ---------------------------------------------------------------------------
 class RetrieveNode final : public OperatorNode {
    public:
     RetrieveNode(std::string name, const runanywhere::v1::OperatorSpec& spec)
@@ -711,9 +695,7 @@ class RetrieveNode final : public OperatorNode {
     std::string system_prompt_;
 };
 
-// ---------------------------------------------------------------------------
 // Port schema helpers — same shape as test_pipeline_executor's helpers.
-// ---------------------------------------------------------------------------
 
 OperatorPortSchema schema(std::vector<std::string> input_ports,
                           std::vector<std::string> output_ports, const char* input_type,

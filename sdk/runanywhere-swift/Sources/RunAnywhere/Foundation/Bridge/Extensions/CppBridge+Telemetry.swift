@@ -199,9 +199,9 @@ private func performTelemetryHTTP(path: String, json: String, requiresAuth: Bool
 
     do {
         _ = try await CppBridge.HTTP.shared.post(path, json: json, requiresAuth: requiresAuth)
-        logger.debug("✅ Telemetry sent to \(path)")
+        logger.debug("Telemetry sent to \(path)")
     } catch {
-        logger.error("❌ HTTP failed for telemetry to \(path): \(error)")
+        logger.error("HTTP failed for telemetry to \(path): \(error)")
     }
 }
 
@@ -211,7 +211,7 @@ extension CppBridge.Events {
     // MARK: - SDK Lifecycle Events
 
     // SDK init STARTED/COMPLETED/FAILED are published once by commons
-    // (rac_sdk_init_phase1_proto) — Swift no longer hand-emits them.
+    // (rac_sdk_init_phase1_proto); Swift must not emit them itself.
 
     /// Emit SDK models loaded event via the canonical SDK event proto stream.
     public static func emitSDKModelsLoaded(count: Int) {

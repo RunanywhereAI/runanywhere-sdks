@@ -28,9 +28,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // Development Configuration API
-// =============================================================================
 
 /**
  * @brief Check if development config is available
@@ -56,9 +54,7 @@ RAC_API const char* rac_dev_config_get_supabase_key(void);
  */
 RAC_API const char* rac_dev_config_get_build_token(void);
 
-// =============================================================================
 // Convenience Functions
-// =============================================================================
 
 /**
  * @brief Check if Supabase config is valid
@@ -72,9 +68,7 @@ RAC_API bool rac_dev_config_has_supabase(void);
  */
 RAC_API bool rac_dev_config_has_build_token(void);
 
-// =============================================================================
 // Usability Checks (canonical, shared by all SDKs)
-// =============================================================================
 
 /**
  * @brief Whether a baked-in credential string is usable: non-empty and not a

@@ -21,9 +21,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // SERVICE VTABLE
-// =============================================================================
 
 /**
  * @brief Embeddings service operations vtable
@@ -69,9 +67,7 @@ typedef struct rac_embeddings_service {
     const char* model_id;
 } rac_embeddings_service_t;
 
-// =============================================================================
 // PUBLIC API
-// =============================================================================
 
 /**
  * @brief Create an embeddings service

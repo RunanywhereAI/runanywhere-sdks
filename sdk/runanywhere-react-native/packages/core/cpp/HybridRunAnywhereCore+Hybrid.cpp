@@ -69,7 +69,7 @@ using namespace ::runanywhere::bridges;
 
 namespace {
 
-// --- proto-byte ABI function-pointer typedefs (resolved via dlsym) -----------
+// proto-byte ABI function-pointer typedefs (resolved via dlsym)
 
 using HybridRouterCreateFn = rac_result_t (*)(rac_handle_t*);
 using HybridRouterDestroyFn = void (*)(rac_handle_t);
@@ -117,7 +117,7 @@ std::vector<uint8_t> copyHybridArrayBufferBytes(
     return bytes;
 }
 
-// --- Registry-routed STT service creation ------------------------------------
+// Registry-routed STT service creation
 //
 // Mirrors the commons JNI create_stt_service_via_registry
 // (sdk/runanywhere-commons/src/jni/rac_stt_hybrid_router_jni.cpp) and the Swift
@@ -181,7 +181,7 @@ rac_stt_service_t* createSttServiceViaRegistry(const std::string& engineHint,
     return service;
 }
 
-// --- Device-state vtable (cached snapshot pushed from JS) ---------------------
+// Device-state vtable (cached snapshot pushed from JS)
 //
 // commons reads is_online / battery_percent / is_thermal_throttled on every
 // transcribe to evaluate the NETWORK / Battery hard filters. We cache the last
@@ -204,7 +204,7 @@ bool deviceStateIsThermalThrottled(void* /*user_data*/) {
     return g_deviceThermalThrottled.load(std::memory_order_relaxed);
 }
 
-// --- Custom-filter predicate table (name -> JS callback) ---------------------
+// Custom-filter predicate table (name -> JS callback)
 //
 // commons resolves the predicate by name and invokes it synchronously during
 // the router's filter phase. We block that (background) routing thread on the
@@ -290,9 +290,7 @@ bool isRegistrationSuccess(rac_result_t rc) {
 
 }  // namespace
 
-// ============================================================================
 // Router lifecycle
-// ============================================================================
 
 std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridSttRouterCreate() {
     return Promise<double>::async([]() -> double {
@@ -354,9 +352,7 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::hybridSttRouterDestroyServ
     });
 }
 
-// ============================================================================
 // Pair + policy
-// ============================================================================
 
 std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridSttRouterSetOfflineService(
     double routerHandle,
@@ -421,9 +417,7 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridSttRouterSetPolicy
         });
 }
 
-// ============================================================================
 // Transcribe + cancel
-// ============================================================================
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::hybridSttRouterTranscribe(
@@ -480,9 +474,7 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridSttRouterCancel(
     });
 }
 
-// ============================================================================
 // Custom-filter predicates (cross-SDK named callback table)
-// ============================================================================
 
 std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridRegisterCustomFilter(
     const std::string& name,
@@ -544,9 +536,7 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridUnregisterCustomFi
     });
 }
 
-// ============================================================================
 // Device-state vtable (cached snapshot pushed from JS)
-// ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::hybridSetDeviceState(
     bool isOnline,
@@ -610,9 +600,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::hybridClearDeviceState() {
     });
 }
 
-// ============================================================================
 // Host-defined cloud STT providers (mirrors Swift Cloud.registerProvider)
-// ============================================================================
 
 namespace {
 
@@ -756,9 +744,7 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::cloudUnregisterSttProvider
     });
 }
 
-// ============================================================================
 // cloud engine plugin registration (mirrors ONNX.register())
-// ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cloudRegister() {
     return Promise<bool>::async([]() -> bool {

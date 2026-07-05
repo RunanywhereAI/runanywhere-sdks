@@ -81,9 +81,7 @@ void emit_voice_agent_state(v1::SDKComponent component, rac_voice_agent_componen
 
 }  // namespace
 
-// =============================================================================
 // HELPER FUNCTIONS FOR C++ COMPONENTS / JNI BRIDGE
-// =============================================================================
 
 namespace rac::events {
 
@@ -342,9 +340,7 @@ void emit_vad_speech_ended(double speech_duration_ms, float energy_level) {
                          /*session_id=*/nullptr, legacy_destination_telemetry());
 }
 
-// =============================================================================
 // SDK LIFECYCLE EVENTS
-// =============================================================================
 
 void emit_sdk_init_started() {
     v1::InitializationEvent ev;
@@ -377,9 +373,7 @@ void emit_sdk_models_loaded(int32_t count, double duration_ms) {
     publish(event, v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_INITIALIZATION);
 }
 
-// =============================================================================
 // MODEL DOWNLOAD EVENTS
-// =============================================================================
 
 void emit_model_download_started(const char* model_id, int64_t total_bytes,
                                  const char* archive_type) {
@@ -450,9 +444,7 @@ void emit_model_download_cancelled(const char* model_id) {
     publish(v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_DOWNLOAD, std::move(m));
 }
 
-// =============================================================================
 // MODEL EXTRACTION EVENTS
-// =============================================================================
 
 void emit_model_extraction_started(const char* model_id, const char* archive_type) {
     (void)archive_type;
@@ -508,9 +500,7 @@ void emit_model_deleted(const char* model_id, int64_t size_bytes) {
     publish(v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_MODEL, std::move(m));
 }
 
-// =============================================================================
 // STORAGE EVENTS
-// =============================================================================
 
 void emit_storage_cache_cleared(int64_t freed_bytes) {
     v1::StorageEvent s;
@@ -536,9 +526,7 @@ void emit_storage_temp_cleaned(int64_t freed_bytes) {
     publish(v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_STORAGE, std::move(s));
 }
 
-// =============================================================================
 // DEVICE EVENTS
-// =============================================================================
 
 void emit_device_registered(const char* device_id) {
     v1::DeviceEvent d;
@@ -558,9 +546,7 @@ void emit_device_registration_failed(rac_result_t error_code, const char* error_
     publish(event, v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_DEVICE);
 }
 
-// =============================================================================
 // NETWORK EVENTS
-// =============================================================================
 
 void emit_network_connectivity_changed(bool is_online) {
     v1::SDKEvent event;
@@ -572,9 +558,7 @@ void emit_network_connectivity_changed(bool is_online) {
     publish(event, v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_NETWORK);
 }
 
-// =============================================================================
 // SDK ERROR EVENTS
-// =============================================================================
 
 void emit_sdk_error(rac_result_t error_code, const char* error_message, const char* operation,
                     const char* context) {
@@ -588,9 +572,7 @@ void emit_sdk_error(rac_result_t error_code, const char* error_message, const ch
     publish(event, v1::SDK_COMPONENT_UNSPECIFIED, v1::EVENT_CATEGORY_FAILURE);
 }
 
-// =============================================================================
 // VOICE AGENT STATE EVENTS
-// =============================================================================
 
 void emit_voice_agent_stt_state_changed(rac_voice_agent_component_state_t state,
                                         const char* model_id, const char* error_message) {

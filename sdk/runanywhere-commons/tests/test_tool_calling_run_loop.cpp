@@ -50,9 +50,7 @@ int fail_count = 0;
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-// ---------------------------------------------------------------------------
 // Mock LLM plugin (identical pattern to the session proto tests).
-// ---------------------------------------------------------------------------
 
 struct MockLlm {
     std::string model_path;
@@ -221,9 +219,7 @@ bool load_mock_llm() {
     return ok;
 }
 
-// ---------------------------------------------------------------------------
 // Tool definition + helpers.
-// ---------------------------------------------------------------------------
 
 runanywhere::v1::ToolDefinition make_weather_tool() {
     runanywhere::v1::ToolDefinition tool;
@@ -250,10 +246,8 @@ runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string&
     return request;
 }
 
-// ---------------------------------------------------------------------------
 // Executor harness — captures every tool call the loop emits and returns
 // canned tool results in FIFO order.
-// ---------------------------------------------------------------------------
 
 struct ExecutorState {
     std::mutex mu;
@@ -303,9 +297,7 @@ rac_result_t executor_callback(const uint8_t* in_bytes, size_t in_size,
     return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
 }
 
-// ---------------------------------------------------------------------------
 // Tests.
-// ---------------------------------------------------------------------------
 
 int test_no_tool_call_completes_immediately() {
     if (!load_mock_llm()) {

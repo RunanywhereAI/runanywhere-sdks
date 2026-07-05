@@ -66,7 +66,7 @@ namespace rac::foundation {
 
 namespace {
 
-// ---- helpers ---------------------------------------------------------------
+// helpers
 
 // Copy a std::string into a freshly allocated C string. Empty std::string maps
 // to nullptr so the C consumer can use the conventional "absent" sentinel.
@@ -82,7 +82,7 @@ char* copy_string_required(const ::std::string& s) {
     return rac_strdup(s.c_str());
 }
 
-// ---- STT language enum mapping --------------------------------------------
+// STT language enum mapping
 //
 // Drift reconciliation: C ABI uses BCP-47 strings ("en", "en-US", "es-MX"),
 // proto uses the STTLanguage enum. We strip the region tag and look up the
@@ -146,7 +146,7 @@ const char* stt_language_to_string(::runanywhere::v1::STTLanguage e) {
     }
 }
 
-// ---- Audio format enum mapping --------------------------------------------
+// Audio format enum mapping
 // Both enums share the same ordering for the formats they overlap on. The C
 // enum starts at PCM=0; proto starts at UNSPECIFIED=0 with PCM=1. Apply +1 / -1
 // shift, with bounds checks.
@@ -193,9 +193,7 @@ rac_audio_format_enum_t audio_format_from_proto(::runanywhere::v1::AudioFormat p
 
 }  // namespace
 
-// ===========================================================================
 // STT
-// ===========================================================================
 
 bool rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in, rac_stt_options_t* out) {
     if (!out)
@@ -298,9 +296,7 @@ bool rac_stt_result_to_proto(const rac_stt_result_t* in, ::runanywhere::v1::STTO
     return true;
 }
 
-// ===========================================================================
 // TTS
-// ===========================================================================
 
 bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts_options_t* out) {
     if (!out)
@@ -393,13 +389,9 @@ bool rac_tts_result_to_proto(const rac_tts_result_t* in, ::runanywhere::v1::TTSO
     return true;
 }
 
-// ===========================================================================
 // VAD
-// ===========================================================================
 
-// ===========================================================================
 // VLM
-// ===========================================================================
 
 bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& in,
                                 rac_vlm_options_t* out, const char** out_prompt) {
@@ -641,9 +633,7 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
     return true;
 }
 
-// ===========================================================================
 // DIFFUSION
-// ===========================================================================
 
 namespace {
 
@@ -752,9 +742,7 @@ bool rac_diffusion_result_to_proto(const rac_diffusion_result_t* in,
     return true;
 }
 
-// ===========================================================================
 // LoRA
-// ===========================================================================
 
 bool rac_lora_entry_to_proto(const rac_lora_entry_t* in,
                              ::runanywhere::v1::LoraAdapterCatalogEntry* out) {
@@ -804,9 +792,7 @@ bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry&
     return true;
 }
 
-// ===========================================================================
 // EMBEDDINGS
-// ===========================================================================
 
 bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOptions& in,
                                        rac_embeddings_options_t* out) {
@@ -857,9 +843,7 @@ bool rac_embeddings_result_to_proto(const rac_embeddings_result_t* in,
     return true;
 }
 
-// ===========================================================================
 // STORAGE
-// ===========================================================================
 
 bool rac_device_storage_to_proto(const rac_device_storage_t* in,
                                  ::runanywhere::v1::DeviceStorageInfo* out) {
@@ -931,9 +915,7 @@ bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageM
     return true;
 }
 
-// ===========================================================================
 // ERRORS
-// ===========================================================================
 
 ::runanywhere::v1::ErrorCategory rac_result_to_proto_category(rac_result_t code) {
     // Non-negative codes (success / invalid) carry no error category.

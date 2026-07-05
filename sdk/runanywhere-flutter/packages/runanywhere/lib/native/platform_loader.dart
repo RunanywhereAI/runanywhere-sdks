@@ -29,9 +29,7 @@ class PlatformLoader {
   // Library name for RACommons (without platform-specific prefix/suffix)
   static const String _commonsLibraryName = 'rac_commons';
 
-  // =============================================================================
   // Public API - RACommons Loading Only
-  // =============================================================================
 
   /// Load the RACommons native library.
   ///
@@ -65,9 +63,7 @@ class PlatformLoader {
     }
   }
 
-  // =============================================================================
   // Platform-Specific Loading (Internal)
-  // =============================================================================
 
   /// Load a native library by name, using platform-appropriate method.
   ///
@@ -292,9 +288,7 @@ class PlatformLoader {
     );
   }
 
-  // =============================================================================
   // State and Utilities
-  // =============================================================================
 
   /// Check if the commons library is loaded.
   static bool get isCommonsLoaded => _commonsLibrary != null;

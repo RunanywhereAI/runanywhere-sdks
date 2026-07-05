@@ -22,9 +22,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // TOKENIZER FILE NAMES
-// =============================================================================
 
 /** Vocabulary file name */
 #define RAC_DIFFUSION_TOKENIZER_VOCAB_FILE "vocab.json"
@@ -32,9 +30,7 @@ extern "C" {
 /** Merge rules file name */
 #define RAC_DIFFUSION_TOKENIZER_MERGES_FILE "merges.txt"
 
-// =============================================================================
 // URL RESOLUTION
-// =============================================================================
 
 /**
  * @brief Get the base URL for a tokenizer source
@@ -88,9 +84,7 @@ RAC_API rac_result_t rac_diffusion_tokenizer_get_file_url(rac_diffusion_tokenize
                                                           const char* filename, char* out_url,
                                                           size_t out_url_size);
 
-// =============================================================================
 // FILE MANAGEMENT
-// =============================================================================
 
 /**
  * @brief Check if tokenizer files exist in a directory
@@ -145,9 +139,7 @@ RAC_API rac_result_t rac_diffusion_tokenizer_download_file(rac_diffusion_tokeniz
                                                            const char* filename,
                                                            const char* output_path);
 
-// =============================================================================
 // DEFAULT TOKENIZER SOURCE FOR MODEL VARIANT
-// =============================================================================
 
 /**
  * @brief Get the default tokenizer source for a model variant

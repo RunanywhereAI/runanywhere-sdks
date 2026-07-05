@@ -21,9 +21,7 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
 
-// =============================================================================
 // Minimal Test Platform Adapter
-// =============================================================================
 
 static rac_bool_t test_file_exists(const char* /*path*/, void* /*user_data*/) {
     return RAC_FALSE;
@@ -118,9 +116,7 @@ static rac_platform_adapter_t make_test_adapter() {
     return adapter;
 }
 
-// =============================================================================
 // Setup / Teardown
-// =============================================================================
 
 static rac_platform_adapter_t g_adapter;
 
@@ -141,9 +137,7 @@ static void teardown() {
     rac_shutdown();
 }
 
-// =============================================================================
 // Helper: check if text is empty or whitespace
-// =============================================================================
 
 static bool is_empty_or_whitespace(const char* text) {
     if (text == nullptr)
@@ -156,9 +150,7 @@ static bool is_empty_or_whitespace(const char* text) {
     return true;
 }
 
-// =============================================================================
 // Tests
-// =============================================================================
 
 static TestResult test_create_destroy() {
     TestResult result;
@@ -481,9 +473,7 @@ static TestResult test_streaming_workflow() {
     return result;
 }
 
-// =============================================================================
 // TTS→STT Round-Trip Tests
-// =============================================================================
 
 static TestResult test_transcribe_tts_hello() {
     TestResult result;
@@ -812,9 +802,7 @@ static TestResult test_transcribe_tts_sentence() {
     return result;
 }
 
-// =============================================================================
 // Main
-// =============================================================================
 
 int main(int argc, char** argv) {
     std::map<std::string, std::function<TestResult()>> tests = {

@@ -48,7 +48,7 @@ extension CppBridge {
                 return
             }
 
-            logger.info("🔧 Registering platform backend...")
+            logger.info("Registering platform backend...")
 
             // Register Swift callbacks for LLM (Foundation Models)
             logger.info("  - Registering LLM callbacks...")
@@ -63,9 +63,9 @@ extension CppBridge {
             let result = rac_backend_platform_register()
             if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_ALREADY_REGISTERED {
                 isInitialized = true
-                logger.info("✅ Platform backend registered successfully (result=\(result))")
+                logger.info("Platform backend registered successfully (result=\(result))")
             } else {
-                logger.error("❌ Failed to register platform backend: \(result)")
+                logger.error("Failed to register platform backend: \(result)")
                 return
             }
 

@@ -17,9 +17,7 @@
 
 static const char* LOG_CAT = "Platform.Diffusion";
 
-// =============================================================================
 // CALLBACK STORAGE
-// =============================================================================
 
 namespace {
 
@@ -29,9 +27,7 @@ bool g_callbacks_set = false;
 
 }  // namespace
 
-// =============================================================================
 // CALLBACK REGISTRATION
-// =============================================================================
 
 extern "C" {
 
@@ -64,9 +60,7 @@ rac_bool_t rac_platform_diffusion_is_available(void) {
                : RAC_FALSE;
 }
 
-// =============================================================================
 // SERVICE API
-// =============================================================================
 
 rac_result_t rac_diffusion_platform_create(const char* model_path,
                                            const rac_diffusion_platform_config_t* config,

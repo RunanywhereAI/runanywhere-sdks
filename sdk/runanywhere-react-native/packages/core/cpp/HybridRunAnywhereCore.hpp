@@ -61,9 +61,7 @@ public:
   HybridRunAnywhereCore();
   ~HybridRunAnywhereCore();
 
-  // ============================================================================
   // SDK Lifecycle
-  // ============================================================================
 
   std::shared_ptr<Promise<bool>>
   initialize(const std::string &configJson) override;
@@ -86,24 +84,18 @@ public:
   std::shared_ptr<Promise<void>>
   pluginLoaderUnload(const std::string &name) override;
 
-  // ============================================================================
   // Authentication - Delegates to AuthBridge
-  // ============================================================================
 
   std::shared_ptr<Promise<bool>> isAuthenticated() override;
   std::shared_ptr<Promise<std::string>> getUserId() override;
   std::shared_ptr<Promise<std::string>> getOrganizationId() override;
 
-  // ============================================================================
   // Device Registration - Delegates to DeviceBridge
-  // ============================================================================
 
   std::shared_ptr<Promise<bool>> isDeviceRegistered() override;
   std::shared_ptr<Promise<std::string>> getDeviceId() override;
 
-  // ============================================================================
   // Model Registry - Delegates to ModelRegistryBridge
-  // ============================================================================
 
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   getAvailableModelsProto() override;
@@ -135,10 +127,8 @@ public:
   refreshModelRegistry(bool includeRemoteCatalog, bool rescanLocal,
                        bool pruneOrphans) override;
 
-  // ============================================================================
   // Download Service - proto-byte download workflow over the registered
   // platform HTTP transport.
-  // ============================================================================
 
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   downloadPlanProto(const std::shared_ptr<ArrayBuffer> &requestBytes) override;
@@ -156,9 +146,7 @@ public:
           &onProgressBytes) override;
   std::shared_ptr<Promise<bool>> clearDownloadProgressCallbackProto() override;
 
-  // ============================================================================
   // Storage - Delegates to StorageBridge
-  // ============================================================================
 
   std::shared_ptr<Promise<bool>> clearCache() override;
   std::shared_ptr<Promise<bool>> cleanTempFiles() override;
@@ -172,9 +160,7 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   storageDeleteProto(const std::shared_ptr<ArrayBuffer> &requestBytes) override;
 
-  // ============================================================================
   // Events - Native SDK event proto bridge
-  // ============================================================================
 
   std::shared_ptr<Promise<double>> subscribeSDKEventsProto(
       const std::function<void(const std::shared_ptr<ArrayBuffer> &)>
@@ -191,9 +177,7 @@ public:
                          const std::string &operation,
                          bool recoverable) override;
 
-  // ============================================================================
   // Model Lifecycle
-  // ============================================================================
 
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   modelLifecycleLoadProto(
@@ -206,19 +190,15 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   componentLifecycleSnapshotProto(double component) override;
 
-  // ============================================================================
   // HTTP Client - libcurl-backed rac_http_client_* runner.
-  // ============================================================================
 
   std::shared_ptr<Promise<std::string>>
   httpRequest(const std::string &method, const std::string &url,
               const std::string &headersJson, const std::string &bodyJson,
               double timeoutMs) override;
 
-  // ============================================================================
   // LLM Capability (Backend-Agnostic)
   // Delegates to rac_llm_component_* APIs via LLMBridge
-  // ============================================================================
 
   std::shared_ptr<Promise<bool>> isTextModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadTextModel() override;
@@ -233,10 +213,8 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   llmCancelProto() override;
 
-  // ============================================================================
   // STT Capability (Backend-Agnostic)
   // Delegates to lifecycle proto APIs via commons.
-  // ============================================================================
 
   std::shared_ptr<Promise<bool>> isSTTModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadSTTModel() override;
@@ -263,12 +241,10 @@ public:
   std::shared_ptr<Promise<void>> sttStreamStop(double sessionId) override;
   std::shared_ptr<Promise<void>> sttStreamCancel(double sessionId) override;
 
-  // ============================================================================
   // Hybrid STT Router (offline sherpa <-> cloud, registry-routed)
   // THIN proto-byte / handle surface over rac_stt_hybrid_router_proto.h +
   // rac_hybrid_device_state.h + rac_hybrid_custom_filter.h. Implemented in
   // HybridRunAnywhereCore+Hybrid.cpp.
-  // ============================================================================
 
   /// JS custom-filter predicate: (candidateModelId) -> Promise<bool>.
   /// Nitro wraps a JS callback that returns a Promise in a double Promise (the
@@ -324,10 +300,8 @@ public:
   cloudUnregisterSttProvider(const std::string &name) override;
   std::shared_ptr<Promise<bool>> cloudIsRegistered() override;
 
-  // ============================================================================
   // TTS Capability (Backend-Agnostic)
   // Delegates to lifecycle proto APIs via commons.
-  // ============================================================================
 
   std::shared_ptr<Promise<bool>> isTTSModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadTTSModel() override;
@@ -342,10 +316,8 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   ttsStopProto() override;
 
-  // ============================================================================
   // VAD Capability (Backend-Agnostic)
   // Delegates to lifecycle proto APIs via commons.
-  // ============================================================================
 
   std::shared_ptr<Promise<bool>> isVADModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadVADModel() override;
@@ -360,10 +332,8 @@ public:
       const std::function<void(const std::shared_ptr<ArrayBuffer> &)>
           &onActivityBytes) override;
 
-  // ============================================================================
   // VLM Capability (Backend-Agnostic)
   // Uses commons VLM service lifecycle plus rac_vlm_*_proto ABI.
-  // ============================================================================
 
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   vlmProcessProto(const std::shared_ptr<ArrayBuffer> &requestBytes) override;
@@ -374,25 +344,19 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   vlmCancelProto() override;
 
-  // ============================================================================
   // Device Identity
-  // ============================================================================
 
   std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() override;
 
-  // ============================================================================
   // Telemetry
   // Matches Swift: CppBridge+Telemetry.swift
   // C++ handles all telemetry logic - batching, JSON building, routing
-  // ============================================================================
 
   std::shared_ptr<Promise<void>> flushTelemetry() override;
   std::shared_ptr<Promise<bool>> isTelemetryInitialized() override;
 
-  // ============================================================================
   // Voice Agent Capability (Backend-Agnostic)
   // Delegates to rac_voice_agent_* APIs via VoiceAgentBridge
-  // ============================================================================
 
   std::shared_ptr<Promise<bool>>
   initializeVoiceAgentWithLoadedModels() override;
@@ -417,11 +381,9 @@ public:
                            double sampleRateHz, double channels, double encoding,
                            bool isFinal) override;
 
-  // ============================================================================
   // Tool Calling - delegates generated proto bytes to commons C ABI.
   // Single source of truth for parsing, formatting, and prompt building.
   // Tool registry and execution are in TypeScript (RunAnywhere+ToolCalling.ts)
-  // ============================================================================
 
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   toolParseProto(const std::shared_ptr<ArrayBuffer> &requestBytes) override;
@@ -459,9 +421,7 @@ public:
   structuredOutputSchemaToJsonProto(
       const std::shared_ptr<ArrayBuffer> &schemaBytes) override;
 
-  // ============================================================================
   // RAG Pipeline - Proto ABI via rac_rag_*_proto symbols (see +Tools.cpp)
-  // ============================================================================
 
   std::shared_ptr<Promise<bool>> ragCreatePipelineProto(
       const std::shared_ptr<ArrayBuffer> &configBytes) override;
@@ -502,14 +462,12 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraAdapterImportProto(
       const std::shared_ptr<ArrayBuffer> &requestBytes) override;
 
-  // ============================================================================
   // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8
   //
   // Delegates to the C ABI exposed by runanywhere-commons. Handles are
   // returned to JS as doubles (the C pointer is round-tripped through a
   // `double` — see HybridRunAnywhereCore.cpp for the ptr<->double
   // conversion helpers).
-  // ============================================================================
 
   std::shared_ptr<Promise<double>> solutionCreateFromProto(
       const std::shared_ptr<ArrayBuffer> &configBytes) override;

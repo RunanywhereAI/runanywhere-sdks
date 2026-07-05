@@ -28,10 +28,8 @@ namespace runanywhere::rag {
 
 namespace {
 
-// ---------------------------------------------------------------------------
 // Reciprocal Rank Fusion — pulled verbatim from the previous RAGBackend
 // implementation so the graph path matches retrieval semantics 1:1.
-// ---------------------------------------------------------------------------
 
 // Embed a single query string; returns an empty vector on failure.
 std::vector<float> embed_one(rac_handle_t embeddings_handle, const std::string& text) {
@@ -137,9 +135,7 @@ std::string format_prompt(const std::string& query, const std::string& context,
     return prompt;
 }
 
-// ---------------------------------------------------------------------------
 // Token sink helpers
-// ---------------------------------------------------------------------------
 
 struct LLMStreamCtx {
     std::string* accumulated_answer;
@@ -165,9 +161,7 @@ rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
 
 }  // namespace
 
-// ---------------------------------------------------------------------------
 // run_rag_query — run embed → retrieve → assemble → LLM once, then return the result.
-// ---------------------------------------------------------------------------
 
 rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
                            RAGGraphResult& out_result) {

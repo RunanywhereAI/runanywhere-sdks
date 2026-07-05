@@ -400,9 +400,7 @@ PipelineSpec make_linear_spec() {
     return spec;
 }
 
-// ---------------------------------------------------------------------------
 // 1. Full lifecycle: start + feed + close + wait.
-// ---------------------------------------------------------------------------
 TEST(start_feed_close_lifecycle) {
     SolutionRunner runner(make_linear_spec());
     CHECK(runner.start() == RAC_SUCCESS);
@@ -413,9 +411,7 @@ TEST(start_feed_close_lifecycle) {
     CHECK(!runner.running());
 }
 
-// ---------------------------------------------------------------------------
 // 2. Double-start returns ALREADY_INITIALIZED.
-// ---------------------------------------------------------------------------
 TEST(double_start_is_rejected) {
     SolutionRunner runner(make_linear_spec());
     CHECK(runner.start() == RAC_SUCCESS);
@@ -424,9 +420,7 @@ TEST(double_start_is_rejected) {
     runner.wait();
 }
 
-// ---------------------------------------------------------------------------
 // 3. cancel() fires mid-stream and the scheduler joins.
-// ---------------------------------------------------------------------------
 TEST(cancel_mid_stream_joins) {
     SolutionRunner runner(make_linear_spec());
     CHECK(runner.start() == RAC_SUCCESS);
@@ -447,17 +441,13 @@ TEST(cancel_mid_stream_joins) {
     CHECK(!runner.running());
 }
 
-// ---------------------------------------------------------------------------
 // 4. feed() before start is a user error.
-// ---------------------------------------------------------------------------
 TEST(feed_before_start_fails) {
     SolutionRunner runner(make_linear_spec());
     CHECK(runner.feed(Item::text("x")) == RAC_ERROR_COMPONENT_NOT_READY);
 }
 
-// ---------------------------------------------------------------------------
 // 5. feed() enforces the root input payload type metadata.
-// ---------------------------------------------------------------------------
 TEST(feed_payload_type_mismatch_is_rejected) {
     OperatorPortSchema audio_ports;
     audio_ports.input_ports = {"in"};
@@ -912,9 +902,7 @@ TEST(operator_emitted_sdk_event_type_with_raw_bytes_body_is_rejected) {
     CHECK(seen->load(std::memory_order_acquire) == 0);
 }
 
-// ---------------------------------------------------------------------------
 // 6. SolutionConfig (VoiceAgent) exposes missing real operator factories.
-// ---------------------------------------------------------------------------
 TEST(voice_agent_solution_without_real_factories_is_unavailable) {
     cleanup_solution_standins();
 
@@ -931,9 +919,7 @@ TEST(voice_agent_solution_without_real_factories_is_unavailable) {
     CHECK(last_error_detail_contains("explicit stand-in factory"));
 }
 
-// ---------------------------------------------------------------------------
 // 6. SolutionConfig (RAG) exposes missing real operator factories.
-// ---------------------------------------------------------------------------
 TEST(rag_solution_without_real_factories_is_unavailable) {
     cleanup_solution_standins();
 
@@ -955,9 +941,7 @@ TEST(rag_solution_without_real_factories_is_unavailable) {
     CHECK(last_error_detail_contains("explicit stand-in factory"));
 }
 
-// ---------------------------------------------------------------------------
 // 7. SolutionConfig (TimeSeries) reaches anomaly_detect after built-in window.
-// ---------------------------------------------------------------------------
 TEST(time_series_solution_without_anomaly_factory_reaches_anomaly_detect) {
     cleanup_solution_standins();
 
@@ -975,9 +959,7 @@ TEST(time_series_solution_without_anomaly_factory_reaches_anomaly_detect) {
     CHECK(!last_error_detail_contains("window"));
 }
 
-// ---------------------------------------------------------------------------
 // 8. SolutionConfig (TimeSeries) compiles/runs without a window stand-in.
-// ---------------------------------------------------------------------------
 TEST(time_series_solution_compiles_with_builtin_window) {
     ScopedTimeSeriesStandins standins;
 
@@ -1000,9 +982,7 @@ TEST(time_series_solution_compiles_with_builtin_window) {
     runner.wait();
 }
 
-// ---------------------------------------------------------------------------
 // 8.1. Portable RAG prompt assembly has a real built-in context_build op.
-// ---------------------------------------------------------------------------
 TEST(context_build_builtin_applies_prompt_template) {
     auto captured = std::make_shared<std::string>();
     ScopedFactory capture(
@@ -1040,9 +1020,7 @@ TEST(context_build_builtin_applies_prompt_template) {
     CHECK(*captured == "Context:\nretrieved chunk\nQuestion:retrieved chunk");
 }
 
-// ---------------------------------------------------------------------------
 // 9. SolutionConfig (VoiceAgent) expands + compiles with explicit stand-ins.
-// ---------------------------------------------------------------------------
 TEST(voice_agent_solution_compiles) {
     ScopedSolutionStandins standins;
 
@@ -1063,12 +1041,10 @@ TEST(voice_agent_solution_compiles) {
     runner.wait();
 }
 
-// ---------------------------------------------------------------------------
 // 10. SolutionConfig (RAG) expands + compiles with explicit stand-ins.
 //     Topology: query (source) → retrieve → context → llm. The retrieve
 //     operator owns the embedding lookup via the host-supplied RAG
 //     session handle, so the L5 graph carries 4 operators + 3 edges.
-// ---------------------------------------------------------------------------
 TEST(rag_solution_compiles) {
     ScopedSolutionStandins standins;
 
@@ -1087,9 +1063,7 @@ TEST(rag_solution_compiles) {
     runner.wait();
 }
 
-// ---------------------------------------------------------------------------
 // 11. C ABI end-to-end: proto-bytes path.
-// ---------------------------------------------------------------------------
 TEST(c_abi_proto_bytes_lifecycle) {
     ScopedSolutionStandins standins;
 
@@ -1113,9 +1087,7 @@ TEST(c_abi_proto_bytes_lifecycle) {
     rac_solution_destroy(h);
 }
 
-// ---------------------------------------------------------------------------
 // 12. C ABI end-to-end: YAML path (SolutionConfig shape).
-// ---------------------------------------------------------------------------
 TEST(c_abi_yaml_solution_lifecycle) {
     ScopedSolutionStandins standins;
 
@@ -1137,9 +1109,7 @@ TEST(c_abi_yaml_solution_lifecycle) {
     rac_solution_destroy(h);
 }
 
-// ---------------------------------------------------------------------------
 // 13. C ABI YAML path — raw PipelineSpec shape (top-level `operators`).
-// ---------------------------------------------------------------------------
 TEST(c_abi_yaml_pipeline_lifecycle) {
     const char* yaml =
         "name: \"inline\"\n"
@@ -1161,13 +1131,11 @@ TEST(c_abi_yaml_pipeline_lifecycle) {
     rac_solution_destroy(h);
 }
 
-// ---------------------------------------------------------------------------
 // 13.5. Engine-backed retrieve operator: verifies the schema contract
 //       (text.utf8 in → text.utf8 out on port "results") and the
 //       honest-failure path when the host did not stamp `session_handle_id`
 //       into OperatorSpec.params. The operator must refuse to run rather
 //       than silently emit mock context.
-// ---------------------------------------------------------------------------
 TEST(retrieve_without_session_handle_fails_honestly) {
     using rac::solutions::OperatorRegistry;
 
@@ -1227,9 +1195,7 @@ TEST(retrieve_without_session_handle_fails_honestly) {
     rac::solutions::register_builtin_operators(registry);
 }
 
-// ---------------------------------------------------------------------------
 // 14. Null / invalid handle paths.
-// ---------------------------------------------------------------------------
 TEST(null_handle_paths) {
     CHECK(rac_solution_start(nullptr) == RAC_ERROR_INVALID_HANDLE);
     CHECK(rac_solution_stop(nullptr) == RAC_ERROR_INVALID_HANDLE);

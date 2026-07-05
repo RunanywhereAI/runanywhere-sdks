@@ -79,14 +79,16 @@ jobs:
         with:
           platform: ios
       - name: Build + package XCFrameworks (commons + backends)
-        # build-ios.sh delegates the build to build-core-xcframework.sh (the
+        # ios-xcframework.sh builds the XCFramework slices and package-commons-ios.sh (the
         # same script pr-build.yml uses, so PR-time and tag-time take identical
         # build paths), then stages the versioned RACommons*-ios-v<version>.zip
         # + .sha256 sidecars into dist/packages/ — the layout sync-checksums.sh
         # and the Package.swift binary targets expect.
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash sdk/runanywhere-commons/scripts/build-ios.sh
+        run: |
+          bash scripts/build/ios-xcframework.sh
+          bash scripts/release/package-commons-ios.sh
       - name: Upload iOS/macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -103,7 +105,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # scripts/build/build-core-android.sh maps these to the canonical
+        # scripts/build/android.sh maps these to the canonical
         # android-{arm64,armv7,x86_64} CMake presets. (Legacy 32-bit `x86`
         # was never wired into the new build path and is dropped here.)
         abi: [arm64-v8a, armeabi-v7a, x86_64]
@@ -114,13 +116,15 @@ jobs:
         with:
           platform: android
       - name: Build + package commons for Android (${{ matrix.abi }})
-        # build-android.sh delegates the build to build-core-android.sh (the
+        # android.sh builds the JNI libs and package-commons-android.sh (the
         # same script pr-build.yml uses), then stages the per-ABI .so set
         # (commons + llamacpp + onnx, from src/main/jniLibs) into the versioned
         # RACommons-android-<abi>-v<version>.zip + .sha256 under dist/.
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash sdk/runanywhere-commons/scripts/build-android.sh ${{ matrix.abi }}
+        run: |
+          bash scripts/build/android.sh ${{ matrix.abi }}
+          bash scripts/release/package-commons-android.sh ${{ matrix.abi }}
       - name: Upload Android ABI artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -141,12 +145,12 @@ jobs:
         with:
           platform: linux
       - name: Build + package commons for Linux x86_64
-        # build-linux.sh drives the linux-release CMake preset (same as PR-time),
+        # scripts/build/linux.sh drives the linux-release CMake preset (same as PR-time),
         # then stages the .so set + headers and packs the versioned
         # RACommons-linux-x86_64-v<version>.tar.gz + .sha256 under dist/.
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash sdk/runanywhere-commons/scripts/build-linux.sh
+        run: bash scripts/build/linux.sh
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -170,12 +174,13 @@ jobs:
       - run: brew install ninja protobuf
       - name: Build rcli (macOS arm64, Metal)
         run: |
+          cd sdk/runanywhere-commons
           cmake --preset rcli-macos-release
           cmake --build --preset rcli-macos-release
       - name: Package rcli tarball
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
+        run: bash scripts/release/package-rcli.sh sdk/runanywhere-commons/build/rcli-macos-release macos-arm64
       - name: Upload rcli macOS artifact
         uses: actions/upload-artifact@v4
         with:
@@ -197,15 +202,16 @@ jobs:
           platform: linux
       - run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
       - name: Sherpa-ONNX prebuilts
-        run: ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
+        run: ./scripts/build/deps/download-sherpa-onnx.sh linux
       - name: Build rcli (Linux x86_64)
         run: |
+          cd sdk/runanywhere-commons
           cmake --preset rcli-linux-release
           cmake --build --preset rcli-linux-release
       - name: Package rcli tarball
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
+        run: bash scripts/release/package-rcli.sh sdk/runanywhere-commons/build/rcli-linux-release linux-x86_64
       - name: Upload rcli Linux artifact
         uses: actions/upload-artifact@v4
         with:
@@ -228,7 +234,7 @@ jobs:
       - name: Build commons + backends for Windows x64
         working-directory: sdk/runanywhere-commons
         shell: cmd
-        run: scripts\build-windows.bat
+        run: ..\..\scripts\build\windows.bat
       - name: Package Windows outputs
         working-directory: sdk/runanywhere-commons
         shell: bash
@@ -240,7 +246,7 @@ jobs:
           # ship a release with no Windows artifact at all. Now symmetric
           # with the iOS/Android/Web policy via pass3-syn-007 + pass3-syn-010.
           if [ ! -d dist/windows ]; then
-            echo "::error::dist/windows missing — build-windows.bat may have failed or used a different output path"
+            echo "::error::dist/windows missing — windows.bat may have failed or used a different output path"
             exit 1
           fi
           (cd dist/windows && 7z a "../RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" .)
@@ -278,7 +284,7 @@ jobs:
         working-directory: sdk/runanywhere-web-next
         run: npm run build:wasm -- --llamacpp --webgpu
       - name: Package Web/WASM outputs
-        # The new wasm/scripts/build.sh emits every WASM variant (CPU, WebGPU)
+        # scripts/build/wasm/bundle.sh emits every WASM variant (CPU, WebGPU)
         # under packages/llamacpp/wasm. Also include packages/core/wasm and
         # packages/onnx/wasm if present (vendored sherpa-onnx / ONNX Runtime
         # artifacts). Package only directories that actually exist so a
@@ -339,7 +345,7 @@ jobs:
         # AAR + JVM JAR → checksum. SDK_VERSION names the JVM JAR.
         env:
           SDK_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash sdk/runanywhere-kotlin/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-android-staging"
+        run: bash scripts/release/package-kotlin.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-android-staging"
       - name: Upload Kotlin SDK artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -367,7 +373,7 @@ jobs:
         # workspaces → npm install + build:ts → npm pack each package → checksum.
         # The script packs @runanywhere/proto-ts alongside the SDK packages (it
         # tracks the SDK version, bumped by scripts/release/sync-versions.sh).
-        run: bash sdk/runanywhere-web-next/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-web-staging"
+        run: bash scripts/release/package-web.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-web-staging"
       - name: Upload Web SDK artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -430,7 +436,7 @@ jobs:
         env:
           RAC_ALLOW_NPM_FALLBACK: "1"
         run: |
-          bash sdk/runanywhere-react-native/scripts/package-sdk.sh \
+          bash scripts/release/package-rn.sh \
             --mode ci \
             --natives-from "$GITHUB_WORKSPACE/rn-natives-staging"
       - name: Upload RN SDK artifacts
@@ -820,7 +826,7 @@ jobs:
             ls -la release-flat/ || true
             exit 1
           fi
-          ./sdk/runanywhere-swift/scripts/sync-checksums.sh release-flat
+          ./scripts/release/sync-checksums.sh release-flat
           if ! git diff --quiet Package.swift; then
             echo "Package.swift checksums updated:"
             git diff Package.swift | head -40

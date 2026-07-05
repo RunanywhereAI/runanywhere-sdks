@@ -172,7 +172,7 @@ private fun ToolCallFormatName?.toToolFormatHint(): String =
 
 // RAToolValue ergonomic helpers (mirror Swift `RAToolValue` extension)
 
-// MARK: Constructors -----------------------------------------------------------
+// MARK: Constructors
 
 /** `RAToolValue.string("hi")` — string scalar (Swift: `RAToolValue("hi")`). */
 fun ai.runanywhere.proto.v1.ToolValue.Companion.string(v: String): RAToolValue = RAToolValue(string_value = v)
@@ -205,7 +205,7 @@ fun ai.runanywhere.proto.v1.ToolValue.Companion.`object`(
     fields: Map<String, RAToolValue>,
 ): RAToolValue = RAToolValue(object_value = RAToolValueObject(fields = fields))
 
-// MARK: Getters ----------------------------------------------------------------
+// MARK: Getters
 
 /** Swift parity: `value.string -> String?`. */
 val RAToolValue.string: String? get() = string_value
@@ -226,7 +226,7 @@ val RAToolValue.array: List<RAToolValue>? get() = array_value?.values
 @Suppress("VariableNaming")
 val RAToolValue.`object`: Map<String, RAToolValue>? get() = object_value?.fields
 
-// MARK: JSON bridge ------------------------------------------------------------
+// MARK: JSON bridge
 //
 // The recursive walk lives in commons (G3); Kotlin only marshals bytes via
 // the `rac_tool_value_{to,from}_json_proto` JNI thunks, mirroring Swift's

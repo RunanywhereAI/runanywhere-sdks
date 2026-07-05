@@ -42,9 +42,7 @@ import 'package:runanywhere_onnx/native/onnx_bindings.dart';
 class Onnx {
   Onnx._();
 
-  // ============================================================================
   // Module Info (matches Swift exactly)
-  // ============================================================================
 
   /// Current version of the ONNX Runtime module
   static const String version = '2.0.0';
@@ -52,18 +50,14 @@ class Onnx {
   /// ONNX Runtime library version (underlying C library)
   static const String onnxRuntimeVersion = '1.23.2';
 
-  // ============================================================================
   // Registration State
-  // ============================================================================
 
   static bool _isRegistered = false;
   static bool _isSherpaRegistered = false;
   static OnnxBindings? _bindings;
   static final _logger = SDKLogger('Onnx');
 
-  // ============================================================================
   // Registration (matches Swift ONNX.register() exactly)
-  // ============================================================================
 
   /// Register ONNX backend with the C++ service registry.
   ///
@@ -156,9 +150,7 @@ class Onnx {
   /// On Android: Checks if librac_backend_onnx_jni.so can be loaded
   static bool get isAvailable => OnnxBindings.checkAvailability();
 
-  // ============================================================================
   // Cleanup
-  // ============================================================================
 
   /// Dispose of resources
   static void dispose() {
@@ -168,9 +160,7 @@ class Onnx {
     _logger.info('ONNX disposed');
   }
 
-  // ============================================================================
   // Auto-Registration (matches Swift exactly)
-  // ============================================================================
 
   /// Enable auto-registration for this module.
   /// Call this function to trigger C++ backend registration.

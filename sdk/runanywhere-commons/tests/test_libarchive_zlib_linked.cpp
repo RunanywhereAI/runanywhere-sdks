@@ -34,7 +34,7 @@
  *       a regression that affects Emscripten/iOS will also show up here.
  *
  *     - Emscripten / cross-compile: ctest is not invoked on Emscripten host
- *       runs, so the failure mode lands first in the wasm/scripts/build.sh
+ *       runs, so the failure mode lands first in the scripts/build/wasm/bundle.sh
  *       libarchive config.h grep and the
  *       configure-time assertion block in sdk/runanywhere-commons/CMakeLists.txt.
  *       This file documents the contract so future maintainers don't move
@@ -43,7 +43,7 @@
  * @see test_extraction_no_program_fallback.cpp (sibling test)
  * @see sdk/runanywhere-commons/CMakeLists.txt (HAVE_ZLIB_H / HAVE_BZLIB_H
  *      configure-time assertion)
- * @see sdk/runanywhere-web/wasm/scripts/build.sh (post-build wasm string
+ * @see scripts/build/wasm/bundle.sh (post-build wasm string
  *      scan + config.h grep)
  */
 

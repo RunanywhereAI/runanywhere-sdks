@@ -64,7 +64,6 @@ export type {
 };
 export { ToolParameterType };
 
-// ---------------------------------------------------------------------------
 // ToolValue ↔ plain-JSON bridge (RN-layer mirror of commons'
 // `rac_tool_value_from_json_proto` / `rac_tool_value_to_json_proto`).
 //
@@ -73,7 +72,6 @@ export { ToolParameterType };
 // commons via `RAToolValue.parseObjectJSON`; RN performs the equivalent
 // walk here in TypeScript so executors receive the same `ToolValue` oneof
 // tree rather than `unknown`.
-// ---------------------------------------------------------------------------
 
 function plainJsonToToolValue(value: unknown): ToolValue {
   if (value === null || value === undefined) {

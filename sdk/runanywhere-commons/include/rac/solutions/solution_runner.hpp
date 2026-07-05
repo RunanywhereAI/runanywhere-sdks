@@ -10,7 +10,6 @@
 // spawns ephemeral sub-pipelines) this class is the natural seam.
 //
 // Threading
-// ---------
 // `start()` is non-blocking — it spawns the scheduler workers and
 // returns. `stop()` closes every input edge and cancels the scheduler
 // (still non-blocking); `cancel()` is an alias that additionally
@@ -19,7 +18,6 @@
 // accidental early drop.
 //
 // SOLID
-// -----
 //   * Single responsibility: lifecycle (start/stop/cancel/wait); no
 //     protocol, no I/O, no engine wiring — those live in the executor
 //     and the operator registry respectively.

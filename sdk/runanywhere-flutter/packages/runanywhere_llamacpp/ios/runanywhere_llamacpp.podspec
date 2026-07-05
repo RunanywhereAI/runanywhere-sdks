@@ -5,7 +5,7 @@
 # generation via llama.cpp) into Flutter iOS apps.
 #
 # The xcframework is staged into this plugin's ios/Frameworks/ directory by
-# sdk/runanywhere-swift/scripts/build-core-xcframework.sh → sync_flutter_frameworks().
+# scripts/build/ios-xcframework.sh → sync_flutter_frameworks().
 #
 
 Pod::Spec.new do |s|
@@ -32,7 +32,7 @@ capabilities using llama.cpp via RABackendLLAMACPP.xcframework.
   s.dependency 'runanywhere'
 
   # =============================================================================
-  # Vendored xcframework (built by sdk/runanywhere-swift/scripts/build-core-xcframework.sh)
+  # Vendored xcframework (built by scripts/build/ios-xcframework.sh)
   # =============================================================================
   s.vendored_frameworks = 'Frameworks/RABackendLLAMACPP.xcframework'
   s.preserve_paths = 'Frameworks/**/*'

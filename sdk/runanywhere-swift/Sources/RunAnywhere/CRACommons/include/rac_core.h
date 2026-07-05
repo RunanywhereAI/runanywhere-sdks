@@ -19,16 +19,12 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // FORWARD DECLARATIONS
-// =============================================================================
 
 /** Platform adapter (see rac_platform_adapter.h) */
 typedef struct rac_platform_adapter rac_platform_adapter_t;
 
-// =============================================================================
 // CONFIGURATION
-// =============================================================================
 
 /**
  * Configuration for initializing the commons library.
@@ -47,9 +43,7 @@ typedef struct rac_config {
     void* reserved;
 } rac_config_t;
 
-// =============================================================================
 // INITIALIZATION API
-// =============================================================================
 
 /**
  * Initializes the commons library.
@@ -115,7 +109,6 @@ RAC_API const char* rac_sdk_get_version(void);
  */
 RAC_API rac_result_t rac_configure_logging(rac_environment_t environment);
 
-// =============================================================================
 // NOTE: The legacy service-registry surface (rac_service_request_t,
 // rac_service_provider_t, rac_service_can_handle_fn, rac_service_create_fn,
 // rac_service_register_provider, rac_service_unregister_provider,
@@ -126,11 +119,8 @@ RAC_API rac_result_t rac_configure_logging(rac_environment_t environment);
 // (rac_plugin_register / rac_plugin_list / rac_plugin_find). Backend selection
 // is simple priority order — the highest-priority registered plugin that serves
 // the requested primitive wins; there is no hardware/format/accelerator scoring.
-// =============================================================================
 
-// =============================================================================
 // GLOBAL MODEL REGISTRY API
-// =============================================================================
 
 /**
  * Gets the global model registry instance.
@@ -171,9 +161,7 @@ RAC_API rac_result_t rac_get_model(const char* model_id, struct rac_model_info**
 RAC_API rac_result_t rac_get_model_by_path(const char* local_path,
                                            struct rac_model_info** out_model);
 
-// =============================================================================
 // GLOBAL LORA REGISTRY API
-// =============================================================================
 
 /**
  * @brief Get the global LoRA adapter registry singleton

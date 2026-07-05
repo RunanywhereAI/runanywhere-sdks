@@ -293,7 +293,6 @@ int rac_wasm_result_to_proto_error(int code, rac_proto_buffer_t *out_proto) {
   return (int)rac_result_to_proto_error((rac_result_t)code, out_proto);
 }
 
-// =============================================================================
 // FIELD OFFSET HELPERS
 //
 // JavaScript must not hard-code C struct field offsets — they depend on
@@ -303,14 +302,13 @@ int rac_wasm_result_to_proto_error(int code, rac_proto_buffer_t *out_proto) {
 //
 // Naming convention:
 //   rac_wasm_offsetof_<struct>_<field>()
-// =============================================================================
 
-// ---- rac_config_t ----
+// rac_config_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_config_log_level(void) {
   return (int)offsetof(rac_config_t, log_level);
 }
 
-// ---- rac_platform_adapter_t ----
+// rac_platform_adapter_t
 // The JS layer
 // (sdk/runanywhere-web-next/packages/llamacpp/src/Foundation/PlatformAdapter.ts)
 // packs function-pointer fields into this struct. Every field offset is
@@ -395,12 +393,12 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_directory_entry_size_bytes(void) {
   return (int)offsetof(rac_directory_entry_t, size_bytes);
 }
 
-// ---- rac_config_t (platform_adapter field) ----
+// rac_config_t (platform_adapter field)
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_config_platform_adapter(void) {
   return (int)offsetof(rac_config_t, platform_adapter);
 }
 
-// ---- rac_llm_options_t ----
+// rac_llm_options_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_options_max_tokens(void) {
   return (int)offsetof(rac_llm_options_t, max_tokens);
 }
@@ -414,7 +412,7 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_options_system_prompt(void) {
   return (int)offsetof(rac_llm_options_t, system_prompt);
 }
 
-// ---- rac_llm_result_t ----
+// rac_llm_result_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_result_text(void) {
   return (int)offsetof(rac_llm_result_t, text);
 }
@@ -425,7 +423,7 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_result_completion_tokens(void) {
   return (int)offsetof(rac_llm_result_t, completion_tokens);
 }
 
-// ---- rac_vlm_image_t ----
+// rac_vlm_image_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_image_format(void) {
   return (int)offsetof(rac_vlm_image_t, format);
 }
@@ -448,7 +446,7 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_image_data_size(void) {
   return (int)offsetof(rac_vlm_image_t, data_size);
 }
 
-// ---- rac_vlm_options_t ----
+// rac_vlm_options_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_options_max_tokens(void) {
   return (int)offsetof(rac_vlm_options_t, max_tokens);
 }
@@ -468,7 +466,7 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_options_model_family(void) {
   return (int)offsetof(rac_vlm_options_t, model_family);
 }
 
-// ---- rac_vlm_result_t ----
+// rac_vlm_result_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_text(void) {
   return (int)offsetof(rac_vlm_result_t, text);
 }
@@ -499,7 +497,7 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_tokens_per_second(void) {
   return (int)offsetof(rac_vlm_result_t, tokens_per_second);
 }
 
-// ---- rac_structured_output_config_t ----
+// rac_structured_output_config_t
 EMSCRIPTEN_KEEPALIVE int
 rac_wasm_offsetof_structured_output_config_json_schema(void) {
   return (int)offsetof(rac_structured_output_config_t, json_schema);
@@ -510,7 +508,7 @@ rac_wasm_offsetof_structured_output_config_include_schema_in_prompt(void) {
                        include_schema_in_prompt);
 }
 
-// ---- rac_structured_output_validation_t ----
+// rac_structured_output_validation_t
 EMSCRIPTEN_KEEPALIVE int
 rac_wasm_offsetof_structured_output_validation_is_valid(void) {
   return (int)offsetof(rac_structured_output_validation_t, is_valid);
@@ -524,7 +522,7 @@ rac_wasm_offsetof_structured_output_validation_extracted_json(void) {
   return (int)offsetof(rac_structured_output_validation_t, extracted_json);
 }
 
-// ---- rac_embeddings_options_t ----
+// rac_embeddings_options_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embeddings_options_normalize(void) {
   return (int)offsetof(rac_embeddings_options_t, normalize);
 }
@@ -535,7 +533,7 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embeddings_options_n_threads(void) {
   return (int)offsetof(rac_embeddings_options_t, n_threads);
 }
 
-// ---- rac_embeddings_result_t ----
+// rac_embeddings_result_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embeddings_result_embeddings(void) {
   return (int)offsetof(rac_embeddings_result_t, embeddings);
 }
@@ -555,7 +553,7 @@ rac_wasm_offsetof_embeddings_result_total_tokens(void) {
   return (int)offsetof(rac_embeddings_result_t, total_tokens);
 }
 
-// ---- rac_embedding_vector_t ----
+// rac_embedding_vector_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_embedding_vector(void) {
   return (int)sizeof(rac_embedding_vector_t);
 }
@@ -566,7 +564,7 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embedding_vector_dimension(void) {
   return (int)offsetof(rac_embedding_vector_t, dimension);
 }
 
-// ---- rac_diffusion_options_t ----
+// rac_diffusion_options_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_prompt(void) {
   return (int)offsetof(rac_diffusion_options_t, prompt);
 }
@@ -609,7 +607,7 @@ rac_wasm_offsetof_diffusion_options_progress_stride(void) {
   return (int)offsetof(rac_diffusion_options_t, progress_stride);
 }
 
-// ---- rac_diffusion_result_t ----
+// rac_diffusion_result_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_image_data(void) {
   return (int)offsetof(rac_diffusion_result_t, image_data);
 }
@@ -634,16 +632,14 @@ rac_wasm_offsetof_diffusion_result_safety_flagged(void) {
   return (int)offsetof(rac_diffusion_result_t, safety_flagged);
 }
 
-// =============================================================================
 // HTTP CLIENT STRUCT HELPERS
 //
 // T3.13 — Web SDK migrates off hand-rolled fetch() onto the commons libcurl-
 // backed C ABI. Rather than hard-coding struct layouts in TypeScript
 // (which breaks on wasm32 padding / future field additions), expose
 // sizeof() and offsetof() for every field the TS HTTPAdapter touches.
-// =============================================================================
 
-// ---- rac_http_request_t ----
+// rac_http_request_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_http_request(void) {
   return (int)sizeof(rac_http_request_t);
 }
@@ -676,7 +672,7 @@ rac_wasm_offsetof_http_request_expected_checksum_hex(void) {
   return (int)offsetof(rac_http_request_t, expected_checksum_hex);
 }
 
-// ---- rac_http_response_t ----
+// rac_http_response_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_http_response(void) {
   return (int)sizeof(rac_http_response_t);
 }
@@ -699,7 +695,7 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_response_redirected_url(void) {
   return (int)offsetof(rac_http_response_t, redirected_url);
 }
 
-// ---- rac_http_header_kv_t ----
+// rac_http_header_kv_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_http_header_kv(void) {
   return (int)sizeof(rac_http_header_kv_t);
 }
@@ -710,7 +706,7 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_header_kv_value(void) {
   return (int)offsetof(rac_http_header_kv_t, value);
 }
 
-// ---- rac_http_download_request_t ----
+// rac_http_download_request_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_http_download_request(void) {
   return (int)sizeof(rac_http_download_request_t);
 }
@@ -745,7 +741,7 @@ rac_wasm_offsetof_http_download_request_expected_sha256_hex(void) {
   return (int)offsetof(rac_http_download_request_t, expected_sha256_hex);
 }
 
-// ---- rac_proto_buffer_t ----
+// rac_proto_buffer_t
 EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_proto_buffer(void) {
   return (int)sizeof(rac_proto_buffer_t);
 }
@@ -762,12 +758,10 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_proto_buffer_error_message(void) {
   return (int)offsetof(rac_proto_buffer_t, error_message);
 }
 
-// =============================================================================
 // DEV CONFIG WRAPPERS
 //
 // Expose development configuration values (Supabase URL/key, build token)
 // so that the TypeScript HTTP layer can use them for dev-mode telemetry.
-// =============================================================================
 
 EMSCRIPTEN_KEEPALIVE
 int rac_wasm_dev_config_is_available(void) {
@@ -789,7 +783,6 @@ const char *rac_wasm_dev_config_get_build_token(void) {
   return rac_dev_config_get_build_token();
 }
 
-// =============================================================================
 // FILE MANAGER WRAPPERS (clearCache / cleanTempFiles)
 //
 // Web has no rac_file_callbacks_t bridge (the platform-adapter file slots are
@@ -800,7 +793,6 @@ const char *rac_wasm_dev_config_get_build_token(void) {
 // commons (rac_file_manager_clear_cache/clear_temp → {base}/RunAnywhere/
 // Cache|Temp). std::filesystem against MEMFS is proven in this build
 // (rac_http_download.cpp, download_orchestrator.cpp).
-// =============================================================================
 
 } // extern "C"
 
@@ -930,7 +922,7 @@ int rac_wasm_file_manager_clear_temp(void) {
   return static_cast<int>(rac_file_manager_clear_temp(&cb));
 }
 
-// ── Model-category / framework capability wrappers (proto-int ABI) ──────────
+// Model-category / framework capability wrappers (proto-int ABI)
 // The proto enums and the C enums use different numeric values, so these
 // wrappers convert via rac_*_from_proto / _to_proto before delegating. They
 // back the Web SDK's ModelTypes helpers — the same C helpers Swift routes

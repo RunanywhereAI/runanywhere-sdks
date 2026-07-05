@@ -12,9 +12,7 @@ import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 
-// =============================================================================
 // Model Registry Bridge
-// =============================================================================
 
 /// Model registry bridge for C++ model registry operations.
 /// Matches Swift's `CppBridge+ModelRegistry.swift`.
@@ -38,9 +36,7 @@ class DartBridgeModelRegistry {
   /// Native global registry handle for other proto-byte bridge surfaces.
   Pointer<Void>? get nativeHandle => _registryHandle;
 
-  // ============================================================================
   // Lifecycle
-  // ============================================================================
 
   /// Wire the global C++ model registry handle (sync, Phase 1 safe).
   ///
@@ -111,9 +107,7 @@ class DartBridgeModelRegistry {
     _logger.debug('Model registry bridge shutdown (global registry preserved)');
   }
 
-  // ============================================================================
   // Model CRUD Operations
-  // ============================================================================
 
   /// Save a generated proto ModelInfo to the C++ registry.
   Future<bool> saveProtoModel(model_pb.ModelInfo model) async {
@@ -569,9 +563,7 @@ class DartBridgeModelRegistry {
     }
   }
 
-  // ============================================================================
   // Refresh — bridges rac_model_registry_refresh_proto
-  // ============================================================================
 
   /// Refresh the model registry via the commons proto entry point
   /// `rac_model_registry_refresh_proto`.
@@ -620,9 +612,7 @@ class DartBridgeModelRegistry {
     }
   }
 
-  // ============================================================================
   // Model Discovery
-  // ============================================================================
 
   /// Discover downloaded models via the proto-bytes ABI.
   ///
@@ -678,9 +668,7 @@ class DartBridgeModelRegistry {
   }
 }
 
-// =============================================================================
 // Model Format Bridge (folded from former dart_bridge_model_format.dart)
-// =============================================================================
 
 /// Thin proto-byte bridge for URL → ModelFormat / ModelArtifactType inference.
 /// Delegates to the commons APIs
@@ -822,9 +810,7 @@ class DartBridgeModelFormat {
   }
 }
 
-// =============================================================================
 // FFI Structs
-// =============================================================================
 
 /// Artifact info struct matching C++ rac_model_artifact_info_t
 /// Used as nested struct in RacModelInfoCStruct

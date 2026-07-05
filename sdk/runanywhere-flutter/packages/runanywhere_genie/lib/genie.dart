@@ -43,9 +43,7 @@ import 'package:runanywhere_genie/native/genie_bindings.dart';
 class Genie {
   Genie._();
 
-  // ============================================================================
   // Module Info (matches Swift exactly)
-  // ============================================================================
 
   /// Current version of the Genie Runtime Dart module.
   ///
@@ -59,17 +57,13 @@ class Genie {
   /// release URL resolution.
   static const String genieNativeVersion = '0.3.0';
 
-  // ============================================================================
   // Registration State
-  // ============================================================================
 
   static bool _isRegistered = false;
   static GenieBindings? _bindings;
   static final _logger = SDKLogger('Genie');
 
-  // ============================================================================
   // Registration (matches Swift Genie.register() exactly)
-  // ============================================================================
 
   /// Register Genie backend with the C++ service registry.
   ///
@@ -142,9 +136,7 @@ class Genie {
   /// - On iOS/other: Always returns false
   static bool get isAvailable => GenieBindings.checkAvailability();
 
-  // ============================================================================
   // Cleanup
-  // ============================================================================
 
   /// Dispose of resources
   static void dispose() {
@@ -153,9 +145,7 @@ class Genie {
     _logger.info('Genie disposed');
   }
 
-  // ============================================================================
   // Auto-Registration (matches Swift exactly)
-  // ============================================================================
 
   /// Enable auto-registration for this module.
   /// Call this method to trigger C++ backend registration.

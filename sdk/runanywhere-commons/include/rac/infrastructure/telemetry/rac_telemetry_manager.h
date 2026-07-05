@@ -27,9 +27,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // TELEMETRY MANAGER
-// =============================================================================
 
 /**
  * @brief Opaque telemetry manager handle
@@ -66,9 +64,7 @@ RAC_API void rac_telemetry_manager_http_complete(rac_telemetry_manager_t* manage
                                                  rac_bool_t success, const char* response_json,
                                                  const char* error_message);
 
-// =============================================================================
 // LIFECYCLE
-// =============================================================================
 
 /**
  * @brief Create telemetry manager
@@ -107,9 +103,7 @@ RAC_API void rac_telemetry_manager_set_http_callback(rac_telemetry_manager_t* ma
                                                      rac_telemetry_http_callback_t callback,
                                                      void* user_data);
 
-// =============================================================================
 // EVENT TRACKING
-// =============================================================================
 
 /**
  * @brief Track a telemetry payload directly
@@ -138,9 +132,7 @@ RAC_API rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* 
  */
 RAC_API rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager);
 
-// =============================================================================
 // ISOLATE-SAFE HTTP DELIVERY (poll-queue)
-// =============================================================================
 
 /**
  * @brief Wake-up callback signalling that HTTP request(s) are queued.
@@ -174,9 +166,7 @@ RAC_API void rac_telemetry_manager_set_http_wakeup(rac_telemetry_manager_t* mana
 RAC_API rac_result_t rac_telemetry_manager_poll_http_request(rac_telemetry_manager_t* manager,
                                                              rac_proto_buffer_t* out);
 
-// =============================================================================
 // JSON SERIALIZATION
-// =============================================================================
 
 /**
  * @brief Serialize telemetry payload to JSON
@@ -214,9 +204,7 @@ rac_telemetry_manager_batch_to_json(const rac_telemetry_batch_request_t* request
 RAC_API rac_result_t rac_telemetry_manager_parse_response(
     const char* json, rac_telemetry_batch_response_t* out_response);
 
-// =============================================================================
 // DEVICE REGISTRATION
-// =============================================================================
 
 /**
  * @brief Serialize device registration request to JSON

@@ -24,9 +24,7 @@ static inline char* realpath(const char* path, char* resolved) {
 
 namespace test_config {
 
-// =============================================================================
 // File Utilities
-// =============================================================================
 
 inline bool file_exists(const std::string& path) {
     struct stat st;
@@ -54,9 +52,7 @@ inline bool require_model(const std::string& path, const std::string& name, Test
     return true;
 }
 
-// =============================================================================
 // Environment / Path Helpers
-// =============================================================================
 
 inline std::string get_home_dir() {
     const char* home = std::getenv("HOME");
@@ -72,9 +68,7 @@ inline std::string get_model_dir() {
     return get_home_dir() + "/.local/share/runanywhere/Models";
 }
 
-// =============================================================================
 // VAD
-// =============================================================================
 
 inline std::string get_vad_model_path() {
     const char* env = std::getenv("RAC_TEST_VAD_MODEL");
@@ -83,9 +77,7 @@ inline std::string get_vad_model_path() {
     return get_model_dir() + "/ONNX/silero-vad/silero_vad.onnx";
 }
 
-// =============================================================================
 // STT (Whisper)
-// =============================================================================
 
 inline std::string get_stt_model_path() {
     const char* env = std::getenv("RAC_TEST_STT_MODEL");
@@ -94,9 +86,7 @@ inline std::string get_stt_model_path() {
     return get_model_dir() + "/ONNX/whisper-tiny-en";
 }
 
-// =============================================================================
 // TTS (Piper / VITS)
-// =============================================================================
 
 inline std::string get_tts_model_path() {
     const char* env = std::getenv("RAC_TEST_TTS_MODEL");
@@ -105,9 +95,7 @@ inline std::string get_tts_model_path() {
     return get_model_dir() + "/ONNX/vits-piper-en_US-lessac-medium";
 }
 
-// =============================================================================
 // LLM (LlamaCPP)
-// =============================================================================
 
 inline std::string get_llm_model_path() {
     const char* env = std::getenv("RAC_TEST_LLM_MODEL");
@@ -116,9 +104,7 @@ inline std::string get_llm_model_path() {
     return get_model_dir() + "/LlamaCpp/qwen3-0.6b/Qwen3-0.6B-Q8_0.gguf";
 }
 
-// =============================================================================
 // WakeWord (openWakeWord)
-// =============================================================================
 
 inline std::string resolve_wakeword_dir() {
     // Try both directory naming conventions used by different playground apps
@@ -175,9 +161,7 @@ inline std::string get_wakeword_model_path() {
     return get_model_dir() + "/ONNX/hey-jarvis/hey_jarvis_v0.1.onnx";
 }
 
-// =============================================================================
 // Test Audio Directory
-// =============================================================================
 
 /**
  * Resolve test audio directory. Checks in order:

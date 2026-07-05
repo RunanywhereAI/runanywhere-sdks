@@ -2,10 +2,9 @@
  * @file stt_module.cpp
  * @brief Unified STT feature module.
  *
- * W4 component unification: merges the former stt_component.cpp (handle-based
- * component path + the *_component_*_proto verbs) with STT's slice of
- * rac_nonllm_lifecycle_proto_abi.cpp (the handle-less
- * rac_stt_transcribe_lifecycle_proto / _stream verbs) into one TU.
+ * One TU owns both the handle-based component path (+ the *_component_*_proto
+ * verbs) and the handle-less rac_stt_transcribe_lifecycle_proto / _stream
+ * verbs.
  *
  * The component section is a direct translation of Swift's STTCapability.swift;
  * do NOT add features not present in the Swift code.
@@ -46,9 +45,7 @@
 #include "infrastructure/events/sdk_event_publish.h"
 #endif
 
-// =============================================================================
 // INTERNAL STRUCTURES
-// =============================================================================
 
 /**
  * Internal STT component state.
@@ -78,9 +75,7 @@ struct rac_stt_component {
     }
 };
 
-// =============================================================================
 // HELPER FUNCTIONS
-// =============================================================================
 
 /**
  * Generate a unique ID for transcription tracking.
@@ -381,9 +376,7 @@ void publish_stt_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
 
 }  // namespace
 
-// =============================================================================
 // LIFECYCLE CALLBACKS
-// =============================================================================
 
 static rac_result_t stt_create_service(const char* model_id, void* user_data,
                                        rac_handle_t* out_service) {
@@ -421,9 +414,7 @@ static void stt_destroy_service(rac_handle_t service, void* user_data) {
     }
 }
 
-// =============================================================================
 // LIFECYCLE API
-// =============================================================================
 
 extern "C" rac_result_t rac_stt_component_create(rac_handle_t* out_handle) {
     return rac::features::create_lifecycle_component<rac_stt_component>(
@@ -507,9 +498,7 @@ extern "C" void rac_stt_component_destroy(rac_handle_t handle) {
     delete component;
 }
 
-// =============================================================================
 // MODEL LIFECYCLE
-// =============================================================================
 
 extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const char* model_path,
                                                      const char* model_id, const char* model_name) {
@@ -600,9 +589,7 @@ extern "C" rac_result_t rac_stt_component_cleanup(rac_handle_t handle) {
     return rac_lifecycle_reset(component->lifecycle);
 }
 
-// =============================================================================
 // TRANSCRIPTION API
-// =============================================================================
 
 extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const void* audio_data,
                                                      size_t audio_size,
@@ -928,9 +915,7 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
     return result;
 }
 
-// =============================================================================
 // STATE QUERY API
-// =============================================================================
 
 extern "C" rac_lifecycle_state_t rac_stt_component_get_state(rac_handle_t handle) {
     if (!handle)
@@ -951,9 +936,7 @@ extern "C" rac_result_t rac_stt_component_get_metrics(rac_handle_t handle,
     return rac_lifecycle_get_metrics(component->lifecycle, out_metrics);
 }
 
-// =============================================================================
 // LANGUAGE INTROSPECTION
-// =============================================================================
 
 extern "C" rac_result_t rac_stt_component_get_supported_languages(rac_handle_t handle,
                                                                   char** out_json) {
@@ -1010,9 +993,7 @@ extern "C" rac_result_t rac_stt_component_detect_language(rac_handle_t handle,
     return rac_stt_detect_language(service, audio_data, audio_size, &local_options, out_language);
 }
 
-// =============================================================================
 // GENERATED-PROTO C ABI
-// =============================================================================
 
 extern "C" rac_result_t
 rac_stt_component_transcribe_proto(rac_handle_t handle, const void* audio_data, size_t audio_size,
@@ -1196,13 +1177,11 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
 #endif
 }
 
-// =============================================================================
 // Persistent per-session streaming handles.
 //
 // Route straight through the service vtable. When a backend leaves the
 // stream_* slots NULL, these helpers report RAC_ERROR_NOT_SUPPORTED and
 // rac_stt_stream.cpp falls back to the per-chunk transcribe_stream path.
-// =============================================================================
 
 namespace {
 
@@ -1321,13 +1300,10 @@ extern "C" rac_result_t rac_stt_component_stream_destroy(rac_handle_t handle,
     return rc;
 }
 
-// =============================================================================
-// LIFECYCLE-OWNED GENERATED-PROTO C ABI (formerly STT slice of
-// rac_nonllm_lifecycle_proto_abi.cpp)
+// LIFECYCLE-OWNED GENERATED-PROTO C ABI
 //
 // Handle-less verbs that resolve the loaded model via the global registry
 // (rac::lifecycle::acquire_lifecycle_stt) rather than a component handle.
-// =============================================================================
 
 namespace {
 

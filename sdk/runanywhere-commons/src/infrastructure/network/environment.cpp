@@ -10,9 +10,7 @@
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/network/rac_environment.h"
 
-// =============================================================================
 // Global State
-// =============================================================================
 
 static bool g_sdk_initialized = false;
 static rac_sdk_config_t g_sdk_config = {};
@@ -24,9 +22,7 @@ static char g_device_id[128] = {0};
 static char g_platform[32] = {0};
 static char g_sdk_version[32] = {0};
 
-// =============================================================================
 // Environment Query Functions
-// =============================================================================
 
 bool rac_env_requires_auth(rac_environment_t env) {
     return env != RAC_ENV_DEVELOPMENT;
@@ -101,9 +97,7 @@ int32_t rac_env_default_http_timeout_ms(rac_environment_t env) {
     }
 }
 
-// =============================================================================
 // URL Parsing Helpers
-// =============================================================================
 
 // Simple URL scheme extraction
 static bool extract_url_scheme(const char* url, char* scheme, size_t scheme_size) {
@@ -160,9 +154,7 @@ static bool is_localhost_host(const char* host) {
            strstr(host, "example.com") != nullptr || strstr(host, ".local") != nullptr;
 }
 
-// =============================================================================
 // Validation Functions
-// =============================================================================
 
 rac_validation_result_t rac_validate_api_key(const char* api_key, rac_environment_t env) {
     // Development mode doesn't require API key
@@ -277,9 +269,7 @@ const char* rac_validation_error_message(rac_validation_result_t result) {
     }
 }
 
-// =============================================================================
 // Global SDK State Functions
-// =============================================================================
 
 // Helper to safely copy string
 static void safe_strcpy(char* dest, size_t dest_size, const char* src) {

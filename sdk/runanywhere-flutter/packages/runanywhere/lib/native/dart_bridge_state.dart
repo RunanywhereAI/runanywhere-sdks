@@ -22,9 +22,7 @@ class DartBridgeState {
   static final _logger = SDKLogger('DartBridge.State');
   static final DartBridgeState instance = DartBridgeState._();
 
-  // ============================================================================
   // Initialization
-  // ============================================================================
 
   /// Install auth secure storage after the platform async cache is ready.
   ///
@@ -110,9 +108,7 @@ class DartBridgeState {
     }
   }
 
-  // ============================================================================
   // Environment Queries
-  // ============================================================================
 
   /// Get current environment from C++ state
   SDKEnvironment get environment {
@@ -181,12 +177,10 @@ class DartBridgeState {
     }
   }
 
-  // ============================================================================
   // Auth State (delegated to rac_auth_manager)
   //
   // F3 removed rac_state_* auth symbols. All auth accessors now delegate to
   // rac_auth_* — single source of truth.
-  // ============================================================================
 
   /// Get access token from the auth manager
   String? get accessToken {
@@ -283,9 +277,7 @@ class DartBridgeState {
     }
   }
 
-  // ============================================================================
   // Device State
-  // ============================================================================
 
   /// Set device registration status
   void setDeviceRegistered(bool registered) {
@@ -314,9 +306,7 @@ class DartBridgeState {
     }
   }
 
-  // ============================================================================
   // Helper Methods
-  // ============================================================================
 
   SDKEnvironment _intToEnvironment(int value) {
     switch (value) {

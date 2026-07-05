@@ -673,7 +673,7 @@ git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks
 
 # 2. Build XCFrameworks (~5-15 minutes)
-./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+./scripts/build/ios-xcframework.sh
 ```
 
 **What the build script does:**
@@ -716,7 +716,7 @@ The sample app's `Package.swift` references the local SDK, which in turn uses th
 ```
 Sample App → Local Swift SDK → Local XCFrameworks (Binaries/)
                                       ↑
-                         Built by sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+                         Built by scripts/build/ios-xcframework.sh
 ```
 
 ### Development Workflow
@@ -727,7 +727,7 @@ Sample App → Local Swift SDK → Local XCFrameworks (Binaries/)
 **After modifying runanywhere-commons (C++ code):**
 
 ```bash
-./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+./scripts/build/ios-xcframework.sh
 ```
 
 ### Running Tests

@@ -5,7 +5,7 @@
 //  Built-in Apple Foundation Models (Apple Intelligence) module.
 //  Platform-specific LLM provider available on iOS 26+ / macOS 26+.
 //
-//  Registration is now handled by the C++ platform backend. This module
+//  Registration is handled by the C++ platform backend. This module
 //  provides the Swift service implementation that the C++ backend calls.
 //
 

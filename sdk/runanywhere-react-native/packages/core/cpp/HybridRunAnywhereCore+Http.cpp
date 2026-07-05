@@ -10,9 +10,7 @@ namespace margelo::nitro::runanywhere {
 using namespace ::runanywhere::bridges;
 
 // HTTP Client
-// ============================================================================
 // HTTP Client — libcurl-backed rac_http_client_*
-// ============================================================================
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::httpRequest(
     const std::string& method,

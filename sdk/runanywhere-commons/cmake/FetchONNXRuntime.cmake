@@ -73,7 +73,7 @@ if(EMSCRIPTEN)
 
 elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     # iOS: Use local ONNX Runtime xcframework from third_party
-    # Downloaded by: ./scripts/ios/download-onnx.sh
+    # Downloaded by: scripts/build/deps/download-onnx.sh ios
     # NOTE: Version must match what sherpa-onnx was built against
 
     set(ONNX_IOS_VERSION "${ONNX_VERSION_IOS}")
@@ -149,7 +149,7 @@ elseif(ANDROID)
     # Android: Use ONNX Runtime from Sherpa-ONNX (16KB aligned in v1.12.20+)
     # Sherpa-ONNX version is defined in VERSIONS file: SHERPA_ONNX_VERSION_ANDROID
     # Sherpa-ONNX bundles a compatible version of ONNX Runtime
-    # Downloaded by: ./scripts/android/download-sherpa-onnx.sh
+    # Downloaded by: scripts/build/deps/download-sherpa-onnx.sh android
     # Anchor on this module's location so the lookup is stable under the
     # single-root CMake layout, where CMAKE_SOURCE_DIR is the repo
     # root but download-sherpa-onnx.sh populates sdk/runanywhere-commons/third_party/.
@@ -207,12 +207,12 @@ elseif(ANDROID)
         message(STATUS "ONNX Runtime Android library: ${ONNX_LIB_PATH}")
         message(STATUS "ONNX Runtime Android headers: ${ONNX_HEADER_PATH}")
     else()
-        message(FATAL_ERROR "Sherpa-ONNX not found. Please run: ./scripts/android/download-sherpa-onnx.sh")
+        message(FATAL_ERROR "Sherpa-ONNX not found. Please run: scripts/build/deps/download-sherpa-onnx.sh android")
     endif()
 
 elseif(APPLE)
     # macOS: Use local ONNX Runtime from third_party if available, otherwise download
-    # Downloaded by: ./scripts/macos/download-onnx.sh
+    # Downloaded by: scripts/build/deps/download-onnx.sh macos
 
     set(ONNX_MACOS_VERSION "${ONNX_VERSION_MACOS}")
     set(ONNX_MACOS_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-macos")

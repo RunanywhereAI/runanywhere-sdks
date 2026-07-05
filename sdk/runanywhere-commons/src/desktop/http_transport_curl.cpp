@@ -33,9 +33,7 @@ namespace {
 constexpr long kConnectTimeoutMs = 30000;
 constexpr long kMaxRedirects = 10;
 
-// -----------------------------------------------------------------------------
 // Per-request context
-// -----------------------------------------------------------------------------
 
 struct RequestContext {
     // Buffered body (request_send only).
@@ -121,9 +119,7 @@ size_t stream_write_callback(char* data, size_t size, size_t nmemb, void* user_d
     return total;
 }
 
-// -----------------------------------------------------------------------------
 // Helpers
-// -----------------------------------------------------------------------------
 
 rac_result_t map_curl_code(CURLcode code, const RequestContext& ctx) {
     switch (code) {
@@ -251,9 +247,7 @@ void populate_response_meta(CURL* curl, const rac_http_request_t* req, const Req
     }
 }
 
-// -----------------------------------------------------------------------------
 // Vtable implementation
-// -----------------------------------------------------------------------------
 
 rac_result_t curl_request_send(void* /*user_data*/, const rac_http_request_t* req,
                                rac_http_response_t* out_resp) {

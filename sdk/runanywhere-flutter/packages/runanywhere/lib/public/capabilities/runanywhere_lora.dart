@@ -33,7 +33,7 @@ class RunAnywhereLoRACapability {
       RunAnywhereLoRACapability._();
   static RunAnywhereLoRACapability get shared => _instance;
 
-  // --- Runtime adapter operations ----------------------------------------
+  // Runtime adapter operations
 
   /// Apply one or more LoRA adapters to the current model.
   Future<LoRAApplyResult> apply(LoRAApplyRequest request) async {
@@ -62,7 +62,7 @@ class RunAnywhereLoRACapability {
     return DartBridgeLora.shared.checkCompatibility(config);
   }
 
-  // --- Catalog operations -----------------------------------------------
+  // Catalog operations
 
   /// Register a LoRA adapter in the global registry. Entry is
   /// deep-copied internally by C++.
@@ -164,7 +164,7 @@ class RunAnywhereLoRACapability {
     return DartBridgeLoraRegistry.shared.getAll();
   }
 
-  // --- SDK-owned artifact registration + download -------------------------
+  // SDK-owned artifact registration + download
   // Mirrors Swift RunAnywhere+LoRADownload.swift:97-160.
 
   static const _loraArtifactModelIdPrefix = 'lora-adapter:';

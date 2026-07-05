@@ -34,9 +34,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // SERVICE VTABLE - Backend implementations provide this
-// =============================================================================
 
 /**
  * LLM Service operations vtable.
@@ -131,9 +129,7 @@ typedef struct rac_llm_service {
     const char* model_id;
 } rac_llm_service_t;
 
-// =============================================================================
 // PUBLIC API - Generic service functions
-// =============================================================================
 
 /**
  * @brief Create an LLM service
@@ -221,9 +217,7 @@ RAC_API void rac_llm_destroy(rac_handle_t handle);
  */
 RAC_API void rac_llm_result_free(rac_llm_result_t* result);
 
-// =============================================================================
 // GENERATED-PROTO LLM ABI - lifecycle-owned model state
-// =============================================================================
 
 /**
  * @brief Generate text from serialized runanywhere.v1.LLMGenerateRequest bytes.
@@ -285,9 +279,7 @@ RAC_API rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_
  */
 RAC_API rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event);
 
-// =============================================================================
 // ADAPTIVE CONTEXT API - For RAG and similar pipelines
-// =============================================================================
 
 /**
  * @brief Inject a system prompt into the LLM's KV cache at position 0

@@ -23,9 +23,7 @@ extern "C" {
 
 // NOTE: rac_llm_config_t is defined in rac_llm_types.h (included above)
 
-// =============================================================================
 // STREAMING CALLBACKS - For component-level streaming
-// =============================================================================
 
 /**
  * @brief Streaming callback for token-by-token generation
@@ -59,9 +57,7 @@ typedef void (*rac_llm_component_complete_callback_fn)(const rac_llm_result_t* r
 typedef void (*rac_llm_component_error_callback_fn)(rac_result_t error_code,
                                                     const char* error_message, void* user_data);
 
-// =============================================================================
 // LLM COMPONENT API - Mirrors Swift's LLMCapability
-// =============================================================================
 
 /**
  * @brief Create an LLM capability component
@@ -251,9 +247,7 @@ RAC_API rac_lifecycle_state_t rac_llm_component_get_state(rac_handle_t handle);
 RAC_API rac_result_t rac_llm_component_get_metrics(rac_handle_t handle,
                                                    rac_lifecycle_metrics_t* out_metrics);
 
-// =============================================================================
 // LORA ADAPTER API
-// =============================================================================
 
 /**
  * @brief Load and apply a LoRA adapter
@@ -313,9 +307,7 @@ RAC_API rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
                                                          const char* adapter_path,
                                                          char** out_error);
 
-// =============================================================================
 // DESTRUCTION
-// =============================================================================
 
 /**
  * @brief Destroy the LLM component

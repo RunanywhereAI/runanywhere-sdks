@@ -46,9 +46,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // CONSTANTS - Voice Agent Timing Defaults
-// =============================================================================
 
 /** Default timeout for waiting for speech input (seconds) */
 #define RAC_VOICE_AGENT_DEFAULT_SPEECH_TIMEOUT_SEC 10.0
@@ -65,9 +63,7 @@ extern "C" {
 /** Maximum time to wait for TTS synthesis (seconds) */
 #define RAC_VOICE_AGENT_TTS_RESPONSE_TIMEOUT_SEC 15.0
 
-// =============================================================================
 // TYPES - Mirrors Swift's VoiceAgentConfiguration and VoiceAgentResult
-// =============================================================================
 
 /**
  * @brief Audio pipeline state - Mirrors Swift's AudioPipelineState enum
@@ -229,9 +225,7 @@ static const rac_voice_agent_config_t RAC_VOICE_AGENT_CONFIG_DEFAULT = {
                         .embedding_model_path = RAC_NULL,
                         .vad_model_path = RAC_NULL}};
 
-// =============================================================================
 // AUDIO PIPELINE STATE MANAGER CONFIG - Mirrors Swift's AudioPipelineStateManager.Configuration
-// =============================================================================
 
 /**
  * @brief Audio pipeline state manager configuration
@@ -258,9 +252,7 @@ static const rac_audio_pipeline_config_t RAC_AUDIO_PIPELINE_CONFIG_DEFAULT = {
     .strict_transitions = RAC_TRUE,
     .max_tts_duration = 30.0f};
 
-// =============================================================================
 // AUDIO PIPELINE STATE MANAGER API
-// =============================================================================
 
 /**
  * @brief Check if microphone can be activated in current state
@@ -292,18 +284,14 @@ RAC_API rac_bool_t rac_audio_pipeline_can_play_tts(rac_audio_pipeline_state_t cu
 RAC_API rac_bool_t rac_audio_pipeline_is_valid_transition(rac_audio_pipeline_state_t from_state,
                                                           rac_audio_pipeline_state_t to_state);
 
-// =============================================================================
 // OPAQUE HANDLE
-// =============================================================================
 
 /**
  * @brief Opaque handle for voice agent instance.
  */
 typedef struct rac_voice_agent* rac_voice_agent_handle_t;
 
-// =============================================================================
 // LIFECYCLE API
-// =============================================================================
 
 /**
  * @brief Create a standalone voice agent that owns its component handles.
@@ -351,9 +339,7 @@ RAC_API rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
  */
 RAC_API void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
 
-// =============================================================================
 // INITIALIZATION & READINESS
-// =============================================================================
 
 /**
  * @brief Initialize the voice agent with configuration.
@@ -401,9 +387,7 @@ RAC_API rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle);
 RAC_API rac_result_t rac_voice_agent_is_ready(rac_voice_agent_handle_t handle,
                                               rac_bool_t* out_is_ready);
 
-// =============================================================================
 // LLM TEXT VERB
-// =============================================================================
 
 /**
  * @brief Generate an LLM response from a text prompt (no STT/TTS).
@@ -420,9 +404,7 @@ RAC_API rac_result_t rac_voice_agent_is_ready(rac_voice_agent_handle_t handle,
 RAC_API rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle,
                                                        const char* prompt, char** out_response);
 
-// =============================================================================
 // GENERATED-PROTO C ABI
-// =============================================================================
 
 /**
  * @section voice_agent_audio_ingress Audio-Ingress Contract

@@ -78,9 +78,7 @@ namespace {
 
 constexpr const char* kTag = "rac_http_client_emscripten";
 
-// =============================================================================
 // Helpers
-// =============================================================================
 
 bool method_is_head(const char* m) {
     return m != nullptr && std::strcmp(m, "HEAD") == 0;
@@ -284,7 +282,6 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // Transport vtable ops
 //
 // These are the thin shims the transport router in
@@ -292,7 +289,6 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
 // `rac_http_transport_ops_t` — the leading
 // `void* user_data` slot is unused here (the adapter has no state;
 // emscripten_fetch is stateless at the handle level).
-// =============================================================================
 
 rac_result_t emscripten_request_send(void* /*user_data*/, const rac_http_request_t* req,
                                      rac_http_response_t* out_resp) {
@@ -334,7 +330,6 @@ const rac_http_transport_ops_t kEmscriptenOps = {
     /*.destroy        =*/nullptr,
 };
 
-// =============================================================================
 // JS-side adapter
 //
 // Instead of the C++ calling `emscripten_fetch` (which then calls JS
@@ -354,7 +349,6 @@ const rac_http_transport_ops_t kEmscriptenOps = {
 // Fallback: if JS never calls `rac_http_transport_register_from_js`,
 // the existing `rac_http_transport_register_emscripten()` path (above)
 // continues to work unchanged.
-// =============================================================================
 
 struct JsTransportState {
     // Function-table indices. Emscripten's addFunction installs the
@@ -417,20 +411,17 @@ const rac_http_transport_ops_t kJsOps = {
 
 }  // namespace
 
-// =============================================================================
 // Public registration API — JS calls this once after the WASM module
 // loads so every HTTP request routes through the Emscripten Fetch
 // adapter. Since this is still the only HTTP implementation in the
 // WASM build, this file also exports the public `rac_http_request_*`
 // symbols.
-// =============================================================================
 
 extern "C" RAC_API rac_result_t rac_http_transport_register_emscripten(void) {
     RAC_LOG_INFO(kTag, "Registering emscripten_fetch HTTP transport");
     return rac_http_transport_register(&kEmscriptenOps, /*user_data=*/nullptr);
 }
 
-// =============================================================================
 // JS-side registration. Takes three function-table indices
 // (obtained from `Module.addFunction(fn, sig)` on the JS side) that match
 // `rac_http_transport_ops_t.request_send` / `_stream` / `_resume`. Any of
@@ -447,7 +438,6 @@ extern "C" RAC_API rac_result_t rac_http_transport_register_emscripten(void) {
 // Pass all three pointers as 0 to unregister the JS adapter. The JS
 // function-table indices remain owned by the JS side (i.e. JS is
 // responsible for the matching `removeFunction`).
-// =============================================================================
 
 extern "C" RAC_API rac_result_t rac_http_transport_register_from_js(
     rac_result_t (*request_send_fp)(void*, const rac_http_request_t*, rac_http_response_t*),
@@ -476,10 +466,8 @@ extern "C" RAC_API rac_result_t rac_http_transport_register_from_js(
     return rac_http_transport_register(&kJsOps, /*user_data=*/nullptr);
 }
 
-// =============================================================================
 // Opaque handle: downstream code (`rac_http_download.cpp`) treats the
 // WASM and native handles the same.
-// =============================================================================
 
 struct rac_http_client {
     // Emscripten Fetch is stateless at the handle level; the struct
@@ -487,7 +475,6 @@ struct rac_http_client {
     int _unused;
 };
 
-// =============================================================================
 // Public API — routes through the platform transport registry so the
 // JS-side trampolines installed via `rac_http_transport_register_from_js`
 // take precedence over the built-in emscripten_fetch adapter.
@@ -499,7 +486,6 @@ struct rac_http_client {
 // layer never calls `rac_http_transport_register_from_js`, requests
 // still resolve through the emscripten_fetch vtable rather than failing
 // with RAC_ERROR_FEATURE_NOT_AVAILABLE.
-// =============================================================================
 
 namespace {
 

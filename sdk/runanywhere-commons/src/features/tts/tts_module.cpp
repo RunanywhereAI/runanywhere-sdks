@@ -2,11 +2,9 @@
  * @file tts_module.cpp
  * @brief Unified TTS feature module.
  *
- * W4 component unification: merges the former tts_component.cpp (handle-based
- * component path + the *_component_*_proto verbs) with TTS's slice of
- * rac_nonllm_lifecycle_proto_abi.cpp (the handle-less
- * rac_tts_synthesize_lifecycle_proto / _stream / stop / list_voices verbs)
- * into one TU.
+ * One TU owns both the handle-based component path (+ the *_component_*_proto
+ * verbs) and the handle-less rac_tts_synthesize_lifecycle_proto / _stream /
+ * stop / list_voices verbs.
  *
  * The component section is a direct translation of Swift's TTSCapability.swift;
  * do NOT add features not present in the Swift code.
@@ -46,9 +44,7 @@
 #include "infrastructure/events/sdk_event_publish.h"
 #endif
 
-// =============================================================================
 // INTERNAL STRUCTURES
-// =============================================================================
 
 struct rac_tts_component {
     rac_handle_t lifecycle;
@@ -67,9 +63,7 @@ struct rac_tts_component {
     }
 };
 
-// =============================================================================
 // HELPER FUNCTIONS
-// =============================================================================
 
 // Generate a simple UUID v4-like string for event tracking
 static std::string generate_uuid_v4() {
@@ -275,9 +269,7 @@ void publish_tts_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
 
 }  // namespace
 
-// =============================================================================
 // LIFECYCLE CALLBACKS
-// =============================================================================
 
 static rac_result_t tts_create_service(const char* voice_id, void* user_data,
                                        rac_handle_t* out_service) {
@@ -313,9 +305,7 @@ static void tts_destroy_service(rac_handle_t service, void* user_data) {
     }
 }
 
-// =============================================================================
 // LIFECYCLE API
-// =============================================================================
 
 extern "C" rac_result_t rac_tts_component_create(rac_handle_t* out_handle) {
     return rac::features::create_lifecycle_component<rac_tts_component>(
@@ -409,9 +399,7 @@ extern "C" void rac_tts_component_destroy(rac_handle_t handle) {
     delete component;
 }
 
-// =============================================================================
 // VOICE LIFECYCLE
-// =============================================================================
 
 extern "C" rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const char* voice_path,
                                                      const char* voice_id, const char* voice_name) {
@@ -517,9 +505,7 @@ extern "C" rac_result_t rac_tts_component_stop(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // SYNTHESIS API
-// =============================================================================
 
 extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const char* text,
                                                      const rac_tts_options_t* options,
@@ -785,9 +771,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
     return result;
 }
 
-// =============================================================================
 // STATE QUERY API
-// =============================================================================
 
 extern "C" rac_lifecycle_state_t rac_tts_component_get_state(rac_handle_t handle) {
     if (!handle)
@@ -808,9 +792,7 @@ extern "C" rac_result_t rac_tts_component_get_metrics(rac_handle_t handle,
     return rac_lifecycle_get_metrics(component->lifecycle, out_metrics);
 }
 
-// =============================================================================
 // LANGUAGE INTROSPECTION
-// =============================================================================
 
 extern "C" rac_result_t rac_tts_component_get_supported_languages(rac_handle_t handle,
                                                                   char** out_json) {
@@ -834,9 +816,7 @@ extern "C" rac_result_t rac_tts_component_get_supported_languages(rac_handle_t h
     return rac_tts_get_languages(service, out_json);
 }
 
-// =============================================================================
 // GENERATED-PROTO C ABI
-// =============================================================================
 
 extern "C" rac_result_t
 rac_tts_component_list_voices_proto(rac_handle_t handle, rac_tts_proto_voice_callback_fn callback,
@@ -1051,13 +1031,10 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream_proto(
 #endif
 }
 
-// =============================================================================
-// LIFECYCLE-OWNED GENERATED-PROTO C ABI (formerly TTS slice of
-// rac_nonllm_lifecycle_proto_abi.cpp)
+// LIFECYCLE-OWNED GENERATED-PROTO C ABI
 //
 // Handle-less verbs that resolve the loaded voice via the global registry
 // (rac::lifecycle::acquire_lifecycle_tts) rather than a component handle.
-// =============================================================================
 
 namespace {
 
@@ -1215,9 +1192,7 @@ rac_result_t rac_tts_synthesize_lifecycle_proto(const uint8_t* request_proto_byt
 #endif
 }
 
-// ---------------------------------------------------------------------------
 // TTS lifecycle stream / stop ABIs (FLT-12)
-// ---------------------------------------------------------------------------
 
 rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size,

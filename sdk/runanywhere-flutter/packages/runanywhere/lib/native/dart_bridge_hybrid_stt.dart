@@ -46,22 +46,18 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 
-// ============================================================================
 // Primitive enum value (rac/plugin/rac_primitive.h)
-// ============================================================================
 
 /// `RAC_PRIMITIVE_TRANSCRIBE` — the speech-to-text primitive the router pins
 /// every service-creation route to.
 const int _kPrimitiveTranscribe = 2;
 
-// ============================================================================
 // FFI structs mirroring the commons C ABI (plugin ABI v3).
 //
 // Only the prefix needed to reach `stt_ops` (in the engine vtable) and the
 // `create` / `destroy` slots (in the STT ops vtable) is consumed; the full
 // field list is mirrored so Dart's Struct layout reproduces the C alignment /
 // padding exactly and the consumed offsets are correct.
-// ============================================================================
 
 /// Mirrors `rac_engine_metadata_t` (rac/plugin/rac_engine_vtable.h). Consumed
 /// only as the leading block of `_RacEngineVtable` so `sttOps` lands at the
@@ -182,9 +178,7 @@ final class _RacSttService extends Struct {
   external Pointer<Utf8> modelId;
 }
 
-// ============================================================================
 // Device-state vtable (rac/router/hybrid/rac_hybrid_device_state.h)
-// ============================================================================
 
 /// `bool (*is_online)(void* user_data)` — bool is one byte in the C ABI; FFI
 /// models it as Uint8.
@@ -205,9 +199,7 @@ final class _RacHybridDeviceStateOps extends Struct {
   external Pointer<Void> userData;
 }
 
-// ============================================================================
 // Custom-filter predicate (rac/router/hybrid/rac_hybrid_custom_filter.h)
-// ============================================================================
 
 /// Mirrors `rac_hybrid_routing_context_t` — {is_online, battery_percent,
 /// candidate_model_id[128]}. The router rewrites `candidateModelId` to the
@@ -228,9 +220,7 @@ final class _RacHybridRoutingContext extends Struct {
 typedef _HybridCustomFilterPredicateNative = Int32 Function(
     Pointer<_RacHybridRoutingContext>, Pointer<Void>);
 
-// ============================================================================
 // Proto-byte router ABI (rac/router/hybrid/rac_stt_hybrid_router_proto.h)
-// ============================================================================
 
 typedef _RouterCreateNative = Int32 Function(Pointer<RacHandle>);
 typedef _RouterCreateDart = int Function(Pointer<RacHandle>);
@@ -308,7 +298,7 @@ class DartBridgeHybridStt {
 
   static DynamicLibrary get _lib => PlatformLoader.loadCommons();
 
-  // --- Cached lookups (resolved once on first access) ----------------------
+  // Cached lookups (resolved once on first access)
 
   static final _RouterCreateDart _routerCreate =
       _lib.lookupFunction<_RouterCreateNative, _RouterCreateDart>(
@@ -369,7 +359,7 @@ class DartBridgeHybridStt {
               _HybridUnregisterCustomFilterDart>(
           'rac_hybrid_unregister_custom_filter');
 
-  // --- Router lifecycle ----------------------------------------------------
+  // Router lifecycle
 
   /// Allocate a native router handle. Throws [StateError] on failure.
   RacHandle createRouter() {
@@ -407,7 +397,7 @@ class DartBridgeHybridStt {
     _routerDestroy(handle);
   }
 
-  // --- Registry-routed service creation ------------------------------------
+  // Registry-routed service creation
 
   /// Create an STT service via the plugin registry, pinning [engineHint]
   /// ("sherpa" / "cloud") as the engine name passed to
@@ -502,7 +492,7 @@ class DartBridgeHybridStt {
     calloc.free(service._servicePtr);
   }
 
-  // --- Slot setters + policy + transcribe ----------------------------------
+  // Slot setters + policy + transcribe
 
   /// Attach (or detach when [service] is null) the offline-side service with
   /// its serialized HybridModelDescriptor bytes. Returns the native rc.
@@ -584,7 +574,7 @@ class DartBridgeHybridStt {
     }
   }
 
-  // --- Device-state vtable -------------------------------------------------
+  // Device-state vtable
 
   /// Install [provider] callbacks into the commons device-state vtable. Returns
   /// the native rc. Pass-through closures are wired into `Pointer.fromFunction`
@@ -619,7 +609,7 @@ class DartBridgeHybridStt {
     return _setDeviceState(nullptr);
   }
 
-  // --- Custom-filter predicates --------------------------------------------
+  // Custom-filter predicates
 
   /// Register (or replace) a named custom-filter predicate. The predicate runs
   /// inside commons during candidate filtering; Dart only supplies the closure.
@@ -650,7 +640,7 @@ class DartBridgeHybridStt {
     }
   }
 
-  // --- cloud plugin registration -------------------------------------------
+  // cloud plugin registration
 
   /// Register the cloud engine with the commons plugin registry so it is
   /// routable via `rac_plugin_find_for_engine(TRANSCRIBE, "cloud")`. Tolerant of
@@ -697,7 +687,7 @@ class DartBridgeHybridStt {
     }
   }
 
-  // --- Helpers -------------------------------------------------------------
+  // Helpers
 
   static Pointer<Uint8> _copyBytes(Uint8List bytes) {
     final ptr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
@@ -708,7 +698,6 @@ class DartBridgeHybridStt {
   }
 }
 
-// ============================================================================
 // Single-process callback state.
 //
 // The C ABI holds ONE device-state vtable process-wide and a name-keyed
@@ -716,7 +705,6 @@ class DartBridgeHybridStt {
 // `Pointer.fromFunction`'s constant-tearoff requirement) resolve the active
 // provider / predicate from this state. Mirrors the Swift/Kotlin "single
 // installed provider + name→box map" lifetime model.
-// ============================================================================
 
 /// Host device-state callbacks consumed by the router's NETWORK / Battery
 /// filters. Implementations must be reentrant (commons may call from multiple

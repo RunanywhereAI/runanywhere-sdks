@@ -6,9 +6,7 @@ import 'package:ffi/ffi.dart';
 
 import 'package:runanywhere/native/types/basic_types.dart';
 
-// =============================================================================
 // Core API Function Signatures (from rac_core.h)
-// =============================================================================
 
 /// rac_result_t rac_init(const rac_config_t* config)
 typedef RacInitNative = Int32 Function(Pointer<Void> config);
@@ -26,9 +24,7 @@ typedef RacIsInitializedDart = int Function();
 typedef RacConfigureLoggingNative = Int32 Function(Int32 environment);
 typedef RacConfigureLoggingDart = int Function(int environment);
 
-// =============================================================================
 // LLM API Function Signatures (from rac_llm_llamacpp.h)
-// =============================================================================
 
 /// rac_result_t rac_backend_llamacpp_register(void)
 typedef RacBackendLlamacppRegisterNative = Int32 Function();
@@ -38,9 +34,7 @@ typedef RacBackendLlamacppRegisterDart = int Function();
 typedef RacBackendLlamacppUnregisterNative = Int32 Function();
 typedef RacBackendLlamacppUnregisterDart = int Function();
 
-// =============================================================================
 // LLM Component API Function Signatures (from rac_llm_component.h)
-// =============================================================================
 
 /// rac_result_t rac_llm_component_create(rac_handle_t* out_handle)
 typedef RacLlmComponentCreateNative = Int32 Function(

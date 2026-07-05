@@ -66,7 +66,7 @@ yarn-error.*
 # TypeScript
 *.tsbuildinfo
 
-# Auto-generated from commons YAMLs by scripts/sync-solutions-yamls.js
+# Auto-generated from commons YAMLs by scripts/examples/react-native/sync-solutions-yamls.js
 src/generated/
 
 # Environment

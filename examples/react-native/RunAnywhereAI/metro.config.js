@@ -1,10 +1,10 @@
 const path = require('path');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 
-// Yarn workspace root (where node_modules with all hoisted deps lives)
-const workspaceRoot = path.resolve(__dirname, '../../../');
+// Repo root — watched so edits to the portal-linked SDK packages hot-reload.
+const repoRoot = path.resolve(__dirname, '../../../');
 const bufbuildProtobufRoot = path.resolve(
-  workspaceRoot,
+  __dirname,
   'node_modules/@bufbuild/protobuf'
 );
 // Use binary-encoding.js directly — the wire/index.js barrel re-exports can be
@@ -32,26 +32,24 @@ defaultConfig.resolver.blockList = [
  * Metro configuration
  * https://reactnative.dev/docs/metro
  *
- * Yarn workspace setup: deps are hoisted to repo root. Metro must:
- *   1. Watch all workspace folders so source changes hot-reload.
- *   2. Look up modules in the root node_modules (where yarn hoists them).
+ * Standalone yarn project: the @runanywhere/* SDK packages resolve via the
+ * portal: protocol, so Metro watches the repo root for their sources and
+ * resolves all modules from this app's own node_modules.
  *
  * @type {import('metro-config').MetroConfig}
  */
 const config = {
-  // Watch source for all workspace packages so edits trigger reload.
-  watchFolders: [workspaceRoot],
+  // Watch the repo root so portal-linked SDK package edits trigger reload.
+  watchFolders: [repoRoot],
   resolver: {
-    // Search node_modules first locally (in case of nohoist), then at workspace root.
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),
-      path.resolve(workspaceRoot, 'node_modules'),
     ],
     // Single instance enforcement for shared peer deps (RN forbids duplicates).
     extraNodeModules: {
-      'react-native': path.resolve(workspaceRoot, 'node_modules/react-native'),
-      'react-native-nitro-modules': path.resolve(workspaceRoot, 'node_modules/react-native-nitro-modules'),
-      'react': path.resolve(workspaceRoot, 'node_modules/react'),
+      'react-native': path.resolve(__dirname, 'node_modules/react-native'),
+      'react-native-nitro-modules': path.resolve(__dirname, 'node_modules/react-native-nitro-modules'),
+      'react': path.resolve(__dirname, 'node_modules/react'),
       // ts-proto generated code uses @bufbuild/protobuf/wire; Metro must resolve the CJS build.
       '@bufbuild/protobuf': bufbuildProtobufRoot,
     },

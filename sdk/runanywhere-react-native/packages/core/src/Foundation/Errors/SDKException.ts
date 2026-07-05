@@ -137,7 +137,7 @@ export class SDKException extends Error {
     return new SDKException(proto);
   }
 
-  // ── Convenience factories (mirror legacy `notInitializedError` etc.) ──
+  // Convenience factories (mirror legacy `notInitializedError` etc.)
 
   static notInitialized(component?: string): SDKException {
     const message = component
@@ -480,9 +480,7 @@ function categoryForCode(code: ErrorCodeProto): ErrorCategoryProto {
   return ErrorCategoryProto.ERROR_CATEGORY_UNSPECIFIED;
 }
 
-// ============================================================================
 // Expected-error classification (Swift RAErrorCode.isExpected)
-// ============================================================================
 
 /**
  * Whether an error code is expected/routine (user cancellation) and should
@@ -499,9 +497,7 @@ export function isExpectedErrorCode(code: ErrorCodeProto): boolean {
   }
 }
 
-// ============================================================================
 // C ABI bridge (Swift RASDKError+Helpers.swift:52-95)
-// ============================================================================
 
 /**
  * Build an `SDKException` from a `rac_result_t` via the canonical commons

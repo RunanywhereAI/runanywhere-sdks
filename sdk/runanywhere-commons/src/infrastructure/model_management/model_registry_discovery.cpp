@@ -29,9 +29,7 @@ using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 
 #ifdef RAC_HAVE_PROTOBUF
 
-// -----------------------------------------------------------------------------
 // Single-TU path / filesystem helpers (internal linkage).
-// -----------------------------------------------------------------------------
 
 namespace {
 
@@ -121,9 +119,7 @@ std::filesystem::path canonical_model_folder_for(const std::string& model_id,
 
 }  // namespace
 
-// -----------------------------------------------------------------------------
 // Cross-TU path inference + reconciliation (declared in model_registry_internal.h).
-// -----------------------------------------------------------------------------
 
 namespace rac::infra::model_registry::detail {
 
@@ -222,9 +218,7 @@ InferenceFramework infer_framework_from_format(ModelFormat format) {
     }
 }
 
-// =============================================================================
 // FILESYSTEM RECONCILIATION (cold-launch discovery)
-// =============================================================================
 // When the SDK process starts, the in-memory registry is empty. Platform SDKs
 // re-seed entries via registerModel(url, ...) which only carry download_url,
 // never local_path. So even though the user's previously downloaded model

@@ -59,12 +59,10 @@ namespace {
 
 #ifdef RAC_HAVE_PROTOBUF
 
-// ---------------------------------------------------------------------------
 // Mock platform adapter — required because rac_model_info_make_proto runs the
 // disk probe via rac_get_platform_adapter(). For a freshly-made model the
 // local_path is empty so the probe never fires, but we install a no-op
 // adapter to keep behaviour deterministic.
-// ---------------------------------------------------------------------------
 void install_noop_adapter() {
     static rac_platform_adapter_t adapter;
     std::memset(&adapter, 0, sizeof(adapter));
@@ -75,9 +73,7 @@ void clear_adapter() {
     rac_set_platform_adapter(nullptr);
 }
 
-// ---------------------------------------------------------------------------
 // Helpers.
-// ---------------------------------------------------------------------------
 struct RegisterArgs {
     std::string url;
     std::string name;
@@ -155,9 +151,7 @@ void remove_by_id(const std::string& id) {
     (void)rac_model_registry_remove_proto(registry, id.c_str());
 }
 
-// ---------------------------------------------------------------------------
 // End-to-end test cases.
-// ---------------------------------------------------------------------------
 int test_register_gguf_round_trip() {
     install_noop_adapter();
 
@@ -262,9 +256,7 @@ int test_register_with_source_override() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // Negative paths.
-// ---------------------------------------------------------------------------
 int test_null_out_pointer() {
     rac_result_t rc = rac_register_model_from_url_proto(nullptr, 0, nullptr);
     ASSERT_EQ(rc, RAC_ERROR_NULL_POINTER);
@@ -323,7 +315,6 @@ int test_empty_url_rejected() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // Regression: merge-not-replace on re-registration (commons-014).
 //
 // When the catalog seed re-runs on app launch, registerModel() must NOT
@@ -331,7 +322,6 @@ int test_empty_url_rejected() {
 // the Android example carried a `existingRegistryIds()` skip-pass to paper
 // over this; the fix moves the merge into commons so all SDKs benefit and
 // the example workaround can be deleted.
-// ---------------------------------------------------------------------------
 int test_re_register_preserves_download_state() {
     install_noop_adapter();
 

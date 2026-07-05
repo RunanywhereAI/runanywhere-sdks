@@ -49,9 +49,7 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-// =============================================================================
 // FACADE IMPLEMENTATION (canonical: backed by g_loaded)
-// =============================================================================
 
 namespace {
 
@@ -552,8 +550,8 @@ rac_result_t rac_lifecycle_require_service(rac_handle_t handle, rac_handle_t* ou
 
 void rac_lifecycle_track_error(rac_handle_t handle, rac_result_t error_code,
                                const char* operation) {
-    // Legacy struct-event emission removed; errors surface via the proto
-    // SDKError path at the feature-module layer.
+    // Errors surface via the proto SDKError path at the feature-module layer;
+    // nothing to emit here.
     (void)handle;
     (void)error_code;
     (void)operation;
@@ -594,12 +592,10 @@ void rac_lifecycle_destroy(rac_handle_t handle) {
 
 #else  // !RAC_HAVE_PROTOBUF
 
-// =============================================================================
 // STANDALONE IMPLEMENTATION (no protobuf: g_loaded does not exist)
 //
 // Self-contained per-handle lifecycle, kept verbatim for builds without the
 // proto-backed canonical store.
-// =============================================================================
 
 namespace {
 
@@ -974,9 +970,7 @@ void rac_lifecycle_destroy(rac_handle_t handle) {
 
 #endif  // RAC_HAVE_PROTOBUF
 
-// =============================================================================
 // SHARED PURE HELPERS (independent of LifecycleManager storage)
-// =============================================================================
 
 extern "C" {
 

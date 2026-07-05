@@ -35,10 +35,8 @@ export interface RunAnywhereCore extends HybridObject<{
   ios: 'c++';
   android: 'c++';
 }> {
-  // ============================================================================
   // SDK Lifecycle
   // Matches Swift: CppBridge+Init.swift
-  // ============================================================================
 
   /**
    * Initialize the SDK with configuration
@@ -84,10 +82,8 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   resultToProtoErrorProto(code: number): Promise<ArrayBuffer>;
 
-  // ============================================================================
   // Plugin Loader
   // Matches Swift: RunAnywhere.pluginLoader backed by rac_registry_*.
-  // ============================================================================
 
   pluginLoaderApiVersion(): Promise<number>;
   pluginLoaderRegisteredCount(): Promise<number>;
@@ -96,10 +92,8 @@ export interface RunAnywhereCore extends HybridObject<{
   pluginLoaderLoad(path: string): Promise<string>;
   pluginLoaderUnload(name: string): Promise<void>;
 
-  // ============================================================================
   // Authentication
   // Matches Swift: CppBridge+Auth.swift
-  // ============================================================================
 
   /**
    * Check if currently authenticated
@@ -118,10 +112,8 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   getOrganizationId(): Promise<string>;
 
-  // ============================================================================
   // Device Registration
   // Matches Swift: CppBridge+Device.swift
-  // ============================================================================
 
   /**
    * Check if device is registered
@@ -134,10 +126,8 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   getDeviceId(): Promise<string>;
 
-  // ============================================================================
   // Model Registry
   // Matches Swift: CppBridge+ModelRegistry.swift
-  // ============================================================================
 
   /**
    * Get all registered models as serialized runanywhere.v1.ModelInfoList bytes.
@@ -250,13 +240,11 @@ export interface RunAnywhereCore extends HybridObject<{
     pruneOrphans: boolean
   ): Promise<boolean>;
 
-  // ============================================================================
   // Download Service
   // Backed by `rac_download_*_proto` (commons) which routes through the
   // platform HTTP transport registered by the RN core (OkHttp on Android,
   // URLSession on iOS). Requests, results, progress, cancellation, and resume
   // state are serialized `runanywhere.v1.*` proto bytes.
-  // ============================================================================
 
   /**
    * Plan a download from serialized runanywhere.v1.DownloadPlanRequest bytes.
@@ -300,10 +288,8 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   clearDownloadProgressCallbackProto(): Promise<boolean>;
 
-  // ============================================================================
   // Storage
   // Matches Swift: RunAnywhere+Storage.swift
-  // ============================================================================
 
   /**
    * Clear the SDK's Cache directory only. Mirrors Swift `clearCache()` →
@@ -343,10 +329,8 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   storageDeleteProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
-  // ============================================================================
   // Events
   // Matches Swift: CppBridge+Events.swift
-  // ============================================================================
 
   /**
    * Subscribe to serialized runanywhere.v1.SDKEvent bytes.
@@ -383,9 +367,7 @@ export interface RunAnywhereCore extends HybridObject<{
     recoverable: boolean
   ): Promise<boolean>;
 
-  // ============================================================================
   // Model Lifecycle
-  // ============================================================================
 
   /**
    * Load a model from serialized runanywhere.v1.ModelLoadRequest bytes.
@@ -411,10 +393,8 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   componentLifecycleSnapshotProto(component: number): Promise<ArrayBuffer>;
 
-  // ============================================================================
   // HTTP Client (libcurl-backed — rac_http_client_*)
   // Matches Swift: HTTPClientAdapter.swift / Kotlin: CppBridgeHTTP.kt
-  // ============================================================================
 
   /**
    * Perform a synchronous HTTP request via the native curl-backed client.
@@ -437,11 +417,9 @@ export interface RunAnywhereCore extends HybridObject<{
     timeoutMs: number
   ): Promise<string>;
 
-  // ============================================================================
   // LLM Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+LLM.swift - calls rac_llm_component_* APIs
   // Requires a backend (e.g., @runanywhere/llamacpp) to be registered
-  // ============================================================================
 
   /**
    * Check if a text model is loaded
@@ -476,11 +454,9 @@ export interface RunAnywhereCore extends HybridObject<{
   ): Promise<void>;
   llmCancelProto(): Promise<ArrayBuffer>;
 
-  // ============================================================================
   // STT Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+STT.swift - calls lifecycle proto APIs.
   // Requires a backend (e.g., @runanywhere/onnx) to be registered.
-  // ============================================================================
 
   /**
    * Check if an STT model is loaded
@@ -498,13 +474,11 @@ export interface RunAnywhereCore extends HybridObject<{
     onEventBytes: (eventBytes: ArrayBuffer) => void
   ): Promise<void>;
 
-  // ============================================================================
   // STT Streaming Session (live partials)
   // Mirrors Swift CppBridge+STT.swift `transcribeSessionStream`:
   // load model on the streaming handle, register the proto-byte callback,
   // start the session, feed audio frames, then stop (drain finals) or
   // cancel (immediate teardown). C ABI: rac_stt_stream.h.
-  // ============================================================================
 
   /**
    * Load an STT model onto the global streaming STT component handle
@@ -551,7 +525,6 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   sttStreamCancel(sessionId: number): Promise<void>;
 
-  // ============================================================================
   // Hybrid STT Router (offline sherpa <-> cloud, registry-routed)
   //
   // THIN proto-byte / handle surface over the commons STT hybrid router
@@ -565,7 +538,6 @@ export interface RunAnywhereCore extends HybridObject<{
   //
   // Handles (router + per-side service) are opaque commons pointers surfaced to
   // JS as doubles (same packing the Solutions / VoiceAgent handles use).
-  // ============================================================================
 
   /**
    * Allocate a native STT hybrid router (`rac_stt_hybrid_router_create`).
@@ -765,11 +737,9 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   cloudIsRegistered(): Promise<boolean>;
 
-  // ============================================================================
   // TTS Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+TTS.swift - calls lifecycle proto APIs.
   // Requires a backend (e.g., @runanywhere/onnx) to be registered.
-  // ============================================================================
 
   /**
    * Check if a TTS model is loaded
@@ -789,11 +759,9 @@ export interface RunAnywhereCore extends HybridObject<{
   ): Promise<void>;
   ttsStopProto(): Promise<ArrayBuffer>;
 
-  // ============================================================================
   // VAD Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+VAD.swift - calls lifecycle proto APIs.
   // Requires a backend (e.g., @runanywhere/onnx) to be registered.
-  // ============================================================================
 
   /**
    * Check if a VAD model is loaded
@@ -817,11 +785,9 @@ export interface RunAnywhereCore extends HybridObject<{
     onActivityBytes: (activityBytes: ArrayBuffer) => void
   ): Promise<boolean>;
 
-  // ============================================================================
   // VLM Capability (Backend-Agnostic)
   // Uses commons VLM service lifecycle plus rac_vlm_*_proto request/result ABI.
   // Backend packages register providers only; core owns public VLM calls.
-  // ============================================================================
 
   /**
    * Process one image from serialized runanywhere.v1.VLMGenerationRequest
@@ -851,11 +817,9 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   getPersistentDeviceUUID(): Promise<string>;
 
-  // ============================================================================
   // Telemetry
   // Matches Swift: CppBridge+Telemetry.swift
   // C++ handles all telemetry logic - batching, JSON building, routing
-  // ============================================================================
 
   /**
    * Flush pending telemetry events immediately
@@ -868,11 +832,9 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   isTelemetryInitialized(): Promise<boolean>;
 
-  // ============================================================================
   // Voice Agent Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+VoiceAgent.swift - calls rac_voice_agent_* APIs
   // Requires STT, LLM, and TTS backends to be registered
-  // ============================================================================
 
   /**
    * Initialize voice agent using already loaded models
@@ -939,7 +901,6 @@ export interface RunAnywhereCore extends HybridObject<{
     isFinal: boolean
   ): Promise<ArrayBuffer>;
 
-  // ============================================================================
   // Tool Calling Capability
   //
   // ARCHITECTURE:
@@ -954,7 +915,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // C++ implements: toolParseProto, toolFormatPromptProto, and
   // toolValidateProto. TypeScript handles: tool registry, executor storage
   // (needs JS APIs like fetch), orchestration.
-  // ============================================================================
 
   /**
    * Parse LLM output for tool calls from serialized runanywhere.v1.ToolParseRequest bytes.
@@ -1076,9 +1036,7 @@ export interface RunAnywhereCore extends HybridObject<{
     schemaBytes: ArrayBuffer
   ): Promise<ArrayBuffer>;
 
-  // ===========================================================================
   // RAG Pipeline (Retrieval-Augmented Generation)
-  // ===========================================================================
 
   ragCreatePipelineProto(configBytes: ArrayBuffer): Promise<boolean>;
   ragDestroyPipelineProto(): Promise<boolean>;
@@ -1156,7 +1114,6 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   loraAdapterImportProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
-  // ===========================================================================
   // Solutions Runtime (rac/solutions/rac_solution.h)
   //
   // Proto-byte / YAML driven L5 solution runtime. Callers pass a serialized
@@ -1168,7 +1125,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // into a 64-bit double (same trick the VoiceAgent / LLM capabilities
   // use for their native handles). Lifecycle verbs (start/stop/cancel/
   // feed/closeInput/destroy) take that handle back.
-  // ===========================================================================
 
   /**
    * Construct a solution from a serialized `runanywhere.v1.SolutionConfig`

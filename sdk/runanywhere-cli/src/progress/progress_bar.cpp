@@ -140,9 +140,7 @@ void ProgressRenderer::finish() {
     }
 }
 
-// -----------------------------------------------------------------------------
 // DownloadProgressScope
-// -----------------------------------------------------------------------------
 
 namespace {
 DownloadProgressScope* g_active_scope = nullptr;

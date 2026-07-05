@@ -6,7 +6,6 @@
 // root CancelToken that cascades to every node.
 //
 // Design choices
-// --------------
 //   * One worker thread per node. Each node owns its own thread via
 //     PipelineNode::start() — we deliberately don't route node work through
 //     a shared pool because nodes are long-lived (one thread per node for

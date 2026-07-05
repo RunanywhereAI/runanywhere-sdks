@@ -18,9 +18,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // EXPORT MACRO
-// =============================================================================
 
 #if defined(RAC_LLAMACPP_BUILDING)
 #if defined(_WIN32)
@@ -34,9 +32,7 @@ extern "C" {
 #define RAC_LLAMACPP_VLM_API
 #endif
 
-// =============================================================================
 // CONFIGURATION
-// =============================================================================
 
 /**
  * LlamaCPP VLM-specific configuration.
@@ -73,9 +69,7 @@ static const rac_vlm_llamacpp_config_t RAC_VLM_LLAMACPP_CONFIG_DEFAULT = {
     .use_gpu_vision = 1   // Use GPU for vision
 };
 
-// =============================================================================
 // LLAMACPP VLM-SPECIFIC API
-// =============================================================================
 
 /**
  * Creates a LlamaCPP VLM service.
@@ -187,9 +181,7 @@ RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_get_model_info(rac_handle_t h
  */
 RAC_LLAMACPP_VLM_API void rac_vlm_llamacpp_destroy(rac_handle_t handle);
 
-// =============================================================================
 // BACKEND REGISTRATION
-// =============================================================================
 
 /**
 /* Note: VLM is registered as part of the unified llama.cpp plugin via

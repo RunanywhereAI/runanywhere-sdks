@@ -51,9 +51,7 @@ std::string describeError(rac_result_t result) {
 
 } // namespace
 
-// ============================================================================
 // Constructor / Destructor
-// ============================================================================
 
 HybridRunAnywhereONNX::HybridRunAnywhereONNX() : HybridObject(TAG) {
   RAC_LOG_INFO(LOG_CATEGORY, "HybridRunAnywhereONNX constructor - ONNX backend module");
@@ -63,9 +61,7 @@ HybridRunAnywhereONNX::~HybridRunAnywhereONNX() {
   RAC_LOG_INFO(LOG_CATEGORY, "HybridRunAnywhereONNX destructor");
 }
 
-// ============================================================================
 // Backend Registration
-// ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::registerBackend() {
   return Promise<bool>::async([this]() {

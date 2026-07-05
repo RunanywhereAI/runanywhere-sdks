@@ -1,9 +1,7 @@
 # Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.30).
 cmake_minimum_required(VERSION 3.24)
 
-# =============================================================================
 # Integration Test Suite for runanywhere-commons
-# =============================================================================
 
 # Helper: link bundled archive dependencies to test targets on MSVC.
 # On MSVC, transitive static lib deps from archive_static don't propagate fully.
@@ -1431,9 +1429,7 @@ if(WIN32 AND DEFINED onnxruntime_SOURCE_DIR AND NOT "${onnxruntime_SOURCE_DIR}" 
     endforeach()
 endif()
 
-# =============================================================================
 # RAG Pipeline Tests (GoogleTest)
-# =============================================================================
 
 if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
     include(FetchContent)
@@ -1523,9 +1519,7 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
         COMMAND rac_simple_tokenizer_test
     )
 endif()
-# =============================================================================
 # RunAnywhere Commons - Benchmark Unit Tests (GoogleTest)
-# =============================================================================
 
 include(FetchContent)
 

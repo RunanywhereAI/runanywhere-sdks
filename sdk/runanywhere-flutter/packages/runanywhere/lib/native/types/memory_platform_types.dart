@@ -4,9 +4,7 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
-// =============================================================================
 // Memory Management (from rac_types.h)
-// =============================================================================
 
 /// void rac_free(void* ptr)
 typedef RacFreeNative = Void Function(Pointer<Void> ptr);
@@ -20,9 +18,7 @@ typedef RacAllocDart = Pointer<Void> Function(int size);
 typedef RacStrdupNative = Pointer<Utf8> Function(Pointer<Utf8> str);
 typedef RacStrdupDart = Pointer<Utf8> Function(Pointer<Utf8> str);
 
-// =============================================================================
 // Error API (from rac_error.h)
-// =============================================================================
 
 /// const char* rac_error_message(rac_result_t error_code)
 typedef RacErrorMessageNative = Pointer<Utf8> Function(Int32 errorCode);
@@ -40,9 +36,7 @@ typedef RacErrorSetDetailsDart = void Function(Pointer<Utf8> details);
 typedef RacErrorClearDetailsNative = Void Function();
 typedef RacErrorClearDetailsDart = void Function();
 
-// =============================================================================
 // Platform Adapter Callbacks (from rac_platform_adapter.h)
-// =============================================================================
 
 /// File exists callback: rac_bool_t (*file_exists)(const char* path, void* user_data)
 typedef RacFileExistsCallbackNative = Int32 Function(
@@ -170,9 +164,7 @@ typedef RacGetVendorIdCallbackNative = Int32 Function(
   Pointer<Void> userData,
 );
 
-// =============================================================================
 // Structs (using FFI Struct for native memory layout)
-// =============================================================================
 
 /// Maximum byte length (including NUL) of a `rac_directory_entry_t::name`
 /// field. Mirrors `RAC_DIRECTORY_ENTRY_NAME_MAX` in

@@ -12,7 +12,7 @@
 
 package com.runanywhere.sdk.public.types
 
-// ─── LLM ────────────────────────────────────────────────────────────────────
+// LLM
 
 public typealias RALLMGenerationOptions = ai.runanywhere.proto.v1.LLMGenerationOptions
 public typealias RALLMGenerationResult = ai.runanywhere.proto.v1.LLMGenerationResult
@@ -31,7 +31,7 @@ public typealias RALoRARemoveRequest = ai.runanywhere.proto.v1.LoRARemoveRequest
 public typealias RALoRAState = ai.runanywhere.proto.v1.LoRAState
 public typealias RALoRAAdapterConfig = ai.runanywhere.proto.v1.LoRAAdapterConfig
 
-// ─── Audio (STT / TTS / VAD) ────────────────────────────────────────────────
+// Audio (STT / TTS / VAD)
 
 public typealias RASTTOutput = ai.runanywhere.proto.v1.STTOutput
 public typealias RASTTOptions = ai.runanywhere.proto.v1.STTOptions
@@ -43,7 +43,7 @@ public typealias RAVoiceAgentComposeConfig = ai.runanywhere.proto.v1.VoiceAgentC
 public typealias RAVoiceEvent = ai.runanywhere.proto.v1.VoiceEvent
 public typealias RAVoiceAgentComponentStates = ai.runanywhere.proto.v1.VoiceAgentComponentStates
 
-// ─── VLM ────────────────────────────────────────────────────────────────────
+// VLM
 
 public typealias RAVLMImage = ai.runanywhere.proto.v1.VLMImage
 public typealias RAVLMResult = ai.runanywhere.proto.v1.VLMResult
@@ -51,13 +51,13 @@ public typealias RAVLMGenerationOptions = ai.runanywhere.proto.v1.VLMGenerationO
 public typealias RAVLMStreamEvent = ai.runanywhere.proto.v1.VLMStreamEvent
 public typealias RAVLMStreamEventKind = ai.runanywhere.proto.v1.VLMStreamEventKind
 
-// ─── RAG ────────────────────────────────────────────────────────────────────
+// RAG
 
 public typealias RARAGConfiguration = ai.runanywhere.proto.v1.RAGConfiguration
 public typealias RARAGStatistics = ai.runanywhere.proto.v1.RAGStatistics
 public typealias RARAGDocument = ai.runanywhere.proto.v1.RAGDocument
 
-// ─── Models / Storage / Hardware / Errors ───────────────────────────────────
+// Models / Storage / Hardware / Errors
 
 public typealias RAModelInfo = ai.runanywhere.proto.v1.ModelInfo
 public typealias RAModelLoadRequest = ai.runanywhere.proto.v1.ModelLoadRequest

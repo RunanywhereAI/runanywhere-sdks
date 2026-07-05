@@ -144,9 +144,7 @@ export class FetchHttpTransport {
     this.requestResumePtr = 0;
   }
 
-  // ---------------------------------------------------------------------------
   // Implementation
-  // ---------------------------------------------------------------------------
 
   private doInstall(): boolean {
     // Signatures (i=i32 pointer, j=i64):
@@ -376,9 +374,7 @@ export class FetchHttpTransport {
     }
   }
 
-  // ---------------------------------------------------------------------------
   // WASM heap marshaling
-  // ---------------------------------------------------------------------------
 
   private now(): number {
     return typeof performance !== 'undefined' && typeof performance.now === 'function'

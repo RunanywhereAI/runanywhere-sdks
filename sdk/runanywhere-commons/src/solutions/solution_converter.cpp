@@ -35,16 +35,12 @@ void add_edge(PipelineSpec* spec, const std::string& from, const std::string& to
     e->set_to(to);
 }
 
-// ---------------------------------------------------------------------------
 // These expansions intentionally reference engine-backed operator type names
 // without installing factories for them. PipelineExecutor must fail with
 // RAC_ERROR_FEATURE_NOT_AVAILABLE until the host registers real factories or a
 // test registers explicit stand-ins with matching port contracts.
-// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
 // VoiceAgent — VAD → STT → LLM → TTS solution signature.
-// ---------------------------------------------------------------------------
 void expand_voice_agent(const runanywhere::v1::VoiceAgentConfig& cfg, PipelineSpec* out) {
     out->set_name("voice_agent");
 
@@ -75,13 +71,11 @@ void expand_voice_agent(const runanywhere::v1::VoiceAgentConfig& cfg, PipelineSp
     add_edge(out, "llm.token", "tts.in");
 }
 
-// ---------------------------------------------------------------------------
 // RAG — Query → Retrieve → Context → LLM solution signature.
 //
 // rac_rag_query_proto performs the embedding lookup internally against the
 // host-provided RAG session, so the L5 graph carries 4 operators + 3 edges
 // rather than 5 + 4 (no separate embed stage).
-// ---------------------------------------------------------------------------
 void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
     out->set_name("rag");
 
@@ -115,9 +109,7 @@ void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
     add_edge(out, "context.out", "llm.in");
 }
 
-// ---------------------------------------------------------------------------
 // WakeWord — always-on listener → trigger.
-// ---------------------------------------------------------------------------
 void expand_wake_word(const runanywhere::v1::WakeWordConfig& cfg, PipelineSpec* out) {
     out->set_name("wake_word");
 
@@ -136,12 +128,10 @@ void expand_wake_word(const runanywhere::v1::WakeWordConfig& cfg, PipelineSpec* 
     add_edge(out, "detect.out", "trigger.in");
 }
 
-// ---------------------------------------------------------------------------
 // AgentLoop — multi-turn tool-calling LLM loop. Modelled as a single
 // generate_text operator with auxiliary tokenise/context build. The
 // iterative loop runs inside the LLM operator's engine; the DAG just
 // frames the I/O.
-// ---------------------------------------------------------------------------
 void expand_agent_loop(const runanywhere::v1::AgentLoopConfig& cfg, PipelineSpec* out) {
     out->set_name("agent_loop");
 
@@ -160,9 +150,7 @@ void expand_agent_loop(const runanywhere::v1::AgentLoopConfig& cfg, PipelineSpec
     add_edge(out, "llm.token", "output.in");
 }
 
-// ---------------------------------------------------------------------------
 // TimeSeries — window + anomaly_detect + generate_text.
-// ---------------------------------------------------------------------------
 void expand_time_series(const runanywhere::v1::TimeSeriesConfig& cfg, PipelineSpec* out) {
     out->set_name("time_series");
 

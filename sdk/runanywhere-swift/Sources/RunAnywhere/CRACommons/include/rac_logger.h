@@ -38,9 +38,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // LOG METADATA STRUCTURE
-// =============================================================================
 
 /**
  * @brief Metadata attached to a log entry.
@@ -82,9 +80,7 @@ typedef struct rac_log_metadata {
     }
 #endif
 
-// =============================================================================
 // CORE LOGGING API
-// =============================================================================
 
 /**
  * @brief Initialize the logging system.
@@ -178,9 +174,7 @@ RAC_API void rac_logger_logf(rac_log_level_t level, const char* category,
 RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
                              const rac_log_metadata_t* metadata, const char* format, va_list args);
 
-// =============================================================================
 // CONVENIENCE MACROS
-// =============================================================================
 
 /**
  * Helper to create metadata with source location.
@@ -309,9 +303,7 @@ RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
         }                                                                       \
     } while (0)
 
-// =============================================================================
 // METADATA REDACTION POLICY
-// =============================================================================
 
 /**
  * @brief Returns true (1) if a log metadata key should be redacted.
@@ -333,9 +325,7 @@ RAC_API rac_result_t rac_log_metadata_should_redact(const char* key, rac_bool_t*
 }
 #endif
 
-// =============================================================================
 // C++ CONVENIENCE CLASS
-// =============================================================================
 
 #ifdef __cplusplus
 

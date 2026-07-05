@@ -41,9 +41,7 @@ std::string copyNullable(const char* value) {
 
 } // anonymous namespace
 
-// =============================================================================
 // Singleton Implementation
-// =============================================================================
 
 AuthBridge& AuthBridge::shared() {
     static AuthBridge instance;
@@ -51,7 +49,6 @@ AuthBridge& AuthBridge::shared() {
 }
 
 // State Management (Owned by commons)
-// =============================================================================
 
 std::string AuthBridge::getAccessToken() const {
     return copyNullable(rac_auth_get_access_token());

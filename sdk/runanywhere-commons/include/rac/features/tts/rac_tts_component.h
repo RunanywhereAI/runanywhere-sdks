@@ -33,9 +33,7 @@ extern "C" {
 
 // NOTE: rac_tts_config_t is defined in rac_tts_types.h (included above)
 
-// =============================================================================
 // TTS COMPONENT API - Mirrors Swift's TTSCapability
-// =============================================================================
 
 /**
  * @brief Create a TTS capability component
@@ -175,9 +173,7 @@ RAC_API void rac_tts_component_destroy(rac_handle_t handle);
 RAC_API rac_result_t rac_tts_component_get_supported_languages(rac_handle_t handle,
                                                                char** out_json);
 
-// =============================================================================
 // GENERATED-PROTO C ABI
-// =============================================================================
 
 /**
  * @brief Callback fired for serialized runanywhere.v1.TTSVoiceInfo bytes.

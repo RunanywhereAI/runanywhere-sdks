@@ -27,7 +27,7 @@ dependencies:
   # Protobuf runtime — consumed by the IDL-generated bindings in
   # `lib/generated/`.
   # Pinned to match the pinned protoc_plugin version in
-  # scripts/setup/setup-toolchain.sh / idl/codegen/generate_dart.sh.
+  # scripts/setup/toolchain.sh / scripts/codegen/generate_dart.sh.
   # Bumped 2026-05-19 (idl-codegen bump): ^3.1.0 -> ^6.0.0.
   # protoc_plugin 25.0.0 (PROTOC_GEN_DART_VERSION) emits `.pb.dart` bindings
   # against the protobuf 6.x runtime API — `protoc_plugin` 25.0.0 declares
@@ -62,8 +62,8 @@ dev_dependencies:
   # with that and broke `melos bootstrap`.
   flutter_lints: ^6.0.0
   # Pinned (not caret) so local + CI codegen produces byte-identical output.
-  # Mirrors PROTOC_PLUGIN_DART_EXPECTED in scripts/setup/setup-toolchain.sh and
-  # the activation in idl/codegen/generate_dart.sh. Bumping requires updating
+  # Mirrors PROTOC_PLUGIN_DART_EXPECTED in scripts/setup/toolchain.sh and
+  # the activation in scripts/codegen/generate_dart.sh. Bumping requires updating
   # this pin (the packages/runanywhere pubspec is the workspace source of
   # truth for shared deps — see the centralization comment block in
   # sdk/runanywhere-flutter/pubspec.yaml).

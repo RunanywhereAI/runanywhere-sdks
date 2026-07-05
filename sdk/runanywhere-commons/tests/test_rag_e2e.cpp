@@ -54,9 +54,7 @@ int g_failures = 0;
         }                                                                               \
     } while (0)
 
-// --------------------------------------------------------------------------
 // Real file-backed platform adapter (persistence tests need genuine file I/O).
-// --------------------------------------------------------------------------
 
 void adapter_log(rac_log_level_t level, const char* category, const char* message, void*) {
     if (level >= RAC_LOG_WARNING) {
@@ -134,9 +132,7 @@ rac_platform_adapter_t make_adapter() {
     return a;
 }
 
-// --------------------------------------------------------------------------
 // Helpers
-// --------------------------------------------------------------------------
 
 std::string env_or(const char* key, const char* fallback) {
     const char* v = std::getenv(key);

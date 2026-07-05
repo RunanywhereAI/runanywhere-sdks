@@ -18,9 +18,7 @@
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 
-// =============================================================================
 // JSON BUILDER HELPERS
-// =============================================================================
 
 namespace {
 
@@ -201,9 +199,7 @@ class JsonBuilder {
 
 }  // namespace
 
-// =============================================================================
 // PAYLOAD JSON SERIALIZATION
-// =============================================================================
 
 rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t* payload,
                                                    rac_environment_t env, char** out_json,
@@ -217,7 +213,7 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
     JsonBuilder json;
     json.start_object();
 
-    // ---- Base fields: every modality (backend _V2IngestEventBase) ----------
+    // Base fields: every modality (backend _V2IngestEventBase)
     // modality and device_id are intentionally omitted — modality is encoded in
     // the endpoint path and device_id lives at the batch level. The batch schema
     // is extra="forbid", so only this modality's fields may appear below.
@@ -242,7 +238,7 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
     json.add_string("error_code", payload->error_code);
     json.add_bool("is_streaming", payload->is_streaming, payload->has_is_streaming);
 
-    // ---- Modality-specific fields ------------------------------------------
+    // Modality-specific fields
     const char* modality = payload->modality ? payload->modality : "system";
     if (strcmp(modality, "llm") == 0) {
         json.add_int("input_tokens", payload->input_tokens);
@@ -363,9 +359,7 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // BATCH REQUEST JSON SERIALIZATION
-// =============================================================================
 
 rac_result_t rac_telemetry_manager_batch_to_json(const rac_telemetry_batch_request_t* request,
                                                  rac_environment_t env, char** out_json,
@@ -414,9 +408,7 @@ rac_result_t rac_telemetry_manager_batch_to_json(const rac_telemetry_batch_reque
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // DEVICE REGISTRATION JSON
-// =============================================================================
 
 rac_result_t rac_device_registration_to_json(const rac_device_registration_request_t* request,
                                              rac_environment_t env, char** out_json,

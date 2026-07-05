@@ -57,9 +57,7 @@ bool query(rac_inference_framework_t fw, const char* ext) {
     return out == RAC_TRUE;
 }
 
-// ---------------------------------------------------------------------------
 // Positive matches per framework.
-// ---------------------------------------------------------------------------
 int test_positive_matches() {
     // LLAMACPP: .gguf, .bin
     EXPECT_TRUE(query(RAC_FRAMEWORK_LLAMACPP, ".gguf"));
@@ -87,9 +85,7 @@ int test_positive_matches() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // Negative cross-framework rejection.
-// ---------------------------------------------------------------------------
 int test_negative_cross_framework() {
     // .gguf is NOT a model file for ONNX
     EXPECT_TRUE(!query(RAC_FRAMEWORK_ONNX, "gguf"));
@@ -110,9 +106,7 @@ int test_negative_cross_framework() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // Unknown / nonsense extensions.
-// ---------------------------------------------------------------------------
 int test_unknown_extensions() {
     EXPECT_TRUE(!query(RAC_FRAMEWORK_LLAMACPP, "foo"));
     EXPECT_TRUE(!query(RAC_FRAMEWORK_ONNX, ".bar"));
@@ -123,9 +117,7 @@ int test_unknown_extensions() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // Case-insensitivity.
-// ---------------------------------------------------------------------------
 int test_case_insensitivity() {
     EXPECT_TRUE(query(RAC_FRAMEWORK_LLAMACPP, "GGUF"));
     EXPECT_TRUE(query(RAC_FRAMEWORK_LLAMACPP, ".GGUF"));
@@ -137,9 +129,7 @@ int test_case_insensitivity() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // Builtin-style frameworks always claim membership.
-// ---------------------------------------------------------------------------
 int test_builtin_frameworks() {
     // Foundation Models / System TTS are builtin:// — no on-disk artifact,
     // so any extension (or none) reports true.
@@ -153,9 +143,7 @@ int test_builtin_frameworks() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // NULL out-pointer rejection.
-// ---------------------------------------------------------------------------
 int test_null_out_pointer() {
     EXPECT_RC(rac_model_format_for_framework(RAC_FRAMEWORK_LLAMACPP, ".gguf", nullptr),
               RAC_ERROR_NULL_POINTER);
@@ -164,9 +152,7 @@ int test_null_out_pointer() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // NULL extension on a non-builtin framework returns false (not an error).
-// ---------------------------------------------------------------------------
 int test_null_extension_non_builtin() {
     rac_bool_t out = RAC_TRUE;  // sentinel — should be set to RAC_FALSE
     EXPECT_RC(rac_model_format_for_framework(RAC_FRAMEWORK_LLAMACPP, nullptr, &out), RAC_SUCCESS);
@@ -178,11 +164,9 @@ int test_null_extension_non_builtin() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // Default fallback for less-enumerated frameworks (UNKNOWN, BUILTIN, NONE,
 // MLX) follows the permissive Swift fallback arm — accepts the common
 // model extensions but rejects unknown ones.
-// ---------------------------------------------------------------------------
 int test_unknown_framework_fallback() {
     EXPECT_TRUE(query(RAC_FRAMEWORK_UNKNOWN, "gguf"));
     EXPECT_TRUE(query(RAC_FRAMEWORK_UNKNOWN, "onnx"));

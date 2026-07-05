@@ -125,9 +125,7 @@ class HTTPClientAdapter {
   Future<String?> Function({required bool requiresAuth})? _tokenResolver;
   Future<String?> Function()? _refreshTokenCallback;
 
-  // --------------------------------------------------------------------------
   // Configuration
-  // --------------------------------------------------------------------------
 
   void configure({
     required String baseURL,
@@ -198,9 +196,7 @@ class HTTPClientAdapter {
     _refreshTokenCallback = onRefresh;
   }
 
-  // --------------------------------------------------------------------------
   // Public request API
-  // --------------------------------------------------------------------------
 
   /// Low-level raw request. Caller owns URL + headers + body.
   Future<HttpClientResponse> rawRequest({
@@ -373,9 +369,7 @@ class HTTPClientAdapter {
     _refreshTokenCallback = null;
   }
 
-  // --------------------------------------------------------------------------
   // Internal helpers
-  // --------------------------------------------------------------------------
 
   String _buildFullURL(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
@@ -538,9 +532,7 @@ class HttpClientException implements Exception {
   String toString() => 'HttpClientException($statusCode): $message';
 }
 
-// ============================================================================
 // Blocking FFI worker (runs on helper isolate)
-// ============================================================================
 
 _HttpRequestResult _sendBlocking(_HttpRequestSpec spec) {
   final bindings = RacNative.bindings;

@@ -86,9 +86,7 @@ static const char* LOG_TAG = "DownloadOrchestrator";
 
 namespace fs = std::filesystem;
 
-// =============================================================================
 // INTERNAL HELPERS
-// =============================================================================
 
 /**
  * Get file extension from a URL/path string (without dot).
@@ -1320,9 +1318,7 @@ void run_proto_download_worker_async(void* user_data) {
     run_proto_download_worker(args->task, args->resume_from);
 }
 
-// =============================================================================
 // EVENT-DRIVEN ASYNC DOWNLOAD DRIVER (Emscripten / Web)
-// =============================================================================
 // The synchronous worker above buffers the whole body on the main thread when
 // the only transport is FetchHttpTransport's sync XHR — the UI freezes and the
 // poll loop never ticks until 100%. When the platform supplies the async
@@ -1923,9 +1919,7 @@ std::vector<proto_plan_file> files_from_plan(const rav1::DownloadPlanResult& pla
 }  // namespace
 #endif  // RAC_HAVE_PROTOBUF
 
-// =============================================================================
 // POST-EXTRACTION MODEL PATH FINDING (ported from Swift ExtractionService)
-// =============================================================================
 
 /**
  * Find a single model file in a directory, searching recursively up to max_depth levels.
@@ -2034,9 +2028,7 @@ static std::string find_nested_directory(const char* extracted_dir) {
     return extracted_dir;
 }
 
-// =============================================================================
 // PUBLIC API — DOWNLOAD ORCHESTRATION
-// =============================================================================
 
 #ifdef RAC_HAVE_PROTOBUF
 extern "C" rac_result_t
@@ -2857,9 +2849,7 @@ extern "C" rac_result_t rac_download_cleanup_terminal_tasks_proto(size_t* out_pu
 }
 #endif
 
-// =============================================================================
 // PUBLIC API — POST-EXTRACTION MODEL PATH FINDING
-// =============================================================================
 
 rac_result_t rac_find_model_path_after_extraction(const char* extracted_dir,
                                                   rac_archive_structure_t structure,
@@ -2921,9 +2911,7 @@ rac_result_t rac_find_model_path_after_extraction(const char* extracted_dir,
     }
 }
 
-// =============================================================================
 // PUBLIC API — UTILITY FUNCTIONS
-// =============================================================================
 
 rac_result_t rac_download_compute_destination(const char* model_id, const char* download_url,
                                               rac_inference_framework_t framework,

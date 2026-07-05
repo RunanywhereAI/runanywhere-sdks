@@ -33,9 +33,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // DIFFUSION COMPONENT API - Component lifecycle and generation
-// =============================================================================
 
 /**
  * @brief Create a diffusion capability component

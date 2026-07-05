@@ -2,9 +2,8 @@
 #define RAC_FOUNDATION_RAC_PROTO_MARSHAL_INTERNAL_H
 
 // Internal (not installed): shared proto-byte marshalling helpers used by the
-// feature modules' proto ABIs. Centralizes the validate / parse-pointer /
-// serialize-into-buffer logic that was previously copy-pasted per feature
-// (stt, tts, vad, voice_agent, embeddings, diffusion).
+// feature modules' proto ABIs (stt, tts, vad, voice_agent, embeddings,
+// diffusion): validate / parse-pointer / serialize-into-buffer.
 //
 // Only include this inside a `#if defined(RAC_HAVE_PROTOBUF)` block — it pulls
 // in <google/protobuf/message_lite.h>.

@@ -20,9 +20,7 @@
 import { LoggingManager } from '../Services/LoggingManager';
 import { LogLevel } from '../Models/LogLevel';
 
-// ============================================================================
 // SDK Logger
-// ============================================================================
 
 /**
  * Simple logger for SDK components with category-based filtering.
@@ -42,9 +40,7 @@ export class SDKLogger {
     this.category = category;
   }
 
-  // ==========================================================================
   // Logging Methods
-  // ==========================================================================
 
   /**
    * Log a debug message.
@@ -122,9 +118,7 @@ export class SDKLogger {
     LoggingManager.shared.log(level, this.category, message, metadata);
   }
 
-  // ==========================================================================
   // Error Logging with Context
-  // ==========================================================================
 
   /**
    * Log an Error object with full context.
@@ -165,9 +159,7 @@ export class SDKLogger {
     LoggingManager.shared.log(LogLevel.LOG_LEVEL_ERROR, this.category, message, metadata);
   }
 
-  // ==========================================================================
   // Convenience Loggers (Static)
-  // ==========================================================================
 
   /**
    * Shared logger for general SDK operations.

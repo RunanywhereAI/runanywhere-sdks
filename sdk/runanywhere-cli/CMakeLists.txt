@@ -1,17 +1,14 @@
-# =============================================================================
 # rcli — RunAnywhere desktop CLI
-# =============================================================================
-# Built from the root CMakeLists via -DRAC_BUILD_CLI=ON (see the rcli-* presets).
+# Built from the commons CMake root via -DRAC_BUILD_CLI=ON (see the rcli-* presets).
 # Links rac_commons + statically-folded backends; the reusable desktop platform
 # adapter lives in commons (RAC_DESKTOP_ADAPTER) per the repo layering rule.
 #
 # Targets:
 #   rcli_core  — OBJECT library with every TU except main.cpp (shared with tests)
 #   rcli       — the CLI binary
-# =============================================================================
 
 if(NOT TARGET rac_commons)
-    message(FATAL_ERROR "rcli must be built from the repository root CMakeLists (rac_commons target missing)")
+    message(FATAL_ERROR "rcli must be built from the sdk/runanywhere-commons CMake root (rac_commons target missing)")
 endif()
 if(NOT RAC_DESKTOP_ADAPTER)
     message(FATAL_ERROR "rcli requires -DRAC_DESKTOP_ADAPTER=ON (desktop platform adapter + curl transport)")
@@ -61,13 +58,13 @@ target_link_libraries(rcli_core PUBLIC rac_commons)
 target_compile_features(rcli_core PUBLIC cxx_std_20)
 
 # Version string: single source of truth is sdk/runanywhere-commons/VERSION,
-# already read into PROJECT_VERSION by the root CMakeLists.
+# already read into PROJECT_VERSION by the commons CMake root.
 target_compile_definitions(rcli_core PUBLIC RCLI_VERSION="${PROJECT_VERSION}")
 
 # Proto-byte ABI access (DownloadProgress, ModelInfo, Register* requests).
 # Same internal-consumer pattern as commons tests' rac_test_define_have_protobuf:
 # rac_commons keeps RAC_HAVE_PROTOBUF/include paths PRIVATE, so re-attach here.
-set(_RCLI_COMMONS_DIR ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons)
+set(_RCLI_COMMONS_DIR ${CMAKE_SOURCE_DIR})
 if(NOT RAC_PROTOBUF_RUNTIME_ENABLED
    OR NOT EXISTS ${_RCLI_COMMONS_DIR}/src/generated/proto/model_types.pb.cc)
     message(FATAL_ERROR "rcli requires the commons protobuf runtime (RAC_PROTOBUF_RUNTIME_ENABLED) "
@@ -117,9 +114,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         PROPERTIES COMPILE_OPTIONS "-w")
 endif()
 
-# =============================================================================
 # rcli binary
-# =============================================================================
 
 add_executable(rcli src/main.cpp)
 target_link_libraries(rcli PRIVATE rcli_core)
@@ -141,9 +136,7 @@ endif()
 
 install(TARGETS rcli RUNTIME DESTINATION bin)
 
-# =============================================================================
 # Tests
-# =============================================================================
 
 if(RAC_BUILD_TESTS)
     add_subdirectory(tests)

@@ -39,9 +39,7 @@ import { encodeProtoMessage } from '../../../services/ProtoWire';
 const logger = new SDKLogger('RunAnywhere.VAD');
 let requestCounter = 0;
 
-// ============================================================================
 // Speech Detection
-// ============================================================================
 
 function audioToArrayBuffer(audio: Uint8Array | Float32Array | string | ArrayBuffer): ArrayBuffer {
   if (typeof audio === 'string') {

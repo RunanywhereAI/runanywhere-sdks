@@ -34,9 +34,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 
-// =============================================================================
 // Minimal single-threaded HTTP/1.1 server used by the tests.
-// =============================================================================
 
 namespace {
 
@@ -180,7 +178,7 @@ void handle_client(int client) {
     }
     parse_request(raw);
 
-    // ---- Routing --------------------------------------------------
+    // Routing
     if (g_last_path == "/echo") {
         respond(client, 200, "OK", g_last_body,
                 {{"X-Echo-Method", g_last_method}, {"X-Echo-Custom", header_value("X-Custom")}});
@@ -281,9 +279,7 @@ std::string server_url(const std::string& path) {
     return oss.str();
 }
 
-// =============================================================================
 // Tiny assert machinery.
-// =============================================================================
 
 int g_failures = 0;
 int g_passes = 0;
@@ -312,9 +308,7 @@ int g_passes = 0;
         }                                                                            \
     } while (0)
 
-// =============================================================================
 // Tests.
-// =============================================================================
 
 void test_get_happy_path() {
     rac_http_client_t* c = nullptr;

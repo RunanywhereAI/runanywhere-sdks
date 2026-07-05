@@ -8,7 +8,6 @@
 //   * a child CancelToken forked from the scheduler's root token
 //
 // Contract
-// --------
 //   `start(parent_cancel)`   — spawn the worker thread; must not be called
 //                              more than once. Idempotent no-ops otherwise.
 //   `stop()`                 — trigger cancel + close input edge; the
@@ -28,7 +27,6 @@
 //   output_->close();
 //
 // Subclasses
-// ----------
 //   `PrimitiveNode<In, Out, Op>` — wraps any callable with signature
 //       void(In&& in, StreamEdge<Out>& out)
 //     Use to adapt a `rac_engine_vtable_t` primitive (stt_transcribe,
@@ -42,7 +40,6 @@
 //                    workers exit.
 //
 // Type-erased base
-// ----------------
 //   `IPipelineNode` allows GraphScheduler to store heterogeneous nodes in
 //   a single container without leaking the In/Out template parameters.
 
@@ -82,9 +79,7 @@ class IPipelineNode {
     virtual const char* name() const noexcept = 0;
 };
 
-// ---------------------------------------------------------------------------
 // PipelineNode<In, Out>
-// ---------------------------------------------------------------------------
 
 template <typename In, typename Out>
 class PipelineNode : public IPipelineNode {
@@ -137,7 +132,7 @@ class PipelineNode : public IPipelineNode {
 
     const char* name() const noexcept override { return name_.c_str(); }
 
-    // ---- Edge accessors --------------------------------------------------
+    // Edge accessors
 
     std::shared_ptr<InputEdge> input() { return input_; }
     std::shared_ptr<OutputEdge> output() { return output_; }
@@ -181,9 +176,7 @@ class PipelineNode : public IPipelineNode {
     std::atomic<bool> started_{false};
 };
 
-// ---------------------------------------------------------------------------
 // PrimitiveNode<In, Out, Op>
-// ---------------------------------------------------------------------------
 //
 // Wraps any callable matching `void(In&&, StreamEdge<Out>&)` as a pipeline
 // node. The typical adapter around a C ABI primitive (e.g. the STT vtable's
@@ -215,9 +208,7 @@ make_primitive_node(std::string name, Op&& op, size_t input_capacity = 16,
         std::move(name), std::forward<Op>(op), input_capacity, output_capacity, policy);
 }
 
-// ---------------------------------------------------------------------------
 // SplitNode<T> — fan-out 1 → N
-// ---------------------------------------------------------------------------
 
 template <typename T>
 class SplitNode : public IPipelineNode {
@@ -302,9 +293,7 @@ class SplitNode : public IPipelineNode {
     std::atomic<bool> started_{false};
 };
 
-// ---------------------------------------------------------------------------
 // MergeNode<T> — fan-in N → 1
-// ---------------------------------------------------------------------------
 
 template <typename T>
 class MergeNode : public IPipelineNode {

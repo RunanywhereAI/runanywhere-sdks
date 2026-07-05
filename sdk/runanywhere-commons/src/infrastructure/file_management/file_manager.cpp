@@ -24,9 +24,7 @@
 #include "rac/infrastructure/file_management/rac_file_manager.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 
-// =============================================================================
 // INTERNAL HELPERS
-// =============================================================================
 
 static const char* LOG_CATEGORY = "FileManager";
 
@@ -130,9 +128,7 @@ static rac_result_t clear_directory_impl(const rac_file_callbacks_t* cb, const c
     return cb->create_directory(path, 1 /* recursive */, cb->user_data);
 }
 
-// =============================================================================
 // DIRECTORY STRUCTURE
-// =============================================================================
 
 rac_result_t rac_file_manager_create_directory_structure(const rac_file_callbacks_t* cb) {
     rac_result_t result = validate_callbacks(cb);
@@ -184,9 +180,7 @@ rac_result_t rac_file_manager_create_directory_structure(const rac_file_callback
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // MODEL FOLDER MANAGEMENT
-// =============================================================================
 
 rac_result_t rac_file_manager_create_model_folder(const rac_file_callbacks_t* cb,
                                                   const char* model_id,
@@ -310,9 +304,7 @@ rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* cb, const
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // DIRECTORY SIZE CALCULATION
-// =============================================================================
 
 rac_result_t rac_file_manager_calculate_dir_size(const rac_file_callbacks_t* cb, const char* path,
                                                  int64_t* out_size) {
@@ -367,9 +359,7 @@ rac_result_t rac_file_manager_models_storage_used(const rac_file_callbacks_t* cb
     return rac_file_manager_calculate_dir_size(cb, models_dir, out_size);
 }
 
-// =============================================================================
 // CACHE & TEMP MANAGEMENT
-// =============================================================================
 
 rac_result_t rac_file_manager_clear_cache(const rac_file_callbacks_t* cb) {
     rac_result_t result = validate_callbacks(cb);
@@ -429,9 +419,7 @@ rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb, int64_t
     return rac_file_manager_calculate_dir_size(cb, cache_dir, out_size);
 }
 
-// =============================================================================
 // STORAGE INFO
-// =============================================================================
 
 rac_result_t rac_file_manager_get_storage_info(const rac_file_callbacks_t* cb,
                                                rac_file_manager_storage_info_t* out_info) {
@@ -528,9 +516,7 @@ rac_result_t rac_file_manager_check_storage(const rac_file_callbacks_t* cb, int6
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // DIRECTORY CLEARING (PUBLIC HELPER)
-// =============================================================================
 
 rac_result_t rac_file_manager_clear_directory(const rac_file_callbacks_t* cb, const char* path) {
     if (path == nullptr) {

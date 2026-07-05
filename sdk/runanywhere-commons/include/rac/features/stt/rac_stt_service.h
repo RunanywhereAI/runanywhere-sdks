@@ -27,9 +27,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // SERVICE VTABLE - Backend implementations provide this
-// =============================================================================
 
 /**
  * STT Service operations vtable.
@@ -83,7 +81,6 @@ typedef struct rac_stt_service_ops {
     rac_result_t (*detect_language)(void* impl, const void* audio_data, size_t audio_size,
                                     const rac_stt_options_t* options, char** out_language);
 
-    // -------------------------------------------------------------------------
     // Persistent per-session streaming handles.
     //
     // These three slots let the commons streaming dispatcher keep a stable
@@ -95,7 +92,6 @@ typedef struct rac_stt_service_ops {
     // `transcribe_stream` calls (legacy path). Backends that fill them in
     // get a stream_create on first chunk, N x stream_feed_audio_chunk, and
     // a final stream_destroy on stop/cancel.
-    // -------------------------------------------------------------------------
 
     /**
      * Allocate a backend-specific streaming session tied to @p impl. The
@@ -140,9 +136,7 @@ typedef struct rac_stt_service {
     const char* model_id;
 } rac_stt_service_t;
 
-// =============================================================================
 // PUBLIC API - Generic service functions
-// =============================================================================
 
 /**
  * @brief Create an STT service
@@ -296,9 +290,7 @@ RAC_API rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_stt_lifecycle_stream_event_callback_fn callback, void* user_data);
 
-// =============================================================================
 // CANONICAL DEFAULTS
-// =============================================================================
 
 /**
  * @brief Populate a default-initialised runanywhere.v1.STTConfiguration.

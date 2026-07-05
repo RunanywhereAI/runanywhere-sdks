@@ -192,7 +192,6 @@ int test_llm_no_model_returns_typed_domain_error() {
     return 0;
 }
 
-// -----------------------------------------------------------------------------
 // Proto ABI runtime-activation smokes.
 //
 // Each CHECK below confirms the API is wired into the protobuf runtime by
@@ -202,7 +201,6 @@ int test_llm_no_model_returns_typed_domain_error() {
 // that is fine. What we are guarding against is a regression where the public
 // symbol is exported but the implementation was compiled into the stub branch
 // that returns RAC_ERROR_FEATURE_NOT_AVAILABLE when RAC_HAVE_PROTOBUF is off.
-// -----------------------------------------------------------------------------
 
 int test_embeddings_create_proto_is_active() {
     runanywhere::v1::EmbeddingsCreateRequest request;

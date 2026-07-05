@@ -155,9 +155,7 @@ int derive_event_kind(int kind, bool is_final, const char* error_message) {
 
 }  // namespace rac::llm
 
-// =============================================================================
 // Protobuf-backed serializer + dispatcher (desktop / iOS / Kotlin).
-// =============================================================================
 
 #ifdef RAC_HAVE_PROTOBUF
 
@@ -265,7 +263,6 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
 
 #else /* RAC_HAVE_PROTOBUF not defined */
 
-// =============================================================================
 // Hand-encoded protobuf wire format for runanywhere.v1.LLMStreamEvent.
 //
 // We avoid linking libprotobuf on Android legacy / WASM (saves ~12 MB
@@ -312,7 +309,6 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
 // proto3 default-value omission semantics are preserved: scalars equal
 // to their type's default (0, false, empty string) are skipped on the
 // wire.
-// =============================================================================
 
 namespace {
 
@@ -463,9 +459,7 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
 
 #endif /* RAC_HAVE_PROTOBUF */
 
-// =============================================================================
 // Registry-backed dispatchers (shared by both build paths).
-// =============================================================================
 
 namespace rac::llm {
 

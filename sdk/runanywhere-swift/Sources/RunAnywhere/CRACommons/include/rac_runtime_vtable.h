@@ -52,9 +52,9 @@ extern "C" {
  */
 #define RAC_RUNTIME_ABI_VERSION 1u
 
-/* ===========================================================================
+/*
  * Device + capability descriptors (by-value POD, safe to include-only).
- * =========================================================================== */
+ */
 
 /** Coarse device class the runtime targets. Mirrors `rac_runtime_id_t` but
  *  kept separate so a runtime can target multiple device classes (CoreML
@@ -103,12 +103,12 @@ typedef struct rac_runtime_capabilities {
 #define RAC_RUNTIME_CAP_DYNAMIC_SHAPES   (1ull << 4)
 #define RAC_RUNTIME_CAP_ZERO_COPY        (1ull << 5)
 
-/* ===========================================================================
+/*
  * Opaque session + buffer handles.
  *
  * Runtimes define the concrete struct privately; callers pass the pointer
  * back unchanged through run_session / destroy_session.
- * =========================================================================== */
+ */
 
 typedef struct rac_runtime_session rac_runtime_session_t;
 typedef struct rac_runtime_buffer  rac_runtime_buffer_t;
@@ -143,9 +143,9 @@ typedef struct rac_runtime_io {
     size_t         rank;
 } rac_runtime_io_t;
 
-/* ===========================================================================
+/*
  * Metadata + vtable layout.
- * =========================================================================== */
+ */
 
 /**
  * @brief Runtime plugin metadata — carried in every vtable.
@@ -242,7 +242,7 @@ typedef struct rac_runtime_vtable {
      *  is the authoritative answer. */
     rac_result_t (*capabilities)(rac_runtime_capabilities_t* out);
 
-    /* ─────────── Reserved slot pool (6 slots) ─────────── */
+    /* Reserved slot pool (6 slots) */
     /*
      * Keeps layout binary-stable as new runtime ops land. Promoting a
      * reserved slot bumps RAC_RUNTIME_ABI_VERSION.
@@ -255,9 +255,9 @@ typedef struct rac_runtime_vtable {
     const void* reserved_slot_5;
 } rac_runtime_vtable_t;
 
-/* ===========================================================================
+/*
  * Dynamic-loader symbol convention (parallel to rac_plugin_entry_<name>).
- * =========================================================================== */
+ */
 
 typedef const rac_runtime_vtable_t* (*rac_runtime_entry_fn)(void);
 

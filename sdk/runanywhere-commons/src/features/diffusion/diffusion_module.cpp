@@ -2,11 +2,9 @@
  * @file diffusion_module.cpp
  * @brief Unified Diffusion feature module.
  *
- * W4 component unification: merges the former diffusion_component.cpp
- * (handle-based component path) with the entire rac_diffusion_proto_abi.cpp
- * (handle-based rac_diffusion_generate_proto / _with_progress / cancel) and
- * Diffusion's slice of rac_nonllm_lifecycle_proto_abi.cpp (the handle-less
- * rac_diffusion_generate_lifecycle_proto) into one TU.
+ * One TU owns the handle-based component path, the handle-based
+ * rac_diffusion_generate_proto / _with_progress / cancel ABI, and the
+ * handle-less rac_diffusion_generate_lifecycle_proto verb.
  *
  * Supports text-to-image, image-to-image, and inpainting.
  */
@@ -45,9 +43,7 @@
 #include "infrastructure/events/sdk_event_publish.h"
 #endif
 
-// =============================================================================
 // INTERNAL STRUCTURES
-// =============================================================================
 
 /**
  * Internal diffusion component state.
@@ -80,9 +76,7 @@ struct rac_diffusion_component {
     }
 };
 
-// =============================================================================
 // HELPER FUNCTIONS
-// =============================================================================
 
 /**
  * Merge user-provided options over component defaults.
@@ -146,9 +140,7 @@ static std::string generate_unique_id() {
     return {buffer};
 }
 
-// =============================================================================
 // LIFECYCLE CALLBACKS
-// =============================================================================
 
 /**
  * Service creation callback for lifecycle manager.
@@ -207,9 +199,7 @@ static void diffusion_destroy_service(rac_handle_t service, void* user_data) {
     }
 }
 
-// =============================================================================
 // LIFECYCLE API
-// =============================================================================
 
 extern "C" rac_result_t rac_diffusion_component_create(rac_handle_t* out_handle) {
     return rac::features::create_lifecycle_component<rac_diffusion_component>(
@@ -341,9 +331,7 @@ extern "C" void rac_diffusion_component_destroy(rac_handle_t handle) {
     delete component;
 }
 
-// =============================================================================
 // MODEL LIFECYCLE
-// =============================================================================
 
 extern "C" rac_result_t rac_diffusion_component_load_model(rac_handle_t handle,
                                                            const char* model_path,
@@ -390,9 +378,7 @@ extern "C" rac_result_t rac_diffusion_component_cleanup(rac_handle_t handle) {
     return rac_lifecycle_reset(component->lifecycle);
 }
 
-// =============================================================================
 // GENERATION API
-// =============================================================================
 
 extern "C" rac_result_t rac_diffusion_component_generate(rac_handle_t handle,
                                                          const rac_diffusion_options_t* options,
@@ -602,9 +588,7 @@ extern "C" rac_result_t rac_diffusion_component_cancel(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // CAPABILITY QUERY API
-// =============================================================================
 
 extern "C" uint32_t rac_diffusion_component_get_capabilities(rac_handle_t handle) {
     if (!handle)
@@ -670,9 +654,7 @@ extern "C" rac_result_t rac_diffusion_component_get_info(rac_handle_t handle,
     return rac_diffusion_get_info(service, out_info);
 }
 
-// =============================================================================
 // STATE QUERY API
-// =============================================================================
 
 extern "C" rac_lifecycle_state_t rac_diffusion_component_get_state(rac_handle_t handle) {
     if (!handle)
@@ -693,15 +675,11 @@ extern "C" rac_result_t rac_diffusion_component_get_metrics(rac_handle_t handle,
     return rac_lifecycle_get_metrics(component->lifecycle, out_metrics);
 }
 
-// =============================================================================
-// PROTO-BYTE C ABI (formerly rac_diffusion_proto_abi.cpp) +
-// LIFECYCLE-OWNED GENERATED-PROTO C ABI (formerly Diffusion slice of
-// rac_nonllm_lifecycle_proto_abi.cpp)
+// PROTO-BYTE C ABI + LIFECYCLE-OWNED GENERATED-PROTO C ABI
 //
 // rac_diffusion_generate_proto / _with_progress / cancel are handle-based;
 // rac_diffusion_generate_lifecycle_proto resolves the loaded model via the
 // global registry (rac::lifecycle::acquire_lifecycle_diffusion).
-// =============================================================================
 
 namespace {
 

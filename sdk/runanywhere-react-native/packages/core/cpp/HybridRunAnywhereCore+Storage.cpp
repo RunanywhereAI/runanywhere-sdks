@@ -88,9 +88,7 @@ std::shared_ptr<ArrayBuffer> callStorageProto(const std::vector<uint8_t>& reques
 } // namespace
 
 // Storage
-// ============================================================================
 // Storage
-// ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::clearCache() {
     return Promise<bool>::async([]() {

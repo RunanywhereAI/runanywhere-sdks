@@ -19,9 +19,7 @@
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 
-// =============================================================================
 // INTERNAL STATE
-// =============================================================================
 
 namespace {
 
@@ -53,9 +51,7 @@ void emit_device_registration_failed(rac_result_t error_code, const char* error_
 
 }  // namespace
 
-// =============================================================================
 // PUBLIC API
-// =============================================================================
 
 extern "C" {
 

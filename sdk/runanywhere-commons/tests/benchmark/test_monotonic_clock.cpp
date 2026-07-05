@@ -11,9 +11,7 @@
 
 #include "rac/core/rac_benchmark.h"
 
-// =============================================================================
 // BASIC FUNCTIONALITY
-// =============================================================================
 
 TEST(MonotonicClock, ReturnsNonNegative) {
     int64_t now = rac_monotonic_now_ms();
@@ -48,9 +46,7 @@ TEST(MonotonicClock, DistinctOverTime) {
     EXPECT_GT(second, first) << "Two calls 10ms apart should produce distinct values";
 }
 
-// =============================================================================
 // THREAD SAFETY
-// =============================================================================
 
 TEST(MonotonicClock, ThreadSafety) {
     constexpr int kNumThreads = 8;

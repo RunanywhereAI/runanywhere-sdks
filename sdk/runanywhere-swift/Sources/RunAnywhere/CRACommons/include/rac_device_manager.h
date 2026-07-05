@@ -23,9 +23,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // CALLBACK TYPES
-// =============================================================================
 
 /**
  * @brief HTTP response for device registration
@@ -109,9 +107,7 @@ typedef struct rac_device_callbacks {
     void* user_data;
 } rac_device_callbacks_t;
 
-// =============================================================================
 // DEVICE MANAGER API
-// =============================================================================
 
 /**
  * @brief Set callbacks for device manager operations

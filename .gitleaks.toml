@@ -1,15 +1,4 @@
-# =============================================================================
-# Gitleaks Configuration — RunAnywhere SDK Monorepo
-#
-# Custom rules supplement gitleaks' built-in detectors (AWS keys, JWTs, etc.).
-# These catch RunAnywhere-specific secrets and internal infrastructure URLs.
-# =============================================================================
-
 title = "RunAnywhere Secret Scanning"
-
-# -----------------------------------------------------------------------------
-# Custom Rules
-# -----------------------------------------------------------------------------
 
 [[rules]]
 id = "runanywhere-api-key"
@@ -35,10 +24,6 @@ description = "Supabase anon/service key"
 regex = '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}'''
 keywords = ["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"]
 
-# -----------------------------------------------------------------------------
-# Allowlists — paths and patterns that are safe to ignore
-# -----------------------------------------------------------------------------
-
 [allowlist]
 description = "Global allowlist"
 
@@ -46,7 +31,6 @@ paths = [
     '''\.gitleaks\.toml$''',
     '''AGENTS\.md$''',
     '''\.cursor/plans/.*\.plan\.md$''',
-    '''thoughts/.*\.md$''',
 ]
 
 regexTarget = "line"

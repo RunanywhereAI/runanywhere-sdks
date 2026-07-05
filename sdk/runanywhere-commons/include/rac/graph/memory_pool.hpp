@@ -7,7 +7,6 @@
 // RAG doc shards) and must avoid per-frame heap churn.
 //
 // Design
-// ------
 //   * Pre-allocates `capacity` instances up-front via a user-supplied factory
 //     (or default-construction).
 //   * `acquire()` returns a `std::shared_ptr<T>` whose custom deleter returns
@@ -19,14 +18,12 @@
 //     when the pipeline is shut down.
 //
 // Ownership note
-// --------------
 //   MemoryPool must be held via `std::shared_ptr` (it uses
 //   `enable_shared_from_this` internally so the deleter can safely recycle
 //   buffers even if the last strong ref to the pool is the deleter itself).
 //   Use `MemoryPool<T>::create(capacity)` to construct one.
 //
 // Non-goals
-// ---------
 //   * Not lock-free — the mutex simplifies condition-variable signalling and
 //     keeps the code small. For audio fan-out hot paths use RingBuffer.
 //   * Not NUMA-aware. Nodes that need per-core pools can hold an array of

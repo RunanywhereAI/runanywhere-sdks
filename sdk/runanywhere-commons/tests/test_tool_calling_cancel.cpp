@@ -85,7 +85,6 @@ int fail_count = 0;
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-// ---------------------------------------------------------------------------
 // Mock LLM plugin (mirrors test_tool_calling_run_loop.cpp + adds a
 // "blocking generate" mode the cancel-during-publish test uses to hold the
 // generate call until a sibling thread fires cancel).
@@ -101,7 +100,6 @@ int fail_count = 0;
 // calling the cancel ABI. The mock polls it; the assertion that matters is
 // that the cancel ABI is concurrent-safe and the loop returns in bounded
 // time, not the specific internal propagation channel.
-// ---------------------------------------------------------------------------
 
 struct MockLlm {
     std::string model_path;
@@ -330,9 +328,7 @@ bool load_mock_llm() {
     return ok;
 }
 
-// ---------------------------------------------------------------------------
 // Tool definition + request helpers.
-// ---------------------------------------------------------------------------
 
 runanywhere::v1::ToolDefinition make_weather_tool() {
     runanywhere::v1::ToolDefinition tool;
@@ -406,9 +402,7 @@ void session_sink_callback(const uint8_t* /*bytes*/, size_t /*size*/, void* user
     sink->event_count++;
 }
 
-// ---------------------------------------------------------------------------
 // Tests.
-// ---------------------------------------------------------------------------
 
 // 1. cancel-during-publish (run loop)
 //

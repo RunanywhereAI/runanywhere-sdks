@@ -71,9 +71,7 @@ int expect_id(const char* url, const char* expected) {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // 1. Simple single-extension filenames.
-// ---------------------------------------------------------------------------
 int test_single_extension() {
     if (expect_id("model.gguf", "model") != 0)
         return 1;
@@ -88,9 +86,7 @@ int test_single_extension() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // 2. Multi-extension chains collapse fully (.tar.gz, .zip.tar.bin.onnx).
-// ---------------------------------------------------------------------------
 int test_multi_extension_chain() {
     if (expect_id("model.tar.gz", "model") != 0)
         return 1;
@@ -102,9 +98,7 @@ int test_multi_extension_chain() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // 3. Case-insensitive extension matching (".GGUF", ".Onnx", ".TAR.GZ").
-// ---------------------------------------------------------------------------
 int test_case_insensitive_extensions() {
     if (expect_id("model.GGUF", "model") != 0)
         return 1;
@@ -115,10 +109,8 @@ int test_case_insensitive_extensions() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // 4. URLs with query strings — the query must be stripped before extension
 //    detection (matches Swift's URL parser).
-// ---------------------------------------------------------------------------
 int test_query_strings() {
     if (expect_id("https://example.com/model.gguf?token=abc", "model") != 0)
         return 1;
@@ -129,9 +121,7 @@ int test_query_strings() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // 5. URLs with anchors / fragments.
-// ---------------------------------------------------------------------------
 int test_url_fragments() {
     if (expect_id("https://example.com/model.gguf#section", "model") != 0)
         return 1;
@@ -140,10 +130,8 @@ int test_url_fragments() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // 6. Bare-name URLs without a slash — Swift's split-last fallback returns
 //    the whole input. The same id (after extension stripping) must come back.
-// ---------------------------------------------------------------------------
 int test_bare_name_no_slash() {
     if (expect_id("bare-name", "bare-name") != 0)
         return 1;
@@ -152,10 +140,8 @@ int test_bare_name_no_slash() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // 7. Unknown extensions are NOT stripped (mirrors Swift). The dotted suffix
 //    is preserved as part of the id.
-// ---------------------------------------------------------------------------
 int test_unknown_extension_preserved() {
     if (expect_id("file.foo", "file.foo") != 0)
         return 1;
@@ -164,9 +150,7 @@ int test_unknown_extension_preserved() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // 8. Empty URL string → empty id (matches Swift's empty-string round-trip).
-// ---------------------------------------------------------------------------
 int test_empty_url() {
     char out[16];
     out[0] = 'X';
@@ -175,9 +159,7 @@ int test_empty_url() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // 9. NULL inputs → RAC_ERROR_NULL_POINTER without writing to the buffer.
-// ---------------------------------------------------------------------------
 int test_null_inputs() {
     char out[16];
     EXPECT_RC(rac_model_id_from_url(nullptr, out, sizeof(out)), RAC_ERROR_NULL_POINTER);
@@ -186,11 +168,9 @@ int test_null_inputs() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // 10. Output buffer too small — the function must NOT silently truncate.
 //     out_size = 0 is also rejected with BUFFER_TOO_SMALL (and out is NULL-
 //     safe untouched in that case because we early-return).
-// ---------------------------------------------------------------------------
 int test_buffer_too_small() {
     // out_size == 0 → BUFFER_TOO_SMALL (regardless of out contents).
     char zero_out[1] = {'X'};
@@ -212,9 +192,7 @@ int test_buffer_too_small() {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
 // 11. Very long URL within capacity — no truncation, all metadata stripped.
-// ---------------------------------------------------------------------------
 int test_very_long_url() {
     std::string long_filename(120, 'a');  // 120 'a's
     std::string url = "https://example.com/path/to/deep/nested/" + long_filename + ".tar.gz";

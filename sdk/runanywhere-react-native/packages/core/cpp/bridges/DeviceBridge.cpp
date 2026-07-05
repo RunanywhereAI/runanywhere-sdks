@@ -27,15 +27,11 @@
 namespace runanywhere {
 namespace bridges {
 
-// =============================================================================
 // Static storage for callbacks (needed for C function pointers)
-// =============================================================================
 
 static DevicePlatformCallbacks* g_deviceCallbacks = nullptr;
 
-// =============================================================================
 // C Callback Implementations (called by RACommons)
-// =============================================================================
 
 static void deviceGetInfoCallback(rac_device_registration_info_t* outInfo, void* userData) {
     if (!outInfo || !g_deviceCallbacks || !g_deviceCallbacks->getDeviceInfo) {
@@ -161,9 +157,7 @@ static rac_result_t deviceHttpPostCallback(
     }
 }
 
-// =============================================================================
 // DeviceBridge Implementation
-// =============================================================================
 
 DeviceBridge& DeviceBridge::shared() {
     static DeviceBridge instance;

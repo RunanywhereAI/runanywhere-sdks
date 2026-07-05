@@ -40,7 +40,7 @@ XCODE_VERSION=26.5
 # the r27 line carries the LTS label, so we hold on the latest r27 patch.
 NDK_VERSION=27.3.13750724
 
-# Emscripten SDK (used by sdk/runanywhere-web/wasm/scripts/build.sh)
+# Emscripten SDK (used by scripts/build/wasm/bundle.sh)
 # (2026-05-19 build-toolchain bump): 3.1.51 -> 5.0.6 (host).
 EMSCRIPTEN_VERSION=5.0.6
 
@@ -69,12 +69,12 @@ FLUTTER_VERSION=3.44.0
 # Cross-language wire-compatibility depends on every generator emitting
 # identical bytes from identical .proto files. These pins are consumed by:
 #   - scripts/setup/setup-toolchain.sh    (installs the pinned versions)
-#   - idl/codegen/generate_*.sh     (verifies the pinned versions at runtime)
+#   - scripts/codegen/generate_*.sh     (verifies the pinned versions at runtime)
 #   - gradle/libs.versions.toml     (Wire runtime, mirrored by hand)
 #   - .syncpackrc.json              (ts-proto if added to centralized npm pins)
 #
 # When bumping any of these, update ALL mirrors in the same commit and
-# regenerate IDL bindings (idl/codegen/generate_all.sh) so idl-drift-check
+# regenerate IDL bindings (scripts/codegen/generate_all.sh) so idl-drift-check
 # stays green.
 # (2026-05-19 idl-codegen bump): 1.181.1 -> 2.11.8 (latest).
 # Major bump: ts-proto 2.x switched to ES modules + dropped the `protobufjs`
@@ -152,7 +152,7 @@ ONNX_VERSION_WINDOWS=1.24.4
 # (2026-05-27): the matching v1.13.2 iOS xcframework was never
 # published to runanywhere-binaries (only v1.12.18 is available there). Pin
 # back to v1.12.18 so `scripts/ios/download-sherpa-onnx.sh` can actually
-# resolve the prebuilt; without it, build-core-xcframework.sh ships a
+# resolve the prebuilt; without it, scripts/build/ios-xcframework.sh ships a
 # non-routable RABackendSherpa.xcframework (RAC_SHERPA_ROUTABLE=0) and
 # every STT/TTS load with `framework=sherpa` fails the router with
 # "no backend route". Sherpa C-API is ABI-stable across 1.12→1.13 so this

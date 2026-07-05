@@ -19,9 +19,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // CONFIGURATION - Mirrors Swift's LLMConfiguration
-// =============================================================================
 
 /**
  * @brief LLM component configuration
@@ -64,9 +62,7 @@ static const rac_llm_config_t RAC_LLM_CONFIG_DEFAULT = {.model_id = RAC_NULL,
                                                         .system_prompt = RAC_NULL,
                                                         .streaming_enabled = RAC_TRUE};
 
-// =============================================================================
 // OPTIONS - Mirrors Swift's LLMGenerationOptions
-// =============================================================================
 
 /**
  * @brief LLM generation options
@@ -153,9 +149,7 @@ static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {.max_tokens = 100,
                                                           .n_threads = 0,
                                                           .disable_thinking = RAC_FALSE};
 
-// =============================================================================
 // RESULT - Mirrors Swift's LLMGenerationResult
-// =============================================================================
 
 /**
  * @brief LLM generation result
@@ -183,9 +177,7 @@ typedef struct rac_llm_result {
     float tokens_per_second;
 } rac_llm_result_t;
 
-// =============================================================================
 // INFO - Mirrors Swift's LLMService properties
-// =============================================================================
 
 /**
  * @brief LLM service handle info
@@ -206,9 +198,7 @@ typedef struct rac_llm_info {
     rac_bool_t supports_streaming;
 } rac_llm_info_t;
 
-// =============================================================================
 // CALLBACKS
-// =============================================================================
 
 /**
  * @brief LLM streaming callback
@@ -222,9 +212,7 @@ typedef struct rac_llm_info {
  */
 typedef rac_bool_t (*rac_llm_stream_callback_fn)(const char* token, void* user_data);
 
-// =============================================================================
 // THINKING TAG PATTERN - Mirrors Swift's ThinkingTagPattern
-// =============================================================================
 
 /**
  * @brief Pattern for extracting thinking/reasoning content from model output
@@ -252,9 +240,7 @@ static const rac_thinking_tag_pattern_t RAC_THINKING_TAG_DEFAULT = {.opening_tag
 static const rac_thinking_tag_pattern_t RAC_THINKING_TAG_FULL = {.opening_tag = "<thinking>",
                                                                  .closing_tag = "</thinking>"};
 
-// =============================================================================
 // STRUCTURED OUTPUT - Mirrors Swift's StructuredOutputConfig
-// =============================================================================
 
 /**
  * @brief Structured output configuration
@@ -294,9 +280,7 @@ typedef struct rac_structured_output_validation {
     char* extracted_json;
 } rac_structured_output_validation_t;
 
-// =============================================================================
 // STREAMING RESULT - Mirrors Swift's LLMStreamingResult
-// =============================================================================
 
 /**
  * @brief Token event during streaming
@@ -413,9 +397,7 @@ typedef struct rac_llm_stream_result {
     char* error_message;
 } rac_llm_stream_result_t;
 
-// =============================================================================
 // MEMORY MANAGEMENT
-// =============================================================================
 
 /**
  * @brief Free LLM result resources

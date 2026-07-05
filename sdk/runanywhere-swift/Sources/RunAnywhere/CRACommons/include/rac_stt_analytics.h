@@ -25,9 +25,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // TYPES
-// =============================================================================
 
 /**
  * @brief Opaque handle for STT analytics service
@@ -64,9 +62,7 @@ typedef struct rac_stt_metrics {
     double total_audio_processed_ms;
 } rac_stt_metrics_t;
 
-// =============================================================================
 // LIFECYCLE
-// =============================================================================
 
 /**
  * @brief Create an STT analytics service instance
@@ -83,9 +79,7 @@ RAC_API rac_result_t rac_stt_analytics_create(rac_stt_analytics_handle_t* out_ha
  */
 RAC_API void rac_stt_analytics_destroy(rac_stt_analytics_handle_t handle);
 
-// =============================================================================
 // TRANSCRIPTION TRACKING
-// =============================================================================
 
 /**
  * @brief Start tracking a transcription
@@ -183,9 +177,7 @@ RAC_API rac_result_t rac_stt_analytics_track_error(rac_stt_analytics_handle_t ha
                                                    const char* model_id,
                                                    const char* transcription_id);
 
-// =============================================================================
 // METRICS
-// =============================================================================
 
 /**
  * @brief Get current analytics metrics

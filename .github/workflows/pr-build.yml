@@ -1,16 +1,14 @@
 name: PR build matrix
 
-# This file replaces the previous 601-line workflow that called per-SDK
-# build-*.sh scripts. The canonical entry point is the root
-# CMake + presets:
+# Native builds drive the CMake presets in sdk/runanywhere-commons (the CMake
+# root for commons + engines + runtimes + rcli + wasm):
 #
+#   cd sdk/runanywhere-commons
 #   cmake --preset <preset>
 #   cmake --build  --preset <preset>
 #   ctest          --preset <preset>     # debug presets only
 #
-# The wrapper scripts under scripts/build/build-core-*.sh package the artifacts for
-# each frontend SDK; per-SDK jobs that need those artifacts call the wrapper
-# instead of duplicating cmake calls.
+# Wrapper scripts under scripts/ package the artifacts for each frontend SDK.
 
 on:
   pull_request:
@@ -31,7 +29,7 @@ jobs:
   # =============================================================================
   # Centralization gates — defend the invariant that toolchain + library
   # pins live in a single source of truth (sdk/runanywhere-commons/VERSIONS,
-  # dependencies/versions.json, sdk/runanywhere-flutter/pubspec.yaml, and
+  # scripts/lib/versions.json, sdk/runanywhere-flutter/pubspec.yaml, and
   # gradle/libs.versions.toml). Fast-fail before kicking off the SDK matrix.
   # See docs/dependencies/CENTRALIZATION.md.
   # =============================================================================
@@ -66,6 +64,9 @@ jobs:
     # tests; Metal is only required by iOS/Swift runtime builds, which
     # run in their own dedicated jobs).
     runs-on: macos-14
+    defaults:
+      run:
+        working-directory: sdk/runanywhere-commons
     steps:
       - uses: actions/checkout@v4
       - name: Install ninja + protobuf
@@ -89,6 +90,9 @@ jobs:
     # Same reason as macos-debug: pin to macos-14 / Xcode 15.4 so the
     # llama.cpp Metal compile units don't trip Xcode 16's strict ARC.
     runs-on: macos-14
+    defaults:
+      run:
+        working-directory: sdk/runanywhere-commons
     steps:
       - uses: actions/checkout@v4
       - run: brew install ninja protobuf
@@ -104,6 +108,9 @@ jobs:
     # "add_library cannot create ALIAS target ... already exists". Skipping
     # the apt install forces the vendored FetchContent path cleanly.
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: sdk/runanywhere-commons
     steps:
       - uses: actions/checkout@v4
       - name: Install ninja
@@ -118,6 +125,9 @@ jobs:
 
   linux-asan:
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: sdk/runanywhere-commons
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
@@ -132,6 +142,9 @@ jobs:
     # macos-14 pin for the same llama.cpp Metal / Xcode 16 reason as
     # macos-debug (the rcli preset enables GGML_METAL=ON).
     runs-on: macos-14
+    defaults:
+      run:
+        working-directory: sdk/runanywhere-commons
     steps:
       - uses: actions/checkout@v4
       - run: brew install ninja protobuf
@@ -139,7 +152,7 @@ jobs:
       - run: cmake --build --preset rcli-macos-release
       - name: Smoke (modelless)
         run: |
-          RCLI=build/rcli-macos-release/sdk/runanywhere-cli/rcli
+          RCLI=build/rcli-macos-release/rcli/rcli
           "$RCLI" version
           "$RCLI" backends
           "$RCLI" list --all
@@ -148,18 +161,21 @@ jobs:
   rcli-linux:
     # rcli desktop CLI on Linux — release build, unit tests, modelless smoke.
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: sdk/runanywhere-commons
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y ninja-build libcurl4-openssl-dev
       - name: Sherpa-ONNX prebuilts
-        run: ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
+        run: ../../scripts/build/deps/download-sherpa-onnx.sh linux
       - run: cmake --preset rcli-linux-release -DRAC_BUILD_TESTS=ON
       - run: cmake --build --preset rcli-linux-release
       - name: Unit tests
         run: ctest --test-dir build/rcli-linux-release -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
       - name: Smoke (modelless)
         run: |
-          RCLI=build/rcli-linux-release/sdk/runanywhere-cli/rcli
+          RCLI=build/rcli-linux-release/rcli/rcli
           "$RCLI" version
           "$RCLI" backends
           "$RCLI" list --all
@@ -167,6 +183,9 @@ jobs:
 
   wasm:
     runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: sdk/runanywhere-commons
     steps:
       - uses: actions/checkout@v4
       - name: Install Emscripten
@@ -185,18 +204,24 @@ jobs:
 
   ios-device:
     runs-on: macos-15
+    defaults:
+      run:
+        working-directory: sdk/runanywhere-commons
     steps:
       - uses: actions/checkout@v4
       - run: brew install protobuf
       - name: Download vendored ONNX Runtime (iOS xcframework)
-        run: bash sdk/runanywhere-commons/scripts/ios/download-onnx.sh
+        run: bash ../../scripts/build/deps/download-onnx.sh ios
       - name: Download vendored Sherpa-ONNX (iOS xcframework)
-        run: bash sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
+        run: bash ../../scripts/build/deps/download-sherpa-onnx.sh ios
       - run: cmake --preset ios-device
       - run: cmake --build --preset ios-device --config Release
 
   android-arm64:
     runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: sdk/runanywhere-commons
     env:
       # Stage the NDK outside the workspace so the unzip + extraction directory
       # do NOT collide with the destination path (which previously caused
@@ -211,7 +236,7 @@ jobs:
           test -d "${ANDROID_NDK_HOME}"
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Download vendored Sherpa-ONNX (Android)
-        run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
+        run: bash ../../scripts/build/deps/download-sherpa-onnx.sh android
       - run: cmake --preset android-arm64
       - run: cmake --build --preset android-arm64
 
@@ -226,11 +251,11 @@ jobs:
       - uses: actions/checkout@v4
       - run: brew install protobuf
       - name: Download vendored ONNX Runtime (iOS xcframework)
-        run: bash sdk/runanywhere-commons/scripts/ios/download-onnx.sh
+        run: bash scripts/build/deps/download-onnx.sh ios
       - name: Download vendored Sherpa-ONNX (iOS xcframework)
-        run: bash sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
+        run: bash scripts/build/deps/download-sherpa-onnx.sh ios
       - name: Build XCFramework
-        run: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+        run: ./scripts/build/ios-xcframework.sh
       - name: swift build
         run: swift build --target RunAnywhere
       # Per-SDK lint lane — fail PRs that introduce SwiftLint
@@ -272,9 +297,9 @@ jobs:
           test -d "${ANDROID_NDK_HOME}"
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Download vendored Sherpa-ONNX (Android)
-        run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
+        run: bash scripts/build/deps/download-sherpa-onnx.sh android
       - name: Build Android JNI libs
-        run: ./scripts/build/build-core-android.sh
+        run: ./scripts/build/android.sh
       - name: gradle assembleDebug
         working-directory: sdk/runanywhere-kotlin
         run: ./gradlew assembleDebug
@@ -315,26 +340,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
-      # Repo root and sdk/runanywhere-react-native pin `packageManager: yarn@3.6.1`
-      # (Yarn Berry). The runner's global yarn is 1.x and refuses to run, so we
+      # sdk/runanywhere-react-native pins `packageManager: yarn@3.6.1` (Yarn
+      # Berry). The runner's global yarn is 1.x and refuses to run, so we
       # activate the pinned version through Corepack before any `yarn` call.
       - name: Enable Corepack (yarn@3.6.1)
         run: |
           corepack enable
           corepack prepare yarn@3.6.1 --activate
-      # Root lockfile gate: the RN example app is a root-workspace member, so
-      # a stale root yarn.lock is still caught here even though the package
-      # commands below run inside the standalone RN workspace.
-      - name: Yarn install (repo root lockfile gate)
-        run: yarn install --immutable
-      # sdk/runanywhere-react-native is ALSO a standalone Yarn project with its
-      # own pinned yarn.lock (fb060a368) and workspaces declaration.
-      # `yarn workspace <name> run <script>` re-detects the project from the
-      # package's cwd, and packages/core's nearest lockfile is the NESTED one —
-      # so a root-only install leaves that project stateless and every package
-      # command dies with "Couldn't find the node_modules state file". Install
-      # and run everything inside the standalone workspace (the documented SDK
-      # dev flow), with the root install kept above as the root-lockfile gate.
       - name: Yarn install (RN standalone workspace)
         working-directory: sdk/runanywhere-react-native
         run: yarn install --immutable

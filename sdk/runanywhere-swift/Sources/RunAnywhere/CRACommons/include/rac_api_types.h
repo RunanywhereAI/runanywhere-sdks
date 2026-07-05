@@ -17,9 +17,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // Authentication Types
-// =============================================================================
 
 /**
  * @brief Authentication request payload
@@ -55,9 +53,7 @@ typedef struct {
     const char* refresh_token;
 } rac_refresh_request_t;
 
-// =============================================================================
 // Health Check Types
-// =============================================================================
 
 /**
  * @brief Health status enum
@@ -78,9 +74,7 @@ typedef struct {
     int64_t timestamp;  // Unix timestamp
 } rac_health_response_t;
 
-// =============================================================================
 // Device Registration Types
-// =============================================================================
 
 /**
  * @brief Device hardware information
@@ -117,9 +111,7 @@ typedef struct {
     char* sync_status;  // "synced" or "pending"
 } rac_device_reg_response_t;
 
-// =============================================================================
 // Telemetry Types
-// =============================================================================
 
 /**
  * @brief Telemetry event payload
@@ -229,9 +221,7 @@ typedef struct {
     char* storage_version;  // "V1" or "V2"
 } rac_telemetry_response_t;
 
-// =============================================================================
 // API Error Types
-// =============================================================================
 
 /**
  * @brief API error information
@@ -244,9 +234,7 @@ typedef struct {
     char* request_url;
 } rac_api_error_t;
 
-// =============================================================================
 // Memory Management
-// =============================================================================
 
 /**
  * @brief Free authentication response
@@ -258,9 +246,7 @@ void rac_auth_response_free(rac_auth_response_t* response);
  */
 void rac_api_error_free(rac_api_error_t* error);
 
-// =============================================================================
 // JSON Serialization
-// =============================================================================
 
 /**
  * @brief Serialize auth request to JSON

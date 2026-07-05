@@ -74,7 +74,7 @@ class RunAnywhereTools {
   // which is single-active-call per capability instance).
   static int _activeSessionHandle = 0;
 
-  // -- registration ---------------------------------------------------------
+  // -- registration
 
   /// Register a tool that the LLM can use.
   ///
@@ -111,7 +111,7 @@ class RunAnywhereTools {
     _logger.info('Cleared all registered tools');
   }
 
-  // -- execution ------------------------------------------------------------
+  // -- execution
 
   /// Execute a tool call manually. Used when `autoExecute: false` is
   /// passed to `generateWithTools`.
@@ -179,7 +179,7 @@ class RunAnywhereTools {
     }
   }
 
-  // -- tool-enabled generation ---------------------------------------------
+  // -- tool-enabled generation
 
   /// Generate text with tool calling support. Delegates the full
   /// parse-execute-loop to commons via
@@ -380,7 +380,7 @@ class RunAnywhereTools {
   }
 
 
-  // -- helpers --------------------------------------------------------------
+  // -- helpers
 
   /// Mirrors Swift `RALLMGenerationOptions.defaults()`
   /// (RALLMTypes+CppBridge.swift:13-21).

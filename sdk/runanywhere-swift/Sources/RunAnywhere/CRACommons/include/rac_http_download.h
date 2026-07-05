@@ -29,9 +29,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // STATUS
-// =============================================================================
 // Status codes match the Kotlin `DownloadError` enum in
 // CppBridgeDownload.kt so the JNI bridge can forward them verbatim.
 // Do not reorder without updating the Kotlin side.
@@ -51,9 +49,7 @@ typedef enum {
     RAC_HTTP_DL_UNKNOWN               = 99
 } rac_http_download_status_t;
 
-// =============================================================================
 // REQUEST
-// =============================================================================
 
 typedef struct {
     const char* url;
@@ -75,9 +71,7 @@ typedef struct {
     const char* expected_sha256_hex;
 } rac_http_download_request_t;
 
-// =============================================================================
 // CALLBACK
-// =============================================================================
 
 /**
  * @brief Progress callback. Fires on every chunk libcurl delivers
@@ -97,9 +91,7 @@ typedef struct {
 typedef rac_bool_t (*rac_http_download_progress_fn)(uint64_t bytes_written, uint64_t total_bytes,
                                                     void* user_data);
 
-// =============================================================================
 // API
-// =============================================================================
 
 /**
  * @brief Synchronous download. Blocks until done, failed, or cancelled.

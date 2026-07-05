@@ -10,11 +10,9 @@ namespace margelo::nitro::runanywhere {
 using namespace ::runanywhere::bridges;
 
 // Telemetry
-// ============================================================================
 // Telemetry
 // Matches Swift: CppBridge+Telemetry.swift
 // C++ handles all telemetry logic - batching, JSON building, routing
-// ============================================================================
 
 std::shared_ptr<Promise<void>> HybridRunAnywhereCore::flushTelemetry() {
     return Promise<void>::async([]() -> void {

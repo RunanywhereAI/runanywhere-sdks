@@ -122,9 +122,7 @@ runanywhere::v1::ToolValue from_json(const std::string& json_text) {
 
 #endif  // RAC_HAVE_PROTOBUF
 
-// ---------------------------------------------------------------------------
 // 1. string round-trip
-// ---------------------------------------------------------------------------
 int test_round_trip_string() {
 #if !defined(RAC_HAVE_PROTOBUF)
     return 0;
@@ -142,9 +140,7 @@ int test_round_trip_string() {
 #endif
 }
 
-// ---------------------------------------------------------------------------
 // 2. number round-trip
-// ---------------------------------------------------------------------------
 int test_round_trip_number() {
 #if !defined(RAC_HAVE_PROTOBUF)
     return 0;
@@ -162,9 +158,7 @@ int test_round_trip_number() {
 #endif
 }
 
-// ---------------------------------------------------------------------------
 // 3. bool round-trip
-// ---------------------------------------------------------------------------
 int test_round_trip_bool() {
 #if !defined(RAC_HAVE_PROTOBUF)
     return 0;
@@ -182,9 +176,7 @@ int test_round_trip_bool() {
 #endif
 }
 
-// ---------------------------------------------------------------------------
 // 4. array round-trip (mixed scalar + nested object)
-// ---------------------------------------------------------------------------
 int test_round_trip_array() {
 #if !defined(RAC_HAVE_PROTOBUF)
     return 0;
@@ -213,9 +205,7 @@ int test_round_trip_array() {
 #endif
 }
 
-// ---------------------------------------------------------------------------
 // 5. object round-trip (mixed scalars + nested array)
-// ---------------------------------------------------------------------------
 int test_round_trip_object() {
 #if !defined(RAC_HAVE_PROTOBUF)
     return 0;

@@ -27,26 +27,20 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // TYPES - Uses types from rac_model_types.h
-// =============================================================================
 
 // NOTE: All model types (rac_model_category_t, rac_model_format_t,
 // rac_inference_framework_t, rac_model_source_t, rac_artifact_type_kind_t,
 // rac_model_info_t) are defined in rac_model_types.h
 
-// =============================================================================
 // OPAQUE HANDLE
-// =============================================================================
 
 /**
  * @brief Opaque handle for model registry instance.
  */
 typedef struct rac_model_registry *rac_model_registry_handle_t;
 
-// =============================================================================
 // LIFECYCLE API
-// =============================================================================
 
 /**
  * @brief Create a model registry instance.
@@ -64,9 +58,7 @@ rac_model_registry_create(rac_model_registry_handle_t *out_handle);
  */
 RAC_API void rac_model_registry_destroy(rac_model_registry_handle_t handle);
 
-// =============================================================================
 // MODEL INFO API - Mirrors Swift's ModelInfoService
-// =============================================================================
 
 /**
  * @brief Save model metadata.
@@ -216,9 +208,7 @@ RAC_API rac_result_t rac_model_registry_update_download_status(
 RAC_API rac_result_t rac_model_registry_persist_folder_manifest(
     rac_model_registry_handle_t handle, const char *model_id);
 
-// =============================================================================
 // PROTO-BYTE MODEL INFO API
-// =============================================================================
 
 /**
  * @brief Save model metadata from serialized runanywhere.v1.ModelInfo bytes.
@@ -350,9 +340,7 @@ RAC_API rac_result_t rac_model_registry_remove_proto(
  */
 RAC_API void rac_model_registry_proto_free(uint8_t *proto_bytes);
 
-// =============================================================================
 // CANONICAL PROTO-BUFFER MODEL REGISTRY API
-// =============================================================================
 
 /**
  * @brief Save serialized runanywhere.v1.ModelInfo and return the saved
@@ -460,9 +448,7 @@ RAC_API rac_result_t rac_model_registry_refresh_proto(
     rac_model_registry_handle_t handle, const uint8_t *request_proto_bytes,
     size_t request_proto_size, rac_proto_buffer_t *out_result);
 
-// =============================================================================
 // QUERY HELPERS
-// =============================================================================
 
 /**
  * @brief Check if a model is downloaded and available.
@@ -491,9 +477,7 @@ RAC_API rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t *model);
 RAC_API rac_artifact_type_kind_t
 rac_model_infer_artifact_type(const char *url, rac_model_format_t format);
 
-// =============================================================================
 // MEMORY MANAGEMENT
-// =============================================================================
 
 /**
  * @brief Allocate a new model info struct.
@@ -525,9 +509,7 @@ RAC_API void rac_model_info_array_free(rac_model_info_t **models, size_t count);
  */
 RAC_API rac_model_info_t *rac_model_info_copy(const rac_model_info_t *model);
 
-// =============================================================================
 // REFRESH — proto entry point only
-// =============================================================================
 //
 // The struct-opts `rac_model_registry_refresh` entry point and its
 // `rac_model_registry_refresh_opts_t` / `rac_discovery_callbacks_t` types were
@@ -539,9 +521,7 @@ RAC_API rac_model_info_t *rac_model_info_copy(const rac_model_info_t *model);
 // the platform adapter's `file_list_directory` slot, not a discovery-callback
 // struct.
 
-// =============================================================================
 // FETCH ASSIGNMENTS — Unified cross-SDK entry point (Task 5 / Web WASM)
-// =============================================================================
 
 /**
  * @brief Fetch model assignments from the server and populate the registry.
@@ -598,13 +578,11 @@ RAC_API rac_result_t rac_model_registry_fetch_assignments_proto(
     const uint8_t *request_bytes, size_t request_size,
     rac_proto_buffer_t *out_result);
 
-// =============================================================================
 // URL → ModelFormat / ArtifactType INFERENCE (proto-byte ABI)
 //
 // Canonical commons-owned heuristic shared by every SDK. Replaces the
 // per-SDK Dart `protoModelFormatFromPath` / `withInferredArtifact` and
 // Kotlin `detectFormatFromUrl` / `inferArtifactFields` helpers.
-// =============================================================================
 
 /**
  * @brief Infer a ModelFormat from a portable URL/file-path string.
@@ -641,7 +619,6 @@ RAC_API rac_result_t rac_artifact_infer_from_url_proto(
     const uint8_t *request_bytes, size_t request_size,
     rac_proto_buffer_t *out_result);
 
-// =============================================================================
 // REGISTER MODEL FROM URL — single-call URL+name+framework → save
 //
 // Composes the canonical RAModelInfo factory (rac_model_info_make_proto)
@@ -650,7 +627,6 @@ RAC_API rac_result_t rac_artifact_infer_from_url_proto(
 // equivalent Kotlin/Flutter/RN/Web glue) with a single ABI call. Output is
 // the saved ModelInfo bytes — same shape as
 // rac_model_registry_register_proto_buffer.
-// =============================================================================
 
 /**
  * @brief Build a fully-populated ModelInfo from a URL+name+framework tuple and

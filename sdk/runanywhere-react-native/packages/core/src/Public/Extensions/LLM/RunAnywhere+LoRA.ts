@@ -161,9 +161,7 @@ function encodeDownloadCompletedRequest(
   );
 }
 
-// ============================================================================
 // Runtime Operations
-// ============================================================================
 
 /**
  * Apply one or more LoRA adapters to the current logical LLM session.
@@ -236,9 +234,7 @@ async function checkCompatibility(
   );
 }
 
-// ============================================================================
 // Catalog Operations
-// ============================================================================
 
 async function register(
   entry: LoraAdapterCatalogEntry
@@ -309,9 +305,7 @@ async function markDownloadCompleted(
   );
 }
 
-// ============================================================================
 // Import completion + catalog conveniences (Swift RunAnywhere+LoRA.swift:138-181)
-// ============================================================================
 
 /**
  * Persist native-reported LoRA adapter import completion in commons.
@@ -389,10 +383,8 @@ async function allRegistered(): Promise<LoraAdapterCatalogEntry[]> {
   return result.entries;
 }
 
-// ============================================================================
 // SDK-owned artifact registration + download
 // (Swift RunAnywhere+LoRADownload.swift:97-160)
-// ============================================================================
 
 const loraArtifactModelIDPrefix = 'lora-adapter:';
 const loraArtifactTag = 'lora-adapter';

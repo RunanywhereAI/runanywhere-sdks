@@ -33,9 +33,7 @@
 #include "infrastructure/events/sdk_event_publish.h"
 #endif
 
-// =============================================================================
 // INTERNAL STORAGE
-// =============================================================================
 
 namespace {
 
@@ -192,9 +190,7 @@ rac_result_t publish_message(const runanywhere::v1::SDKEvent& event) {
 
 }  // namespace
 
-// =============================================================================
 // CANONICAL SDK EVENT PROTO-BYTE STREAM API
-// =============================================================================
 
 extern "C" {
 
@@ -558,9 +554,7 @@ rac_result_t publish_auth_failed(rac_result_t error_code, const char* message, c
 
 }  // namespace rac::events
 
-// =============================================================================
 // INTERNAL RESET (for testing)
-// =============================================================================
 
 namespace rac_internal {
 

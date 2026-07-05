@@ -43,9 +43,7 @@
 
 static const char* kLogTag = "Extraction";
 
-// =============================================================================
 // INTERNAL HELPERS
-// =============================================================================
 
 enum class archive_kind {
     unknown,
@@ -282,9 +280,7 @@ static std::string ensure_trailing_slash(const std::string& path) {
     return path + '/';
 }
 
-// =============================================================================
 // PUBLIC API - rac_extract_archive_native
-// =============================================================================
 
 rac_result_t rac_extract_archive_native(const char* archive_path, const char* destination_dir,
                                         const rac_extraction_options_t* options,
@@ -572,9 +568,7 @@ void rac_model_extraction_result_free(rac_model_extraction_result_t* result) {
     result->archive_type = RAC_ARCHIVE_TYPE_NONE;
 }
 
-// =============================================================================
 // PUBLIC API - rac_detect_archive_type
-// =============================================================================
 
 rac_bool_t rac_detect_archive_type(const char* file_path, rac_archive_type_t* out_type) {
     if (!file_path || !out_type)

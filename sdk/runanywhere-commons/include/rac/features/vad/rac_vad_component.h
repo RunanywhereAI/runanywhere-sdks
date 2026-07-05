@@ -37,9 +37,7 @@ extern "C" {
 
 // NOTE: rac_vad_config_t is defined in rac_vad_types.h (included above)
 
-// =============================================================================
 // VAD COMPONENT API - Mirrors Swift's VADCapability
-// =============================================================================
 
 /**
  * @brief Create a VAD capability component
@@ -248,9 +246,7 @@ RAC_API void rac_vad_component_destroy(rac_handle_t handle);
 RAC_API rac_result_t rac_vad_component_get_statistics(rac_handle_t handle, float* ambient_level_out,
                                                       float* recent_avg_out, float* recent_max_out);
 
-// =============================================================================
 // GENERATED-PROTO C ABI
-// =============================================================================
 
 /**
  * @brief Callback fired for serialized runanywhere.v1.VADStreamEvent bytes.

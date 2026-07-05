@@ -937,7 +937,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # The pre-9226feb2c WebGPU artifact predated these helpers, which caused
     # PlatformAdapter.register() to throw and LlamaCppBridge.ts to silently
     # fall back to CPU. Always rebuild `racommons-llamacpp-webgpu.{js,wasm}`
-    # alongside the CPU variant via `./wasm/scripts/build.sh --llamacpp --webgpu`
+    # alongside the CPU variant via `./scripts/build/wasm/bundle.sh --llamacpp --webgpu`
     # whenever this list or wasm/src/wasm_exports.cpp changes.
     "_rac_wasm_offsetof_platform_adapter_abi_version"
     "_rac_wasm_offsetof_platform_adapter_struct_size"
@@ -1305,7 +1305,7 @@ function(rac_wasm_add_target)
         COMMENT "Copying ${RWT_OUTPUT_NAME} WASM outputs to ${RWT_OUTPUT_DIR}"
     )
 
-    # Pthread worker staging policy (mirrored by wasm/scripts/build.sh):
+    # Pthread worker staging policy (mirrored by scripts/build/wasm/bundle.sh):
     #   * Emscripten <5.x : toolchain emits a separate `<output>.worker.js` next
     #     to the main glue. The companion MUST be present; missing it is a real
     #     bug (linker dropped pthread output) and we hard-fail the build.

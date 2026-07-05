@@ -147,18 +147,14 @@ enum ErrorCategory : int;
 
 namespace rac::foundation {
 
-// ===========================================================================
 // LoRA
-// ===========================================================================
 
 bool rac_lora_entry_to_proto(const rac_lora_entry_t* in,
                              ::runanywhere::v1::LoraAdapterCatalogEntry* out);
 bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry& in,
                                rac_lora_entry_t* out);
 
-// ===========================================================================
 // STORAGE
-// ===========================================================================
 
 bool rac_device_storage_to_proto(const rac_device_storage_t* in,
                                  ::runanywhere::v1::DeviceStorageInfo* out);
@@ -174,9 +170,7 @@ bool rac_model_storage_metrics_to_proto(const rac_model_storage_metrics_t* in,
 bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageMetrics& in,
                                           rac_model_storage_metrics_t* out);
 
-// ===========================================================================
 // ERRORS
-// ===========================================================================
 
 // Convert C category enum to proto category. Folds modality categories
 // (STT/TTS/LLM/...) into ERROR_CATEGORY_COMPONENT per the canonicalized

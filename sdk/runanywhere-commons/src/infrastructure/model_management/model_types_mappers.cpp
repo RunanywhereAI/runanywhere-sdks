@@ -16,9 +16,7 @@
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
-// ---------------------------------------------------------------------------
 // Proto enum integer values (mirrors runanywhere.v1 in idl/model_types.proto).
-// ---------------------------------------------------------------------------
 
 namespace {
 
@@ -88,9 +86,7 @@ constexpr int32_t kProtoMfUnknown = 15;
 
 extern "C" {
 
-// =============================================================================
 // InferenceFramework
-// =============================================================================
 
 rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
                                                 rac_inference_framework_t* out) {
@@ -210,9 +206,7 @@ rac_result_t rac_inference_framework_to_proto(rac_inference_framework_t value, i
     }
 }
 
-// =============================================================================
 // ModelCategory
-// =============================================================================
 
 rac_result_t rac_model_category_from_proto(int32_t proto_value, rac_model_category_t* out) {
     if (out == nullptr) {
@@ -297,9 +291,7 @@ rac_result_t rac_model_category_to_proto(rac_model_category_t value, int32_t* ou
     }
 }
 
-// =============================================================================
 // ModelFormat
-// =============================================================================
 
 rac_result_t rac_model_format_from_proto(int32_t proto_value, rac_model_format_t* out) {
     if (out == nullptr) {
@@ -328,9 +320,7 @@ rac_result_t rac_model_format_to_proto(rac_model_format_t value, int32_t* out) {
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // ModelSource
-// =============================================================================
 
 rac_result_t rac_model_source_from_proto(int32_t proto_value, rac_model_source_t* out) {
     if (out == nullptr) {
@@ -373,9 +363,7 @@ rac_result_t rac_model_source_to_proto(rac_model_source_t value, int32_t* out) {
     }
 }
 
-// =============================================================================
 // ArchiveType
-// =============================================================================
 
 rac_result_t rac_archive_type_from_proto(int32_t proto_value, rac_archive_type_t* out) {
     if (out == nullptr) {
@@ -429,9 +417,7 @@ rac_result_t rac_archive_type_to_proto(rac_archive_type_t value, int32_t* out) {
     }
 }
 
-// =============================================================================
 // ArchiveStructure
-// =============================================================================
 
 rac_result_t rac_archive_structure_from_proto(int32_t proto_value, rac_archive_structure_t* out) {
     if (out == nullptr) {

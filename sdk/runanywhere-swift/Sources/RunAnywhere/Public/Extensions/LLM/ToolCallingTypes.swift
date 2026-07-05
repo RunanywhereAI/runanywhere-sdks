@@ -5,9 +5,8 @@
 //  `argumentsJson` / `resultJson` (oneof tree), and tight RA*
 //  convenience inits/getters consumed by the example app or SDK internals.
 //
-//  The recursive ToolValue <-> JSON walk now lives in commons behind
-//  `rac_tool_value_to_json_proto` / `rac_tool_value_from_json_proto`. Swift
-//  no longer hand-rolls it. Public API shape is preserved.
+//  The recursive ToolValue <-> JSON walk lives in commons behind
+//  `rac_tool_value_to_json_proto` / `rac_tool_value_from_json_proto`.
 //
 
 import CRACommons
@@ -87,10 +86,9 @@ public extension RAToolValue {
     ///
     /// Throws an `SDKException` (category `.internal`) when the input is not
     /// valid JSON, the commons bridge cannot decode the payload, or the JSON
-    /// root is not an object (e.g. an array or scalar). Callers that
-    /// previously relied on the silent-empty-dict fallback must now translate
-    /// the thrown error into their own failure surface (e.g.
-    /// `RAToolResult.success = false`).
+    /// root is not an object (e.g. an array or scalar). There is no
+    /// silent-empty-dict fallback; callers translate the thrown error into
+    /// their own failure surface (e.g. `RAToolResult.success = false`).
     static func parseObjectJSON(_ json: String) throws -> [String: RAToolValue] {
         var wrapper = RAToolValueJSON(); wrapper.json = json
         let value: RAToolValue = try NativeProtoABI.invoke(

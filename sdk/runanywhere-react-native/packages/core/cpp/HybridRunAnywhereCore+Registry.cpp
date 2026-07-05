@@ -28,9 +28,7 @@ namespace margelo::nitro::runanywhere {
 using namespace ::runanywhere::bridges;
 
 // Model Registry and Compatibility
-// ============================================================================
 // Model Registry
-// ============================================================================
 
 namespace {
 
@@ -523,7 +521,6 @@ HybridRunAnywhereCore::importModelProto(
       });
 }
 
-// ============================================================================
 // Refresh — delegates to rac_model_registry_refresh_proto in commons.
 //
 // The RN C++ bridge has no protobuf runtime linked, so we hand-encode the
@@ -533,7 +530,6 @@ HybridRunAnywhereCore::importModelProto(
 // bytes, which is a valid empty message. rescan_local / prune_orphans are
 // honoured at the C ABI layer (commons runs the adapter rescan when the
 // file_list_directory slot is populated).
-// ============================================================================
 
 namespace {
 
@@ -654,12 +650,10 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::refreshModelRegistry(
       });
 }
 
-// ============================================================================
 // Model type lookups - sync thunks to the commons model-types C ABI
 // (pure table/string lookups, safe on the JS thread). Mirrors Swift
 // ModelTypes.swift displayName / RAModelCategory+DefaultFramework.swift /
 // RAModelFileRole+Inference.swift.
-// ============================================================================
 
 std::string HybridRunAnywhereCore::frameworkDisplayName(double frameworkProto) {
   rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;

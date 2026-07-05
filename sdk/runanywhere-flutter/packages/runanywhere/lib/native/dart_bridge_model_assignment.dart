@@ -14,15 +14,11 @@ import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart'
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
-// =============================================================================
 // Exception Return Constants
-// =============================================================================
 
 const int _exceptionalReturnInt32 = -1;
 
-// =============================================================================
 // Model Assignment Bridge
-// =============================================================================
 
 /// Model assignment bridge for C++ model assignment operations.
 /// Matches Swift's `CppBridge+ModelAssignment.swift`.
@@ -44,9 +40,7 @@ class DartBridgeModelAssignment {
   static SDKEnvironment _environment =
       SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
 
-  // ============================================================================
   // Registration
-  // ============================================================================
 
   /// Register model assignment callbacks with C++
   ///
@@ -105,9 +99,7 @@ class DartBridgeModelAssignment {
     _accessToken = token;
   }
 
-  // ============================================================================
   // Fetch Operations
-  // ============================================================================
 
   /// Fetch model assignments from backend
   Future<List<model_pb.ModelInfo>> fetchAssignments({
@@ -245,9 +237,7 @@ class DartBridgeModelAssignment {
     }
   }
 
-  // ============================================================================
   // Helpers
-  // ============================================================================
 
   model_pb.ModelInfo _structToModelInfo(Pointer<RacModelInfoStruct> struct) {
     return DartBridgeModelFormat.shared.applyInferredArtifact(
@@ -271,9 +261,7 @@ class DartBridgeModelAssignment {
   }
 }
 
-// =============================================================================
 // HTTP Callback
-// =============================================================================
 
 int _httpGetCallback(
   Pointer<Utf8> endpoint,
@@ -348,9 +336,7 @@ void _performHttpGet(
   outResponse.ref.statusCode = 200;
 }
 
-// =============================================================================
 // FFI Types
-// =============================================================================
 
 /// HTTP GET callback
 typedef RacAssignmentHttpGetCallbackNative = Int32 Function(Pointer<Utf8>,

@@ -16,9 +16,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // AUDIO CONVERSION API
-// =============================================================================
 
 /**
  * @brief Convert Float32 PCM samples to WAV format (Int16 PCM with header)

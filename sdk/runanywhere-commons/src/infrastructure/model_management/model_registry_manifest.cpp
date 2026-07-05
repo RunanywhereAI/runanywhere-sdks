@@ -397,9 +397,7 @@ int32_t restore_models_from_folder_manifests(rac_model_registry_handle_t handle)
 
 #endif  // RAC_HAVE_PROTOBUF
 
-// =============================================================================
 // PUBLIC API
-// =============================================================================
 
 extern "C" rac_result_t
 rac_model_registry_persist_folder_manifest(rac_model_registry_handle_t handle,

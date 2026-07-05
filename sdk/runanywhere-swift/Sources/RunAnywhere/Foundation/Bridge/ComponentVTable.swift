@@ -113,11 +113,10 @@ extension CppBridge.ComponentVTable {
 
     /// VLM component vtable — `rac_vlm_component_*` family.
     ///
-    /// SDK-side `loadModel(from:)` adapters were removed from the
-    /// VLM actor; the level-3 handle is never loaded with a model and the
+    /// The level-3 VLM handle is never loaded with a model, so the
     /// `loadModel` slot is dead in practice. The slot is kept here only so
     /// the `ComponentVTable` shape stays uniform with the sibling modalities
-    /// (LLM, STT, TTS, VAD). Inference and cancel now route through the
+    /// (LLM, STT, TTS, VAD). Inference and cancel route through the
     /// lifecycle service via the proto ABI.
     public static let vlm = CppBridge.ComponentVTable(
         component: .vlm,

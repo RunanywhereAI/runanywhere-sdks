@@ -36,9 +36,7 @@
 
 using nlohmann::json;
 
-// =============================================================================
 // CONSTANTS - Format-specific tags
-// =============================================================================
 
 // Format: DEFAULT (<tool_call>JSON</tool_call>)
 static const char* TAG_DEFAULT_START = "<tool_call>";
@@ -62,9 +60,7 @@ static const char* TOOL_NAME_KEYS[] = {"tool",   "name",   "function", "func",
 static const char* ARGUMENT_KEYS[] = {"arguments",  "args",  "params",
                                       "parameters", "input", nullptr};
 
-// =============================================================================
 // FORMAT DETECTION AND NAMING
-// =============================================================================
 
 extern "C" const char* rac_tool_call_format_name(rac_tool_call_format_t format) {
     if (format >= 0 && format < RAC_TOOL_FORMAT_COUNT) {
@@ -140,9 +136,7 @@ extern "C" rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_ou
     return RAC_TOOL_FORMAT_DEFAULT;
 }
 
-// =============================================================================
 // HELPER FUNCTIONS - String Operations
-// =============================================================================
 
 /**
  * @brief Case-insensitive string comparison
@@ -196,9 +190,7 @@ static bool is_key_char(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
 }
 
-// =============================================================================
 // JSON PARSING HELPERS (Manual - No External Library)
-// =============================================================================
 
 /**
  * @brief Find matching closing brace for JSON object
@@ -778,9 +770,7 @@ static bool is_json_scalar_literal(const char* s) {
     return s[i] == '\0';
 }
 
-// =============================================================================
 // JSON NORMALIZATION
-// =============================================================================
 
 extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str, char** out_normalized) {
     if (!json_str || !out_normalized) {
@@ -859,9 +849,7 @@ extern "C" rac_result_t rac_tool_call_normalize_json(const char* json_str, char*
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // TOOL NAME AND ARGUMENTS EXTRACTION
-// =============================================================================
 
 /**
  * @brief Extract tool name and arguments using multiple strategies
@@ -1024,9 +1012,7 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
     return false;
 }
 
-// =============================================================================
 // FORMAT-SPECIFIC PARSERS
-// =============================================================================
 
 /**
  * @brief Parse LFM2 (Liquid AI) format: <|tool_call_start|>[func(arg="val")]<|tool_call_end|>
@@ -1289,9 +1275,7 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
 static bool parse_default_format(const char* llm_output, char** out_tool_name, char** out_args_json,
                                  char** out_clean_text);
 
-// =============================================================================
 // PARSE TOOL CALL - Main entry points
-// =============================================================================
 
 extern "C" rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_call_t* out_result) {
     // Auto-detect format from output, then parse
@@ -2113,9 +2097,7 @@ extern "C" void rac_tool_call_validation_free(rac_tool_call_validation_t* valida
     validation->error_code = RAC_SUCCESS;
 }
 
-// =============================================================================
 // PROMPT FORMATTING
-// =============================================================================
 
 /**
  * @brief Get parameter type name
@@ -2661,9 +2643,7 @@ static std::string get_format_example_json(rac_tool_call_format_t format) {
     return example;
 }
 
-// =============================================================================
 // FORMAT-AWARE PROMPT GENERATION
-// =============================================================================
 
 extern "C" rac_result_t
 rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions,
@@ -2787,9 +2767,7 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // LEGACY PROMPT GENERATION (uses DEFAULT format)
-// =============================================================================
 
 extern "C" rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t* definitions,
                                                     size_t num_definitions, char** out_prompt) {
@@ -2918,9 +2896,7 @@ rac_tool_call_build_followup_prompt(const char* original_user_prompt, const char
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // JSON SERIALIZATION UTILITIES
-// =============================================================================
 
 extern "C" rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definition_t* definitions,
                                                           size_t num_definitions, char** out_json) {

@@ -1,15 +1,10 @@
-# =============================================================================
 # RunAnywhere Tools
-# =============================================================================
 # Standalone command-line tools built on runanywhere-commons
 #
 # Binaries:
 #   - runanywhere-server: OpenAI-compatible HTTP server
-# =============================================================================
 
-# =============================================================================
 # RunAnywhere Server Binary
-# =============================================================================
 
 add_executable(runanywhere-server
     runanywhere-server.cpp

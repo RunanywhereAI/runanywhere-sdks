@@ -135,8 +135,8 @@ ctest --test-dir build/macos-debug -R "rcli_unit_tests|desktop_adapter_tests"
 # Full Docker e2e (Linux): modelless smoke, hermetic loopback pull/rm,
 # tts→stt roundtrip, vad, voice turn, LLM one-shot, serve /health —
 # models mounted from ~/.local/share/runanywhere/Models
-# (sdk/runanywhere-commons/tests/scripts/download-test-models.sh layout):
-bash sdk/runanywhere-commons/tests/scripts/run-cli-e2e-linux.sh
+# (scripts/tests/download-test-models.sh layout):
+bash scripts/tests/run-cli-e2e-linux.sh
 ```
 
 CI: `pr-build.yml` builds both rcli presets and runs the modelless smoke +

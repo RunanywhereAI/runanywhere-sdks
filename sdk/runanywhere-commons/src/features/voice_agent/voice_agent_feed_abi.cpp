@@ -6,8 +6,7 @@
  * The C core owns no microphone (see the "Audio-Ingress Contract" in
  * rac_voice_agent.h). Platform SDKs capture raw mic frames and push them
  * here continuously; this TU performs energy-based utterance segmentation
- * in-core (the logic that previously lived duplicated in every SDK's
- * VoiceAgentMicDriver) and, once an utterance closes, runs the shared
+ * in-core and, once an utterance closes, runs the shared
  * VAD -> STT -> LLM -> TTS pipeline (`d7_process_utterance`). The
  * synthesized reply is returned inline as a `VoiceAgentResult` so the SDK
  * driver collapses to "capture -> feed -> play", while the per-stage

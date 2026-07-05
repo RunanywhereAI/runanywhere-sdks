@@ -17,9 +17,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // EXPORT MACRO
-// =============================================================================
 
 #if defined(RAC_ONNX_BUILDING)
 #if defined(_WIN32)
@@ -33,9 +31,7 @@ extern "C" {
 #define RAC_ONNX_API
 #endif
 
-// =============================================================================
 // CONFIGURATION
-// =============================================================================
 
 /**
  * ONNX STT model types.
@@ -60,9 +56,7 @@ typedef struct rac_stt_onnx_config {
 static const rac_stt_onnx_config_t RAC_STT_ONNX_CONFIG_DEFAULT = {
     .model_type = RAC_STT_ONNX_MODEL_AUTO, .num_threads = 0, .use_coreml = RAC_TRUE};
 
-// =============================================================================
 // ONNX STT API
-// =============================================================================
 
 RAC_ONNX_API rac_result_t rac_stt_onnx_create(const char* model_path,
                                               const rac_stt_onnx_config_t* config,

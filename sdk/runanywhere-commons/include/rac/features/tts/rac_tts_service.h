@@ -27,9 +27,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // SERVICE VTABLE - Backend implementations provide this
-// =============================================================================
 
 /**
  * TTS Service operations vtable.
@@ -93,9 +91,7 @@ typedef struct rac_tts_service {
     const char* model_id;
 } rac_tts_service_t;
 
-// =============================================================================
 // PUBLIC API - Generic service functions
-// =============================================================================
 
 /**
  * @brief Create a TTS service
@@ -263,9 +259,7 @@ RAC_API rac_result_t rac_tts_stop_lifecycle_proto(rac_proto_buffer_t* out_result
  */
 RAC_API rac_result_t rac_tts_list_voices_lifecycle_proto(rac_proto_buffer_t* out);
 
-// =============================================================================
 // CANONICAL DEFAULTS
-// =============================================================================
 
 /**
  * @brief Populate a default-initialised runanywhere.v1.TTSConfiguration.

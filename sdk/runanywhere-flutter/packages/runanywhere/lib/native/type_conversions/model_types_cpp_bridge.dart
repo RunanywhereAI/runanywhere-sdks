@@ -21,9 +21,7 @@ import 'package:runanywhere/generated/model_types.pbenum.dart' as pb;
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 
-// =============================================================================
 // C++ Constants (from rac_model_types.h)
-// =============================================================================
 
 /// Artifact kind constants (rac_artifact_type_kind_t).
 /// Values mirror commons' `rac_artifact_type_kind_t` enum:
@@ -36,7 +34,6 @@ abstract class RacArtifactKind {
   static const int builtIn = 4;
 }
 
-// =============================================================================
 // FFI bindings for commons enum mappers
 //
 // Each pair maps a Dart proto enum integer (e.g.
@@ -45,7 +42,6 @@ abstract class RacArtifactKind {
 //   `rac_result_t rac_*_from_proto(int32_t proto_value, int32_t* out);`
 //   `rac_result_t rac_*_to_proto  (int32_t value,       int32_t* out);`
 // (The C enums are `int` so they pass through Dart FFI as `Int32`.)
-// =============================================================================
 
 typedef _RacEnumMapperNative = Int32 Function(Int32, Pointer<Int32>);
 typedef _RacEnumMapperDart = int Function(int, Pointer<Int32>);
@@ -129,9 +125,7 @@ pb.InferenceFramework _frameworkProtoFromC(int cFramework) {
 pb.InferenceFramework inferenceFrameworkFromC(int cFramework) =>
     _frameworkProtoFromC(cFramework);
 
-// =============================================================================
 // Generated proto <-> C++ conversion helpers
-// =============================================================================
 
 extension ProtoModelCategoryCppBridge on pb.ModelCategory {
   /// Convert a generated model category enum to C++ rac_model_category_t.

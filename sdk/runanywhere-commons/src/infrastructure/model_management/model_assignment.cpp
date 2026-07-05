@@ -37,9 +37,7 @@ using json = nlohmann::json;
 
 static const char* LOG_CAT = "ModelAssignment";
 
-// =============================================================================
 // INTERNAL STATE
-// =============================================================================
 
 static rac_assignment_callbacks_t g_callbacks = {};
 static std::mutex g_mutex;
@@ -53,9 +51,7 @@ static bool g_cache_valid = false;
 static std::vector<std::string> g_cached_model_proto_bytes;
 #endif
 
-// =============================================================================
 // HELPER FUNCTIONS
-// =============================================================================
 
 static void clear_cache_internal() {
     for (auto* model : g_cached_models) {
@@ -78,14 +74,12 @@ static bool is_cache_valid() {
     return std::cmp_less(elapsed, g_cache_timeout_seconds);
 }
 
-// ---------------------------------------------------------------------------
 // nlohmann/json field accessors. Mirror the lenient behaviour of the former
 // hand-rolled getters: return the first present, non-null key (numbers coerced
 // to their text form) and fall back to the default for absent / null /
 // wrong-type values. Parsing is strict — json::parse(..., allow_exceptions=
 // false) rejects a malformed body; the proto fetch path tries the binary
 // ModelInfoList / RefreshResult decoders before this JSON fallback runs.
-// ---------------------------------------------------------------------------
 static std::string json_first_string(const json& obj, std::initializer_list<const char*> keys) {
     for (const char* key : keys) {
         const auto it = obj.find(key);
@@ -299,9 +293,7 @@ static rac_result_t copy_models_to_output(const std::vector<rac_model_info_t*>& 
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // DEFAULT HTTP TRANSPORT
-// =============================================================================
 // Used when the SDK did not register rac_assignment_callbacks_t.http_get but a
 // platform rac_http_transport_ops_t vtable is available. Explicit callbacks
 // always keep precedence (see assignment_http_get_locked).
@@ -1314,9 +1306,7 @@ static void populate_assignment_refresh_result(ModelRegistryRefreshResult* resul
 
 #endif  // RAC_HAVE_PROTOBUF
 
-// =============================================================================
 // PUBLIC API IMPLEMENTATION
-// =============================================================================
 
 rac_result_t rac_model_assignment_set_callbacks(const rac_assignment_callbacks_t* callbacks) {
     RAC_LOG_INFO(LOG_CAT, "rac_model_assignment_set_callbacks called");

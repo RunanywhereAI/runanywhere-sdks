@@ -1,0 +1,87 @@
+#Your Existing rules from memory
+# Work Ground:
+
+## Task: repo restructure + de-slop (executed 2026-07-05; all 6 phases done; NOT committed — user reviews, builds, and commits)
+
+### Goal
+Clean the repo root: move build systems into their owning folders (like the Kotlin SDK owns its gradle setup), remove AI slop (scratch docs, plan files, banner comments, ascii art, useless md), keep everything working (CI, release, run script, external consumers).
+
+### Root files that CANNOT move (external hard constraints)
+- Package.swift + Package.resolved: SwiftPM requires the manifest at the git URL root; all external SPM consumers and release.yml sync-checksums depend on it. Stays.
+- jitpack.yml: JitPack only reads repo root. Delete only if JitPack is no longer a Kotlin distribution channel (pending user decision).
+- run + run.bat: dev entry point, stays at root; fix its broken commands.
+- Dotfile configs (.pre-commit-config.yaml, renovate.json, .gitleaks.toml, .gitignore, .gitattributes, .syncpackrc.json location flexible): tools read them from root.
+
+### Root files that CAN move
+- CMake system (CMakeLists.txt, CMakePresets.json, cmake/): move to sdk/runanywhere-commons/ as the new CMake root.
+  Option A: commons is CMake root, engines/ and runtimes/ stay siblings, reached via add_subdirectory with out-of-tree paths.
+  Option B: also move engines/ and runtimes/ inside sdk/runanywhere-commons/ so commons is fully self-contained (they are commons plugins, nothing else uses them).
+  Blast radius: ~11 CI job steps (pr-build native lanes, streaming-perf, release rcli), run script, scripts/build/build-core-android.sh, commons build scripts, wasm build script, rcli CMake root guard. All in-repo, mechanical.
+- Root yarn workspace (package.json, yarn.lock, .yarnrc.yml): exists only to link examples/react-native/RunAnywhereAI to the RN SDK packages (RN SDK has its own standalone yarn workspace + lock). Move: make the RN example app its own yarn root with portal: deps to the SDK packages; move the react resolutions pin with it; repoint the rn-typecheck root install step in pr-build.yml.
+- dependencies/versions.json + .syncpackrc.json: movable with edits to renovate fileMatch, syncpack config path, and scripts/validation/gates/check_typescript_centralization.sh. Low value, optional.
+
+### CMake cleanup (rides along with the move)
+- Gut root CMakeLists engine-test blob (lines ~268-423, per-engine test executables hardcoded at root): push down into engines/ or commons tests.
+- Merge duplicate cmake module dirs (root cmake/ and sdk/runanywhere-commons/cmake/ are both on CMAKE_MODULE_PATH).
+- Delete compat shims sdk/runanywhere-commons/scripts/build-{android,ios,linux}.sh after repointing release.yml to the real scripts.
+- Remove dead references: scripts/build.sh guard in release.yml, tools/plugin-loader-smoke and tests/streaming if(EXISTS) guards in root CMake.
+- Dedupe per-platform download-onnx.sh / download-sherpa-onnx.sh (near-identical copies under ios/ macos/ linux/ android/) into one parameterized script.
+
+### run script fixes
+- run sdk rn build calls sdk/runanywhere-react-native/scripts/build-react-native.sh which is on the legacy-files blocklist and does not exist: dead command, remove or repoint.
+- run codegen only runs generate_kotlin.sh despite claiming full IDL codegen: point it at idl/codegen/generate_all.sh.
+
+### CI dependency map (what breaks if paths move)
+- sdk/runanywhere-commons/VERSIONS: read by setup-toolchain composite action, auto-tag.yml, release.yml validate, idl-drift-check.yml, renovate (9 custom managers). Widest surface, do not rename.
+- CMakePresets.json: cmake --preset used by pr-build (9 native jobs), streaming-perf, release rcli jobs, run, build scripts. All call sites need -S sdk/runanywhere-commons or cd after the move.
+- scripts/build/build-core-android.sh: called by pr-build, release (via commons build-android.sh shim), run, 3 example verify scripts; hardcodes 9 jniLibs destinations across 4 SDKs.
+- Root Package.swift: release publish job runs scripts/release/sync-checksums.sh against it.
+- scripts/release/sync-versions.sh: executed by auto-tag.yml and run sync-versions.
+- dependencies/versions.json: renovate fileMatch + check_typescript_centralization.sh.
+- .gitleaks.toml allowlists thoughts/*.md: update after deleting thoughts/.
+
+### Slop removal inventory
+- thoughts/ tree at root (13 plan files, specs, html diagrams, file.txt) and second copy at sdk/runanywhere-commons/thoughts/. Contains active web-sdk-rewrite plans, decide before deleting.
+- Stray docs: sdk/runanywhere-web-next/WEB_REWRITE_CHECKLIST.md, Playground/android-use-agent/X_POST.md, Playground/android-use-agent/ASSESSMENT.md, Playground/swift-starter-app/docs/SDK-API-CORRECTIONS.md, Playground/swift-starter-app/blog/, idl/codegen/CONVENIENCE_CODEGEN_DESIGN.md.
+- Duplicated heavy docs: ARCHITECTURE.md in 5 SDKs, Documentation.md in 3 SDKs (1600+ lines each). Delete or consolidate, pending decision.
+- Banner comments: ~826 // ==== banners in sdk/runanywhere-commons/src, ~775 in sdk/runanywhere-swift/Sources. Kotlin is clean. Sweep scope pending decision.
+- Ascii box-drawing diagrams: 28 md files, ~20 source headers. Swift CRACommons/include headers are mirrored copies of commons headers, clean in sync.
+- Emoji in log strings: 5 Swift files (SentryManager, SDKLogger, CppBridge+Telemetry, CppBridge+Platform, RAAudioFormat+Extensions).
+- Phase 1/2/3 comments are legitimate (real SDK init phases), do NOT remove.
+- .idea: examples/android/.idea has 13 tracked files beyond run configs; sdk/runanywhere-cli/.idea untracked and not gitignore-covered (root .idea rules are path-anchored); add nested .idea ignore rule.
+- engines/qhexrt/: untracked, headers only, referenced by nothing. Delete or keep pending decision.
+
+### Decisions (locked 2026-07-05)
+1. CMake move: Option B. engines/ and runtimes/ move inside sdk/runanywhere-commons/; commons is the CMake root and fully self-contained.
+2. jitpack.yml: keep at root.
+3. Yarn workspace root: moves to examples/react-native/RunAnywhereAI (portal: deps to SDK packages).
+4. thoughts/ trees: delete entirely (root and sdk/runanywhere-commons copies).
+5. engines/qhexrt/: delete.
+6. run is the ONLY entry point of the repo. Single mono scripts/ folder at root holds every script; scripts are pruned to only what is needed and rewritten cleanly with proper terminal UX (clear help, args, status output). No ascii art in files; presentation lives in terminal output.
+
+### Mono scripts/ folder design (proposed)
+scripts/
+  lib/         shared shell helpers: output formatting, mode detection, version loading
+  setup/       environment setup, doctor, toolchain install
+  build/       native builds per target: android, ios/xcframework, linux, macos, wasm, windows, rcli
+  codegen/     idl proto generation (moved from idl/codegen/)
+  release/     version sync, per-sdk packaging, checksums, artifact validation
+  validation/  source gates: pii, exports, centralization, deprecated surfaces
+run dispatches into these; nothing outside scripts/ except per-component build system files (CMake in commons, gradle in kotlin, package.json per js workspace, pubspec for flutter).
+
+### Decisions round 2 (locked 2026-07-05)
+a. Comment sweep: full source sweep across ALL SDKs (commons, swift, kotlin, flutter, rn, web, cli), not just commons/swift. Banners, ascii diagrams in headers, emoji logs.
+b. Docs: delete every ARCHITECTURE.md / Documentation.md style doc; docs will be re-made properly later (separate task).
+c. dependencies/versions.json + .syncpackrc.json: fold into scripts/ area; update renovate fileMatch, syncpack config path, check_typescript_centralization.sh.
+d. Mono-scripts scope: everything moves, example app scripts live under scripts/examples/. Playground stays untouched.
+
+### AGENTS.md format (locked 2026-07-05)
+Every SDK and example app has its own SMALL AGENTS.md with exactly three sections: Info (what the project is + component rules), Build Info (build/test/lint commands), Work Ground (short dated agent-to-agent notes; prune stale ones). Root AGENTS.md holds only global rules + repo map + the index of sub-files; component detail is offloaded to the sub-files. Never grow the root file with component detail.
+
+### Execution order
+1. Slop removal: thoughts/, stray docs, qhexrt, .idea, gitignore rules. No build impact.
+2. Option B move: engines/ + runtimes/ into commons, CMake root to commons, merge cmake module dirs, gut engine-test blob, repoint CI presets calls.
+3. Mono scripts/ rework: consolidate, prune, rewrite scripts with clean terminal UX; run becomes sole entry point; repoint CI and delete compat shims and dead references.
+4. Yarn workspace move to RN example app.
+5. Comment/ascii/emoji sweep (scope per open decision a).
+

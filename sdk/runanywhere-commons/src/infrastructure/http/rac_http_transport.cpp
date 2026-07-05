@@ -102,9 +102,7 @@ void release_slot(const std::shared_ptr<Slot>& slot) {
 
 }  // namespace
 
-// =============================================================================
 // Public C ABI
-// =============================================================================
 
 extern "C" rac_result_t rac_http_transport_register(const rac_http_transport_ops_t* ops,
                                                     void* user_data) {
@@ -170,7 +168,6 @@ extern "C" rac_bool_t rac_http_transport_is_registered(void) {
     return registry().active ? RAC_TRUE : RAC_FALSE;
 }
 
-// =============================================================================
 // Internal accessor (not in the public header). Used by
 // rac_http_client_default.cpp / rac_http_client_emscripten.cpp to
 // dispatch a single HTTP operation while keeping the adapter's
@@ -179,7 +176,6 @@ extern "C" rac_bool_t rac_http_transport_is_registered(void) {
 // dispatch sites acquire the pair through the `rac_internal::TransportRef`
 // RAII guard (rac_http_transport_ref.h) so the contract holds on every
 // exit path.
-// =============================================================================
 
 namespace rac_internal {
 

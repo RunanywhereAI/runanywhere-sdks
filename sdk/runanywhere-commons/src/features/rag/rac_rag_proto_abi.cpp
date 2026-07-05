@@ -140,7 +140,6 @@ void publish_failure(rac_result_t code, const char* operation, const char* messa
     (void)rac_sdk_event_publish_failure(code, message, "rag", operation, RAC_TRUE);
 }
 
-// ---------------------------------------------------------------------------
 // D-6: model-id -> filesystem-path resolution for the RAG proto ABI.
 //
 // Given a registered model id, looks up the model in the global registry and
@@ -148,7 +147,6 @@ void publish_failure(rac_result_t code, const char* operation, const char* messa
 // std::string. If the model isn't registered or has no local_path set (never
 // downloaded), *out_err_message is populated and the function returns an
 // empty string.
-// ---------------------------------------------------------------------------
 std::string resolve_rag_model_id_to_path(const std::string& model_id,
                                          std::string* out_err_message) {
     if (model_id.empty()) {
@@ -179,7 +177,6 @@ std::string resolve_rag_model_id_to_path(const std::string& model_id,
     return path;
 }
 
-// ---------------------------------------------------------------------------
 // Session handle
 //
 // The RAG proto ABI hands out rac_handle_t values that are in fact pointers
@@ -193,7 +190,6 @@ std::string resolve_rag_model_id_to_path(const std::string& model_id,
 // several RAG indexes live at once. Mobile SDK bridges currently expose only
 // one session for convenience, but that is a frontend choice, not an ABI
 // limitation -- the commons layer imposes no single-session restriction.
-// ---------------------------------------------------------------------------
 struct Session {
     std::unique_ptr<RAGBackend> backend;
     // Registry ids captured at create — telemetry attribution only (ingestion

@@ -32,7 +32,6 @@
 @end
 #endif
 
-// =============================================================================
 // HTTP Download (Platform Adapter Fallback)
 //
 // Public RN model downloads bypass this Objective-C path and call
@@ -40,7 +39,6 @@
 // fallback remains registered on the RACommons platform adapter for
 // platform-adapter-only consumers that request an async download before going
 // through the Nitro public API.
-// =============================================================================
 
 static const int RAC_SUCCESS = 0;
 static const int RAC_ERROR_INVALID_PARAMETER = -106;
@@ -238,9 +236,7 @@ didCompleteWithError:(NSError*)error {
 
 @end
 
-// ============================================================================
 // Secure Storage (Keychain)
-// ============================================================================
 
 /**
  * Set a value in the Keychain
@@ -403,9 +399,7 @@ bool PlatformAdapter_getPersistentDeviceUUID(char** outValue) {
     }
 }
 
-// ============================================================================
 // Native Directories
-// ============================================================================
 
 bool PlatformAdapter_getModelBaseDirectory(char** outValue) {
     @autoreleasepool {
@@ -437,9 +431,7 @@ bool PlatformAdapter_getModelBaseDirectory(char** outValue) {
     }
 }
 
-// ============================================================================
 // Device Info (Synchronous)
-// ============================================================================
 
 #import <sys/utsname.h>
 #import <mach/mach.h>
@@ -660,9 +652,7 @@ bool PlatformAdapter_isTablet(void) {
     }
 }
 
-// ============================================================================
 // HTTP Download (Async Platform Adapter Fallback)
-// ============================================================================
 
 int PlatformAdapter_httpDownload(
     const char* url,
@@ -703,14 +693,12 @@ bool PlatformAdapter_httpDownloadCancel(const char* taskId) {
     }
 }
 
-// ============================================================================
 // Directory Enumeration (Platform Adapter Slots)
 //
 // Cross-SDK parity with Swift CppBridge+PlatformAdapter (the source of truth)
 // and the Kotlin / Flutter siblings. The same logic
 // powers the C++ model-registry refresh path (rescan_local) and the
 // rac_model_info_make_proto is_downloaded probe for multi-file artifacts.
-// ============================================================================
 
 #define PLATFORM_DIRECTORY_ENTRY_NAME_MAX 512  // RAC_DIRECTORY_ENTRY_NAME_MAX
 

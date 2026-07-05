@@ -29,7 +29,7 @@
 #   sdk/runanywhere-react-native/packages/*/android/build.gradle (def coreVersion)
 #   sdk/runanywhere-flutter/packages/*/pubspec.yaml        (each version: line)
 #   sdk/runanywhere-flutter/.../sdk_constants.dart         (Flutter version constant)
-#   dependencies/versions.json                             (@runanywhere/proto-ts pin — first-party suite version)
+#   scripts/lib/versions.json                             (@runanywhere/proto-ts pin — first-party suite version)
 #
 # Does NOT touch (intentional, documented SoT for distinct domains):
 #   - sdk/runanywhere-swift/.../SDKConstants.swift — its `version` constant now
@@ -43,12 +43,12 @@
 #     (drives `flutter pub get` host), not the SDK release version. The
 #     toolchain pin is centralized in `sdk/runanywhere-commons/VERSIONS`
 #     (`FLUTTER_VERSION`); bumping the toolchain is a separate concern.
-#   - dependencies/versions.json third-party pins (long, protobufjs, typescript,
+#   - scripts/lib/versions.json third-party pins (long, protobufjs, typescript,
 #     eslint, vite, react-native, etc.) — those track upstream library
 #     versions, not OUR release version. Only the first-party
 #     @runanywhere/proto-ts pin (published from this repo in lockstep with
 #     the SDK suite) is bumped by this script.
-#   - .syncpackrc.json — derived from dependencies/versions.json; mirror by hand.
+#   - scripts/lib/syncpack.json — derived from scripts/lib/versions.json; mirror by hand.
 # =============================================================================
 
 set -euo pipefail
@@ -124,7 +124,7 @@ bump_npm_proto_ts_dep() {
 }
 
 # Update the first-party `@runanywhere/proto-ts` pin inside
-# `dependencies/versions.json`. While that file is otherwise a third-party
+# `scripts/lib/versions.json`. While that file is otherwise a third-party
 # library registry, `@runanywhere/proto-ts` is published from THIS repo in
 # lockstep with the SDK suite — leaving the pin behind ships a stale
 # version every release. See pass3-syn-015.
@@ -209,13 +209,13 @@ echo ""
 echo ">> Shared proto-ts:"
 bump_json_version "${REPO_ROOT}/sdk/shared/proto-ts/package.json"
 # Also bump the first-party `@runanywhere/proto-ts` pin in
-# `dependencies/versions.json` (the central TS-deps registry that
+# `scripts/lib/versions.json` (the central TS-deps registry that
 # renovate.json's customManager and syncpack read). The proto-ts package is
 # published from this repo in lockstep with the SDK suite, so its pin must
 # advance with every release — otherwise downstream consumers (and any tool
 # reading versions.json as source-of-truth) resolve to the prior release's
 # proto-ts. See pass3-syn-015.
-bump_versions_json_proto_ts_pin "${REPO_ROOT}/dependencies/versions.json"
+bump_versions_json_proto_ts_pin "${REPO_ROOT}/scripts/lib/versions.json"
 
 # 4. Web SDK packages
 echo ""

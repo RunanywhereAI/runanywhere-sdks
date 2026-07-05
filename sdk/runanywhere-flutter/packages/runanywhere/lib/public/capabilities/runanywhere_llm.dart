@@ -215,9 +215,7 @@ class RunAnywhereLLM {
     return _generateStreamProto(effectiveRequest);
   }
 
-  // ---------------------------------------------------------------------------
   // Private helpers
-  // ---------------------------------------------------------------------------
 
   LLMGenerateRequest _toGenerateRequest(
     String prompt,

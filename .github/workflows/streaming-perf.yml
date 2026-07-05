@@ -14,7 +14,7 @@ on:
       - 'sdk/runanywhere-commons/include/rac/features/voice_agent/**'
       - 'idl/voice_events.proto'
       - 'idl/voice_agent_service.proto'
-      - 'cmake/**'
+      - 'sdk/runanywhere-commons/cmake/**'
       - '.github/workflows/streaming-perf.yml'
       # Per-SDK streaming parity tests live inside each SDK tree, not under
       # tests/streaming/. Trigger this workflow when any of those change so a
@@ -40,7 +40,7 @@ on:
       - 'sdk/runanywhere-commons/include/rac/features/voice_agent/**'
       - 'idl/voice_events.proto'
       - 'idl/voice_agent_service.proto'
-      - 'cmake/**'
+      - 'sdk/runanywhere-commons/cmake/**'
       - '.github/workflows/streaming-perf.yml'
       # Mirror the per-SDK paths from the PR trigger so main-branch pushes
       # that only change a per-SDK comparator still trip the parity gate.
@@ -77,6 +77,7 @@ jobs:
           sudo apt-get install -y ninja-build cmake python3
 
       - name: Configure
+        working-directory: sdk/runanywhere-commons
         run: cmake --preset linux-debug -DRAC_BUILD_TESTS=ON
 
       # NOTE: parity_test_cpp / perf_producer / cancel_producer are
@@ -88,35 +89,36 @@ jobs:
       # not-yet-implemented producers.
       - name: Build streaming targets (best-effort)
         run: |
+          cd sdk/runanywhere-commons
           cmake --build --preset linux-debug --target parity_test_cpp || true
           cmake --build --preset linux-debug --target perf_producer   || true
           cmake --build --preset linux-debug --target cancel_producer || true
 
       - name: Run parity check (best-effort)
-        run: ctest --test-dir build/linux-debug -R parity_test_cpp_check --output-on-failure || true
+        run: ctest --test-dir sdk/runanywhere-commons/build/linux-debug -R parity_test_cpp_check --output-on-failure || true
 
       - name: Run perf producer (best-effort)
-        run: ctest --test-dir build/linux-debug -R perf_producer_cpp --output-on-failure || true
+        run: ctest --test-dir sdk/runanywhere-commons/build/linux-debug -R perf_producer_cpp --output-on-failure || true
 
       - name: Run cancel producer (best-effort)
-        run: ctest --test-dir build/linux-debug -R cancel_producer_cpp --output-on-failure || true
+        run: ctest --test-dir sdk/runanywhere-commons/build/linux-debug -R cancel_producer_cpp --output-on-failure || true
 
       - name: Aggregate perf percentiles (no per-SDK logs => harness sanity only)
-        run: ctest --test-dir build/linux-debug -R perf_aggregate --output-on-failure || true
+        run: ctest --test-dir sdk/runanywhere-commons/build/linux-debug -R perf_aggregate --output-on-failure || true
 
       - name: Aggregate cancel traces
-        run: ctest --test-dir build/linux-debug -R cancel_aggregate --output-on-failure || true
+        run: ctest --test-dir sdk/runanywhere-commons/build/linux-debug -R cancel_aggregate --output-on-failure || true
 
       - name: Upload perf-bench fixture
-        if: hashFiles('build/linux-debug/tests/streaming/perf_bench/**') != ''
+        if: hashFiles('sdk/runanywhere-commons/build/linux-debug/tests/streaming/perf_bench/**') != ''
         uses: actions/upload-artifact@v4
         with:
           name: perf-bench-fixture
-          path: build/linux-debug/tests/streaming/perf_bench/
+          path: sdk/runanywhere-commons/build/linux-debug/tests/streaming/perf_bench/
 
       - name: Upload cancel-parity fixture
-        if: hashFiles('build/linux-debug/tests/streaming/cancel_parity/**') != ''
+        if: hashFiles('sdk/runanywhere-commons/build/linux-debug/tests/streaming/cancel_parity/**') != ''
         uses: actions/upload-artifact@v4
         with:
           name: cancel-parity-fixture
-          path: build/linux-debug/tests/streaming/cancel_parity/
+          path: sdk/runanywhere-commons/build/linux-debug/tests/streaming/cancel_parity/

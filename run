@@ -4,7 +4,9 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${REPO_ROOT}"
 
+COMMONS_DIR="sdk/runanywhere-commons"
 KOTLIN_SDK_DIR="sdk/runanywhere-kotlin"
+WEB_SDK_DIR="sdk/runanywhere-web-next"
 ANDROID_EXAMPLE_DIR="examples/android/RunAnywhereAI"
 
 if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ]; then
@@ -20,61 +22,53 @@ show_help() {
 
 ${C_BOLD}RunAnywhere SDK${C_RESET}
 
-  Build, lint, and run any of the SDKs and example apps in this monorepo.
+  Single entry point for building, testing, and packaging everything in this
+  monorepo. All implementation lives under scripts/.
 
 ${C_BOLD}USAGE${C_RESET}
   ./run <group> [subcommand] [args]
 
 ${C_BOLD}DOCTOR & SETUP${C_RESET}
   ${C_CMD}doctor${C_RESET}                       Scan host toolchains and show what can be built
-  ${C_CMD}setup${C_RESET} ${C_DIM}[target]${C_RESET}                Provision env (local.properties, deps). Default: every host-buildable target
+  ${C_CMD}setup${C_RESET} ${C_DIM}[target]${C_RESET}                Provision env (local.properties, deps)
                                 ${C_DIM}target = android | flutter | rn | ios | web${C_RESET}
 
-${C_BOLD}SDK${C_RESET}
-  ${C_CMD}sdk commons build-android${C_RESET}    Build C++ commons for all Android ABIs + stage .so into consumers
-  ${C_CMD}sdk commons build-ios${C_RESET}        Build C++ commons xcframework ${C_DIM}(macOS only)${C_RESET}
-  ${C_CMD}sdk commons build-wasm${C_RESET}       Build C++ commons for WebAssembly
-  ${C_CMD}sdk commons build-linux${C_RESET}      Build C++ commons for the Linux host
-  ${C_CMD}sdk commons clean${C_RESET}            Wipe C++ commons build outputs
-  ${C_CMD}sdk kotlin build${C_RESET}             Build Kotlin SDK debug AAR
-  ${C_CMD}sdk kotlin release${C_RESET}           Build Kotlin SDK release AAR
-  ${C_CMD}sdk kotlin publish${C_RESET}           Publish Kotlin SDK to ~/.m2 (Maven Local)
-  ${C_CMD}sdk kotlin test${C_RESET}              Run Kotlin SDK unit tests
-  ${C_CMD}sdk kotlin lint${C_RESET}              ktlint + detekt on the Kotlin SDK
-  ${C_CMD}sdk kotlin format${C_RESET}            Auto-format Kotlin SDK with ktlint
-  ${C_CMD}sdk kotlin clean${C_RESET}             Clean Kotlin SDK build outputs
+${C_BOLD}NATIVE CORE (C++ commons + engines)${C_RESET}
+  ${C_CMD}sdk commons build-android${C_RESET}    Build for all Android ABIs + stage .so into consumers
+  ${C_CMD}sdk commons build-ios${C_RESET}        Build XCFrameworks ${C_DIM}(macOS only)${C_RESET}
+  ${C_CMD}sdk commons build-wasm${C_RESET}       Build the WebAssembly artifacts
+  ${C_CMD}sdk commons build-linux${C_RESET}      Build for the Linux host
+  ${C_CMD}sdk commons lint${C_RESET}             clang-format check ${C_DIM}(--fix to auto-fix)${C_RESET}
+  ${C_CMD}sdk commons clean${C_RESET}            Wipe native build outputs
+
+${C_BOLD}SDKS${C_RESET}
+  ${C_CMD}sdk kotlin${C_RESET}  {build|release|publish|test|lint|format|clean}
   ${C_CMD}sdk flutter${C_RESET} {build|lint|clean}
-  ${C_CMD}sdk rn${C_RESET}      {build|clean}
+  ${C_CMD}sdk rn${C_RESET}      {typecheck|clean}
   ${C_CMD}sdk ios${C_RESET}     {build|clean}   ${C_DIM}(macOS only)${C_RESET}
-  ${C_CMD}sdk web${C_RESET}     {build|clean}
-  ${C_CMD}sdk web-next${C_RESET} {vendor|build-wasm|stage|typecheck|build|clean}  ${C_DIM}(worker-first rewrite)${C_RESET}
+  ${C_CMD}sdk web${C_RESET}     {build|typecheck|build-wasm|vendor|clean}
 
 ${C_BOLD}EXAMPLE APPS${C_RESET}
-  ${C_CMD}example android stage${C_RESET}        Build SDK release AARs + copy into examples/android/.../libs/
-  ${C_CMD}example android build${C_RESET}        Stage AARs + assembleDebug the example app
-  ${C_CMD}example android install${C_RESET}      Stage + build + install + launch on device
-  ${C_CMD}example android lint${C_RESET}         ktlint + detekt for the example app
-  ${C_CMD}example android clean${C_RESET}        Clean Android example build outputs
+  ${C_CMD}example android${C_RESET} {stage|build|install|lint|clean}
   ${C_CMD}example flutter${C_RESET} {build|clean}
   ${C_CMD}example ios${C_RESET}     {build|clean}   ${C_DIM}(macOS only)${C_RESET}
   ${C_CMD}example web${C_RESET}     {dev|build|clean}
 
 ${C_BOLD}UTILITIES${C_RESET}
+  ${C_CMD}codegen${C_RESET} ${C_DIM}[lang]${C_RESET}               Regenerate proto bindings (all languages, or one of:
+                                ${C_DIM}cpp | swift | kotlin | dart | ts${C_RESET})
+  ${C_CMD}validate${C_RESET}                     Run the source-validation gates
+  ${C_CMD}sync-versions${C_RESET} ${C_DIM}<ver>${C_RESET}          Propagate a version bump across all manifests
   ${C_CMD}clean${C_RESET}                        Clean every SDK + native + cache
   ${C_CMD}lint${C_RESET}                         Run linters across all SDKs
   ${C_CMD}format${C_RESET}                       Run formatters across all SDKs
-  ${C_CMD}codegen${C_RESET}                      Generate code from idl/
-  ${C_CMD}sync-versions${C_RESET}                Propagate version pins via scripts/release/sync-versions.sh
   ${C_CMD}help${C_RESET}                         Show this help
 
 ${C_BOLD}EXAMPLES${C_RESET}
   ${C_DIM}\$${C_RESET} ./run doctor
-  ${C_DIM}\$${C_RESET} ./run setup
+  ${C_DIM}\$${C_RESET} ./run sdk commons build-android
   ${C_DIM}\$${C_RESET} ./run sdk kotlin publish
   ${C_DIM}\$${C_RESET} ./run example android install
-
-${C_BOLD}LEARN MORE${C_RESET}
-  See AGENTS.md for architecture; sdk/<name>/AGENTS.md for per-SDK detail.
 
 EOF
 }
@@ -93,11 +87,12 @@ require_macos() {
 
 cmd_sdk_commons() {
     case "${1:-}" in
-        build-android) bash scripts/build/build-core-android.sh ;;
-        build-ios)     require_macos; bash sdk/runanywhere-swift/scripts/build-core-xcframework.sh ;;
-        build-wasm)    bash sdk/runanywhere-web-next/scripts/build-core-wasm.sh ;;
-        build-linux)   cmake --preset=linux-release && cmake --build --preset=linux-release ;;
-        clean)         rm -rf build/android-* build/ios-* build/wasm-* build/linux-* ;;
+        build-android) shift; bash scripts/build/android.sh "$@" ;;
+        build-ios)     require_macos; shift; bash scripts/build/ios-xcframework.sh "$@" ;;
+        build-wasm)    shift; bash scripts/build/wasm.sh "$@" ;;
+        build-linux)   shift; bash scripts/build/linux.sh "$@" ;;
+        lint)          shift; bash scripts/validation/lint-cpp.sh "$@" ;;
+        clean)         rm -rf "${COMMONS_DIR}/build" ;;
         *)             bad_subcommand "sdk commons" "${1:-}" ;;
     esac
 }
@@ -126,9 +121,9 @@ cmd_sdk_flutter() {
 
 cmd_sdk_rn() {
     case "${1:-}" in
-        build)  (cd sdk/runanywhere-react-native && ./scripts/build-react-native.sh --setup) ;;
-        clean)  (cd sdk/runanywhere-react-native && yarn clean 2>/dev/null || npm run clean 2>/dev/null || true) ;;
-        *)      bad_subcommand "sdk rn" "${1:-}" ;;
+        typecheck) (cd sdk/runanywhere-react-native && yarn install && yarn workspace @runanywhere/core typecheck) ;;
+        clean)     (cd sdk/runanywhere-react-native && yarn clean 2>/dev/null || true) ;;
+        *)         bad_subcommand "sdk rn" "${1:-}" ;;
     esac
 }
 
@@ -143,22 +138,12 @@ cmd_sdk_ios() {
 
 cmd_sdk_web() {
     case "${1:-}" in
-        build)  (cd sdk/runanywhere-web-next && (yarn build 2>/dev/null || npm run build)) ;;
-        clean)  (cd sdk/runanywhere-web-next && (yarn clean 2>/dev/null || npm run clean 2>/dev/null || true)) ;;
-        *)      bad_subcommand "sdk web" "${1:-}" ;;
-    esac
-}
-
-cmd_sdk_web_next() {
-    local dir="sdk/runanywhere-web-next"
-    case "${1:-}" in
-        stage)      (cd "${dir}" && npm run stage:wasm) ;;
-        build)      (cd "${dir}" && npm install && npm run typecheck && npm run build) ;;
-        typecheck)  (cd "${dir}" && npm run typecheck) ;;
-        vendor)     (cd "${dir}" && npm run vendor:wasm:speech) ;;
-        build-wasm) (cd "${dir}" && npm run build:wasm) ;;
-        clean)      (cd "${dir}" && npm run clean 2>/dev/null || true) ;;
-        *)         bad_subcommand "sdk web-next" "${1:-}" ;;
+        build)      (cd "${WEB_SDK_DIR}" && npm install && npm run typecheck && npm run build) ;;
+        typecheck)  (cd "${WEB_SDK_DIR}" && npm run typecheck) ;;
+        build-wasm) (cd "${WEB_SDK_DIR}" && npm run build:wasm) ;;
+        vendor)     (cd "${WEB_SDK_DIR}" && npm run vendor:wasm:speech) ;;
+        clean)      (cd "${WEB_SDK_DIR}" && npm run clean 2>/dev/null || true) ;;
+        *)          bad_subcommand "sdk web" "${1:-}" ;;
     esac
 }
 
@@ -170,13 +155,12 @@ cmd_sdk() {
         rn)       shift; cmd_sdk_rn       "$@" ;;
         ios)      shift; cmd_sdk_ios      "$@" ;;
         web)      shift; cmd_sdk_web      "$@" ;;
-        web-next) shift; cmd_sdk_web_next "$@" ;;
         *)        bad_subcommand "sdk" "${1:-}" ;;
     esac
 }
 
 cmd_example_android() {
-    local stage="${ANDROID_EXAMPLE_DIR}/scripts/stage-sdk-aars.sh"
+    local stage="scripts/examples/android/stage-sdk-aars.sh"
     case "${1:-}" in
         stage)    bash "${stage}" release ;;
         build)    bash "${stage}" release && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:assembleDebug) ;;
@@ -211,8 +195,8 @@ cmd_example_ios() {
 cmd_example_web() {
     local ex_dir="${EX:-examples/web-next/RunAnywhereAI}"
     case "${1:-}" in
-        dev)    (cd "${ex_dir}" && (yarn dev 2>/dev/null || npm run dev)) ;;
-        build)  (cd "${ex_dir}" && (yarn build 2>/dev/null || npm run build)) ;;
+        dev)    (cd "${ex_dir}" && npm run dev) ;;
+        build)  (cd "${ex_dir}" && npm run build) ;;
         clean)  rm -rf "${ex_dir}/dist" "${ex_dir}/.vite" ;;
         *)      bad_subcommand "example web" "${1:-}" ;;
     esac
@@ -228,10 +212,33 @@ cmd_example() {
     esac
 }
 
+cmd_codegen() {
+    case "${1:-all}" in
+        all)     bash scripts/codegen/generate_all.sh ;;
+        cpp)     bash scripts/codegen/generate_cpp.sh ;;
+        swift)   bash scripts/codegen/generate_swift.sh ;;
+        kotlin)  bash scripts/codegen/generate_kotlin.sh ;;
+        dart)    bash scripts/codegen/generate_dart.sh ;;
+        ts)      bash scripts/codegen/generate_ts.sh ;;
+        *)       bad_subcommand "codegen" "${1:-}" ;;
+    esac
+}
+
+cmd_validate() {
+    local failed=0
+    bash scripts/validation/gates/check_typescript_centralization.sh || failed=1
+    bash scripts/validation/gates/check_flutter_centralization.sh || failed=1
+    bash scripts/validation/gates/check_gradle_centralization.sh || failed=1
+    bash scripts/validation/gates/check_deprecated_surfaces.sh || failed=1
+    bash scripts/validation/commons/check_no_pii_logging.sh || failed=1
+    bash scripts/validation/commons/check_rac_api_exports.sh || failed=1
+    return "${failed}"
+}
+
 cmd_clean() {
-    cmd_sdk_kotlin clean   || true
+    cmd_sdk_kotlin clean || true
     cmd_example_android clean || true
-    cmd_sdk_commons clean  || true
+    cmd_sdk_commons clean || true
     rm -rf .gradle build/reports
 }
 
@@ -252,11 +259,12 @@ case "${1:-help}" in
     setup)              shift; bash scripts/setup/setup.sh "$@" ;;
     sdk)                shift; cmd_sdk "$@" ;;
     example)            shift; cmd_example "$@" ;;
+    codegen)            shift; cmd_codegen "$@" ;;
+    validate)           cmd_validate ;;
     clean)              cmd_clean ;;
     lint)               cmd_lint ;;
     format)             cmd_format ;;
-    codegen)            bash idl/codegen/generate_kotlin.sh ;;
-    sync-versions)      bash scripts/release/sync-versions.sh ;;
+    sync-versions)      shift; bash scripts/release/sync-versions.sh "$@" ;;
     *)
         echo "error: unknown command: $1" >&2
         echo "run './run help' for usage" >&2

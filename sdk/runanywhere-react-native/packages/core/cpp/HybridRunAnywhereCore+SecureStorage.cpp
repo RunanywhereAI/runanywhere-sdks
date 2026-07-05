@@ -9,9 +9,7 @@ namespace margelo::nitro::runanywhere {
 
 using namespace ::runanywhere::bridges;
 
-// ============================================================================
 // Device Identity
-// ============================================================================
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getPersistentDeviceUUID() {
     return Promise<std::string>::async([]() -> std::string {

@@ -21,10 +21,8 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // CONSTANTS - Single Source of Truth for VAD
 // Swift references these via CRACommons import
-// =============================================================================
 
 // Audio Format Constants
 #define RAC_VAD_DEFAULT_SAMPLE_RATE 16000
@@ -50,9 +48,7 @@ extern "C" {
 #define RAC_VAD_MIN_SPEECH_DURATION_MS 100
 #define RAC_VAD_MIN_SILENCE_DURATION_MS 300
 
-// =============================================================================
 // CONFIGURATION - Mirrors Swift's VADConfiguration
-// =============================================================================
 
 /**
  * @brief VAD component configuration
@@ -95,9 +91,7 @@ static const rac_vad_config_t RAC_VAD_CONFIG_DEFAULT = {
     .enable_auto_calibration = RAC_FALSE,
     .calibration_multiplier = RAC_VAD_DEFAULT_CALIBRATION_MULTIPLIER};
 
-// =============================================================================
 // SPEECH ACTIVITY - Mirrors Swift's SpeechActivityEvent
-// =============================================================================
 
 /**
  * @brief Speech activity event type
@@ -110,9 +104,7 @@ typedef enum rac_speech_activity {
     RAC_SPEECH_ONGOING = 2
 } rac_speech_activity_t;
 
-// =============================================================================
 // INPUT - Mirrors Swift's VADInput
-// =============================================================================
 
 /**
  * @brief VAD input data
@@ -138,9 +130,7 @@ static const rac_vad_input_t RAC_VAD_INPUT_DEFAULT = {
     .energy_threshold_override = -1.0f /* No override */
 };
 
-// =============================================================================
 // OUTPUT - Mirrors Swift's VADOutput
-// =============================================================================
 
 /**
  * @brief VAD output data
@@ -159,9 +149,7 @@ typedef struct rac_vad_output {
     int64_t timestamp_ms;
 } rac_vad_output_t;
 
-// =============================================================================
 // INFO - Mirrors Swift's VADService properties
-// =============================================================================
 
 /**
  * @brief VAD service info
@@ -182,9 +170,7 @@ typedef struct rac_vad_info {
     float frame_length;
 } rac_vad_info_t;
 
-// =============================================================================
 // STATISTICS - Mirrors Swift's VADStatistics
-// =============================================================================
 
 /**
  * @brief VAD statistics
@@ -211,9 +197,7 @@ typedef struct rac_vad_statistics {
     float peak_energy;
 } rac_vad_statistics_t;
 
-// =============================================================================
 // CALLBACKS
-// =============================================================================
 
 /**
  * @brief Speech activity callback

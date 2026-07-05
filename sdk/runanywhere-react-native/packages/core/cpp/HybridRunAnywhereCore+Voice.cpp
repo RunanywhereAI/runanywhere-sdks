@@ -80,7 +80,7 @@ std::shared_ptr<ArrayBuffer> copyVoiceProtoBuffer(rac_proto_buffer_t& protoBuffe
     return buffer;
 }
 
-// --- Request-shaped stream callback lifetime --------------------------------
+// Request-shaped stream callback lifetime
 //
 // `rac_llm_generate_stream_proto` and its STT/TTS/VLM siblings copy the
 // {callback, user_data} slot under an internal mutex and RELEASE that mutex
@@ -195,11 +195,9 @@ void vadActivityProtoCallback(const uint8_t* protoBytes, size_t protoSize, void*
 } // namespace
 
 // LLM/STT/TTS/VAD/Voice Agent
-// ============================================================================
 // LLM Capability (Backend-Agnostic)
 // Calls rac_llm_component_* APIs - works with any registered backend
 // Uses a global LLM component handle shared across HybridRunAnywhereCore instances
-// ============================================================================
 
 // Global LLM component handle - shared across all instances
 static rac_handle_t g_llm_component_handle = nullptr;
@@ -503,11 +501,9 @@ HybridRunAnywhereCore::loraAdapterImportProto(
     });
 }
 
-// ============================================================================
 // STT Capability (Backend-Agnostic)
 // Calls rac_stt_component_* APIs - works with any registered backend
 // Uses a global STT component handle shared across HybridRunAnywhereCore instances
-// ============================================================================
 
 // Global STT component handle - shared across all instances
 // This ensures model loading state persists even when HybridRunAnywhereCore instances are recreated
@@ -601,7 +597,6 @@ HybridRunAnywhereCore::sttTranscribeStreamProto(
     });
 }
 
-// ============================================================================
 // STT Streaming Session (rac_stt_stream.h)
 // Mirrors Swift CppBridge+STT.swift `transcribeSessionStream`: callback is
 // registered BEFORE start, stop drains final events THROUGH the
@@ -612,7 +607,6 @@ HybridRunAnywhereCore::sttTranscribeStreamProto(
 // The C ABI exposes ONE callback slot per handle, so the bridge tracks a
 // single live session guarded by a mutex and rejects a second concurrent
 // start.
-// ============================================================================
 
 namespace {
 
@@ -803,11 +797,9 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::sttStreamCancel(double ses
     });
 }
 
-// ============================================================================
 // TTS Capability (Backend-Agnostic)
 // Calls rac_tts_component_* APIs - works with any registered backend
 // Uses a global TTS component handle shared across HybridRunAnywhereCore instances
-// ============================================================================
 
 // Global TTS component handle - shared across all instances
 static rac_handle_t g_tts_component_handle = nullptr;
@@ -941,11 +933,9 @@ HybridRunAnywhereCore::ttsStopProto() {
     });
 }
 
-// ============================================================================
 // VAD Capability (Backend-Agnostic)
 // Calls rac_vad_component_* APIs - works with any registered backend
 // Uses a global VAD component handle shared across HybridRunAnywhereCore instances
-// ============================================================================
 
 // Global VAD component handle - shared across all instances
 static rac_handle_t g_vad_component_handle = nullptr;
@@ -1101,10 +1091,8 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::vadSetActivityCallbackProt
     });
 }
 
-// ============================================================================
 // VLM Capability (Backend-Agnostic)
 // Uses commons lifecycle-owned VLM proto APIs.
-// ============================================================================
 
 static rac_bool_t vlmProtoBytesCallback(const uint8_t* protoBytes,
                                         size_t protoSize,
@@ -1186,12 +1174,10 @@ HybridRunAnywhereCore::vlmCancelProto() {
     });
 }
 
-// ============================================================================
 // Voice Agent Capability (Backend-Agnostic)
 // Calls rac_voice_agent_* APIs - requires STT, LLM, TTS, and VAD backends
 // Uses a global voice agent handle that composes the global component handles
 // Mirrors Swift SDK's CppBridge.VoiceAgent.shared architecture
-// ============================================================================
 
 // Global Voice Agent handle - composes the global STT, LLM, TTS, VAD handles
 static rac_voice_agent_handle_t g_voice_agent_handle = nullptr;
@@ -1460,9 +1446,7 @@ HybridRunAnywhereCore::voiceAgentFeedAudioProto(
         });
 }
 
-// ============================================================================
 // Global component teardown
-// ============================================================================
 //
 // Reset the LLM/STT/TTS/VAD/voice-agent globals plus the commons lifecycle
 // registry so a HybridRunAnywhereCore::destroy() leaves no stale component

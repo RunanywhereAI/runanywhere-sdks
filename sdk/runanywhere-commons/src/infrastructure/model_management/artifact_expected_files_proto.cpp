@@ -6,11 +6,8 @@
  * underlying RAModelInfo.OneOf_Artifact.expectedFiles computed property
  * (sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/
  * ModelTypes+Artifacts.swift). Every field-set in this file mirrors the
- * Swift implementation 1:1 so the Swift extension can be deleted.
- *
- * Lives in a NEW source file (rather than appending to model_types.cpp or
- * model_registry.cpp) to stay merge-safe while concurrent agents edit
- * model_registry.cpp / download_orchestrator.cpp.
+ * Swift implementation 1:1.
+
  *
  * Resolution order (Swift parity):
  *   1. Top-level model.expected_files when present.
@@ -67,9 +64,7 @@ void copy_patterns_into(const google::protobuf::RepeatedPtrField<std::string>& r
 
 }  // namespace
 
-// =============================================================================
 // PUBLIC API
-// =============================================================================
 
 extern "C" rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_model_bytes,
                                                           size_t in_model_size,
@@ -95,19 +90,15 @@ extern "C" rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_mode
                                           "failed to parse ModelInfo");
     }
 
-    // -------------------------------------------------------------------------
     // Step 1: top-level model.expected_files short-circuit (Swift's
     // `if hasExpectedFiles { return expectedFiles }` in
     // RAModelInfo.expectedArtifactFiles).
-    // -------------------------------------------------------------------------
     if (model.has_expected_files()) {
         return copy_proto(model.expected_files(), out_proto);
     }
 
-    // -------------------------------------------------------------------------
     // Step 2: walk the artifact oneof. Mirrors Swift's
     // OneOf_Artifact.expectedFiles switch.
-    // -------------------------------------------------------------------------
     runanywhere::v1::ExpectedModelFiles result;
 
     switch (model.artifact_case()) {

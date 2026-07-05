@@ -22,9 +22,7 @@ extern "C" {
 
 // NOTE: rac_tts_config_t is defined in rac_tts_types.h (included above)
 
-// =============================================================================
 // TTS COMPONENT API - Mirrors Swift's TTSCapability
-// =============================================================================
 
 /**
  * @brief Create a TTS capability component

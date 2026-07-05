@@ -207,9 +207,7 @@ function describeLevel(level: LogLevel): string {
   }
 }
 
-// ============================================================================
 // Metadata sanitization (Swift SDKLogger.swift:255-280 / commons log_redact.cpp)
-// ============================================================================
 
 /**
  * Canonical sensitive-substring list. Lowercase, in declaration order; the

@@ -90,9 +90,7 @@ public:
      */
     rac_model_registry_handle_t getHandle() const { return handle_; }
 
-    // =========================================================================
     // Model CRUD Operations
-    // =========================================================================
 
     /**
      * Add a model to the registry
@@ -109,9 +107,7 @@ public:
      */
     rac_result_t updateModelPath(const std::string& modelId, const std::string& localPath);
 
-    // =========================================================================
     // Model Queries
-    // =========================================================================
 
     /**
      * Get a model by ID

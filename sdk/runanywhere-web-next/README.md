@@ -52,8 +52,8 @@ needs the `coi-serviceworker.js` polyfill.
 ## Via the root runner
 
 ```bash
-./run sdk web-next stage      # stage WASM artifacts
-./run sdk web-next build      # install + typecheck + build
-./run sdk web-next typecheck  # typecheck only
-./run sdk web-next clean      # remove dist
+./run sdk web build       # install + typecheck + build
+./run sdk web typecheck    # typecheck only
+./run sdk web build-wasm   # build the WASM artifacts
+./run sdk web clean        # remove dist
 ```

@@ -2,11 +2,9 @@
  * @file embeddings_module.cpp
  * @brief Unified Embeddings feature module.
  *
- * W4 component unification: merges the former embeddings_component.cpp
- * (handle-based component path) with the entire rac_embeddings_proto_abi.cpp
- * (handle-based rac_embeddings_embed_batch_proto / rac_embeddings_create_proto)
- * and Embeddings's slice of rac_nonllm_lifecycle_proto_abi.cpp (the handle-less
- * rac_embeddings_embed_batch_lifecycle_proto) into one TU.
+ * One TU owns the handle-based component path, the handle-based
+ * rac_embeddings_embed_batch_proto / rac_embeddings_create_proto ABI, and the
+ * handle-less rac_embeddings_embed_batch_lifecycle_proto verb.
  */
 
 #include <algorithm>
@@ -43,9 +41,7 @@
 
 static const char* LOG_CAT = "Embeddings.Component";
 
-// =============================================================================
 // INTERNAL STRUCTURES
-// =============================================================================
 
 struct rac_embeddings_component {
     /** Lifecycle manager handle */
@@ -60,9 +56,7 @@ struct rac_embeddings_component {
     rac_embeddings_component() : lifecycle(nullptr) { config = RAC_EMBEDDINGS_CONFIG_DEFAULT; }
 };
 
-// =============================================================================
 // LIFECYCLE CALLBACKS
-// =============================================================================
 
 /**
  * Service creation callback for lifecycle manager.
@@ -106,9 +100,7 @@ static void embeddings_destroy_service(rac_handle_t service, void* user_data) {
     }
 }
 
-// =============================================================================
 // LIFECYCLE API
-// =============================================================================
 
 extern "C" rac_result_t rac_embeddings_component_create(rac_handle_t* out_handle) {
     return rac::features::create_lifecycle_component<rac_embeddings_component>(
@@ -167,9 +159,7 @@ extern "C" void rac_embeddings_component_destroy(rac_handle_t handle) {
     delete component;
 }
 
-// =============================================================================
 // MODEL LIFECYCLE
-// =============================================================================
 
 extern "C" rac_result_t rac_embeddings_component_load_model(rac_handle_t handle,
                                                             const char* model_path,
@@ -207,9 +197,7 @@ extern "C" rac_result_t rac_embeddings_component_cleanup(rac_handle_t handle) {
     return rac_lifecycle_reset(component->lifecycle);
 }
 
-// =============================================================================
 // EMBEDDING GENERATION API
-// =============================================================================
 
 extern "C" rac_result_t rac_embeddings_component_embed(rac_handle_t handle, const char* text,
                                                        const rac_embeddings_options_t* options,
@@ -290,9 +278,7 @@ rac_embeddings_component_embed_batch(rac_handle_t handle, const char* const* tex
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // STATE QUERY API
-// =============================================================================
 
 extern "C" rac_lifecycle_state_t rac_embeddings_component_get_state(rac_handle_t handle) {
     if (!handle)
@@ -313,15 +299,11 @@ extern "C" rac_result_t rac_embeddings_component_get_metrics(rac_handle_t handle
     return rac_lifecycle_get_metrics(component->lifecycle, out_metrics);
 }
 
-// =============================================================================
-// PROTO-BYTE C ABI (formerly rac_embeddings_proto_abi.cpp) +
-// LIFECYCLE-OWNED GENERATED-PROTO C ABI (formerly Embeddings slice of
-// rac_nonllm_lifecycle_proto_abi.cpp)
+// PROTO-BYTE C ABI + LIFECYCLE-OWNED GENERATED-PROTO C ABI
 //
 // rac_embeddings_embed_batch_proto / rac_embeddings_create_proto are
 // handle-based; rac_embeddings_embed_batch_lifecycle_proto resolves the loaded
 // model via the global registry (rac::lifecycle::acquire_lifecycle_embeddings).
-// =============================================================================
 
 namespace {
 

@@ -2,18 +2,13 @@
  * @file llm_module.cpp
  * @brief Unified LLM feature module.
  *
- * W4 component unification: merges the former
- *   - llm_component.cpp        (legacy handle-based component path; mirrors
- *                               Swift's LLMCapability.swift)
- *   - rac_llm_proto_service.cpp (lifecycle-owned handle-less generated-proto
- *                               C ABI: rac_llm_generate_proto / _stream / cancel)
- * into a single translation unit so one TU owns both the component path and the
- * modern handle-less proto path. Each exported entry point still owns its own
- * event emission and they never co-fire for one request.
+ * One TU owns both the handle-based component path (mirrors Swift's
+ * LLMCapability.swift) and the lifecycle-owned handle-less generated-proto
+ * C ABI (rac_llm_generate_proto / _stream / cancel). Each exported entry
+ * point owns its own event emission and they never co-fire for one request.
  *
- * IMPORTANT: This is a direct merge of the two source files. The component
- * section is a direct translation of Swift's LLMCapability; do NOT add features
- * not present in the Swift code. The proto section owns the dlsym-bound,
+ * IMPORTANT: The component section is a direct translation of Swift's
+ * LLMCapability; do NOT add features not present in the Swift code. The proto section owns the dlsym-bound,
  * handle-less verbs (rac_llm_generate_proto / _stream / cancel) — their names
  * MUST NOT change (all 5 SDKs bind them by name).
  */
@@ -68,13 +63,9 @@
 
 extern "C" void rac_lora_forget_component_state(rac_handle_t handle);
 
-// =============================================================================
-// COMPONENT SECTION (formerly llm_component.cpp)
-// =============================================================================
+// COMPONENT SECTION
 
-// =============================================================================
 // INTERNAL STRUCTURES
-// =============================================================================
 
 /**
  * Internal LLM component state.
@@ -107,9 +98,7 @@ struct rac_llm_component {
     }
 };
 
-// =============================================================================
 // HELPER FUNCTIONS
-// =============================================================================
 
 /**
  * Simple token estimation (~4 chars per token).
@@ -136,12 +125,10 @@ static std::string generate_unique_id() {
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-// ---------------------------------------------------------------------------
 // LLM event emit helpers. Build the canonical GenerationEvent / ModelEvent and
 // publish through the destination router (sdk_event_publish.h). generation_id is
 // carried on the SDKEvent envelope session_id (telemetry groups by session_id).
 // These centralize the per-event field mapping so the many call sites stay thin.
-// ---------------------------------------------------------------------------
 
 void emit_llm_model_load(runanywhere::v1::ModelEventKind kind, const char* model_id,
                          const char* model_name, rac_inference_framework_t framework,
@@ -252,9 +239,7 @@ void emit_llm_streaming_update(const char* generation_id, int32_t tokens_generat
 
 #endif  // RAC_HAVE_PROTOBUF
 
-// =============================================================================
 // EOS / SPECIAL TOKEN STRIPPING
-// =============================================================================
 
 /**
  * Strip tokenizer-internal special tokens from a streamed LLM token before
@@ -346,9 +331,7 @@ static const char* llm_strip_eos_tokens(const char* token, char* buf, size_t buf
     return buf;
 }
 
-// =============================================================================
 // LIFECYCLE CALLBACKS
-// =============================================================================
 
 /**
  * Service creation callback for lifecycle manager.
@@ -394,9 +377,7 @@ static void llm_destroy_service(rac_handle_t service, void* user_data) {
     }
 }
 
-// =============================================================================
 // LIFECYCLE API
-// =============================================================================
 
 extern "C" rac_result_t rac_llm_component_create(rac_handle_t* out_handle) {
     return rac::features::create_lifecycle_component<rac_llm_component>(
@@ -490,9 +471,7 @@ extern "C" void rac_llm_component_destroy(rac_handle_t handle) {
     delete component;
 }
 
-// =============================================================================
 // MODEL LIFECYCLE
-// =============================================================================
 
 extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const char* model_path,
                                                      const char* model_id, const char* model_name) {
@@ -580,9 +559,7 @@ extern "C" rac_result_t rac_llm_component_cleanup(rac_handle_t handle) {
     return result;
 }
 
-// =============================================================================
 // GENERATION API
-// =============================================================================
 
 extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const char* prompt,
                                                    const rac_llm_options_t* options,
@@ -1073,9 +1050,7 @@ extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // LORA ADAPTER API
-// =============================================================================
 
 extern "C" rac_result_t rac_llm_component_load_lora(rac_handle_t handle, const char* adapter_path,
                                                     float scale) {
@@ -1190,9 +1165,7 @@ extern "C" rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // STATE QUERY API
-// =============================================================================
 
 extern "C" rac_lifecycle_state_t rac_llm_component_get_state(rac_handle_t handle) {
     if (!handle)
@@ -1213,8 +1186,7 @@ extern "C" rac_result_t rac_llm_component_get_metrics(rac_handle_t handle,
     return rac_lifecycle_get_metrics(component->lifecycle, out_metrics);
 }
 
-// =============================================================================
-// PROTO SECTION (formerly rac_llm_proto_service.cpp)
+// PROTO SECTION
 //
 // Lifecycle-owned LLM generated-proto C ABI. These verbs (rac_llm_generate_proto
 // / _stream / cancel) are handle-less and dlsym-bound BY NAME by all 5 SDKs —
@@ -1222,7 +1194,6 @@ extern "C" rac_result_t rac_llm_component_get_metrics(rac_handle_t handle,
 // registry (rac::llm::acquire_lifecycle_llm) rather than a component handle, and
 // own their own event emission via publish_generation_event (never co-fire with
 // the component path above for one request).
-// =============================================================================
 
 namespace {
 

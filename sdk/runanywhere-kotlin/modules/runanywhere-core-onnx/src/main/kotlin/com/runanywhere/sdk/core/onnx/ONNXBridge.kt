@@ -89,9 +89,7 @@ internal object ONNXBridge {
     val isLoaded: Boolean
         get() = nativeLibraryLoaded
 
-    // ==========================================================================
     // JNI Methods
-    // ==========================================================================
 
     /**
      * Register the ONNX backend with the C++ service registry.

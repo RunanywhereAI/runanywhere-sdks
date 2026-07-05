@@ -35,9 +35,7 @@
 namespace runanywhere {
 namespace bridges {
 
-// =============================================================================
 // POSIX Callback Implementations
-// =============================================================================
 
 static rac_result_t posixCreateDirectory(const char* path, int recursive, void* /*userData*/) {
     if (!path) return RAC_ERROR_NULL_POINTER;
@@ -200,9 +198,7 @@ static int64_t posixGetTotalSpace(void* /*userData*/) {
     return static_cast<int64_t>(vfs.f_blocks) * static_cast<int64_t>(vfs.f_frsize);
 }
 
-// =============================================================================
 // FileManagerBridge Implementation
-// =============================================================================
 
 FileManagerBridge& FileManagerBridge::shared() {
     static FileManagerBridge instance;

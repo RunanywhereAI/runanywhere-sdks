@@ -3,7 +3,7 @@
  *
  * Two buttons run the canonical voice_agent.yaml + rag.yaml solutions
  * shipped at sdk/runanywhere-commons/examples/solutions/. The YAMLs are
- * synced from the commons sources via `scripts/sync-solutions-yamls.js`
+ * synced from the commons sources via `scripts/examples/react-native/sync-solutions-yamls.js`
  * (runs on postinstall + before typecheck), so this screen never embeds
  * a hand-edited YAML literal. Each lifecycle transition is appended to a
  * simple scrolling log.

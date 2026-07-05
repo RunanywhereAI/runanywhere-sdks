@@ -4,7 +4,7 @@
 # Vendors the locally built RACommons.xcframework into Flutter iOS apps.
 #
 # The xcframework is staged into this plugin's ios/Frameworks/ directory by
-# sdk/runanywhere-swift/scripts/build-core-xcframework.sh → sync_flutter_frameworks(). Run that
+# scripts/build/ios-xcframework.sh → sync_flutter_frameworks(). Run that
 # script once after checkout, and re-run it whenever the native layer changes.
 #
 
@@ -36,7 +36,7 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
   s.dependency 'Flutter'
 
   # =============================================================================
-  # Vendored xcframework (built by sdk/runanywhere-swift/scripts/build-core-xcframework.sh)
+  # Vendored xcframework (built by scripts/build/ios-xcframework.sh)
   # =============================================================================
   s.vendored_frameworks = 'Frameworks/RACommons.xcframework'
 

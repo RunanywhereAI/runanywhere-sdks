@@ -19,9 +19,7 @@
 
 static const char* LOG_CAT = "Platform.LLM";
 
-// =============================================================================
 // CALLBACK STORAGE
-// =============================================================================
 
 namespace {
 
@@ -31,9 +29,7 @@ bool g_callbacks_set = false;
 
 }  // namespace
 
-// =============================================================================
 // INTERNAL SNAPSHOT HELPER
-// =============================================================================
 
 namespace runanywhere::commons::platform_llm {
 
@@ -54,9 +50,7 @@ bool snapshot_callbacks(rac_platform_llm_callbacks_t* out) {
 
 }  // namespace runanywhere::commons::platform_llm
 
-// =============================================================================
 // CALLBACK REGISTRATION
-// =============================================================================
 
 extern "C" {
 
@@ -92,9 +86,7 @@ rac_bool_t rac_platform_llm_is_available(void) {
                : RAC_FALSE;
 }
 
-// =============================================================================
 // SERVICE API
-// =============================================================================
 
 rac_result_t rac_llm_platform_create(const char* model_path,
                                      const rac_llm_platform_config_t* config,

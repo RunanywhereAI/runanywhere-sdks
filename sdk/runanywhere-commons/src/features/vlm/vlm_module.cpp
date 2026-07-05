@@ -2,11 +2,9 @@
  * @file vlm_module.cpp
  * @brief Unified VLM feature module.
  *
- * W4 component unification: merges the former vlm_component.cpp (handle-based
- * Vision Language Model component path) with the entire rac_vlm_proto_abi.cpp
- * (proto-byte C ABI: rac_vlm_process_proto / _stream / cancel / generate /
- * stream / cancel_lifecycle, plus the rac_vlm_proto_quiesce in-flight guard)
- * into one TU.
+ * One TU owns both the handle-based VLM component path and the proto-byte
+ * C ABI (rac_vlm_process_proto / _stream / cancel / generate / stream /
+ * cancel_lifecycle, plus the rac_vlm_proto_quiesce in-flight guard).
  */
 
 #include <atomic>
@@ -47,9 +45,7 @@
 
 static const char* LOG_CAT = "VLM.Component";
 
-// =============================================================================
 // INTERNAL STRUCTURES
-// =============================================================================
 
 /**
  * Internal VLM component state.
@@ -87,9 +83,7 @@ struct rac_vlm_component {
     }
 };
 
-// =============================================================================
 // HELPER FUNCTIONS
-// =============================================================================
 
 /**
  * Simple token estimation (~4 chars per token).
@@ -102,9 +96,7 @@ static int32_t estimate_tokens(const char* text) {
     return tokens > 0 ? tokens : 1;
 }
 
-// =============================================================================
 // SPECIAL TOKEN STRIPPING
-// =============================================================================
 
 /**
  * Strip model-internal special tokens (e.g. <|im_end|>) from a token string.
@@ -150,9 +142,7 @@ static const char* vlm_strip_special_tokens(const char* token, char* buf, size_t
     return buf;
 }
 
-// =============================================================================
 // MODEL FILE RESOLUTION
-// =============================================================================
 
 /**
  * Resolve VLM model files within a directory.
@@ -227,9 +217,7 @@ extern "C" rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char*
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // LIFECYCLE CALLBACKS
-// =============================================================================
 
 /**
  * Service creation callback for lifecycle manager.
@@ -275,9 +263,7 @@ static void vlm_destroy_service(rac_handle_t service, void* user_data) {
     }
 }
 
-// =============================================================================
 // LIFECYCLE API
-// =============================================================================
 
 extern "C" rac_result_t rac_vlm_component_create(rac_handle_t* out_handle) {
     return rac::features::create_lifecycle_component<rac_vlm_component>(
@@ -350,9 +336,7 @@ extern "C" void rac_vlm_component_destroy(rac_handle_t handle) {
     delete component;
 }
 
-// =============================================================================
 // MODEL LIFECYCLE
-// =============================================================================
 
 extern "C" rac_result_t rac_vlm_component_load_model(rac_handle_t handle, const char* model_path,
                                                      const char* mmproj_path, const char* model_id,
@@ -473,9 +457,7 @@ extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
     return result;
 }
 
-// =============================================================================
 // GENERATION API
-// =============================================================================
 
 extern "C" rac_result_t rac_vlm_component_process(rac_handle_t handle, const rac_vlm_image_t* image,
                                                   const char* prompt,
@@ -750,9 +732,7 @@ extern "C" rac_result_t rac_vlm_component_cancel(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-// =============================================================================
 // STATE QUERY API
-// =============================================================================
 
 extern "C" rac_lifecycle_state_t rac_vlm_component_get_state(rac_handle_t handle) {
     if (!handle)
@@ -773,9 +753,7 @@ extern "C" rac_result_t rac_vlm_component_get_metrics(rac_handle_t handle,
     return rac_lifecycle_get_metrics(component->lifecycle, out_metrics);
 }
 
-// =============================================================================
 // PROTO-BACKED LOAD FROM RESOLVED ARTIFACTS
-// =============================================================================
 
 extern "C" rac_result_t rac_vlm_component_load_resolved_artifacts_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size, rac_proto_buffer_t* out_result) {
@@ -859,15 +837,13 @@ extern "C" rac_result_t rac_vlm_component_load_resolved_artifacts_proto(
 #endif
 }
 
-// =============================================================================
-// PROTO-BYTE C ABI (formerly rac_vlm_proto_abi.cpp)
+// PROTO-BYTE C ABI
 //
 // Proto-byte verbs for VLM service operations. rac_vlm_process_proto keeps both
 // the lifecycle-owned path and the legacy handle-as-service fallback. The
 // VlmInFlightGuard + rac_vlm_proto_quiesce in-flight quiesce (called from
 // rac_vlm_component_destroy above) close the UAF window where a destroy thread
 // races a still-in-flight stream dispatch.
-// =============================================================================
 
 namespace {
 

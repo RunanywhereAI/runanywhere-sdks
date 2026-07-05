@@ -26,9 +26,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // TYPES
-// =============================================================================
 
 /** Opaque handle to platform diffusion service */
 typedef struct rac_diffusion_platform* rac_diffusion_platform_handle_t;
@@ -109,9 +107,7 @@ typedef struct rac_diffusion_platform_result {
     rac_bool_t safety_triggered;
 } rac_diffusion_platform_result_t;
 
-// =============================================================================
 // SWIFT CALLBACK TYPES
-// =============================================================================
 
 /**
  * Callback to check if platform diffusion can handle a model ID.
@@ -210,9 +206,7 @@ typedef struct rac_platform_diffusion_callbacks {
     void* user_data;
 } rac_platform_diffusion_callbacks_t;
 
-// =============================================================================
 // CALLBACK REGISTRATION
-// =============================================================================
 
 /**
  * Sets the Swift callbacks for platform diffusion operations.
@@ -238,9 +232,7 @@ RAC_API const rac_platform_diffusion_callbacks_t* rac_platform_diffusion_get_cal
  */
 RAC_API rac_bool_t rac_platform_diffusion_is_available(void);
 
-// =============================================================================
 // SERVICE API
-// =============================================================================
 
 /**
  * Creates a platform diffusion service.

@@ -25,9 +25,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // TYPES - Mirrors Swift's GenerationMetrics and StreamingMetricsCollector
-// =============================================================================
 
 /**
  * @brief Generation metrics snapshot.
@@ -126,9 +124,7 @@ static const rac_streaming_result_t RAC_STREAMING_RESULT_DEFAULT = {.text = RAC_
                                                                     .thinking_tokens = 0,
                                                                     .response_tokens = 0};
 
-// =============================================================================
 // OPAQUE HANDLES
-// =============================================================================
 
 /**
  * @brief Opaque handle for streaming metrics collector.
@@ -140,9 +136,7 @@ typedef struct rac_streaming_metrics_collector* rac_streaming_metrics_handle_t;
  */
 typedef struct rac_generation_analytics* rac_generation_analytics_handle_t;
 
-// =============================================================================
 // STREAMING METRICS COLLECTOR API - Mirrors Swift's StreamingMetricsCollector
-// =============================================================================
 
 /**
  * @brief Create a streaming metrics collector.
@@ -267,9 +261,7 @@ RAC_API rac_result_t rac_streaming_metrics_set_token_counts(rac_streaming_metric
                                                             int32_t input_tokens,
                                                             int32_t output_tokens);
 
-// =============================================================================
 // GENERATION ANALYTICS SERVICE API - Mirrors Swift's GenerationAnalyticsService
-// =============================================================================
 
 /**
  * @brief Create a generation analytics service.
@@ -389,9 +381,7 @@ RAC_API rac_result_t rac_generation_analytics_get_metrics(rac_generation_analyti
  */
 RAC_API rac_result_t rac_generation_analytics_reset(rac_generation_analytics_handle_t handle);
 
-// =============================================================================
 // MEMORY MANAGEMENT
-// =============================================================================
 
 /**
  * @brief Free a streaming result.

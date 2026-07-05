@@ -163,7 +163,6 @@ int test_stt_stream_events() {
     return 0;
 }
 
-// -----------------------------------------------------------------------------
 // Persistent per-session streaming handles.
 //
 // Installs a mock plugin that implements the new stream_create /
@@ -172,7 +171,6 @@ int test_stt_stream_events() {
 // rac_stt_stream_feed_audio_proto; we assert the backend was created
 // exactly once and torn down exactly once — this is the whole point of
 // the persistent-stream fix (previously Sherpa allocated state per chunk).
-// -----------------------------------------------------------------------------
 
 struct MockStreamState {
     int create_count = 0;

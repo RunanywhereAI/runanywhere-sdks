@@ -35,9 +35,7 @@
 extern "C" {
 #endif
 
-// =============================================================================
 // SERVER CONFIGURATION
-// =============================================================================
 
 /**
  * @brief Server configuration options
@@ -98,9 +96,7 @@ static const rac_server_config_t RAC_SERVER_CONFIG_DEFAULT = {.host = "127.0.0.1
                                                               .max_concurrent_requests = 4,
                                                               .verbose = RAC_FALSE};
 
-// =============================================================================
 // SERVER STATUS
-// =============================================================================
 
 /**
  * @brief Server status information
@@ -131,9 +127,7 @@ typedef struct rac_server_status {
     int64_t uptime_seconds;
 } rac_server_status_t;
 
-// =============================================================================
 // SERVER LIFECYCLE
-// =============================================================================
 
 /**
  * @brief Start the HTTP server
@@ -188,9 +182,7 @@ RAC_API rac_result_t rac_server_get_status(rac_server_status_t* status);
  */
 RAC_API int rac_server_wait(void);
 
-// =============================================================================
 // SERVER CALLBACKS (Optional)
-// =============================================================================
 
 /**
  * @brief Request callback type
@@ -234,9 +226,7 @@ typedef void (*rac_server_error_callback_fn)(const char* path, rac_result_t erro
  */
 RAC_API void rac_server_set_error_callback(rac_server_error_callback_fn callback, void* user_data);
 
-// =============================================================================
 // ERROR CODES
-// =============================================================================
 
 /** Server is already running */
 #define RAC_ERROR_SERVER_ALREADY_RUNNING ((rac_result_t) - 200)

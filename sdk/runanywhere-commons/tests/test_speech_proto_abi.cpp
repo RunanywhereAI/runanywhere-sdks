@@ -778,9 +778,7 @@ int test_voice_agent_proto_sequence_and_component_failure() {
     return 0;
 }
 
-// -----------------------------------------------------------------------------
 // Full-session voice-agent ABI coverage.
-// -----------------------------------------------------------------------------
 
 int test_voice_agent_d7_process_turn_proto_full_flow() {
     rac_voice_agent_handle_t agent = nullptr;

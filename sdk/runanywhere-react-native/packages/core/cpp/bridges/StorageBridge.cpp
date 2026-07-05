@@ -25,15 +25,11 @@
 namespace runanywhere {
 namespace bridges {
 
-// =============================================================================
 // Static storage for callbacks (needed for C function pointers)
-// =============================================================================
 
 static StoragePlatformCallbacks* g_storageCallbacks = nullptr;
 
-// =============================================================================
 // C Callback Implementations (called by RACommons)
-// =============================================================================
 
 static int64_t storageCalculateDirSizeCallback(const char* path, void* userData) {
     if (!path || !g_storageCallbacks || !g_storageCallbacks->calculateDirSize) {
@@ -79,9 +75,7 @@ static int64_t storageGetTotalSpaceCallback(void* userData) {
     return g_storageCallbacks->getTotalSpace();
 }
 
-// =============================================================================
 // StorageBridge Implementation
-// =============================================================================
 
 StorageBridge& StorageBridge::shared() {
     static StorageBridge instance;

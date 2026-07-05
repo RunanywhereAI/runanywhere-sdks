@@ -13,9 +13,7 @@ namespace rac {
 namespace server {
 namespace translation {
 
-// =============================================================================
 // OpenAI REQUEST -> Commons Format
-// =============================================================================
 
 std::string openaiToolsToCommonsJson(const Json& openaiTools) {
     if (!openaiTools.is_array() || openaiTools.empty()) {
@@ -132,9 +130,7 @@ std::string buildPromptFromOpenAI(const Json& messages, const Json& tools,
     return promptStr;
 }
 
-// =============================================================================
 // Commons Format -> OpenAI RESPONSE
-// =============================================================================
 
 Json commonsToolCallToOpenAI(const rac_tool_call_t& toolCall) {
     Json toolCalls = Json::array();
@@ -165,9 +161,7 @@ std::string generateToolCallId() {
     return ss.str();
 }
 
-// =============================================================================
 // Message Formatting
-// =============================================================================
 
 std::string extractLastUserMessage(const Json& messages) {
     if (!messages.is_array()) {
