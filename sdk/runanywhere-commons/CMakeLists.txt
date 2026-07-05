@@ -1396,23 +1396,11 @@ if(RAC_ENABLE_PROTOBUF)
     else()
         find_package(Protobuf ${PROTOBUF_VERSION} EXACT QUIET)
     endif()
-    # Fallback for homebrew/system protobuf 34.x: the upstream config file
-    # reports PACKAGE_VERSION_MAJOR==7 (runtime ABI major) and rejects
-    # `Protobuf <X> EXACT`. Module mode finds the same install with a
-    # synthesized version string. Accept either so local dev on macOS works
-    # without requiring a vendored FetchContent build.
-    #
-    # Require Protobuf >= 5.0 in the fallback so a system protobuf 3.x
-    # install (Ubuntu 22.04 ships 3.12, 24.04 ships 3.21) is rejected and
-    # FetchContent fetches the centralized PROTOBUF_VERSION below. The
-    # checked-in generated headers under src/generated/proto/ are Protobuf
-    # C++ Version 7.34.1 and include `google/protobuf/runtime_version.h`,
-    # which only exists in the libprotobuf 4.x+ runtime. Linking against
-    # 3.x produces `fatal error: google/protobuf/runtime_version.h: No such
-    # file or directory`.
-    if(NOT Protobuf_FOUND)
-        find_package(Protobuf 5.0 QUIET)
-    endif()
+    # The checked-in C++ gencode hard-checks the protobuf runtime patch line
+    # with `PROTOBUF_VERSION == 7035000`. Do not accept a loose system
+    # protobuf fallback here: Homebrew can provide a newer/older 7.x runtime
+    # that satisfies `find_package(Protobuf 5.0)` but fails at compile time.
+    # If the exact package is unavailable, use the vendored version below.
 
     if(NOT Protobuf_FOUND AND RAC_VENDOR_PROTOBUF)
         include(FetchContent)
