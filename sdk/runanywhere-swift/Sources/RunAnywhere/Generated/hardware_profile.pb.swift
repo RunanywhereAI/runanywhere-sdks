@@ -295,7 +295,7 @@ public nonisolated struct RANpuCapability: Sendable {
 
   public var hexagonArch: RAHexagonArch = .unknown
 
-  /// True iff hexagon_arch is in the QHexRT-supported set (v75/v79/v81 today).
+  /// True iff hexagon_arch is in the QHexRT-supported set (v75+ today).
   public var qhexrtSupported: Bool = false
 
   /// rac_hexagon_arch_name(): "v68" ... "v81", "unknown". Materialized so
