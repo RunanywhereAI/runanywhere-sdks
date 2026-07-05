@@ -4,35 +4,19 @@ library;
 import 'dart:async';
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/hardware_profile.pb.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere_qhexrt/native/qhexrt_bindings.dart';
 
-/// Detected Hexagon NPU capability (pre-flight; no QNN load required).
-class NpuInfo {
-  const NpuInfo({
-    required this.socModel,
-    required this.socId,
-    required this.arch,
-    required this.supported,
-  });
+// Re-export the generated wire types so consumers never hand-mirror them.
+export 'package:runanywhere/generated/hardware_profile.pb.dart'
+    show NpuCapability;
+export 'package:runanywhere/generated/hardware_profile.pbenum.dart'
+    show HexagonArch;
 
-  /// Vendor SoC model (e.g. "SM8750"); empty when unknown.
-  final String socModel;
-
-  /// /sys/devices/soc0/soc_id, or -1 when unavailable.
-  final int socId;
-
-  /// Hexagon arch name ("v73", "v79", "v81", "unknown").
-  final String arch;
-
-  /// True when [arch] is one QHexRT runs on (v79/v81).
-  final bool supported;
-
-  static const unknown = NpuInfo(socModel: '', socId: -1, arch: 'unknown', supported: false);
-}
-
-/// QHexRT NPU module — runs prebuilt QNN context binaries on Snapdragon v79/v81
-/// NPUs. Android/Snapdragon only; on unsupported parts it stays unavailable.
+/// QHexRT NPU module — runs prebuilt QNN context binaries on Snapdragon
+/// v75/v79/v81 NPUs. Android/Snapdragon only; on unsupported parts it stays
+/// unavailable.
 class QHexRT {
   QHexRT._();
 
@@ -42,23 +26,26 @@ class QHexRT {
   static QhexrtBindings? _bindings;
   static final _logger = SDKLogger('QHexRT');
 
+  /// The unknown/unsupported fallback returned when the probe is unavailable.
+  static NpuCapability _unknownCapability() =>
+      NpuCapability(socId: -1, archName: 'unknown');
+
   /// Whether the native backend library can be loaded on this device.
   static bool get isAvailable => QhexrtBindings.checkAvailability();
 
   /// Probe the Hexagon NPU without loading QNN. Safe on any device.
-  static NpuInfo probeNpu() {
-    if (!isAvailable) return NpuInfo.unknown;
+  ///
+  /// Returns the generated `runanywhere.v1.NpuCapability` proto message
+  /// (socModel, socId, hexagonArch, qhexrtSupported, archName) decoded from
+  /// commons' `rac_npu_probe_proto()`. On unsupported devices or probe
+  /// failure it returns the unknown fallback (socId -1, archName "unknown").
+  static NpuCapability probeNpu() {
+    if (!isAvailable) return _unknownCapability();
     try {
-      final r = (_bindings ??= QhexrtBindings()).probe();
-      return NpuInfo(
-        socModel: r.socModel,
-        socId: r.socId,
-        arch: r.arch == 0 ? 'unknown' : 'v${r.arch}',
-        supported: r.supported,
-      );
+      return (_bindings ??= QhexrtBindings()).probeProto();
     } catch (e) {
       _logger.error('NPU probe failed: $e');
-      return NpuInfo.unknown;
+      return _unknownCapability();
     }
   }
 
@@ -79,7 +66,8 @@ class QHexRT {
       _logger.info('rac_backend_qhexrt_register() returned: $result');
       if (result == RacResultCode.errorBackendUnavailable ||
           result == RacResultCode.errorCapabilityUnsupported) {
-        _logger.error('QHexRT unavailable; a Hexagon v79/v81 NPU is required.');
+        _logger.error(
+            'QHexRT unavailable; a Hexagon v75/v79/v81 NPU is required.');
         return;
       }
       if (result != RacResultCode.success &&
@@ -94,8 +82,8 @@ class QHexRT {
     }
   }
 
-  /// Unregister the QHexRT backend.
-  static void unregister() {
+  /// Unregister the QHexRT backend. Async for symmetry with [register].
+  static Future<void> unregister() async {
     if (_isRegistered) {
       _bindings?.unregister();
       _isRegistered = false;

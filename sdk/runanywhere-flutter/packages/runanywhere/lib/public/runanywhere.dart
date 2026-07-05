@@ -72,6 +72,7 @@ import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/dart_bridge_events.dart';
+import 'package:runanywhere/native/dart_bridge_hf_auth.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
@@ -151,6 +152,18 @@ abstract final class RunAnywhere {
   /// Swift's `isDeviceRegistered()`.
   static bool get isDeviceRegistered =>
       DartBridgeDevice.instance.isDeviceRegistered();
+
+  /// Supply a Hugging Face bearer token so the SDK can download **private**
+  /// model repos (e.g. gated `runanywhere/<name>_HNPU` NPU bundles). Auth
+  /// lives in the C++ commons layer, which attaches it ONLY to https
+  /// `huggingface.co`/`hf.co` requests — downloads, HEAD size preflight,
+  /// resumable transfers, and HF repo registration — on every platform
+  /// uniformly. Kotlin parity: `RunAnywhere.setHfToken`.
+  ///
+  /// Pass an empty string to clear the token (public no-auth behavior);
+  /// pass null to reset to the default state, where the `HF_TOKEN`
+  /// environment variable acts as the fallback.
+  static void setHfToken(String? token) => DartBridgeHfAuth.setHfToken(token);
 
   /// Awaitable Phase-2 completion. Mirrors Swift's
   /// `completeServicesInitialization()` (RunAnywhere.swift:255-273):
