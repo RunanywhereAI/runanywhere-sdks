@@ -2070,6 +2070,26 @@ rac_bool_t stream_token_callback(const char* token, void* user_data) {
 
 #endif  // RAC_HAVE_PROTOBUF
 
+template <typename Op, typename... Args>
+rac_result_t call_lifecycle_op(Op op, Args&&... args) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)op;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    rac::llm::LifecycleLlmRef ref;
+    rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+
+    rc = (ref.ops && (ref.ops->*op))
+             ? (ref.ops->*op)(ref.impl, std::forward<Args>(args)...)
+             : RAC_ERROR_NOT_SUPPORTED;
+    rac::llm::release_lifecycle_llm(&ref);
+    return rc;
+#endif
+}
+
 }  // namespace
 
 extern "C" {
@@ -2353,27 +2373,6 @@ rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event) {
 #endif
 }
 
-namespace {
-template <typename Op, typename... Args>
-rac_result_t call_lifecycle_op(Op op, Args&&... args) {
-#if !defined(RAC_HAVE_PROTOBUF)
-    (void)op;
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#else
-    rac::llm::LifecycleLlmRef ref;
-    rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
-
-    rc = (ref.ops && (ref.ops->*op))
-             ? (ref.ops->*op)(ref.impl, std::forward<Args>(args)...)
-             : RAC_ERROR_NOT_SUPPORTED;
-    rac::llm::release_lifecycle_llm(&ref);
-    return rc;
-#endif
-}
-}  // namespace
 
 /** Seed the lifecycle-owned LLM's adaptive context with a system prompt. */
 rac_result_t rac_llm_inject_system_prompt_lifecycle(const char* prompt) {
@@ -2428,8 +2427,11 @@ rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_by
     std::vector<std::string> stop_storage;
     std::vector<const char*> stop_ptrs;
     std::string grammar_storage;
-    rac_llm_options_t options =
-        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage);
+    std::vector<std::string> history_storage;
+    std::vector<const char*> history_ptrs;
+    rac_llm_options_t options = options_from_request(
+        request, system_prompt, stop_storage, stop_ptrs, grammar_storage, history_storage,
+        history_ptrs);
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};
