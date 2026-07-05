@@ -1439,10 +1439,11 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
         options.temperature = std::clamp(request.temperature(), 0.0f, 2.0f);
     }
 
-    // top_p: same contract — proto3 zero is the unset sentinel, 1.0 means no truncation
-    // (idl/llm_options.proto:53). Pass embedded value through unconditionally; gate the
-    // legacy inline scalar to avoid clobbering the engine default on unmigrated callers.
-    if (has_options) {
+    // top_p: proto3 zero is the unset sentinel, 1.0 means no truncation
+    // (idl/llm_options.proto:53). Gate both canonical and legacy fields so a
+    // canonical-only knob (for example disable_thinking) does not accidentally
+    // override the engine default with top_p=0.
+    if (has_options && opts.top_p() > 0.0f) {
         options.top_p = opts.top_p();
     } else if (request.top_p() > 0.0f) {
         options.top_p = request.top_p();

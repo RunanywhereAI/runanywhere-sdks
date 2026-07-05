@@ -1096,10 +1096,10 @@ endif()
 # shared library librunanywhere_jni.so dynamic-links against librac_commons.so
 # and needs every rac_* C ABI function resolvable at link time. Several
 # functions in the public C headers are still missing the `RAC_API`
-# visibility attribute (rac_plugin_list, rac_llm_{extract,strip}_thinking,
+# visibility attribute (rac_llm_{extract,strip}_thinking,
 # rac_llm_split_thinking_tokens, rac_voice_agent_set_proto_callback,
-# rac_llm_{,un}set_stream_proto_callback); hiding them breaks the JNI link
-# with `undefined symbol` errors. Forcing default visibility on this target
+# rac_llm_{,un}set_stream_proto_callback); hiding them breaks JNI/shared
+# consumers with `undefined symbol` errors. Forcing default visibility on this target
 # matches the macOS/iOS xcframework behaviour, where commons is a static
 # archive and every symbol is visible to downstream consumers. The override
 # is target-scoped so engine backends keep their hidden-visibility hardening.

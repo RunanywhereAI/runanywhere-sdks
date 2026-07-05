@@ -21,6 +21,7 @@
 #     --token <hf_...>   HF token for PRIVATE runanywhere/*_HNPU repos (never stored)
 #     --build            stage AARs + assemble & install app + androidTest APKs first
 #     --arch <v81>       arch filter used only to pick the default model set
+#     --max-new <n>      override LLM/VLM max new tokens
 #     --repo/--modality/--files  run ONE ad-hoc HF repo instead of a catalog id
 set -euo pipefail
 
@@ -34,6 +35,7 @@ RUNNER="${RUNNER:-androidx.test.runner.AndroidJUnitRunner}"
 TEST_CLASS="com.runanywhere.runanywhereai.NpuModelE2ETest"
 HF_TOKEN="${HF_TOKEN:-}"
 ARCH="${ARCH:-v81}"
+MAX_NEW="${MAX_NEW:-}"
 BUILD=0
 REPO="" ; MODALITY="" ; FILES=""
 MODELS=()
@@ -44,6 +46,7 @@ while [ $# -gt 0 ]; do
     --token)  HF_TOKEN="$2"; shift 2;;
     --build)  BUILD=1; shift;;
     --arch)   ARCH="$2"; shift 2;;
+    --max-new) MAX_NEW="$2"; shift 2;;
     --repo)   REPO="$2"; shift 2;;
     --modality) MODALITY="$2"; shift 2;;
     --files)  FILES="$2"; shift 2;;
@@ -88,6 +91,7 @@ run_one() { # $1=model-id  $2..=extra `-e k v` pairs
   "${ADB[@]}" logcat -c || true
   local extra=(-e class "$TEST_CLASS")
   [ -n "$HF_TOKEN" ] && extra+=(-e hfToken "$HF_TOKEN")
+  [ -n "$MAX_NEW" ] && extra+=(-e maxNew "$MAX_NEW")
   # -w blocks until the test finishes; the NPU_E2E result lands in logcat.
   "${ADB[@]}" shell am instrument -w -r "$@" "${extra[@]}" "$TEST_PKG/$RUNNER" 2>&1 \
     | sed 's/^/  [instr] /' || true

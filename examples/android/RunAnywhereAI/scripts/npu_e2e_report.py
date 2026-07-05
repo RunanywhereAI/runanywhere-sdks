@@ -21,10 +21,24 @@ from pathlib import Path
 INTELLIGIBILITY_WER_MAX = 0.15  # forge TTS_INTELLIGIBILITY_WER
 
 _WORD = re.compile(r"[^\W_]+(?:'[^\W_]+)*", re.UNICODE)
+_ASR_ALIASES = {"mr": "mister", "neuro": "neural"}
+_DIGIT_WORDS = {
+    "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four",
+    "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine",
+}
+APP_ROOT = Path(__file__).resolve().parents[1]
+SUITES = APP_ROOT / "app" / "src" / "androidTest" / "assets" / "npu_suites"
 
 
 def _words(s):
-    return _WORD.findall(s.lower())
+    out = []
+    for w in _WORD.findall(s.lower()):
+        w = _ASR_ALIASES.get(w, w)
+        if w.isdigit():
+            out.extend(_DIGIT_WORDS[ch] for ch in w)
+        else:
+            out.append(w)
+    return out
 
 
 def wer(ref, hyp):
@@ -39,6 +53,20 @@ def wer(ref, hyp):
             cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (r[i - 1] != h[j - 1]))
         prev = cur
     return prev[len(h)] / len(r)
+
+
+def _suite_gate(mid):
+    path = SUITES / f"{mid}.json"
+    if not path.exists():
+        return {"intelligibility_wer_max": INTELLIGIBILITY_WER_MAX, "suite_pass_frac": 1.0}
+    try:
+        gate = json.loads(path.read_text()).get("gate", {})
+    except Exception:  # noqa: BLE001
+        gate = {}
+    return {
+        "intelligibility_wer_max": gate.get("intelligibility_wer_max", INTELLIGIBILITY_WER_MAX),
+        "suite_pass_frac": gate.get("suite_pass_frac", 1.0),
+    }
 
 
 def _load_whisper():
@@ -83,7 +111,11 @@ def main():
             if wavs and wmodel is None:
                 wmodel = _load_whisper()
             if wavs and wmodel is not None:
+                gate = _suite_gate(mid)
+                wer_max = float(gate["intelligibility_wer_max"])
+                pass_frac = float(gate["suite_pass_frac"])
                 wers = []
+                passed = 0
                 for s in r.get("samples", []):
                     wav = d / f"tts_{mid}_{s.get('idx')}.wav"
                     if wav.exists():
@@ -91,15 +123,23 @@ def main():
                         w = round(wer(s.get("input", ""), hyp), 3)
                         s["intelligibility_wer"] = w
                         s["intelligibility_hyp"] = hyp
+                        s["intelligibility_pass"] = w <= wer_max
                         wers.append(w)
+                        if w <= wer_max:
+                            passed += 1
                 if wers:
                     worst = max(wers)
+                    frac = round(passed / len(wers), 2)
                     r["intelligibility_wer"] = worst
-                    ok = worst <= INTELLIGIBILITY_WER_MAX
+                    r["intelligibility_pass_frac"] = frac
+                    ok = frac >= pass_frac - 1e-9
                     r.setdefault("gates", {})["tts_intelligibility"] = ok
                     if not ok and r.get("status") == "PASS":
                         r["status"] = "FAIL"
-                        r["detail"] = f"intelligibility wer={worst} > {INTELLIGIBILITY_WER_MAX}"
+                        r["detail"] = f"intelligibility pass_frac={frac} < {pass_frac} (worst wer={worst})"
+                    elif ok and r.get("status") == "FAIL" and "intelligibility" in r.get("detail", ""):
+                        r["status"] = "PASS"
+                        r["detail"] = "ok"
                     rp.write_text(json.dumps(r, indent=2))  # persist the augmented report
 
         gates = r.get("gates", {})

@@ -100,6 +100,7 @@ rac_result_t qhexrt_tts_synthesize(void* impl, const char* text, const rac_tts_o
         return RAC_ERROR_NULL_POINTER;
     }
     try {
+        qhx_session_reset(c->sess);  // public SDK synthesize calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in{};
         in.text = text;
@@ -140,6 +141,7 @@ rac_result_t qhexrt_tts_synthesize_stream(void* impl, const char* text,
         return RAC_ERROR_NULL_POINTER;
     }
     try {
+        qhx_session_reset(c->sess);  // public SDK stream calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in{};
         in.text = text;

@@ -57,6 +57,13 @@ private fun RALLMGenerationOptions?.toGenerateRequest(
 ): RALLMGenerateRequest {
     val options = this ?: RALLMGenerationOptions()
     val schema = options.structured_output?.json_schema ?: options.json_schema.orEmpty()
+    val canonicalOnlyOptions =
+        options.disable_thinking ||
+            options.thinking_pattern != null ||
+            options.structured_output != null ||
+            options.tool_calling != null ||
+            options.enable_real_time_tracking ||
+            options.repeat_last_n != 0
     return RALLMGenerateRequest(
         prompt = prompt,
         max_tokens = options.max_tokens,
@@ -75,6 +82,7 @@ private fun RALLMGenerationOptions?.toGenerateRequest(
         // path (C++ options_from_request already forwards it to rac_llm_options_t.grammar).
         grammar = options.structured_output?.grammar ?: options.grammar.orEmpty(),
         execution_target = options.execution_target?.name.orEmpty(),
+        options = options.takeIf { canonicalOnlyOptions },
     )
 }
 

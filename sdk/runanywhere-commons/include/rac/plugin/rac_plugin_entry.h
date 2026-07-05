@@ -352,12 +352,13 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *
  * Thread-safe.
  */
-rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+RAC_API rac_result_t
+rac_plugin_register(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Unregister a plugin by name. No-op if the name is not registered.
  */
-rac_result_t rac_plugin_unregister(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+RAC_API rac_result_t rac_plugin_unregister(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Look up the highest-priority plugin that serves `primitive`, or NULL
@@ -366,7 +367,8 @@ rac_result_t rac_plugin_unregister(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEP
  * Thread-safe. The returned pointer is valid for the remaining lifetime of
  * the registry (i.e. until `rac_plugin_unregister` is called for this name).
  */
-const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+RAC_API const rac_engine_vtable_t*
+rac_plugin_find(rac_primitive_t primitive) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Look up the plugin registered under `engine_name` IFF it serves
@@ -376,7 +378,7 @@ const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive) RAC_PLUGIN
  *
  * Thread-safe.
  */
-const rac_engine_vtable_t*
+RAC_API const rac_engine_vtable_t*
 rac_plugin_find_for_engine(rac_primitive_t primitive,
                            const char* engine_name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
@@ -395,7 +397,7 @@ RAC_API rac_result_t rac_plugin_list(rac_primitive_t primitive,
  * @brief Total number of registered plugins (across all primitives,
  *        counting each plugin once).
  */
-size_t rac_plugin_count(void) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+RAC_API size_t rac_plugin_count(void) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 #ifdef __cplusplus
 }

@@ -2,6 +2,7 @@ package com.runanywhere.runanywhereai
 
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ThinkingTagPattern
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -57,7 +58,7 @@ import java.io.File
  *   OR -e hfRepo <org/repo> -e arch <v81> -e modality <llm|vlm|stt|tts> -e manifest <m.json>
  *      (legacy: -e files "m.json,..." — only the first name, the manifest, is used)
  *   -e hfToken <hf_...>   download private runanywhere/<name>_HNPU repos (never committed/logged)
- *   -e maxNew <n>         override VLM max new tokens (default 48)
+ *   -e maxNew <n>         override LLM/VLM max new tokens (default 48)
  *
  * Run via scripts/run_npu_e2e.sh (loops the catalog, one model at a time, aggregates).
  */
@@ -78,6 +79,7 @@ class NpuModelE2ETest {
                 "onto a single chip, and mobile devices became capable of running large neural " +
                 "networks entirely on the phone. In two or three sentences, summarize why on-device " +
                 "inference matters for privacy and latency."
+        val THINKING_TAGS = ThinkingTagPattern(open_tag = "<think>", close_tag = "</think>")
     }
 
     // ---- baselines (public, HF-derived; offline provenance documented in the skill) ----
@@ -101,7 +103,7 @@ class NpuModelE2ETest {
         "The Hexagon neural processing unit runs this model.",
     )
 
-    private data class VlmCase(val asset: String, val prompt: String, val expect: List<String>)
+    private data class VlmCase(val asset: String, val prompt: String, val expect: List<String>, val maxNew: Int = 48)
     private val vlmCases = listOf(
         VlmCase("test.jpg", "Describe this image.", listOf("cat", "cats", "kitten")),
     )
@@ -180,7 +182,7 @@ class NpuModelE2ETest {
                 val suite = NpuSuite.load(InstrumentationRegistry.getInstrumentation().context.assets, model.id)
                 report.put("suite", if (suite != null) "npu_suite/v1:${suite.metric}:${suite.cases.size}cases" else "heuristic")
                 when (model.category) {
-                    ModelCategory.MODEL_CATEGORY_LANGUAGE -> runLlm(report, suite)
+                    ModelCategory.MODEL_CATEGORY_LANGUAGE -> runLlm(report, suite, maxNew)
                     ModelCategory.MODEL_CATEGORY_MULTIMODAL -> runVlm(report, maxNew, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> runStt(report, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> runTts(report, model, outDir, suite)
@@ -209,9 +211,11 @@ class NpuModelE2ETest {
     }
 
     // ---------------------------------------------------------------- LLM ----
-    private suspend fun runLlm(report: RunReport, suite: NpuSuite?) {
-        val goldCases = suite?.cases?.filter { it.text != null && it.goldTokens != null }.orEmpty()
-        if (goldCases.isNotEmpty()) {
+    private suspend fun runLlm(report: RunReport, suite: NpuSuite?, maxNew: Int) {
+        val suiteCases = suite?.cases
+            ?.filter { it.text != null && (it.goldTokens != null || it.keywords.isNotEmpty()) }
+            .orEmpty()
+        if (suiteCases.isNotEmpty()) {
             // Canonical-suite path over the SAME prompts forge/goal_npu uses. The app runs the model
             // CHAT-templated (no no_template option), so the GATE is answer-correctness (suite expect_keywords)
             // + coherence — a chat-formatted-but-correct answer must not fail for not being a base completion.
@@ -219,23 +223,26 @@ class NpuModelE2ETest {
             // precisely because the app is chat, not base); forge's own base-completion path gates on it.
             report.put("parity_metric", "answer+coherence(+greedy_tol_base)")
             var decSum = 0.0; var ttftSum = 0.0; var n = 0; var passN = 0
-            for ((i, c) in goldCases.withIndex()) {
-                val gold = c.goldTokens!!
-                val g = withTimeout(INFER_TIMEOUT_MS) { greedyGenerate(c.text!!, maxOf(gold.size + 24, 32)) }
-                val drift = NpuMetrics.normalizedTokenEdit(g.tokenIds, gold)     // vs base gold (informational)
+            for ((i, c) in suiteCases.withIndex()) {
+                val gold = c.goldTokens
+                val budget = maxOf(maxNew, suite!!.maxNew, c.maxNew, (gold?.size ?: 0) + 24, 32)
+                val g = withTimeout(INFER_TIMEOUT_MS) { greedyGenerate(c.text!!, budget) }
+                val drift = gold?.let { NpuMetrics.normalizedTokenEdit(g.tokenIds, it) } // vs base gold (informational)
                 val coherent = g.text.isNotBlank() && NpuMetrics.wordRepeatRatio(g.text) < NpuRubric.REPEAT_MAX
                 val pass = coherent && (c.keywords.isEmpty() || c.keywords.any { g.text.contains(it, ignoreCase = true) })
                 if (pass) passN++
                 if (g.outTok > 0) { decSum += g.decodeToks; ttftSum += g.ttftMs; n++ }
-                report.addSample(JSONObject().put("idx", i).put("id", c.id).put("input", c.text!!.take(60))
+                val sample = JSONObject().put("idx", i).put("id", c.id).put("input", c.text!!.take(60))
                     .put("output", g.text.take(200)).put("expect", c.keywords.joinToString(","))
-                    .put("metric", "answer+coherence").put("greedy_tol_base", round3(drift))
-                    .put("gold_ntok", gold.size).put("dev_ntok", g.tokenIds.size)
+                    .put("metric", "answer+coherence").put("max_new", budget)
+                    .put("dev_ntok", g.tokenIds.size)
                     .put("ttft_ms", round2(g.ttftMs)).put("decode_toks", round2(g.decodeToks))
                     .put("prefill_toks", round2(g.prefillToks)).put("tokens_per_s", round2(g.tokensPerS))
-                    .put("total_ms", round2(g.totalMs)).put("out_tok", g.outTok).put("pass", pass))
+                    .put("total_ms", round2(g.totalMs)).put("out_tok", g.outTok).put("pass", pass)
+                if (gold != null) sample.put("greedy_tol_base", round3(drift!!)).put("gold_ntok", gold.size)
+                report.addSample(sample)
             }
-            val frac = passN.toDouble() / goldCases.size
+            val frac = passN.toDouble() / suiteCases.size
             report.put("suite_pass_frac", round2(frac))
             report.gate("llm_answer_suite", frac >= suite!!.passFrac - 1e-9)
             if (n > 0) report.put("decode_toks", round2(decSum / n)).put("ttft_ms", round2(ttftSum / n))
@@ -247,7 +254,12 @@ class NpuModelE2ETest {
         for ((i, c) in llmCases.withIndex()) {
             val r = withTimeout(INFER_TIMEOUT_MS) {
                 RunAnywhere.aggregateStream(c.prompt, RunAnywhere.generateStream(c.prompt,
-                    RALLMGenerationOptions(max_tokens = c.maxNew, temperature = 0f)))
+                    RALLMGenerationOptions(
+                        max_tokens = c.maxNew,
+                        temperature = 0f,
+                        top_p = 1f,
+                        disable_thinking = true,
+                    )))
             }
             val text = r.text.trim()
             val decTok = if (r.decode_time_ms > 0) r.tokens_generated * 1000.0 / r.decode_time_ms else r.tokens_per_second
@@ -269,7 +281,12 @@ class NpuModelE2ETest {
 
     /** Greedy (temp=0) generation collecting per-token ids (for token-level parity) + perf metrics. */
     private suspend fun greedyGenerate(prompt: String, maxNew: Int): Gen {
-        val opts = RALLMGenerationOptions(max_tokens = maxNew, temperature = 0f)
+        val opts = RALLMGenerationOptions(
+            max_tokens = maxNew,
+            temperature = 0f,
+            top_p = 1f,
+            thinking_pattern = THINKING_TAGS,
+        )
         val ids = ArrayList<Int>(); val sb = StringBuilder()
         val t0 = System.currentTimeMillis(); var ttftWall = 0.0
         var ttft = 0.0; var tps = 0.0; var decMs = 0.0; var preMs = 0.0; var totMs = 0.0; var outTok = 0; var inTok = 0
@@ -298,17 +315,19 @@ class NpuModelE2ETest {
     private suspend fun runVlm(report: RunReport, maxNew: Int, suite: NpuSuite?) {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         val imgCases = suite?.cases
-            ?.mapNotNull { c -> c.imageAsset?.let { Triple(it, c.text ?: "Describe this image.", c.keywords) } }
-            ?.takeIf { it.isNotEmpty() } ?: vlmCases.map { Triple(it.asset, it.prompt, it.expect) }
+            ?.mapNotNull { c -> c.imageAsset?.let { VlmCase(it, c.text ?: "Describe this image.", c.keywords, c.maxNew) } }
+            ?.takeIf { it.isNotEmpty() } ?: vlmCases
         for ((i, cc) in imgCases.withIndex()) {
-            val (asset, prompt, kws) = cc
+            val (asset, prompt, kws, caseMaxNew) = cc
+            val suiteBudget = maxOf(suite?.maxNew ?: 0, caseMaxNew)
+            val budget = if (suiteBudget > 0) suiteBudget else maxOf(maxNew, 1)
             val f = File(ctx.cacheDir, "vlm_$i.jpg").apply { writeBytes(testAsset(asset)) }
             val r = withTimeout(INFER_TIMEOUT_MS) {
                 // Greedy (temperature=0, no top-p/top-k) — the parity setting: the device caption must
                 // match the fp32 gold deterministically, not a sampled variant. (0f is also the option
                 // default, but pin it explicitly so a future default change can't silently un-greedy the gate.)
                 RunAnywhere.processImage(RAVLMImage.fromFilePath(f.absolutePath),
-                    RAVLMGenerationOptions(prompt = prompt, max_tokens = maxNew, temperature = 0f, top_p = 0f, top_k = 0))
+                    RAVLMGenerationOptions(prompt = prompt, max_tokens = budget, temperature = 0f, top_p = 0f, top_k = 0))
             }
             val text = r.text.trim()
             val pass = text.isNotBlank() && kws.any { text.contains(it, ignoreCase = true) }
@@ -318,7 +337,7 @@ class NpuModelE2ETest {
                 .put("tokens_per_s", round2(r.tokens_per_second.toDouble()))
                 .put("total_ms", round2(r.processing_time_ms.toDouble()))
                 .put("out_tok", r.completion_tokens).put("img_tok", r.image_tokens)
-                .put("metric", "keyword:${kws.firstOrNull() ?: ""}").put("pass", pass))
+                .put("metric", "keyword:${kws.firstOrNull() ?: ""}").put("max_new", budget).put("pass", pass))
             report.gate("vlm_case_$i", pass)
             report.put("vision_ms", round2(r.image_encode_time_ms.toDouble()))
                 .put("ttft_ms", round2(r.time_to_first_token_ms.toDouble()))

@@ -141,6 +141,7 @@ rac_result_t qhexrt_stt_transcribe(void* impl, const void* audio_data, size_t au
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        qhx_session_reset(c->sess);  // public SDK transcribe calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
         std::vector<float> audio_f32;
@@ -174,6 +175,7 @@ rac_result_t qhexrt_stt_transcribe_stream(void* impl, const void* audio_data, si
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        qhx_session_reset(c->sess);  // public SDK stream calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
         std::vector<float> audio_f32;

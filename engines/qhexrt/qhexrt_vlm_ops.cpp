@@ -151,6 +151,7 @@ rac_result_t qhexrt_vlm_process(void* impl, const rac_vlm_image_t* image, const 
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        qhx_session_reset(c->sess);  // public SDK process calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
         if (!fill_inputs(&in, image, prompt, options)) {
@@ -183,6 +184,7 @@ rac_result_t qhexrt_vlm_process_stream(void* impl, const rac_vlm_image_t* image,
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        qhx_session_reset(c->sess);  // public SDK stream calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
         if (!fill_inputs(&in, image, prompt, options)) {

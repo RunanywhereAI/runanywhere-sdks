@@ -35,9 +35,25 @@ object NpuRubric {
 /** Metric functions that reproduce forge's parity math, token-for-token. */
 object NpuMetrics {
     private val WORD = Regex("[\\p{L}\\p{N}]+(?:'[\\p{L}\\p{N}]+)*")
+    private val ASR_ALIASES = mapOf("mr" to "mister", "neuro" to "neural")
+    private val DIGIT_WORDS = mapOf(
+        '0' to "zero", '1' to "one", '2' to "two", '3' to "three", '4' to "four",
+        '5' to "five", '6' to "six", '7' to "seven", '8' to "eight", '9' to "nine"
+    )
 
     /** Unicode word runs (intra-word apostrophes kept), lowercased — forge text.normalize_text. */
-    fun words(s: String): List<String> = WORD.findAll(s.lowercase()).map { it.value }.toList()
+    fun words(s: String): List<String> {
+        val out = mutableListOf<String>()
+        for (m in WORD.findAll(s.lowercase())) {
+            val w = ASR_ALIASES[m.value] ?: m.value
+            if (w.all { it.isDigit() }) {
+                w.forEach { out.add(DIGIT_WORDS[it] ?: it.toString()) }
+            } else {
+                out.add(w)
+            }
+        }
+        return out
+    }
 
     /** word-level WER = Levenshtein(ref_words, hyp_words) / |ref_words|  (forge text.wer). */
     fun wer(ref: String, hyp: String): Double {
@@ -195,6 +211,7 @@ class SuiteCase(private val o: JSONObject) {
         ?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList()
     val goldTokens: List<Int>? get() = o.optJSONArray("gold_tokens")
         ?.let { a -> (0 until a.length()).map { a.getInt(it) } }?.takeIf { it.isNotEmpty() }
+    val maxNew: Int get() = o.optInt("max_new", 0)
 }
 
 /**
@@ -211,6 +228,7 @@ class NpuSuite(private val o: JSONObject) {
     val editTol: Double get() = gate.optDouble("edit_tol", NpuRubric.EDIT_TOL)
     val werMax: Double get() = gate.optDouble("wer_max", NpuRubric.WER_MAX)
     val passFrac: Double get() = gate.optDouble("suite_pass_frac", 0.60)
+    val maxNew: Int get() = gate.optInt("max_new", 0)
     val cases: List<SuiteCase> get() = o.optJSONArray("cases")
         ?.let { a -> (0 until a.length()).map { SuiteCase(a.getJSONObject(it)) } } ?: emptyList()
 

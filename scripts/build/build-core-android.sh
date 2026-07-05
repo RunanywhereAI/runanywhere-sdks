@@ -28,9 +28,11 @@ cd "${REPO_ROOT}"
 KOTLIN_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/jniLibs"
 KOTLIN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/src/main/jniLibs"
 KOTLIN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/main/jniLibs"
+KOTLIN_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs"
 RN_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/android/src/main/jniLibs"
 RN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/android/src/main/jniLibs"
 RN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/src/main/jniLibs"
+RN_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/android/src/main/jniLibs"
 RN_CORE_INCLUDE_DEST="${RN_CORE_JNI_DEST}/include"
 
 # Flutter destinations.
@@ -38,6 +40,7 @@ FLUTTER_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere
 FLUTTER_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/src/main/jniLibs"
 FLUTTER_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/android/src/main/jniLibs"
 FLUTTER_GENIE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_genie/android/src/main/jniLibs"
+FLUTTER_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/jniLibs"
 
 COMMONS_INCLUDE_SRC="${REPO_ROOT}/sdk/runanywhere-commons/include"
 SHERPA_ANDROID_JNI_SRC="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-android/jniLibs"
@@ -116,12 +119,15 @@ mkdir -p \
     "${KOTLIN_JNI_DEST}" \
     "${KOTLIN_LLAMA_JNI_DEST}" \
     "${KOTLIN_ONNX_JNI_DEST}" \
+    "${KOTLIN_QHEXRT_JNI_DEST}" \
     "${RN_CORE_JNI_DEST}" \
     "${RN_LLAMA_JNI_DEST}" \
     "${RN_ONNX_JNI_DEST}" \
+    "${RN_QHEXRT_JNI_DEST}" \
     "${FLUTTER_CORE_JNI_DEST}" \
     "${FLUTTER_LLAMA_JNI_DEST}" \
     "${FLUTTER_ONNX_JNI_DEST}" \
+    "${FLUTTER_QHEXRT_JNI_DEST}" \
     "${FLUTTER_GENIE_JNI_DEST}"
 
 rm -rf "${RN_CORE_INCLUDE_DEST}"
@@ -139,6 +145,84 @@ copy_if_exists() {
             cp -v "${src}" "${dst}/"
         done
     fi
+}
+
+find_qairt_root() {
+    local candidate
+    for candidate in \
+        "${QAIRT_ROOT:-}" \
+        "${QNN_SDK_ROOT:-}" \
+        "${QNN_ROOT:-}" \
+        "${REPO_ROOT}/../qairt/2.47.0.260601" ; do
+        [ -n "${candidate}" ] || continue
+        if [ -d "${candidate}/lib/aarch64-android" ]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+
+    local found
+    found="$(find "${REPO_ROOT}/.." -maxdepth 4 -type d -path "*/qairt/*/lib/aarch64-android" -print 2>/dev/null | sort -r | head -1 || true)"
+    if [ -n "${found}" ]; then
+        dirname "$(dirname "${found}")"
+        return 0
+    fi
+
+    return 1
+}
+
+stage_qhexrt_qnn_runtime_libs() {
+    local abi="$1"; shift
+    local engine_lib="$1"; shift
+
+    [ "${abi}" = "arm64-v8a" ] || return 0
+    [ -f "${engine_lib}" ] || return 0
+
+    local engine_available=0
+    if strings "${engine_lib}" | grep -q "qhexrt:engine-available"; then
+        engine_available=1
+    fi
+
+    local qairt_root
+    qairt_root="$(find_qairt_root || true)"
+    if [ -z "${qairt_root}" ]; then
+        if [ "${engine_available}" -eq 1 ]; then
+            echo "error: QHexRT engine is linked, but QAIRT/QNN runtime libs were not found." >&2
+            echo "       Set QAIRT_ROOT or QNN_SDK_ROOT to the QAIRT install root." >&2
+            exit 1
+        fi
+        return 0
+    fi
+
+    local host_dir="${qairt_root}/lib/aarch64-android"
+    local qnn_libs=(
+        "${host_dir}/libQnnHtp.so"
+        "${host_dir}/libQnnHtpNetRunExtensions.so"
+        "${host_dir}/libQnnHtpPrepare.so"
+        "${host_dir}/libQnnSystem.so"
+        "${host_dir}/libQnnHtpV75CalculatorStub.so"
+        "${host_dir}/libQnnHtpV75Stub.so"
+        "${host_dir}/libQnnHtpV79CalculatorStub.so"
+        "${host_dir}/libQnnHtpV79Stub.so"
+        "${host_dir}/libQnnHtpV81CalculatorStub.so"
+        "${host_dir}/libQnnHtpV81Stub.so"
+        "${qairt_root}/lib/hexagon-v75/unsigned/libQnnHtpV75Skel.so"
+        "${qairt_root}/lib/hexagon-v79/unsigned/libQnnHtpV79Skel.so"
+        "${qairt_root}/lib/hexagon-v81/unsigned/libQnnHtpV81Skel.so"
+    )
+
+    local src
+    for src in "${qnn_libs[@]}"; do
+        if [ ! -f "${src}" ]; then
+            echo "error: required QHexRT QAIRT runtime lib is missing: ${src}" >&2
+            exit 1
+        fi
+    done
+
+    echo "  Staging QHexRT QAIRT runtime libs from ${qairt_root}"
+    for src in "${qnn_libs[@]}"; do
+        copy_if_exists "${src}" "$@"
+    done
 }
 
 validate_elf_16kb_alignment() {
@@ -176,6 +260,13 @@ validate_staged_abi_16kb_alignment() {
     for dst in "$@"; do
         [ -d "${dst}" ] || continue
         while IFS= read -r so_file; do
+            case "$(basename "${so_file}")" in
+                libQnnHtpV*Skel.so)
+                    # DSP-side skels are extracted for cDSP lookup through
+                    # ADSP_LIBRARY_PATH; they are not Android host-loaded ELF.
+                    continue
+                    ;;
+            esac
             validate_elf_16kb_alignment "${so_file}" || failed=1
         done < <(find "${dst}" -maxdepth 1 -type f -name "*.so" -print)
     done
@@ -192,7 +283,14 @@ for ABI in "${ABIS[@]}"; do
     OMP_ARCH="$(ndk_omp_arch_for_abi "${ABI}")"
     echo "▶ ${ABI} via preset '${PRESET}'"
 
-    cmake --preset "${PRESET}"
+    CMAKE_CONFIGURE_ARGS=("--preset" "${PRESET}")
+    if [ "${ABI}" = "arm64-v8a" ] && \
+       [ -f "${REPO_ROOT}/engines/qhexrt/prebuilt/include/qhexrt/qhexrt_c.h" ] && \
+       [ -f "${REPO_ROOT}/engines/qhexrt/prebuilt/lib/${ABI}/libqhexrt_core.a" ] && \
+       [ -f "${REPO_ROOT}/engines/qhexrt/prebuilt/lib/${ABI}/libqhexrt_host.a" ]; then
+        CMAKE_CONFIGURE_ARGS+=("-DRAC_BACKEND_QHEXRT=ON")
+    fi
+    cmake "${CMAKE_CONFIGURE_ARGS[@]}"
     # Use CMake's generator-agnostic --parallel, CAPPED (repo resource
     # discipline: a bare --parallel spawns one heavy compiler per core and
     # has OOM-crashed dev laptops). Override with RAC_BUILD_JOBS if needed.
@@ -204,18 +302,22 @@ for ABI in "${ABIS[@]}"; do
     KOTLIN_DEST="${KOTLIN_JNI_DEST}/${ABI}"
     KOTLIN_LLAMA_DEST="${KOTLIN_LLAMA_JNI_DEST}/${ABI}"
     KOTLIN_ONNX_DEST="${KOTLIN_ONNX_JNI_DEST}/${ABI}"
+    KOTLIN_QHEXRT_DEST="${KOTLIN_QHEXRT_JNI_DEST}/${ABI}"
     RN_CORE_DEST="${RN_CORE_JNI_DEST}/${ABI}"
     RN_LLAMA_DEST="${RN_LLAMA_JNI_DEST}/${ABI}"
     RN_ONNX_DEST="${RN_ONNX_JNI_DEST}/${ABI}"
+    RN_QHEXRT_DEST="${RN_QHEXRT_JNI_DEST}/${ABI}"
     FLUTTER_CORE_DEST="${FLUTTER_CORE_JNI_DEST}/${ABI}"
     FLUTTER_LLAMA_DEST="${FLUTTER_LLAMA_JNI_DEST}/${ABI}"
     FLUTTER_ONNX_DEST="${FLUTTER_ONNX_JNI_DEST}/${ABI}"
     FLUTTER_GENIE_DEST="${FLUTTER_GENIE_JNI_DEST}/${ABI}"
+    FLUTTER_QHEXRT_DEST="${FLUTTER_QHEXRT_JNI_DEST}/${ABI}"
 
     mkdir -p \
-        "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" \
-        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" \
-        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" "${FLUTTER_GENIE_DEST}"
+        "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" "${KOTLIN_QHEXRT_DEST}" \
+        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
+        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
+        "${FLUTTER_QHEXRT_DEST}" "${FLUTTER_GENIE_DEST}"
 
     # Clean everything we manage before re-staging so stale artifacts from a
     # previous run (e.g. a dropped backend) don't linger.
@@ -223,9 +325,10 @@ for ABI in "${ABIS[@]}"; do
         "${KOTLIN_DEST}"/*.so \
         "${KOTLIN_LLAMA_DEST}"/*.so \
         "${KOTLIN_ONNX_DEST}"/*.so \
-        "${RN_CORE_DEST}"/*.so "${RN_LLAMA_DEST}"/*.so "${RN_ONNX_DEST}"/*.so \
+        "${KOTLIN_QHEXRT_DEST}"/*.so \
+        "${RN_CORE_DEST}"/*.so "${RN_LLAMA_DEST}"/*.so "${RN_ONNX_DEST}"/*.so "${RN_QHEXRT_DEST}"/*.so \
         "${FLUTTER_CORE_DEST}"/*.so "${FLUTTER_LLAMA_DEST}"/*.so \
-        "${FLUTTER_ONNX_DEST}"/*.so "${FLUTTER_GENIE_DEST}"/*.so
+        "${FLUTTER_ONNX_DEST}"/*.so "${FLUTTER_QHEXRT_DEST}"/*.so "${FLUTTER_GENIE_DEST}"/*.so
 
     # -------------------------------------------------------------------------
     # Locate artifacts produced by the CMake build.
@@ -247,6 +350,8 @@ for ABI in "${ABIS[@]}"; do
     LIB_LLAMA_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_llamacpp_jni.so" -print -quit || true)"
     LIB_ONNX="$(find "${BUILD_DIR}"  -maxdepth 6 -name "librac_backend_onnx.so"          -print -quit || true)"
     LIB_ONNX_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_onnx_jni.so"   -print -quit || true)"
+    LIB_QHEXRT="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_qhexrt.so"       -print -quit || true)"
+    LIB_QHEXRT_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_qhexrt_jni.so" -print -quit || true)"
     LIB_RAG_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_rag_jni.so"     -print -quit || true)"
     # New Sherpa-ONNX plugin artifact, peer of librac_backend_onnx.so.
     LIB_SHERPA="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_sherpa.so"       -print -quit || true)"
@@ -275,6 +380,10 @@ for ABI in "${ABIS[@]}"; do
     copy_if_exists "${LIB_LLAMA_JNI}" "${KOTLIN_LLAMA_DEST}" "${RN_LLAMA_DEST}" "${FLUTTER_LLAMA_DEST}"
     copy_if_exists "${LIB_ONNX}"      "${KOTLIN_ONNX_DEST}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
     copy_if_exists "${LIB_ONNX_JNI}"  "${KOTLIN_ONNX_DEST}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
+    copy_if_exists "${LIB_QHEXRT}"     "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"
+    copy_if_exists "${LIB_QHEXRT_JNI}" "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"
+    stage_qhexrt_qnn_runtime_libs "${ABI}" "${LIB_QHEXRT}" \
+        "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"
     # Sherpa is the long-term owner of Sherpa-ONNX-backed STT/TTS/VAD; ship
     # it alongside the onnx plugin on every ONNX-enabled SDK package. Routed
     # to the Kotlin ONNX module (not core).
@@ -300,8 +409,10 @@ for ABI in "${ABIS[@]}"; do
     fi
     for dst in \
         "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" \
-        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" \
-        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" "${FLUTTER_GENIE_DEST}" ; do
+        "${KOTLIN_QHEXRT_DEST}" \
+        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
+        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
+        "${FLUTTER_QHEXRT_DEST}" "${FLUTTER_GENIE_DEST}" ; do
         cp -v "${LIBCXX_SHARED}" "${dst}/"
     done
 
@@ -318,9 +429,10 @@ for ABI in "${ABIS[@]}"; do
     done
 
     validate_staged_abi_16kb_alignment "${ABI}" \
-        "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" \
-        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" \
-        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" "${FLUTTER_GENIE_DEST}"
+        "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" "${KOTLIN_QHEXRT_DEST}" \
+        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
+        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
+        "${FLUTTER_QHEXRT_DEST}" "${FLUTTER_GENIE_DEST}"
 done
 
 echo ""
@@ -328,11 +440,14 @@ echo "✓ Android native libs copied to:"
 echo "  - ${KOTLIN_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${KOTLIN_LLAMA_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${KOTLIN_ONNX_JNI_DEST}/{${ABIS[*]}}"
+echo "  - ${KOTLIN_QHEXRT_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${RN_CORE_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${RN_LLAMA_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${RN_ONNX_JNI_DEST}/{${ABIS[*]}}"
+echo "  - ${RN_QHEXRT_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${FLUTTER_CORE_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${FLUTTER_LLAMA_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${FLUTTER_ONNX_JNI_DEST}/{${ABIS[*]}}"
+echo "  - ${FLUTTER_QHEXRT_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${FLUTTER_GENIE_JNI_DEST}/{${ABIS[*]}}"
 echo "✓ React Native headers copied to: ${RN_CORE_INCLUDE_DEST}"

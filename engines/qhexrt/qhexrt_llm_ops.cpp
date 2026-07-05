@@ -187,6 +187,7 @@ rac_result_t qhexrt_llm_generate(void* impl, const char* prompt, const rac_llm_o
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        qhx_session_reset(c->sess);  // public SDK generate calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
         fill_inputs(&in, prompt, options);
@@ -217,6 +218,7 @@ rac_result_t qhexrt_llm_generate_stream(void* impl, const char* prompt,
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        qhx_session_reset(c->sess);  // public SDK stream calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
         fill_inputs(&in, prompt, options);
