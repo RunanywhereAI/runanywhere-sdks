@@ -252,6 +252,19 @@ internal object ModelCatalog {
                 ),
             ),
         ),
+        MultiFileModel(
+            "qwen3.5-0.8b-q4_k_m", "Qwen 3.5 0.8B", LLAMA, MULTIMODAL, 786_962_240,
+            files = listOf(
+                ModelFile(
+                    "https://huggingface.co/bartowski/Qwen_Qwen3.5-0.8B-GGUF/resolve/main/Qwen_Qwen3.5-0.8B-Q4_K_M.gguf",
+                    "Qwen_Qwen3.5-0.8B-Q4_K_M.gguf"
+                ),
+                ModelFile(
+                    "https://huggingface.co/bartowski/Qwen_Qwen3.5-0.8B-GGUF/resolve/main/mmproj-Qwen_Qwen3.5-0.8B-bf16.gguf",
+                    "mmproj-Qwen_Qwen3.5-0.8B-bf16.gguf"
+                ),
+            ),
+        ),
         ArchiveModel(
             "smolvlm-500m-instruct-q8_0",
             "SmolVLM 500M Instruct",
