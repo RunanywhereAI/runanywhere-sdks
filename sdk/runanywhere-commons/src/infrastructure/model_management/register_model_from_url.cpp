@@ -401,6 +401,8 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
             const std::string direct_url = hf::normalize_explicit_file_ref(request.url());
             if (!direct_url.empty()) {
                 request.set_url(direct_url);
+            } else if (policy != nullptr) {
+                return register_from_hf_folder(request, policy, out_proto);
             } else {
                 return register_from_hf_repo(request, out_proto);
             }
@@ -634,6 +636,7 @@ register_multi_file_model(const runanywhere::v1::RegisterMultiFileModelRequest& 
         model.set_description(request.description());
     }
     *model.mutable_multi_file()->mutable_files() = request.files();
+    model.set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE);
 
     rac_model_registry_handle_t registry = rac_get_model_registry();
     if (!registry) {
