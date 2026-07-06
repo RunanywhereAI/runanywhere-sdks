@@ -528,7 +528,7 @@ TestResult test_rcli_mlx_run_end_to_end() {
   if (code != 0 ||
       list_json.find("\"id\":\"mlx.fake.stt\"") == std::string::npos ||
       list_json.find("\"modality\":\"stt\"") == std::string::npos ||
-      list_json.find("\"backend\":\"mlx\"") == std::string::npos ||
+      list_json.find("\"backend\":\"MLX\"") == std::string::npos ||
       list_json.find("\"id\":\"mlx.fake.tts\"") == std::string::npos ||
       list_json.find("\"modality\":\"tts\"") == std::string::npos) {
     result.expected = "MLX STT/TTS rows from rcli list --all";

@@ -61,9 +61,7 @@ fun InferenceFramework.shortLabel(): String = when (this) {
     InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "Apple"
     InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> "System"
     InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> "NPU"
-    InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> "Genie"
     InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> "Sherpa"
-    InferenceFramework.INFERENCE_FRAMEWORK_METALRT -> "Metal"
     InferenceFramework.INFERENCE_FRAMEWORK_COREML -> "Core ML"
     InferenceFramework.INFERENCE_FRAMEWORK_MLX -> "MLX"
     InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS -> "Piper"
@@ -86,9 +84,7 @@ fun InferenceFramework.consumerBackendLabel(): String = when (this) {
     InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "Apple Built-in"
     InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> "System Voice"
     InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> "Hexagon NPU"
-    InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> "Qualcomm Genie"
     InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> "Sherpa Voice"
-    InferenceFramework.INFERENCE_FRAMEWORK_METALRT -> "Apple Metal"
     InferenceFramework.INFERENCE_FRAMEWORK_COREML -> "Core ML"
     InferenceFramework.INFERENCE_FRAMEWORK_MLX -> "MLX"
     InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS -> "Piper Voice"
@@ -111,9 +107,7 @@ fun InferenceFramework.backendIcon(): ImageVector = when (this) {
     InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> RACIcons.Filled.Bolt
     InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> RACIcons.Outline.Robot
     InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> RACIcons.Outline.Cpu
-    InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> RACIcons.Outline.Bolt
     InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> RACIcons.Outline.Microphone
-    InferenceFramework.INFERENCE_FRAMEWORK_METALRT -> RACIcons.Outline.Bolt
     InferenceFramework.INFERENCE_FRAMEWORK_COREML -> RACIcons.Outline.Cpu
     InferenceFramework.INFERENCE_FRAMEWORK_MLX -> RACIcons.Outline.Cpu
     InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS -> RACIcons.Outline.Robot

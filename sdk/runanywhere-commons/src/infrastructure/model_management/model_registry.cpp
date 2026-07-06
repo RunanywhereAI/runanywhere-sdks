@@ -100,6 +100,11 @@ void normalize_model_registry_state(ModelInfo* model) {
         return;
     }
 
+    if (has_nonempty_local_path(*model)) {
+        overwrite_download_state_from_local_path(model);
+        return;
+    }
+
     const bool downloaded = model_is_downloaded_from_fields(*model);
     if (!model->has_is_downloaded()) {
         model->set_is_downloaded(downloaded);
@@ -202,6 +207,7 @@ ModelInfo model_snapshot_locked(rac_model_registry_handle_t handle, const std::s
                             /*overwrite_artifact=*/true,
                             /*overwrite_registry_state=*/true);
     }
+    normalize_model_registry_state(&snapshot);
     return snapshot;
 }
 

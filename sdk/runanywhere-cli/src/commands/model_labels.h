@@ -46,10 +46,6 @@ inline const char* backend(v1::InferenceFramework framework) {
             return "Core ML";
         case v1::INFERENCE_FRAMEWORK_MLX:
             return "MLX";
-        case v1::INFERENCE_FRAMEWORK_METALRT:
-            return "MetalRT";
-        case v1::INFERENCE_FRAMEWORK_GENIE:
-            return "Qualcomm Genie";
         case v1::INFERENCE_FRAMEWORK_TFLITE:
             return "TensorFlow Lite";
         case v1::INFERENCE_FRAMEWORK_EXECUTORCH:

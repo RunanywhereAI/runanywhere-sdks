@@ -82,10 +82,6 @@ extension InferenceFramework {
             return "Core ML"
         case .mlx:
             return "MLX"
-        case .metalrt:
-            return "Apple Metal"
-        case .genie:
-            return "Qualcomm Genie"
         case .sherpa:
             return "Sherpa Voice"
         case .qhexrt:
@@ -131,10 +127,6 @@ extension InferenceFramework {
             return "Core ML"
         case .mlx:
             return "MLX"
-        case .metalrt:
-            return "Metal"
-        case .genie:
-            return "Genie"
         case .sherpa:
             return "Sherpa"
         case .qhexrt:
@@ -180,10 +172,6 @@ extension InferenceFramework {
             return "Apple-optimized model runtime"
         case .mlx:
             return "Apple Silicon local models"
-        case .metalrt:
-            return "Apple GPU acceleration"
-        case .genie:
-            return "Qualcomm accelerated runtime"
         case .sherpa:
             return "Private speech models"
         case .qhexrt:
@@ -229,10 +217,6 @@ extension InferenceFramework {
             return AppColors.primaryOrange
         case .mlx:
             return AppColors.primaryPurple
-        case .metalrt:
-            return AppColors.primaryBlue
-        case .genie:
-            return AppColors.statusGreen
         case .sherpa:
             return AppColors.primaryPurple
         case .qhexrt:
@@ -270,10 +254,6 @@ extension InferenceFramework {
             return "cpu"
         case .mlx:
             return "memorychip"
-        case .metalrt:
-            return "bolt.fill"
-        case .genie:
-            return "sparkles"
         case .sherpa:
             return "waveform.badge.mic"
         case .qhexrt:

@@ -179,10 +179,6 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
             return "platform";
         case RAC_FRAMEWORK_COREML:
             return primitive == RAC_PRIMITIVE_DIFFUSION ? "coreml" : "platform";
-        case RAC_FRAMEWORK_METALRT:
-            return "metalrt";
-        case RAC_FRAMEWORK_GENIE:
-            return "genie";
         case RAC_FRAMEWORK_QHEXRT:
             return "qhexrt";
         case RAC_FRAMEWORK_FLUID_AUDIO:
