@@ -9,7 +9,9 @@
 #include "test_common.h"
 
 #include <cstdlib>
+#include <initializer_list>
 #include <string>
+#include <vector>
 
 #include "model_types.pb.h"
 #include "rac/core/rac_core.h"
@@ -91,11 +93,14 @@ TestResult test_json_writer_shape() {
   json.begin_array("files");
   json.begin_array_object().field("path", "a.gguf").end_object();
   json.begin_array_object().field("path", "b.gguf").end_object();
-  json.end_array().end_object();
+  json.end_array();
+  json.begin_array("scores").value(1.0).value(0.5).end_array();
+  json.end_object();
 
   const std::string expected =
       R"({"name":"qwen3-0.6b","size":640,"downloaded":true,)"
-      R"("files":[{"path":"a.gguf"},{"path":"b.gguf"}]})";
+      R"("files":[{"path":"a.gguf"},{"path":"b.gguf"}],)"
+      R"("scores":[1,0.5]})";
   if (json.str() != expected) {
     result.expected = expected;
     result.actual = json.str();
@@ -343,6 +348,25 @@ void remove_registered_model(const std::string &id) {
   }
 }
 
+class RegisteredModelCleanup {
+public:
+  RegisteredModelCleanup(std::initializer_list<const char *> ids) {
+    ids_.reserve(ids.size());
+    for (const char *id : ids) {
+      ids_.emplace_back(id);
+    }
+  }
+
+  ~RegisteredModelCleanup() {
+    for (const auto &id : ids_) {
+      remove_registered_model(id);
+    }
+  }
+
+private:
+  std::vector<std::string> ids_;
+};
+
 bool get_registered_model(const std::string &id, runanywhere::v1::ModelInfo *out,
                           std::string *error) {
   rac_proto_buffer_t found;
@@ -365,6 +389,17 @@ TestResult test_mlx_catalog_registration() {
     result.details = "catalog registration failed rc=" + std::to_string(rc);
     return result;
   }
+  RegisteredModelCleanup cleanup({
+      "mlx-qwen3-0.6b-4bit",
+      "mlx-llama-3.2-1b-instruct-4bit",
+      "mlx-qwen2-vl-2b-instruct-4bit",
+      "mlx-fastvlm-0.5b-bf16",
+      "mlx-qwen3-embedding-0.6b-4bit-dwq",
+      "mlx-qwen3-asr-0.6b-8bit",
+      "mlx-glm-asr-nano-2512-4bit",
+      "mlx-qwen3-tts-12hz-0.6b-base-8bit",
+      "mlx-soprano-1.1-80m-5bit",
+  });
 
   runanywhere::v1::ModelInfo qwen;
   std::string error;
@@ -437,11 +472,41 @@ TestResult test_mlx_catalog_registration() {
     return result;
   }
 
-  remove_registered_model("mlx-qwen3-0.6b-4bit");
-  remove_registered_model("mlx-llama-3.2-1b-instruct-4bit");
-  remove_registered_model("mlx-qwen2-vl-2b-instruct-4bit");
-  remove_registered_model("mlx-fastvlm-0.5b-bf16");
-  remove_registered_model("mlx-qwen3-embedding-0.6b-4bit-dwq");
+  runanywhere::v1::ModelInfo qwen_asr;
+  if (!get_registered_model("mlx-qwen3-asr-0.6b-8bit", &qwen_asr, &error) ||
+      qwen_asr.category() != runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+      qwen_asr.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      !qwen_asr.has_multi_file() || qwen_asr.multi_file().files_size() != 9) {
+    result.details = "registered MLX Qwen3-ASR metadata is incomplete";
+    return result;
+  }
+
+  runanywhere::v1::ModelInfo glm_asr;
+  if (!get_registered_model("mlx-glm-asr-nano-2512-4bit", &glm_asr, &error) ||
+      glm_asr.category() != runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+      glm_asr.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      !glm_asr.has_multi_file() || glm_asr.multi_file().files_size() != 9) {
+    result.details = "registered MLX GLM-ASR metadata is incomplete";
+    return result;
+  }
+
+  runanywhere::v1::ModelInfo qwen_tts;
+  if (!get_registered_model("mlx-qwen3-tts-12hz-0.6b-base-8bit", &qwen_tts, &error) ||
+      qwen_tts.category() != runanywhere::v1::MODEL_CATEGORY_SPEECH_SYNTHESIS ||
+      qwen_tts.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      !qwen_tts.has_multi_file() || qwen_tts.multi_file().files_size() != 12) {
+    result.details = "registered MLX Qwen3-TTS metadata is incomplete";
+    return result;
+  }
+
+  runanywhere::v1::ModelInfo soprano;
+  if (!get_registered_model("mlx-soprano-1.1-80m-5bit", &soprano, &error) ||
+      soprano.category() != runanywhere::v1::MODEL_CATEGORY_SPEECH_SYNTHESIS ||
+      soprano.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      !soprano.has_multi_file() || soprano.multi_file().files_size() != 7) {
+    result.details = "registered MLX Soprano metadata is incomplete";
+    return result;
+  }
 
   result.passed = true;
   return result;
@@ -468,6 +533,8 @@ TestResult test_hf_ref_registration() {
        "https://huggingface.co/org/repo/resolve/main/sub/dir/file.gguf"},
       {"https://huggingface.co/org/repo/resolve/main/f.gguf",
        "https://huggingface.co/org/repo/resolve/main/f.gguf"},
+      {"https://huggingface.co/org/repo/blob/main/sub/f.gguf",
+       "https://huggingface.co/org/repo/resolve/main/sub/f.gguf"},
       {"https://example.com/m.gguf", "https://example.com/m.gguf"},
   };
   for (const Case &c : cases) {

@@ -68,10 +68,10 @@ jobs:
 
   native_ios:
     needs: validate
-    # T5.7: macos-15 ships Xcode 16+ / Swift 6; the iOS/macOS native build
-    # consumes Swift 6.3.2 and brew formulas (swift-protobuf, grpc-swift v2)
-    # that require Xcode 16+. macos-14 only ships Xcode 15.x.
-    runs-on: macos-15
+    # MLX audio is linked through mlx-audio-swift, which requires Swift 6.2+.
+    # Use the macOS 26 runner line for Xcode 26 while keeping the desktop rcli
+    # lane on its existing macos-14 llama.cpp Metal pin.
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -459,12 +459,14 @@ jobs:
   validate_consumer_swift:
     # native_ios produces the iOS artifact this job downloads. Do NOT add
     # sdk_kotlin here — the Swift consumer doesn't touch any Kotlin AAR/JAR
-    # and serializing macos-15 Swift validation behind ubuntu Kotlin
+    # and serializing Swift validation behind ubuntu Kotlin
     # packaging (~15-25 min on the release-day critical path) is wasteful.
     # See pass3-syn-008.
     needs: [validate, native_ios]
     if: always() && needs.validate.result == 'success'
-    runs-on: macos-15
+    # Swift consumers now resolve the default RunAnywhereMLX graph, including
+    # mlx-audio-swift, so this validation also needs Swift 6.2+.
+    runs-on: macos-26
     timeout-minutes: 20
     steps:
       - name: Clone swift-starter-example

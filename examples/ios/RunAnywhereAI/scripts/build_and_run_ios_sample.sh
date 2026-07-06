@@ -210,7 +210,8 @@ build_app() {
             DESTINATION="platform=macOS"
             ;;
         device|*)
-            local DEVICE_ID=$(xcodebuild -project RunAnywhereAI.xcodeproj -scheme RunAnywhereAI -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
+            local DEVICE_ID
+            DEVICE_ID=$(xcodebuild -project RunAnywhereAI.xcodeproj -scheme RunAnywhereAI -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
             [[ -z "$DEVICE_ID" ]] && { log_error "No connected iOS device found"; exit 1; }
             DESTINATION="platform=iOS,id=$DEVICE_ID"
             ;;
@@ -256,7 +257,8 @@ deploy_and_run() {
 
     case "$TARGET" in
         simulator)
-            local SIM_ID=$(xcrun simctl list devices available | grep "${DEVICE_NAME:-iPhone}" | head -1 | grep -Eo '[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}')
+            local SIM_ID
+            SIM_ID=$(xcrun simctl list devices available | grep "${DEVICE_NAME:-iPhone}" | head -1 | grep -Eo '[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}')
             [[ -z "$SIM_ID" ]] && { log_error "No available simulator found"; exit 1; }
             xcrun simctl boot "$SIM_ID" 2>/dev/null || true
             xcrun simctl install "$SIM_ID" "$APP_PATH"
@@ -269,7 +271,8 @@ deploy_and_run() {
             log_info "App launched on macOS"
             ;;
         device|*)
-            local DEVICE_ID=$(xcrun devicectl list devices 2>/dev/null | grep -E "available \\(paired\\)|connected" | grep -E "iPhone|iPad" | grep -oE '[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}' | head -1)
+            local DEVICE_ID
+            DEVICE_ID=$(xcrun devicectl list devices 2>/dev/null | grep -E "available \\(paired\\)|connected" | grep -E "iPhone|iPad" | grep -oE '[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}' | head -1)
             [[ -z "$DEVICE_ID" ]] && { log_error "No connected iOS device found"; exit 1; }
             log_step "Installing on device: $DEVICE_ID"
             xcrun devicectl device install app --device "$DEVICE_ID" "$APP_PATH"

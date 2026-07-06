@@ -23,8 +23,11 @@ int test_default_sampling_guards_against_repetition() {
     EXPECT_TRUE(options.temperature > 0.0f);
     EXPECT_TRUE(options.top_p > 0.0f);
     EXPECT_TRUE(options.top_p <= 1.0f);
+    EXPECT_TRUE(options.top_k == 0);
+    EXPECT_TRUE(options.seed == 0);
     EXPECT_TRUE(options.repetition_penalty > 1.0f);
     EXPECT_TRUE(options.min_p == 0.0f);
+    EXPECT_TRUE(options.emit_image_embeddings == RAC_FALSE);
     return 0;
 }
 

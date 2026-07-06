@@ -395,31 +395,28 @@ int run_run(const GlobalOptions& options, const std::string& ref, const std::str
         return 1;
     }
 
-    v1::InferenceFramework framework = v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
+    EngineHintResolution engine_hint;
     std::string engine_error;
-    if (!parse_engine_hint(params.engine, &framework, &engine_error)) {
+    if (!resolve_engine_hint(params.engine, &engine_hint, &engine_error)) {
         out::error_line(engine_error);
         return 2;
     }
 
-    model_ref::ResolveOptions resolve_options;
-    if (framework != v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
-        resolve_options.has_framework = true;
-        resolve_options.framework = framework;
-    }
     if (!image_path.empty()) {
-        resolve_options.has_category = true;
-        resolve_options.category = v1::MODEL_CATEGORY_MULTIMODAL;
+        engine_hint.resolve_options.has_category = true;
+        engine_hint.resolve_options.category = v1::MODEL_CATEGORY_MULTIMODAL;
     }
 
     model_ref::Resolved resolved;
     std::string error;
-    if (model_ref::resolve(ref, &resolved, &error, &resolve_options) != RAC_SUCCESS) {
+    if (model_ref::resolve(ref, &resolved, &error, &engine_hint.resolve_options) != RAC_SUCCESS) {
         out::error_line(error);
         return 1;
     }
 
-    if (!load_model(options, resolved.model_id, framework, !image_path.empty())) {
+    const v1::InferenceFramework load_framework =
+        resolved.from_catalog ? v1::INFERENCE_FRAMEWORK_UNSPECIFIED : engine_hint.framework;
+    if (!load_model(options, resolved.model_id, load_framework, !image_path.empty())) {
         return 1;
     }
 

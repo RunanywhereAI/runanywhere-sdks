@@ -101,8 +101,11 @@ rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t
     switch (framework) {
         case RAC_FRAMEWORK_LLAMACPP:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
-        case RAC_FRAMEWORK_MLX:
             return RAC_MODEL_CATEGORY_LANGUAGE;
+        case RAC_FRAMEWORK_MLX:
+            // MLX serves language, VLM, embedding, STT, and TTS folders; the
+            // model entry must carry the concrete category.
+            return RAC_MODEL_CATEGORY_UNKNOWN;
         case RAC_FRAMEWORK_QHEXRT:
             // QHexRT serves LLM/VLM/STT/TTS bundles alike — no single category
             // is implied by the framework; the registered model's explicit
@@ -825,6 +828,9 @@ rac_result_t rac_model_format_for_framework(rac_inference_framework_t framework,
             match = matches_any({"mlmodelc", "mlpackage", "mlmodel"});
             break;
         case RAC_FRAMEWORK_MLX:
+            // MLX folders intentionally accept auxiliary files as model members:
+            // config/tokenizer JSON, chat templates, SentencePiece models, and
+            // safetensors shards all belong to the same folder bundle.
             match = matches_any({"safetensors", "json", "jinja", "model"});
             break;
         case RAC_FRAMEWORK_FLUID_AUDIO:

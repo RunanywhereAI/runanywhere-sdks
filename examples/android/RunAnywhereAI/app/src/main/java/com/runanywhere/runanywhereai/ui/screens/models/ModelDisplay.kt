@@ -32,6 +32,10 @@ enum class ConsumerModelGroup(val title: String, val footer: String) {
         "Document Models",
         "Embedding and answer models used by document Q&A.",
     ),
+    LORA_ADAPTERS(
+        "LoRA Adapters",
+        "Style, task, and domain adapters that attach to compatible chat models.",
+    ),
     OTHER(
         "Other Models",
         "Additional SDK entries available on this device.",
@@ -128,6 +132,7 @@ fun InferenceFramework.backendIcon(): ImageVector = when (this) {
 fun RAModelInfo.consumerGroup(): ConsumerModelGroup = when {
     framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
         framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> ConsumerModelGroup.APPLE_BUILT_IN
+    isLoraAdapterEntry() -> ConsumerModelGroup.LORA_ADAPTERS
     category == ModelCategory.MODEL_CATEGORY_LANGUAGE -> ConsumerModelGroup.CHAT_MODELS
     category == ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
         category == ModelCategory.MODEL_CATEGORY_VISION -> ConsumerModelGroup.VISION_MODELS
@@ -138,6 +143,13 @@ fun RAModelInfo.consumerGroup(): ConsumerModelGroup = when {
     category == ModelCategory.MODEL_CATEGORY_EMBEDDING -> ConsumerModelGroup.DOCUMENT_MODELS
     else -> ConsumerModelGroup.OTHER
 }
+
+private fun RAModelInfo.isLoraAdapterEntry(): Boolean =
+    id.startsWith("lora-adapter:") ||
+        metadata?.tags.orEmpty().any { tag ->
+            tag.equals("lora-adapter", ignoreCase = true) ||
+                tag.equals("lora", ignoreCase = true)
+        }
 
 fun RAModelInfo.capabilityLabels(): List<String> = buildList {
     when (category) {

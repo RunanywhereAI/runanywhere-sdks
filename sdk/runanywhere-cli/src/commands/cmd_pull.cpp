@@ -270,21 +270,15 @@ void register_pull(CLI::App &app, GlobalOptions &options) {
     if (bootstrap(options, &env) != RAC_SUCCESS) {
       throw CLI::RuntimeError(1);
     }
-    runanywhere::v1::InferenceFramework framework =
-        runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
+    EngineHintResolution engine_hint;
     std::string engine_error;
-    if (!parse_engine_hint(*engine, &framework, &engine_error)) {
+    if (!resolve_engine_hint(*engine, &engine_hint, &engine_error)) {
       out::error_line(engine_error);
       throw CLI::RuntimeError(2);
     }
-    model_ref::ResolveOptions resolve_options;
-    if (framework != runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
-      resolve_options.has_framework = true;
-      resolve_options.framework = framework;
-    }
     model_ref::Resolved resolved;
     std::string error;
-    if (model_ref::resolve(*ref, &resolved, &error, &resolve_options) != RAC_SUCCESS) {
+    if (model_ref::resolve(*ref, &resolved, &error, &engine_hint.resolve_options) != RAC_SUCCESS) {
       out::error_line(error);
       throw CLI::RuntimeError(1);
     }

@@ -279,17 +279,21 @@ private final class MLXSession: @unchecked Sendable {
         var isSynthesizing = false
     }
 
+    private struct ModelState {
+        var generationContainer: ModelContainer?
+        var embedderContainer: EmbedderModelContainer?
+        #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
+        var sttModel: STTGenerationModel?
+        var ttsModel: SpeechGenerationModel?
+        #endif
+    }
+
     // swiftlint:disable:next strict_fileprivate
     fileprivate let kind: MLXSessionKind
     // swiftlint:disable:next strict_fileprivate
     fileprivate let modelID: String
     private let lock = OSAllocatedUnfairLock(initialState: State())
-    private var generationContainer: ModelContainer?
-    private var embedderContainer: EmbedderModelContainer?
-    #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
-    private var sttModel: STTGenerationModel?
-    private var ttsModel: SpeechGenerationModel?
-    #endif
+    private let modelLock = OSAllocatedUnfairLock(initialState: ModelState())
 
     init(kind: MLXSessionKind, modelID: String) {
         self.kind = kind
@@ -307,33 +311,55 @@ private final class MLXSession: @unchecked Sendable {
 
         let directory = modelDirectoryURL(from: modelPath)
         let tokenizerLoader: any TokenizerLoader = TransformersTokenizerLoader()
+        var loadedGenerationContainer: ModelContainer?
+        var loadedEmbedderContainer: EmbedderModelContainer?
+        #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
+        var loadedSTTModel: STTGenerationModel?
+        var loadedTTSModel: SpeechGenerationModel?
+        #endif
         switch kind {
         case .llm:
-            generationContainer = try await LLMModelFactory.shared.loadContainer(
+            loadedGenerationContainer = try await LLMModelFactory.shared.loadContainer(
                 from: directory,
                 using: tokenizerLoader
             )
         case .vlm:
-            generationContainer = try await VLMModelFactory.shared.loadContainer(
+            loadedGenerationContainer = try await VLMModelFactory.shared.loadContainer(
                 from: directory,
                 using: tokenizerLoader
             )
         case .embeddings:
-            embedderContainer = try await EmbedderModelFactory.shared.loadContainer(
+            loadedEmbedderContainer = try await EmbedderModelFactory.shared.loadContainer(
                 from: directory,
                 using: tokenizerLoader
             )
         case .stt:
             #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
-            sttModel = try await loadSpeechRecognitionModel(from: directory, modelID: modelID)
+            loadedSTTModel = try await loadSpeechRecognitionModel(from: directory, modelID: modelID)
             #else
             throw MLXRuntimeError.mlxAudioUnavailable
             #endif
         case .tts:
             #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
-            ttsModel = try await MLXAudioTTS.TTS.loadModel(modelRepo: directory.path)
+            loadedTTSModel = try await MLXAudioTTS.TTS.loadModel(modelRepo: directory.path)
             #else
             throw MLXRuntimeError.mlxAudioUnavailable
+            #endif
+        }
+        modelLock.withLock { models in
+            if let loadedGenerationContainer {
+                models.generationContainer = loadedGenerationContainer
+            }
+            if let loadedEmbedderContainer {
+                models.embedderContainer = loadedEmbedderContainer
+            }
+            #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
+            if let loadedSTTModel {
+                models.sttModel = loadedSTTModel
+            }
+            if let loadedTTSModel {
+                models.ttsModel = loadedTTSModel
+            }
             #endif
         }
         lock.withLock {
@@ -402,12 +428,14 @@ private final class MLXSession: @unchecked Sendable {
     }
 
     func cleanup() {
-        generationContainer = nil
-        embedderContainer = nil
-        #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
-        sttModel = nil
-        ttsModel = nil
-        #endif
+        modelLock.withLock { models in
+            models.generationContainer = nil
+            models.embedderContainer = nil
+            #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
+            models.sttModel = nil
+            models.ttsModel = nil
+            #endif
+        }
         if isGenerationSession {
             MLXMemoryPolicy.releaseGenerationCachedBuffers(reason: "cleanup \(kindDescription)")
         }
@@ -448,7 +476,7 @@ private final class MLXSession: @unchecked Sendable {
         parameters: GenerateParameters,
         onToken: @escaping @Sendable (String) -> Bool
     ) async throws -> MLXGenerationMetrics {
-        guard let container = generationContainer else {
+        guard let container = modelLock.withLock({ $0.generationContainer }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
 
@@ -508,7 +536,7 @@ private final class MLXSession: @unchecked Sendable {
         parameters: GenerateParameters,
         onToken: @escaping @Sendable (String) -> Bool
     ) async throws -> MLXGenerationMetrics {
-        guard let container = generationContainer else {
+        guard let container = modelLock.withLock({ $0.generationContainer }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
 
@@ -547,7 +575,7 @@ private final class MLXSession: @unchecked Sendable {
         texts: [String],
         options: UnsafePointer<rac_embeddings_options_t>?
     ) async throws -> ([[Float]], Int32) {
-        guard let container = embedderContainer else {
+        guard let container = modelLock.withLock({ $0.embedderContainer }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
 
@@ -609,7 +637,7 @@ private final class MLXSession: @unchecked Sendable {
         options: UnsafePointer<rac_stt_options_t>?
     ) throws -> MLXSTTOutput {
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
-        guard let model = sttModel else {
+        guard let model = modelLock.withLock({ $0.sttModel }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
         let audio = try makeSTTAudioArray(audioData: audioData, options: options?.pointee)
@@ -632,7 +660,7 @@ private final class MLXSession: @unchecked Sendable {
         userData: UnsafeMutableRawPointer?
     ) async throws {
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
-        guard let model = sttModel else {
+        guard let model = modelLock.withLock({ $0.sttModel }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
         let audio = try makeSTTAudioArray(audioData: audioData, options: options?.pointee)
@@ -683,7 +711,7 @@ private final class MLXSession: @unchecked Sendable {
         options: UnsafePointer<rac_tts_options_t>?
     ) async throws -> (samples: [Float], sampleRate: Int, processingTimeMs: Int64) {
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
-        guard let model = ttsModel else {
+        guard let model = modelLock.withLock({ $0.ttsModel }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
         let started = Date()
@@ -721,7 +749,7 @@ private final class MLXSession: @unchecked Sendable {
         userData: UnsafeMutableRawPointer?
     ) async throws {
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
-        guard let model = ttsModel else {
+        guard let model = modelLock.withLock({ $0.ttsModel }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
         lock.withLock {
@@ -805,11 +833,13 @@ private final class MLXSession: @unchecked Sendable {
     fileprivate func releaseResidentGenerationModel() {
         guard isGenerationSession else { return }
         cancel()
-        generationContainer = nil
-        #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
-        sttModel = nil
-        ttsModel = nil
-        #endif
+        modelLock.withLock { models in
+            models.generationContainer = nil
+            #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
+            models.sttModel = nil
+            models.ttsModel = nil
+            #endif
+        }
         lock.withLock {
             $0.isLoaded = false
             $0.isCancelled = true
@@ -1088,13 +1118,17 @@ private func imageInput(from image: rac_vlm_image_t) throws -> UserInput.Image {
             throw MLXRuntimeError.invalidImage
         }
         let rgb = UnsafeBufferPointer(start: pixels, count: expectedRGBByteCount)
-        var rgba = Data(capacity: width * height * 4)
-        for pixelIndex in 0..<(width * height) {
-            let base = pixelIndex * 3
-            rgba.append(rgb[base])
-            rgba.append(rgb[base + 1])
-            rgba.append(rgb[base + 2])
-            rgba.append(255)
+        var rgba = Data(count: width * height * 4)
+        rgba.withUnsafeMutableBytes { rawBuffer in
+            guard let rgbaBytes = rawBuffer.bindMemory(to: UInt8.self).baseAddress else { return }
+            for pixelIndex in 0..<(width * height) {
+                let rgbBase = pixelIndex * 3
+                let rgbaBase = pixelIndex * 4
+                rgbaBytes[rgbaBase] = rgb[rgbBase]
+                rgbaBytes[rgbaBase + 1] = rgb[rgbBase + 1]
+                rgbaBytes[rgbaBase + 2] = rgb[rgbBase + 2]
+                rgbaBytes[rgbaBase + 3] = 255
+            }
         }
         let ciImage = CIImage(
             bitmapData: rgba,

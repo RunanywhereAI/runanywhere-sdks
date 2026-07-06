@@ -59,20 +59,16 @@ let useLocalNatives = true // Toggle: false for release (default committed to ma
 // Updated automatically by CI/CD during releases.
 let sdkVersion = "0.19.13"
 
-// mlx-audio-swift currently requires swift-tools-version 6.2. Keep it off the
-// default dependency graph so the SDK remains buildable on the Swift 6.1 CI
-// toolchain, but allow local Swift 6.2+ validation with:
-//   RUNANYWHERE_ENABLE_MLX_AUDIO_SWIFT=1 swift build --target MLXRuntime
-let enableMLXAudioSwift = ProcessInfo.processInfo.environment["RUNANYWHERE_ENABLE_MLX_AUDIO_SWIFT"] == "1"
-let mlxAudioPackageDependencies: [Package.Dependency] = enableMLXAudioSwift ? [
-    // Latest tag v0.1.2 still depends on mlx-swift-lm 2.x. Pin current main
-    // until upstream cuts a tag compatible with mlx-swift-lm 3.x.
+// mlx-audio-swift currently requires a Swift 6.2+ toolchain and has not cut a
+// tag compatible with mlx-swift-lm 3.x. Pin current main so MLX STT/TTS are
+// first-class in the Apple MLX runtime while upstream release tags catch up.
+let mlxAudioPackageDependencies: [Package.Dependency] = [
     .package(url: "https://github.com/Blaizzy/mlx-audio-swift.git", revision: "580e952adda0cd6bdc5c04f402822adbb61525c8"),
-] : []
-let mlxAudioRuntimeDependencies: [Target.Dependency] = enableMLXAudioSwift ? [
+]
+let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
     .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
-] : []
+]
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -108,7 +104,7 @@ let package = Package(
         ),
 
         // =================================================================
-        // MLX Backend - adds Apple MLX LLM/VLM/embedding capabilities
+        // MLX Backend - adds Apple MLX LLM/VLM/embedding/STT/TTS capabilities
         // =================================================================
         .library(
             name: "RunAnywhereMLX",
@@ -137,11 +133,9 @@ let package = Package(
         // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
         // the policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
+        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.6")),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
-        // mlx-audio-swift currently requires swift-tools-version 6.2 while
-        // this SDK still supports the Xcode 16.4 / Swift 6.1 toolchain in CI.
-        // Keep audio callbacks in MLXRuntime, but compile the Swift audio
-        // bridge only when those modules are available.
+        // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS.
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
         //
         // grpc-swift intentionally NOT wired. The *.grpc.swift files under
@@ -161,7 +155,10 @@ let package = Package(
             name: "CRACommons",
             dependencies: ["RACommonsBinary"],
             path: "sdk/runanywhere-swift/Sources/RunAnywhere/CRACommons",
-            publicHeadersPath: "include"
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("../../../../runanywhere-commons/include"),
+            ]
         ),
 
         // =================================================================
@@ -213,7 +210,10 @@ let package = Package(
                 "RABackendMLXBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/MLXRuntime/include",
-            publicHeadersPath: "."
+            publicHeadersPath: ".",
+            cSettings: [
+                .headerSearchPath("../../../../runanywhere-commons/include"),
+            ]
         ),
 
         // =================================================================
@@ -314,6 +314,7 @@ let package = Package(
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
                 .product(name: "MLXVLM", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+                .product(name: "MLX", package: "mlx-swift"),
                 .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ] + mlxAudioRuntimeDependencies,

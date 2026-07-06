@@ -23,6 +23,7 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_plugin_entry_mlx.h"
+#include "common/rac_engine_unavailable.h"
 
 #define LOG_CAT "MLX"
 
@@ -33,26 +34,45 @@ rac_mlx_callbacks_t g_callbacks = {};
 bool g_callbacks_set = false;
 
 struct MlxSession {
+    std::mutex mutex;
     rac_mlx_session_kind_t kind = RAC_MLX_SESSION_KIND_LLM;
     rac_handle_t swift_handle = nullptr;
     std::string model_id;
     std::string model_path;
     bool initialized = false;
+    bool closing = false;
 };
 
 MlxSession* as_session(void* impl) {
     return static_cast<MlxSession*>(impl);
 }
 
-rac_result_t require_session(void* impl, MlxSession** out) {
+rac_result_t lock_session(void* impl, std::unique_lock<std::mutex>& lock, MlxSession** out) {
     if (!impl || !out) {
         return RAC_ERROR_NULL_POINTER;
     }
-    *out = as_session(impl);
-    if (*out == nullptr || (*out)->swift_handle == nullptr) {
+    auto* session = as_session(impl);
+    if (session == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
+    lock = std::unique_lock<std::mutex>(session->mutex);
+    if (session->closing || session->swift_handle == nullptr) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    *out = session;
     return RAC_SUCCESS;
+}
+
+std::string normalized_load_path(const char* model_path) {
+    std::string load_path = model_path ? model_path : "";
+    const std::filesystem::path path(load_path);
+    if (path.has_extension()) {
+        const std::string extension = path.extension().string();
+        if (extension == ".safetensors" || extension == ".json") {
+            load_path = path.parent_path().empty() ? load_path : path.parent_path().string();
+        }
+    }
+    return load_path;
 }
 
 rac_result_t create_session(rac_mlx_session_kind_t kind, const char* model_id,
@@ -93,30 +113,23 @@ rac_result_t create_session(rac_mlx_session_kind_t kind, const char* model_id,
 }
 
 rac_result_t mlx_initialize(void* impl, const char* model_path) {
-    MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
     if (!model_path || model_path[0] == '\0') {
         return RAC_ERROR_INVALID_PATH;
     }
-
     rac_mlx_callbacks_t callbacks = {};
     if (!runanywhere::commons::mlx::snapshot_callbacks(&callbacks) ||
         callbacks.initialize == nullptr) {
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
 
-    std::string load_path = model_path;
-    const std::filesystem::path path(load_path);
-    if (path.has_extension()) {
-        const std::string extension = path.extension().string();
-        if (extension == ".safetensors" || extension == ".json") {
-            load_path = path.parent_path().empty() ? load_path : path.parent_path().string();
-        }
+    MlxSession* session = nullptr;
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
+    if (rc != RAC_SUCCESS) {
+        return rc;
     }
 
+    const std::string load_path = normalized_load_path(model_path);
     rc = callbacks.initialize(session->swift_handle, load_path.c_str(), callbacks.user_data);
     if (rc == RAC_SUCCESS) {
         session->model_path = load_path;
@@ -127,7 +140,8 @@ rac_result_t mlx_initialize(void* impl, const char* model_path) {
 
 rac_result_t mlx_cancel(void* impl) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -140,7 +154,8 @@ rac_result_t mlx_cancel(void* impl) {
 
 rac_result_t mlx_cleanup(void* impl) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -163,8 +178,18 @@ void mlx_destroy(void* impl) {
         return;
     }
     rac_mlx_callbacks_t callbacks = {};
-    if (runanywhere::commons::mlx::snapshot_callbacks(&callbacks) && callbacks.destroy) {
-        callbacks.destroy(session->swift_handle, callbacks.user_data);
+    rac_handle_t swift_handle = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(session->mutex);
+        session->closing = true;
+        swift_handle = session->swift_handle;
+        session->swift_handle = nullptr;
+        session->initialized = false;
+        session->model_path.clear();
+    }
+    if (swift_handle != nullptr && runanywhere::commons::mlx::snapshot_callbacks(&callbacks) &&
+        callbacks.destroy) {
+        callbacks.destroy(swift_handle, callbacks.user_data);
     }
     delete session;
 }
@@ -176,7 +201,8 @@ rac_result_t llm_initialize(void* impl, const char* model_path) {
 rac_result_t llm_generate(void* impl, const char* prompt, const rac_llm_options_t* options,
                           rac_llm_result_t* out_result) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -195,7 +221,8 @@ rac_result_t llm_generate(void* impl, const char* prompt, const rac_llm_options_
 rac_result_t llm_generate_stream(void* impl, const char* prompt, const rac_llm_options_t* options,
                                  rac_llm_stream_callback_fn callback, void* user_data) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -216,6 +243,10 @@ rac_result_t llm_get_info(void* impl, rac_llm_info_t* out_info) {
         return RAC_ERROR_NULL_POINTER;
     }
     MlxSession* session = as_session(impl);
+    std::unique_lock<std::mutex> lock;
+    if (session) {
+        lock = std::unique_lock<std::mutex>(session->mutex);
+    }
     out_info->is_ready = session && session->initialized ? RAC_TRUE : RAC_FALSE;
     out_info->supports_streaming = RAC_TRUE;
     out_info->current_model =
@@ -236,7 +267,8 @@ rac_result_t vlm_initialize(void* impl, const char* model_path, const char* mmpr
 rac_result_t vlm_process(void* impl, const rac_vlm_image_t* image, const char* prompt,
                          const rac_vlm_options_t* options, rac_vlm_result_t* out_result) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -256,7 +288,8 @@ rac_result_t vlm_process_stream(void* impl, const rac_vlm_image_t* image, const 
                                 const rac_vlm_options_t* options,
                                 rac_vlm_stream_callback_fn callback, void* user_data) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -277,6 +310,10 @@ rac_result_t vlm_get_info(void* impl, rac_vlm_info_t* out_info) {
         return RAC_ERROR_NULL_POINTER;
     }
     MlxSession* session = as_session(impl);
+    std::unique_lock<std::mutex> lock;
+    if (session) {
+        lock = std::unique_lock<std::mutex>(session->mutex);
+    }
     out_info->is_ready = session && session->initialized ? RAC_TRUE : RAC_FALSE;
     out_info->current_model =
         session && !session->model_id.empty() ? session->model_id.c_str() : nullptr;
@@ -299,7 +336,8 @@ rac_result_t embedding_embed_batch(void* impl, const char* const* texts, size_t 
                                    const rac_embeddings_options_t* options,
                                    rac_embeddings_result_t* out_result) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -328,8 +366,10 @@ rac_result_t embedding_get_info(void* impl, rac_embeddings_info_t* out_info) {
     if (!out_info) {
         return RAC_ERROR_NULL_POINTER;
     }
-    MlxSession* session = as_session(impl);
-    if (!session || !session->swift_handle) {
+    MlxSession* session = nullptr;
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
+    if (rc != RAC_SUCCESS) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     rac_mlx_callbacks_t callbacks = {};
@@ -355,7 +395,8 @@ rac_result_t stt_initialize(void* impl, const char* model_path) {
 rac_result_t stt_transcribe(void* impl, const void* audio_data, size_t audio_size,
                             const rac_stt_options_t* options, rac_stt_result_t* out_result) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -375,7 +416,8 @@ rac_result_t stt_transcribe_stream(void* impl, const void* audio_data, size_t au
                                    const rac_stt_options_t* options,
                                    rac_stt_stream_callback_t callback, void* user_data) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -396,7 +438,11 @@ rac_result_t stt_get_info(void* impl, rac_stt_info_t* out_info) {
         return RAC_ERROR_NULL_POINTER;
     }
     MlxSession* session = as_session(impl);
-    if (session && session->swift_handle) {
+    std::unique_lock<std::mutex> lock;
+    if (session) {
+        lock = std::unique_lock<std::mutex>(session->mutex);
+    }
+    if (session && !session->closing && session->swift_handle) {
         rac_mlx_callbacks_t callbacks = {};
         if (runanywhere::commons::mlx::snapshot_callbacks(&callbacks) &&
             callbacks.stt_info != nullptr) {
@@ -416,7 +462,8 @@ rac_result_t stt_create(const char* model_id, const char* config_json, void** ou
 
 rac_result_t tts_initialize(void* impl) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -425,13 +472,24 @@ rac_result_t tts_initialize(void* impl) {
     if (load_path.empty()) {
         return RAC_ERROR_INVALID_PATH;
     }
-    return mlx_initialize(impl, load_path.c_str());
+    rac_mlx_callbacks_t callbacks = {};
+    if (!runanywhere::commons::mlx::snapshot_callbacks(&callbacks) ||
+        callbacks.initialize == nullptr) {
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
+    rc = callbacks.initialize(session->swift_handle, load_path.c_str(), callbacks.user_data);
+    if (rc == RAC_SUCCESS) {
+        session->model_path = load_path;
+        session->initialized = true;
+    }
+    return rc;
 }
 
 rac_result_t tts_synthesize(void* impl, const char* text, const rac_tts_options_t* options,
                             rac_tts_result_t* out_result) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -450,7 +508,8 @@ rac_result_t tts_synthesize(void* impl, const char* text, const rac_tts_options_
 rac_result_t tts_synthesize_stream(void* impl, const char* text, const rac_tts_options_t* options,
                                    rac_tts_stream_callback_t callback, void* user_data) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -468,7 +527,8 @@ rac_result_t tts_synthesize_stream(void* impl, const char* text, const rac_tts_o
 
 rac_result_t tts_stop(void* impl) {
     MlxSession* session = nullptr;
-    rac_result_t rc = require_session(impl, &session);
+    std::unique_lock<std::mutex> lock;
+    rac_result_t rc = lock_session(impl, lock, &session);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -477,7 +537,10 @@ rac_result_t tts_stop(void* impl) {
         callbacks.tts_stop != nullptr) {
         return callbacks.tts_stop(session->swift_handle, callbacks.user_data);
     }
-    return mlx_cancel(impl);
+    if (callbacks.cancel != nullptr) {
+        return callbacks.cancel(session->swift_handle, callbacks.user_data);
+    }
+    return RAC_SUCCESS;
 }
 
 rac_result_t tts_get_info(void* impl, rac_tts_info_t* out_info) {
@@ -485,7 +548,11 @@ rac_result_t tts_get_info(void* impl, rac_tts_info_t* out_info) {
         return RAC_ERROR_NULL_POINTER;
     }
     MlxSession* session = as_session(impl);
-    if (session && session->swift_handle) {
+    std::unique_lock<std::mutex> lock;
+    if (session) {
+        lock = std::unique_lock<std::mutex>(session->mutex);
+    }
+    if (session && !session->closing && session->swift_handle) {
         rac_mlx_callbacks_t callbacks = {};
         if (runanywhere::commons::mlx::snapshot_callbacks(&callbacks) &&
             callbacks.tts_info != nullptr) {
@@ -504,11 +571,13 @@ rac_result_t tts_create(const char* model_id, const char* config_json, void** ou
 }
 
 rac_result_t mlx_capability_check(void) {
-#if !defined(__APPLE__)
-    return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+    return rac_engine_unavailable_capability(
+#if defined(__APPLE__)
+        1,
 #else
-    return rac_mlx_is_available() == RAC_TRUE ? RAC_SUCCESS : RAC_ERROR_BACKEND_UNAVAILABLE;
+        0,
 #endif
+        rac_mlx_is_available() == RAC_TRUE ? 1 : 0);
 }
 
 }  // namespace
@@ -646,7 +715,7 @@ static const rac_engine_manifest_t k_mlx_manifest = {
     .package_owner = "runanywhere",
     .package_name = "runanywhere_mlx",
     .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
-    .priority = 100,
+    .priority = 110,
     .capability_flags = 0,
     .primitives = k_mlx_primitives,
     .primitives_count = sizeof(k_mlx_primitives) / sizeof(k_mlx_primitives[0]),

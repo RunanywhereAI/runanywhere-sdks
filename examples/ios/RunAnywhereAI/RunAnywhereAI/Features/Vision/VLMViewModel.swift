@@ -37,6 +37,9 @@ final class VLMViewModel: NSObject {
     // Auto-streaming mode
     var isAutoStreamingEnabled = false
     static let autoStreamInterval: TimeInterval = 2.5 // seconds between auto-captures
+    private static let liveFrameMaxTokens = 96
+    private static let selectedImageMaxTokens = 128
+    private static let autoStreamMaxTokens = 64
 
     // Camera
     private(set) var captureSession: AVCaptureSession?
@@ -181,7 +184,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe what you see briefly."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = 96
+            options.maxTokens = Self.liveFrameMaxTokens
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) { currentDescription += $0 }
@@ -205,7 +208,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe this image in detail."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = 128
+            options.maxTokens = Self.selectedImageMaxTokens
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) { currentDescription += $0 }
@@ -229,7 +232,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe this image in detail."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = 128
+            options.maxTokens = Self.selectedImageMaxTokens
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) { currentDescription += $0 }
@@ -278,7 +281,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe what you see in one sentence."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = 64
+            options.maxTokens = Self.autoStreamMaxTokens
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) {

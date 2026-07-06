@@ -41,4 +41,23 @@ bool parse_engine_hint(const std::string& engine,
     return false;
 }
 
+bool resolve_engine_hint(const std::string& engine, EngineHintResolution* out_resolution,
+                         std::string* error) {
+    if (!out_resolution) {
+        if (error) {
+            *error = "engine resolution output is required";
+        }
+        return false;
+    }
+    *out_resolution = EngineHintResolution{};
+    if (!parse_engine_hint(engine, &out_resolution->framework, error)) {
+        return false;
+    }
+    if (out_resolution->framework != runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
+        out_resolution->resolve_options.has_framework = true;
+        out_resolution->resolve_options.framework = out_resolution->framework;
+    }
+    return true;
+}
+
 }  // namespace rcli::commands

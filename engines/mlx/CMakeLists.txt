@@ -30,7 +30,9 @@ rac_add_engine_plugin(mlx
     CXX_STANDARD        20
     SHARED_ONLY
     SOURCES             ${MLX_SOURCES}
-    INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include
+    INCLUDE_DIRECTORIES
+        ${RAC_COMMONS_ROOT_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
 message(STATUS "mlx engine Configuration:")

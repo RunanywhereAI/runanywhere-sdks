@@ -244,7 +244,10 @@ rac_result_t bootstrap(const GlobalOptions &options, Bootstrapped *out) {
     }
 #endif
 #if defined(RCLI_HAS_MLX)
-    if (rac_backend_mlx_register() != RAC_SUCCESS) {
+    if (rac_mlx_is_available() != RAC_TRUE) {
+      out::status_line(
+          "warning: mlx backend requires MLX runtime callbacks; skipping registration");
+    } else if (rac_backend_mlx_register() != RAC_SUCCESS) {
       out::status_line(
           "warning: mlx backend requires MLX runtime callbacks; backend failed to register");
     }

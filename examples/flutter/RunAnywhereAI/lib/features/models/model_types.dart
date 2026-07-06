@@ -229,7 +229,7 @@ extension InferenceFrameworkDisplay on LLMFramework {
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN:
         return AppColors.primaryGreen;
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return Colors.black;
+        return AppColors.statusGray;
       default:
         return AppColors.statusGray;
     }

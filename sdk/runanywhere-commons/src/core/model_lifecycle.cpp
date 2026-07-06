@@ -36,6 +36,7 @@
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_engine_ids.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 namespace rac::core::model_lifecycle::detail {
@@ -61,20 +62,20 @@ std::map<runanywhere::v1::SDKComponent, std::shared_ptr<LoadedModel>> g_loaded;
 const char* engine_name_for_framework(runanywhere::v1::InferenceFramework framework) {
     switch (framework) {
         case runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP:
-            return "llamacpp";
+            return RAC_ENGINE_ID_LLAMACPP;
         case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
-            return "qhexrt";
+            return RAC_ENGINE_ID_QHEXRT;
         case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
-            return "onnx";
+            return RAC_ENGINE_ID_ONNX;
         case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:
-            return "sherpa";
+            return RAC_ENGINE_ID_SHERPA;
         case runanywhere::v1::INFERENCE_FRAMEWORK_MLX:
-            return "mlx";
+            return RAC_ENGINE_ID_MLX;
         case runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         case runanywhere::v1::INFERENCE_FRAMEWORK_SYSTEM_TTS:
-            return "platform";
+            return RAC_ENGINE_ID_PLATFORM;
         case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
-            return "coreml";
+            return RAC_ENGINE_ID_COREML;
         default:
             return nullptr;
     }

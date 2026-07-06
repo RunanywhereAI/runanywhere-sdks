@@ -12,6 +12,7 @@
 
 #include <stdint.h>
 
+#if __has_include("rac/core/rac_error.h")
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
@@ -19,18 +20,32 @@
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
+#else
+#include "rac_error.h"
+#include "rac_types.h"
+#include "rac_embeddings_service.h"
+#include "rac_llm_service.h"
+#include "rac_stt_service.h"
+#include "rac_tts_service.h"
+#include "rac_vlm_service.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef enum rac_mlx_session_kind {
-    RAC_MLX_SESSION_KIND_LLM = 1,
-    RAC_MLX_SESSION_KIND_VLM = 2,
-    RAC_MLX_SESSION_KIND_EMBEDDINGS = 3,
-    RAC_MLX_SESSION_KIND_STT = 4,
-    RAC_MLX_SESSION_KIND_TTS = 5,
-} rac_mlx_session_kind_t;
+/**
+ * MLX session kinds mirror runanywhere.v1.SDKComponent wire values from
+ * idl/sdk_events.proto. Keep new values in IDL/codegen first, then reflect
+ * them here for the C ABI shim.
+ */
+typedef int32_t rac_mlx_session_kind_t;
+
+#define RAC_MLX_SESSION_KIND_STT 1
+#define RAC_MLX_SESSION_KIND_TTS 2
+#define RAC_MLX_SESSION_KIND_LLM 4
+#define RAC_MLX_SESSION_KIND_VLM 5
+#define RAC_MLX_SESSION_KIND_EMBEDDINGS 8
 
 typedef rac_result_t (*rac_mlx_create_fn)(rac_mlx_session_kind_t kind, const char* model_id,
                                           const char* config_json, rac_handle_t* out_handle,

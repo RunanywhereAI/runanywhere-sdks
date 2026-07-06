@@ -31,8 +31,6 @@ rac_result_t rac_backend_mlx_register(void) {
         return RAC_SUCCESS;
     }
 
-    rac_bundle_policy_register(mlx_bundle_policy());
-
     const rac_engine_vtable_t* vt = rac_plugin_entry_mlx();
     if (vt == nullptr) {
         RAC_LOG_WARNING(LOG_CAT, "rac_plugin_entry_mlx() returned NULL");
@@ -44,6 +42,7 @@ rac_result_t rac_backend_mlx_register(void) {
         RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register(mlx) failed: %d", rc);
         return rc;
     }
+    rac_bundle_policy_register(mlx_bundle_policy());
     g_registered = true;
     RAC_LOG_INFO(LOG_CAT, "MLX backend registered");
     return RAC_SUCCESS;

@@ -22,6 +22,7 @@
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_engine_ids.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
 
@@ -160,27 +161,28 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
                                              rac_primitive_t primitive) {
     switch (framework) {
         case RAC_FRAMEWORK_LLAMACPP:
-            return "llamacpp";
+            return RAC_ENGINE_ID_LLAMACPP;
         case RAC_FRAMEWORK_MLX:
-            return "mlx";
+            return RAC_ENGINE_ID_MLX;
         case RAC_FRAMEWORK_SHERPA:
-            return "sherpa";
+            return RAC_ENGINE_ID_SHERPA;
         case RAC_FRAMEWORK_ONNX:
             if (primitive == RAC_PRIMITIVE_EMBED) {
-                return "onnx";
+                return RAC_ENGINE_ID_ONNX;
             }
             if (primitive == RAC_PRIMITIVE_TRANSCRIBE || primitive == RAC_PRIMITIVE_SYNTHESIZE ||
                 primitive == RAC_PRIMITIVE_DETECT_VOICE) {
-                return "sherpa";
+                return RAC_ENGINE_ID_SHERPA;
             }
             return nullptr;
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
         case RAC_FRAMEWORK_SYSTEM_TTS:
-            return "platform";
+            return RAC_ENGINE_ID_PLATFORM;
         case RAC_FRAMEWORK_COREML:
-            return primitive == RAC_PRIMITIVE_DIFFUSION ? "coreml" : "platform";
+            return primitive == RAC_PRIMITIVE_DIFFUSION ? RAC_ENGINE_ID_COREML
+                                                        : RAC_ENGINE_ID_PLATFORM;
         case RAC_FRAMEWORK_QHEXRT:
-            return "qhexrt";
+            return RAC_ENGINE_ID_QHEXRT;
         case RAC_FRAMEWORK_FLUID_AUDIO:
         case RAC_FRAMEWORK_BUILTIN:
         case RAC_FRAMEWORK_NONE:
@@ -199,9 +201,17 @@ rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>
     *out_service = nullptr;
 
     const char* engine_hint = plugin_hint_for_framework(spec.framework, spec.primitive);
-    const rac_engine_vtable_t* vt = (engine_hint != nullptr)
-                                        ? rac_plugin_find_for_engine(spec.primitive, engine_hint)
-                                        : rac_plugin_find(spec.primitive);
+    const rac_engine_vtable_t* vt = nullptr;
+    if (engine_hint != nullptr) {
+        vt = rac_plugin_find_for_engine(spec.primitive, engine_hint);
+        if (vt == nullptr) {
+            RAC_LOG_WARNING(spec.log_cat, "plugin '%s' does not serve %s; falling back to priority",
+                            engine_hint, rac_primitive_name(spec.primitive));
+        }
+    }
+    if (vt == nullptr) {
+        vt = rac_plugin_find(spec.primitive);
+    }
     const OpsT* ops = (vt && spec.select_ops) ? spec.select_ops(vt) : nullptr;
     if (!vt || !ops || !ops->create) {
         if (engine_hint != nullptr) {

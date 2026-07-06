@@ -19,9 +19,12 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
+#include <set>
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
 #include <unistd.h>
 
 #include "app.h"
@@ -455,6 +458,54 @@ int run_cli_capture(const std::vector<std::string> &args,
   return exit_code;
 }
 
+bool backend_has_primitives(const std::string &json_text, const std::string &backend_name,
+                            std::initializer_list<std::string> expected,
+                            std::string *error) {
+  try {
+    const auto document = nlohmann::json::parse(json_text);
+    for (const auto &backend : document.value("backends", nlohmann::json::array())) {
+      if (backend.value("name", "") != backend_name) {
+        continue;
+      }
+      std::set<std::string> primitives;
+      for (const auto &primitive : backend.value("primitives", nlohmann::json::array())) {
+        primitives.insert(primitive.value("name", ""));
+      }
+      for (const auto &name : expected) {
+        if (!primitives.contains(name)) {
+          if (error) {
+            *error = "missing primitive " + name;
+          }
+          return false;
+        }
+      }
+      return true;
+    }
+    if (error) {
+      *error = "backend not found: " + backend_name;
+    }
+    return false;
+  } catch (const std::exception &ex) {
+    if (error) {
+      *error = ex.what();
+    }
+    return false;
+  }
+}
+
+bool run_cli_or_fail(const std::vector<std::string> &args,
+                     const std::string &expected_label,
+                     std::string *stdout_text, TestResult *result) {
+  const int code = run_cli_capture(args, stdout_text);
+  if (code == 0) {
+    return true;
+  }
+  result->expected = expected_label + " exit 0";
+  result->actual = "exit " + std::to_string(code);
+  result->details = *stdout_text;
+  return false;
+}
+
 TestResult test_rcli_mlx_run_end_to_end() {
   TestResult result;
   result.test_name = "rcli_mlx_run_end_to_end";
@@ -522,30 +573,33 @@ TestResult test_rcli_mlx_run_end_to_end() {
   }
 
   std::string backends_json;
-  int code = run_cli_capture(
-      {"rcli", "--json", "--no-progress", "--home", home.string(), "backends"},
-      &backends_json);
-  if (code != 0 ||
-      backends_json.find("\"name\":\"mlx\"") == std::string::npos ||
-      backends_json.find("\"name\":\"generate_text\"") == std::string::npos ||
-      backends_json.find("\"name\":\"vlm\"") == std::string::npos ||
-      backends_json.find("\"name\":\"embed\"") == std::string::npos ||
-      backends_json.find("\"name\":\"transcribe\"") == std::string::npos ||
-      backends_json.find("\"name\":\"synthesize\"") == std::string::npos) {
+  if (!run_cli_or_fail({"rcli", "--json", "--no-progress", "--home",
+                        home.string(), "backends"},
+                       "backends", &backends_json, &result)) {
+    rcli::shutdown();
+    return result;
+  }
+  std::string backend_error;
+  if (!backend_has_primitives(backends_json, "mlx",
+                              {"generate_text", "vlm", "embed", "transcribe",
+                               "synthesize"},
+                              &backend_error)) {
     result.expected =
         "mlx backend with generate_text/vlm/embed/transcribe/synthesize "
         "primitives";
-    result.actual = backends_json;
+    result.actual = backend_error.empty() ? backends_json : backend_error + ": " + backends_json;
     rcli::shutdown();
     return result;
   }
 
   std::string list_json;
-  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
-                          home.string(), "list", "--all"},
-                         &list_json);
-  if (code != 0 ||
-      list_json.find("\"id\":\"mlx.fake.vlm\"") == std::string::npos ||
+  if (!run_cli_or_fail({"rcli", "--json", "--no-progress", "--home",
+                        home.string(), "list", "--all"},
+                       "list", &list_json, &result)) {
+    rcli::shutdown();
+    return result;
+  }
+  if (list_json.find("\"id\":\"mlx.fake.vlm\"") == std::string::npos ||
       list_json.find("\"modality\":\"vlm\"") == std::string::npos ||
       list_json.find("\"id\":\"mlx.fake.embed\"") == std::string::npos ||
       list_json.find("\"modality\":\"embedding\"") == std::string::npos ||
@@ -561,15 +615,10 @@ TestResult test_rcli_mlx_run_end_to_end() {
   }
 
   std::string run_json;
-  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
-                          home.string(), "run", "mlx.fake.llm", "Hello MLX",
-                          "--engine", "mlx", "--max-tokens", "4"},
-                         &run_json);
-
-  if (code != 0) {
-    result.expected = "exit 0";
-    result.actual = "exit " + std::to_string(code);
-    result.details = run_json;
+  if (!run_cli_or_fail({"rcli", "--json", "--no-progress", "--home",
+                        home.string(), "run", "mlx.fake.llm", "Hello MLX",
+                        "--engine", "mlx", "--max-tokens", "4"},
+                       "LLM", &run_json, &result)) {
     rcli::shutdown();
     return result;
   }
@@ -599,16 +648,12 @@ TestResult test_rcli_mlx_run_end_to_end() {
   }
 
   std::string vlm_json;
-  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
-                          home.string(), "run", "mlx.fake.vlm",
-                          "What is in the image?", "--image",
-                          input_image.string(), "--engine", "mlx", "--max-tokens",
-                          "4"},
-                         &vlm_json);
-  if (code != 0) {
-    result.expected = "VLM exit 0";
-    result.actual = "exit " + std::to_string(code);
-    result.details = vlm_json;
+  if (!run_cli_or_fail({"rcli", "--json", "--no-progress", "--home",
+                        home.string(), "run", "mlx.fake.vlm",
+                        "What is in the image?", "--image",
+                        input_image.string(), "--engine", "mlx", "--max-tokens",
+                        "4"},
+                       "VLM", &vlm_json, &result)) {
     rcli::shutdown();
     return result;
   }
@@ -637,14 +682,10 @@ TestResult test_rcli_mlx_run_end_to_end() {
   }
 
   std::string embed_json;
-  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
-                          home.string(), "embed", "mlx.fake.embed",
-                          "Hello MLX embeddings", "--text", "Batch item"},
-                         &embed_json);
-  if (code != 0) {
-    result.expected = "embedding exit 0";
-    result.actual = "exit " + std::to_string(code);
-    result.details = embed_json;
+  if (!run_cli_or_fail({"rcli", "--json", "--no-progress", "--home",
+                        home.string(), "embed", "Hello MLX embeddings",
+                        "--model", "mlx.fake.embed", "--text", "Batch item"},
+                       "embedding", &embed_json, &result)) {
     rcli::shutdown();
     return result;
   }
@@ -675,14 +716,10 @@ TestResult test_rcli_mlx_run_end_to_end() {
   }
 
   std::string stt_json;
-  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
-                          home.string(), "stt", "mlx.fake.stt", "--input",
-                          input_wav.string()},
-                         &stt_json);
-  if (code != 0) {
-    result.expected = "STT exit 0";
-    result.actual = "exit " + std::to_string(code);
-    result.details = stt_json;
+  if (!run_cli_or_fail({"rcli", "--json", "--no-progress", "--home",
+                        home.string(), "stt", "mlx.fake.stt", "--input",
+                        input_wav.string()},
+                       "STT", &stt_json, &result)) {
     rcli::shutdown();
     return result;
   }
@@ -711,15 +748,13 @@ TestResult test_rcli_mlx_run_end_to_end() {
   }
 
   std::string tts_json;
-  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
-                          home.string(), "tts", "mlx.fake.tts", "--text",
-                          "Hello MLX audio", "--output", output_wav.string()},
-                         &tts_json);
+  const bool tts_ok = run_cli_or_fail(
+      {"rcli", "--json", "--no-progress", "--home", home.string(), "tts",
+       "mlx.fake.tts", "--text", "Hello MLX audio", "--output",
+       output_wav.string()},
+      "TTS", &tts_json, &result);
   rcli::shutdown();
-  if (code != 0) {
-    result.expected = "TTS exit 0";
-    result.actual = "exit " + std::to_string(code);
-    result.details = tts_json;
+  if (!tts_ok) {
     return result;
   }
   if (tts_json.find("\"voice\":\"mlx.fake.tts\"") == std::string::npos ||

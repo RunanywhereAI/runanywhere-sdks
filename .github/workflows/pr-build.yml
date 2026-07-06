@@ -184,9 +184,15 @@ jobs:
           cmake --build --preset wasm
 
   ios-device:
-    runs-on: macos-15
+    # MLX audio is linked through mlx-audio-swift, which requires Swift 6.2+.
+    # Use the macOS 26 runner line for Xcode 26 while keeping the macOS C++
+    # desktop/rcli lanes on their existing macos-14 pins.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: ios
       - run: brew install protobuf
       - name: Download vendored ONNX Runtime (iOS xcframework)
         run: bash sdk/runanywhere-commons/scripts/ios/download-onnx.sh
@@ -220,10 +226,15 @@ jobs:
   # =============================================================================
 
   swift-spm:
-    runs-on: macos-15
+    # Builds the Apple MLX Swift runtime, including mlx-audio-swift. This
+    # needs Swift 6.2+, so use the macOS 26/Xcode 26 runner line.
+    runs-on: macos-26
     needs: [ios-device]
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: ios
       - run: brew install protobuf
       - name: Download vendored ONNX Runtime (iOS xcframework)
         run: bash sdk/runanywhere-commons/scripts/ios/download-onnx.sh
@@ -232,7 +243,7 @@ jobs:
       - name: Build XCFramework
         run: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
       - name: swift build
-        run: swift build --target RunAnywhere
+        run: swift build --target MLXRuntime --jobs 2
       # Per-SDK lint lane — fail PRs that introduce SwiftLint
       # violations or unused declarations. Soft (continue-on-error) until the
       # baseline is clean; flip to required gate once the backlog clears.
