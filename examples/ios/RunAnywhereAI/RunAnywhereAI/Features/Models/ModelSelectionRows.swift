@@ -166,6 +166,7 @@ struct FlatModelRow: View {
     private var frameworkColor: Color {
         switch model.framework {
         case .llamaCpp: return AppColors.primaryAccent
+        case .mlx: return .teal
         case .onnx: return .purple
         case .foundationModels: return .primary
         default: return .gray
@@ -175,6 +176,7 @@ struct FlatModelRow: View {
     private var frameworkName: String {
         switch model.framework {
         case .llamaCpp: return "Fast"
+        case .mlx: return "MLX"
         case .onnx: return "ONNX"
         case .foundationModels: return "Apple"
         case .systemTts: return "System"

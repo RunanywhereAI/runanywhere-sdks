@@ -11,7 +11,8 @@
 #   scripts/build-ios.sh               Build commons C++ libraries for iOS
 #
 # sdk/runanywhere-swift/scripts/build-core-xcframework.sh    Build / package native xcframeworks
-#   (RACommons, RABackendONNX, RABackendLLAMACPP, RABackendSherpa) into
+#   (RACommons, RABackendONNX, RABackendLLAMACPP, RABackendSherpa,
+#   RABackendMLX) into
 #   sdk/runanywhere-swift/Binaries/. The Swift SDK itself is compiled by
 #   Xcode/SwiftPM directly and no longer has a per-SDK orchestrator script.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -219,7 +220,7 @@ build_app() {
 
     $CLEAN_BUILD && xcodebuild clean -project RunAnywhereAI.xcodeproj -scheme RunAnywhereAI -configuration Debug >/dev/null 2>&1 || true
 
-    if xcodebuild -project RunAnywhereAI.xcodeproj -scheme RunAnywhereAI -configuration Debug -destination "$DESTINATION" -allowProvisioningUpdates build > /tmp/xcodebuild.log 2>&1; then
+    if xcodebuild -project RunAnywhereAI.xcodeproj -scheme RunAnywhereAI -configuration Debug -destination "$DESTINATION" -allowProvisioningUpdates -skipPackagePluginValidation -jobs 2 build > /tmp/xcodebuild.log 2>&1; then
         TIME_APP=$(($(date +%s) - start_time))
         log_info "App build succeeded"
         log_time "App build time: $(format_duration $TIME_APP)"

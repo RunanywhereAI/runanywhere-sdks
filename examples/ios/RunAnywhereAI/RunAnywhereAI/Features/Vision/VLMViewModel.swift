@@ -181,7 +181,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe what you see briefly."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = 200
+            options.maxTokens = 96
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) { currentDescription += $0 }
@@ -205,7 +205,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe this image in detail."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = 300
+            options.maxTokens = 128
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) { currentDescription += $0 }
@@ -229,7 +229,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe this image in detail."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = 300
+            options.maxTokens = 128
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) { currentDescription += $0 }
@@ -278,7 +278,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe what you see in one sentence."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = 100
+            options.maxTokens = 64
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) {

@@ -566,7 +566,7 @@ rac_result_t resolve_repo_folder(const std::string& ref, const char* manifest_le
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     ParsedRef parsed;
-    if (!parse_ref(ref, &parsed) || parsed.file_path.empty()) {
+    if (!parse_ref(ref, &parsed)) {
         *error = "not a folder-level Hugging Face reference: " + ref;
         return RAC_ERROR_INVALID_ARGUMENT;
     }

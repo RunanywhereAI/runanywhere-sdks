@@ -102,6 +102,7 @@ rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t
         case RAC_FRAMEWORK_LLAMACPP:
         case RAC_FRAMEWORK_GENIE:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
+        case RAC_FRAMEWORK_MLX:
             return RAC_MODEL_CATEGORY_LANGUAGE;
         case RAC_FRAMEWORK_QHEXRT:
             // QHexRT serves LLM/VLM/STT/TTS bundles alike — no single category
@@ -176,6 +177,8 @@ rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t frame
     static const rac_model_format_t coreml_formats[] = {
         RAC_MODEL_FORMAT_COREML, RAC_MODEL_FORMAT_MLMODEL, RAC_MODEL_FORMAT_MLPACKAGE};
     static const rac_model_format_t metalrt_formats[] = {RAC_MODEL_FORMAT_SAFETENSORS};
+    static const rac_model_format_t mlx_formats[] = {RAC_MODEL_FORMAT_SAFETENSORS,
+                                                     RAC_MODEL_FORMAT_FOLDER};
     static const rac_model_format_t genie_formats[] = {RAC_MODEL_FORMAT_QNN_CONTEXT};
 
     switch (framework) {
@@ -190,6 +193,8 @@ rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t frame
             return copy_supported_formats(coreml_formats, 3, out_formats, out_count);
         case RAC_FRAMEWORK_METALRT:
             return copy_supported_formats(metalrt_formats, 1, out_formats, out_count);
+        case RAC_FRAMEWORK_MLX:
+            return copy_supported_formats(mlx_formats, 2, out_formats, out_count);
         case RAC_FRAMEWORK_GENIE:
         case RAC_FRAMEWORK_QHEXRT:
             return copy_supported_formats(genie_formats, 1, out_formats, out_count);
@@ -219,6 +224,10 @@ rac_bool_t rac_framework_supports_format(rac_inference_framework_t framework,
                        : RAC_FALSE;
         case RAC_FRAMEWORK_METALRT:
             return (format == RAC_MODEL_FORMAT_SAFETENSORS) ? RAC_TRUE : RAC_FALSE;
+        case RAC_FRAMEWORK_MLX:
+            return (format == RAC_MODEL_FORMAT_SAFETENSORS || format == RAC_MODEL_FORMAT_FOLDER)
+                       ? RAC_TRUE
+                       : RAC_FALSE;
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return (format == RAC_MODEL_FORMAT_BIN) ? RAC_TRUE : RAC_FALSE;
         default:
@@ -234,6 +243,7 @@ rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t f
                                      // (encoder/decoder/tokens.txt)
         case RAC_FRAMEWORK_COREML:   // CoreML compiled models (.mlmodelc) are directories
         case RAC_FRAMEWORK_METALRT:  // MetalRT models are directories (config.json + .safetensors)
+        case RAC_FRAMEWORK_MLX:      // MLX models are local HF-style folders
         case RAC_FRAMEWORK_GENIE:    // Genie models are directories (config.json + bin files)
         case RAC_FRAMEWORK_QHEXRT:   // QHexRT models are directories (manifest.json + bin files)
             return RAC_TRUE;
@@ -250,6 +260,7 @@ rac_bool_t rac_framework_supports_llm(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_QHEXRT:
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
+        case RAC_FRAMEWORK_MLX:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -261,6 +272,7 @@ rac_bool_t rac_framework_supports_stt(rac_inference_framework_t framework) {
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_SHERPA:
+        case RAC_FRAMEWORK_MLX:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -273,6 +285,7 @@ rac_bool_t rac_framework_supports_tts(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_SYSTEM_TTS:
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_SHERPA:
+        case RAC_FRAMEWORK_MLX:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -290,6 +303,8 @@ const char* rac_framework_display_name(rac_inference_framework_t framework) {
             return "llama.cpp";
         case RAC_FRAMEWORK_COREML:
             return "Core ML";
+        case RAC_FRAMEWORK_MLX:
+            return "MLX";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return "Foundation Models";
         case RAC_FRAMEWORK_SYSTEM_TTS:
@@ -322,6 +337,8 @@ const char* rac_framework_analytics_key(rac_inference_framework_t framework) {
             return "llama_cpp";
         case RAC_FRAMEWORK_COREML:
             return "coreml";
+        case RAC_FRAMEWORK_MLX:
+            return "mlx";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return "foundation_models";
         case RAC_FRAMEWORK_SYSTEM_TTS:
@@ -838,6 +855,9 @@ rac_result_t rac_model_format_for_framework(rac_inference_framework_t framework,
             break;
         case RAC_FRAMEWORK_METALRT:
             match = matches_any({"safetensors", "json"});
+            break;
+        case RAC_FRAMEWORK_MLX:
+            match = matches_any({"safetensors", "json", "jinja", "model"});
             break;
         case RAC_FRAMEWORK_FLUID_AUDIO:
             match = matches_any({"bin"});

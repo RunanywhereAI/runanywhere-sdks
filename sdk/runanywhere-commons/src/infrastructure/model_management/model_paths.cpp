@@ -851,6 +851,8 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
             return "LlamaCpp";
         case RAC_FRAMEWORK_COREML:
             return "CoreML";
+        case RAC_FRAMEWORK_MLX:
+            return "MLX";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return "FoundationModels";
         case RAC_FRAMEWORK_SYSTEM_TTS:

@@ -92,6 +92,14 @@ let package = Package(
             targets: ["LlamaCPPRuntime"]
         ),
 
+        // =================================================================
+        // MLX Backend - adds Apple MLX LLM/VLM/embedding capabilities
+        // =================================================================
+        .library(
+            name: "RunAnywhereMLX",
+            targets: ["MLXRuntime"]
+        ),
+
     ],
     dependencies: [
         // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
@@ -114,6 +122,9 @@ let package = Package(
         // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
         // the policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
+        .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
+        .package(url: "https://github.com/Blaizzy/mlx-audio-swift", revision: "580e952adda0cd6bdc5c04f402822adbb61525c8"),
+        .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
         //
         // grpc-swift intentionally NOT wired. The *.grpc.swift files under
         // Sources/RunAnywhere/Generated/ are excluded from the RunAnywhere
@@ -171,6 +182,19 @@ let package = Package(
                 "RABackendSherpaBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // =================================================================
+        // C Bridge Module - MLX Backend Headers
+        // =================================================================
+        .target(
+            name: "MLXBackend",
+            dependencies: [
+                "CRACommons",
+                "RABackendMLXBinary",
+            ],
+            path: "sdk/runanywhere-swift/Sources/MLXRuntime/include",
             publicHeadersPath: "."
         ),
 
@@ -261,6 +285,35 @@ let package = Package(
         ),
 
         // =================================================================
+        // MLX Runtime Backend
+        // =================================================================
+        .target(
+            name: "MLXRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "MLXBackend",
+                "RABackendMLXBinary",
+                .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "MLXVLM", package: "mlx-swift-lm"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+                .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
+                .product(name: "MLXHuggingFace", package: "mlx-swift-lm"),
+                .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+                .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
+            ],
+            path: "sdk/runanywhere-swift/Sources/MLXRuntime",
+            exclude: ["include"],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("CoreImage"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+            ]
+        ),
+
+        // =================================================================
         // RunAnywhere unit tests (e.g. AudioCaptureManager – Issue #198)
         // =================================================================
         .testTarget(
@@ -308,6 +361,10 @@ func binaryTargets() -> [Target] {
                 name: "RABackendSherpaBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework"
             ),
+            .binaryTarget(
+                name: "RABackendMLXBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendMLX.xcframework"
+            ),
         ]
     } else {
         // =====================================================================
@@ -325,7 +382,7 @@ func binaryTargets() -> [Target] {
         //   1. Build XCFrameworks (CI native_ios job, or locally via
         //      `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh`).
         //   2. Run `sdk/runanywhere-swift/scripts/sync-checksums.sh <zip_dir>` against the directory
-        //      that holds the four `*-ios-v<version>.zip` artifacts. This
+        //      that holds the five `*-ios-v<version>.zip` artifacts. This
         //      overwrites each `checksum:` line below with the real SHA-256.
         //   3. The release workflow (`release.yml::publish`) runs the
         //      checksum sync automatically right before creating the draft
@@ -359,6 +416,11 @@ func binaryTargets() -> [Target] {
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
                 checksum: "771b6d4273a2b3b7b1f459aaa5d29b4f42f7f341eed9018a8031cd80143556bb"
+            ),
+            .binaryTarget(
+                name: "RABackendMLXBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMLX-ios-v\(sdkVersion).zip",
+                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
             ),
         ]
     }

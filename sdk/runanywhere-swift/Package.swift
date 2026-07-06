@@ -54,6 +54,7 @@ let package = Package(
         // want to link a subset of the runtimes).
         .library(name: "RunAnywhereLlamaCPP", targets: ["LlamaCPPRuntime"]),
         .library(name: "RunAnywhereONNX", targets: ["ONNXRuntime"]),
+        .library(name: "RunAnywhereMLX", targets: ["MLXRuntime"]),
     ],
     dependencies: [
         // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
@@ -76,6 +77,9 @@ let package = Package(
         // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
         // the dep-version policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
+        .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
+        .package(url: "https://github.com/Blaizzy/mlx-audio-swift", revision: "580e952adda0cd6bdc5c04f402822adbb61525c8"),
+        .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
     ],
     targets: [
         // -------------------------------------------------------------------
@@ -121,6 +125,19 @@ let package = Package(
                 "RABackendSherpaBinary",
             ],
             path: "Sources/ONNXRuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // -------------------------------------------------------------------
+        // C Bridge Module — MLX Backend Headers
+        // -------------------------------------------------------------------
+        .target(
+            name: "MLXBackend",
+            dependencies: [
+                "CRACommons",
+                "RABackendMLXBinary",
+            ],
+            path: "Sources/MLXRuntime/include",
             publicHeadersPath: "."
         ),
 
@@ -226,6 +243,37 @@ let package = Package(
         ),
 
         // -------------------------------------------------------------------
+        // MLX Runtime Backend
+        // -------------------------------------------------------------------
+        .target(
+            name: "MLXRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "MLXBackend",
+                "RABackendMLXBinary",
+                .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "MLXVLM", package: "mlx-swift-lm"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+                .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
+                .product(name: "MLXHuggingFace", package: "mlx-swift-lm"),
+                .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+                .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
+            ],
+            path: "Sources/MLXRuntime",
+            exclude: [
+                "include",
+            ],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("CoreImage"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+            ]
+        ),
+
+        // -------------------------------------------------------------------
         // Unit tests: HandleStreamAdapter lifecycle, proto helpers
         // (LoRA / model-import / lifecycle / structured-output / tool-calling),
         // error mapping.
@@ -262,6 +310,10 @@ let package = Package(
         .binaryTarget(
             name: "RABackendSherpaBinary",
             path: "Binaries/RABackendSherpa.xcframework"
+        ),
+        .binaryTarget(
+            name: "RABackendMLXBinary",
+            path: "Binaries/RABackendMLX.xcframework"
         ),
     ]
 )

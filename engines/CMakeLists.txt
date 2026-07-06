@@ -39,6 +39,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/onnx/CMakeLists.txt")
     add_subdirectory(onnx)
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/mlx/CMakeLists.txt")
+    add_subdirectory(mlx)
+endif()
+
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metalrt/CMakeLists.txt")
     add_subdirectory(metalrt)
 endif()

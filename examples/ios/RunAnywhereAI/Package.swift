@@ -51,6 +51,7 @@ let package = Package(
                 // Optional modules - pick what you need:
                 .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),         // STT/TTS/VAD (CPU via ONNX/Sherpa)
                 .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),     // LLM
+                .product(name: "RunAnywhereMLX", package: "runanywhere-sdks"),          // Apple MLX LLM/VLM
             ],
             path: "RunAnywhereAI",
             exclude: [

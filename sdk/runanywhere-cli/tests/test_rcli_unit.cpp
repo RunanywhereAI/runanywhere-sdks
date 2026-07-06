@@ -12,11 +12,13 @@
 #include <string>
 
 #include "model_types.pb.h"
+#include "rac/core/rac_core.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
 #include "catalog/catalog.h"
 #include "catalog/model_ref.h"
+#include "commands/engine_options.h"
 #include "config/cli_paths.h"
 #include "io/output.h"
 #include "io/proto.h"
@@ -221,6 +223,175 @@ TestResult test_catalog_lookup() {
     return result;
   }
 
+  const rcli::catalog::CatalogEntry *mlx_llm =
+      rcli::catalog::find("mlx-qwen3");
+  if (!mlx_llm || mlx_llm->framework !=
+                      runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      mlx_llm->format != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
+      mlx_llm->category != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
+      mlx_llm->files == nullptr || mlx_llm->file_count != 9 ||
+      !mlx_llm->supports_thinking) {
+    result.details = "mlx-qwen3 should be a complete MLX language bundle";
+    return result;
+  }
+
+  const rcli::catalog::CatalogEntry *mlx_vlm =
+      rcli::catalog::find("mlx-qwen2-vl");
+  if (!mlx_vlm || mlx_vlm->category !=
+                      runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
+      mlx_vlm->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      mlx_vlm->files == nullptr || mlx_vlm->file_count != 11) {
+    result.details = "mlx-qwen2-vl should be a complete MLX VLM bundle";
+    return result;
+  }
+  bool has_preprocessor = false;
+  for (size_t i = 0; i < mlx_vlm->file_count; ++i) {
+    has_preprocessor =
+        has_preprocessor ||
+        std::string(mlx_vlm->files[i].filename) == "preprocessor_config.json";
+  }
+  if (!has_preprocessor) {
+    result.details = "MLX VLM catalog entry must include preprocessor_config.json";
+    return result;
+  }
+
+  const rcli::catalog::CatalogEntry *mlx_embed =
+      rcli::catalog::find("mlx-qwen3-embed");
+  if (!mlx_embed || mlx_embed->category !=
+                       runanywhere::v1::MODEL_CATEGORY_EMBEDDING ||
+      mlx_embed->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      mlx_embed->files == nullptr || mlx_embed->file_count != 11) {
+    result.details = "mlx-qwen3-embed should be a complete MLX embedding bundle";
+    return result;
+  }
+
+  result.passed = true;
+  return result;
+}
+
+TestResult test_engine_hint_parsing() {
+  TestResult result;
+  result.test_name = "engine_hint_parsing";
+
+  struct Case {
+    std::string in;
+    runanywhere::v1::InferenceFramework expected;
+  };
+  const Case cases[] = {
+      {"", runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED},
+      {"mlx", runanywhere::v1::INFERENCE_FRAMEWORK_MLX},
+      {"llama.cpp", runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP},
+      {"llama-cpp", runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP},
+      {"onnx", runanywhere::v1::INFERENCE_FRAMEWORK_ONNX},
+      {"sherpa", runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA},
+  };
+  for (const Case &c : cases) {
+    runanywhere::v1::InferenceFramework actual =
+        runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
+    std::string error;
+    if (!rcli::commands::parse_engine_hint(c.in, &actual, &error) ||
+        actual != c.expected) {
+      result.expected = std::to_string(static_cast<int>(c.expected));
+      result.actual = std::to_string(static_cast<int>(actual));
+      result.details = "input: " + c.in + " error: " + error;
+      return result;
+    }
+  }
+
+  runanywhere::v1::InferenceFramework actual =
+      runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
+  std::string error;
+  if (rcli::commands::parse_engine_hint("banana", &actual, &error) ||
+      error.find("unsupported engine") == std::string::npos) {
+    result.details = "unsupported engine should fail with an actionable error";
+    return result;
+  }
+
+  result.passed = true;
+  return result;
+}
+
+void remove_registered_model(const std::string &id) {
+  if (auto *registry = rac_get_model_registry()) {
+    (void)rac_model_registry_remove_proto(registry, id.c_str());
+  }
+}
+
+bool get_registered_model(const std::string &id, runanywhere::v1::ModelInfo *out,
+                          std::string *error) {
+  rac_proto_buffer_t found;
+  rac_proto_buffer_init(&found);
+  const rac_result_t rc = rac_model_registry_get_proto_buffer(
+      rac_get_model_registry(), id.c_str(), &found);
+  const bool parsed = rcli::proto::parse_proto_buffer(&found, out, error);
+  if (!parsed && error && error->empty()) {
+    *error = "registry get failed rc=" + std::to_string(rc);
+  }
+  return rc == RAC_SUCCESS && parsed;
+}
+
+TestResult test_mlx_catalog_registration() {
+  TestResult result;
+  result.test_name = "mlx_catalog_registration";
+
+  const rac_result_t rc = rcli::catalog::register_all();
+  if (rc != RAC_SUCCESS) {
+    result.details = "catalog registration failed rc=" + std::to_string(rc);
+    return result;
+  }
+
+  runanywhere::v1::ModelInfo qwen;
+  std::string error;
+  if (!get_registered_model("mlx-qwen3-0.6b-4bit", &qwen, &error)) {
+    result.details = error;
+    return result;
+  }
+  if (qwen.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      qwen.format() != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
+      qwen.category() != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
+      !qwen.has_multi_file() || qwen.multi_file().files_size() != 9 ||
+      qwen.download_size_bytes() != 351383618 || !qwen.supports_thinking()) {
+    result.details = "registered MLX Qwen3 metadata is incomplete";
+    return result;
+  }
+
+  runanywhere::v1::ModelInfo vlm;
+  if (!get_registered_model("mlx-qwen2-vl-2b-instruct-4bit", &vlm, &error)) {
+    result.details = error;
+    return result;
+  }
+  bool preprocessor_registered = false;
+  for (const auto &file : vlm.multi_file().files()) {
+    preprocessor_registered =
+        preprocessor_registered || file.filename() == "preprocessor_config.json";
+  }
+  if (vlm.category() != runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
+      vlm.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      !vlm.has_multi_file() || vlm.multi_file().files_size() != 11 ||
+      !preprocessor_registered) {
+    result.details = "registered MLX VLM metadata is incomplete";
+    return result;
+  }
+
+  runanywhere::v1::ModelInfo embedding;
+  if (!get_registered_model("mlx-qwen3-embedding-0.6b-4bit-dwq", &embedding,
+                            &error)) {
+    result.details = error;
+    return result;
+  }
+  if (embedding.category() != runanywhere::v1::MODEL_CATEGORY_EMBEDDING ||
+      embedding.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      embedding.format() != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
+      !embedding.has_multi_file() || embedding.multi_file().files_size() != 11) {
+    result.details = "registered MLX embedding metadata is incomplete";
+    return result;
+  }
+
+  remove_registered_model("mlx-qwen3-0.6b-4bit");
+  remove_registered_model("mlx-llama-3.2-1b-instruct-4bit");
+  remove_registered_model("mlx-qwen2-vl-2b-instruct-4bit");
+  remove_registered_model("mlx-qwen3-embedding-0.6b-4bit-dwq");
+
   result.passed = true;
   return result;
 }
@@ -290,6 +461,8 @@ int main(int argc, char **argv) {
   suite.add("resolve_home_precedence", test_resolve_home_precedence);
   suite.add("state_dir", test_state_dir);
   suite.add("catalog_lookup", test_catalog_lookup);
+  suite.add("engine_hint_parsing", test_engine_hint_parsing);
+  suite.add("mlx_catalog_registration", test_mlx_catalog_registration);
   suite.add("hf_ref_registration", test_hf_ref_registration);
   return suite.run(argc, argv);
 }

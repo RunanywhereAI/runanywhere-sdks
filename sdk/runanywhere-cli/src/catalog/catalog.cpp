@@ -52,6 +52,124 @@ constexpr CatalogFile kMiniLmFiles[] = {
      "vocab.txt", true},
 };
 
+constexpr CatalogFile kMlxQwen3_06BFiles[] = {
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "added_tokens.json",
+     "added_tokens.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/merges.txt",
+     "merges.txt", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/vocab.json",
+     "vocab.json", true},
+};
+
+constexpr CatalogFile kMlxLlama32_1BFiles[] = {
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+constexpr CatalogFile kMlxQwen2Vl2BFiles[] = {
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/main/"
+     "added_tokens.json",
+     "added_tokens.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/main/"
+     "chat_template.json",
+     "chat_template.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/main/"
+     "merges.txt",
+     "merges.txt", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/main/"
+     "preprocessor_config.json",
+     "preprocessor_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/main/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
+constexpr CatalogFile kMlxQwen3Embedding06BFiles[] = {
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/resolve/main/"
+     "added_tokens.json",
+     "added_tokens.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/resolve/main/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/resolve/main/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/resolve/main/"
+     "merges.txt",
+     "merges.txt", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/resolve/main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/resolve/main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/resolve/main/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
 constexpr int64_t MB = 1024LL * 1024LL;
 
 // ids/URLs verbatim from: examples/ios ModelCatalogBootstrap.swift, Android
@@ -141,6 +259,24 @@ constexpr CatalogEntry kCatalog[] = {
     {"all-minilm-l6-v2", "minilm", "All-MiniLM-L6-v2 (Embeddings)",
      v1::MODEL_CATEGORY_EMBEDDING, v1::INFERENCE_FRAMEWORK_ONNX,
      v1::MODEL_FORMAT_ONNX, nullptr, kMiniLmFiles, 2, 90 * MB, 0, false},
+
+    // --- MLX (Apple Silicon / Apple GPU via mlx-swift-lm) ---
+    {"mlx-qwen3-0.6b-4bit", "mlx-qwen3", "Qwen3 0.6B 4-bit (MLX)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxQwen3_06BFiles, 9, 351383618,
+     4096, true},
+    {"mlx-llama-3.2-1b-instruct-4bit", "mlx-llama3.2",
+     "Llama 3.2 1B Instruct 4-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxLlama32_1BFiles, 6, 712575975, 0, false},
+    {"mlx-qwen2-vl-2b-instruct-4bit", "mlx-qwen2-vl",
+     "Qwen2-VL 2B Instruct 4-bit (MLX)", v1::MODEL_CATEGORY_MULTIMODAL,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxQwen2Vl2BFiles, 11, 1261853827, 2048, false},
+    {"mlx-qwen3-embedding-0.6b-4bit-dwq", "mlx-qwen3-embed",
+     "Qwen3 Embedding 0.6B 4-bit DWQ (MLX)", v1::MODEL_CATEGORY_EMBEDDING,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxQwen3Embedding06BFiles, 11, 351230811, 0, false},
 };
 
 constexpr size_t kCatalogCount = sizeof(kCatalog) / sizeof(kCatalog[0]);

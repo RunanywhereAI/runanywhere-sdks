@@ -23,6 +23,7 @@ check_xcframeworks() {
     for framework in \
         RACommons.xcframework \
         RABackendLLAMACPP.xcframework \
+        RABackendMLX.xcframework \
         RABackendONNX.xcframework \
         RABackendSherpa.xcframework
     do
@@ -65,6 +66,8 @@ xcodebuild \
     -configuration Debug \
     -sdk iphonesimulator \
     -destination "${DESTINATION}" \
+    -skipPackagePluginValidation \
+    -jobs 2 \
     build
 
 log "iOS verification complete"

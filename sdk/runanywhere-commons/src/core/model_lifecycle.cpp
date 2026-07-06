@@ -72,6 +72,8 @@ const char* engine_name_for_framework(runanywhere::v1::InferenceFramework framew
             return "genie";
         case runanywhere::v1::INFERENCE_FRAMEWORK_METALRT:
             return "metalrt";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_MLX:
+            return "mlx";
         case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
             return "coreml";
         default:

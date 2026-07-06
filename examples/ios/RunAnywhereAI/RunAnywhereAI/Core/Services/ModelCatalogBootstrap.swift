@@ -132,6 +132,48 @@ enum ModelCatalogBootstrap {
         )
         logger.info("LLM models registered")
 
+        // --- MLX models (Apple Metal, Hugging Face repo-folder bundles) -------
+        await registerLLM(
+            id: "mlx-qwen3-0.6b-4bit",
+            name: "MLX Qwen3 0.6B 4bit",
+            url: "https://huggingface.co/mlx-community/Qwen3-0.6B-4bit",
+            framework: .mlx,
+            memoryRequirement: 650_000_000,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "mlx-llama-3.2-1b-instruct-4bit",
+            name: "MLX Llama 3.2 1B Instruct 4bit",
+            url: "https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit",
+            framework: .mlx,
+            memoryRequirement: 900_000_000
+        )
+        await registerLLM(
+            id: "mlx-qwen3-4b-4bit",
+            name: "MLX Qwen3 4B 4bit",
+            url: "https://huggingface.co/mlx-community/Qwen3-4B-4bit",
+            framework: .mlx,
+            memoryRequirement: 2_400_000_000,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "mlx-qwen2-vl-2b-instruct-4bit",
+            name: "MLX Qwen2-VL 2B Instruct 4bit",
+            url: "https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit",
+            framework: .mlx,
+            modality: .multimodal,
+            memoryRequirement: 2_200_000_000
+        )
+        await registerLLM(
+            id: "mlx-qwen3-vl-4b-instruct-4bit",
+            name: "MLX Qwen3-VL 4B Instruct 4bit",
+            url: "https://huggingface.co/lmstudio-community/Qwen3-VL-4B-Instruct-MLX-4bit",
+            framework: .mlx,
+            modality: .multimodal,
+            memoryRequirement: 4_000_000_000
+        )
+        logger.info("MLX models registered")
+
         // --- VLM models (multi-modal, multi-file) -----------------------------
         await registerArchive(
             id: "smolvlm-500m-instruct-q8_0",
@@ -235,7 +277,15 @@ enum ModelCatalogBootstrap {
             modality: .embedding,
             memoryRequirement: 25_500_000
         )
-        logger.info("ONNX Embedding models registered")
+        await registerLLM(
+            id: "mlx-qwen3-embedding-0.6b-4bit-dwq",
+            name: "MLX Qwen3 Embedding 0.6B 4bit DWQ",
+            url: "https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ",
+            framework: .mlx,
+            modality: .embedding,
+            memoryRequirement: 350_000_000
+        )
+        logger.info("Embedding models registered")
 
         // --- LoRA adapters ------------------------------------------------------
         // Mirrors Android `ModelBootstrap.seedLora` / `ModelCatalog.loraAdapters`.

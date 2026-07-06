@@ -153,6 +153,17 @@ bundle_policy_for(const runanywhere::v1::RegisterModelFromUrlRequest& request) {
     return rac_bundle_policy_find(framework);
 }
 
+bool request_framework_is(const runanywhere::v1::RegisterModelFromUrlRequest& request,
+                          rac_inference_framework_t expected) {
+    if (!request.has_framework()) {
+        return false;
+    }
+    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
+    return rac_inference_framework_from_proto(static_cast<int32_t>(request.framework()),
+                                              &framework) == RAC_SUCCESS &&
+           framework == expected;
+}
+
 // Resolve a folder-level Hugging Face ref (hf.co/org/repo/<subdir>, or a
 // manifest-leaf ref when the framework's bundle policy allows it) into a
 // multi-file registration carrying EVERY file under the subfolder — the
@@ -191,6 +202,8 @@ rac_result_t register_from_hf_folder(const runanywhere::v1::RegisterModelFromUrl
     }
     if (request.has_category()) {
         multi_file.set_category(request.category());
+    } else if (request_framework_is(request, RAC_FRAMEWORK_MLX)) {
+        multi_file.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
     }
     if (request.has_source()) {
         multi_file.set_source(request.source());
@@ -314,6 +327,9 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
                 (policy != nullptr && policy->manifest_leaf_names_bundle == RAC_TRUE)
                     ? policy->manifest_extension
                     : nullptr;
+            if (request_framework_is(request, RAC_FRAMEWORK_MLX)) {
+                return register_from_hf_folder(request, policy, out_proto);
+            }
             if (hf::is_folder_ref(request.url(), manifest_leaf_ext)) {
                 return register_from_hf_folder(request, policy, out_proto);
             }

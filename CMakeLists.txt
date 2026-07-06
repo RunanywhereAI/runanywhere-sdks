@@ -257,6 +257,11 @@ if(RAC_BUILD_PLUGIN_SMOKE
     add_subdirectory(tools/plugin-loader-smoke)
 endif()
 
+# Enable CTest before SDK subdirectories that register their own tests.
+if(RAC_BUILD_TESTS)
+    enable_testing()
+endif()
+
 # rcli desktop CLI. Added after engines/ because it links the
 # rac_backend_* targets that only exist once the engine subdirs configured.
 if(RAC_BUILD_CLI)
@@ -266,7 +271,6 @@ endif()
 # Tests — wired through commons/tests for now. RAC_BUILD_TESTS is forwarded
 # from this root option to the commons cache slot of the same name.
 if(RAC_BUILD_TESTS)
-    enable_testing()
     # Commons/tests is configured before engines/ in the root build, so the
     # Genie plugin-entry test is wired here once rac_backend_genie exists.
     if(RAC_BACKEND_GENIE AND TARGET rac_backend_genie AND NOT TARGET test_plugin_entry_genie)
