@@ -78,7 +78,10 @@ let package = Package(
         // the dep-version policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
-        .package(url: "https://github.com/Blaizzy/mlx-audio-swift", revision: "580e952adda0cd6bdc5c04f402822adbb61525c8"),
+        // mlx-audio-swift currently requires swift-tools-version 6.2 while
+        // this SDK still supports the Xcode 16.4 / Swift 6.1 toolchain in CI.
+        // Keep audio callbacks in MLXRuntime, but compile the Swift audio
+        // bridge only when those modules are available.
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
     ],
     targets: [
@@ -255,8 +258,6 @@ let package = Package(
                 .product(name: "MLXVLM", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
-                .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
-                .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ],
             path: "Sources/MLXRuntime",

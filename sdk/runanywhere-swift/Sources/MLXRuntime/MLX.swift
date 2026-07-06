@@ -9,8 +9,6 @@ import CoreImage
 import CRACommons
 import Foundation
 import MLX
-import MLXAudioSTT
-import MLXAudioTTS
 import MLXBackend
 import MLXEmbedders
 import MLXLLM
@@ -19,6 +17,11 @@ import MLXVLM
 import os
 import RunAnywhere
 import Tokenizers
+
+#if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
+import MLXAudioSTT
+import MLXAudioTTS
+#endif
 
 public enum MLX {
     private static let logger = SDKLogger(category: "MLX")
@@ -157,6 +160,12 @@ private struct MLXGenerationMetrics {
     var tokensPerSecond: Float = 0
 }
 
+private struct MLXSTTOutput {
+    let text: String
+    let language: String?
+    let totalTime: TimeInterval
+}
+
 private enum MLXMemoryPolicy {
     private static let vlmCacheLimitBytes = 64 * 1024 * 1024
 
@@ -277,8 +286,10 @@ private final class MLXSession: @unchecked Sendable {
     private let lock = OSAllocatedUnfairLock(initialState: State())
     private var generationContainer: ModelContainer?
     private var embedderContainer: EmbedderModelContainer?
+    #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
     private var sttModel: STTGenerationModel?
     private var ttsModel: SpeechGenerationModel?
+    #endif
 
     init(kind: MLXSessionKind, modelID: String) {
         self.kind = kind
@@ -313,9 +324,17 @@ private final class MLXSession: @unchecked Sendable {
                 using: tokenizerLoader
             )
         case .stt:
+            #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
             sttModel = try await loadSpeechRecognitionModel(from: directory, modelID: modelID)
+            #else
+            throw MLXRuntimeError.mlxAudioUnavailable
+            #endif
         case .tts:
+            #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
             ttsModel = try await MLXAudioTTS.TTS.loadModel(modelRepo: directory.path)
+            #else
+            throw MLXRuntimeError.mlxAudioUnavailable
+            #endif
         }
         lock.withLock {
             $0.isLoaded = true
@@ -385,8 +404,10 @@ private final class MLXSession: @unchecked Sendable {
     func cleanup() {
         generationContainer = nil
         embedderContainer = nil
+        #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         sttModel = nil
         ttsModel = nil
+        #endif
         if isGenerationSession {
             MLXMemoryPolicy.releaseGenerationCachedBuffers(reason: "cleanup \(kindDescription)")
         }
@@ -586,13 +607,22 @@ private final class MLXSession: @unchecked Sendable {
     func transcribe(
         audioData: Data,
         options: UnsafePointer<rac_stt_options_t>?
-    ) throws -> STTOutput {
+    ) throws -> MLXSTTOutput {
+        #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         guard let model = sttModel else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
         let audio = try makeSTTAudioArray(audioData: audioData, options: options?.pointee)
         let parameters = sttGenerateParameters(from: options?.pointee)
-        return model.generate(audio: audio, generationParameters: parameters)
+        let output = model.generate(audio: audio, generationParameters: parameters)
+        return MLXSTTOutput(
+            text: output.text,
+            language: output.language,
+            totalTime: output.totalTime
+        )
+        #else
+        throw MLXRuntimeError.mlxAudioUnavailable
+        #endif
     }
 
     func transcribeStream(
@@ -601,6 +631,7 @@ private final class MLXSession: @unchecked Sendable {
         callback: rac_stt_stream_callback_t?,
         userData: UnsafeMutableRawPointer?
     ) async throws {
+        #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         guard let model = sttModel else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
@@ -629,6 +660,9 @@ private final class MLXSession: @unchecked Sendable {
         if !emittedFinal, !finalText.isEmpty {
             finalText.withCString { callback?($0, RAC_TRUE, userData) }
         }
+        #else
+        throw MLXRuntimeError.mlxAudioUnavailable
+        #endif
     }
 
     func sttInfo() -> rac_stt_info_t {
@@ -636,7 +670,11 @@ private final class MLXSession: @unchecked Sendable {
         var info = rac_stt_info_t()
         info.is_ready = state.isLoaded ? RAC_TRUE : RAC_FALSE
         info.current_model = nil
+        #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         info.supports_streaming = RAC_TRUE
+        #else
+        info.supports_streaming = RAC_FALSE
+        #endif
         return info
     }
 
@@ -644,6 +682,7 @@ private final class MLXSession: @unchecked Sendable {
         text: String,
         options: UnsafePointer<rac_tts_options_t>?
     ) async throws -> (samples: [Float], sampleRate: Int, processingTimeMs: Int64) {
+        #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         guard let model = ttsModel else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
@@ -670,6 +709,9 @@ private final class MLXSession: @unchecked Sendable {
         let samples = output.asArray(Float.self)
         let elapsedMs = Int64(Date().timeIntervalSince(started) * 1000)
         return (samples, model.sampleRate, elapsedMs)
+        #else
+        throw MLXRuntimeError.mlxAudioUnavailable
+        #endif
     }
 
     func synthesizeStream(
@@ -678,6 +720,7 @@ private final class MLXSession: @unchecked Sendable {
         callback: rac_tts_stream_callback_t?,
         userData: UnsafeMutableRawPointer?
     ) async throws {
+        #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         guard let model = ttsModel else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
@@ -708,6 +751,9 @@ private final class MLXSession: @unchecked Sendable {
                 callback?(rawBuffer.baseAddress, rawBuffer.count, userData)
             }
         }
+        #else
+        throw MLXRuntimeError.mlxAudioUnavailable
+        #endif
     }
 
     func ttsStop() {
@@ -760,8 +806,10 @@ private final class MLXSession: @unchecked Sendable {
         guard isGenerationSession else { return }
         cancel()
         generationContainer = nil
+        #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         sttModel = nil
         ttsModel = nil
+        #endif
         lock.withLock {
             $0.isLoaded = false
             $0.isCancelled = true
@@ -787,6 +835,7 @@ private enum MLXRuntimeError: LocalizedError {
     case invalidAudioInput
     case unsupportedAudioFormat
     case unsupportedSTTModel([String])
+    case mlxAudioUnavailable
     case allocationFailed
 
     var errorDescription: String? {
@@ -803,6 +852,8 @@ private enum MLXRuntimeError: LocalizedError {
             return "MLX speech inference currently accepts 16-bit mono PCM audio."
         case .unsupportedSTTModel(let hints):
             return "Unsupported MLX STT model. Supported local loaders: Qwen3-ASR and GLM-ASR. Hints: \(hints.joined(separator: ", "))"
+        case .mlxAudioUnavailable:
+            return "MLX audio requires mlx-audio-swift, which currently needs Swift tools 6.2. This build was compiled without that optional bridge."
         case .allocationFailed:
             return "MLX runtime failed to allocate output memory."
         }
@@ -899,11 +950,13 @@ private func generateParameters(from options: rac_vlm_options_t?) -> GeneratePar
     )
 }
 
+#if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
 private func sttGenerateParameters(from options: rac_stt_options_t?) -> STTGenerateParameters {
     let resolved = options ?? RAC_STT_OPTIONS_DEFAULT
     let language = string(from: resolved.language)
     return STTGenerateParameters(language: language)
 }
+#endif
 
 private func string(from pointer: UnsafePointer<CChar>?) -> String? {
     guard let pointer else { return nil }
@@ -927,6 +980,7 @@ private func modelHints(from directory: URL, modelID: String) -> [String] {
     return hints.map { $0.lowercased() }
 }
 
+#if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
 private func loadSpeechRecognitionModel(from directory: URL, modelID: String) async throws
     -> STTGenerationModel {
     let hints = modelHints(from: directory, modelID: modelID)
@@ -973,6 +1027,7 @@ private func makeSTTAudioArray(
     }
     return MLXArray(samples)
 }
+#endif
 
 private func floatPCMData(from samples: [Float]) -> Data {
     var copy = samples
