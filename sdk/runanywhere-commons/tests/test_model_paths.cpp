@@ -59,6 +59,15 @@ int test_mlx_framework_directory_uses_mlx_segment() {
                   sizeof(expected_path)),
               RAC_SUCCESS);
     EXPECT_TRUE(std::strcmp(expected_path, model_path) == 0);
+
+    char extracted_id[256] = {};
+    EXPECT_RC(rac_model_paths_extract_model_id(model_path, extracted_id, sizeof(extracted_id)),
+              RAC_SUCCESS);
+    EXPECT_TRUE(std::strcmp(extracted_id, kModelId) == 0);
+
+    rac_inference_framework_t extracted_framework = RAC_FRAMEWORK_UNKNOWN;
+    EXPECT_RC(rac_model_paths_extract_framework(model_path, &extracted_framework), RAC_SUCCESS);
+    EXPECT_TRUE(extracted_framework == RAC_FRAMEWORK_MLX);
     return 0;
 }
 

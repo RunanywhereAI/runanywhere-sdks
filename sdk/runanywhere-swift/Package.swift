@@ -8,6 +8,7 @@
 // scope for this dep-bump pass — see AGENTS.md "no source edits" rule.
 // Re-attempt once the Swift 6 strict-concurrency migration lands.
 import PackageDescription
+import Foundation
 
 // =============================================================================
 // RunAnywhere Swift SDK — LOCAL development Package.swift
@@ -25,6 +26,21 @@ import PackageDescription
 //
 // Min platforms: iOS 17.5 / macOS 14.5 (matches the root package).
 // =============================================================================
+
+// mlx-audio-swift currently requires swift-tools-version 6.2. Keep it off the
+// default dependency graph so the SDK remains buildable on the Swift 6.1 CI
+// toolchain, but allow local Swift 6.2+ validation with:
+//   RUNANYWHERE_ENABLE_MLX_AUDIO_SWIFT=1 swift build --target MLXRuntime
+let enableMLXAudioSwift = ProcessInfo.processInfo.environment["RUNANYWHERE_ENABLE_MLX_AUDIO_SWIFT"] == "1"
+let mlxAudioPackageDependencies: [Package.Dependency] = enableMLXAudioSwift ? [
+    // Latest tag v0.1.2 still depends on mlx-swift-lm 2.x. Pin current main
+    // until upstream cuts a tag compatible with mlx-swift-lm 3.x.
+    .package(url: "https://github.com/Blaizzy/mlx-audio-swift.git", revision: "580e952adda0cd6bdc5c04f402822adbb61525c8"),
+] : []
+let mlxAudioRuntimeDependencies: [Target.Dependency] = enableMLXAudioSwift ? [
+    .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
+    .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+] : []
 
 let package = Package(
     name: "RunAnywhere",
@@ -83,7 +99,7 @@ let package = Package(
         // Keep audio callbacks in MLXRuntime, but compile the Swift audio
         // bridge only when those modules are available.
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
-    ],
+    ] + mlxAudioPackageDependencies,
     targets: [
         // -------------------------------------------------------------------
         // C Bridge Module — Core Commons
@@ -259,7 +275,7 @@ let package = Package(
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
-            ],
+            ] + mlxAudioRuntimeDependencies,
             path: "Sources/MLXRuntime",
             exclude: [
                 "include",

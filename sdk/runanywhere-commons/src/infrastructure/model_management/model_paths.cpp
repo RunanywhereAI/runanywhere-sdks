@@ -1362,9 +1362,9 @@ rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_
     // under {Models}/{framework}/{id}/ will be parsed as direct
     // {Models}/{id}/ entries and model-id extraction will collapse to the
     // framework name (observed previously for Sherpa which was missing here).
-    const char* frameworks[] = {"ONNX",      "Sherpa",     "LlamaCpp", "FoundationModels",
-                                "SystemTTS", "FluidAudio", "BuiltIn",  "CoreML",
-                                "QHexRT",    "None",       "Unknown"};
+    const char* frameworks[] = {"ONNX",      "Sherpa",     "LlamaCpp", "MLX",
+                                "FoundationModels", "SystemTTS", "FluidAudio", "BuiltIn",
+                                "CoreML",    "QHexRT",     "None",     "Unknown"};
     for (const char* fw : frameworks) {
         if (nextComponent == fw) {
             isFramework = true;
@@ -1425,6 +1425,9 @@ rac_result_t rac_model_paths_extract_framework(const char* path,
         return RAC_SUCCESS;
     } else if (nextComponent == "LlamaCpp") {
         *out_framework = RAC_FRAMEWORK_LLAMACPP;
+        return RAC_SUCCESS;
+    } else if (nextComponent == "MLX") {
+        *out_framework = RAC_FRAMEWORK_MLX;
         return RAC_SUCCESS;
     } else if (nextComponent == "CoreML") {
         *out_framework = RAC_FRAMEWORK_COREML;

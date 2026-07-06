@@ -59,6 +59,21 @@ let useLocalNatives = true // Toggle: false for release (default committed to ma
 // Updated automatically by CI/CD during releases.
 let sdkVersion = "0.19.13"
 
+// mlx-audio-swift currently requires swift-tools-version 6.2. Keep it off the
+// default dependency graph so the SDK remains buildable on the Swift 6.1 CI
+// toolchain, but allow local Swift 6.2+ validation with:
+//   RUNANYWHERE_ENABLE_MLX_AUDIO_SWIFT=1 swift build --target MLXRuntime
+let enableMLXAudioSwift = ProcessInfo.processInfo.environment["RUNANYWHERE_ENABLE_MLX_AUDIO_SWIFT"] == "1"
+let mlxAudioPackageDependencies: [Package.Dependency] = enableMLXAudioSwift ? [
+    // Latest tag v0.1.2 still depends on mlx-swift-lm 2.x. Pin current main
+    // until upstream cuts a tag compatible with mlx-swift-lm 3.x.
+    .package(url: "https://github.com/Blaizzy/mlx-audio-swift.git", revision: "580e952adda0cd6bdc5c04f402822adbb61525c8"),
+] : []
+let mlxAudioRuntimeDependencies: [Target.Dependency] = enableMLXAudioSwift ? [
+    .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
+    .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+] : []
+
 let package = Package(
     name: "runanywhere-sdks",
     platforms: [
@@ -137,7 +152,7 @@ let package = Package(
         // callback (see sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/
         // VoiceAgentStreamAdapter.swift).
         //
-    ],
+    ] + mlxAudioPackageDependencies,
     targets: [
         // =================================================================
         // C Bridge Module - Core Commons
@@ -301,7 +316,7 @@ let package = Package(
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
-            ],
+            ] + mlxAudioRuntimeDependencies,
             path: "sdk/runanywhere-swift/Sources/MLXRuntime",
             exclude: ["include"],
             linkerSettings: [
