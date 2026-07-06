@@ -11,12 +11,17 @@
 package com.margelo.nitro.runanywhere
 
 import android.content.Context
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import com.margelo.nitro.NitroModules
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -526,6 +531,85 @@ object PlatformAdapterBridge {
         }
         // Fallback: Check display metrics if context unavailable
         return false
+    }
+
+    // ========================================================================
+    // App / Client Info
+    // ========================================================================
+
+    @JvmStatic
+    fun getAppIdentifier(): String? {
+        return applicationContext()?.packageName
+    }
+
+    @JvmStatic
+    fun getAppName(): String? {
+        val context = applicationContext() ?: return null
+        return try {
+            context.applicationInfo.loadLabel(context.packageManager).toString()
+                .ifBlank { null }
+        } catch (e: Exception) {
+            Log.w(TAG, "getAppName failed: ${e.message}")
+            null
+        }
+    }
+
+    @JvmStatic
+    fun getAppVersion(): String? {
+        val context = applicationContext() ?: return null
+        return try {
+            readPackageInfo(context)?.versionName?.ifBlank { null }
+        } catch (e: Exception) {
+            Log.w(TAG, "getAppVersion failed: ${e.message}")
+            null
+        }
+    }
+
+    @JvmStatic
+    fun getAppBuild(): String? {
+        val context = applicationContext() ?: return null
+        return try {
+            readPackageInfo(context)?.let { readVersionCode(it).toString() }
+        } catch (e: Exception) {
+            Log.w(TAG, "getAppBuild failed: ${e.message}")
+            null
+        }
+    }
+
+    private fun readPackageInfo(context: Context): PackageInfo? {
+        val packageManager = context.packageManager
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            packageManager.getPackageInfo(
+                context.packageName,
+                PackageManager.PackageInfoFlags.of(0),
+            )
+        } else {
+            val method = PackageManager::class.java.getMethod(
+                "getPackageInfo",
+                String::class.java,
+                Int::class.javaPrimitiveType,
+            )
+            method.invoke(packageManager, context.packageName, 0) as? PackageInfo
+        }
+    }
+
+    private fun readVersionCode(packageInfo: PackageInfo): Long {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode
+        } else {
+            val field = PackageInfo::class.java.getField("versionCode")
+            field.getInt(packageInfo).toLong()
+        }
+    }
+
+    @JvmStatic
+    fun getLocaleIdentifier(): String {
+        return Locale.getDefault().toLanguageTag()
+    }
+
+    @JvmStatic
+    fun getTimezoneIdentifier(): String {
+        return TimeZone.getDefault().id
     }
 
     // ========================================================================

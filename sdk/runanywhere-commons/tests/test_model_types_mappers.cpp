@@ -54,8 +54,7 @@ namespace {
 // Kept locally so the test file does not depend on the generated *.pb.h.
 // ---------------------------------------------------------------------------
 
-// InferenceFramework — proto range 0..23 minus the retired values 8
-// (WHISPERKIT_COREML), 17 (WHISPERKIT), and 18 (OPENAI_WHISPER), which are no
+// InferenceFramework — proto range 0..24 minus retired values that are no
 // longer defined in the proto and therefore map to RAC_ERROR_INVALID_ARGUMENT.
 constexpr int32_t kProtoIfwAll[] = {
     0,   // UNSPECIFIED        → RAC_FRAMEWORK_UNKNOWN
@@ -66,8 +65,6 @@ constexpr int32_t kProtoIfwAll[] = {
     5,   // FLUID_AUDIO        → RAC_FRAMEWORK_FLUID_AUDIO
     6,   // COREML             → RAC_FRAMEWORK_COREML
     7,   // MLX                → RAC_FRAMEWORK_MLX
-    9,   // METALRT            → RAC_FRAMEWORK_METALRT
-    10,  // GENIE              → RAC_FRAMEWORK_GENIE
     11,  // TFLITE             → RAC_FRAMEWORK_UNKNOWN (no C case)
     12,  // EXECUTORCH         → RAC_FRAMEWORK_UNKNOWN
     13,  // MEDIAPIPE          → RAC_FRAMEWORK_UNKNOWN
@@ -79,6 +76,7 @@ constexpr int32_t kProtoIfwAll[] = {
     21,  // NONE               → RAC_FRAMEWORK_NONE
     22,  // UNKNOWN            → RAC_FRAMEWORK_UNKNOWN
     23,  // SHERPA             → RAC_FRAMEWORK_SHERPA
+    24,  // QHEXRT             → RAC_FRAMEWORK_QHEXRT
 };
 
 // All defined C inference framework values.
@@ -92,8 +90,7 @@ constexpr rac_inference_framework_t kCAllFrameworks[] = {
     RAC_FRAMEWORK_NONE,
     RAC_FRAMEWORK_MLX,
     RAC_FRAMEWORK_COREML,
-    RAC_FRAMEWORK_METALRT,
-    RAC_FRAMEWORK_GENIE,
+    RAC_FRAMEWORK_QHEXRT,
     RAC_FRAMEWORK_SHERPA,
     RAC_FRAMEWORK_UNKNOWN,
 };

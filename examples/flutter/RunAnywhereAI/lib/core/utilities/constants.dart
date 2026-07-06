@@ -13,10 +13,12 @@
 class DefaultConfig {
   DefaultConfig._();
 
-  static const String runanywhereApiKey =
-      String.fromEnvironment('RUNANYWHERE_API_KEY');
-  static const String runanywhereBaseUrl =
-      String.fromEnvironment('RUNANYWHERE_BASE_URL');
+  static const String runanywhereApiKey = String.fromEnvironment(
+    'RUNANYWHERE_API_KEY',
+  );
+  static const String runanywhereBaseUrl = String.fromEnvironment(
+    'RUNANYWHERE_BASE_URL',
+  );
 }
 
 /// Keychain keys for secure storage
@@ -26,6 +28,7 @@ class KeychainKeys {
   static const String apiKey = 'runanywhere_api_key';
   static const String baseURL = 'runanywhere_base_url';
   static const String analyticsLogToLocal = 'analyticsLogToLocal';
+  static const String hfToken = 'hf_token';
 }
 
 /// UserDefaults keys for preferences

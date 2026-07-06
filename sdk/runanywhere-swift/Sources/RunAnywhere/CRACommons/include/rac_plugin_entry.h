@@ -22,10 +22,10 @@
 #ifndef RAC_PLUGIN_ENTRY_H
 #define RAC_PLUGIN_ENTRY_H
 
-#include "rac_error.h"
-#include "rac_logger.h"
-#include "rac_types.h"
-#include "rac_engine_vtable.h"
+#include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_types.h"
+#include "rac/plugin/rac_engine_vtable.h"
 
 // NOLINTBEGIN(modernize-redundant-void-arg,modernize-use-nullptr)
 #ifdef __cplusplus
@@ -67,23 +67,19 @@ extern "C" {
  *                 Plugins built against v2 will be rejected at register
  *                 time with RAC_ERROR_ABI_VERSION_MISMATCH because the
  *                 new `create` slot is unreachable otherwise.
- *                 NOTE: `rac_service_register_provider` /
- *                 `rac_service_unregister_provider` remain as no-op
- *                 deprecation shims (log a WARN, return RAC_SUCCESS) in
- *                 `src/plugin/rac_plugin_registry.cpp` to keep older Genie
- *                 .so / Flutter pre-v3 plugin binaries dlopenable.
  *                 The associated *types* / *fn typedefs /
  *                 `rac_service_create` / `rac_service_list_providers` are
  *                 gone for good; new code MUST use `rac_plugin_register` /
- *                 `rac_plugin_unregister`. The shims can be deleted once
- *                 every shipped Genie / RN / Flutter binary has been
- *                 rebuilt against v3.
+ *                 `rac_plugin_unregister`.
  *   4u — removed the never-implemented rerank_ops vtable slot and the
  *                 RAC_PRIMITIVE_RERANK primitive (wire value 6 retired). All
  *                 engines rebuild against v4; v3 plugins are rejected at
  *                 register time with RAC_ERROR_ABI_VERSION_MISMATCH.
+ *   5u — rac_llm_options_t grew across the engine service boundary. Engines
+ *                 compiled against v4 may read a shorter options layout, so
+ *                 they are rejected at register time until rebuilt.
  */
-#define RAC_PLUGIN_API_VERSION 4u
+#define RAC_PLUGIN_API_VERSION 5u
 
 /* ===========================================================================
  * Plugin entry-point signature
@@ -113,7 +109,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  * Example:
  * @code
  *   // sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry_llamacpp.h
- *   #include "rac_plugin_entry.h"
+ *   #include "rac/plugin/rac_plugin_entry.h"
  *   RAC_PLUGIN_ENTRY_DECL(llamacpp);
  * @endcode
  */
@@ -214,8 +210,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *
  * Some backends need more than the bare
  * `rac_plugin_register(rac_plugin_entry_<name>())` that RAC_STATIC_PLUGIN_REGISTER
- * performs — e.g. llamacpp also hooks up its CPU-runtime provider, and metalrt
- * emits a stub-mode diagnostic when the closed-source engine binary is absent.
+ * performs — e.g. llamacpp also hooks up its CPU-runtime provider.
  * Those backends expose a hand-written `rac_backend_<name>_register()` that does
  * the unified plugin registration *plus* the engine-specific bring-up, and is
  * idempotent on repeat calls (so the dynamic-link path — where the SDK bridge
@@ -349,12 +344,13 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *
  * Thread-safe.
  */
-rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+RAC_API rac_result_t
+rac_plugin_register(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Unregister a plugin by name. No-op if the name is not registered.
  */
-rac_result_t rac_plugin_unregister(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+RAC_API rac_result_t rac_plugin_unregister(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Look up the highest-priority plugin that serves `primitive`, or NULL
@@ -363,7 +359,8 @@ rac_result_t rac_plugin_unregister(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEP
  * Thread-safe. The returned pointer is valid for the remaining lifetime of
  * the registry (i.e. until `rac_plugin_unregister` is called for this name).
  */
-const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+RAC_API const rac_engine_vtable_t*
+rac_plugin_find(rac_primitive_t primitive) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Look up the plugin registered under `engine_name` IFF it serves
@@ -373,9 +370,9 @@ const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive) RAC_PLUGIN
  *
  * Thread-safe.
  */
-const rac_engine_vtable_t* rac_plugin_find_for_engine(rac_primitive_t primitive,
-                                                      const char* engine_name)
-    RAC_PLUGIN_REGISTRY_NOEXCEPT;
+RAC_API const rac_engine_vtable_t*
+rac_plugin_find_for_engine(rac_primitive_t primitive,
+                           const char* engine_name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Iterate all plugins registered for `primitive`, in descending
@@ -392,7 +389,7 @@ RAC_API rac_result_t rac_plugin_list(rac_primitive_t primitive,
  * @brief Total number of registered plugins (across all primitives,
  *        counting each plugin once).
  */
-size_t rac_plugin_count(void) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+RAC_API size_t rac_plugin_count(void) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 #ifdef __cplusplus
 }

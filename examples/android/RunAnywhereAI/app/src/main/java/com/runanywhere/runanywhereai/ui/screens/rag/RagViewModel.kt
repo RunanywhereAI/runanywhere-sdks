@@ -64,7 +64,7 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val doc = withContext(Dispatchers.IO) { DocumentExtractor.extract(getApplication(), uri) }
                 ensurePipeline(embeddingId, llmId)
-                RunAnywhere.ragIngest(doc.text, doc.name)
+                RunAnywhere.ragIngest(doc.text, doc.metadataJSON)
                 documents += doc.name
                 chunkCount = runCatching { RunAnywhere.ragGetStatistics().indexed_chunks.toInt() }
                     .getOrDefault(chunkCount)

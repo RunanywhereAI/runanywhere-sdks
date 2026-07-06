@@ -251,8 +251,6 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->framework = RAC_FRAMEWORK_MLX;
         else if (framework == "fluid_audio" || framework == "FluidAudio")
             model->framework = RAC_FRAMEWORK_FLUID_AUDIO;
-        else if (framework == "genie" || framework == "qnn_genie" || framework == "Genie")
-            model->framework = RAC_FRAMEWORK_GENIE;
         else if (framework == "qhexrt" || framework == "qhx" || framework == "qnn")
             model->framework = RAC_FRAMEWORK_QHEXRT;
         else if (framework == "sherpa" || framework == "sherpa_onnx" || framework == "sherpa-onnx")
@@ -556,7 +554,7 @@ static InferenceFramework infer_proto_framework_from_format(ModelFormat format) 
         case runanywhere::v1::MODEL_FORMAT_MLPACKAGE:
             return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
         case runanywhere::v1::MODEL_FORMAT_QNN_CONTEXT:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
+            return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
         case runanywhere::v1::MODEL_FORMAT_TFLITE:
             return runanywhere::v1::INFERENCE_FRAMEWORK_TFLITE;
         default:
@@ -580,8 +578,6 @@ static ModelCategory infer_proto_category_from_framework(InferenceFramework fram
         case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
         case runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         case runanywhere::v1::INFERENCE_FRAMEWORK_MLX:
-        case runanywhere::v1::INFERENCE_FRAMEWORK_METALRT:
-        case runanywhere::v1::INFERENCE_FRAMEWORK_GENIE:
         case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
         case runanywhere::v1::INFERENCE_FRAMEWORK_EXECUTORCH:
         case runanywhere::v1::INFERENCE_FRAMEWORK_MLC:
@@ -613,10 +609,6 @@ static InferenceFramework proto_framework_from_struct(rac_inference_framework_t 
             return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
         case RAC_FRAMEWORK_COREML:
             return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
-        case RAC_FRAMEWORK_METALRT:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_METALRT;
-        case RAC_FRAMEWORK_GENIE:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
         case RAC_FRAMEWORK_QHEXRT:
             return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
         case RAC_FRAMEWORK_SHERPA:
@@ -1054,11 +1046,7 @@ static InferenceFramework framework_from_assignment_token(const std::string& tok
                 return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
             case 8:
                 return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
-            // Value 9 (WHISPERKIT_COREML) retired — falls through to UNKNOWN.
-            case 10:
-                return runanywhere::v1::INFERENCE_FRAMEWORK_METALRT;
-            case 11:
-                return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
+            // Value 9 and values 10-11 retired — fall through to UNKNOWN.
             case 12:
                 return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;
             case 13:
@@ -1088,9 +1076,6 @@ static InferenceFramework framework_from_assignment_token(const std::string& tok
         return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
     if (lower == "fluid_audio" || lower == "fluid-audio") {
         return runanywhere::v1::INFERENCE_FRAMEWORK_FLUID_AUDIO;
-    }
-    if (lower == "genie" || lower == "qnn_genie" || lower == "qnn-genie") {
-        return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
     }
     if (lower == "qhexrt" || lower == "qhx" || lower == "qnn") {
         return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;

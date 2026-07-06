@@ -4,7 +4,7 @@
  *
  * A single vtable type replaces the per-domain `rac_llm_service_ops_t`,
  * `rac_stt_service_ops_t`, `rac_tts_service_ops_t`, … structs. Every engine
- * backend (llama.cpp, ONNX, sherpa, MetalRT, …)
+ * backend (llama.cpp, ONNX, sherpa, QHexRT, …)
  * populates one of these. Primitives the engine does NOT serve leave the
  * corresponding op-struct pointer NULL; the registry treats NULL as "engine
  * does not support this primitive" and returns `RAC_ERROR_CAPABILITY_UNSUPPORTED`.

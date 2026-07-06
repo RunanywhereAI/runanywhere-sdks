@@ -98,6 +98,12 @@ extern jmethodID g_getCoreCountMethod;
 extern jmethodID g_getArchitectureMethod;
 extern jmethodID g_getGPUFamilyMethod;
 extern jmethodID g_isTabletMethod;
+extern jmethodID g_getAppIdentifierMethod;
+extern jmethodID g_getAppNameMethod;
+extern jmethodID g_getAppVersionMethod;
+extern jmethodID g_getAppBuildMethod;
+extern jmethodID g_getLocaleIdentifierMethod;
+extern jmethodID g_getTimezoneIdentifierMethod;
 extern jmethodID g_httpDownloadMethod;
 extern jmethodID g_httpDownloadCancelMethod;
 // Directory enumeration slots populated by Kotlin PlatformAdapterBridge so
@@ -134,6 +140,31 @@ static JNIEnv* getJNIEnv() {
 // Android JNI bridge for secure storage
 // Uses cached class/method references from cpp-adapter.cpp to avoid FindClass from bg threads
 namespace AndroidBridge {
+    std::string callStaticString(jmethodID method, const char* label) {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return "";
+        if (!g_platformAdapterBridgeClass || !method) {
+            LOGE("PlatformAdapterBridge class or %s method not cached", label);
+            return "";
+        }
+
+        jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, method);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            LOGE("Exception in PlatformAdapterBridge.%s", label);
+            return "";
+        }
+        if (!result) return "";
+
+        const char* str = env->GetStringUTFChars(result, nullptr);
+        std::string value = str ? str : "";
+        if (str) {
+            env->ReleaseStringUTFChars(result, str);
+        }
+        env->DeleteLocalRef(result);
+        return value;
+    }
+
     bool secureSet(const char* key, const char* value) {
         JNIEnv* env = getJNIEnv();
         if (!env) return false;
@@ -439,6 +470,30 @@ namespace AndroidBridge {
         return result == JNI_TRUE;
     }
 
+    std::string getAppIdentifier() {
+        return callStaticString(g_getAppIdentifierMethod, "getAppIdentifier");
+    }
+
+    std::string getAppName() {
+        return callStaticString(g_getAppNameMethod, "getAppName");
+    }
+
+    std::string getAppVersion() {
+        return callStaticString(g_getAppVersionMethod, "getAppVersion");
+    }
+
+    std::string getAppBuild() {
+        return callStaticString(g_getAppBuildMethod, "getAppBuild");
+    }
+
+    std::string getLocaleIdentifier() {
+        return callStaticString(g_getLocaleIdentifierMethod, "getLocaleIdentifier");
+    }
+
+    std::string getTimezoneIdentifier() {
+        return callStaticString(g_getTimezoneIdentifierMethod, "getTimezoneIdentifier");
+    }
+
     rac_result_t httpDownload(const char* url, const char* destinationPath, const char* taskId) {
         JNIEnv* env = getJNIEnv();
         if (!env) return RAC_ERROR_NOT_SUPPORTED;
@@ -625,6 +680,14 @@ extern "C" {
     bool PlatformAdapter_getArchitecture(char** outValue);
     bool PlatformAdapter_getGPUFamily(char** outValue);
 
+    // App/client metadata (Bundle.main)
+    bool PlatformAdapter_getAppIdentifier(char** outValue);
+    bool PlatformAdapter_getAppName(char** outValue);
+    bool PlatformAdapter_getAppVersion(char** outValue);
+    bool PlatformAdapter_getAppBuild(char** outValue);
+    bool PlatformAdapter_getLocaleIdentifier(char** outValue);
+    bool PlatformAdapter_getTimezoneIdentifier(char** outValue);
+
     // Platform HTTP download fallback used by the RACommons platform adapter.
     // Public RN downloads enter commons through the rac_download_*_proto ABI.
     int PlatformAdapter_httpDownload(
@@ -775,6 +838,126 @@ using SdkRetryHttpProtoFn = rac_result_t (*)(rac_proto_buffer_t*);
 template <typename Fn>
 Fn loadOptionalSymbol(const char* name) {
     return reinterpret_cast<Fn>(dlsym(RTLD_DEFAULT, name));
+}
+
+struct RNClientInfo {
+    const char* sdk_binding;
+    const char* app_identifier;
+    const char* app_name;
+    const char* app_version;
+    const char* app_build;
+    const char* locale;
+    const char* timezone;
+};
+
+using SetClientInfoFn = void (*)(const RNClientInfo*);
+
+static const char* nullableCString(const std::string& value) {
+    return value.empty() ? nullptr : value.c_str();
+}
+
+#if defined(__APPLE__)
+static std::string takePlatformString(bool (*reader)(char**)) {
+    if (!reader) {
+        return "";
+    }
+    char* value = nullptr;
+    if (reader(&value) && value) {
+        std::string result(value);
+        std::free(value);
+        return result;
+    }
+    if (value) {
+        std::free(value);
+    }
+    return "";
+}
+#endif
+
+static std::string getClientAppIdentifier() {
+#if defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getAppIdentifier();
+#elif defined(__APPLE__)
+    return takePlatformString(PlatformAdapter_getAppIdentifier);
+#else
+    return "";
+#endif
+}
+
+static std::string getClientAppName() {
+#if defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getAppName();
+#elif defined(__APPLE__)
+    return takePlatformString(PlatformAdapter_getAppName);
+#else
+    return "";
+#endif
+}
+
+static std::string getClientAppVersion() {
+#if defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getAppVersion();
+#elif defined(__APPLE__)
+    return takePlatformString(PlatformAdapter_getAppVersion);
+#else
+    return "";
+#endif
+}
+
+static std::string getClientAppBuild() {
+#if defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getAppBuild();
+#elif defined(__APPLE__)
+    return takePlatformString(PlatformAdapter_getAppBuild);
+#else
+    return "";
+#endif
+}
+
+static std::string getClientLocale() {
+#if defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getLocaleIdentifier();
+#elif defined(__APPLE__)
+    return takePlatformString(PlatformAdapter_getLocaleIdentifier);
+#else
+    return "";
+#endif
+}
+
+static std::string getClientTimezone() {
+#if defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getTimezoneIdentifier();
+#elif defined(__APPLE__)
+    return takePlatformString(PlatformAdapter_getTimezoneIdentifier);
+#else
+    return "";
+#endif
+}
+
+static void configureClientInfo() {
+    auto setClientInfo = loadOptionalSymbol<SetClientInfoFn>("rac_sdk_set_client_info");
+    if (!setClientInfo) {
+        LOGD("rac_sdk_set_client_info unavailable; app metadata will be omitted");
+        return;
+    }
+
+    const std::string sdkBinding = "react_native";
+    const std::string appIdentifier = getClientAppIdentifier();
+    const std::string appName = getClientAppName();
+    const std::string appVersion = getClientAppVersion();
+    const std::string appBuild = getClientAppBuild();
+    const std::string locale = getClientLocale();
+    const std::string timezone = getClientTimezone();
+
+    RNClientInfo info{};
+    info.sdk_binding = sdkBinding.c_str();
+    info.app_identifier = nullableCString(appIdentifier);
+    info.app_name = nullableCString(appName);
+    info.app_version = nullableCString(appVersion);
+    info.app_build = nullableCString(appBuild);
+    info.locale = nullableCString(locale);
+    info.timezone = nullableCString(timezone);
+    setClientInfo(&info);
 }
 
 static void initProtoBuffer(rac_proto_buffer_t* buffer) {
@@ -1711,7 +1894,7 @@ rac_result_t InitBridge::initialize(
     apiKey_ = apiKey;
     baseURL_ = baseURL;
     deviceId_ = deviceId;
-    platform_ = platform.empty() ? "react_native" : platform;
+    platform_ = platform.empty() ? defaultNativePlatform() : platform;
     sdkVersion_ = sdkVersion.empty() ? std::string(rac_sdk_get_version()) : sdkVersion;
 
     // Step 1: Register platform adapter FIRST
@@ -1768,6 +1951,7 @@ rac_result_t InitBridge::initialize(
     } else {
         LOGI("SDK config initialized with version: %s", sdkConfig.sdk_version);
     }
+    configureClientInfo();
 
     // Step 5: Phase 1 proto (canonical commons owner for state init) when
     // bundled headers/native symbols expose rac_sdk_init_phase1_proto. Older

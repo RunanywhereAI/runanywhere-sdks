@@ -5,6 +5,8 @@ import 'package:runanywhere/runanywhere.dart' show RunAnywhere, ToolDefinition;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/services/hf_token_store.dart';
+import 'package:runanywhere_ai/core/services/model_catalog_bootstrap.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere_ai/core/utilities/url_utils.dart';
@@ -82,7 +84,9 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         _maxTokens = (prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000)
             .clamp(500, 20000)
             .toInt();
-        final storedPrompt = prefs.getString(PreferenceKeys.defaultSystemPrompt);
+        final storedPrompt = prefs.getString(
+          PreferenceKeys.defaultSystemPrompt,
+        );
         // Prefill a meaningful default the first time (null) so it's applied and
         // editable everywhere; respect an explicit empty string the user saved.
         _systemPrompt = storedPrompt ?? kDefaultSystemPrompt;
@@ -111,10 +115,9 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     }
   }
 
-  /// Load the persisted HuggingFace token from SharedPreferences
+  /// Load the persisted HuggingFace token from secure storage.
   Future<void> _loadHfToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(PreferenceKeys.hfToken) ?? '';
+    final token = await HfTokenStore.load();
     if (mounted) {
       setState(() {
         _hfTokenController.text = token;
@@ -123,11 +126,27 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   }
 
   /// Persist the HuggingFace token and apply it to the SDK after editing.
-  Future<void> _saveHfToken(String value) async {
+  Future<void> _saveHfToken(String value, {bool showFeedback = false}) async {
     final token = value.trim();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(PreferenceKeys.hfToken, token);
-    RunAnywhere.setHfToken(token.isEmpty ? '' : token);
+    await HfTokenStore.save(token);
+    RunAnywhere.setHfToken(token);
+    await ModelCatalogBootstrap.refreshNpuCatalog();
+    if (showFeedback && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            token.isEmpty
+                ? 'Hugging Face token cleared'
+                : 'Hugging Face token saved',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _clearHfToken() async {
+    _hfTokenController.clear();
+    await _saveHfToken('', showFeedback: true);
   }
 
   /// Load API configuration from keychain
@@ -721,29 +740,44 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('HuggingFace token', style: AppTypography.subheadline(context)),
+            Text(
+              'HuggingFace token',
+              style: AppTypography.subheadline(context),
+            ),
             const SizedBox(height: AppSpacing.xSmall),
-            Focus(
-              onFocusChange: (hasFocus) {
-                if (!hasFocus) {
-                  unawaited(_saveHfToken(_hfTokenController.text));
-                }
-              },
-              child: TextField(
-                controller: _hfTokenController,
-                decoration: const InputDecoration(
-                  hintText: 'hf_…',
-                  border: OutlineInputBorder(),
-                ),
-                autocorrect: false,
-                obscureText: true,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (value) => unawaited(_saveHfToken(value)),
+            TextField(
+              controller: _hfTokenController,
+              decoration: const InputDecoration(
+                hintText: 'hf_…',
+                border: OutlineInputBorder(),
               ),
+              autocorrect: false,
+              obscureText: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (value) => unawaited(_saveHfToken(value)),
+            ),
+            const SizedBox(height: AppSpacing.xSmall),
+            Wrap(
+              spacing: AppSpacing.small,
+              runSpacing: AppSpacing.xSmall,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => unawaited(
+                    _saveHfToken(_hfTokenController.text, showFeedback: true),
+                  ),
+                  icon: const Icon(Icons.check, size: 18),
+                  label: const Text('Save token'),
+                ),
+                TextButton.icon(
+                  onPressed: () => unawaited(_clearHfToken()),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Clear'),
+                ),
+              ],
             ),
             const SizedBox(height: AppSpacing.xSmall),
             Text(
-              'Used to download private Hugging Face model repos',
+              'Used to download private Hugging Face model repos, including HNPU/QHexRT NPU bundles',
               style: AppTypography.caption2(
                 context,
               ).copyWith(color: AppColors.textSecondary(context)),

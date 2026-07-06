@@ -92,6 +92,8 @@ android {
         jniLibs {
             // SDK + backend AARs each bundle the NDK C++ runtime; keep one copy per ABI.
             pickFirsts += "**/libc++_shared.so"
+            pickFirsts += "**/libomp.so"
+            pickFirsts += "**/librac_commons.so"
             useLegacyPackaging = true
         }
     }

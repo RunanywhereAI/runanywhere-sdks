@@ -5,15 +5,14 @@ import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/app/content_view.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/services/hf_token_store.dart';
 import 'package:runanywhere_ai/core/services/model_catalog_bootstrap.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere_ai/core/utilities/url_utils.dart';
-import 'package:runanywhere_genie/runanywhere_genie.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// RunAnywhereAIApp
 ///
@@ -88,8 +87,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
       // Re-apply the persisted HuggingFace token (Settings screen) so private
       // HF model repos stay downloadable across app restarts.
-      final prefs = await SharedPreferences.getInstance();
-      final hfToken = prefs.getString(PreferenceKeys.hfToken)?.trim() ?? '';
+      final hfToken = await HfTokenStore.load();
       if (hfToken.isNotEmpty) {
         RunAnywhere.setHfToken(hfToken);
         debugPrint('🔑 Applied persisted HuggingFace token');
@@ -163,15 +161,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     }
 
     LlamaCpp.register();
-
-    if (Genie.isAvailable) {
-      await Genie.register(priority: 200);
-      debugPrint(
-        '✅ Genie backend registered; NPU model catalog is pending generated registry/catalog support',
-      );
-    } else {
-      debugPrint('ℹ️ Genie NPU not available (non-Snapdragon device)');
-    }
 
     try {
       await Onnx.register();

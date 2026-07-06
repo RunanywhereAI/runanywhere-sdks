@@ -637,8 +637,6 @@ jobs:
               path: ../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
             runanywhere_onnx:
               path: ../sdk/runanywhere-flutter/packages/runanywhere_onnx
-            runanywhere_genie:
-              path: ../sdk/runanywhere-flutter/packages/runanywhere_genie
           EOF
       - name: Analyze flutter-starter-example against in-tree SDK
         run: |

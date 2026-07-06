@@ -1099,28 +1099,10 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     add_test(NAME plugin_entry_onnx_tests COMMAND test_plugin_entry_onnx)
 endif()
 
-if(RAC_BACKEND_GENIE AND TARGET rac_backend_genie)
-    add_executable(test_plugin_entry_genie test_plugin_entry_genie.cpp)
-    target_include_directories(test_plugin_entry_genie PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/engines/genie
-    )
-    target_link_libraries(test_plugin_entry_genie PRIVATE rac_commons rac_backend_genie)
-    rac_link_archive_deps(test_plugin_entry_genie)
-    target_compile_features(test_plugin_entry_genie PRIVATE cxx_std_17)
-    add_test(NAME plugin_entry_genie_tests COMMAND test_plugin_entry_genie)
-endif()
-
 # Note: sherpa plugin-entry test is wired in the root CMakeLists.txt (alongside
-# the genie test) because rac_backend_sherpa is built by engines/ which is
+# other engine tests) because rac_backend_sherpa is built by engines/ which is
 # configured after sdk/runanywhere-commons/, so the target does not exist yet
 # when this file runs in a root-level build.
-
-# Note: metalrt plugin-entry test is wired in the root
-# CMakeLists.txt for the same reason as sherpa — rac_backend_metalrt is built
-# by engines/ (Apple-only OBJECT library folded into rac_commons) and is not
-# yet configured at this point.
 
 if(APPLE AND RAC_BACKEND_COREML AND TARGET rac_backend_coreml)
     add_executable(test_diffusion_coreml_generate test_diffusion_coreml_generate.cpp)

@@ -289,7 +289,11 @@ void rac_logger_logv(rac_log_level_t level, const char* category,
 
     // Format the message (only reached when level passes)
     char buffer[2048];
-    vsnprintf(buffer, sizeof(buffer), format, args);
+    const int written = vsnprintf(buffer, sizeof(buffer), format, args);
+    if (written < 0) {
+        snprintf(buffer, sizeof(buffer), "<log formatting failed>");
+    }
+    buffer[sizeof(buffer) - 1] = '\0';
 
     rac_logger_log(level, category, buffer, metadata);
 }

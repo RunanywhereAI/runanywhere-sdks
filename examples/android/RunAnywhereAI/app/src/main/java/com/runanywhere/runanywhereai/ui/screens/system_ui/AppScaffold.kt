@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -13,15 +15,24 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.rememberDrawerState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.runanywhere.runanywhereai.RunAnywhereApplication
+import com.runanywhere.runanywhereai.data.conversation.ConversationRepository
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.ui.navigation.AppNavHost
+import com.runanywhere.runanywhereai.ui.navigation.Chat
+import com.runanywhere.runanywhereai.ui.navigation.More
+import com.runanywhere.runanywhereai.ui.navigation.Vision
+import com.runanywhere.runanywhereai.ui.navigation.Voice
+import com.runanywhere.runanywhereai.ui.navigation.isConsumerTopLevel
+import com.runanywhere.runanywhereai.ui.navigation.navigateTopLevel
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatDetailsSheet
 import com.runanywhere.runanywhereai.ui.screens.chat.ConversationHistorySheet
 import com.runanywhere.runanywhereai.ui.screens.intro.InitErrorScreen
@@ -34,9 +45,10 @@ import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
 import com.runanywhere.runanywhereai.util.LocalIsExpandedLayout
 import com.runanywhere.runanywhereai.util.isExpandedScreen
+import kotlinx.coroutines.launch
 
-// Single app frame: route-dispatched chrome + NavHost. Bottom bar on compact widths,
-// side nav rail on expanded (tablet) widths.
+// Single app frame: route-dispatched chrome + NavHost. Compact widths use a
+// modal drawer; expanded layouts keep the same IA visible as a side drawer.
 @Composable
 fun AppScaffold() {
     val navController = rememberNavController()
@@ -52,9 +64,23 @@ fun AppScaffold() {
     var showHistorySheet by remember { mutableStateOf(false) }
     var showLoraSheet by remember { mutableStateOf(false) }
     var showDetailsSheet by remember { mutableStateOf(false) }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
     val isExpanded = isExpandedScreen()
     val showNav = destination != null
+    val recentConversations = ConversationRepository.summaries
+    val canNavigateBack = destination != null &&
+        !destination.isConsumerTopLevel() &&
+        navController.previousBackStackEntry != null
+    val startNewChat = {
+        chatViewModel.clearChat()
+        navController.navigateTopLevel(Chat)
+    }
+    val openConversation = { id: String ->
+        chatViewModel.loadConversation(id)
+        navController.navigateTopLevel(Chat)
+    }
 
     CompositionLocalProvider(LocalIsExpandedLayout provides isExpanded) {
         val frame: @Composable () -> Unit = {
@@ -74,17 +100,20 @@ fun AppScaffold() {
                             onHistory = { showHistorySheet = true },
                             onLora = { showLoraSheet = true },
                             onDetails = { showDetailsSheet = true },
+                            onMenu = { scope.launch { drawerState.open() } },
+                            onNavigateBack = { navController.popBackStack() },
+                            showMenu = !isExpanded,
+                            canNavigateBack = canNavigateBack,
                         )
                     }
-                },
-                // Bottom bar only on compact widths; expanded uses the rail (added in the Row below).
-                bottomBar = {
-                    if (showNav && !isExpanded) AppBottomBar(navController, destination)
                 },
             ) { innerPadding ->
                 AppNavHost(
                     navController = navController,
                     chatViewModel = chatViewModel,
+                    onOpenVision = { navController.navigateTopLevel(Vision) },
+                    onOpenVoice = { navController.navigateTopLevel(Voice) },
+                    onOpenAdvanced = { navController.navigateTopLevel(More) },
                     modifier = Modifier
                         .padding(innerPadding)
                         .consumeWindowInsets(innerPadding),
@@ -95,13 +124,49 @@ fun AppScaffold() {
         Box(modifier = Modifier.fillMaxSize()) {
             if (showNav && isExpanded) {
                 PermanentNavigationDrawer(
-                    drawerContent = { AppNavigationDrawer(navController, destination) },
+                    drawerContent = {
+                        AppNavigationDrawer(
+                            navController = navController,
+                            destination = destination,
+                            recentConversations = recentConversations,
+                            onNewChat = startNewChat,
+                            onOpenConversation = openConversation,
+                            onHistory = { showHistorySheet = true },
+                            onModels = { showModelSheet = true },
+                            onAdapters = { showLoraSheet = true },
+                            permanent = true,
+                        )
+                    },
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     frame()
                 }
             } else {
-                frame()
+                ModalNavigationDrawer(
+                    drawerState = drawerState,
+                    gesturesEnabled = showNav,
+                    drawerContent = {
+                        AppNavigationDrawer(
+                            navController = navController,
+                            destination = destination,
+                            recentConversations = recentConversations,
+                            onNewChat = startNewChat,
+                            onOpenConversation = openConversation,
+                            onHistory = { showHistorySheet = true },
+                            onModels = { showModelSheet = true },
+                            onAdapters = { showLoraSheet = true },
+                            onDismiss = { afterClose ->
+                                scope.launch {
+                                    drawerState.close()
+                                    afterClose()
+                                }
+                            },
+                            permanent = false,
+                        )
+                    },
+                ) {
+                    frame()
+                }
             }
 
             // Startup splash gate: covers the app until SDK setup reports ready, so the

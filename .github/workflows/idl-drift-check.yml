@@ -148,6 +148,7 @@ jobs:
         # ABI generator parses YAML schemas, so the system Python
         # needs both packages available before generate_all.sh runs.
         run: |
+          PYTHON_PROTOBUF_VERSION="$(grep -E '^PYTHON_PROTOBUF_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2)"
           # python3 is REQUIRED in CI. generate_all.sh soft-skips every
           # convenience + modality-ABI generator with a warning (exit 0) when
           # python3 is absent, which would let annotation edits pass the drift
@@ -156,7 +157,7 @@ jobs:
             echo "::error::python3 not on PATH — required for convenience codegen"
             exit 1
           fi
-          python3 -m pip install --upgrade --break-system-packages protobuf pyyaml
+          python3 -m pip install --upgrade --break-system-packages "protobuf>=${PYTHON_PROTOBUF_VERSION},<7" pyyaml
 
       - name: Dump toolchain versions (debug)
         run: |

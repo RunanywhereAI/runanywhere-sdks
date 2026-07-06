@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
     `maven-publish`
+    signing
 }
 
 val useLocalNatives: Boolean =
@@ -103,7 +104,10 @@ android {
     }
 
     sourceSets {
-        getByName("main") { java.srcDirs("src/main/kotlin") }
+        getByName("main") {
+            java.srcDirs("src/main/kotlin")
+            jniLibs.srcDirs("src/main/jniLibs", "src/androidMain/jniLibs")
+        }
         getByName("test") { java.srcDirs("src/test/kotlin") }
     }
 
@@ -162,8 +166,22 @@ version = System.getenv("SDK_VERSION")?.removePrefix("v")
     ?: System.getenv("VERSION")?.removePrefix("v")
     ?: "0.1.5-SNAPSHOT"
 
-// Private backend: publishable to mavenLocal only. No remote repositories or
-// signing are declared, so it can never be pushed to Maven Central / GitHub.
+val mavenCentralUsername: String? =
+    System.getenv("MAVEN_CENTRAL_USERNAME")
+        ?: project.findProperty("mavenCentral.username") as String?
+val mavenCentralPassword: String? =
+    System.getenv("MAVEN_CENTRAL_PASSWORD")
+        ?: project.findProperty("mavenCentral.password") as String?
+val signingKeyId: String? =
+    System.getenv("GPG_KEY_ID")
+        ?: project.findProperty("signing.keyId") as String?
+val signingPassword: String? =
+    System.getenv("GPG_SIGNING_PASSWORD")
+        ?: project.findProperty("signing.password") as String?
+val signingKey: String? =
+    System.getenv("GPG_SIGNING_KEY")
+        ?: project.findProperty("signing.key") as String?
+
 afterEvaluate {
     publishing {
         publications {
@@ -172,7 +190,72 @@ afterEvaluate {
                 groupId = project.group.toString()
                 artifactId = "runanywhere-qhexrt"
                 version = project.version.toString()
+
+                pom {
+                    name.set("RunAnywhere QHexRT Backend")
+                    description.set("Qualcomm Hexagon NPU backend for RunAnywhere SDK - Android arm64 QNN-context inference on supported Snapdragon devices.")
+                    url.set("https://runanywhere.ai")
+                    inceptionYear.set("2024")
+
+                    licenses {
+                        license {
+                            name.set("The Apache License, Version 2.0")
+                            url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                            distribution.set("repo")
+                        }
+                    }
+
+                    developers {
+                        developer {
+                            id.set("runanywhere")
+                            name.set("RunAnywhere Team")
+                            email.set("founders@runanywhere.ai")
+                            organization.set("RunAnywhere AI")
+                            organizationUrl.set("https://runanywhere.ai")
+                        }
+                    }
+
+                    scm {
+                        connection.set("scm:git:git://github.com/RunanywhereAI/runanywhere-sdks.git")
+                        developerConnection.set("scm:git:ssh://github.com/RunanywhereAI/runanywhere-sdks.git")
+                        url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
+                    }
+                }
             }
         }
+
+        repositories {
+            maven {
+                name = "MavenCentral"
+                url = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
+                credentials {
+                    username = mavenCentralUsername
+                    password = mavenCentralPassword
+                }
+            }
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/RunanywhereAI/runanywhere-sdks")
+                credentials {
+                    username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+                    password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
+                }
+            }
+        }
+    }
+
+    signing {
+        if (signingKey != null && signingKey.contains("BEGIN PGP")) {
+            useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
+        } else {
+            useGpgCmd()
+        }
+        sign(publishing.publications)
+    }
+}
+
+tasks.withType<Sign>().configureEach {
+    onlyIf {
+        project.hasProperty("signing.gnupg.keyName") || signingKey != null
     }
 }

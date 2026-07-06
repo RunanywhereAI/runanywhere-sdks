@@ -25,6 +25,8 @@ import {
 } from '@runanywhere/web';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
+import { formatFramework } from '../services/model-display';
+import { getGenerationSettings } from './settings';
 
 const TOP_K = 3;
 
@@ -232,8 +234,16 @@ function fillSelect(select: HTMLSelectElement, models: ModelInfo[], emptyLabel: 
   }
   select.disabled = false;
   select.innerHTML = models
-    .map((model) => `<option value="${escapeHtml(model.id)}">${escapeHtml(model.name || model.id)}</option>`)
+    .map((model) => {
+      const label = `${model.name || model.id} · ${formatFramework(model.framework)}`;
+      return `<option value="${escapeHtml(model.id)}">${escapeHtml(label)}</option>`;
+    })
     .join('');
+}
+
+function selectedLlmSupportsThinking(): boolean {
+  return registryModelsForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE)
+    .some((model) => model.id === selectedLlmModelId && model.supportsThinking);
 }
 
 // ---------------------------------------------------------------------------
@@ -347,6 +357,7 @@ async function askQuestion(): Promise<void> {
       retrievalTopK: TOP_K,
       maxTokens: 512,
       temperature: 0.4,
+      disableThinking: selectedLlmSupportsThinking() && !getGenerationSettings().thinkingModeEnabled,
     });
 
     if (result.errorCode !== 0) {
@@ -359,7 +370,7 @@ async function askQuestion(): Promise<void> {
       return;
     }
 
-    setAnswer(formatAnswer(result.answer, result.retrievedChunks));
+    setAnswer(formatAnswer(result.answer, result.retrievedChunks, result.thinkingContent));
   } catch (err) {
     setAnswer(`Failed: ${formatError(err)}`);
   } finally {
@@ -471,27 +482,32 @@ async function ensureRAGReady(): Promise<boolean> {
 }
 
 /**
- * Split `<think>...</think>` reasoning out of the answer into a collapsible
+ * Split built-in thinking tags out of the answer into a collapsible
  * section (iOS parity: RAGViewModel.swift:145-149 thinkingContent +
  * DocumentRAGView.swift:473-543 thinkingSection).
  */
 function splitThinking(text: string): { answer: string; thinking: string | null } {
-  const match = /<think>([\s\S]*?)<\/think>/i.exec(text);
+  const match = /<(think|thinking)>([\s\S]*?)<\/\1>/i.exec(text);
   if (!match) {
     // Tolerate an unterminated opening tag (model cut off mid-thought).
-    const open = /<think>([\s\S]*)$/i.exec(text);
+    const open = /<(think|thinking)>([\s\S]*)$/i.exec(text);
     if (open) {
-      return { answer: text.slice(0, open.index).trim(), thinking: open[1].trim() || null };
+      return { answer: text.slice(0, open.index).trim(), thinking: open[2].trim() || null };
     }
     return { answer: text, thinking: null };
   }
-  const thinking = match[1].trim();
+  const thinking = match[2].trim();
   const answer = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim();
   return { answer, thinking: thinking || null };
 }
 
-function formatAnswer(text: string, sources: RAGSearchResult[]): string {
-  const { answer, thinking } = splitThinking(text);
+function formatAnswer(
+  text: string,
+  sources: RAGSearchResult[],
+  thinkingContent?: string,
+): string {
+  const split = splitThinking(text);
+  const thinking = thinkingContent?.trim() || split.thinking;
   const thinkingHtml = thinking
     ? `<details class="docs-thinking" style="margin-bottom:8px;">
         <summary style="cursor:pointer; font-size:0.8rem; opacity:0.7;">Reasoning</summary>
@@ -504,7 +520,7 @@ function formatAnswer(text: string, sources: RAGSearchResult[]): string {
       <pre>${escapeHtml(source.text.slice(0, 400))}${source.text.length > 400 ? '...' : ''}</pre>
     </div>
   `).join('');
-  return `${thinkingHtml}<div class="docs-answer-text">${escapeHtml(answer)}</div><div class="docs-sources">${sourcesHtml}</div>`;
+  return `${thinkingHtml}<div class="docs-answer-text">${escapeHtml(split.answer)}</div><div class="docs-sources">${sourcesHtml}</div>`;
 }
 
 function createDocumentId(): string {

@@ -5,6 +5,7 @@ data class AppSettings(
     val maxTokens: Int = 1024,
     val systemPrompt: String = "",
     val streaming: Boolean = true,
+    val disableThinking: Boolean = false,
     val toolCallingEnabled: Boolean = false,
     val hfToken: String = "",
 )

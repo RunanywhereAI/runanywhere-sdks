@@ -31,6 +31,14 @@ export interface SDKInitOptions {
   environment?: SDKEnvironment;
   /** Optional development-mode device registration build token (dev-mode parity with Swift). */
   buildToken?: string;
+  /** Optional host app/site identifier for device registration metadata. Defaults to location.origin on Web. */
+  appIdentifier?: string;
+  /** Optional host app/site display name for device registration metadata. Defaults to document metadata/title on Web. */
+  appName?: string;
+  /** Optional host app/site version. Omit when the app does not have a real version. */
+  appVersion?: string;
+  /** Optional host app/site build number. Omit when the app does not have a real build number. */
+  appBuild?: string;
   /** Hardware acceleration preference for LLM/VLM inference. Web-only (WebGPU platform option); no Swift counterpart. */
   acceleration?: AccelerationPreference;
   /**

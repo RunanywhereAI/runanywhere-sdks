@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -600,7 +601,9 @@ static int64_t structured_now_us() {
 
 static rac_result_t structured_result_from_text(const std::string& raw_text,
                                                 const rac_structured_output_config_t* config,
-                                                runanywhere::v1::StructuredOutputResult* result) {
+                                                runanywhere::v1::StructuredOutputResult* result,
+                                                const std::string& thinking_open_tag,
+                                                const std::string& thinking_close_tag) {
     if (!result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -609,8 +612,10 @@ static rac_result_t structured_result_from_text(const std::string& raw_text,
     size_t response_len = 0;
     const char* thinking = nullptr;
     size_t thinking_len = 0;
-    (void)rac_llm_extract_thinking(raw_text.c_str(), &response, &response_len, &thinking,
-                                   &thinking_len);
+    (void)rac_llm_extract_thinking_with_tags(
+        raw_text.c_str(), thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
+        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
+        &response_len, &thinking, &thinking_len);
     const std::string parse_text = response ? std::string(response, response_len) : raw_text;
 
     rac_structured_output_parse_result_t parsed{};
@@ -690,6 +695,8 @@ struct StructuredStreamContext {
     std::string request_id;
     std::string raw_text;
     std::string last_partial_json;
+    std::string thinking_open_tag;
+    std::string thinking_close_tag;
     // commons-104: track tokens so terminal events can report finish_reason
     // "length" when the engine stopped because options.max_tokens was reached,
     // mirroring rac_llm_proto_service.cpp generate_stream and llm_component.
@@ -747,8 +754,11 @@ static void maybe_dispatch_partial_json(StructuredStreamContext* ctx) {
     size_t response_len = 0;
     const char* thinking = nullptr;
     size_t thinking_len = 0;
-    (void)rac_llm_extract_thinking(ctx->raw_text.c_str(), &response, &response_len, &thinking,
-                                   &thinking_len);
+    (void)rac_llm_extract_thinking_with_tags(
+        ctx->raw_text.c_str(),
+        ctx->thinking_open_tag.empty() ? nullptr : ctx->thinking_open_tag.c_str(),
+        ctx->thinking_close_tag.empty() ? nullptr : ctx->thinking_close_tag.c_str(), &response,
+        &response_len, &thinking, &thinking_len);
     const std::string scan_text = response ? std::string(response, response_len) : ctx->raw_text;
 
     size_t start = 0;
@@ -797,7 +807,9 @@ static void dispatch_structured_terminal_once(StructuredStreamContext* ctx,
     ctx->terminal_sent = true;
 
     runanywhere::v1::StructuredOutputResult result;
-    rac_result_t result_rc = structured_result_from_text(ctx->raw_text, ctx->config, &result);
+    rac_result_t result_rc =
+        structured_result_from_text(ctx->raw_text, ctx->config, &result, ctx->thinking_open_tag,
+                                    ctx->thinking_close_tag);
     // Treat INVALID_FORMAT/VALIDATION_FAILED as typed semantic outcomes carried
     // by the StructuredOutputResult envelope, not as transport errors. Only
     // ABI/IO failures (null args, OOM, serialization) emit an ERROR event with
@@ -1407,6 +1419,10 @@ extern "C" rac_result_t rac_structured_output_generate_proto(const uint8_t* requ
     }
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
+    std::string thinking_open_tag;
+    std::string thinking_close_tag;
+    (void)rac::llm::model_thinking_tags_from_registry(ref.model_id, &thinking_open_tag,
+                                                      &thinking_close_tag);
     rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
     options.streaming_enabled = RAC_FALSE;
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
@@ -1435,7 +1451,8 @@ extern "C" rac_result_t rac_structured_output_generate_proto(const uint8_t* requ
 
     runanywhere::v1::StructuredOutputResult result;
     rc = structured_result_from_text(raw.text ? raw.text : "",
-                                     has_options ? &converted.config : nullptr, &result);
+                                     has_options ? &converted.config : nullptr, &result,
+                                     thinking_open_tag, thinking_close_tag);
     rac_llm_result_free(&raw);
     rac::llm::release_lifecycle_llm(&ref);
     // Mirrors rac_structured_output_parse_proto: INVALID_FORMAT and
@@ -1531,6 +1548,8 @@ rac_structured_output_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.config = has_options ? &converted.config : nullptr;
     ctx.request_id = request.request_id();
     ctx.max_tokens = options.max_tokens;
+    (void)rac::llm::model_thinking_tags_from_registry(ref.model_id, &ctx.thinking_open_tag,
+                                                      &ctx.thinking_close_tag);
 
     // Defensive: catch any C++ exception that escapes the engine vtable so it
     // cannot propagate across the extern "C" boundary. See parallel guard in

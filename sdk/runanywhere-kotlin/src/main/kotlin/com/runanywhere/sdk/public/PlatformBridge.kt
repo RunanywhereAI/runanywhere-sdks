@@ -7,13 +7,20 @@
 
 package com.runanywhere.sdk.public
 
+import android.content.Context
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
+import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.events.EventBus
+import java.util.Locale
+import java.util.TimeZone
 
 private const val TAG = "PlatformBridge"
 private val logger = SDKLogger(TAG)
@@ -48,6 +55,7 @@ internal fun initializePlatformBridge(environment: SDKEnvironment, apiKey: Strin
     }
 
     CppBridge.initialize(resolvedEnvironment)
+    configureClientInfo()
 
     // Wire the public EventBus to the canonical native SDKEvent stream
     // so consumers see lifecycle/error/model events emitted by C++.
@@ -57,6 +65,80 @@ internal fun initializePlatformBridge(environment: SDKEnvironment, apiKey: Strin
     EventBus.start()
 
     logger.debug("CppBridge initialization complete. Native library loaded: ${CppBridge.isNativeLibraryLoaded}")
+}
+
+private fun configureClientInfo() {
+    val locale = Locale.getDefault().toLanguageTag()
+    val timezone = TimeZone.getDefault().id
+
+    val appInfo = readAndroidAppInfo()
+    RunAnywhereBridge.racSdkSetClientInfo(
+        sdkBinding = "kotlin",
+        appIdentifier = appInfo?.identifier,
+        appName = appInfo?.name,
+        appVersion = appInfo?.version,
+        appBuild = appInfo?.build,
+        locale = locale,
+        timezone = timezone,
+    )
+}
+
+private data class AndroidAppInfo(
+    val identifier: String,
+    val name: String?,
+    val version: String?,
+    val build: String?,
+)
+
+private fun readAndroidAppInfo(): AndroidAppInfo? {
+    if (!AndroidPlatformContext.isInitialized()) {
+        return null
+    }
+
+    return try {
+        val context = AndroidPlatformContext.applicationContext
+        val packageName = context.packageName
+        val packageManager = context.packageManager
+        val packageInfo = readPackageInfo(context) ?: return null
+        val appName =
+            runCatching { context.applicationInfo.loadLabel(packageManager).toString() }.getOrNull()
+        val versionName = packageInfo.versionName
+        AndroidAppInfo(
+            identifier = packageName,
+            name = appName,
+            version = versionName,
+            build = readVersionCode(packageInfo).toString(),
+        )
+    } catch (e: Exception) {
+        logger.debug("Unable to read Android app metadata: ${e.message}")
+        null
+    }
+}
+
+private fun readPackageInfo(context: Context): PackageInfo? {
+    val packageManager = context.packageManager
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.PackageInfoFlags.of(0),
+        )
+    } else {
+        val method = PackageManager::class.java.getMethod(
+            "getPackageInfo",
+            String::class.java,
+            Int::class.javaPrimitiveType,
+        )
+        method.invoke(packageManager, context.packageName, 0) as? PackageInfo
+    }
+}
+
+private fun readVersionCode(packageInfo: PackageInfo): Long {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        packageInfo.longVersionCode
+    } else {
+        val field = PackageInfo::class.java.getField("versionCode")
+        field.getInt(packageInfo).toLong()
+    }
 }
 
 /**

@@ -804,6 +804,124 @@ static bool jniClearPendingException(JNIEnv* env) {
     return false;
 }
 
+static bool decodeUtf8CodePoint(const char* source, size_t length, size_t& index, uint32_t& code_point) {
+    const auto first = static_cast<unsigned char>(source[index]);
+    if (first < 0x80) {
+        code_point = first;
+        ++index;
+        return true;
+    }
+
+    size_t sequence_length = 0;
+    uint32_t value = 0;
+    uint32_t minimum_value = 0;
+    if ((first & 0xe0u) == 0xc0u) {
+        sequence_length = 2;
+        value = first & 0x1fu;
+        minimum_value = 0x80u;
+    } else if ((first & 0xf0u) == 0xe0u) {
+        sequence_length = 3;
+        value = first & 0x0fu;
+        minimum_value = 0x800u;
+    } else if ((first & 0xf8u) == 0xf0u) {
+        sequence_length = 4;
+        value = first & 0x07u;
+        minimum_value = 0x10000u;
+    } else {
+        ++index;
+        return false;
+    }
+
+    if (index + sequence_length > length) {
+        ++index;
+        return false;
+    }
+
+    for (size_t offset = 1; offset < sequence_length; ++offset) {
+        const auto next = static_cast<unsigned char>(source[index + offset]);
+        if ((next & 0xc0u) != 0x80u) {
+            ++index;
+            return false;
+        }
+        value = (value << 6u) | (next & 0x3fu);
+    }
+
+    if (value < minimum_value || value > 0x10ffffu || (value >= 0xd800u && value <= 0xdfffu)) {
+        ++index;
+        return false;
+    }
+
+    code_point = value;
+    index += sequence_length;
+    return true;
+}
+
+static std::string jniSafeLogString(const char* value, const char* fallback) {
+    const char* source = value != nullptr ? value : fallback;
+    if (source == nullptr) {
+        return "";
+    }
+
+    constexpr size_t kMaxLogChars = 4096;
+    const size_t source_length = std::strlen(source);
+    std::string output;
+    output.reserve(std::min(source_length, kMaxLogChars));
+
+    for (size_t i = 0; i < source_length && output.size() < kMaxLogChars;) {
+        const size_t start = i;
+        uint32_t code_point = 0;
+        if (!decodeUtf8CodePoint(source, source_length, i, code_point)) {
+            output.push_back('?');
+            continue;
+        }
+
+        if (code_point == '\n' || code_point == '\r' || code_point == '\t' ||
+            code_point >= 0x20u) {
+            const size_t byte_count = i - start;
+            if (output.size() + byte_count > kMaxLogChars) {
+                break;
+            }
+            output.append(source + start, byte_count);
+        } else {
+            output.push_back('?');
+        }
+    }
+
+    return output;
+}
+
+static std::vector<jchar> utf8ToJChars(const std::string& value) {
+    std::vector<jchar> chars;
+    chars.reserve(value.size());
+
+    for (size_t i = 0; i < value.size();) {
+        uint32_t code_point = 0;
+        if (!decodeUtf8CodePoint(value.c_str(), value.size(), i, code_point)) {
+            code_point = '?';
+        }
+
+        if (code_point <= 0xffffu) {
+            chars.push_back(static_cast<jchar>(code_point));
+        } else {
+            code_point -= 0x10000u;
+            chars.push_back(static_cast<jchar>(0xd800u + (code_point >> 10u)));
+            chars.push_back(static_cast<jchar>(0xdc00u + (code_point & 0x3ffu)));
+        }
+    }
+
+    return chars;
+}
+
+static jstring newSafeLogJString(JNIEnv* env, const std::string& value) {
+    const std::vector<jchar> chars = utf8ToJChars(value);
+    jstring result =
+        env->NewString(chars.empty() ? nullptr : chars.data(), static_cast<jsize>(chars.size()));
+    if (result == nullptr) {
+        jniClearPendingException(env);
+    }
+    return result;
+}
+
 // =============================================================================
 // Platform Adapter C Callbacks (called by C++ library)
 // =============================================================================
@@ -827,6 +945,9 @@ static rac_platform_adapter_t g_c_adapter;
 static void jni_log_callback(rac_log_level_t level, const char* tag, const char* message,
                              void* user_data) {
     JNIEnv* env = getJNIEnv();
+    const std::string safe_tag = jniSafeLogString(tag, "RAC");
+    const std::string safe_message = jniSafeLogString(message, "");
+
     std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_log == nullptr) {
         // Fallback to direct native logging (NOT through RAC_LOG_* to avoid recursion,
@@ -856,17 +977,32 @@ static void jni_log_callback(rac_log_level_t level, const char* tag, const char*
                 prio = ANDROID_LOG_INFO;
                 break;
         }
-        __android_log_print(prio, tag ? tag : "RAC", "%s", message ? message : "");
+        __android_log_print(prio, safe_tag.c_str(), "%s", safe_message.c_str());
 #else
-        fprintf(stdout, "[DEBUG] [%s] %s\n", tag ? tag : "RAC", message ? message : "");
+        fprintf(stdout, "[DEBUG] [%s] %s\n", safe_tag.c_str(), safe_message.c_str());
 #endif
         return;
     }
 
-    jstring jTag = env->NewStringUTF(tag ? tag : "RAC");
-    jstring jMessage = env->NewStringUTF(message ? message : "");
+    jstring jTag = newSafeLogJString(env, safe_tag);
+    jstring jMessage = newSafeLogJString(env, safe_message);
+    if (jTag == nullptr || jMessage == nullptr) {
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_WARN, safe_tag.c_str(), "%s", safe_message.c_str());
+#else
+        fprintf(stdout, "[WARN] [%s] %s\n", safe_tag.c_str(), safe_message.c_str());
+#endif
+        if (jTag != nullptr) {
+            env->DeleteLocalRef(jTag);
+        }
+        if (jMessage != nullptr) {
+            env->DeleteLocalRef(jMessage);
+        }
+        return;
+    }
 
     env->CallVoidMethod(g_platform_adapter, g_method_log, static_cast<jint>(level), jTag, jMessage);
+    jniClearPendingException(env);
 
     env->DeleteLocalRef(jTag);
     env->DeleteLocalRef(jMessage);
@@ -3362,6 +3498,32 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     }
 
     return static_cast<jint>(result);
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkSetClientInfo(
+    JNIEnv* env, jclass clazz, jstring sdkBinding, jstring appIdentifier, jstring appName,
+    jstring appVersion, jstring appBuild, jstring locale, jstring timezone) {
+    (void)clazz;
+
+    std::string sdkBindingStr = getCString(env, sdkBinding);
+    std::string appIdentifierStr = getCString(env, appIdentifier);
+    std::string appNameStr = getCString(env, appName);
+    std::string appVersionStr = getCString(env, appVersion);
+    std::string appBuildStr = getCString(env, appBuild);
+    std::string localeStr = getCString(env, locale);
+    std::string timezoneStr = getCString(env, timezone);
+
+    rac_client_info_t info = {};
+    info.sdk_binding = sdkBindingStr.empty() ? nullptr : sdkBindingStr.c_str();
+    info.app_identifier = appIdentifierStr.empty() ? nullptr : appIdentifierStr.c_str();
+    info.app_name = appNameStr.empty() ? nullptr : appNameStr.c_str();
+    info.app_version = appVersionStr.empty() ? nullptr : appVersionStr.c_str();
+    info.app_build = appBuildStr.empty() ? nullptr : appBuildStr.c_str();
+    info.locale = localeStr.empty() ? nullptr : localeStr.c_str();
+    info.timezone = timezoneStr.empty() ? nullptr : timezoneStr.c_str();
+
+    rac_sdk_set_client_info(&info);
 }
 
 // =============================================================================

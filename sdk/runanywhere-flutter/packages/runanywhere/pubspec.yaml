@@ -51,6 +51,8 @@ dependencies:
   # The cap originated when 11.3.x introduced a transient ABI/Manifest issue;
   # 13.x is now the latest stable and the cap is no longer warranted.
   device_info_plus: ^13.1.0
+  flutter_timezone: ^5.1.0
+  package_info_plus: ^10.1.0
   # Utilities
   uuid: ^4.5.3
 

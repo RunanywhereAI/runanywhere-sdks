@@ -67,6 +67,7 @@ void TelemetryBridge::initialize(
     const std::string& deviceId,
     const std::string& deviceModel,
     const std::string& osVersion,
+    const std::string& platform,
     const std::string& sdkVersion
 ) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -80,15 +81,22 @@ void TelemetryBridge::initialize(
 
     environment_ = environment;
 
-    LOGI("Creating telemetry manager: device=%s, model=%s, os=%s, sdk=%s, env=%d",
-         deviceId.c_str(), deviceModel.c_str(), osVersion.c_str(), sdkVersion.c_str(), environment);
+    const std::string telemetryPlatform = platform.empty() ? "unknown" : platform;
+
+    LOGI("Creating telemetry manager: device=%s, model=%s, os=%s, platform=%s, sdk=%s, env=%d",
+         deviceId.c_str(),
+         deviceModel.c_str(),
+         osVersion.c_str(),
+         telemetryPlatform.c_str(),
+         sdkVersion.c_str(),
+         environment);
 
     // Create telemetry manager
     // Matches Swift: rac_telemetry_manager_create(Environment.toC(environment), did, plat, ver)
     manager_ = rac_telemetry_manager_create(
         environment,
         deviceId.c_str(),
-        "react-native",  // platform
+        telemetryPlatform.c_str(),
         sdkVersion.c_str()
     );
 
@@ -321,4 +329,3 @@ static void telemetryHttpCallback(
 
 } // namespace bridges
 } // namespace runanywhere
-

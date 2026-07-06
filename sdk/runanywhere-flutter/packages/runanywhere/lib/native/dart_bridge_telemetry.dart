@@ -5,12 +5,13 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -63,8 +64,11 @@ class DartBridgeTelemetry {
     if (_isInitialized && _managerPtr != null) {
       try {
         final lib = PlatformLoader.loadCommons();
-        final flushFn = lib.lookupFunction<Int32 Function(Pointer<Void>),
-            int Function(Pointer<Void>)>('rac_telemetry_manager_flush');
+        final flushFn = lib
+            .lookupFunction<
+              Int32 Function(Pointer<Void>),
+              int Function(Pointer<Void>)
+            >('rac_telemetry_manager_flush');
         flushFn(_managerPtr!);
         _logger.debug('Telemetry flushed');
       } catch (e) {
@@ -88,7 +92,11 @@ class DartBridgeTelemetry {
     if (_managerPtr != null) return;
     _environment = environment;
     try {
-      _createManagerAndAttach(PlatformLoader.loadCommons(), environment, deviceId);
+      _createManagerAndAttach(
+        PlatformLoader.loadCommons(),
+        environment,
+        deviceId,
+      );
       _logger.debug('Telemetry sink attached in Phase 1');
     } catch (e) {
       _logger.debug('Phase-1 telemetry attach failed: $e');
@@ -100,29 +108,47 @@ class DartBridgeTelemetry {
   /// the [initialize] fallback (when Phase-1 attach didn't run). Does NOT set
   /// device info or mark initialized.
   static void _createManagerAndAttach(
-      DynamicLibrary lib, SDKEnvironment environment, String deviceId) {
-    const sdkVersion = '0.19.13';
+    DynamicLibrary lib,
+    SDKEnvironment environment,
+    String deviceId,
+  ) {
+    final sdkVersion = SDKConstants.version;
     // platform is the OS family (matches iOS "ios"/"macos", Kotlin "android",
     // and the backend telemetry_events.platform contract), NOT the binding.
     final platform = Platform.isAndroid
         ? 'android'
         : Platform.isIOS
-            ? 'ios'
-            : Platform.isMacOS
-                ? 'macos'
-                : 'flutter';
+        ? 'ios'
+        : Platform.isMacOS
+        ? 'macos'
+        : 'flutter';
 
-    final createManager = lib.lookupFunction<
-        Pointer<Void> Function(Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-        Pointer<Void> Function(int, Pointer<Utf8>, Pointer<Utf8>,
-            Pointer<Utf8>)>('rac_telemetry_manager_create');
+    final createManager = lib
+        .lookupFunction<
+          Pointer<Void> Function(
+            Int32,
+            Pointer<Utf8>,
+            Pointer<Utf8>,
+            Pointer<Utf8>,
+          ),
+          Pointer<Void> Function(
+            int,
+            Pointer<Utf8>,
+            Pointer<Utf8>,
+            Pointer<Utf8>,
+          )
+        >('rac_telemetry_manager_create');
 
     final deviceIdPtr = deviceId.toNativeUtf8();
     final platformPtr = platform.toNativeUtf8();
     final sdkVersionPtr = sdkVersion.toNativeUtf8();
     try {
       final ptr = createManager(
-          _environmentToInt(environment), deviceIdPtr, platformPtr, sdkVersionPtr);
+        _environmentToInt(environment),
+        deviceIdPtr,
+        platformPtr,
+        sdkVersionPtr,
+      );
       if (ptr == nullptr) {
         _logger.warning('Failed to create telemetry manager');
         return;
@@ -180,10 +206,11 @@ class DartBridgeTelemetry {
       // Phase 2 (the Phase-1 attach creates the manager without it).
       final deviceModel = await _getDeviceModel();
       final osVersion = Platform.operatingSystemVersion;
-      final setDeviceInfo = lib.lookupFunction<
-          Void Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>),
-          void Function(Pointer<Void>, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_telemetry_manager_set_device_info');
+      final setDeviceInfo = lib
+          .lookupFunction<
+            Void Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>),
+            void Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>)
+          >('rac_telemetry_manager_set_device_info');
       final deviceModelPtr = deviceModel.toNativeUtf8();
       final osVersionPtr = osVersion.toNativeUtf8();
       setDeviceInfo(_managerPtr!, deviceModelPtr, osVersionPtr);
@@ -193,9 +220,10 @@ class DartBridgeTelemetry {
       _isInitialized = true;
       _logger.debug('Telemetry manager initialized');
     } catch (e, stack) {
-      _logger.debug('Telemetry initialization error: $e', metadata: {
-        'stack': stack.toString(),
-      });
+      _logger.debug(
+        'Telemetry initialization error: $e',
+        metadata: {'stack': stack.toString()},
+      );
       _isInitialized = true; // Avoid retry loops
     }
   }
@@ -215,8 +243,11 @@ class DartBridgeTelemetry {
       _httpWakeup?.close();
       _httpWakeup = null;
 
-      final destroy = lib.lookupFunction<Void Function(Pointer<Void>),
-          void Function(Pointer<Void>)>('rac_telemetry_manager_destroy');
+      final destroy = lib
+          .lookupFunction<
+            Void Function(Pointer<Void>),
+            void Function(Pointer<Void>)
+          >('rac_telemetry_manager_destroy');
 
       destroy(_managerPtr!);
       _managerPtr = null;
@@ -234,10 +265,15 @@ class DartBridgeTelemetry {
   static void _setTelemetrySink(Pointer<Void> manager) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final setSink = lib.lookupFunction<Void Function(Pointer<Void>),
-          void Function(Pointer<Void>)>('rac_events_set_telemetry_sink');
+      final setSink = lib
+          .lookupFunction<
+            Void Function(Pointer<Void>),
+            void Function(Pointer<Void>)
+          >('rac_events_set_telemetry_sink');
       setSink(manager);
-      _logger.debug('Telemetry sink ${manager == nullptr ? "detached" : "attached"}');
+      _logger.debug(
+        'Telemetry sink ${manager == nullptr ? "detached" : "attached"}',
+      );
     } catch (e) {
       _logger.debug('Failed to set telemetry sink: $e');
     }
@@ -252,13 +288,19 @@ class DartBridgeTelemetry {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final setWakeup = lib.lookupFunction<
-          Void Function(Pointer<Void>,
-              Pointer<NativeFunction<Void Function(Pointer<Void>)>>, Pointer<Void>),
-          void Function(
+      final setWakeup = lib
+          .lookupFunction<
+            Void Function(
               Pointer<Void>,
               Pointer<NativeFunction<Void Function(Pointer<Void>)>>,
-              Pointer<Void>)>('rac_telemetry_manager_set_http_wakeup');
+              Pointer<Void>,
+            ),
+            void Function(
+              Pointer<Void>,
+              Pointer<NativeFunction<Void Function(Pointer<Void>)>>,
+              Pointer<Void>,
+            )
+          >('rac_telemetry_manager_set_http_wakeup');
 
       // NativeCallable.listener is cross-isolate-safe: commons may signal this
       // from the LLM worker isolate during a generation-completion flush, and
@@ -266,8 +308,9 @@ class DartBridgeTelemetry {
       // request data, so it avoids the "native callback from a different
       // isolate" abort a data-carrying Pointer.fromFunction hit. On wake-up we
       // drain commons' owned request queue via rac_telemetry_manager_poll_*.
-      final wakeup =
-          NativeCallable<Void Function(Pointer<Void>)>.listener(_telemetryHttpWakeup);
+      final wakeup = NativeCallable<Void Function(Pointer<Void>)>.listener(
+        _telemetryHttpWakeup,
+      );
       _httpWakeup = wakeup;
       setWakeup(_managerPtr!, wakeup.nativeFunction, nullptr);
       _logger.debug('Telemetry HTTP wake-up registered');
@@ -285,11 +328,11 @@ class DartBridgeTelemetry {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final pollFn = lib.lookupFunction<
-          Int32 Function(Pointer<Void>, Pointer<RacProtoBuffer>),
-          int Function(Pointer<Void>, Pointer<RacProtoBuffer>)>(
-        'rac_telemetry_manager_poll_http_request',
-      );
+      final pollFn = lib
+          .lookupFunction<
+            Int32 Function(Pointer<Void>, Pointer<RacProtoBuffer>),
+            int Function(Pointer<Void>, Pointer<RacProtoBuffer>)
+          >('rac_telemetry_manager_poll_http_request');
       final bindings = RacNative.bindings;
 
       // Bounded so a misbehaving producer can't spin forever; the loop also
@@ -303,8 +346,9 @@ class DartBridgeTelemetry {
           if (code != 0 || out.ref.data == nullptr || out.ref.size < 5) {
             return;
           }
-          final bytes =
-              out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+          final bytes = out.ref.data
+              .asTypedList(out.ref.size)
+              .toList(growable: false);
           final requiresAuth = bytes[0] != 0;
           final endpointLen =
               bytes[1] | (bytes[2] << 8) | (bytes[3] << 16) | (bytes[4] << 24);
@@ -326,23 +370,8 @@ class DartBridgeTelemetry {
   // ============================================================================
 
   static Future<String> _getDeviceModel() async {
-    try {
-      final deviceInfo = DeviceInfoPlugin();
-
-      if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        return iosInfo.model;
-      } else if (Platform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
-        return '${androidInfo.brand} ${androidInfo.model}';
-      } else if (Platform.isMacOS) {
-        final macInfo = await deviceInfo.macOsInfo;
-        return macInfo.model;
-      }
-      return 'unknown';
-    } catch (e) {
-      return 'unknown';
-    }
+    final deviceModel = DartBridgeDevice.cachedDeviceModel.trim();
+    return deviceModel.isEmpty ? 'unknown' : deviceModel;
   }
 
   static int _environmentToInt(SDKEnvironment env) {
@@ -381,7 +410,10 @@ void _telemetryHttpWakeup(Pointer<Void> userData) {
 /// telemetry POST was unauthenticated. Kotlin parity: telemetry goes through
 /// the token-managed adapter, not a hand-built request.
 Future<void> _sendTelemetryHttp(
-    String endpoint, String body, bool requiresAuth) async {
+  String endpoint,
+  String body,
+  bool requiresAuth,
+) async {
   try {
     final response = await HTTPClientAdapter.shared.send(
       method: 'POST',
@@ -391,8 +423,9 @@ Future<void> _sendTelemetryHttp(
     );
 
     if (response.isSuccess) {
-      DartBridgeTelemetry._logger
-          .info('Telemetry POST $endpoint -> ${response.statusCode} OK');
+      DartBridgeTelemetry._logger.info(
+        'Telemetry POST $endpoint -> ${response.statusCode} OK',
+      );
     } else {
       // Surface the real reason — commons only logs the error string, and a
       // non-2xx carries its detail in the body (e.g. a 422 extra="forbid"
@@ -420,10 +453,11 @@ void _notifyHttpComplete(bool success, String? responseJson, String? error) {
 
   try {
     final lib = PlatformLoader.loadCommons();
-    final httpComplete = lib.lookupFunction<
-        Void Function(Pointer<Void>, Int32, Pointer<Utf8>, Pointer<Utf8>),
-        void Function(Pointer<Void>, int, Pointer<Utf8>,
-            Pointer<Utf8>)>('rac_telemetry_manager_http_complete');
+    final httpComplete = lib
+        .lookupFunction<
+          Void Function(Pointer<Void>, Int32, Pointer<Utf8>, Pointer<Utf8>),
+          void Function(Pointer<Void>, int, Pointer<Utf8>, Pointer<Utf8>)
+        >('rac_telemetry_manager_http_complete');
 
     final responsePtr = responseJson?.toNativeUtf8() ?? nullptr;
     final errorPtr = error?.toNativeUtf8() ?? nullptr;
@@ -443,4 +477,3 @@ void _notifyHttpComplete(bool success, String? responseJson, String? error) {
     // Ignore - best effort notification
   }
 }
-

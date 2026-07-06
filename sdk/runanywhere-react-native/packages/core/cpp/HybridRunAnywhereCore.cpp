@@ -83,7 +83,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         std::string deviceId = extractStringValue(configJson, "deviceId");
         std::string envStr = extractStringValue(configJson, "environment", "production");
         std::string sdkVersionFromConfig = extractStringValue(configJson, "sdkVersion", "0.2.0");
-        std::string platformFromConfig = extractStringValue(configJson, "platform", "react_native");
+        std::string platformFromConfig = extractStringValue(configJson, "platform", defaultNativePlatform());
         std::string buildToken = extractStringValue(configJson, "buildToken", "");
         bool forceRefreshAssignments = extractBoolValue(configJson, "forceRefreshAssignments", false);
         bool flushTelemetry = extractBoolValue(configJson, "flushTelemetry", true);
@@ -206,6 +206,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
                     persistentDeviceId,
                     deviceModel,
                     osVersion,
+                    platformFromConfig,
                     sdkVersionFromConfig  // Use version from config
                 );
 

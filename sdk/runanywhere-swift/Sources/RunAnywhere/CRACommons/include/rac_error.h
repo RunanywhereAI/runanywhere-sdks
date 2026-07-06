@@ -15,7 +15,7 @@
 #ifndef RAC_ERROR_H
 #define RAC_ERROR_H
 
-#include "rac_types.h"
+#include "rac/core/rac_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -430,7 +430,7 @@ extern "C" {
 /** Plugin's `metadata.abi_version` did not equal `RAC_PLUGIN_API_VERSION`. */
 #define RAC_ERROR_ABI_VERSION_MISMATCH ((rac_result_t) - 810)
 /** Plugin's `capability_check()` returned non-zero (silent reject; engine
- *  does not run on this host — e.g. MetalRT on Linux). */
+ *  does not run on this host). */
 #define RAC_ERROR_CAPABILITY_UNSUPPORTED ((rac_result_t) - 811)
 /** Plugin registration rejected due to duplicate `metadata.name`. */
 #define RAC_ERROR_PLUGIN_DUPLICATE ((rac_result_t) - 812)

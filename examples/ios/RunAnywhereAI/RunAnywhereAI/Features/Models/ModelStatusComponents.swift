@@ -343,7 +343,7 @@ struct ModelRequiredOverlay: View {
         case .tts: return "Read Aloud"
         case .vad: return "Voice Activity Detection"
         case .voice: return "Voice Assistant"
-        case .vlm: return "Vision AI"
+        case .vlm: return "Live Mode"
         case .ragEmbedding: return "Embedding Model"
         case .ragLLM: return "Language Model"
         }
@@ -356,7 +356,7 @@ struct ModelRequiredOverlay: View {
         case .tts: return "Have any text read aloud with natural-sounding voices."
         case .vad: return "Detect speech activity in real-time using on-device voice detection."
         case .voice: return "Talk naturally with your AI assistant. Let's set up the components together."
-        case .vlm: return "Point your camera at anything and get AI-powered descriptions in real-time."
+        case .vlm: return "Choose a vision model to understand photos and the live camera."
         case .ragEmbedding: return "Select an embedding model to convert documents into searchable vectors."
         case .ragLLM: return "Select a language model to generate answers from your documents."
         }

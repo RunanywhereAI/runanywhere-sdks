@@ -461,7 +461,6 @@ cmake_extra=(
 )
 ios_cmake_extra=(
     "-DRAC_BACKEND_COREML=OFF"
-    "-DRAC_BACKEND_METALRT=OFF"
 )
 if [ "${RAC_BACKEND_ONNX}" = "OFF" ]; then
     cmake_extra+=("-DRAC_BACKEND_ONNX=OFF")
@@ -504,7 +503,6 @@ macos_cmake_args=(
     "-DRAC_BACKEND_ONNX=OFF"
     "-DRAC_BACKEND_SHERPA=OFF"
     "-DRAC_BACKEND_COREML=OFF"
-    "-DRAC_BACKEND_METALRT=OFF"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_absl=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_CURL=TRUE"
@@ -715,7 +713,6 @@ sync_react_native_frameworks() {
 #   runanywhere             ← RACommons.xcframework
 #   runanywhere_llamacpp    ← RABackendLLAMACPP.xcframework
 #   runanywhere_onnx        ← RABackendONNX.xcframework
-#   runanywhere_genie       ← (no iOS binary; Android/Snapdragon only)
 sync_flutter_frameworks() {
     local flutter_root="${REPO_ROOT}/sdk/runanywhere-flutter/packages"
     if [ ! -d "${flutter_root}" ]; then
@@ -755,8 +752,6 @@ sync_flutter_frameworks() {
         run rm -rf "${flutter_onnx}/RABackendSherpa.xcframework"
         run cp -R "${DEST}/RABackendSherpa.xcframework" "${flutter_onnx}/"
     fi
-
-    # runanywhere_genie has no iOS binary — soft-skip.
 }
 
 sync_react_native_frameworks

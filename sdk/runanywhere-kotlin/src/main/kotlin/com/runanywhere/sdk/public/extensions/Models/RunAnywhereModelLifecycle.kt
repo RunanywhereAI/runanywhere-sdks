@@ -21,6 +21,7 @@ import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAModelLoadResult
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +66,15 @@ suspend fun RunAnywhere.loadModel(request: RAModelLoadRequest): RAModelLoadResul
         result
     }
 
+suspend fun RunAnywhere.loadModel(model: RAModelInfo): RAModelLoadResult =
+    loadModel(
+        RAModelLoadRequest(
+            model_id = model.id,
+            category = model.lifecycleLoadCategory,
+            framework = model.lifecycleLoadFramework,
+        ),
+    )
+
 suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadResult {
     if (!isInitialized) {
         return ModelUnloadResult(
@@ -81,6 +91,36 @@ suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadRes
 
 suspend fun RunAnywhere.currentModel(request: CurrentModelRequest = CurrentModelRequest()): CurrentModelResult =
     CppBridgeModelLifecycle.currentModel(request) ?: CurrentModelResult()
+
+suspend fun RunAnywhere.currentModel(model: RAModelInfo): CurrentModelResult {
+    for (category in model.lifecycleLookupCategories) {
+        val result = currentModel(CurrentModelRequest(category = category))
+        if (result.found) return result
+    }
+    return CurrentModelResult()
+}
+
+suspend fun RunAnywhere.currentModel(candidates: Iterable<RAModelInfo>): CurrentModelResult? {
+    val candidateList = candidates.toList()
+    val candidateIds = candidateList.mapTo(mutableSetOf()) { it.id }
+    if (candidateIds.isEmpty()) return null
+
+    val queriedCategories = mutableSetOf<ModelCategory>()
+    for (model in candidateList) {
+        for (category in model.lifecycleLookupCategories) {
+            if (!queriedCategories.add(category)) continue
+            val result = currentModel(CurrentModelRequest(category = category))
+            if (result.found && result.model_id in candidateIds) return result
+        }
+    }
+    return null
+}
+
+fun RAModelInfo.matchesLifecycleCategory(category: ModelCategory): Boolean =
+    category in lifecycleLookupCategories
+
+val RAModelInfo.isVisionLanguageModel: Boolean
+    get() = matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_MULTIMODAL)
 
 internal suspend fun RunAnywhere.loadedModelSnapshot(
     category: ModelCategory,
@@ -120,3 +160,33 @@ suspend fun RunAnywhere.modelInfoForCategory(category: ModelCategory): ModelInfo
 suspend fun RunAnywhere.componentLifecycleSnapshot(
     component: SDKComponent,
 ): ComponentLifecycleSnapshot? = CppBridgeModelLifecycle.snapshot(component)
+
+private val RAModelInfo.lifecycleLoadCategory: ModelCategory?
+    get() =
+        category.takeUnless {
+            it == ModelCategory.MODEL_CATEGORY_UNSPECIFIED
+        }
+
+private val RAModelInfo.lifecycleLoadFramework: InferenceFramework?
+    get() =
+        framework.takeUnless {
+            it == InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED ||
+                it == InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+        }
+
+private val RAModelInfo.lifecycleLookupCategories: List<ModelCategory>
+    get() =
+        when (category) {
+            ModelCategory.MODEL_CATEGORY_MULTIMODAL ->
+                listOf(
+                    ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+                    ModelCategory.MODEL_CATEGORY_VISION,
+                )
+            ModelCategory.MODEL_CATEGORY_VISION ->
+                listOf(
+                    ModelCategory.MODEL_CATEGORY_VISION,
+                    ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+                )
+            ModelCategory.MODEL_CATEGORY_UNSPECIFIED -> emptyList()
+            else -> listOf(category)
+        }

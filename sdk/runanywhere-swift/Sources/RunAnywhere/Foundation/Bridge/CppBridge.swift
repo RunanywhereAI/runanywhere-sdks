@@ -107,6 +107,11 @@ public enum CppBridge {
         // In development: C++ stderr ON for debugging
         rac_configure_logging(environment.cEnvironment)
 
+        // Step 1.6: Host app/client metadata. `platform` remains the OS
+        // family; this separate structured payload carries the SDK binding and
+        // Bundle facts for device registration.
+        ClientInfo.register()
+
         // Step 2: Telemetry manager (builds JSON, calls HTTP callback).
         // Must come before Events.register(): the events bridge attaches this
         // manager to the C++ router as the telemetry sink, so the manager has

@@ -399,22 +399,22 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "1685832e2b3a40b04ae27ad8d600e8f483bc355480677395241e0ab4ecdbd6fe"
+                checksum: "b1fe74a812af389c6c42339dcd3f3019c1c47137837cfe0e4ea746b95b48613e"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "a551a2218e0fda0dab5aca8d803982db3ad7185021a0db16300b3d996ac1910d"
+                checksum: "071e062573e792daa521b31b314e21a318423b01e0e2d30371cb7da77690624f"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "cf2608b6f85622edf33ea23c73e5e6ddf9ef7f967050767c8b578428578d78c7"
+                checksum: "7a57fa3db9ed572a2b46d8d500549b1b9b06a78bc77927a0e2256a5ce01d1de1"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "771b6d4273a2b3b7b1f459aaa5d29b4f42f7f341eed9018a8031cd80143556bb"
+                checksum: "e7c23219b47edcfeb1492441027af2f1295905db03a25f1efc1987ddd32f6cd2"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",

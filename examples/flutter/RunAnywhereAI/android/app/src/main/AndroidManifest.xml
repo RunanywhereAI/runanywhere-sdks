@@ -12,7 +12,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:extractNativeLibs="true"
         android:enableOnBackInvokedCallback="true">
-        <!-- Declare vendor public library for Genie NPU (Qualcomm FastRPC DSP communication) -->
+        <!-- Declare vendor public library for QHexRT/QNN FastRPC DSP communication -->
         <uses-native-library android:name="libcdsprpc.so" android:required="false" />
         <activity
             android:name=".MainActivity"

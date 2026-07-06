@@ -225,35 +225,96 @@ class RunAnywhereLLM {
     bool streaming = false,
   }) {
     final opts = options ?? LLMGenerationOptions();
-    // Defaults mirror Swift `RALLMGenerationOptions.defaults()`
-    // (RALLMTypes+CppBridge.swift:13-21): maxTokens=100, temperature=0.8,
-    // topP=1.0, topK=0, repetitionPenalty=1.0.
-    return LLMGenerateRequest(
-      prompt: prompt,
-      maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
-      temperature: opts.hasTemperature() ? opts.temperature : 0.8,
-      topP: opts.hasTopP() ? opts.topP : 1.0,
-      topK: opts.hasTopK() ? opts.topK : 0,
+    final Iterable<Object?> rawStopSequences =
+        opts.stopSequences as Iterable<Object?>;
+    final List<String> stopSequences = rawStopSequences
+        .map((Object? sequence) => sequence?.toString() ?? '')
+        .toList(growable: false);
+    final requestOptions = LLMGenerationOptions(
+      maxTokens: opts.hasMaxTokens() ? opts.maxTokens : null,
+      temperature: opts.hasTemperature() ? opts.temperature : null,
+      topP: opts.hasTopP() ? opts.topP : null,
+      topK: opts.hasTopK() ? opts.topK : null,
       repetitionPenalty:
-          opts.hasRepetitionPenalty() ? opts.repetitionPenalty : 1.0,
-      stopSequences: opts.stopSequences,
-      systemPrompt: opts.hasSystemPrompt() ? opts.systemPrompt : null,
-      emitThoughts: opts.hasThinkingPattern(),
-      streamingEnabled: streaming,
+          opts.hasRepetitionPenalty() ? opts.repetitionPenalty : null,
+      stopSequences: stopSequences,
+      streamingEnabled:
+          opts.hasStreamingEnabled() ? opts.streamingEnabled : null,
       preferredFramework:
-          opts.hasPreferredFramework() ? opts.preferredFramework.name : null,
-      jsonSchema: _jsonSchemaForOptions(opts),
-      executionTarget:
-          opts.hasExecutionTarget() ? opts.executionTarget.name : null,
+          opts.hasPreferredFramework() ? opts.preferredFramework : null,
+      systemPrompt: opts.hasSystemPrompt() ? opts.systemPrompt : null,
+      jsonSchema: opts.hasJsonSchema() ? opts.jsonSchema : null,
+      thinkingPattern: opts.hasThinkingPattern() ? opts.thinkingPattern : null,
+      executionTarget: opts.hasExecutionTarget() ? opts.executionTarget : null,
+      structuredOutput:
+          opts.hasStructuredOutput() ? opts.structuredOutput : null,
+      enableRealTimeTracking:
+          opts.hasEnableRealTimeTracking() ? opts.enableRealTimeTracking : null,
       seed: opts.hasSeed() ? opts.seed : null,
       frequencyPenalty:
           opts.hasFrequencyPenalty() ? opts.frequencyPenalty : null,
       presencePenalty: opts.hasPresencePenalty() ? opts.presencePenalty : null,
+      repeatLastN: opts.hasRepeatLastN() ? opts.repeatLastN : null,
       minP: opts.hasMinP() ? opts.minP : null,
       grammar: opts.hasGrammar() ? opts.grammar : null,
       responseFormat: opts.hasResponseFormat() ? opts.responseFormat : null,
       echoPrompt: opts.hasEchoPrompt() ? opts.echoPrompt : null,
       nThreads: opts.hasNThreads() ? opts.nThreads : null,
+      toolCalling: opts.hasToolCalling() ? opts.toolCalling : null,
+      disableThinking: opts.hasDisableThinking() ? opts.disableThinking : null,
+    );
+    if (!requestOptions.hasMaxTokens() || requestOptions.maxTokens <= 0) {
+      requestOptions.maxTokens = 100;
+    }
+    if (!requestOptions.hasTemperature() || requestOptions.temperature <= 0) {
+      requestOptions.temperature = 0.8;
+    }
+    if (!requestOptions.hasTopP() || requestOptions.topP <= 0) {
+      requestOptions.topP = 1.0;
+    }
+    if (!requestOptions.hasRepetitionPenalty() ||
+        requestOptions.repetitionPenalty <= 0) {
+      requestOptions.repetitionPenalty = 1.0;
+    }
+    requestOptions.streamingEnabled = streaming || opts.streamingEnabled;
+    // Defaults mirror Swift `RALLMGenerationOptions.defaults()`
+    // (RALLMTypes+CppBridge.swift:13-21): maxTokens=100, temperature=0.8,
+    // topP=1.0, topK=0, repetitionPenalty=1.0.
+    return LLMGenerateRequest(
+      prompt: prompt,
+      maxTokens: requestOptions.maxTokens,
+      temperature: requestOptions.temperature,
+      topP: requestOptions.topP,
+      topK: requestOptions.hasTopK() ? requestOptions.topK : 0,
+      repetitionPenalty: requestOptions.repetitionPenalty,
+      stopSequences: stopSequences,
+      systemPrompt:
+          requestOptions.hasSystemPrompt() ? requestOptions.systemPrompt : null,
+      emitThoughts: requestOptions.hasThinkingPattern(),
+      streamingEnabled: requestOptions.streamingEnabled,
+      preferredFramework: requestOptions.hasPreferredFramework()
+          ? requestOptions.preferredFramework.toString()
+          : null,
+      jsonSchema: _jsonSchemaForOptions(requestOptions),
+      executionTarget: requestOptions.hasExecutionTarget()
+          ? requestOptions.executionTarget.toString()
+          : null,
+      seed: requestOptions.hasSeed() ? requestOptions.seed : null,
+      frequencyPenalty: requestOptions.hasFrequencyPenalty()
+          ? requestOptions.frequencyPenalty
+          : null,
+      presencePenalty: requestOptions.hasPresencePenalty()
+          ? requestOptions.presencePenalty
+          : null,
+      minP: requestOptions.hasMinP() ? requestOptions.minP : null,
+      grammar: requestOptions.hasGrammar() ? requestOptions.grammar : null,
+      responseFormat: requestOptions.hasResponseFormat()
+          ? requestOptions.responseFormat
+          : null,
+      echoPrompt:
+          requestOptions.hasEchoPrompt() ? requestOptions.echoPrompt : null,
+      nThreads: requestOptions.hasNThreads() ? requestOptions.nThreads : null,
+      options: requestOptions,
     );
   }
 
@@ -325,8 +386,8 @@ class RunAnywhereLLM {
         await DartBridge.ensureServicesReady();
       } catch (e) {
         if (!controller.isClosed) {
-          controller
-              .addError(e is SDKException ? e : SDKException.generationFailed('$e'));
+          controller.addError(
+              e is SDKException ? e : SDKException.generationFailed('$e'));
           await controller.close();
         }
         return;

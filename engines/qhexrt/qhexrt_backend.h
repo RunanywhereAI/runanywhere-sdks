@@ -6,8 +6,8 @@
  * @brief Shell header for the QHexRT (Qualcomm Hexagon NPU runtime) engine plugin.
  *
  * QHexRT is a PRIVATE, closed-source C++ runtime that runs prebuilt QNN context
- * binaries on Snapdragon Hexagon NPUs (HTP). Unlike `genie`, QHexRT is the
- * RunAnywhere-owned NPU runtime (LLM today; VLM / TTS / ASR on the roadmap).
+ * binaries on Snapdragon Hexagon NPUs (HTP). QHexRT is the RunAnywhere-owned
+ * NPU runtime (LLM today; VLM / TTS / ASR on the roadmap).
  *
  * ### How this plugin stays private
  *
@@ -18,8 +18,7 @@
  * *into* the plugin `.so` so there is no separately-shippable QHexRT binary and
  * the runtime symbols are internal to the carrier library.
  *
- * Two build modes, mirroring `engines/metalrt` (USAGE B in
- * engines/common/rac_engine_unavailable.h):
+ * Two build modes:
  *
  *   - Engine NOT available (default / public): `RAC_QHEXRT_ENGINE_AVAILABLE=0`.
  *     The plugin compiles to a not-routable shell that rejects registration

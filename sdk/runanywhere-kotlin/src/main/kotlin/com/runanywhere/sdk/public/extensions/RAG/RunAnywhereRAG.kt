@@ -12,6 +12,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
@@ -79,6 +80,7 @@ suspend fun RunAnywhere.ragResolvedConfiguration(
 ): RARAGConfiguration {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()
+    ensureRagNativeLibsLoaded()
     val embedding =
         loadRagArtifactModel(
             this,
@@ -111,7 +113,11 @@ private suspend fun loadRagArtifactModel(
                 } else {
                     model.category
                 },
-            framework = model.framework,
+            framework =
+                model.framework.takeUnless {
+                    it == InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED ||
+                        it == InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+                },
         )
     val result = sdk.loadModel(request)
     if (!result.success) {

@@ -24,11 +24,11 @@ import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Slim Hexagon-NPU capability card. NPU models themselves live in the standard
- * model pickers (registered only for the probed arch); this card is the one
- * NPU-specific surface left — it tells the user whether this device runs them.
- */
+ /**
+  * Slim Hexagon-NPU capability card. NPU models themselves live in the standard
+ * model pickers (registered as logical HNPU URLs); this card is the one
+  * NPU-specific surface left — it tells the user whether this device runs them.
+  */
 @Composable
 fun HexagonNpuCard() {
     val dimens = LocalDimens.current

@@ -49,9 +49,21 @@ Notes:
 
 - `scripts/build/build-core-android.sh` stages JNI libraries into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs`.
 - `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` stages `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, and `RABackendSherpa.xcframework` into the Flutter plugin `ios/Frameworks` directories.
-- `runanywhere_genie` is Android/Snapdragon-only; iOS builds do not expect a Genie XCFramework.
 - If the iOS build reports stale Pods or generated Flutter config, run `cd ios && pod install && cd ..` after `flutter pub get`.
 - `scripts/verify.sh` runs `pub get`, analysis, APK build, and optional iOS/native artifact refresh gates.
+
+### Private HNPU / QHexRT Downloads on Android
+
+The Flutter example includes the `runanywhere_qhexrt` package and registers QHexRT on supported Snapdragon/Hexagon Android devices. QHexRT native libraries are private local artifacts: stage them into `sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/jniLibs/arm64-v8a/` before building, and do not commit them.
+
+To test private `runanywhere/*_HNPU` bundles from the app:
+
+1. Open `Settings` -> `Downloads`.
+2. Paste a Hugging Face token into `HuggingFace token` and tap `Save token`.
+3. Download and load an HNPU model through the normal model UI. The app registers logical HNPU URLs; the SDK resolves the matching Hexagon arch natively.
+4. Tap `Clear` to return to public/no-auth downloads.
+
+The token is passed to the SDK through `RunAnywhere.setHfToken(...)`; it is not stored in catalogs, assets, logs, or source files.
 
 ### How It Works
 

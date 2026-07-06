@@ -54,6 +54,13 @@ fun LLMGenerationOptions.Companion.defaults(): RALLMGenerationOptions =
  *   string forms.
  */
 fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerateRequest {
+    val requestOptions =
+        copy(
+            max_tokens = max_tokens.takeIf { it > 0 } ?: 100,
+            temperature = temperature.takeIf { it > 0.0f } ?: 0.8f,
+            top_p = top_p.takeIf { it > 0.0f } ?: 1.0f,
+            repetition_penalty = repetition_penalty.takeIf { it > 0.0f } ?: 1.0f,
+        )
     val so = structured_output
     val schema =
         when {
@@ -66,22 +73,23 @@ fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerate
             StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA -> "json_schema"
             else -> ""
         }
-    val grammar = so?.grammar.orEmpty()
+    val effectiveGrammar = so?.grammar?.takeIf { it.isNotBlank() } ?: grammar.orEmpty()
     return RALLMGenerateRequest(
         prompt = prompt,
-        max_tokens = max_tokens,
-        temperature = temperature,
-        top_p = top_p,
-        top_k = top_k,
-        repetition_penalty = repetition_penalty,
+        max_tokens = requestOptions.max_tokens,
+        temperature = requestOptions.temperature,
+        top_p = requestOptions.top_p,
+        top_k = requestOptions.top_k,
+        repetition_penalty = requestOptions.repetition_penalty,
         stop_sequences = stop_sequences,
         streaming_enabled = streaming_enabled,
         preferred_framework = preferred_framework.wireString,
         system_prompt = system_prompt.orEmpty(),
         json_schema = schema,
         response_format = responseFormat,
-        grammar = grammar,
+        grammar = effectiveGrammar,
         execution_target = execution_target?.wireString.orEmpty(),
+        options = requestOptions,
     )
 }
 
@@ -134,7 +142,7 @@ val RAExecutionTarget.wireString: String
 
 /**
  * Canonical wire string for an inference framework — the lowercase short name
- * (e.g. "llamacpp", "onnx", "metalrt"). Used when serializing to the canonical
+ * (e.g. "llamacpp", "onnx", "qhexrt"). Used when serializing to the canonical
  * `RALLMGenerateRequest.preferred_framework` field. The Swift SDK gets this
  * for free from the `rac_wire_string` codegen in `RAConvenience.swift`; Kotlin
  * has no equivalent codegen so we maintain the table by hand.
@@ -144,13 +152,12 @@ val InferenceFramework.wireString: String
         when (this) {
             InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "llamacpp"
             InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> "onnx"
-            InferenceFramework.INFERENCE_FRAMEWORK_METALRT -> "metalrt"
             InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "foundation-models"
             InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> "system-tts"
             InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO -> "fluid-audio"
             InferenceFramework.INFERENCE_FRAMEWORK_COREML -> "coreml"
             InferenceFramework.INFERENCE_FRAMEWORK_MLX -> "mlx"
-            InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> "genie"
+            InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> "qhexrt"
             InferenceFramework.INFERENCE_FRAMEWORK_TFLITE -> "tflite"
             InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH -> "executorch"
             InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE -> "mediapipe"
@@ -162,6 +169,5 @@ val InferenceFramework.wireString: String
             InferenceFramework.INFERENCE_FRAMEWORK_NONE -> "none"
             InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN -> "unknown"
             InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> "sherpa"
-            InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> "qhexrt"
             InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED -> ""
         }

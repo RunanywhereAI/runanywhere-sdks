@@ -859,10 +859,6 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
             return "SystemTTS";
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return "FluidAudio";
-        case RAC_FRAMEWORK_METALRT:
-            return "MetalRT";
-        case RAC_FRAMEWORK_GENIE:
-            return "Genie";
         case RAC_FRAMEWORK_QHEXRT:
             return "QHexRT";
         case RAC_FRAMEWORK_BUILTIN:
@@ -1362,7 +1358,7 @@ rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_
     // framework name (observed previously for Sherpa which was missing here).
     const char* frameworks[] = {"ONNX",      "Sherpa",     "LlamaCpp", "FoundationModels",
                                 "SystemTTS", "FluidAudio", "BuiltIn",  "CoreML",
-                                "MetalRT",   "Genie",      "None",     "Unknown"};
+                                "QHexRT",    "None",       "Unknown"};
     for (const char* fw : frameworks) {
         if (nextComponent == fw) {
             isFramework = true;
@@ -1436,17 +1432,11 @@ rac_result_t rac_model_paths_extract_framework(const char* path,
     } else if (nextComponent == "FluidAudio") {
         *out_framework = RAC_FRAMEWORK_FLUID_AUDIO;
         return RAC_SUCCESS;
-    } else if (nextComponent == "MetalRT") {
-        *out_framework = RAC_FRAMEWORK_METALRT;
-        return RAC_SUCCESS;
     } else if (nextComponent == "BuiltIn") {
         *out_framework = RAC_FRAMEWORK_BUILTIN;
         return RAC_SUCCESS;
     } else if (nextComponent == "None") {
         *out_framework = RAC_FRAMEWORK_NONE;
-        return RAC_SUCCESS;
-    } else if (nextComponent == "Genie") {
-        *out_framework = RAC_FRAMEWORK_GENIE;
         return RAC_SUCCESS;
     } else if (nextComponent == "QHexRT") {
         *out_framework = RAC_FRAMEWORK_QHEXRT;

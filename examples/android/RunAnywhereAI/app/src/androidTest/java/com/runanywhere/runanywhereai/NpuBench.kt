@@ -9,11 +9,10 @@ import kotlin.math.sqrt
 /**
  * Rubric thresholds, metric math, and the shareable report record for
  * [NpuModelE2ETest]. Pure host-side logic (no SDK / QNN types) so it mirrors the
- * forge per-modality rubric (`forge/forge/eval/suite.py`, `forge/forge/validate/{text,parity,audio}.py`)
- * independently of the runtime it is checking. androidTest only — NOT product code.
+ * conversion parity rubric independently of the runtime it is checking. androidTest only - NOT product code.
  *
- * The bars come straight from forge:
- *   WER_MAX 0.05 · greedy_tol edit 0.10 · repetition_ratio 0.50 · MeloTTS 44100 Hz.
+ * The bars come straight from the model conversion rubric:
+ *   WER_MAX 0.05, greedy_tol edit 0.10, repetition_ratio 0.50, MeloTTS 44100 Hz.
  */
 object NpuRubric {
     const val WER_MAX = 0.05            // ASR word-error-rate ceiling      (forge WER_MAX)

@@ -16,6 +16,9 @@ public enum SDKConstants {
     /// SDK name
     public static let name = "RunAnywhere SDK"
 
+    /// SDK binding identifier reported in client metadata.
+    public static let binding = "swift"
+
     /// Platform identifier
     #if os(iOS)
     public static let platform = "ios"
