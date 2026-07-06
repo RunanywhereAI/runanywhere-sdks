@@ -164,27 +164,11 @@ struct FlatModelRow: View {
     @State private var downloadErrorMessage: String?
 
     private var frameworkColor: Color {
-        switch model.framework {
-        case .llamaCpp: return AppColors.primaryAccent
-        case .onnx: return .purple
-        case .foundationModels: return .primary
-        default: return .gray
-        }
+        model.framework.consumerBackendColor
     }
 
     private var frameworkName: String {
-        switch model.framework {
-        case .llamaCpp: return "Fast"
-        case .onnx: return "ONNX"
-        case .foundationModels: return "Apple"
-        case .systemTts: return "System"
-        default: return model.framework.displayName
-        }
-    }
-
-    /// Check if any LoRA adapters are compatible with this model
-    private var hasLoRAAdapters: Bool {
-        model.supportsLora
+        model.framework.consumerBackendLabel
     }
 
     private var downloadAccessibilityLabel: String {
@@ -228,8 +212,12 @@ struct FlatModelRow: View {
         } else if model.localPathURL != nil {
             return "Ready"
         } else {
-            return ""  // Removed "Download" text
+            return "Download"
         }
+    }
+
+    private var hasBlockingStatus: Bool {
+        availabilityReason != nil || downloadErrorMessage != nil
     }
 
     /// Get logo asset name for model - uses centralized extension
@@ -238,8 +226,7 @@ struct FlatModelRow: View {
     }
 
     var body: some View {
-        HStack(spacing: AppSpacing.mediumLarge) {
-            // Model logo
+        HStack(alignment: .top, spacing: AppSpacing.mediumLarge) {
             Image(modelLogoName)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
@@ -247,8 +234,7 @@ struct FlatModelRow: View {
                 .cornerRadius(8)
 
             modelInfoView
-
-            Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             actionButton
         }
@@ -258,78 +244,69 @@ struct FlatModelRow: View {
 
     private var modelInfoView: some View {
         VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
-            // Model name with framework badge inline
-            HStack(spacing: AppSpacing.smallMedium) {
-                Text(model.name)
-                    .font(AppTypography.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(AppColors.textPrimary)
+            Text(model.name)
+                .font(AppTypography.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(AppColors.textPrimary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
-                // Framework badge
-                Text(frameworkName)
-                    .font(AppTypography.caption2)
-                    .fontWeight(.medium)
-                    .padding(.horizontal, AppSpacing.small)
-                    .padding(.vertical, AppSpacing.xxSmall)
-                    .background(frameworkColor.opacity(0.15))
-                    .foregroundColor(frameworkColor)
-                    .cornerRadius(AppSpacing.cornerRadiusSmall)
-            }
+            backendBadge
+
+            Text(model.framework.consumerBackendDescription)
+                .font(AppTypography.caption2)
+                .foregroundColor(AppColors.textSecondary)
+                .lineLimit(1)
 
             statusRowView
         }
     }
 
+    private var backendBadge: some View {
+        HStack(spacing: AppSpacing.xxSmall) {
+            Image(systemName: model.framework.consumerBackendIcon)
+            Text(frameworkName)
+        }
+        .font(AppTypography.caption2)
+        .fontWeight(.medium)
+        .padding(.horizontal, AppSpacing.small)
+        .padding(.vertical, AppSpacing.xxSmall)
+        .background(frameworkColor.opacity(0.15))
+        .foregroundColor(frameworkColor)
+        .cornerRadius(AppSpacing.cornerRadiusSmall)
+    }
+
     private var statusRowView: some View {
         HStack(spacing: AppSpacing.smallMedium) {
-            // Status indicator (no size badge here anymore)
-            if isDownloading {
-                HStack(spacing: AppSpacing.xSmall) {
-                    ProgressView()
-                        .scaleEffect(0.6)
-                    Text("\(downloadStage.displayName)… \(Int(downloadProgress * 100))%")
-                        .font(AppTypography.caption2)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-            } else if !statusText.isEmpty {
-                HStack(spacing: AppSpacing.xxSmall) {
-                    Image(systemName: statusIcon)
-                        .foregroundColor(statusColor)
-                        .font(AppTypography.caption2)
-                    Text(statusText)
-                        .font(AppTypography.caption2)
-                        .foregroundColor(statusColor)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+            statusIndicator
+
+            if !hasBlockingStatus {
+                ForEach(model.consumerCapabilityBadges) { badge in
+                    ConsumerBadge(badge: badge)
                 }
             }
+        }
+    }
 
-            // Thinking support indicator
-            if model.supportsThinking {
-                HStack(spacing: AppSpacing.xxSmall) {
-                    Image(systemName: "brain")
-                    Text("Smart")
-                }
-                .font(AppTypography.caption2)
-                .padding(.horizontal, AppSpacing.small)
-                .padding(.vertical, AppSpacing.xxSmall)
-                .background(AppColors.badgePurple)
-                .foregroundColor(AppColors.primaryPurple)
-                .cornerRadius(AppSpacing.cornerRadiusSmall)
+    @ViewBuilder private var statusIndicator: some View {
+        if isDownloading {
+            HStack(spacing: AppSpacing.xSmall) {
+                ProgressView()
+                    .scaleEffect(0.6)
+                Text("\(downloadStage.displayName)… \(Int(downloadProgress * 100))%")
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textSecondary)
             }
-
-            // LoRA adapter support indicator
-            if hasLoRAAdapters {
-                HStack(spacing: AppSpacing.xxSmall) {
-                    Image(systemName: "sparkles")
-                    Text("LoRA")
-                }
-                .font(AppTypography.caption2)
-                .padding(.horizontal, AppSpacing.small)
-                .padding(.vertical, AppSpacing.xxSmall)
-                .background(AppColors.badgeBlue)
-                .foregroundColor(AppColors.primaryBlue)
-                .cornerRadius(AppSpacing.cornerRadiusSmall)
+        } else if !statusText.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: AppSpacing.xxSmall) {
+                Image(systemName: statusIcon)
+                    .foregroundColor(statusColor)
+                    .font(AppTypography.caption2)
+                Text(statusText)
+                    .font(AppTypography.caption2)
+                    .foregroundColor(statusColor)
+                    .lineLimit(hasBlockingStatus ? 3 : 1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

@@ -4,6 +4,7 @@
  */
 
 #include "commands/commands.h"
+#include "commands/model_labels.h"
 #include "commands/model_setup.h"
 
 #include <memory>
@@ -66,6 +67,7 @@ int run_show(const GlobalOptions &options, const std::string &ref) {
         .field("name", model.name())
         .field("category", static_cast<int64_t>(model.category()))
         .field("framework", static_cast<int64_t>(model.framework()))
+        .field("backend", model_labels::backend(model.framework()))
         .field("format", static_cast<int64_t>(model.format()))
         .field("download_url", model.download_url())
         .field("local_path", model.local_path())
@@ -90,6 +92,8 @@ int run_show(const GlobalOptions &options, const std::string &ref) {
 
   out::result_line("id          " + model.id());
   out::result_line("name        " + model.name());
+  out::result_line("backend     " +
+                   std::string(model_labels::backend(model.framework())));
   if (model.download_size_bytes() > 0) {
     out::result_line("size        " + out::human_bytes(static_cast<uint64_t>(
                                           model.download_size_bytes())));

@@ -15,7 +15,14 @@ import type { ModelInfo } from '@runanywhere/proto-ts/model_types';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
-import { getModelDownloadSizeBytes } from '../utils/modelDisplay';
+import {
+  DEFAULT_INFERENCE_FRAMEWORK,
+  getFrameworkColor,
+  getFrameworkDisplayName,
+  getFrameworkIcon,
+  getModelDownloadSizeBytes,
+  getPrimaryFramework,
+} from '../utils/modelDisplay';
 
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return '0 B';
@@ -138,26 +145,47 @@ export const StorageScreen: React.FC = () => {
           {downloadedModels.length === 0 ? (
             <Text style={styles.emptyText}>No downloaded models.</Text>
           ) : (
-            downloadedModels.map((model) => (
-              <View key={model.id} style={styles.modelRow}>
-                <View style={styles.modelText}>
-                  <Text style={styles.modelName}>{model.name || model.id}</Text>
-                  <Text style={styles.modelSize}>
-                    {formatBytes(getModelDownloadSizeBytes(model))}
-                  </Text>
+            downloadedModels.map((model) => {
+              const framework = getPrimaryFramework(model, DEFAULT_INFERENCE_FRAMEWORK);
+              const frameworkColor = getFrameworkColor(framework);
+              return (
+                <View key={model.id} style={styles.modelRow}>
+                  <View style={styles.modelText}>
+                    <Text style={styles.modelName}>{model.name || model.id}</Text>
+                    <View style={styles.modelMeta}>
+                      <Text style={styles.modelSize}>
+                        {formatBytes(getModelDownloadSizeBytes(model))}
+                      </Text>
+                      <View
+                        style={[
+                          styles.backendBadge,
+                          { backgroundColor: `${frameworkColor}18` },
+                        ]}
+                      >
+                        <Icon
+                          name={getFrameworkIcon(framework)}
+                          size={12}
+                          color={frameworkColor}
+                        />
+                        <Text style={[styles.backendText, { color: frameworkColor }]}>
+                          {getFrameworkDisplayName(framework)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => deleteModel(model)}
+                  >
+                    <Icon
+                      name="trash-outline"
+                      size={18}
+                      color={Colors.primaryRed}
+                    />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => deleteModel(model)}
-                >
-                  <Icon
-                    name="trash-outline"
-                    size={18}
-                    color={Colors.primaryRed}
-                  />
-                </TouchableOpacity>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
       </ScrollView>
@@ -262,6 +290,12 @@ const styles = StyleSheet.create({
   modelText: {
     flex: 1,
   },
+  modelMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.small,
+    marginTop: 4,
+  },
   modelName: {
     ...Typography.subheadline,
     color: Colors.textPrimary,
@@ -270,7 +304,18 @@ const styles = StyleSheet.create({
   modelSize: {
     ...Typography.footnote,
     color: Colors.textSecondary,
-    marginTop: 2,
+  },
+  backendBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  backendText: {
+    ...Typography.caption2,
+    fontWeight: '700',
   },
   deleteButton: {
     padding: Padding.padding10,

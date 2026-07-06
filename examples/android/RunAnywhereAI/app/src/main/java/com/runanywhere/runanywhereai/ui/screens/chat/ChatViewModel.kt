@@ -1,20 +1,30 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
 import ai.runanywhere.proto.v1.GenerationEventKind
+import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.SDKComponent
-import ai.runanywhere.proto.v1.ThinkingTagPattern
+import ai.runanywhere.proto.v1.VLMImageFormat
+import ai.runanywhere.proto.v1.VLMStreamEventKind
+import android.app.Application
+import android.net.Uri
+import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.data.conversation.ConversationRepository
 import com.runanywhere.runanywhereai.data.conversation.GenerationMode
+import com.runanywhere.runanywhereai.data.conversation.StoredAttachment
+import com.runanywhere.runanywhereai.data.conversation.StoredAttachmentKind
 import com.runanywhere.runanywhereai.data.conversation.StoredConversation
 import com.runanywhere.runanywhereai.data.conversation.StoredMessage
+import com.runanywhere.runanywhereai.data.conversation.StoredSource
 import com.runanywhere.runanywhereai.data.conversation.StoredStats
 import com.runanywhere.runanywhereai.data.conversation.StoredTool
+import com.runanywhere.runanywhereai.data.rag.DocumentExtractor
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
@@ -25,17 +35,32 @@ import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingOptions
 import com.runanywhere.sdk.public.extensions.Models.analyticsKey
 import com.runanywhere.sdk.public.extensions.aggregateStream
 import com.runanywhere.sdk.public.extensions.cancelGeneration
+import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
+import com.runanywhere.sdk.public.extensions.defaults
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.generateWithTools
 import com.runanywhere.sdk.public.extensions.getRegisteredTools
+import com.runanywhere.sdk.public.extensions.ragCreatePipeline
+import com.runanywhere.sdk.public.extensions.ragDestroyPipeline
+import com.runanywhere.sdk.public.extensions.ragGetStatistics
+import com.runanywhere.sdk.public.extensions.ragIngest
+import com.runanywhere.sdk.public.extensions.ragQuery
+import com.runanywhere.sdk.public.extensions.processImageStream
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 
-class ChatViewModel : ViewModel() {
+class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     val messages = mutableStateListOf<ChatMessage>()
 
@@ -53,7 +78,7 @@ class ChatViewModel : ViewModel() {
     val conversationCreatedAt: Long get() = createdAt
 
     // Mirrors iOS LLMViewModel.useToolCalling: the in-chat toggle reads and
-    // writes the persisted setting shared with the Tool Calling screen.
+    // writes the persisted setting shared with the Web & Tools screen.
     val toolsEnabled: Boolean get() = SettingsRepository.settings.toolCallingEnabled
 
     val canSend: Boolean get() = input.isNotBlank() && !isGenerating && GlobalState.model.isLoaded
@@ -61,6 +86,7 @@ class ChatViewModel : ViewModel() {
     private var job: Job? = null
     private var conversationId: String? = null
     private var createdAt: Long = 0L
+    private var ragPipelineKey: Pair<String, String>? = null
 
     // TTFT/completion metrics from the SDK event bus, keyed like iOS
     // LLMViewModel.firstTokenLatencies. The chat runs one generation at a time,
@@ -129,6 +155,158 @@ class ChatViewModel : ViewModel() {
         }
     }
 
+    fun sendImage(uri: Uri, loadedModelName: String?) {
+        if (isGenerating) return
+        val prompt = input.trim().ifBlank { "Describe this image in detail." }
+        input = ""
+        isGenerating = true
+        activeGenerationTTFTMs = null
+        activeGenerationMetrics = null
+
+        job = viewModelScope.launch {
+            var file: File? = null
+            var replyIndex: Int? = null
+            try {
+                val name = withContext(Dispatchers.IO) {
+                    runCatching { displayName(uri) }.getOrNull()
+                } ?: "Selected image"
+                messages += ChatMessage(
+                    text = prompt,
+                    isUser = true,
+                    attachment = ChatAttachment(
+                        kind = ChatAttachmentKind.IMAGE,
+                        name = name,
+                        detail = loadedModelName?.let { "Image model: $it" },
+                    ),
+                )
+                replyIndex = messages.size
+                messages += ChatMessage("", isUser = false)
+                file = withContext(Dispatchers.IO) { copyUriToCache(uri, "chat_image_", imageCacheSuffix(uri)) }
+                val image = RAVLMImage(
+                    file_path = file.absolutePath,
+                    format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
+                )
+                val options = RAVLMGenerationOptions(prompt = prompt, max_tokens = 300, temperature = 0.7f)
+                var accumulated = ""
+                RunAnywhere.processImageStream(image, options).collect { event ->
+                    when (event.kind) {
+                        VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN -> {
+                            if (event.token.isNotEmpty()) {
+                                accumulated += event.token
+                                replyIndex?.let { index ->
+                                    messages[index] = messages[index].copy(text = accumulated)
+                                }
+                            }
+                        }
+                        VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED -> {
+                            val result = event.result ?: return@collect
+                            val text = result.text.ifBlank { accumulated }
+                            replyIndex?.let { index ->
+                                messages[index] = messages[index].copy(
+                                    text = text.ifBlank { "I could not read that image." },
+                                    stats = GenerationStats(
+                                        tokens = result.completion_tokens,
+                                        tokensPerSecond = result.tokens_per_second.toDouble(),
+                                        timeToFirstTokenMs = result.time_to_first_token_ms.takeIf { it > 0 },
+                                        totalTimeMs = result.processing_time_ms,
+                                        modelName = loadedModelName,
+                                        mode = GenerationMode.STREAMING,
+                                    ),
+                                )
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RACLog.e("image question failed", e)
+                val index = replyIndex
+                if (index != null && index in messages.indices) {
+                    messages[index] = messages[index].copy(text = "Error: ${e.message}")
+                } else {
+                    messages += ChatMessage("Error: ${e.message}", isUser = false)
+                }
+            } finally {
+                file?.delete()
+                isGenerating = false
+                persist()
+            }
+        }
+    }
+
+    fun sendDocument(uri: Uri, embeddingModel: RAModelInfo?, answerModel: RAModelInfo?) {
+        if (isGenerating) return
+        val prompt = input.trim().ifBlank { "Summarize this document." }
+        input = ""
+        isGenerating = true
+        activeGenerationTTFTMs = null
+        activeGenerationMetrics = null
+
+        job = viewModelScope.launch {
+            var replyIndex: Int? = null
+            try {
+                val name = withContext(Dispatchers.IO) {
+                    runCatching { displayName(uri) }.getOrNull()
+                } ?: "Selected document"
+                val answerModelName = answerModel?.name
+                messages += ChatMessage(
+                    text = prompt,
+                    isUser = true,
+                    attachment = ChatAttachment(
+                        kind = ChatAttachmentKind.DOCUMENT,
+                        name = name,
+                        detail = answerModelName?.let { "Answer model: $it" },
+                    ),
+                )
+                replyIndex = messages.size
+                messages += ChatMessage("", isUser = false)
+                val embedding = embeddingModel ?: error("Choose or download a document index model first.")
+                val answer = answerModel ?: error("Choose or download a document answer model first.")
+                val doc = withContext(Dispatchers.IO) { DocumentExtractor.extract(getApplication(), uri) }
+                ensureRagPipeline(embedding, answer)
+                RunAnywhere.ragIngest(doc.text, doc.metadataJSON)
+                runCatching { RunAnywhere.ragGetStatistics() }
+                val result = RunAnywhere.ragQuery(prompt, RAGQueryOptions.defaults(question = prompt))
+                val sources = result.retrieved_chunks.map {
+                    ChatSource(
+                        text = it.text.trim(),
+                        score = it.similarity_score,
+                        document = it.source_document.orEmpty(),
+                    )
+                }
+                replyIndex?.let { index ->
+                    messages[index] = messages[index].copy(
+                        text = result.answer.ifBlank { "I could not find an answer in that document." },
+                        sources = sources,
+                        stats = GenerationStats(
+                            tokens = 0,
+                            tokensPerSecond = 0.0,
+                            timeToFirstTokenMs = null,
+                            totalTimeMs = result.total_time_ms,
+                            modelName = answer.name,
+                            mode = GenerationMode.NON_STREAMING,
+                        ),
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RACLog.e("document question failed", e)
+                val index = replyIndex
+                if (index != null && index in messages.indices) {
+                    messages[index] = messages[index].copy(text = "Error: ${e.message}")
+                } else {
+                    messages += ChatMessage("Error: ${e.message}", isUser = false)
+                }
+            } finally {
+                isGenerating = false
+                persist()
+            }
+        }
+    }
+
     // Mirrors iOS LLMViewModel+Events.handleGenerationEvent: record TTFT on
     // FIRST_TOKEN_GENERATED and completion metrics on COMPLETED/STREAM_COMPLETED.
     private fun handleGenerationEvent(event: SDKEvent) {
@@ -168,8 +346,16 @@ class ChatViewModel : ViewModel() {
             max_tokens = s.maxTokens,
             temperature = s.temperature,
             system_prompt = s.systemPrompt.ifBlank { null },
-            thinking_pattern = ThinkingTagPattern(open_tag = "<think>", close_tag = "</think>"),
+            disable_thinking = s.disableThinking,
         )
+    }
+
+    private suspend fun ensureRagPipeline(embeddingModel: RAModelInfo, answerModel: RAModelInfo) {
+        val key = embeddingModel.id to answerModel.id
+        if (ragPipelineKey == key) return
+        if (ragPipelineKey != null) runCatching { RunAnywhere.ragDestroyPipeline() }
+        RunAnywhere.ragCreatePipeline(embeddingModel = embeddingModel, llmModel = answerModel)
+        ragPipelineKey = key
     }
 
     private suspend fun generateReply(prompt: String, index: Int) {
@@ -275,7 +461,10 @@ class ChatViewModel : ViewModel() {
 
     fun stop() {
         job?.cancel()
-        viewModelScope.launch { RunAnywhere.cancelGeneration() }
+        viewModelScope.launch {
+            runCatching { RunAnywhere.cancelGeneration() }
+            runCatching { RunAnywhere.cancelVLMGeneration() }
+        }
         isGenerating = false
     }
 
@@ -376,6 +565,17 @@ private fun ChatMessage.toStored() = StoredMessage(
     text = text,
     isUser = isUser,
     thinking = thinking,
+    attachment = attachment?.let {
+        StoredAttachment(
+            kind = when (it.kind) {
+                ChatAttachmentKind.IMAGE -> StoredAttachmentKind.IMAGE
+                ChatAttachmentKind.DOCUMENT -> StoredAttachmentKind.DOCUMENT
+            },
+            name = it.name,
+            detail = it.detail,
+        )
+    },
+    sources = sources.map { StoredSource(it.text, it.score, it.document) },
     tool = tool?.let { StoredTool(it.name, it.arguments, it.result, it.success, it.error) },
     stats = stats?.let {
         StoredStats(
@@ -395,6 +595,17 @@ private fun StoredMessage.toUi() = ChatMessage(
     text = text,
     isUser = isUser,
     thinking = thinking,
+    attachment = attachment?.let {
+        ChatAttachment(
+            kind = when (it.kind) {
+                StoredAttachmentKind.IMAGE -> ChatAttachmentKind.IMAGE
+                StoredAttachmentKind.DOCUMENT -> ChatAttachmentKind.DOCUMENT
+            },
+            name = it.name,
+            detail = it.detail,
+        )
+    },
+    sources = sources.map { ChatSource(it.text, it.score, it.document) },
     tool = tool?.let { ToolCallInfo(it.name, it.arguments, it.result, it.success, it.error) },
     stats = stats?.let {
         GenerationStats(
@@ -409,6 +620,38 @@ private fun StoredMessage.toUi() = ChatMessage(
         )
     },
 )
+
+private fun ChatViewModel.displayName(uri: Uri): String? =
+    getApplication<Application>().contentResolver
+        .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { cursor ->
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (cursor.moveToFirst() && index >= 0) cursor.getString(index)?.takeIf { it.isNotBlank() } else null
+        }
+
+private fun ChatViewModel.copyUriToCache(uri: Uri, prefix: String, suffix: String): File {
+    val app = getApplication<Application>()
+    val file = File.createTempFile(prefix, suffix, app.cacheDir)
+    try {
+        val input = app.contentResolver.openInputStream(uri) ?: error("Could not open the selected file.")
+        input.use { source ->
+            FileOutputStream(file).use { destination -> source.copyTo(destination) }
+        }
+        return file
+    } catch (e: Exception) {
+        file.delete()
+        throw e
+    }
+}
+
+private fun ChatViewModel.imageCacheSuffix(uri: Uri): String {
+    val app = getApplication<Application>()
+    val extension = app.contentResolver.getType(uri)
+        ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+        ?.lowercase()
+        ?.takeIf { it in setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "heif") }
+    return ".${extension ?: "jpg"}"
+}
 
 private fun prettyJson(raw: String): String = runCatching {
     val trimmed = raw.trim()

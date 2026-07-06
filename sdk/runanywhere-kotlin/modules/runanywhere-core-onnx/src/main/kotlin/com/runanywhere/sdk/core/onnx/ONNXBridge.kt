@@ -33,6 +33,9 @@ internal object ONNXBridge {
     @Volatile
     private var nativeLibraryLoaded = false
 
+    @Volatile
+    private var sherpaLibraryLoaded = false
+
     private val loadLock = Any()
 
     /**
@@ -66,8 +69,10 @@ internal object ONNXBridge {
                 // in the APK. Wrapped in try/catch so non-Sherpa builds aren't blocked.
                 try {
                     System.loadLibrary("rac_backend_sherpa")
+                    sherpaLibraryLoaded = true
                     logger.info("rac_backend_sherpa loaded; Sherpa autoregister fired")
                 } catch (e: UnsatisfiedLinkError) {
+                    sherpaLibraryLoaded = false
                     logger.warning("rac_backend_sherpa not present: ${e.message}")
                 }
                 nativeLibraryLoaded = true
@@ -88,6 +93,9 @@ internal object ONNXBridge {
      */
     val isLoaded: Boolean
         get() = nativeLibraryLoaded
+
+    val isSherpaLoaded: Boolean
+        get() = sherpaLibraryLoaded
 
     // ==========================================================================
     // JNI Methods

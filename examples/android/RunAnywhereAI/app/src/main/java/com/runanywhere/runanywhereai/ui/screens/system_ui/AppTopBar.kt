@@ -2,6 +2,8 @@ package com.runanywhere.runanywhereai.ui.screens.system_ui
 
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavDestination
@@ -20,6 +22,7 @@ import com.runanywhere.runanywhereai.ui.navigation.Tts
 import com.runanywhere.runanywhereai.ui.navigation.Vision
 import com.runanywhere.runanywhereai.ui.navigation.Voice
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatTopBar
+import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
 
 // Pure route dispatcher: picks each screen's own top bar. No UI defined here.
@@ -36,6 +39,10 @@ fun AppTopBar(
     onHistory: () -> Unit,
     onLora: () -> Unit,
     onDetails: () -> Unit,
+    onMenu: () -> Unit,
+    onNavigateBack: () -> Unit,
+    showMenu: Boolean,
+    canNavigateBack: Boolean,
 ) {
     when {
         destination == null -> Unit
@@ -50,25 +57,49 @@ fun AppTopBar(
             onHistory = onHistory,
             onLora = onLora,
             onDetails = onDetails,
+            onMenu = onMenu,
+            showMenu = showMenu,
         )
-        destination.hasRoute<Voice>() -> StandardTopBar("Voice")
-        destination.hasRoute<More>() -> StandardTopBar("More")
-        destination.hasRoute<Settings>() -> StandardTopBar("Settings")
-        destination.hasRoute<Tools>() -> StandardTopBar("Tool Calling")
-        destination.hasRoute<Tts>() -> StandardTopBar("Text to Speech")
-        destination.hasRoute<Stt>() -> StandardTopBar("Speech to Text")
-        destination.hasRoute<Vision>() -> StandardTopBar("Vision")
-        destination.hasRoute<Documents>() -> StandardTopBar("Documents")
-        destination.hasRoute<Solutions>() -> StandardTopBar("Solutions")
-        destination.hasRoute<CloudProviders>() -> StandardTopBar("Cloud providers")
-        destination.hasRoute<Benchmarks>() -> StandardTopBar("Benchmarks")
-        destination.hasRoute<BenchmarkDetail>() -> StandardTopBar("Run details")
+        destination.hasRoute<Voice>() -> StandardTopBar("Talk", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<More>() -> StandardTopBar("Advanced", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Settings>() -> StandardTopBar("Settings", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Tools>() -> StandardTopBar("Web & tools", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Tts>() -> StandardTopBar("Read aloud", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Stt>() -> StandardTopBar("Transcription", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Vision>() -> StandardTopBar("Images & live", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Documents>() -> StandardTopBar("Documents", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Solutions>() -> StandardTopBar("Solutions", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<CloudProviders>() -> StandardTopBar("Cloud providers", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Benchmarks>() -> StandardTopBar("Benchmarks", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<BenchmarkDetail>() -> StandardTopBar("Run details", showMenu, onMenu, canNavigateBack, onNavigateBack)
         else -> Unit
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StandardTopBar(title: String) {
-    CenterAlignedTopAppBar(title = { Text(title) })
+private fun StandardTopBar(
+    title: String,
+    showMenu: Boolean = false,
+    onMenu: () -> Unit = {},
+    canNavigateBack: Boolean = false,
+    onNavigateBack: () -> Unit = {},
+) {
+    CenterAlignedTopAppBar(
+        title = { Text(title) },
+        navigationIcon = {
+            when {
+                canNavigateBack -> {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(RACIcons.Outline.ChevronLeft, contentDescription = "Go back")
+                    }
+                }
+                showMenu -> {
+                    IconButton(onClick = onMenu) {
+                        Icon(RACIcons.Outline.Menu, contentDescription = "Open menu")
+                    }
+                }
+            }
+        },
+    )
 }

@@ -104,7 +104,10 @@ android {
     }
 
     sourceSets {
-        getByName("main") { java.srcDirs("src/main/kotlin") }
+        getByName("main") {
+            java.srcDirs("src/main/kotlin")
+            jniLibs.srcDirs("src/main/jniLibs", "src/androidMain/jniLibs")
+        }
         getByName("test") { java.srcDirs("src/test/kotlin") }
     }
 

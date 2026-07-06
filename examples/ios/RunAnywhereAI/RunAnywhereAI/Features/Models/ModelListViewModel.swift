@@ -20,6 +20,7 @@ class ModelListViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private var cancellables = Set<AnyCancellable>()
+    private var attemptedDefaultChatModelLoad = false
 
     // MARK: - Initialization
 
@@ -104,6 +105,7 @@ class ModelListViewModel: ObservableObject {
 
             // Sync currentModel with SDK's current model state
             await syncCurrentModelWithSDK()
+            await loadDefaultChatModelIfAvailable()
         } catch {
             print("Failed to load models from SDK: \(error)")
             errorMessage = "Failed to load models: \(error.localizedDescription)"
@@ -125,6 +127,37 @@ class ModelListViewModel: ObservableObject {
 
     func setCurrentModel(_ model: RAModelInfo?) {
         currentModel = model
+    }
+
+    func loadDefaultChatModelIfAvailable() async {
+        guard !isLoadingModel, currentModel == nil, !attemptedDefaultChatModelLoad else { return }
+        guard isAppleFoundationDefaultAvailable else { return }
+        guard let defaultModel = availableModels.first(where: {
+            $0.isAppleFoundationModel && $0.category == .language
+        }) else {
+            return
+        }
+
+        attemptedDefaultChatModelLoad = true
+        isLoadingModel = true
+        defer { isLoadingModel = false }
+
+        do {
+            try await loadModel(defaultModel)
+            currentModel = defaultModel
+            print("ModelListViewModel: Loaded default Apple Foundation model")
+        } catch {
+            print("ModelListViewModel: Failed to load default Apple Foundation model: \(error.localizedDescription)")
+        }
+    }
+
+    private var isAppleFoundationDefaultAvailable: Bool {
+        #if os(iOS) || os(macOS)
+        if #available(iOS 26.0, macOS 26.0, *) {
+            return SystemFoundationModels.isAvailable
+        }
+        #endif
+        return false
     }
 
     /// Alias for loadModelsFromRegistry to match view calls

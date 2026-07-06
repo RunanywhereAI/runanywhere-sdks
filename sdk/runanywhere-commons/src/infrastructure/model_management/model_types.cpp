@@ -279,6 +279,10 @@ const char* rac_framework_display_name(rac_inference_framework_t framework) {
             return "llama.cpp";
         case RAC_FRAMEWORK_COREML:
             return "Core ML";
+        case RAC_FRAMEWORK_MLX:
+            return "MLX";
+        case RAC_FRAMEWORK_METALRT:
+            return "MetalRT";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return "Foundation Models";
         case RAC_FRAMEWORK_SYSTEM_TTS:
@@ -309,6 +313,10 @@ const char* rac_framework_analytics_key(rac_inference_framework_t framework) {
             return "llama_cpp";
         case RAC_FRAMEWORK_COREML:
             return "coreml";
+        case RAC_FRAMEWORK_MLX:
+            return "mlx";
+        case RAC_FRAMEWORK_METALRT:
+            return "metalrt";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return "foundation_models";
         case RAC_FRAMEWORK_SYSTEM_TTS:

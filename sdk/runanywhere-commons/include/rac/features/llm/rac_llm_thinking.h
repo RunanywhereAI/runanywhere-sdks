@@ -1,6 +1,6 @@
 /**
  * @file rac_llm_thinking.h
- * @brief C ABI for splitting `<think>...</think>` content from LLM output.
+ * @brief C ABI for splitting thinking-tag content from LLM output.
  *
  * Moves the Swift `ThinkingContentParser` block out
  * of every frontend (currently duplicated in Swift, with stubs queued for
@@ -37,10 +37,11 @@ extern "C" {
 #endif
 
 /**
- * Extracts the FIRST `<think>...</think>` block from @p text. The remaining
- * text (before + after the block, joined by '\n') is returned via @p
- * out_response; the inside-think content via @p out_thinking. Either may be
- * NULL on output if absent.
+ * Extracts the FIRST built-in thinking block from @p text. The default parser
+ * recognizes both `<think>...</think>` and `<thinking>...</thinking>` so
+ * existing model behavior stays intact. The remaining text (before + after
+ * the block, joined by '\n') is returned via @p out_response; the inside-think
+ * content via @p out_thinking. Either may be NULL on output if absent.
  *
  * Outputs point into a thread_local buffer owned by the implementation;
  * caller must copy before the next call on the same thread.
@@ -56,7 +57,7 @@ extern "C" {
  *                         on success — empty string at minimum).
  * @param out_response_len Length of response text in bytes (excluding NUL).
  * @param out_thinking     Receives a pointer to thinking text, or NULL when
- *                         no <think>...</think> block was found.
+ *                         no built-in thinking block was found.
  * @param out_thinking_len Length of thinking text, or 0 when out_thinking
  *                         is NULL.
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER.
@@ -66,9 +67,24 @@ rac_result_t rac_llm_extract_thinking(const char* text, const char** out_respons
                                       size_t* out_thinking_len);
 
 /**
- * Removes ALL `<think>...</think>` blocks (multiple per text + trailing
- * unclosed `<think>`) from @p text. Returns the trimmed remainder via
- * @p out_stripped (thread_local; copy before next call).
+ * Extracts thinking content with a caller-provided tag pair plus the built-in
+ * fallbacks described by `rac_llm_extract_thinking`. If either custom tag is
+ * empty, commons uses only the built-in recognizer.
+ *
+ * This is still a commons-internal parser; SDKs should consume the generated
+ * proto fields populated by commons.
+ */
+rac_result_t rac_llm_extract_thinking_with_tags(const char* text, const char* open_tag,
+                                                const char* close_tag,
+                                                const char** out_response,
+                                                size_t* out_response_len,
+                                                const char** out_thinking,
+                                                size_t* out_thinking_len);
+
+/**
+ * Removes ALL built-in thinking blocks (multiple per text + trailing unclosed
+ * tags) from @p text. Returns the trimmed remainder via @p out_stripped
+ * (thread_local; copy before next call).
  *
  * @internal Commons-internal helper. See `rac_llm_extract_thinking` above —
  * SDKs should read the trimmed response from the proto-populated

@@ -29,6 +29,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
+#include "features/llm/llm_thinking_tags_internal.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/rag/rac_rag.h"
@@ -639,7 +640,14 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     size_t answer_len = 0;
     const char* thinking = nullptr;
     size_t thinking_len = 0;
-    if (rac_llm_extract_thinking(raw_answer, &answer, &answer_len, &thinking, &thinking_len) ==
+    std::string thinking_open_tag;
+    std::string thinking_close_tag;
+    (void)rac::llm::model_thinking_tags_from_registry(
+        s->llm_model_id.c_str(), &thinking_open_tag, &thinking_close_tag);
+    if (rac_llm_extract_thinking_with_tags(
+            raw_answer, thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
+            thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &answer,
+            &answer_len, &thinking, &thinking_len) ==
         RAC_SUCCESS) {
         proto.set_answer(answer ? std::string(answer, answer_len) : std::string());
         if (thinking && thinking_len > 0) {
@@ -664,6 +672,11 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
             }
             if (s_item.contains("score") && s_item["score"].is_number()) {
                 chunk->set_similarity_score(s_item["score"].get<float>());
+            }
+            if (s_item.contains("source_document") && s_item["source_document"].is_string()) {
+                chunk->set_source_document(s_item["source_document"].get<std::string>());
+            } else if (s_item.contains("source") && s_item["source"].is_string()) {
+                chunk->set_source_document(s_item["source"].get<std::string>());
             }
         }
     }

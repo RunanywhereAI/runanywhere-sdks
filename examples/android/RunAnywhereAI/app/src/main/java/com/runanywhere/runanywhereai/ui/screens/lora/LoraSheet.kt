@@ -24,11 +24,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +43,7 @@ import com.runanywhere.runanywhereai.ui.screens.models.formatModelSize
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +92,7 @@ fun LoraSheet(viewModel: LoraViewModel, onDismiss: () -> Unit) {
                         isBusy = state.busyId == entry.id,
                         progressPercent = if (state.busyId == entry.id) state.progressPercent else null,
                         onDownload = { viewModel.download(entry) },
-                        onApply = { viewModel.apply(entry) },
+                        onApply = { scale -> viewModel.apply(entry, scale) },
                         onRemove = viewModel::clear,
                     )
                 }
@@ -119,10 +125,13 @@ private fun LoraRow(
     isBusy: Boolean,
     progressPercent: Int?,
     onDownload: () -> Unit,
-    onApply: () -> Unit,
+    onApply: (Float) -> Unit,
     onRemove: () -> Unit,
 ) {
     val dimens = LocalDimens.current
+    var scale by rememberSaveable(entry.id) {
+        mutableFloatStateOf(entry.default_scale.takeIf { it > 0f } ?: 1f)
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -130,46 +139,87 @@ private fun LoraRow(
             .background(MaterialTheme.colorScheme.surface)
             .padding(dimens.spacingMd),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = entry.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (entry.description.isNotBlank()) {
+        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = entry.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        text = entry.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = dimens.spacingXs),
                     )
+                    if (entry.description.isNotBlank()) {
+                        Text(
+                            text = entry.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = dimens.spacingXs),
+                        )
+                    }
+                    if (entry.size_bytes > 0) {
+                        Text(
+                            text = formatModelSize(entry.size_bytes),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = dimens.spacingXs),
+                        )
+                    }
                 }
-                if (entry.size_bytes > 0) {
-                    Text(
-                        text = formatModelSize(entry.size_bytes),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = dimens.spacingXs),
-                    )
-                }
+
+                Spacer(Modifier.size(dimens.spacingMd))
+
+                LoraAction(
+                    isActive = isActive,
+                    isDownloaded = isDownloaded,
+                    isBusy = isBusy,
+                    progressPercent = progressPercent,
+                    onDownload = onDownload,
+                    onApply = { onApply(scale) },
+                    onRemove = onRemove,
+                )
             }
 
-            Spacer(Modifier.size(dimens.spacingMd))
+            if (isDownloaded && !isActive) {
+                StrengthControl(scale = scale, onScaleChange = { scale = it })
+            } else if (isActive) {
+                Text(
+                    text = "Strength ${String.format(Locale.US, "%.2fx", scale)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
 
-            LoraAction(
-                isActive = isActive,
-                isDownloaded = isDownloaded,
-                isBusy = isBusy,
-                progressPercent = progressPercent,
-                onDownload = onDownload,
-                onApply = onApply,
-                onRemove = onRemove,
+@Composable
+private fun StrengthControl(scale: Float, onScaleChange: (Float) -> Unit) {
+    val dimens = LocalDimens.current
+    Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Strength",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = String.format(Locale.US, "%.2fx", scale),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
+        Slider(
+            value = scale,
+            onValueChange = onScaleChange,
+            valueRange = 0.1f..2.0f,
+            steps = 18,
+        )
     }
 }
 

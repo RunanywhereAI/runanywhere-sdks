@@ -65,6 +65,7 @@ final class LLMViewModel {
     var generationCancellable: AnyCancellable?
     private var firstTokenLatencies: [String: Double] = [:]
     private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
+    var preparedDocumentRAGPipelineKey: ChatDocumentRAGPipelineKey?
     /// TTFT (ms) reported by the SDK event bus for the generation in flight.
     /// The event carries an SDK-side generation id the app never sees on the
     /// result, so the single-generation-at-a-time chat keeps the latest value
@@ -193,7 +194,7 @@ final class LLMViewModel {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(conversationSelected(_:)),
-            name: Notification.Name("ConversationSelected"),
+            name: .conversationSelected,
             object: nil
         )
 
@@ -201,6 +202,8 @@ final class LLMViewModel {
 
         // Reconcile against the SDK's authoritative model snapshot in case a
         // model was loaded before this ViewModel subscribed.
+        await checkModelStatusFromSDK()
+        await ModelListViewModel.shared.loadDefaultChatModelIfAvailable()
         await checkModelStatusFromSDK()
 
         if isModelLoaded {
@@ -553,9 +556,16 @@ final class LLMViewModel {
         }
         options.streamingEnabled = useStreaming
         // Structured flag — commons applies the model's no-think directive;
-        // the app never injects control tokens into prompts. Same gate as the
-        // RAG path (RAGViewModel.askQuestion).
+        // the app never injects control tokens into prompts. Chat document
+        // attachments use the same gate before calling the SDK RAG pipeline.
         options.disableThinking = loadedModelSupportsThinking && !thinkingModeEnabled
+        if let currentModel = ModelListViewModel.shared.currentModel, currentModel.supportsThinking {
+            options.thinkingPattern = currentModel.hasThinkingPattern
+                ? currentModel.thinkingPattern
+                : .defaultPattern
+        } else if loadedModelSupportsThinking {
+            options.thinkingPattern = .defaultPattern
+        }
         return options
     }
 

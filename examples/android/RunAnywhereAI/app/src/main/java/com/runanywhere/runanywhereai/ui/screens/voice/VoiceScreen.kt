@@ -103,21 +103,30 @@ fun VoiceScreen() {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
     ) {
+        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
+            Text("Talk Mode", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Start a hands-free conversation once the assistant has listening and speaking models ready.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = RoundedCornerShape(dimens.radiusLg),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column {
-                SetupRow(RACIcons.Outline.MessageCircle, "Language model", llmName, onClick = { sheet = llmVm })
+                SetupRow(RACIcons.Outline.MessageCircle, "Assistant", llmName, onClick = { sheet = llmVm })
                 Divider()
-                SetupRow(RACIcons.Outline.Brain, "Speech to text", sttName, onClick = { sheet = sttVm })
+                SetupRow(RACIcons.Outline.Brain, "Listen", sttName, onClick = { sheet = sttVm })
                 Divider()
-                SetupRow(RACIcons.Outline.Robot, "Voice", ttsVoice?.name, onClick = { sheet = ttsVm })
+                SetupRow(RACIcons.Outline.Robot, "Speak", ttsVoice?.name, onClick = { sheet = ttsVm })
                 Divider()
                 SetupRow(
                     RACIcons.Outline.Activity,
-                    "Voice activity (VAD) — optional, Silero auto-loads",
+                    "Turn-taking",
                     vadName,
                     onClick = { sheet = vadVm },
                 )
@@ -127,7 +136,7 @@ fun VoiceScreen() {
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
             if (voiceVm.turns.isEmpty()) {
                 Text(
-                    text = if (ready) "Tap the mic and start talking" else "Pick a model for each step to begin",
+                    text = if (ready) "Tap the mic and start talking" else "Choose listening and speaking models to begin",
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -6,6 +6,8 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/features/models/model_list_view_model.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 class StorageView extends StatefulWidget {
   const StorageView({super.key});
@@ -35,6 +37,9 @@ class _StorageViewState extends State<StorageView> {
     });
 
     try {
+      if (ModelListViewModel.shared.availableModels.isEmpty) {
+        await ModelListViewModel.shared.loadModelsFromRegistry();
+      }
       final storageInfo = await sdk.RunAnywhere.downloads.getStorageInfo();
       final models = await sdk.RunAnywhere.downloads.list();
       if (!mounted) return;
@@ -344,10 +349,37 @@ class _StoredModelRowState extends State<_StoredModelRow> {
 
   @override
   Widget build(BuildContext context) {
+    final catalogModel = _catalogModelFor(widget.model.modelId);
+    final framework = catalogModel?.backendFramework;
     return Card(
       child: ListTile(
         title: Text(widget.model.name),
-        subtitle: Text(widget.model.sizeBytes.toInt().formattedFileSize),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.model.sizeBytes.toInt().formattedFileSize),
+            if (framework != null) ...[
+              const SizedBox(height: AppSpacing.xxSmall),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    framework.backendIcon,
+                    size: 12,
+                    color: framework.backendColor,
+                  ),
+                  const SizedBox(width: AppSpacing.xxSmall),
+                  Text(
+                    framework.displayName,
+                    style: AppTypography.caption2(context).copyWith(
+                      color: framework.backendColor,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
         trailing: IconButton(
           icon: _isDeleting
               ? const SizedBox(
@@ -362,6 +394,13 @@ class _StoredModelRowState extends State<_StoredModelRow> {
         ),
       ),
     );
+  }
+
+  ModelInfo? _catalogModelFor(String modelId) {
+    for (final model in ModelListViewModel.shared.availableModels) {
+      if (model.id == modelId) return model;
+    }
+    return null;
   }
 }
 

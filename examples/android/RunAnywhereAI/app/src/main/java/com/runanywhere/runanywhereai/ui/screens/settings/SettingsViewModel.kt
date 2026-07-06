@@ -52,6 +52,7 @@ class SettingsViewModel : ViewModel() {
     fun setMaxTokens(value: Int) = SettingsRepository.setMaxTokens(value)
     fun setSystemPrompt(value: String) = SettingsRepository.setSystemPrompt(value)
     fun setStreaming(value: Boolean) = SettingsRepository.setStreaming(value)
+    fun setDisableThinking(value: Boolean) = SettingsRepository.setDisableThinking(value)
 
     fun setHfToken(value: String) {
         SettingsRepository.setHfToken(value)

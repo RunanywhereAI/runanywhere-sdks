@@ -32,6 +32,9 @@ import com.runanywhere.runanywhereai.ui.theme.AppMotion
 fun AppNavHost(
     navController: NavHostController,
     chatViewModel: ChatViewModel,
+    onOpenVision: () -> Unit,
+    onOpenVoice: () -> Unit,
+    onOpenAdvanced: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     NavHost(
@@ -55,7 +58,14 @@ fun AppNavHost(
                 fadeOut(tween(AppMotion.DURATION_SHORT, easing = AppMotion.EaseIn))
         },
     ) {
-        composable<Chat> { ChatScreen(chatViewModel) }
+        composable<Chat> {
+            ChatScreen(
+                viewModel = chatViewModel,
+                onOpenVision = onOpenVision,
+                onOpenVoice = onOpenVoice,
+                onOpenAdvanced = onOpenAdvanced,
+            )
+        }
         composable<Voice> { VoiceScreen() }
         composable<More> { MoreScreen(onNavigate = { navController.navigate(it) }) }
         composable<Settings> { SettingsScreen() }

@@ -8,15 +8,12 @@
 import SwiftUI
 import AVFoundation
 import RunAnywhere
-import PhotosUI
 
-// MARK: - VLM Camera View
+// MARK: - Live Mode View
 
 struct VLMCameraView: View {
     @State private var viewModel = VLMViewModel()
     @State private var showingModelSelection = false
-    @State private var showingPhotos = false
-    @State private var selectedPhoto: PhotosPickerItem?
     @State private var shouldResumeAutoStreaming = false
     @Environment(\.scenePhase)
     private var scenePhase
@@ -31,7 +28,7 @@ struct VLMCameraView: View {
                 modelRequiredContent
             }
         }
-        .navigationTitle("Vision AI")
+        .navigationTitle("Live Mode")
         #if os(iOS)
         .navigationBarTitleDisplayModeCompat(.inline)
         #endif
@@ -45,10 +42,6 @@ struct VLMCameraView: View {
                 await viewModel.checkModelStatus()
                 setupCameraIfNeeded()
             }
-        }
-        .photosPicker(isPresented: $showingPhotos, selection: $selectedPhoto, matching: .images)
-        .onChange(of: selectedPhoto) { _, item in
-            Task { await handlePhoto(item) }
         }
         .task(id: viewModel.isAutoStreamingEnabled) {
             guard viewModel.isAutoStreamingEnabled else { return }
@@ -104,7 +97,7 @@ struct VLMCameraView: View {
                         Spacer()
                         HStack(spacing: 8) {
                             ProgressView().tint(.white)
-                            Text("Analyzing...").font(.caption).foregroundColor(.white)
+                            Text("Looking...").font(.caption).foregroundColor(.white)
                         }
                         .padding(12)
                         .background(.ultraThinMaterial)
@@ -140,7 +133,7 @@ struct VLMCameraView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 HStack(spacing: 6) {
-                    Text("Description")
+                    Text("Live answer")
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(.primary)
@@ -173,7 +166,7 @@ struct VLMCameraView: View {
 
             ScrollView {
                 Text(viewModel.currentDescription.isEmpty
-                     ? "Tap the button to describe what your camera sees"
+                     ? "Tap Ask to describe the camera, or turn on Live for automatic updates."
                      : viewModel.currentDescription)
                     .font(.system(.body, design: .default))
                     .fontWeight(.regular)
@@ -199,38 +192,35 @@ struct VLMCameraView: View {
     }
 
     private var controlBar: some View {
-        HStack(spacing: 32) {
-            // Photos button
-            Button { showingPhotos = true } label: {
-                VStack(spacing: 4) {
-                    Image(systemName: "photo").font(.title2)
-                    Text("Photos").font(.caption2)
-                }
-                .foregroundColor(.white)
-            }
-
+        HStack(spacing: 42) {
             // Main action button - tap for single, or shows streaming state
-            Button {
-                if viewModel.isAutoStreamingEnabled {
-                    viewModel.isAutoStreamingEnabled = false
-                } else {
-                    Task { await viewModel.describeCurrentFrame() }
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(buttonColor)
-                        .frame(width: 64, height: 64)
-                    if viewModel.isProcessing {
-                        ProgressView().tint(.white)
-                    } else if viewModel.isAutoStreamingEnabled {
-                        Image(systemName: "stop.fill").font(.title2).foregroundColor(.white)
+            VStack(spacing: 6) {
+                Button {
+                    if viewModel.isAutoStreamingEnabled {
+                        viewModel.isAutoStreamingEnabled = false
                     } else {
-                        Image(systemName: "sparkles").font(.title).foregroundColor(.white)
+                        Task { await viewModel.describeCurrentFrame() }
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(buttonColor)
+                            .frame(width: 64, height: 64)
+                        if viewModel.isProcessing {
+                            ProgressView().tint(.white)
+                        } else if viewModel.isAutoStreamingEnabled {
+                            Image(systemName: "stop.fill").font(.title2).foregroundColor(.white)
+                        } else {
+                            Image(systemName: "sparkles").font(.title).foregroundColor(.white)
+                        }
                     }
                 }
+                .disabled(viewModel.isProcessing && !viewModel.isAutoStreamingEnabled)
+
+                Text(viewModel.isAutoStreamingEnabled ? "Stop" : "Ask")
+                    .font(.caption2)
+                    .foregroundColor(.white)
             }
-            .disabled(viewModel.isProcessing && !viewModel.isAutoStreamingEnabled)
 
             // Auto-stream toggle
             Button { viewModel.toggleAutoStreaming() } label: {
@@ -262,10 +252,10 @@ struct VLMCameraView: View {
         VStack(spacing: 20) {
             Spacer()
             Image(systemName: "camera.viewfinder").font(.system(size: 60)).foregroundColor(.orange)
-            Text("Vision AI").font(.title).fontWeight(.bold).foregroundColor(.white)
-            Text("Select a vision model to describe images").foregroundColor(.gray)
+            Text("Live Mode").font(.title).fontWeight(.bold).foregroundColor(.white)
+            Text("Choose a vision model to understand the camera").foregroundColor(.gray)
             Button { showingModelSelection = true } label: {
-                HStack { Image(systemName: "sparkles"); Text("Select Model") }
+                HStack { Image(systemName: "sparkles"); Text("Choose Vision Model") }
                     .font(.headline).frame(width: 200).padding(.vertical, 12)
             }
             .buttonStyle(.borderedProminent).tint(.orange)
@@ -315,16 +305,6 @@ struct VLMCameraView: View {
         }
     }
 
-    private func handlePhoto(_ item: PhotosPickerItem?) async {
-        guard let item = item,
-              let data = try? await item.loadTransferable(type: Data.self) else { return }
-        #if os(iOS)
-        guard let image = UIImage(data: data) else { return }
-        #elseif os(macOS)
-        guard let image = NSImage(data: data) else { return }
-        #endif
-        await viewModel.describeImage(image)
-    }
 }
 
 // MARK: - Camera Preview

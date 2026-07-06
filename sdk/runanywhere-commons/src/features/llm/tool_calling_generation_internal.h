@@ -1,0 +1,209 @@
+#ifndef RAC_FEATURES_LLM_TOOL_CALLING_GENERATION_INTERNAL_H
+#define RAC_FEATURES_LLM_TOOL_CALLING_GENERATION_INTERNAL_H
+
+#include <atomic>
+#include <mutex>
+#include <string>
+
+#include "features/llm/llm_thinking_directive_internal.h"
+#include "features/llm/llm_thinking_tags_internal.h"
+#include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/llm/rac_llm_thinking.h"
+#include "rac/features/llm/rac_llm_types.h"
+
+#if defined(RAC_HAVE_PROTOBUF)
+#include "infrastructure/events/sdk_event_publish.h"
+#include "sdk_events.pb.h"
+#include "tool_calling.pb.h"
+#endif
+
+namespace rac::llm::tool_calling {
+
+struct GenerationState {
+    int32_t max_tokens = 0;
+    float temperature = 0.0f;
+    float top_p = 0.0f;
+    std::string system_prompt;
+    bool disable_thinking = false;
+    bool thinking_tags_resolved = false;
+    std::string thinking_open_tag;
+    std::string thinking_close_tag;
+};
+
+struct GenerationCancelBinding {
+    std::mutex* active_ref_mu = nullptr;
+    LifecycleLlmRef** active_ref = nullptr;
+    std::atomic<bool>* cancel_requested = nullptr;
+};
+
+inline void split_display_text_and_thinking(const std::string& raw_text, std::string* out_text,
+                                            std::string* out_thinking,
+                                            const GenerationState& generation) {
+    const char* response = nullptr;
+    size_t response_len = 0;
+    const char* thinking = nullptr;
+    size_t thinking_len = 0;
+    if (rac_llm_extract_thinking_with_tags(
+            raw_text.c_str(),
+            generation.thinking_open_tag.empty() ? nullptr : generation.thinking_open_tag.c_str(),
+            generation.thinking_close_tag.empty() ? nullptr
+                                                  : generation.thinking_close_tag.c_str(),
+            &response, &response_len, &thinking, &thinking_len) != RAC_SUCCESS) {
+        if (out_text) {
+            *out_text = raw_text;
+        }
+        if (out_thinking) {
+            out_thinking->clear();
+        }
+        return;
+    }
+
+    if (out_text) {
+        *out_text = response ? std::string(response, response_len) : std::string();
+    }
+    if (out_thinking) {
+        *out_thinking =
+            (thinking && thinking_len > 0) ? std::string(thinking, thinking_len) : std::string();
+    }
+}
+
+#if defined(RAC_HAVE_PROTOBUF)
+inline void set_display_text_and_thinking(runanywhere::v1::ToolCallingResult* result,
+                                          const std::string& raw_text,
+                                          const GenerationState& generation) {
+    if (!result) {
+        return;
+    }
+
+    std::string display_text;
+    std::string thinking_content;
+    split_display_text_and_thinking(raw_text, &display_text, &thinking_content, generation);
+    result->set_text(display_text);
+    if (!thinking_content.empty()) {
+        result->set_thinking_content(thinking_content);
+    } else {
+        result->clear_thinking_content();
+    }
+}
+#endif
+
+inline void publish_generation_completed_event(const LifecycleLlmRef& ref,
+                                               const rac_llm_result_t& raw) {
+#if defined(RAC_HAVE_PROTOBUF)
+    // Tool-calling generate calls still need the canonical LLM telemetry path.
+    runanywhere::v1::SDKEvent llm_event;
+    auto* gen = llm_event.mutable_generation();
+    gen->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED);
+    if (ref.model_id != nullptr && ref.model_id[0] != '\0') {
+        gen->set_model_id(ref.model_id);
+    }
+    if (raw.completion_tokens > 0) {
+        gen->set_tokens_count(raw.completion_tokens);
+        gen->set_tokens_used(raw.completion_tokens);
+    }
+    if (raw.prompt_tokens > 0) {
+        gen->set_input_tokens(raw.prompt_tokens);
+    }
+    if (raw.tokens_per_second > 0.0f) {
+        gen->set_tokens_per_second(raw.tokens_per_second);
+    }
+    if (raw.time_to_first_token_ms > 0) {
+        gen->set_time_to_first_token_ms(raw.time_to_first_token_ms);
+    }
+    (void)rac::events::publish(llm_event, runanywhere::v1::SDK_COMPONENT_LLM,
+                               runanywhere::v1::EVENT_CATEGORY_LLM);
+#else
+    (void)ref;
+    (void)raw;
+#endif
+}
+
+inline bool run_generate_once(GenerationState& generation,
+                              const GenerationCancelBinding& cancel_binding,
+                              const std::string& prompt, std::string* out_response,
+                              rac_result_t* out_rc) {
+    LifecycleLlmRef ref;
+    rac_result_t rc = acquire_lifecycle_llm(&ref);
+    if (rc != RAC_SUCCESS) {
+        if (out_rc) {
+            *out_rc = rc;
+        }
+        return false;
+    }
+
+    rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
+    if (generation.max_tokens > 0) {
+        options.max_tokens = generation.max_tokens;
+    }
+    if (generation.temperature > 0.0f) {
+        options.temperature = generation.temperature;
+    }
+    if (generation.top_p > 0.0f) {
+        options.top_p = generation.top_p;
+    }
+    options.streaming_enabled = RAC_FALSE;
+    options.system_prompt =
+        generation.system_prompt.empty() ? nullptr : generation.system_prompt.c_str();
+    options.disable_thinking = generation.disable_thinking ? RAC_TRUE : RAC_FALSE;
+
+    clear_lifecycle_llm_cancel(&ref);
+
+    if (!ref.ops || !ref.ops->generate) {
+        release_lifecycle_llm(&ref);
+        if (out_rc) {
+            *out_rc = RAC_ERROR_NOT_SUPPORTED;
+        }
+        return false;
+    }
+
+    if (!generation.thinking_tags_resolved) {
+        (void)model_thinking_tags_from_registry(ref.model_id, &generation.thinking_open_tag,
+                                                &generation.thinking_close_tag);
+        generation.thinking_tags_resolved = true;
+    }
+
+    if (cancel_binding.active_ref_mu && cancel_binding.active_ref &&
+        cancel_binding.cancel_requested) {
+        std::lock_guard<std::mutex> guard(*cancel_binding.active_ref_mu);
+        *cancel_binding.active_ref = &ref;
+        if (cancel_binding.cancel_requested->load(std::memory_order_acquire)) {
+            request_lifecycle_llm_cancel(&ref);
+        }
+    }
+
+    rac_llm_result_t raw{};
+    const std::string effective_prompt =
+        apply_no_think_directive(prompt, options.disable_thinking);
+    rc = ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw);
+
+    if (cancel_binding.active_ref_mu && cancel_binding.active_ref) {
+        std::lock_guard<std::mutex> guard(*cancel_binding.active_ref_mu);
+        *cancel_binding.active_ref = nullptr;
+    }
+
+    if (rc != RAC_SUCCESS) {
+        rac_llm_result_free(&raw);
+        release_lifecycle_llm(&ref);
+        if (out_rc) {
+            *out_rc = rc;
+        }
+        return false;
+    }
+
+    if (out_response) {
+        *out_response = raw.text ? raw.text : "";
+    }
+    publish_generation_completed_event(ref, raw);
+
+    rac_llm_result_free(&raw);
+    release_lifecycle_llm(&ref);
+    if (out_rc) {
+        *out_rc = RAC_SUCCESS;
+    }
+    return true;
+}
+
+}  // namespace rac::llm::tool_calling
+
+#endif  // RAC_FEATURES_LLM_TOOL_CALLING_GENERATION_INTERNAL_H

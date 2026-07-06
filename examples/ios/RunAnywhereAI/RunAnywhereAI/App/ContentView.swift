@@ -2,225 +2,93 @@
 //  ContentView.swift
 //  RunAnywhereAI
 //
-//  Main app navigation with 5 tabs (iOS limit)
-//  Organized by AI capability: Chat, Vision, Voice, More utilities, Settings
+//  Consumer assistant shell. Chat is the product; advanced SDK demos live behind
+//  Settings/Advanced instead of top-level tabs.
 //
 
 import SwiftUI
 
 struct ContentView: View {
-    @State private var selectedTab = 0
+    var body: some View {
+        Group {
+            #if os(macOS)
+            ConsumerMacShell()
+            #else
+            ConsumerCompactShell()
+            #endif
+        }
+        .accentColor(AppColors.primaryAccent)
+    }
+}
+
+#if os(macOS)
+private enum ConsumerRootDestination: Hashable {
+    case assistant
+    case models
+    case settings
+    case advanced
+}
+
+private struct ConsumerMacShell: View {
+    @State private var selectedDestination: ConsumerRootDestination? = .assistant
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // Tab 0: Chat - Pure text LLM conversation
-            ChatInterfaceView()
-                .tabItem {
-                    Label("Chat", systemImage: "message")
+        NavigationSplitView {
+            List(selection: $selectedDestination) {
+                Section("RunAnywhere") {
+                    NavigationLink(value: ConsumerRootDestination.assistant) {
+                        Label("Assistant", systemImage: "sparkles")
+                    }
+                    NavigationLink(value: ConsumerRootDestination.models) {
+                        Label("Models", systemImage: "square.stack.3d.up")
+                    }
                 }
-                .tag(0)
 
-            // Tab 1: Vision - Image understanding & generation
-            VisionHubView()
-                .tabItem {
-                    Label("Vision", systemImage: "eye")
+                Section("Manage") {
+                    NavigationLink(value: ConsumerRootDestination.settings) {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                    NavigationLink(value: ConsumerRootDestination.advanced) {
+                        Label("Advanced", systemImage: "slider.horizontal.3")
+                    }
                 }
-                .tag(1)
-
-            // Tab 2: Voice - Voice Assistant (hero feature)
-            VoiceAssistantView()
-                .tabItem {
-                    Label("Voice", systemImage: "mic.circle")
-                }
-                .tag(2)
-
-            // Tab 3: More - Additional utilities
-            MoreHubView()
-                .tabItem {
-                    Label("More", systemImage: "ellipsis.circle")
-                }
-                .tag(3)
-
-            // Tab 4: Settings
-            Group {
-                #if os(macOS)
+            }
+            .navigationTitle("RunAnywhere")
+            .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
+        } detail: {
+            switch selectedDestination ?? .assistant {
+            case .assistant:
+                ChatInterfaceView()
+            case .models:
+                SimplifiedModelsView()
+            case .settings:
                 NavigationStack {
                     CombinedSettingsView()
                 }
-                #else
-                NavigationView {
-                    CombinedSettingsView()
+            case .advanced:
+                NavigationStack {
+                    ConsumerAdvancedHubView()
                 }
-                .navigationViewStyle(.stack)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                #endif
             }
-            .tabItem {
-                Label("Settings", systemImage: "gear")
-            }
-            .tag(4)
         }
-        .accentColor(AppColors.primaryAccent)
-        #if os(macOS)
         .frame(
-            minWidth: 800,
+            minWidth: 900,
             idealWidth: 1200,
             maxWidth: .infinity,
-            minHeight: 600,
-            idealHeight: 800,
+            minHeight: 620,
+            idealHeight: 820,
             maxHeight: .infinity
         )
-        #endif
     }
 }
-
-// MARK: - Vision Hub (VLM + Image Generation)
-
-struct VisionHubView: View {
+#else
+private struct ConsumerCompactShell: View {
     var body: some View {
-        NavigationView {
-            List {
-                Section {
-                    NavigationLink {
-                        VLMCameraView()
-                    } label: {
-                        FeatureRow(
-                            icon: "camera.viewfinder",
-                            iconColor: .purple,
-                            title: "Vision Chat",
-                            subtitle: "Chat with images using your camera or photos"
-                        )
-                    }
-                } header: {
-                    Text("Vision AI")
-                } footer: {
-                    Text("Understand and create visual content with AI")
-                }
-            }
-            .navigationTitle("Vision")
-        }
-        #if os(iOS)
-        .navigationViewStyle(.stack)
-        #endif
+        ChatInterfaceView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
-
-// MARK: - More Hub (Additional Utilities)
-
-struct MoreHubView: View {
-    var body: some View {
-        NavigationView {
-            List {
-                Section {
-                    NavigationLink {
-                        DocumentRAGView()
-                    } label: {
-                        FeatureRow(
-                            icon: "doc.text.magnifyingglass",
-                            iconColor: .indigo,
-                            title: "Document Q&A",
-                            subtitle: "Ask questions about PDF and JSON documents"
-                        )
-                    }
-
-                    NavigationLink {
-                        SpeechToTextView()
-                    } label: {
-                        FeatureRow(
-                            icon: "waveform",
-                            iconColor: .blue,
-                            title: "Transcribe",
-                            subtitle: "Convert speech to text"
-                        )
-                    }
-
-                    NavigationLink {
-                        TextToSpeechView()
-                    } label: {
-                        FeatureRow(
-                            icon: "speaker.wave.2",
-                            iconColor: .green,
-                            title: "Speak",
-                            subtitle: "Convert text to speech"
-                        )
-                    }
-
-                    NavigationLink {
-                        VoiceActivityDetectionView()
-                    } label: {
-                        FeatureRow(
-                            icon: "waveform.badge.mic",
-                            iconColor: .cyan,
-                            title: "Voice Detection",
-                            subtitle: "Detect speech activity in real-time"
-                        )
-                    }
-
-                    NavigationLink {
-                        StorageView()
-                    } label: {
-                        FeatureRow(
-                            icon: "folder",
-                            iconColor: .orange,
-                            title: "Storage",
-                            subtitle: "Manage models and files"
-                        )
-                    }
-
-                    #if os(iOS)
-                    NavigationLink {
-                        VoiceDictationManagementView()
-                    } label: {
-                        FeatureRow(
-                            icon: "keyboard",
-                            iconColor: .indigo,
-                            title: "Voice Keyboard",
-                            subtitle: "Dictate text in any app on-device"
-                        )
-                    }
-                    #endif
-                } header: {
-                    Text("Utilities")
-                } footer: {
-                    Text("Additional tools and utilities")
-                }
-            }
-            .navigationTitle("More")
-        }
-        #if os(iOS)
-        .navigationViewStyle(.stack)
-        #endif
-    }
-}
-
-// MARK: - Feature Row Component
-
-struct FeatureRow: View {
-    let icon: String
-    let iconColor: Color
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(.white)
-                .frame(width: 44, height: 44)
-                .background(iconColor)
-                .cornerRadius(10)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.headline)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(.vertical, 8)
-    }
-}
+#endif
 
 #Preview {
     ContentView()

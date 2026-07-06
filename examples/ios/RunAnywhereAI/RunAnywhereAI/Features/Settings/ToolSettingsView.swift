@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Foundation
 import RunAnywhere
 import os
 
@@ -28,7 +29,7 @@ class ToolSettingsViewModel: ObservableObject {
         }
     }
 
-    // Built-in demo tools with REAL API implementations
+    // App-local demo tools with REAL API implementations
     private var demoTools: [(definition: RAToolDefinition, executor: ToolExecutor)] {
         [
             // Weather Tool - Uses Open-Meteo API (free, no API key required)
@@ -151,6 +152,9 @@ class ToolSettingsViewModel: ObservableObject {
     }
 
     func registerDemoTools() async {
+        await RunAnywhere.registerWebSearchTool()
+        logger.info("Registered tool \(RunAnywhere.webSearchToolDefinition.name)")
+
         for tool in demoTools {
             await RunAnywhere.registerTool(tool.definition, executor: tool.executor)
             logger.info("Registered tool \(tool.definition.name)")
@@ -211,7 +215,7 @@ struct ToolSettingsSection: View {
         } footer: {
             Text(
                 "Allow the LLM to use registered tools to perform actions like "
-                + "getting weather, time, or calculations."
+                + "web lookup, weather, time, or calculations."
             )
             .font(AppTypography.caption)
         }
@@ -276,7 +280,7 @@ struct ToolSettingsCard: View {
 
                 Text(
                     "Allow the LLM to use registered tools to perform actions like "
-                    + "getting weather, time, or calculations."
+                    + "web lookup, weather, time, or calculations."
                 )
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.textSecondary)

@@ -1,5 +1,10 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -30,16 +35,113 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.data.rag.DocumentExtractor
 import com.runanywhere.runanywhereai.state.GlobalState
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
+import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
+import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.launch
 
+private enum class PendingAttachmentKind { IMAGE, DOCUMENT }
+
+private data class PendingAttachment(
+    val kind: PendingAttachmentKind,
+    val uri: Uri,
+    val name: String,
+)
+
 @Composable
-fun ChatScreen(viewModel: ChatViewModel) {
+fun ChatScreen(
+    viewModel: ChatViewModel,
+    onOpenVision: () -> Unit,
+    onOpenVoice: () -> Unit,
+    onOpenAdvanced: () -> Unit,
+) {
     val dimens = LocalDimens.current
+    val context = LocalContext.current
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val messages = viewModel.messages
+    val imageModelVm: ModelSelectionViewModel =
+        viewModel(key = "chat-vlm-model", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.VLM))
+    val documentIndexVm: ModelSelectionViewModel =
+        viewModel(key = "chat-rag-index-model", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.RAG_EMBEDDING))
+    val documentAnswerVm: ModelSelectionViewModel =
+        viewModel(key = "chat-rag-answer-model", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.RAG_LLM))
+    var pendingAttachment by remember { mutableStateOf<PendingAttachment?>(null) }
+    var showImageModelSheet by remember { mutableStateOf(false) }
+    var showDocumentIndexSheet by remember { mutableStateOf(false) }
+    var showDocumentAnswerSheet by remember { mutableStateOf(false) }
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        pendingAttachment = PendingAttachment(
+            kind = PendingAttachmentKind.IMAGE,
+            uri = uri,
+            name = displayName(context, uri) ?: "Selected image",
+        )
+    }
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        pendingAttachment = PendingAttachment(
+            kind = PendingAttachmentKind.DOCUMENT,
+            uri = uri,
+            name = displayName(context, uri) ?: "Selected document",
+        )
+    }
+
+    fun sendPendingAttachment(attachment: PendingAttachment) {
+        when (attachment.kind) {
+            PendingAttachmentKind.IMAGE -> {
+                val imageModel = imageModelVm.readySelectedModel()
+                if (imageModel == null) {
+                    showImageModelSheet = true
+                    return
+                }
+                scope.launch {
+                    if (imageModelVm.state.currentModelId != imageModel.id) {
+                        val loaded = imageModelVm.select(imageModel)
+                        if (!loaded) {
+                            showImageModelSheet = true
+                            return@launch
+                        }
+                    }
+                    pendingAttachment = null
+                    viewModel.sendImage(attachment.uri, loadedModelName = imageModel.name)
+                }
+            }
+            PendingAttachmentKind.DOCUMENT -> {
+                val indexModel = documentIndexVm.readySelectedModel()
+                val answerModel = documentAnswerVm.readySelectedModel()
+                when {
+                    indexModel == null -> showDocumentIndexSheet = true
+                    answerModel == null -> showDocumentAnswerSheet = true
+                    else -> {
+                        pendingAttachment = null
+                        viewModel.sendDocument(
+                            uri = attachment.uri,
+                            embeddingModel = indexModel,
+                            answerModel = answerModel,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun submitComposer() {
+        val attachment = pendingAttachment
+        if (attachment == null) {
+            viewModel.send()
+        } else if (!viewModel.isGenerating) {
+            sendPendingAttachment(attachment)
+        }
+    }
 
     var autoFollow by remember { mutableStateOf(true) }
 
@@ -101,13 +203,20 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     ChatInputBar(
                         input = viewModel.input,
                         onInputChange = viewModel::onInputChange,
-                        onSend = viewModel::send,
-                        canSend = viewModel.canSend,
+                        onSend = ::submitComposer,
+                        canSend = viewModel.canSend || (pendingAttachment != null && !viewModel.isGenerating),
                         isGenerating = viewModel.isGenerating,
                         onStop = viewModel::stop,
                         toolsEnabled = viewModel.toolsEnabled,
                         onToggleTools = viewModel::toggleTools,
+                        onAttachDocument = { documentPicker.launch(DocumentExtractor.acceptedMimeTypes) },
+                        onAttachImage = { imagePicker.launch("image/*") },
+                        onOpenLive = onOpenVision,
+                        onOpenTalk = onOpenVoice,
+                        onOpenAdvanced = onOpenAdvanced,
                         modifier = Modifier.widthIn(max = dimens.contentMaxWidth),
+                        pendingAttachment = pendingAttachment?.toComposerAttachment(),
+                        onClearAttachment = { pendingAttachment = null },
                     )
                 }
             }
@@ -139,4 +248,42 @@ fun ChatScreen(viewModel: ChatViewModel) {
             )
         }
     }
+
+    if (showImageModelSheet) {
+        ModelSelectionSheet(viewModel = imageModelVm, onDismiss = { showImageModelSheet = false })
+    }
+    if (showDocumentIndexSheet) {
+        ModelSelectionSheet(viewModel = documentIndexVm, onDismiss = { showDocumentIndexSheet = false })
+    }
+    if (showDocumentAnswerSheet) {
+        ModelSelectionSheet(viewModel = documentAnswerVm, onDismiss = { showDocumentAnswerSheet = false })
+    }
 }
+
+private fun ModelSelectionViewModel.readySelectedModel(): RAModelInfo? {
+    val selected = state.currentModelId
+        ?.let { id -> state.models.firstOrNull { it.id == id && isReady(it) } }
+    return selected ?: state.models.firstOrNull { isReady(it) }
+}
+
+private fun PendingAttachment.toComposerAttachment(): ComposerAttachment =
+    when (kind) {
+        PendingAttachmentKind.IMAGE -> ComposerAttachment(
+            name = name,
+            description = "Ask about this image",
+            icon = RACIcons.Outline.Eye,
+        )
+        PendingAttachmentKind.DOCUMENT -> ComposerAttachment(
+            name = name,
+            description = "Ask with sources from this document",
+            icon = RACIcons.Outline.FileText,
+        )
+    }
+
+private fun displayName(context: Context, uri: Uri): String? =
+    context.contentResolver
+        .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { cursor ->
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (cursor.moveToFirst() && index >= 0) cursor.getString(index)?.takeIf { it.isNotBlank() } else null
+        }

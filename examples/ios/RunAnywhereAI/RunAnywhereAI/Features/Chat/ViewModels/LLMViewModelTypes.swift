@@ -34,3 +34,11 @@ struct GenerationMetricsFromSDK: Sendable {
     let tokensPerSecond: Double
     let timeToFirstTokenMs: Double?
 }
+
+// MARK: - Document RAG
+
+struct ChatDocumentRAGPipelineKey: Equatable {
+    let documentID: UUID
+    let embeddingModelID: String
+    let answerModelID: String
+}

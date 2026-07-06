@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -27,12 +28,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.BuildConfig
+import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
 import com.runanywhere.runanywhereai.ui.screens.models.formatModelSize
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
@@ -56,7 +59,19 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Section("Generation") {
+        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            Text(
+                text = "Personalize the assistant, manage local models, and keep downloads private.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Section("Assistant") {
             SliderRow(
                 label = "Temperature",
                 valueText = String.format(Locale.US, "%.1f", settings.temperature),
@@ -90,9 +105,15 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 checked = settings.streaming,
                 onCheckedChange = viewModel::setStreaming,
             )
+            ToggleRow(
+                label = "Show reasoning when available",
+                description = "Thinking models can show a collapsible reasoning trace before the answer.",
+                checked = !settings.disableThinking,
+                onCheckedChange = { viewModel.setDisableThinking(!it) },
+            )
         }
 
-        Section("Storage") {
+        Section("Models & Storage") {
             Text(
                 text = "Models ${formatModelSize(storage.modelsBytes)}  ·  ${formatModelSize(storage.freeBytes)} free",
                 style = RACTextStyles.Metric,
@@ -122,9 +143,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             }
         }
 
-        Section("Downloads") {
+        Section("Private Downloads") {
             Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-                Text("HuggingFace token", style = MaterialTheme.typography.bodyLarge)
+                Text("Hugging Face token", style = MaterialTheme.typography.bodyLarge)
                 OutlinedTextField(
                     value = settings.hfToken,
                     onValueChange = viewModel::setHfToken,
@@ -234,14 +255,20 @@ private fun SliderRow(
 @Composable
 private fun ToggleRow(label: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -259,11 +286,17 @@ private fun DownloadedModelRow(model: RAModelInfo, busy: Boolean, onDelete: () -
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(model.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    formatModelSize(model.download_size_bytes),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+                ) {
+                    BackendBadge(framework = model.framework, compact = true)
+                    Text(
+                        formatModelSize(model.download_size_bytes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             if (busy) {
                 CircularProgressIndicator(

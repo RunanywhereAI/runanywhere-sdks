@@ -113,7 +113,9 @@ fun RagScreen() {
                     .weight(1f)
                     .fillMaxHeight()
                     .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
             ) {
+                DocumentHeader()
                 SetupCard(
                     embeddingName = embeddingName,
                     llmName = llmName,
@@ -151,6 +153,7 @@ fun RagScreen() {
                 .padding(dimens.screenPadding),
             verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
         ) {
+            DocumentHeader()
             if (showFullSetup) {
                 SetupCard(
                     embeddingName = embeddingName,
@@ -188,6 +191,18 @@ fun RagScreen() {
     }
 
     sheet?.let { active -> ModelSelectionSheet(viewModel = active, onDismiss = { sheet = null }) }
+}
+
+@Composable
+private fun DocumentHeader() {
+    Column(verticalArrangement = Arrangement.spacedBy(LocalDimens.current.spacingSm)) {
+        Text("Documents", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Add a file, then ask questions with cited source chunks.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable

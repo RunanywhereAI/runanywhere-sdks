@@ -49,6 +49,10 @@ public extension RALLMGenerationOptions {
     func toRALLMGenerateRequest(prompt: String) -> RALLMGenerateRequest {
         var request = RALLMGenerateRequest()
         request.prompt = prompt
+        // Embed the full options envelope so typed controls such as
+        // disableThinking, thinkingPattern, toolCalling, grammar, and
+        // structured output reach commons as one canonical payload.
+        request.options = self
         request.maxTokens = maxTokens
         request.temperature = temperature
         request.topP = topP
