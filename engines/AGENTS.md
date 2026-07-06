@@ -78,8 +78,7 @@ engine exists in this tree.
 | **onnx** | EMBED (`embedding_ops`) | ONNX Runtime via `runtimes/onnxrt` `Session` | **2** — uses a separate runtime as a library | **ON** | priority 50. Declares `RAC_RUNTIME_ONNXRT`. Embeddings slot gated on `RAC_BACKEND_RAG`; when RAG is off the engine registers with zero primitives. STT/TTS/VAD are sherpa's, not onnx's. |
 | **cloud** | STT (`stt_ops`) | none — HTTP to a provider (Sarvam today) | **3** (no runtime — HTTP) | **ON** | priority 50, modality-agnostic name. `runtimes=NULL` → always eligible, never runtime-rejected. Provider via `config_json["provider"]`. Multi-modality-ready. |
 | **coreml** | DIFFUSION (`diffusion_ops`) | **our** Stable-Diffusion pipeline on Apple CoreML `MLModel` | **3** — our inference code on a device-runtime | **ON (Apple)** | priority 100, Apple-only (`AVAILABILITY_PRIVATE`), modality-agnostic name. Self-registers via `RAC_STATIC_PLUGIN_REGISTER(coreml)`. The engine `coreml` uses the runtime `coreml` (same framework name, separate registry/dir). CMake pins `RAC_COREML_GENERATE_AVAILABLE=1`, so it is routable by default on Apple. Multi-modality-ready. |
-| **genie** | none (all-NULL stub) | Qualcomm Genie (NPU) SDK — not in-tree | — (shell) | **OFF** | Bare stub via `RAC_ENGINE_UNAVAILABLE_PLUGIN`. `RAC_GENIE_LLM_OPS_AVAILABLE=0` pinned in CMake; never routable in-tree. First consumer of the shared unavailable shell. |
-| **metalrt** | none by default (all-NULL stub); LLM+STT+TTS+VLM when binary linked | private, **closed-source** MetalRT lib (`libmetalrt_engine.a`) | **1** (when present) — custom Metal shaders | **OFF (reserved)** | priority 120 when routable. **RESERVED / experimental** — not a live boundary member. Apple-only, stub when the binary is absent. See "Stubs & reserved engines". |
+| **qhexrt** | LLM, VLM, STT, TTS (`llm_ops`/`vlm_ops`/`stt_ops`/`tts_ops`) when linked | private RunAnywhere QHexRT prebuilt archive | **1** — QNN-context bundles on Snapdragon HNPU | **OFF** | priority 150 when routable. Public builds compile a not-routable shell when the private archive is absent; authorized Android builds link the prebuilt under `QHEXRT_ROOT`. |
 
 `RAC_PRIMITIVE_RERANK` (wire value 6) and its former `rerank_ops` slot were
 **removed in ABI v4**: there is no `rerank_ops` field on `rac_engine_vtable_t`,
@@ -154,7 +153,7 @@ cleanest references). Names are by convention; CMake lists them explicitly.
 The boilerplate `create` adapter (a 7-line forward onto the engine's native
 `rac_<primitive>_<name>_create`) can be generated with
 `RAC_DEFINE_CREATE_ADAPTER(primitive, name)` — sherpa uses it for STT/TTS/VAD;
-engines with richer create flows (llamacpp, onnx, coreml, metalrt) hand-write it.
+engines with richer create flows (llamacpp, onnx, coreml, qhexrt) hand-write it.
 
 ### `engines/common/` shared helpers
 
@@ -164,7 +163,7 @@ Include via the `engines/` dir on the include path (e.g.
 
 | Header | Provides |
 |---|---|
-| `rac_engine_unavailable.h` | `rac_engine_unavailable_capability(...)` (the 3-way decision) + `RAC_ENGINE_UNAVAILABLE_PLUGIN(name, display, cap_fn)` — emits the full not-routable shell: empty manifest + all-NULL `.rodata` vtable + `RAC_PLUGIN_ENTRY_DEF`. Internal building blocks `RAC_ENGINE_UNAVAILABLE_MANIFEST_DEF` / `_VTABLE_DEF` are exposed for engines wanting the shared manifest but a bespoke vtable. Used by genie (always-stub) and metalrt's stub arm. |
+| `rac_engine_unavailable.h` | `rac_engine_unavailable_capability(...)` (the 3-way decision) + `RAC_ENGINE_UNAVAILABLE_PLUGIN(name, display, cap_fn)` — emits the full not-routable shell: empty manifest + all-NULL `.rodata` vtable + `RAC_PLUGIN_ENTRY_DEF`. Internal building blocks `RAC_ENGINE_UNAVAILABLE_MANIFEST_DEF` / `_VTABLE_DEF` are exposed for engines wanting the shared manifest but a bespoke vtable. Used by qhexrt when the private archive is absent. |
 | `rac_engine_jni_bridge.h` | `RAC_DEFINE_ENGINE_JNI_BRIDGE(...)` and `RAC_DEFINE_ENGINE_JNI_BRIDGE_NO_ONLOAD(...)` — the standard `nativeRegister/Unregister/IsRegistered/GetVersion` Android JNI quartet. The full variant also emits `JNI_OnLoad` (for a standalone per-engine `.so`: onnx, llamacpp); the `_NO_ONLOAD` variant omits it (for a TU folded into a host lib that already owns `JNI_OnLoad`: cloud's `rac_cloud_jni.cpp` → `librunanywhere_jni.so`). Plus `RAC_JNI_FN`, `RAC_DEFINE_ENGINE_JNI_LOG_TAG`, `LOGi/LOGe/LOGw`. **JVM symbol parity is load-bearing** — the class-path token must match the Kotlin `*Bridge` byte-for-byte. |
 | `rac_engine_sibling_loader.h` | `rac_engine_register_sibling(solib_name, register_symbol)` — cross-registers a sibling engine that lives in a separate `.so`, working around Android's per-class-loader linker namespaces (dlopen-then-dlsym, falling back to `RTLD_DEFAULT`). |
 | `rac_engine_stt_types.h` | Shared internal STT request/result structs (`STTRequest`, `STTResult`, `WordTiming`, `AudioSegment`, `STTModelType`) — one definition to avoid an ODR landmine across STT engines. Sherpa is the sole consumer today. |
@@ -311,48 +310,13 @@ No new plugin, no rename, no ABI bump — the engine already owns one
 
 ---
 
-## Stubs & reserved engines
+## Private engine shells
 
-Two engines compile but are intentionally **not routable** in the public tree.
-Both publish the same `rac_plugin_entry_<name>` symbol in stub and real mode, so
-downstream SDKs can load the shell with no platform branches while the router
-only ever sees them when their real ops are present.
-
-### `genie` — Qualcomm Genie (NPU) shell
-
-- **OFF by default**, never routable in-tree: `RAC_GENIE_LLM_OPS_AVAILABLE=0` is
-  pinned in `engines/genie/CMakeLists.txt` as a build fact (not a user option).
-- Emitted entirely by `RAC_ENGINE_UNAVAILABLE_PLUGIN(genie, …)` — empty manifest
-  + all-NULL vtable. Only `genie_capability_check()` (a `__ANDROID__` + SDK 3-way
-  gate) is engine-specific. genie is the first consumer of the shared shell.
-- When real Genie LLM ops land, replace the shared shell with a hand-written
-  routable manifest/vtable exposing `RAC_PRIMITIVE_GENERATE_TEXT`.
-
-### `metalrt` — RESERVED / experimental (private closed-source MetalRT)
-
-**Mark this clearly: `metalrt` is reserved-for-future, NOT a live boundary
-member.**
-
-- **OFF by default** (`RAC_BACKEND_METALRT=OFF`, forced OFF on non-Apple). Wraps
-  a **private, closed-source** lib (`libmetalrt_engine.a`); the public repo
-  carries only stubs (`engines/metalrt/stubs/`) that compile every `metalrt_*`
-  symbol to a no-op.
-- When `RAC_METALRT_ENGINE_AVAILABLE=0` (the default), the plugin entry takes the
-  **stub arm** (`RAC_ENGINE_UNAVAILABLE_PLUGIN`) — all-NULL vtable, registration
-  rejected, routing never selects it. When the binary is linked it serves
-  LLM+STT+TTS+VLM at priority 120.
-- **`rac_backend_metalrt_register()` has zero call sites in the monorepo** — no
-  SDK bridge or commons code calls it (confirmed: the only references are its own
-  definition, the header declaration, and the doc comment in the static-register
-  shim). The sole wiring is the static-init shim `rac_static_register_metalrt.cpp`
-  (`RAC_STATIC_REGISTER_BACKEND(metalrt)`), which is added to `rac_commons`
-  **only** under `RAC_STATIC_PLUGINS` and **only** when the engine target is built
-  (OFF by default). Treat metalrt as a re-drop seam for the closed-source engine,
-  not as an active engine.
-- Built as an OBJECT library folded into `rac_commons` (so static-init runs
-  before `main()` on iOS without a separate `.dylib` the App Store would reject)
-  — the one engine that intentionally does **not** use `rac_add_engine_plugin`
-  (see `cmake/plugins.cmake:34-51`).
+`qhexrt` is private and Android/Snapdragon-only. Public builds compile the same
+`rac_plugin_entry_qhexrt` symbol as a not-routable shell when the prebuilt
+archive is absent; authorized builds set `-DRAC_BACKEND_QHEXRT=ON` and point
+`QHEXRT_ROOT` at the private archive to expose LLM, VLM, STT, and TTS over QNN
+context bundles. The source for the private runtime never enters this repo.
 
 ---
 

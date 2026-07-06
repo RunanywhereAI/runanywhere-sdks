@@ -710,10 +710,6 @@ rac_inference_framework_t proto_framework_to_c(rav1::InferenceFramework framewor
             return RAC_FRAMEWORK_MLX;
         case rav1::INFERENCE_FRAMEWORK_COREML:
             return RAC_FRAMEWORK_COREML;
-        case rav1::INFERENCE_FRAMEWORK_METALRT:
-            return RAC_FRAMEWORK_METALRT;
-        case rav1::INFERENCE_FRAMEWORK_GENIE:
-            return RAC_FRAMEWORK_GENIE;
         case rav1::INFERENCE_FRAMEWORK_SHERPA:
             return RAC_FRAMEWORK_SHERPA;
         case rav1::INFERENCE_FRAMEWORK_QHEXRT:

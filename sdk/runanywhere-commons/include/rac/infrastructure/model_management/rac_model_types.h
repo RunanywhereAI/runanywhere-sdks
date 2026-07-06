@@ -239,9 +239,7 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_NONE = 6,              /**< No framework needed */
     RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
     RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
-    // Value 9 (WHISPERKIT_COREML) intentionally retired — leave the gap to keep ABI stable.
-    RAC_FRAMEWORK_METALRT = 10, /**< MetalRT (custom Metal GPU kernels, Apple only) */
-    RAC_FRAMEWORK_GENIE = 11,   /**< Qualcomm Genie (Hexagon NPU LLM) */
+    // Values 9-11 intentionally retired — leave the gaps stable.
     RAC_FRAMEWORK_SHERPA = 12,  /**< Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
     RAC_FRAMEWORK_QHEXRT = 13,  /**< QHexRT (Qualcomm Hexagon NPU runtime) */
     RAC_FRAMEWORK_UNKNOWN = 99  /**< Unknown framework */
@@ -657,7 +655,6 @@ RAC_API const char* rac_model_format_extension(rac_model_format_t format);
  *   - LLAMACPP             : .gguf, .bin
  *   - ONNX, SHERPA         : .onnx, .ort
  *   - COREML               : .mlmodelc, .mlpackage, .mlmodel
- *   - METALRT              : .safetensors, .json
  *   - FOUNDATION_MODELS,
  *     SYSTEM_TTS           : (always RAC_TRUE — builtin:// models)
  *   - default              : .gguf, .onnx, .bin, .ort, .mlmodelc

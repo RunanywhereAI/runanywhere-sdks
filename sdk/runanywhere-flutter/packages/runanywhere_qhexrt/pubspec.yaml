@@ -21,7 +21,9 @@ dependencies:
   flutter:
     sdk: flutter
   runanywhere: ^0.19.13
-  ffi: any
+  # Keep this bounded for pub.dev publish validation, matching the core
+  # package's major-version range.
+  ffi: '>=2.2.0 <3.0.0'
 
 dev_dependencies:
   flutter_test:

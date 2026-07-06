@@ -45,6 +45,7 @@ import {
   isModelLoadedForCategory,
   unloadModelsForCategory,
 } from '../utils/runAnywhereLifecycle';
+import { refreshNpuCatalog } from '../services/ModelCatalogBootstrap';
 
 const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
 const listModels = async (): Promise<ModelInfo[]> =>
@@ -458,15 +459,27 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
-  const saveHfToken = useCallback(async (value: string) => {
-    const trimmed = value.trim();
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.HF_TOKEN, trimmed);
-      await RunAnywhere.setHfToken(trimmed);
-    } catch (error) {
-      console.error('[Settings] Failed to save HuggingFace token:', error);
-    }
-  }, []);
+  const saveHfToken = useCallback(
+    async (value: string, options: { showFeedback?: boolean } = {}) => {
+      const trimmed = value.trim();
+      try {
+        await AsyncStorage.setItem(STORAGE_KEYS.HF_TOKEN, trimmed);
+        await RunAnywhere.setHfToken(trimmed);
+        await refreshNpuCatalog();
+        if (options.showFeedback) {
+          Alert.alert(
+            trimmed ? 'Saved' : 'Cleared',
+            trimmed
+              ? 'Hugging Face token saved for private model downloads.'
+              : 'Hugging Face token cleared. Private model downloads will require a token.'
+          );
+        }
+      } catch (error) {
+        console.error('[Settings] Failed to save HuggingFace token:', error);
+      }
+    },
+    []
+  );
 
   const handleHfTokenChange = useCallback(
     (value: string) => {
@@ -482,6 +495,17 @@ export const SettingsScreen: React.FC = () => {
     },
     [hfToken, saveHfToken]
   );
+
+  const handleHfTokenSave = useCallback(() => {
+    // eslint-disable-next-line no-void
+    void saveHfToken(hfToken, { showFeedback: true });
+  }, [hfToken, saveHfToken]);
+
+  const handleHfTokenClear = useCallback(() => {
+    setHfTokenInput('');
+    // eslint-disable-next-line no-void
+    void saveHfToken('', { showFeedback: true });
+  }, [saveHfToken]);
 
   const loadGenerationSettings = async () => {
     try {
@@ -958,7 +982,6 @@ export const SettingsScreen: React.FC = () => {
               ]}
               value={hfToken}
               onChangeText={handleHfTokenChange}
-              onBlur={handleHfTokenCommit}
               onSubmitEditing={handleHfTokenCommit}
               placeholder="hf_…"
               placeholderTextColor={colors.onSurfaceVariant}
@@ -968,8 +991,34 @@ export const SettingsScreen: React.FC = () => {
               secureTextEntry
               textContentType="password"
             />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: dimens.spacing.sm }}>
+              <TouchableOpacity
+                style={[
+                  styles.outlineBtn,
+                  styles.centerRow,
+                  { borderColor: colors.outline, borderRadius: dimens.radius.sm },
+                ]}
+                onPress={handleHfTokenSave}
+              >
+                <Icon name="check" size={dimens.icon.sm} color={colors.primary} />
+                <Text style={[typography.labelLarge, { color: colors.primary }]}>
+                  Save token
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.outlineBtn,
+                  styles.centerRow,
+                  { borderColor: colors.outline, borderRadius: dimens.radius.sm },
+                ]}
+                onPress={handleHfTokenClear}
+              >
+                <Icon name="trash" size={dimens.icon.sm} color={colors.error} />
+                <Text style={[typography.labelLarge, { color: colors.error }]}>Clear</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
-              Used to download private Hugging Face model repos
+              Used to download private Hugging Face model repos, including HNPU/QHexRT NPU bundles
             </Text>
           </View>
         </Section>

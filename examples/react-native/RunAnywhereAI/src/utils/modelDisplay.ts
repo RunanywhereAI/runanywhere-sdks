@@ -33,7 +33,6 @@ export const getFrameworkColor = (
       return Colors.frameworkSystemTTS;
     case InferenceFramework.INFERENCE_FRAMEWORK_TFLITE:
       return Colors.frameworkTFLite;
-    case InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
     case InferenceFramework.INFERENCE_FRAMEWORK_MLX:
     case InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
       return Colors.primaryPurple;
@@ -64,7 +63,6 @@ export const getFrameworkIcon = (
     case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
       return 'sparkles-outline';
     case InferenceFramework.INFERENCE_FRAMEWORK_COREML:
-    case InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
     case InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
       return 'hardware-chip-outline';
     case InferenceFramework.INFERENCE_FRAMEWORK_ONNX:

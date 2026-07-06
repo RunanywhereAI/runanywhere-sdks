@@ -82,16 +82,10 @@ try {
 
 // QHexRT (Qualcomm Hexagon NPU) — Android arm64 only. On other platforms the
 // native hybrid is absent, so the app falls back.
-// probeNpu() resolves to the generated runanywhere.v1.NpuCapability proto
-// message (archName is provided by commons — no local arch mapping needed).
 let QHexRT: OptionalBackend | null = null;
-let qhexrtProbe:
-  | (() => Promise<{ archName: string; qhexrtSupported: boolean }>)
-  | null = null;
 try {
   const qhexrtModule = require('@runanywhere/qhexrt');
   QHexRT = qhexrtModule.QHexRT as OptionalBackend;
-  qhexrtProbe = () => qhexrtModule.QHexRT.probeNpu();
 } catch {
   logDiagnostic('[App] QHexRT backend not available - NPU disabled on this platform');
 }
@@ -154,30 +148,23 @@ async function registerBackends(): Promise<BackendRegistrationState> {
     );
   }
 
-  // QHexRT registers all NPU modalities (LLM/VLM/STT/TTS) in one call. Probe
-  // first so unsupported devices never install a higher-priority private
-  // backend, and so the catalog only sees arch-exact NPU bundles.
-  let npuArch: string | null = null;
-  if (QHexRT && qhexrtProbe) {
+  // QHexRT registers all NPU modalities (LLM/VLM/STT/TTS) in one call. The SDK
+  // resolves logical HNPU URLs to the current Hexagon arch during registration.
+  let qhexrtRegistered = false;
+  if (QHexRT) {
     try {
-      const npu = await qhexrtProbe();
-      if (npu.qhexrtSupported) {
-        const qhexrtRegistered = (await QHexRT.register()) !== false;
-        if (qhexrtRegistered) {
-          npuArch = npu.archName;
-          logDiagnostic('[App] QHexRT (NPU) backend registered');
-        } else {
-          logDiagnostic('[App] QHexRT.register() returned false - NPU unavailable on this device');
-        }
+      qhexrtRegistered = (await QHexRT.register()) !== false;
+      if (qhexrtRegistered) {
+        logDiagnostic('[App] QHexRT (NPU) backend registered');
       } else {
-        logDiagnostic('[App] Skipping QHexRT registration - unsupported Hexagon NPU');
+        logDiagnostic('[App] QHexRT.register() returned false - NPU unavailable on this device');
       }
     } catch (error) {
-      logDiagnostic(`[App] NPU probe failed: ${String(error)}`);
+      logDiagnostic(`[App] QHexRT backend not available: ${String(error)}`);
     }
   }
 
-  return { llamaRegistered, onnxRegistered, npuArch };
+  return { llamaRegistered, onnxRegistered, qhexrtRegistered };
 }
 
 const App: React.FC = () => {

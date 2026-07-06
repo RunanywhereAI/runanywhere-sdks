@@ -87,16 +87,19 @@ WIRE_VERSION=5.5.1
 # SWIFT_PROTOBUF_VERSION stays at 1.38.0 (already latest stable as of
 # 2026-05-19; release tag matches v1.38.0 on apple/swift-protobuf).
 SWIFT_PROTOBUF_VERSION=1.38.0
+# Python descriptor parsing used by the convenience generators. Keep within
+# protobuf 6.x to match current CI installs while avoiding surprise 7.x drift.
+PYTHON_PROTOBUF_VERSION=6.33
 # (2026-05-19 idl-codegen bump): 22.0.0 -> 25.0.0 (latest stable on
 # pub.dev). protoc_plugin 25.x emits Dart bindings that require the
 # `protobuf` 6.x runtime — pubspec.yaml is bumped in lockstep. Requires
 # Dart 3.0+ at codegen time (Flutter 3.44 bundles Dart 3.10).
 PROTOC_GEN_DART_VERSION=25.0.0
-# (2026-05-19 idl-codegen bump): 25 -> 34 (latest matching libprotobuf
-# C++ pin 34.1 used by sdk/runanywhere-commons/src/generated/proto/*.pb.cc).
-# protoc 25.x emitted v3.25 wire-format headers; protoc 34.x emits v4.34
-# headers compatible with the bumped PROTOBUF_VERSION=34.1.
-PROTOC_VERSION_MAJOR=34
+# (2026-07-05 idl-codegen bump): 34 -> 35 (matches libprotobuf
+# C++ pin 35.1 used by sdk/runanywhere-commons/src/generated/proto/*.pb.cc).
+# The C++ generator emits exact runtime patch guards, so keep this in lockstep
+# with PROTOBUF_VERSION below and regenerate IDL bindings when it changes.
+PROTOC_VERSION_MAJOR=35
 
 # CMake version installed in CI. Toolchain present on the build host.
 # (2026-05-19 build-toolchain bump): 3.27 -> 4.3.2 (latest stable per cmake.org).
@@ -184,7 +187,7 @@ SHERPA_ONNX_VERSION_WINDOWS=1.13.2
 # llama.cpp (LLM inference)
 # =============================================================================
 # Latest stable upstream release.
-LLAMACPP_VERSION=b9222
+LLAMACPP_VERSION=b9878
 
 # =============================================================================
 # nlohmann/json
@@ -216,8 +219,8 @@ BZIP2_VERSION=1.0.8
 # =============================================================================
 # Must match what the checked-in generated headers under
 # sdk/runanywhere-commons/src/generated/proto/ were emitted by (Protobuf C++
-# 7.35.0 → upstream tag v35.0). Bumping requires regenerating those headers.
-PROTOBUF_VERSION=35.0
+# 7.35.1 → upstream tag v35.1). Bumping requires regenerating those headers.
+PROTOBUF_VERSION=35.1
 
 # =============================================================================
 # GoogleTest (test framework for commons + RAG unit tests)

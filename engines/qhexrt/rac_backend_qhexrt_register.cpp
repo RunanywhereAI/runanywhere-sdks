@@ -45,7 +45,7 @@ rac_result_t rac_backend_qhexrt_register(void) {
     // Arch gate: only register on a Hexagon v75+ part. On unsupported
     // devices QHexRT cannot run, and registering its providers would make the
     // router select QHexRT for *all* LLM/VLM/STT/TTS loads (intercepting
-    // llamacpp / onnx / genie models and failing them). Refuse here so the
+    // CPU/GGUF/ONNX models and failing them). Refuse here so the
     // platform SDKs fall back to the CPU engines. (qhexrt_supported is false on
     // non-Snapdragon / non-Android and on older Hexagon parts.)
     rac_npu_info_t npu;

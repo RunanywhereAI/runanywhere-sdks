@@ -7,7 +7,7 @@
  *     category, contextLength=2048.
  *   - .onnx single-file → SINGLE_FILE artifact, ONNX framework.
  *   - .mlmodelc single-file → SINGLE_FILE artifact, COREML framework.
- *   - .safetensors single-file → SINGLE_FILE artifact, METALRT framework.
+ *   - .safetensors single-file → SINGLE_FILE artifact, UNKNOWN framework.
  *   - multi-file artifact request (no archive suffix) → SINGLE_FILE artifact
  *     when no override is given.
  *   - .tar.gz archive → TAR_GZ_ARCHIVE artifact_type, ARCHIVE branch.
@@ -244,10 +244,7 @@ int test_make_safetensors_single_file() {
     ASSERT_TRUE(make_proto(args, &model));
 
     ASSERT_EQ(model.format(), runanywhere::v1::MODEL_FORMAT_SAFETENSORS);
-    ASSERT_EQ(model.framework(), runanywhere::v1::INFERENCE_FRAMEWORK_METALRT);
-    // METALRT framework falls into the default arm of category_from_framework
-    // which returns AUDIO. (Mirrors Swift's fallback.) The point of this test
-    // is to verify framework detection from .safetensors → METALRT.
+    ASSERT_EQ(model.framework(), runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN);
     ASSERT_EQ(model.category(), runanywhere::v1::MODEL_CATEGORY_AUDIO);
     // AUDIO does not require context length.
     ASSERT_EQ(model.context_length(), 0);

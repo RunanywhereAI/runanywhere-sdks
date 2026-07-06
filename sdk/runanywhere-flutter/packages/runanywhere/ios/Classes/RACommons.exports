@@ -799,7 +799,7 @@ _rac_extract_archive_native
 # Lower-level event bus (analytics/track). Public event stream remains rac_sdk_event_*.
 
 # Structured error API — rac_error_message and related helpers called from
-# Swift runtime shims (ONNX.swift, MetalRT.swift) and JNI error bridges.
+# Swift runtime shims and JNI error bridges.
 _rac_error_clear_details
 _rac_error_get_details
 _rac_error_is_commons_error

@@ -79,11 +79,6 @@ int test_positive_matches() {
     EXPECT_TRUE(query(RAC_FRAMEWORK_COREML, ".mlpackage"));
     EXPECT_TRUE(query(RAC_FRAMEWORK_COREML, "mlmodel"));
 
-    // MetalRT: .safetensors, .json
-    EXPECT_TRUE(query(RAC_FRAMEWORK_METALRT, "safetensors"));
-    EXPECT_TRUE(query(RAC_FRAMEWORK_METALRT, ".safetensors"));
-    EXPECT_TRUE(query(RAC_FRAMEWORK_METALRT, "json"));
-
     return 0;
 }
 
@@ -104,7 +99,7 @@ int test_negative_cross_framework() {
     // .mlmodelc is NOT a model file for LLAMACPP
     EXPECT_TRUE(!query(RAC_FRAMEWORK_LLAMACPP, "mlmodelc"));
 
-    // .json is NOT a model file for ONNX (only MetalRT accepts it)
+    // .json is NOT a model file for ONNX
     EXPECT_TRUE(!query(RAC_FRAMEWORK_ONNX, "json"));
 
     return 0;
@@ -117,7 +112,6 @@ int test_unknown_extensions() {
     EXPECT_TRUE(!query(RAC_FRAMEWORK_LLAMACPP, "foo"));
     EXPECT_TRUE(!query(RAC_FRAMEWORK_ONNX, ".bar"));
     EXPECT_TRUE(!query(RAC_FRAMEWORK_COREML, "qux"));
-    EXPECT_TRUE(!query(RAC_FRAMEWORK_METALRT, "txt"));
     EXPECT_TRUE(!query(RAC_FRAMEWORK_SHERPA, ""));  // empty string
 
     return 0;
@@ -133,7 +127,6 @@ int test_case_insensitivity() {
     EXPECT_TRUE(query(RAC_FRAMEWORK_ONNX, "ONNX"));
     EXPECT_TRUE(query(RAC_FRAMEWORK_ONNX, ".ONNX"));
     EXPECT_TRUE(query(RAC_FRAMEWORK_COREML, "MLMODELC"));
-    EXPECT_TRUE(query(RAC_FRAMEWORK_METALRT, "SafeTensors"));
     return 0;
 }
 

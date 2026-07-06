@@ -6,22 +6,6 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.ModelCategory
 
-/**
- * One NPU (QHexRT) bundle = one manifest-pinned hf.co folder ref
- * (`https://huggingface.co/<repo>/<arch>/<manifest>.json`). Commons + the
- * engine's bundle policy resolve the full file set (sizes, checksums, nested
- * paths, and the repo-root `config.json` when present) from the Hub tree at
- * registration — no file lists in the app. Context binaries are arch-exact
- * ([arch] is the Hexagon architecture they were compiled for: v75+),
- * so registration filters to the arch probed on the running device.
- */
-internal data class NpuBundle(
-    val id: String,
-    val name: String,
-    val category: ModelCategory,
-    val arch: String,
-    val url: String,
-)
 
 // Curated catalog, kept in lockstep with the iOS / Flutter / RN example apps.
 internal object ModelCatalog {
@@ -47,124 +31,54 @@ internal object ModelCatalog {
     }
 
     /**
-     * QHexRT (Hexagon NPU) bundles for the probed device architecture,
-     * registered like every other catalog entry — one URL through the SDK's
-     * canonical from-url path. The URL is an HF folder-bundle ref pinned to
-     * the bundle's manifest (`huggingface.co/<repo>/<arch>/<manifest>.json`);
-     * commons + the engine-registered QHexRT bundle policy resolve the full
-     * file set (sizes, checksums, nested paths) from the Hub tree — the app
-     * carries no file lists. Returns an empty list when the NPU is
-     * unsupported ([arch] == null), so pickers on other devices never see
-     * QHEXRT entries. Source data: [npuBundles].
+     * Registers logical HNPU rows. QHexRT's native bundle resolver chooses the
+     * current device arch; unsupported devices or missing arch folders fail
+     * during SDK registration and never become picker-visible.
      */
-    fun npuModels(arch: String?): List<CatalogModel> {
-        if (arch == null) return emptyList()
-        return npuBundles.filter { it.arch == arch }.map { npu ->
-            SingleFileModel(
-                id = npu.id,
-                name = npu.name,
-                url = npu.url,
-                framework = QHEXRT,
-                category = npu.category,
-                memoryBytes = 0L,
-            )
-        }
-    }
+    fun npuModels(): List<CatalogModel> = npuCatalog
 
-    /** The NPU (QHexRT) catalog — one manifest-pinned hf.co folder ref per bundle. */
-    val npuBundles: List<NpuBundle> = listOf(
-        NpuBundle("lfm2_5_230m_v79", "LFM2.5 230M (HNPU)", LANGUAGE, "v79",
-            "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/v79/lfm2-5-230m.json"),
-        NpuBundle("lfm2_5_230m_v81", "LFM2.5 230M (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/v81/lfm2-5-230m.json"),
-        NpuBundle("lfm2_5_350m_v79", "LFM2.5 350M (HNPU)", LANGUAGE, "v79",
-            "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/v79/lfm2-5-350m-2048.json"),
-        NpuBundle("lfm2_5_350m_v81", "LFM2.5 350M (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/v81/lfm2-5-350m-2048.json"),
-        NpuBundle("qwen3_5_0_8b_v81", "Qwen3.5 0.8B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/v81/qwen3.5-0.8b-1024.json"),
-        NpuBundle("qwen3_5_2b_v81", "Qwen3.5 2B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/v81/qwen3.5-2b-1024.json"),
-        NpuBundle("qwen3_5_4b_v81", "Qwen3.5 4B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/v81/qwen3.5-4b-1024.json"),
-        NpuBundle("qwen3_0_6b_v81", "Qwen3 0.6B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/v81/qwen3-0.6b-1024final.json"),
-        NpuBundle("llama3_2_1b_v81", "Llama 3.2 1B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/llama3_2_1b_HNPU/v79/llama-3.2-1b.json"),
-        NpuBundle("ternary_bonsai_1_7b_v81", "Ternary Bonsai 1.7B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/v81/ternary-bonsai-1.7b-1024.json"),
-        NpuBundle("phi_tiny_moe_v81", "Phi Tiny MoE (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/v81/phimoe.json"),
-        NpuBundle("gemma3n_e4b_v81", "Gemma 3n E4B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/v81/gemma-3n-E4B-it.json"),
-        NpuBundle("gemma4_e2b_v81", "Gemma 4 E2B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/v81/gemma4-e2b.json"),
-        NpuBundle("gemma4_e4b_v81", "Gemma 4 E4B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/gemma4_e4b_HNPU/v81/gemma-4-E4B.json"),
-        NpuBundle("deepseek_r1_distill_qwen_1_5b_v81", "DeepSeek R1 Distill Qwen 1.5B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/v81/DeepSeek-R1-Distill-Qwen-1.5B.json"),
-        NpuBundle("deepseek_r1_distill_qwen_7b_v81", "DeepSeek R1 Distill Qwen 7B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/v81/DeepSeek-R1-Distill-Qwen-7B.json"),
-        NpuBundle("nemotron_nano_8b_v81", "Llama 3.1 Nemotron Nano 8B (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/v81/nemotron-nano-8b.json"),
-        NpuBundle("nemoguard_content_8b_v81", "NemoGuard 8B Content Safety (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/v81/nemoguard-content-8b.json"),
-        NpuBundle("nemoguard_topic_8b_v81", "NemoGuard 8B Topic Control (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/v81/nemoguard-topic-8b.json"),
-        NpuBundle("qwen3_vl_2b_text_v81", "Qwen3-VL 2B Text (HNPU)", LANGUAGE, "v81",
-            "https://huggingface.co/runanywhere/qwen3_vl_HNPU/v81/qwen3vl-2b-text-512.json"),
-        NpuBundle("qwen3_vl_v79", "Qwen3-VL 2B (HNPU)", MULTIMODAL, "v79",
-            "https://huggingface.co/runanywhere/qwen3_vl_HNPU/v79/qwen3vl-2b-vlm-512.json"),
-        NpuBundle("internvl3_5_1b_v79", "InternVL3.5 1B (HNPU)", MULTIMODAL, "v79",
-            "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU/v79/internvl3_5-1b-512.json"),
-        NpuBundle("internvl3_5_1b_v81", "InternVL3.5 1B (HNPU)", MULTIMODAL, "v81",
-            "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU/v81/internvl3_5-1b.json"),
-        NpuBundle("gemma4_e2b_vlm_v81", "Gemma 4 E2B Image (HNPU)", MULTIMODAL, "v81",
-            "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/v81/gemma4-e2b-vlm.json"),
-        NpuBundle("nemotron_nano_vl_8b_v81", "Llama 3.1 Nemotron Nano VL 8B (HNPU)", MULTIMODAL, "v81",
-            "https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/v81/nemotron-vl-8b-vlm.json"),
-        NpuBundle("whisper_base_v79", "Whisper Base (HNPU)", STT, "v79",
-            "https://huggingface.co/runanywhere/whisper_base_HNPU/v79/whisper-base.json"),
-        NpuBundle("whisper_base_v81", "Whisper Base (HNPU)", STT, "v81",
-            "https://huggingface.co/runanywhere/whisper_base_HNPU/v81/whisper-base.json"),
-        NpuBundle("whisper_small_v79", "Whisper Small (HNPU)", STT, "v79",
-            "https://huggingface.co/runanywhere/whisper_small_HNPU/v79/whisper-small.json"),
-        NpuBundle("whisper_small_v81", "Whisper Small (HNPU)", STT, "v81",
-            "https://huggingface.co/runanywhere/whisper_small_HNPU/v81/whisper-small.json"),
-        NpuBundle("moonshine_tiny_v81", "Moonshine Tiny (HNPU)", STT, "v81",
-            "https://huggingface.co/runanywhere/moonshine_tiny_HNPU/v81/moonshine-tiny.json"),
-        NpuBundle("moonshine_base_v81", "Moonshine Base (HNPU)", STT, "v81",
-            "https://huggingface.co/runanywhere/moonshine_base_HNPU/v81/moonshine-base.json"),
-        NpuBundle("parakeet_tdt_0_6b_v2_v81", "Parakeet TDT 0.6B v2 (HNPU)", STT, "v81",
-            "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/v81/parakeet-tdt-0.6b-v2.json"),
-        NpuBundle("parakeet_tdt_0_6b_v3_v81", "Parakeet TDT 0.6B v3 (HNPU)", STT, "v81",
-            "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/v81/parakeet-tdt-0.6b.json"),
-        NpuBundle("parakeet_rnnt_1_1b_v81", "Parakeet RNNT 1.1B (HNPU)", STT, "v81",
-            "https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/v81/parakeet-rnnt-1.1b.json"),
-        NpuBundle("canary_qwen_2_5b_v81", "Canary Qwen 2.5B (HNPU)", STT, "v81",
-            "https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/v81/canary-qwen-2.5b.json"),
-        NpuBundle("canary_1b_flash_v81", "Canary-1B-flash (HNPU)", STT, "v81",
-            "https://huggingface.co/runanywhere/canary_1b_flash_HNPU/v81/canary-1b-flash.json"),
-        NpuBundle("nemotron_asr_streaming_v81", "Nemotron ASR Streaming 0.6B (HNPU)", STT, "v81",
-            "https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/v81/nemotron-3.5-asr-streaming-0.6b.json"),
-        NpuBundle("melotts_en_v79", "MeloTTS EN (HNPU)", TTS, "v79",
-            "https://huggingface.co/runanywhere/melotts_en_HNPU/v79/melotts-en.json"),
-        NpuBundle("melotts_en_v81", "MeloTTS EN (HNPU)", TTS, "v81",
-            "https://huggingface.co/runanywhere/melotts_en_HNPU/v81/melotts-en.json"),
-        NpuBundle("kokoro_en_v81", "Kokoro-82M EN (HNPU)", TTS, "v81",
-            "https://huggingface.co/runanywhere/kokoro_en_HNPU/v81/kokoro-en.json"),
-        NpuBundle("kitten_nano_0_8_v81", "Kitten-nano-0.8-fp32 (HNPU)", TTS, "v81",
-            "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/v81/kitten_nano08_v81.json"),
-        NpuBundle("kitten_mini_0_1_v81", "Kitten-mini-0.1 (HNPU)", TTS, "v81",
-            "https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/v81/kitten_mini01_v81.json"),
-        NpuBundle("kitten_mini_0_8_v81", "Kitten-mini-0.8 (HNPU)", TTS, "v81",
-            "https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/v81/kitten_mini08_v81.json"),
-        NpuBundle("kitten_micro_0_8_v81", "Kitten-micro-0.8 (HNPU)", TTS, "v81",
-            "https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/v81/kitten_micro08_v81.json"),
-        NpuBundle("kitten_nano_0_2_v81", "Kitten-nano-0.2 (HNPU)", TTS, "v81",
-            "https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/v81/kitten_nano02_v81.json"),
-        NpuBundle("kitten_nano_0_1_v81", "Kitten-nano-0.1 (HNPU)", TTS, "v81",
-            "https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/v81/kitten_nano01_v81.json"),
+    /** Logical HNPU catalog — direct SDK model rows with native-resolved HF URLs. */
+    val npuCatalog: List<SingleFileModel> = listOf(
+        SingleFileModel("lfm2_5_230m", "LFM2.5 230M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("lfm2_5_350m", "LFM2.5 350M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("qwen3_5_0_8b", "Qwen3.5 0.8B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json", QHEXRT, LANGUAGE, 0L, supportsThinking = true),
+        SingleFileModel("qwen3_5_2b", "Qwen3.5 2B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("qwen3_5_4b", "Qwen3.5 4B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("qwen3_0_6b", "Qwen3 0.6B (HNPU)", "https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("llama3_2_1b", "Llama 3.2 1B (HNPU)", "https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("ternary_bonsai_1_7b", "Ternary Bonsai 1.7B (HNPU)", "https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("phi_tiny_moe", "Phi Tiny MoE (HNPU)", "https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("gemma3n_e4b", "Gemma 3n E4B (HNPU)", "https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("gemma4_e2b", "Gemma 4 E2B (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("gemma4_e4b", "Gemma 4 E4B (HNPU)", "https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("deepseek_r1_distill_qwen_1_5b", "DeepSeek R1 Distill Qwen 1.5B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json", QHEXRT, LANGUAGE, 0L, supportsThinking = true),
+        SingleFileModel("deepseek_r1_distill_qwen_7b", "DeepSeek R1 Distill Qwen 7B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json", QHEXRT, LANGUAGE, 0L, supportsThinking = true),
+        SingleFileModel("nemotron_nano_8b", "Llama 3.1 Nemotron Nano 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("nemoguard_content_8b", "NemoGuard 8B Content Safety (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("nemoguard_topic_8b", "NemoGuard 8B Topic Control (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("qwen3_vl_2b_text", "Qwen3-VL 2B Text (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("qwen3_vl", "Qwen3-VL 2B (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json", QHEXRT, MULTIMODAL, 0L),
+        SingleFileModel("internvl3_5_1b", "InternVL3.5 1B (HNPU)", "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU", QHEXRT, MULTIMODAL, 0L),
+        SingleFileModel("gemma4_e2b_vlm", "Gemma 4 E2B Image (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json", QHEXRT, MULTIMODAL, 0L),
+        SingleFileModel("nemotron_nano_vl_8b", "Llama 3.1 Nemotron Nano VL 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json", QHEXRT, MULTIMODAL, 0L),
+        SingleFileModel("whisper_base", "Whisper Base (HNPU)", "https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json", QHEXRT, STT, 0L),
+        SingleFileModel("whisper_small", "Whisper Small (HNPU)", "https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json", QHEXRT, STT, 0L),
+        SingleFileModel("moonshine_tiny", "Moonshine Tiny (HNPU)", "https://huggingface.co/runanywhere/moonshine_tiny_HNPU/moonshine-tiny.json", QHEXRT, STT, 0L),
+        SingleFileModel("moonshine_base", "Moonshine Base (HNPU)", "https://huggingface.co/runanywhere/moonshine_base_HNPU/moonshine-base.json", QHEXRT, STT, 0L),
+        SingleFileModel("parakeet_tdt_0_6b_v2", "Parakeet TDT 0.6B v2 (HNPU)", "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json", QHEXRT, STT, 0L),
+        SingleFileModel("parakeet_tdt_0_6b_v3", "Parakeet TDT 0.6B v3 (HNPU)", "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json", QHEXRT, STT, 0L),
+        SingleFileModel("parakeet_rnnt_1_1b", "Parakeet RNNT 1.1B (HNPU)", "https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json", QHEXRT, STT, 0L),
+        SingleFileModel("canary_qwen_2_5b", "Canary Qwen 2.5B (HNPU)", "https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json", QHEXRT, STT, 0L),
+        SingleFileModel("canary_1b_flash", "Canary-1B-flash (HNPU)", "https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json", QHEXRT, STT, 0L),
+        SingleFileModel("nemotron_asr_streaming", "Nemotron ASR Streaming 0.6B (HNPU)", "https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json", QHEXRT, STT, 0L),
+        SingleFileModel("melotts_en", "MeloTTS EN (HNPU)", "https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json", QHEXRT, TTS, 0L),
+        SingleFileModel("kokoro_en", "Kokoro-82M EN (HNPU)", "https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json", QHEXRT, TTS, 0L),
+        SingleFileModel("kitten_nano_0_8", "Kitten-nano-0.8-fp32 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json", QHEXRT, TTS, 0L),
+        SingleFileModel("kitten_mini_0_1", "Kitten-mini-0.1 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json", QHEXRT, TTS, 0L),
+        SingleFileModel("kitten_mini_0_8", "Kitten-mini-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json", QHEXRT, TTS, 0L),
+        SingleFileModel("kitten_micro_0_8", "Kitten-micro-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json", QHEXRT, TTS, 0L),
+        SingleFileModel("kitten_nano_0_2", "Kitten-nano-0.2 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json", QHEXRT, TTS, 0L),
+        SingleFileModel("kitten_nano_0_1", "Kitten-nano-0.1 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json", QHEXRT, TTS, 0L),
     )
 
     val loraAdapters = listOf(

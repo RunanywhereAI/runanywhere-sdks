@@ -109,12 +109,11 @@ sdk/runanywhere-swift/
 │       └── include/            ← ONNXBackend C bridge headers
 ├── Tests/
 │   └── RunAnywhereTests/       ← 6 test files
-└── Binaries/                   ← git-ignored XCFrameworks (5 present)
+└── Binaries/                   ← git-ignored XCFrameworks (4 present)
     ├── RACommons.xcframework
     ├── RABackendLLAMACPP.xcframework
     ├── RABackendONNX.xcframework
-    ├── RABackendSherpa.xcframework
-    └── RABackendMetalRT.xcframework
+    └── RABackendSherpa.xcframework
 ```
 
 The seven top-level subdirectories under `Sources/RunAnywhere/` are each documented in detail later: `Public/` (§5), `Foundation/Bridge/` (§6), `Foundation/` non-bridge (§7), `Adapters/` (§8), `Infrastructure/` (§9), `HttpTransport/` (§10), `Features/` (§11), `Generated/` (§12).
@@ -2453,7 +2452,6 @@ All five XCFrameworks live in `sdk/runanywhere-swift/Binaries/` (git-ignored):
 | `RABackendLLAMACPP.xcframework` | ios-arm64, ios-arm64-simulator | 34M |
 | `RABackendONNX.xcframework` | ios-arm64, ios-arm64-simulator | 60M |
 | `RABackendSherpa.xcframework` | ios-arm64, ios-arm64-simulator | 31M |
-| `RABackendMetalRT.xcframework` | ios-arm64, ios-arm64-simulator | 12K |
 
 `RACommons` is the only framework with a macOS slice. Each xcframework is a static archive (`.a`) with a `Headers/` directory per slice.
 

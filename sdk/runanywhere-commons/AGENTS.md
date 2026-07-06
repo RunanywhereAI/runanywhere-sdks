@@ -118,7 +118,7 @@ scripts/build-windows.bat
 │                    Engine Plugins                                 │
 │  llamacpp (LLM+VLM) | sherpa (STT+TTS+VAD)                       │
 │  onnx (Embed+WakeWord) | coreml (Image/Diffusion, Apple)         │
-│  metalrt (LLM+STT+TTS+VLM, Apple) | platform (Apple FM+TTS+Diff)│
+│  qhexrt (LLM+VLM+STT+TTS, HNPU) | platform (Apple FM+TTS+Diff)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -142,12 +142,12 @@ All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vta
 
 | Primitive | vtable field | Backends |
 |-----------|-------------|----------|
-| `RAC_PRIMITIVE_GENERATE_TEXT` | `llm_ops` | llamacpp, platform, metalrt |
-| `RAC_PRIMITIVE_TRANSCRIBE` | `stt_ops` | sherpa, metalrt |
-| `RAC_PRIMITIVE_SYNTHESIZE` | `tts_ops` | sherpa, platform, metalrt |
+| `RAC_PRIMITIVE_GENERATE_TEXT` | `llm_ops` | llamacpp, platform, qhexrt |
+| `RAC_PRIMITIVE_TRANSCRIBE` | `stt_ops` | sherpa, qhexrt |
+| `RAC_PRIMITIVE_SYNTHESIZE` | `tts_ops` | sherpa, platform, qhexrt |
 | `RAC_PRIMITIVE_DETECT_VOICE` | `vad_ops` | sherpa (Silero), energy-based (built-in) |
 | `RAC_PRIMITIVE_EMBED` | `embedding_ops` | onnx |
-| `RAC_PRIMITIVE_VLM` | `vlm_ops` | llamacpp-vlm, metalrt |
+| `RAC_PRIMITIVE_VLM` | `vlm_ops` | llamacpp-vlm, qhexrt |
 | `RAC_PRIMITIVE_DIFFUSION` | `diffusion_ops` | platform (CoreML) |
 
 NULL slot = "not supported." ABI version mismatch → immediate rejection at registration. (Wire value 6, formerly `RAC_PRIMITIVE_RERANK`/`rerank_ops`, is retired — no backend implemented it — which is why the ABI is now v4.)
@@ -246,7 +246,7 @@ Add new codes to `rac_error.h`, add case to `rac_error_message()` in `rac_error.
 | **sherpa** | STT, TTS, VAD | ONNX | Sherpa-ONNX C API | `rac_backend_sherpa_register()` |
 | **onnx-embeddings** | Embed | ONNX | Sherpa-ONNX | `rac_backend_onnx_embeddings_register()` |
 | **onnx-wakeword** | WakeWord | ONNX | openWakeWord | `rac_backend_wakeword_onnx_register()` |
-| **metalrt** | LLM, STT, TTS, VLM (Apple) | MetalRT | Metal | `rac_backend_metalrt_register()` |
+| **qhexrt** | LLM, VLM, STT, TTS | QNN context bundle | QHexRT / Hexagon NPU | `rac_backend_qhexrt_register()` |
 | **platform** | LLM, TTS, Diffusion (Apple) | builtin:// | Swift callbacks | `rac_backend_platform_register()` |
 
 ## Version Management

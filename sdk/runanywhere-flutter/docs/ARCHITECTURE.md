@@ -13,9 +13,9 @@ Android. It is a thin Dart FFI bridge over the shared C++ core
 
 Design goals:
 
-- **Modular backends**: separate Flutter plugin packages per backend. LlamaCPP
-  and ONNX/Sherpa are in scope for the current validation pass; Genie is a
-  deferred backend and should not create active gap rows by itself.
+- **Modular backends**: separate Flutter plugin packages per backend. LlamaCPP,
+  ONNX/Sherpa, and QHexRT use thin Flutter package wrappers over the shared
+  native C ABI.
 - **C++ commons does the work**: registries, event publisher, plugin router, HTTP,
   download orchestration, and all inference live in the C ABI (`rac_*`).
 - **Dart orchestration**: the SDK exposes a static namespace + capability accessors and
@@ -46,7 +46,7 @@ sdk/runanywhere-flutter/
     │   └── android/                 # gradle + RunAnywherePlugin.kt + OkHttp transport
     ├── runanywhere_llamacpp/        # LLM + VLM (GGUF via llama.cpp)
     ├── runanywhere_onnx/            # STT + TTS + VAD (Sherpa-ONNX)
-    └── runanywhere_genie/           # Qualcomm Genie NPU LLM (Android-only)
+    └── runanywhere_qhexrt/          # Qualcomm Hexagon NPU (Android-only)
 ```
 
 Backend packages depend on `runanywhere ^0.19.0` and vendor their own
@@ -73,8 +73,8 @@ XCFramework + `.so` files.
 │        runanywhere-commons (C++ core)                                │
 │        ModuleRegistry · ServiceRegistry · EventPublisher · Router    │
 ├──────────────┬───────────────┬────────────────────────────────────┬─┘
-│  LlamaCpp    │   Sherpa /    │       Qualcomm Genie NPU           │
-│ (LLM, VLM)   │    ONNX       │       (LLM, Android-only)          │
+│  LlamaCpp    │   Sherpa /    │       QHexRT HNPU                  │
+│ (LLM, VLM)   │    ONNX       │       (LLM,VLM,STT,TTS Android)    │
 │              │ (STT,TTS,VAD) │                                    │
 └──────────────┴───────────────┴────────────────────────────────────┘
 ```
@@ -86,7 +86,7 @@ XCFramework + `.so` files.
 | `runanywhere` | ~5 MB | ~3 MB | Core SDK, registries, events, FFI bridge |
 | `runanywhere_llamacpp` | ~15–25 MB | ~10–15 MB | LLM + VLM (GGUF) |
 | `runanywhere_onnx` | ~50–70 MB | ~40–60 MB | STT, TTS, VAD (Sherpa-ONNX + Piper) |
-| `runanywhere_genie` | n/a | varies | Deferred Genie NPU package |
+| `runanywhere_qhexrt` | n/a | varies | Private QHexRT NPU package |
 
 ---
 
@@ -304,7 +304,7 @@ runtime + format compatibility on inference.
 |--------|---------|--------------|----------|
 | `LlamaCpp` | `runanywhere_llamacpp` | LLM, VLM | 100 |
 | `Onnx` | `runanywhere_onnx` | STT, TTS, VAD | 90 |
-| `Genie` | `runanywhere_genie` | Deferred LLM backend | 200 (when registered) |
+| `QHexRT` | `runanywhere_qhexrt` | LLM, VLM, STT, TTS via QNN-context bundles | 150 (when registered) |
 | `RAGModule` | core extension | RAG pipelines | — |
 
 ---
@@ -415,7 +415,7 @@ lives in the bundled C++ backend library.
 | `runanywhere` (Dart) | 0.19.13 |
 | `runanywhere_llamacpp` | 0.19.13 |
 | `runanywhere_onnx` | 0.19.13 |
-| `runanywhere_genie` | 0.19.13 |
+| `runanywhere_qhexrt` | 0.19.13 |
 | `RACommons` native | 0.1.6 |
 | llama.cpp engine | b7199 |
 | ONNX Runtime | 1.23.2 |
@@ -434,7 +434,7 @@ lives in the bundled C++ backend library.
 | `runanywhere` | `RACommons.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
 | `runanywhere_llamacpp` | `RABackendLLAMACPP.xcframework` | `ios-arm64`, `ios-arm64-simulator` |
 | `runanywhere_onnx` | `RABackendONNX.xcframework`, `RABackendSherpa.xcframework` | `ios-arm64`, `ios-arm64-simulator` |
-| `runanywhere_genie` | — | none |
+| `runanywhere_qhexrt` | — | none |
 
 ### Android Shared Libraries (per ABI: arm64-v8a, armeabi-v7a, x86_64)
 
@@ -443,4 +443,4 @@ lives in the bundled C++ backend library.
 | `runanywhere` | `librac_commons.so`, `librunanywhere_jni.so`, `libc++_shared.so`, `libomp.so` |
 | `runanywhere_llamacpp` | `librac_backend_llamacpp.so`, `librac_backend_llamacpp_jni.so`, `libc++_shared.so` |
 | `runanywhere_onnx` | `libonnxruntime.so`, `libsherpa-onnx-c-api.so`, `libsherpa-onnx-cxx-api.so`, `libsherpa-onnx-jni.so`, `librac_backend_onnx.so`, `librac_backend_onnx_jni.so`, `librac_backend_sherpa.so`, `libc++_shared.so` |
-| `runanywhere_genie` | `libc++_shared.so` only (backend `.so` downloaded at runtime) |
+| `runanywhere_qhexrt` | `librac_backend_qhexrt*.so`, QAIRT/QNN libs, `libc++_shared.so` (private natives staged separately) |

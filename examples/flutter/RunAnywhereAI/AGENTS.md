@@ -60,7 +60,7 @@ The app depends on four local Flutter SDK packages via `path:` dependencies in `
 ```
 runanywhere           → ../../../sdk/runanywhere-flutter/packages/runanywhere
 runanywhere_llamacpp  → ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
-runanywhere_genie     → ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
+runanywhere_qhexrt    → ../../../sdk/runanywhere-flutter/packages/runanywhere_qhexrt
 runanywhere_onnx      → ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
 ```
 
@@ -79,7 +79,7 @@ App startup runs a multi-phase sequence in `initState` via `addPostFrameCallback
 
 1. **Eager .so loading** (Android only) — `DynamicLibrary.open()` on 6 `.so` files to preload before any SDK call
 2. **SDK init** — reads API key / base URL from secure storage (`KeychainHelper`); calls `RunAnywhere.initialize(...)` with or without credentials
-3. **Module registration** — guarded by a static `_modulesRegistered` flag to survive hot-reload. Registers: LlamaCpp (9 GGUF models), Genie NPU (Android/Snapdragon only, chip-conditional models), VLM (SmolVLM 500M), Sherpa STT/TTS (Whisper + Piper models), RAG embeddings (MiniLM), ONNX backend, RAG backend
+3. **Module registration** — guarded by a static `_modulesRegistered` flag to survive hot-reload. Registers: LlamaCpp (9 GGUF models), QHexRT NPU (Android/Snapdragon only, chip-conditional HNPU models), VLM (SmolVLM 500M), Sherpa STT/TTS (Whisper + Piper models), RAG embeddings (MiniLM), ONNX backend, RAG backend
 
 ### State Management
 
@@ -128,7 +128,7 @@ All AI calls go through `RunAnywhere`:
 ## Build Configuration Gotchas
 
 - **Android `packagingOptions`** (`android/app/build.gradle`): `pickFirst '**/libc++_shared.so'` and `pickFirst '**/libomp.so'` — required because multiple SDK plugin packages each bundle these shared libs
-- **Android `extractNativeLibs="true"`** and `<uses-native-library android:name="libcdsprpc.so" android:required="false"/>` in `AndroidManifest.xml` — required for Genie NPU (Qualcomm FastRPC)
+- **Android `extractNativeLibs="true"`** and `<uses-native-library android:name="libcdsprpc.so" android:required="false"/>` in `AndroidManifest.xml` — required for QHexRT/QNN FastRPC
 - **iOS Podfile post_install**: forces `EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64` on all pods and Runner — locally built xcframeworks only contain arm64 simulator slices
 - **iOS Podfile permission flags**: `PERMISSION_MICROPHONE=1`, `PERMISSION_SPEECH_RECOGNIZER=1`, `PERMISSION_CAMERA=1` must be set for `permission_handler` to compile those capabilities
 - **Gradle heap**: `-Xmx6g` in `gradle.properties` — native compilation is memory-intensive

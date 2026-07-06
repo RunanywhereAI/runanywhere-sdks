@@ -4,8 +4,8 @@
  *
  * This is the SOLE plugin registration path. The legacy
  * `service_registry.cpp` / `rac_service_register_provider()` path was
- * removed. All engine backends (llamacpp, onnx, sherpa, metalrt,
- * platform) register via
+ * removed. All engine backends (llamacpp, onnx, sherpa, qhexrt,
+ * coreml, platform) register via
  * `rac_plugin_register(rac_plugin_entry_<name>())`, and commons consumers
  * route through `rac_plugin_find` + `vt->ops->create`.
  */
@@ -749,44 +749,6 @@ const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt, rac_primitive_
         default:
             return nullptr;
     }
-}
-
-// =============================================================================
-// Legacy ABI shim — rac_service_register_provider
-// =============================================================================
-//
-// The unified plugin registry above replaces per-service provider
-// registration. However, older binaries (notably some Genie .so builds
-// shipped with the React Native and Flutter examples) still reference
-// the symbol `rac_service_register_provider`. Without this symbol they
-// fail to dlopen with "undefined reference" and the entire backend goes
-// dark — even features that don't actually need Genie.
-//
-// To keep those binaries loadable we provide a no-op shim that simply
-// returns success. New code must register engines via
-// rac_plugin_register(); this shim only exists so dlopen of a stale
-// librac_backend_genie.so continues to resolve.
-rac_result_t rac_service_register_provider(int /*service_type*/, void* /*ops*/,
-                                           void* /*user_data*/) {
-    RAC_LOG_WARNING(LOG_CAT,
-                    "rac_service_register_provider() is a deprecated shim — "
-                    "unified plugin registry has replaced per-service "
-                    "registration; caller should migrate to rac_plugin_register().");
-    return RAC_SUCCESS;
-}
-
-// Symmetric unregister shim. Stale Genie .so files emitted before the
-// unified plugin registry land call this on backend teardown; without
-// the symbol, dlopen fails outright with "cannot locate symbol
-// rac_service_unregister_provider" and the entire Genie engine is
-// skipped on Android — masking unrelated logs in every example app.
-// New code must use rac_plugin_unregister().
-rac_result_t rac_service_unregister_provider(int /*service_type*/, void* /*ops*/) {
-    RAC_LOG_WARNING(LOG_CAT,
-                    "rac_service_unregister_provider() is a deprecated shim — "
-                    "unified plugin registry has replaced per-service "
-                    "registration; caller should migrate to rac_plugin_unregister().");
-    return RAC_SUCCESS;
 }
 
 }  // extern "C"

@@ -27,8 +27,6 @@ const Map<InferenceFramework, String> _kFrameworkDisplayNames = {
   InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS: 'Foundation Models',
   InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS: 'System TTS',
   InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO: 'FluidAudio',
-  InferenceFramework.INFERENCE_FRAMEWORK_METALRT: 'MetalRT',
-  InferenceFramework.INFERENCE_FRAMEWORK_GENIE: 'Qualcomm Genie',
   InferenceFramework.INFERENCE_FRAMEWORK_TFLITE: 'TensorFlow Lite',
   InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH: 'ExecuTorch',
   InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE: 'MediaPipe',

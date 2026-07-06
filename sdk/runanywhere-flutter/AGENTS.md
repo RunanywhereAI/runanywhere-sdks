@@ -16,7 +16,7 @@ sdk/runanywhere-flutter/
     ├── runanywhere/            # Core SDK (FFI bridge, public API, events, models)
     ├── runanywhere_llamacpp/   # LlamaCpp backend (LLM + VLM)
     ├── runanywhere_onnx/       # Sherpa/ONNX Runtime backend (STT + TTS + VAD)
-    └── runanywhere_genie/      # Qualcomm Genie NPU backend (LLM, Android-only)
+    └── runanywhere_qhexrt/     # QHexRT Qualcomm Hexagon NPU backend (Android-only)
 ```
 
 Example app: `examples/flutter/RunAnywhereAI/`.
@@ -26,7 +26,7 @@ Example app: `examples/flutter/RunAnywhereAI/`.
 ```
 runanywhere_llamacpp ──┐
 runanywhere_onnx    ───┼──→ runanywhere (core)
-runanywhere_genie   ───┘
+runanywhere_qhexrt  ───┘
 ```
 
 All three backend packages depend on `runanywhere ^0.19.0`. The core package vendors `RACommons` (C++ library); backend packages vendor their own XCFrameworks/`.so` files.
@@ -80,7 +80,7 @@ NativeFunctions + PlatformLoader     (Cached FFI lookups + DynamicLibrary load)
     ↓
 RACommons (C++ core)                 (ModuleRegistry, ServiceRegistry, EventPublisher)
     ↓
-LlamaCpp | Sherpa/ONNX | Genie NPU   (Backend engines registered via vtable v3)
+LlamaCpp | Sherpa/ONNX | QHexRT HNPU (Backend engines registered via vtable v4)
 ```
 
 ### Key Architectural Patterns
@@ -210,13 +210,13 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 - iOS: `RABackendONNX.xcframework` (vendored), `RABackendSherpa.xcframework` (present but not in podspec)
 - Android: 8 `.so` per ABI (`libonnxruntime`, `libsherpa-onnx-{c-api,cxx-api,jni}`, `librac_backend_{onnx,onnx_jni,sherpa}`, `libc++_shared`); declares `RECORD_AUDIO` permission; load order: `onnxruntime` → `sherpa-onnx-c-api` → backends
 
-### `runanywhere_genie` — Qualcomm NPU LLM (Android-only)
+### `runanywhere_qhexrt` — Qualcomm Hexagon NPU (Android-only)
 
-- `await Genie.register(priority: 200)` → FFI `rac_backend_genie_register()`
-- Capabilities dynamic; only registers on Snapdragon devices (`checkAvailability()`)
-- iOS: pod exists for plugin registration only — no xcframework, no `runanywhere` dependency
-- Android: ships only `libc++_shared.so`; backend `.so` downloaded from private release URL (may fail silently)
-- Closed-source backend; not committed to repo
+- `await QHexRT.register()` → FFI `rac_backend_qhexrt_register()`
+- Capabilities dynamic; only registers on supported Snapdragon Hexagon NPUs
+- iOS: compatibility pod only — no runtime binary
+- Android: ships/stages private QHexRT `.so` files plus QAIRT/QNN runtime libraries for arm64-v8a
+- Private backend; only the public package wrapper and C ABI surface live in this repo
 
 ## Generated Code
 
@@ -264,7 +264,7 @@ Extends `package:flutter_lints/flutter.yaml` with:
 | `runanywhere_llamacpp` | `RABackendLLAMACPP.xcframework` | `ios-arm64`, `ios-arm64-simulator` |
 | `runanywhere_onnx` | `RABackendONNX.xcframework` | `ios-arm64`, `ios-arm64-simulator` |
 | `runanywhere_onnx` | `RABackendSherpa.xcframework` (present, not vendored in podspec) | `ios-arm64`, `ios-arm64-simulator` |
-| `runanywhere_genie` | — | none |
+| `runanywhere_qhexrt` | — | none |
 
 ### Android Shared Libraries (per ABI: arm64-v8a, armeabi-v7a, x86_64)
 
@@ -273,13 +273,13 @@ Extends `package:flutter_lints/flutter.yaml` with:
 | `runanywhere` | `librac_commons.so`, `librunanywhere_jni.so`, `libc++_shared.so`, `libomp.so` |
 | `runanywhere_llamacpp` | `librac_backend_llamacpp.so`, `librac_backend_llamacpp_jni.so`, `libc++_shared.so` |
 | `runanywhere_onnx` | `libonnxruntime.so`, `libsherpa-onnx-c-api.so`, `libsherpa-onnx-cxx-api.so`, `libsherpa-onnx-jni.so`, `librac_backend_onnx.so`, `librac_backend_onnx_jni.so`, `librac_backend_sherpa.so`, `libc++_shared.so` |
-| `runanywhere_genie` | `libc++_shared.so` only (backend `.so` downloaded separately) |
+| `runanywhere_qhexrt` | `librac_backend_qhexrt*.so`, QAIRT/QNN libs, `libc++_shared.so` (private natives staged separately) |
 
 ## Package Architecture Notes
 
 ### `libc++_shared.so` Duplication Is Intentional
 
-Each Flutter plugin package (`runanywhere`, `runanywhere_llamacpp`, `runanywhere_onnx`, `runanywhere_genie`) bundles its own `libc++_shared.so` in `android/src/main/jniLibs/{abi}/`. This duplication is **by design**, not a bug to dedup.
+Each Flutter plugin package (`runanywhere`, `runanywhere_llamacpp`, `runanywhere_onnx`, `runanywhere_qhexrt`) bundles its own `libc++_shared.so` in `android/src/main/jniLibs/{abi}/`. This duplication is **by design**, not a bug to dedup.
 
 | Concern | Resolution |
 |---|---|
@@ -318,9 +318,9 @@ Both engines share the **underlying ONNX Runtime** (`libonnxruntime.so` / equiva
 | `runanywhere` (Dart package) | 0.19.13 |
 | `runanywhere_llamacpp` | 0.19.13 |
 | `runanywhere_onnx` | 0.19.13 |
-| `runanywhere_genie` | 0.19.13 |
+| `runanywhere_qhexrt` | 0.19.13 |
 | `RACommons` native | 0.1.6 |
-| Genie native | 0.3.0 |
+| QHexRT native | private staged artifact |
 | llama.cpp engine | b7199 |
 | ONNX Runtime | 1.23.2 |
 | Canonical version source | `sdk/runanywhere-commons/VERSION` (0.19.13) |
