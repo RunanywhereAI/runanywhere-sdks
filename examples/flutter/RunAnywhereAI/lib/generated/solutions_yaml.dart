@@ -7,7 +7,7 @@ abstract final class SolutionsYaml {
   static const String voiceAgent = r'''
 # RunAnywhere Solution — canonical voice agent.
 #
-# Matches the VAD STT LLM TTS DAG built by the hand-rolled
+# Matches the VAD → STT → LLM → TTS DAG built by the hand-rolled
 # voice_agent_pipeline.cpp; SolutionRunner compiles this YAML into an
 # equivalent GraphScheduler graph via PipelineExecutor.
 #
@@ -45,7 +45,7 @@ voice_agent:
   static const String rag = r'''
 # RunAnywhere Solution — retrieval-augmented generation.
 #
-# Mirrors the Query Embed Retrieve ContextBuild LLM DAG T4.6
+# Mirrors the Query → Embed → Retrieve → ContextBuild → LLM DAG T4.6
 # landed. SolutionRunner expands this into a PipelineSpec (see
 # solution_converter.cpp::expand_rag) and compiles it into a
 # GraphScheduler graph.

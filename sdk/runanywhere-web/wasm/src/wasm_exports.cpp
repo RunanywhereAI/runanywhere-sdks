@@ -119,6 +119,25 @@ int rac_wasm_get_version_patch(void) {
   return ver.patch;
 }
 
+EMSCRIPTEN_KEEPALIVE
+void rac_wasm_set_client_info(const char *sdk_binding,
+                              const char *app_identifier,
+                              const char *app_name,
+                              const char *app_version,
+                              const char *app_build,
+                              const char *locale,
+                              const char *timezone) {
+  rac_client_info_t info{};
+  info.sdk_binding = sdk_binding;
+  info.app_identifier = app_identifier;
+  info.app_name = app_name;
+  info.app_version = app_version;
+  info.app_build = app_build;
+  info.locale = locale;
+  info.timezone = timezone;
+  rac_sdk_set_client_info(&info);
+}
+
 /**
  * Helper: Get the size of rac_platform_adapter_t for JS struct allocation.
  * JavaScript needs to know the struct size to allocate WASM memory.

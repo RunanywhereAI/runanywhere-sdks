@@ -895,6 +895,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_sdk_get_environment"
     "_rac_sdk_is_initialized"
     "_rac_sdk_reset"
+    "_rac_wasm_set_client_info"
 
     # Auth manager (read-only state query — used by RunAnywhere auth properties).
     # Future auth flows (authenticate/refresh) will need additional exports

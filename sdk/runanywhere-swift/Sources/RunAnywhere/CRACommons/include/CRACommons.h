@@ -145,6 +145,7 @@
 
 #include "rac_api_types.h"
 #include "rac_auth_manager.h"
+#include "rac_client_info.h"
 #include "rac_dev_config.h"
 #include "rac_endpoints.h"
 #include "rac_environment.h"

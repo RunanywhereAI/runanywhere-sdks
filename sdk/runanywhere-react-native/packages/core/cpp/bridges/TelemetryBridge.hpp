@@ -44,6 +44,7 @@ public:
      * @param deviceId Persistent device UUID
      * @param deviceModel Device model string (e.g., "iPhone 16 Pro")
      * @param osVersion OS version string (e.g., "18.0")
+     * @param platform Backend platform string ("ios"/"android")
      * @param sdkVersion SDK version string
      */
     void initialize(
@@ -51,6 +52,7 @@ public:
         const std::string& deviceId,
         const std::string& deviceModel,
         const std::string& osVersion,
+        const std::string& platform,
         const std::string& sdkVersion
     );
 

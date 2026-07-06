@@ -156,6 +156,18 @@ interface SdkInitModule extends EmscriptenRunanywhereModule {
     outResult: number,
   ): number;
   _rac_sdk_retry_http_proto?(outResult: number): number;
+  _rac_wasm_set_client_info?(
+    sdkBinding: number,
+    appIdentifier: number,
+    appName: number,
+    appVersion: number,
+    appBuild: number,
+    locale: number,
+    timezone: number,
+  ): void;
+  _rac_wasm_get_version_major?(): number;
+  _rac_wasm_get_version_minor?(): number;
+  _rac_wasm_get_version_patch?(): number;
   _rac_auth_is_authenticated?(): number;
   _rac_auth_get_user_id?(): number;
   _rac_auth_get_organization_id?(): number;
@@ -265,6 +277,97 @@ function invokeSdkResultProto(
   );
 }
 
+function normalizeMetadataString(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : null;
+}
+
+function browserDocumentTitle(): string | null {
+  if (typeof document === 'undefined') return null;
+  const appNameMeta = document.querySelector<HTMLMetaElement>('meta[name="application-name"]');
+  return normalizeMetadataString(appNameMeta?.content)
+    ?? normalizeMetadataString(document.title);
+}
+
+function browserLocale(): string | null {
+  if (typeof navigator === 'undefined') return null;
+  return normalizeMetadataString(navigator.languages?.[0])
+    ?? normalizeMetadataString(navigator.language);
+}
+
+function browserTimezone(): string | null {
+  try {
+    return normalizeMetadataString(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  } catch {
+    return null;
+  }
+}
+
+function clientInfoValue(value: string | null | undefined): string | null {
+  return normalizeMetadataString(value);
+}
+
+function nativeSdkVersion(module: SdkInitModule): string {
+  if (
+    typeof module._rac_wasm_get_version_major !== 'function'
+    || typeof module._rac_wasm_get_version_minor !== 'function'
+    || typeof module._rac_wasm_get_version_patch !== 'function'
+  ) {
+    return SDK_VERSION;
+  }
+
+  try {
+    const major = module._rac_wasm_get_version_major();
+    const minor = module._rac_wasm_get_version_minor();
+    const patch = module._rac_wasm_get_version_patch();
+    if (major < 0 || minor < 0 || patch < 0) return SDK_VERSION;
+    return `${major}.${minor}.${patch}`;
+  } catch {
+    return SDK_VERSION;
+  }
+}
+
+function configureWebClientInfo(module: SdkInitModule): void {
+  if (typeof module._rac_wasm_set_client_info !== 'function') return;
+
+  const values = [
+    'web',
+    clientInfoValue(_initOptions?.appIdentifier)
+      ?? (typeof location !== 'undefined' ? normalizeMetadataString(location.origin) : null),
+    clientInfoValue(_initOptions?.appName) ?? browserDocumentTitle(),
+    clientInfoValue(_initOptions?.appVersion),
+    clientInfoValue(_initOptions?.appBuild),
+    browserLocale(),
+    browserTimezone(),
+  ];
+  const ptrs: number[] = [];
+  try {
+    for (const value of values) {
+      if (!value) {
+        ptrs.push(0);
+        continue;
+      }
+      const bytes = module.lengthBytesUTF8(value) + 1;
+      const ptr = module._malloc(bytes);
+      module.stringToUTF8(value, ptr, bytes);
+      ptrs.push(ptr);
+    }
+    module._rac_wasm_set_client_info(
+      ptrs[0],
+      ptrs[1],
+      ptrs[2],
+      ptrs[3],
+      ptrs[4],
+      ptrs[5],
+      ptrs[6],
+    );
+  } finally {
+    for (const ptr of ptrs) {
+      if (ptr) module._free(ptr);
+    }
+  }
+}
+
 function throwIfSdkInitFailed(result: ProtoSdkInitResult | null, phase: string): void {
   if (!result) {
     throw SDKException.fromCode(
@@ -310,7 +413,7 @@ export function completeNativePhase1ForModule(module: EmscriptenRunanywhereModul
     baseUrl: _initOptions?.baseURL ?? '',
     deviceId: ensureDeviceId(),
     platform: SDK_PLATFORM,
-    sdkVersion: SDK_VERSION,
+    sdkVersion: nativeSdkVersion(sdkModule),
   }).finish();
 
   const result = invokeSdkInitProto(
@@ -320,6 +423,7 @@ export function completeNativePhase1ForModule(module: EmscriptenRunanywhereModul
     'rac_sdk_init_phase1_proto',
   );
   throwIfSdkInitFailed(result, 'SDK Phase 1');
+  configureWebClientInfo(sdkModule);
   _hasCompletedNativePhase1 = true;
 }
 

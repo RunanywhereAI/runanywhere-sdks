@@ -30,6 +30,12 @@ jmethodID g_getCoreCountMethod = nullptr;
 jmethodID g_getArchitectureMethod = nullptr;
 jmethodID g_getGPUFamilyMethod = nullptr;
 jmethodID g_isTabletMethod = nullptr;
+jmethodID g_getAppIdentifierMethod = nullptr;
+jmethodID g_getAppNameMethod = nullptr;
+jmethodID g_getAppVersionMethod = nullptr;
+jmethodID g_getAppBuildMethod = nullptr;
+jmethodID g_getLocaleIdentifierMethod = nullptr;
+jmethodID g_getTimezoneIdentifierMethod = nullptr;
 jmethodID g_httpDownloadMethod = nullptr;
 jmethodID g_httpDownloadCancelMethod = nullptr;
 // Directory enumeration slots: cached so InitBridge.cpp can populate
@@ -66,6 +72,21 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_getArchitectureMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getArchitecture", "()Ljava/lang/String;");
       g_getGPUFamilyMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getGPUFamily", "()Ljava/lang/String;");
       g_isTabletMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "isTablet", "()Z");
+      auto getOptionalStaticMethod = [&](const char* name, const char* signature) -> jmethodID {
+        jmethodID method = env->GetStaticMethodID(g_platformAdapterBridgeClass, name, signature);
+        if (env->ExceptionCheck()) {
+          env->ExceptionClear();
+          return nullptr;
+        }
+        return method;
+      };
+      // Best-effort: older host-app Kotlin bridges may predate these methods.
+      g_getAppIdentifierMethod = getOptionalStaticMethod("getAppIdentifier", "()Ljava/lang/String;");
+      g_getAppNameMethod = getOptionalStaticMethod("getAppName", "()Ljava/lang/String;");
+      g_getAppVersionMethod = getOptionalStaticMethod("getAppVersion", "()Ljava/lang/String;");
+      g_getAppBuildMethod = getOptionalStaticMethod("getAppBuild", "()Ljava/lang/String;");
+      g_getLocaleIdentifierMethod = getOptionalStaticMethod("getLocaleIdentifier", "()Ljava/lang/String;");
+      g_getTimezoneIdentifierMethod = getOptionalStaticMethod("getTimezoneIdentifier", "()Ljava/lang/String;");
       g_httpDownloadMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpDownload", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I");
       g_httpDownloadCancelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpDownloadCancel", "(Ljava/lang/String;)Z");
       // Best-effort directory enumeration lookups. If the host app's Kotlin

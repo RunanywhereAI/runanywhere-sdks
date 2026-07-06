@@ -661,6 +661,69 @@ bool PlatformAdapter_isTablet(void) {
 }
 
 // ============================================================================
+// App / Client Info
+// ============================================================================
+
+static bool PlatformAdapter_copyNSString(NSString* value, char** outValue) {
+    if (!outValue) {
+        return false;
+    }
+    *outValue = NULL;
+    if (value == nil || value.length == 0) {
+        return false;
+    }
+    const char* utf8Value = [value UTF8String];
+    if (!utf8Value) {
+        return false;
+    }
+    *outValue = strdup(utf8Value);
+    return *outValue != NULL;
+}
+
+bool PlatformAdapter_getAppIdentifier(char** outValue) {
+    @autoreleasepool {
+        return PlatformAdapter_copyNSString([[NSBundle mainBundle] bundleIdentifier], outValue);
+    }
+}
+
+bool PlatformAdapter_getAppName(char** outValue) {
+    @autoreleasepool {
+        NSBundle* bundle = [NSBundle mainBundle];
+        NSString* displayName = [bundle objectForInfoDictionaryKey:@"CFBundleDisplayName"];
+        NSString* bundleName = [bundle objectForInfoDictionaryKey:@"CFBundleName"];
+        return PlatformAdapter_copyNSString(displayName ?: bundleName, outValue);
+    }
+}
+
+bool PlatformAdapter_getAppVersion(char** outValue) {
+    @autoreleasepool {
+        NSString* version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+        return PlatformAdapter_copyNSString(version, outValue);
+    }
+}
+
+bool PlatformAdapter_getAppBuild(char** outValue) {
+    @autoreleasepool {
+        NSString* build = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
+        return PlatformAdapter_copyNSString(build, outValue);
+    }
+}
+
+bool PlatformAdapter_getLocaleIdentifier(char** outValue) {
+    @autoreleasepool {
+        NSString* locale = [[[NSLocale currentLocale] localeIdentifier] stringByReplacingOccurrencesOfString:@"_"
+                                                                                                  withString:@"-"];
+        return PlatformAdapter_copyNSString(locale, outValue);
+    }
+}
+
+bool PlatformAdapter_getTimezoneIdentifier(char** outValue) {
+    @autoreleasepool {
+        return PlatformAdapter_copyNSString([[NSTimeZone localTimeZone] name], outValue);
+    }
+}
+
+// ============================================================================
 // HTTP Download (Async Platform Adapter Fallback)
 // ============================================================================
 
