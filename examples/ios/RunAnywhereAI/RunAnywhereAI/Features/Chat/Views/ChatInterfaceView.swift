@@ -493,7 +493,7 @@ extension ChatInterfaceView {
 
     private func selectConversation(_ conversation: Conversation) {
         let selected = conversationStore.loadConversation(conversation.id) ?? conversation
-        NotificationCenter.default.post(name: Notification.Name("ConversationSelected"), object: selected)
+        NotificationCenter.default.post(name: .conversationSelected, object: selected)
         showingConversationList = false
     }
 

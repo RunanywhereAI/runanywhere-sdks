@@ -1,10 +1,14 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
 import ai.runanywhere.proto.v1.ModelCategory
+import com.runanywhere.sdk.public.extensions.isVisionLanguageModel
+import com.runanywhere.sdk.public.extensions.matchesLifecycleCategory
 import com.runanywhere.sdk.public.types.RAModelInfo
 
 // Which model category a selection sheet is for. UI-layer filter over proto categories.
-enum class ModelSelectionContext(val title: String) {
+enum class ModelSelectionContext(
+    val title: String,
+) {
     LLM("Choose Chat Model"),
     STT("Choose Listening Model"),
     TTS("Choose Voice"),
@@ -14,34 +18,14 @@ enum class ModelSelectionContext(val title: String) {
     RAG_LLM("Choose Document Answer Model"),
     ;
 
-    fun accepts(category: ModelCategory): Boolean = when (this) {
-        LLM, RAG_LLM -> category == ModelCategory.MODEL_CATEGORY_LANGUAGE
-        STT -> category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-        TTS -> category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-        VAD -> category == ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-        VLM -> category == ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
-            category == ModelCategory.MODEL_CATEGORY_VISION
-        RAG_EMBEDDING -> category == ModelCategory.MODEL_CATEGORY_EMBEDDING
-    }
+    val loadsModel: Boolean get() = this != RAG_EMBEDDING && this != RAG_LLM
 
-    // Category to query/load under. null = mixed or selected by reference.
-    // RAG models are picked by reference; the RAG pipeline loads them by id when it's created.
-    val loadCategory: ModelCategory? get() = when (this) {
-        LLM -> ModelCategory.MODEL_CATEGORY_LANGUAGE
-        STT -> ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-        TTS -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-        VAD -> ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-        VLM -> ModelCategory.MODEL_CATEGORY_MULTIMODAL
-        RAG_EMBEDDING, RAG_LLM -> null
-    }
-
-    fun loadCategoryFor(model: RAModelInfo): ModelCategory? = when (this) {
-        VLM -> when (model.category) {
-            ModelCategory.MODEL_CATEGORY_VISION,
-            ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-            -> model.category
-            else -> loadCategory
-        }
-        else -> loadCategory
+    fun accepts(model: RAModelInfo): Boolean = when (this) {
+        LLM, RAG_LLM -> model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE)
+        STT -> model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION)
+        TTS -> model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)
+        VAD -> model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION)
+        VLM -> model.isVisionLanguageModel
+        RAG_EMBEDDING -> model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_EMBEDDING)
     }
 }

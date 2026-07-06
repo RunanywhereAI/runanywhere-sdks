@@ -354,10 +354,7 @@ extension RAModelInfo {
         if normalizedID.hasPrefix("lora-adapter:") {
             return true
         }
-        if metadata.tags.contains(where: { $0.lowercased() == "lora-adapter" || $0.lowercased() == "lora" }) {
-            return true
-        }
-        return name.localizedCaseInsensitiveContains("lora")
+        return metadata.tags.contains(where: { $0.lowercased() == "lora-adapter" || $0.lowercased() == "lora" })
     }
 
     var consumerModelGroup: ConsumerModelGroup {

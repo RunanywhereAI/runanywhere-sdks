@@ -30,22 +30,16 @@
 #include <unordered_map>
 #include <vector>
 
-#include "features/llm/llm_thinking_directive_internal.h"
-#include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/llm/tool_calling_generation_internal.h"
 #include "rac/core/rac_logger.h"
-#include "rac/features/llm/rac_llm_service.h"
-#include "rac/features/llm/rac_llm_thinking.h"
-#include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "errors.pb.h"
 #include "llm_service.pb.h"
-#include "sdk_events.pb.h"
 
-#include "infrastructure/events/sdk_event_publish.h"
 #include "tool_calling.pb.h"
 #endif
 
@@ -64,36 +58,6 @@ int64_t now_us() {
 int64_t now_ms() {
     using namespace std::chrono;
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-}
-
-void split_display_text_and_thinking(const std::string& raw_text, std::string* out_text,
-                                     std::string* out_thinking,
-                                     const std::string& thinking_open_tag,
-                                     const std::string& thinking_close_tag) {
-    const char* response = nullptr;
-    size_t response_len = 0;
-    const char* thinking = nullptr;
-    size_t thinking_len = 0;
-    if (rac_llm_extract_thinking_with_tags(
-            raw_text.c_str(), thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
-            thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
-            &response_len, &thinking, &thinking_len) != RAC_SUCCESS) {
-        if (out_text) {
-            *out_text = raw_text;
-        }
-        if (out_thinking) {
-            out_thinking->clear();
-        }
-        return;
-    }
-
-    if (out_text) {
-        *out_text = response ? std::string(response, response_len) : std::string();
-    }
-    if (out_thinking) {
-        *out_thinking =
-            (thinking && thinking_len > 0) ? std::string(thinking, thinking_len) : std::string();
-    }
 }
 
 enum class SessionState {
@@ -131,16 +95,7 @@ struct ToolCallingSession {
     bool keep_tools_available = false;
     bool validate_calls = true;
 
-    int32_t max_tokens = 0;
-    float temperature = 0.0f;
-    float top_p = 0.0f;
-    std::string system_prompt;
-    // Suppress the model thinking phase on every generate in the session
-    // (ToolCallingSessionCreateRequest.disable_thinking).
-    bool disable_thinking = false;
-    bool thinking_tags_resolved = false;
-    std::string thinking_open_tag;
-    std::string thinking_close_tag;
+    rac::llm::tool_calling::GenerationState generation;
 
     // Request-level tool_choice / forced_tool_name overrides.
     bool has_tool_choice = false;
@@ -328,14 +283,14 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const ToolCallingSess
     options.set_format_hint(session.format_hint);
     options.set_max_iterations(static_cast<int32_t>(session.max_iterations));
     options.set_keep_tools_available(session.keep_tools_available);
-    if (session.max_tokens > 0) {
-        options.set_max_tokens(session.max_tokens);
+    if (session.generation.max_tokens > 0) {
+        options.set_max_tokens(session.generation.max_tokens);
     }
-    if (session.temperature > 0.0f) {
-        options.set_temperature(session.temperature);
+    if (session.generation.temperature > 0.0f) {
+        options.set_temperature(session.generation.temperature);
     }
-    if (!session.system_prompt.empty()) {
-        options.set_system_prompt(session.system_prompt);
+    if (!session.generation.system_prompt.empty()) {
+        options.set_system_prompt(session.generation.system_prompt);
     }
     // Honor request-level tool_choice / forced_tool_name on the
     // snapshot consumed by the format/validate proto helpers.
@@ -484,116 +439,6 @@ validate_tool_call(const ToolCallingSession& session, const runanywhere::v1::Too
     return result;
 }
 
-bool run_generate_once(ToolCallingSession& session, const std::string& prompt,
-                       std::string* out_response, rac_result_t* out_rc) {
-    rac::llm::LifecycleLlmRef ref;
-    rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
-    if (rc != RAC_SUCCESS) {
-        if (out_rc)
-            *out_rc = rc;
-        return false;
-    }
-
-    rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
-    if (session.max_tokens > 0) {
-        options.max_tokens = session.max_tokens;
-    }
-    if (session.temperature > 0.0f) {
-        options.temperature = session.temperature;
-    }
-    if (session.top_p > 0.0f) {
-        options.top_p = session.top_p;
-    }
-    options.streaming_enabled = RAC_FALSE;
-    options.system_prompt = session.system_prompt.empty() ? nullptr : session.system_prompt.c_str();
-    options.disable_thinking = session.disable_thinking ? RAC_TRUE : RAC_FALSE;
-
-    rac::llm::clear_lifecycle_llm_cancel(&ref);
-
-    rac_llm_result_t raw{};
-    if (!ref.ops || !ref.ops->generate) {
-        rac::llm::release_lifecycle_llm(&ref);
-        if (out_rc)
-            *out_rc = RAC_ERROR_NOT_SUPPORTED;
-        return false;
-    }
-
-    if (!session.thinking_tags_resolved) {
-        (void)rac::llm::model_thinking_tags_from_registry(
-            ref.model_id, &session.thinking_open_tag, &session.thinking_close_tag);
-        session.thinking_tags_resolved = true;
-    }
-
-    // Publish the in-flight ref so cancel calls from other
-    // threads can interrupt this generate. If a cancel arrived before we
-    // got here, latch it onto the ref now.
-    {
-        std::lock_guard<std::mutex> guard(session.active_ref_mu);
-        session.active_ref = &ref;
-        if (session.cancel_requested.load(std::memory_order_acquire)) {
-            rac::llm::request_lifecycle_llm_cancel(&ref);
-        }
-    }
-
-    // Apply the no-think directive at the prompt level when requested (same
-    // contract as the rac_llm_generate / proto generate sites).
-    const std::string effective_prompt =
-        rac::llm::apply_no_think_directive(prompt, options.disable_thinking);
-    rc = ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw);
-
-    // Unpublish before the ref goes out of scope.
-    {
-        std::lock_guard<std::mutex> guard(session.active_ref_mu);
-        session.active_ref = nullptr;
-    }
-
-    if (rc != RAC_SUCCESS) {
-        rac_llm_result_free(&raw);
-        rac::llm::release_lifecycle_llm(&ref);
-        if (out_rc)
-            *out_rc = rc;
-        return false;
-    }
-
-    if (out_response) {
-        *out_response = raw.text ? raw.text : "";
-    }
-
-    // Telemetry: each tool-calling turn IS an LLM generation, but the session
-    // only emits ToolCallingSessionEvents — so without this the "llm" V2 table
-    // never fills for tools-enabled chats. Publish a routed GenerationEvent so
-    // the telemetry sink records the turn (component=LLM → modality "llm").
-    {
-        runanywhere::v1::SDKEvent llm_event;
-        auto* gen = llm_event.mutable_generation();
-        gen->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED);
-        if (ref.model_id != nullptr && ref.model_id[0] != '\0') {
-            gen->set_model_id(ref.model_id);
-        }
-        if (raw.completion_tokens > 0) {
-            gen->set_tokens_count(raw.completion_tokens);
-            gen->set_tokens_used(raw.completion_tokens);
-        }
-        if (raw.prompt_tokens > 0) {
-            gen->set_input_tokens(raw.prompt_tokens);
-        }
-        if (raw.tokens_per_second > 0.0f) {
-            gen->set_tokens_per_second(raw.tokens_per_second);
-        }
-        if (raw.time_to_first_token_ms > 0) {
-            gen->set_time_to_first_token_ms(raw.time_to_first_token_ms);
-        }
-        (void)rac::events::publish(llm_event, runanywhere::v1::SDK_COMPONENT_LLM,
-                                   runanywhere::v1::EVENT_CATEGORY_LLM);
-    }
-
-    rac_llm_result_free(&raw);
-    rac::llm::release_lifecycle_llm(&ref);
-    if (out_rc)
-        *out_rc = RAC_SUCCESS;
-    return true;
-}
-
 void run_generate_loop(ToolCallingSession& session) {
     while (session.iteration < session.max_iterations) {
         session.iteration++;
@@ -601,7 +446,10 @@ void run_generate_loop(ToolCallingSession& session) {
 
         std::string response;
         rac_result_t rc = RAC_SUCCESS;
-        if (!run_generate_once(session, session.current_prompt, &response, &rc)) {
+        rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
+            &session.active_ref_mu, &session.active_ref, &session.cancel_requested};
+        if (!rac::llm::tool_calling::run_generate_once(
+                session.generation, cancel_binding, session.current_prompt, &response, &rc)) {
             // Distinguish cancel from other generate failures.
             // A cancel that landed before or during generate makes the session
             // terminal — emit a cancel error and mark state kCancelled so the
@@ -618,10 +466,8 @@ void run_generate_loop(ToolCallingSession& session) {
         const bool has_call =
             parse_tool_call_from_output(session, response, &clean_text, &parsed_call);
 
-        split_display_text_and_thinking(clean_text, &session.final_text,
-                                        &session.final_thinking_content,
-                                        session.thinking_open_tag,
-                                        session.thinking_close_tag);
+        rac::llm::tool_calling::split_display_text_and_thinking(
+            clean_text, &session.final_text, &session.final_thinking_content, session.generation);
         emit_llm_chunk(session, session.final_text, true, "stop");
 
         if (!has_call) {
@@ -715,11 +561,11 @@ rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t
     session->user_data = user_data;
 
     session->user_prompt = request.prompt();
-    session->max_tokens = request.max_tokens();
-    session->temperature = request.temperature();
-    session->top_p = request.top_p();
-    session->system_prompt = request.system_prompt();
-    session->disable_thinking = request.disable_thinking();
+    session->generation.max_tokens = request.max_tokens();
+    session->generation.temperature = request.temperature();
+    session->generation.top_p = request.top_p();
+    session->generation.system_prompt = request.system_prompt();
+    session->generation.disable_thinking = request.disable_thinking();
 
     session->format_hint =
         request.format_hint().empty() ? std::string("default") : request.format_hint();

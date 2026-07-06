@@ -37,19 +37,16 @@ extension LLMViewModel {
         let messageIndex = messagesValue.count - 1
 
         do {
-            try await RunAnywhere.ragCreatePipeline(
+            try await prepareDocumentRAGPipelineIfNeeded(
+                document: document,
                 embeddingModel: embeddingModel,
-                llmModel: answerModel
-            )
-            try await RunAnywhere.ragIngest(
-                text: document.text,
-                metadataJSON: document.metadataJSON
+                answerModel: answerModel
             )
 
             var options = RARAGQueryOptions.defaults(question: prompt)
             let settings = SettingsViewModel.shared
             options.disableThinking =
-                settings.loadedModelSupportsThinking && !settings.thinkingModeEnabled
+                answerModel.supportsThinking && !settings.thinkingModeEnabled
 
             let result = try await RunAnywhere.ragQuery(options)
             updateDocumentMessage(
@@ -63,6 +60,31 @@ extension LLMViewModel {
         }
 
         await finalizeGeneration(at: messageIndex)
+    }
+
+    private func prepareDocumentRAGPipelineIfNeeded(
+        document: ChatDocumentAttachment,
+        embeddingModel: RAModelInfo,
+        answerModel: RAModelInfo
+    ) async throws {
+        let key = ChatDocumentRAGPipelineKey(
+            documentID: document.id,
+            embeddingModelID: embeddingModel.id,
+            answerModelID: answerModel.id
+        )
+        guard preparedDocumentRAGPipelineKey != key else { return }
+
+        preparedDocumentRAGPipelineKey = nil
+        await RunAnywhere.ragDestroyPipeline()
+        try await RunAnywhere.ragCreatePipeline(
+            embeddingModel: embeddingModel,
+            llmModel: answerModel
+        )
+        try await RunAnywhere.ragIngest(
+            text: document.text,
+            metadataJSON: document.metadataJSON
+        )
+        preparedDocumentRAGPipelineKey = key
     }
 
     private func updateDocumentMessage(

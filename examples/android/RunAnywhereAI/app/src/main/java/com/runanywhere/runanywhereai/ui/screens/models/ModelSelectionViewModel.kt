@@ -1,7 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
-import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelListRequest
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,13 +10,13 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.extensions.currentModel
 import com.runanywhere.sdk.public.extensions.downloadModelStream
 import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -58,7 +56,7 @@ class ModelSelectionViewModel(
     private suspend fun reload() {
         try {
             val models = RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
-                .filter { context.accepts(it.category) }
+                .filter { context.accepts(it) }
             state = state.copy(models = models, isLoading = false, error = null)
             syncCurrent(models)
             autoLoadIfNeeded(models)
@@ -98,15 +96,12 @@ class ModelSelectionViewModel(
     suspend fun select(model: RAModelInfo): Boolean {
         state = state.copy(busyModelId = model.id, error = null)
         return try {
-            val loadCategory = context.loadCategoryFor(model)
-            if (isBuiltIn(model) || loadCategory == null) {
+            if (model.isBuiltIn || !context.loadsModel) {
                 if (isLlm) GlobalState.model.set(model)
                 state = state.copy(currentModelId = model.id, busyModelId = null)
                 true
             } else {
-                val result = RunAnywhere.loadModel(
-                    RAModelLoadRequest(model_id = model.id, category = loadCategory),
-                )
+                val result = RunAnywhere.loadModel(model)
                 if (result.success) {
                     if (isLlm) {
                         GlobalState.model.set(model)
@@ -132,33 +127,25 @@ class ModelSelectionViewModel(
         state = state.copy(error = null)
     }
 
-    fun isReady(model: RAModelInfo): Boolean = isBuiltIn(model) || model.isDownloadedOnDisk
+    fun isReady(model: RAModelInfo): Boolean = model.isBuiltIn || model.isDownloadedOnDisk
 
     private suspend fun syncCurrent(models: List<RAModelInfo>) {
-        val category = context.loadCategory ?: return
-        val loadedId = runCatching {
-            RunAnywhere.currentModel(CurrentModelRequest(category = category)).model_id.takeIf { it.isNotEmpty() }
-        }.getOrNull() ?: return
+        val loadedId = RunAnywhere.currentModel(models)?.model_id ?: return
         state = state.copy(currentModelId = loadedId)
         if (isLlm) models.firstOrNull { it.id == loadedId }?.let { GlobalState.model.set(it) }
     }
 
     private suspend fun autoLoadIfNeeded(models: List<RAModelInfo>) {
         if (!isLlm || GlobalState.model.isLoaded) return
-        val category = context.loadCategory ?: return
-        val candidate = models.firstOrNull { isReady(it) && !isBuiltIn(it) } ?: return
+        val candidate = models.firstOrNull { isReady(it) && !it.isBuiltIn } ?: return
         runCatching {
-            val result = RunAnywhere.loadModel(RAModelLoadRequest(model_id = candidate.id, category = category))
+            val result = RunAnywhere.loadModel(candidate)
             if (result.success) {
                 GlobalState.model.set(candidate)
                 GlobalState.lora.set(null)
             }
         }.onFailure { RACLog.w("auto-load skipped: ${candidate.id}") }
     }
-
-    private fun isBuiltIn(model: RAModelInfo): Boolean =
-        model.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
-            model.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
 
     class Factory(private val context: ModelSelectionContext) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

@@ -65,6 +65,7 @@ final class LLMViewModel {
     var generationCancellable: AnyCancellable?
     private var firstTokenLatencies: [String: Double] = [:]
     private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
+    var preparedDocumentRAGPipelineKey: ChatDocumentRAGPipelineKey?
     /// TTFT (ms) reported by the SDK event bus for the generation in flight.
     /// The event carries an SDK-side generation id the app never sees on the
     /// result, so the single-generation-at-a-time chat keeps the latest value
@@ -193,7 +194,7 @@ final class LLMViewModel {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(conversationSelected(_:)),
-            name: Notification.Name("ConversationSelected"),
+            name: .conversationSelected,
             object: nil
         )
 

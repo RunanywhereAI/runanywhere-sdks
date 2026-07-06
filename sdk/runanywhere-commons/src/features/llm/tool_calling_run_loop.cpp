@@ -32,13 +32,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "features/llm/llm_thinking_directive_internal.h"
-#include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/llm/tool_calling_generation_internal.h"
 #include "rac/core/rac_logger.h"
-#include "rac/features/llm/rac_llm_service.h"
-#include "rac/features/llm/rac_llm_thinking.h"
-#include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
@@ -104,52 +100,15 @@ int64_t now_ms() {
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
 
-void set_display_text_and_thinking(runanywhere::v1::ToolCallingResult* result,
-                                   const std::string& raw_text,
-                                   const std::string& thinking_open_tag,
-                                   const std::string& thinking_close_tag) {
-    if (!result) {
-        return;
-    }
-
-    const char* response = nullptr;
-    size_t response_len = 0;
-    const char* thinking = nullptr;
-    size_t thinking_len = 0;
-    if (rac_llm_extract_thinking_with_tags(
-            raw_text.c_str(), thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
-            thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
-            &response_len, &thinking, &thinking_len) != RAC_SUCCESS) {
-        result->set_text(raw_text);
-        return;
-    }
-
-    result->set_text(response ? std::string(response, response_len) : std::string());
-    if (thinking && thinking_len > 0) {
-        result->set_thinking_content(std::string(thinking, thinking_len));
-    } else {
-        result->clear_thinking_content();
-    }
-}
-
 // Snapshot of immutable per-loop inputs. Mirrors the per-session struct in
 // tool_calling_session.cpp but without the state-machine plumbing.
 struct LoopContext {
     std::string user_prompt;
     std::string format_hint;
-    std::string system_prompt;
-    int32_t max_tokens = 0;
-    float temperature = 0.0f;
-    float top_p = 0.0f;
     uint32_t max_iterations = kDefaultMaxIterations;
     bool keep_tools_available = false;
     bool validate_calls = true;
-    // Suppress the model thinking phase on every generate in the loop
-    // (ToolCallingSessionCreateRequest.disable_thinking).
-    bool disable_thinking = false;
-    bool thinking_tags_resolved = false;
-    std::string thinking_open_tag;
-    std::string thinking_close_tag;
+    rac::llm::tool_calling::GenerationState generation;
 
     // request-level tool_choice / forced_tool_name overrides.
     // When present, build_options_snapshot copies them onto the synthesized
@@ -168,14 +127,14 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const LoopContext& ct
     options.set_format_hint(ctx.format_hint);
     options.set_max_iterations(static_cast<int32_t>(ctx.max_iterations));
     options.set_keep_tools_available(ctx.keep_tools_available);
-    if (ctx.max_tokens > 0) {
-        options.set_max_tokens(ctx.max_tokens);
+    if (ctx.generation.max_tokens > 0) {
+        options.set_max_tokens(ctx.generation.max_tokens);
     }
-    if (ctx.temperature > 0.0f) {
-        options.set_temperature(ctx.temperature);
+    if (ctx.generation.temperature > 0.0f) {
+        options.set_temperature(ctx.generation.temperature);
     }
-    if (!ctx.system_prompt.empty()) {
-        options.set_system_prompt(ctx.system_prompt);
+    if (!ctx.generation.system_prompt.empty()) {
+        options.set_system_prompt(ctx.generation.system_prompt);
     }
     // Honor ToolCallingSessionCreateRequest.tool_choice / forced_tool_name
     // The request-level fields take precedence over any
@@ -297,85 +256,6 @@ validate_tool_call(const LoopContext& ctx, const runanywhere::v1::ToolCall& tool
     return result;
 }
 
-bool run_generate_once(LoopContext& ctx, LoopCancelState* cancel_state,
-                       const std::string& prompt, std::string* out_response, rac_result_t* out_rc) {
-    rac::llm::LifecycleLlmRef ref;
-    rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
-    if (rc != RAC_SUCCESS) {
-        if (out_rc)
-            *out_rc = rc;
-        return false;
-    }
-
-    rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
-    if (ctx.max_tokens > 0) {
-        options.max_tokens = ctx.max_tokens;
-    }
-    if (ctx.temperature > 0.0f) {
-        options.temperature = ctx.temperature;
-    }
-    if (ctx.top_p > 0.0f) {
-        options.top_p = ctx.top_p;
-    }
-    options.streaming_enabled = RAC_FALSE;
-    options.system_prompt = ctx.system_prompt.empty() ? nullptr : ctx.system_prompt.c_str();
-    options.disable_thinking = ctx.disable_thinking ? RAC_TRUE : RAC_FALSE;
-
-    rac::llm::clear_lifecycle_llm_cancel(&ref);
-
-    if (!ref.ops || !ref.ops->generate) {
-        rac::llm::release_lifecycle_llm(&ref);
-        if (out_rc)
-            *out_rc = RAC_ERROR_NOT_SUPPORTED;
-        return false;
-    }
-
-    if (!ctx.thinking_tags_resolved) {
-        (void)rac::llm::model_thinking_tags_from_registry(ref.model_id, &ctx.thinking_open_tag,
-                                                          &ctx.thinking_close_tag);
-        ctx.thinking_tags_resolved = true;
-    }
-
-    // publish the in-flight ref so a cancel from another
-    // thread can interrupt. Latch a pre-arrived cancel onto the ref now.
-    if (cancel_state) {
-        std::lock_guard<std::mutex> guard(cancel_state->active_ref_mu);
-        cancel_state->active_ref = &ref;
-        if (cancel_state->cancel_requested.load(std::memory_order_acquire)) {
-            rac::llm::request_lifecycle_llm_cancel(&ref);
-        }
-    }
-
-    rac_llm_result_t raw{};
-    // Apply the no-think directive at the prompt level when requested (same
-    // contract as the rac_llm_generate / proto generate sites).
-    const std::string effective_prompt =
-        rac::llm::apply_no_think_directive(prompt, options.disable_thinking);
-    rc = ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw);
-
-    if (cancel_state) {
-        std::lock_guard<std::mutex> guard(cancel_state->active_ref_mu);
-        cancel_state->active_ref = nullptr;
-    }
-
-    if (rc != RAC_SUCCESS) {
-        rac_llm_result_free(&raw);
-        rac::llm::release_lifecycle_llm(&ref);
-        if (out_rc)
-            *out_rc = rc;
-        return false;
-    }
-
-    if (out_response) {
-        *out_response = raw.text ? raw.text : "";
-    }
-    rac_llm_result_free(&raw);
-    rac::llm::release_lifecycle_llm(&ref);
-    if (out_rc)
-        *out_rc = RAC_SUCCESS;
-    return true;
-}
-
 void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status, const std::string& message) {
     if (!out_result)
         return;
@@ -472,16 +352,16 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
 
     LoopContext ctx;
     ctx.user_prompt = request.prompt();
-    ctx.max_tokens = request.max_tokens();
-    ctx.temperature = request.temperature();
-    ctx.top_p = request.top_p();
-    ctx.system_prompt = request.system_prompt();
+    ctx.generation.max_tokens = request.max_tokens();
+    ctx.generation.temperature = request.temperature();
+    ctx.generation.top_p = request.top_p();
+    ctx.generation.system_prompt = request.system_prompt();
     ctx.format_hint =
         request.format_hint().empty() ? std::string("default") : request.format_hint();
     ctx.max_iterations =
         request.max_iterations() == 0 ? kDefaultMaxIterations : request.max_iterations();
     ctx.keep_tools_available = request.keep_tools_available();
-    ctx.disable_thinking = request.disable_thinking();
+    ctx.generation.disable_thinking = request.disable_thinking();
     // Honor ToolCallingSessionCreateRequest.validate_calls (idl/tool_calling.proto).
     // The field is `optional bool` so we can preserve the historical default
     // (validate=true) when the caller did not set it, while still letting hosts
@@ -519,7 +399,11 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
 
         std::string response;
         rac_result_t rc = RAC_SUCCESS;
-        if (!run_generate_once(ctx, cancel_state.get(), current_prompt, &response, &rc)) {
+        rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
+            &cancel_state->active_ref_mu, &cancel_state->active_ref,
+            &cancel_state->cancel_requested};
+        if (!rac::llm::tool_calling::run_generate_once(
+                ctx.generation, cancel_binding, current_prompt, &response, &rc)) {
             // distinguish cancel from other generate
             // failures, mirroring run_generate_loop in tool_calling_session.cpp.
             // A cancel that latched before/during generate surfaces as
@@ -528,8 +412,8 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
             const bool cancelled = cancel_state->cancel_requested.load(std::memory_order_acquire);
             const rac_result_t report_rc = cancelled ? RAC_ERROR_CANCELLED : rc;
             const char* msg = cancelled ? "LLM generation cancelled" : "LLM generation failed";
-            set_display_text_and_thinking(&final_result, final_text, ctx.thinking_open_tag,
-                                          ctx.thinking_close_tag);
+            rac::llm::tool_calling::set_display_text_and_thinking(&final_result, final_text,
+                                                                  ctx.generation);
             final_result.set_is_complete(false);
             final_result.set_iterations_used(static_cast<int32_t>(iteration));
             final_result.set_error_code(static_cast<int32_t>(report_rc));
@@ -647,8 +531,8 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
         is_complete = true;
     }
 
-    set_display_text_and_thinking(&final_result, final_text, ctx.thinking_open_tag,
-                                  ctx.thinking_close_tag);
+    rac::llm::tool_calling::set_display_text_and_thinking(&final_result, final_text,
+                                                          ctx.generation);
     final_result.set_is_complete(is_complete);
     final_result.set_iterations_used(static_cast<int32_t>(iteration));
 

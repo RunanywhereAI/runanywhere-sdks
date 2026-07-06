@@ -804,6 +804,58 @@ static bool jniClearPendingException(JNIEnv* env) {
     return false;
 }
 
+static bool decodeUtf8CodePoint(const char* source, size_t length, size_t& index, uint32_t& code_point) {
+    const auto first = static_cast<unsigned char>(source[index]);
+    if (first < 0x80) {
+        code_point = first;
+        ++index;
+        return true;
+    }
+
+    size_t sequence_length = 0;
+    uint32_t value = 0;
+    uint32_t minimum_value = 0;
+    if ((first & 0xe0u) == 0xc0u) {
+        sequence_length = 2;
+        value = first & 0x1fu;
+        minimum_value = 0x80u;
+    } else if ((first & 0xf0u) == 0xe0u) {
+        sequence_length = 3;
+        value = first & 0x0fu;
+        minimum_value = 0x800u;
+    } else if ((first & 0xf8u) == 0xf0u) {
+        sequence_length = 4;
+        value = first & 0x07u;
+        minimum_value = 0x10000u;
+    } else {
+        ++index;
+        return false;
+    }
+
+    if (index + sequence_length > length) {
+        ++index;
+        return false;
+    }
+
+    for (size_t offset = 1; offset < sequence_length; ++offset) {
+        const auto next = static_cast<unsigned char>(source[index + offset]);
+        if ((next & 0xc0u) != 0x80u) {
+            ++index;
+            return false;
+        }
+        value = (value << 6u) | (next & 0x3fu);
+    }
+
+    if (value < minimum_value || value > 0x10ffffu || (value >= 0xd800u && value <= 0xdfffu)) {
+        ++index;
+        return false;
+    }
+
+    code_point = value;
+    index += sequence_length;
+    return true;
+}
+
 static std::string jniSafeLogString(const char* value, const char* fallback) {
     const char* source = value != nullptr ? value : fallback;
     if (source == nullptr) {
@@ -811,13 +863,25 @@ static std::string jniSafeLogString(const char* value, const char* fallback) {
     }
 
     constexpr size_t kMaxLogChars = 4096;
+    const size_t source_length = std::strlen(source);
     std::string output;
-    output.reserve(std::min(std::strlen(source), kMaxLogChars));
+    output.reserve(std::min(source_length, kMaxLogChars));
 
-    for (size_t i = 0; source[i] != '\0' && output.size() < kMaxLogChars; ++i) {
-        const auto c = static_cast<unsigned char>(source[i]);
-        if (c == '\n' || c == '\r' || c == '\t' || (c >= 0x20 && c < 0x7f)) {
-            output.push_back(static_cast<char>(c));
+    for (size_t i = 0; i < source_length && output.size() < kMaxLogChars;) {
+        const size_t start = i;
+        uint32_t code_point = 0;
+        if (!decodeUtf8CodePoint(source, source_length, i, code_point)) {
+            output.push_back('?');
+            continue;
+        }
+
+        if (code_point == '\n' || code_point == '\r' || code_point == '\t' ||
+            code_point >= 0x20u) {
+            const size_t byte_count = i - start;
+            if (output.size() + byte_count > kMaxLogChars) {
+                break;
+            }
+            output.append(source + start, byte_count);
         } else {
             output.push_back('?');
         }
@@ -826,8 +890,32 @@ static std::string jniSafeLogString(const char* value, const char* fallback) {
     return output;
 }
 
+static std::vector<jchar> utf8ToJChars(const std::string& value) {
+    std::vector<jchar> chars;
+    chars.reserve(value.size());
+
+    for (size_t i = 0; i < value.size();) {
+        uint32_t code_point = 0;
+        if (!decodeUtf8CodePoint(value.c_str(), value.size(), i, code_point)) {
+            code_point = '?';
+        }
+
+        if (code_point <= 0xffffu) {
+            chars.push_back(static_cast<jchar>(code_point));
+        } else {
+            code_point -= 0x10000u;
+            chars.push_back(static_cast<jchar>(0xd800u + (code_point >> 10u)));
+            chars.push_back(static_cast<jchar>(0xdc00u + (code_point & 0x3ffu)));
+        }
+    }
+
+    return chars;
+}
+
 static jstring newSafeLogJString(JNIEnv* env, const std::string& value) {
-    jstring result = env->NewStringUTF(value.c_str());
+    const std::vector<jchar> chars = utf8ToJChars(value);
+    jstring result =
+        env->NewString(chars.empty() ? nullptr : chars.data(), static_cast<jsize>(chars.size()));
     if (result == nullptr) {
         jniClearPendingException(env);
     }

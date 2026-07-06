@@ -159,25 +159,28 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (isGenerating) return
         val prompt = input.trim().ifBlank { "Describe this image in detail." }
         input = ""
-        val name = displayName(uri) ?: "Selected image"
-        messages += ChatMessage(
-            text = prompt,
-            isUser = true,
-            attachment = ChatAttachment(
-                kind = ChatAttachmentKind.IMAGE,
-                name = name,
-                detail = loadedModelName?.let { "Image model: $it" },
-            ),
-        )
-        val replyIndex = messages.size
-        messages += ChatMessage("", isUser = false)
         isGenerating = true
         activeGenerationTTFTMs = null
         activeGenerationMetrics = null
 
         job = viewModelScope.launch {
             var file: File? = null
+            var replyIndex: Int? = null
             try {
+                val name = withContext(Dispatchers.IO) {
+                    runCatching { displayName(uri) }.getOrNull()
+                } ?: "Selected image"
+                messages += ChatMessage(
+                    text = prompt,
+                    isUser = true,
+                    attachment = ChatAttachment(
+                        kind = ChatAttachmentKind.IMAGE,
+                        name = name,
+                        detail = loadedModelName?.let { "Image model: $it" },
+                    ),
+                )
+                replyIndex = messages.size
+                messages += ChatMessage("", isUser = false)
                 file = withContext(Dispatchers.IO) { copyUriToCache(uri, "chat_image_", imageCacheSuffix(uri)) }
                 val image = RAVLMImage(
                     file_path = file.absolutePath,
@@ -190,23 +193,27 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN -> {
                             if (event.token.isNotEmpty()) {
                                 accumulated += event.token
-                                messages[replyIndex] = messages[replyIndex].copy(text = accumulated)
+                                replyIndex?.let { index ->
+                                    messages[index] = messages[index].copy(text = accumulated)
+                                }
                             }
                         }
                         VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED -> {
                             val result = event.result ?: return@collect
                             val text = result.text.ifBlank { accumulated }
-                            messages[replyIndex] = messages[replyIndex].copy(
-                                text = text.ifBlank { "I could not read that image." },
-                                stats = GenerationStats(
-                                    tokens = result.completion_tokens,
-                                    tokensPerSecond = result.tokens_per_second.toDouble(),
-                                    timeToFirstTokenMs = result.time_to_first_token_ms.takeIf { it > 0 },
-                                    totalTimeMs = result.processing_time_ms,
-                                    modelName = loadedModelName,
-                                    mode = GenerationMode.STREAMING,
-                                ),
-                            )
+                            replyIndex?.let { index ->
+                                messages[index] = messages[index].copy(
+                                    text = text.ifBlank { "I could not read that image." },
+                                    stats = GenerationStats(
+                                        tokens = result.completion_tokens,
+                                        tokensPerSecond = result.tokens_per_second.toDouble(),
+                                        timeToFirstTokenMs = result.time_to_first_token_ms.takeIf { it > 0 },
+                                        totalTimeMs = result.processing_time_ms,
+                                        modelName = loadedModelName,
+                                        mode = GenerationMode.STREAMING,
+                                    ),
+                                )
+                            }
                         }
                         else -> Unit
                     }
@@ -215,7 +222,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 throw e
             } catch (e: Exception) {
                 RACLog.e("image question failed", e)
-                messages[replyIndex] = messages[replyIndex].copy(text = "Error: ${e.message}")
+                val index = replyIndex
+                if (index != null && index in messages.indices) {
+                    messages[index] = messages[index].copy(text = "Error: ${e.message}")
+                } else {
+                    messages += ChatMessage("Error: ${e.message}", isUser = false)
+                }
             } finally {
                 file?.delete()
                 isGenerating = false
@@ -228,25 +240,28 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (isGenerating) return
         val prompt = input.trim().ifBlank { "Summarize this document." }
         input = ""
-        val name = displayName(uri) ?: "Selected document"
-        val answerModelName = answerModel?.name
-        messages += ChatMessage(
-            text = prompt,
-            isUser = true,
-            attachment = ChatAttachment(
-                kind = ChatAttachmentKind.DOCUMENT,
-                name = name,
-                detail = answerModelName?.let { "Answer model: $it" },
-            ),
-        )
-        val replyIndex = messages.size
-        messages += ChatMessage("", isUser = false)
         isGenerating = true
         activeGenerationTTFTMs = null
         activeGenerationMetrics = null
 
         job = viewModelScope.launch {
+            var replyIndex: Int? = null
             try {
+                val name = withContext(Dispatchers.IO) {
+                    runCatching { displayName(uri) }.getOrNull()
+                } ?: "Selected document"
+                val answerModelName = answerModel?.name
+                messages += ChatMessage(
+                    text = prompt,
+                    isUser = true,
+                    attachment = ChatAttachment(
+                        kind = ChatAttachmentKind.DOCUMENT,
+                        name = name,
+                        detail = answerModelName?.let { "Answer model: $it" },
+                    ),
+                )
+                replyIndex = messages.size
+                messages += ChatMessage("", isUser = false)
                 val embedding = embeddingModel ?: error("Choose or download a document index model first.")
                 val answer = answerModel ?: error("Choose or download a document answer model first.")
                 val doc = withContext(Dispatchers.IO) { DocumentExtractor.extract(getApplication(), uri) }
@@ -261,23 +276,30 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         document = it.source_document.orEmpty(),
                     )
                 }
-                messages[replyIndex] = messages[replyIndex].copy(
-                    text = result.answer.ifBlank { "I could not find an answer in that document." },
-                    sources = sources,
-                    stats = GenerationStats(
-                        tokens = 0,
-                        tokensPerSecond = 0.0,
-                        timeToFirstTokenMs = null,
-                        totalTimeMs = result.total_time_ms,
-                        modelName = answerModelName,
-                        mode = GenerationMode.NON_STREAMING,
-                    ),
-                )
+                replyIndex?.let { index ->
+                    messages[index] = messages[index].copy(
+                        text = result.answer.ifBlank { "I could not find an answer in that document." },
+                        sources = sources,
+                        stats = GenerationStats(
+                            tokens = 0,
+                            tokensPerSecond = 0.0,
+                            timeToFirstTokenMs = null,
+                            totalTimeMs = result.total_time_ms,
+                            modelName = answer.name,
+                            mode = GenerationMode.NON_STREAMING,
+                        ),
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 RACLog.e("document question failed", e)
-                messages[replyIndex] = messages[replyIndex].copy(text = "Error: ${e.message}")
+                val index = replyIndex
+                if (index != null && index in messages.indices) {
+                    messages[index] = messages[index].copy(text = "Error: ${e.message}")
+                } else {
+                    messages += ChatMessage("Error: ${e.message}", isUser = false)
+                }
             } finally {
                 isGenerating = false
                 persist()
@@ -610,11 +632,16 @@ private fun ChatViewModel.displayName(uri: Uri): String? =
 private fun ChatViewModel.copyUriToCache(uri: Uri, prefix: String, suffix: String): File {
     val app = getApplication<Application>()
     val file = File.createTempFile(prefix, suffix, app.cacheDir)
-    val input = app.contentResolver.openInputStream(uri) ?: error("Could not open the selected file.")
-    input.use { source ->
-        FileOutputStream(file).use { destination -> source.copyTo(destination) }
+    try {
+        val input = app.contentResolver.openInputStream(uri) ?: error("Could not open the selected file.")
+        input.use { source ->
+            FileOutputStream(file).use { destination -> source.copyTo(destination) }
+        }
+        return file
+    } catch (e: Exception) {
+        file.delete()
+        throw e
     }
-    return file
 }
 
 private fun ChatViewModel.imageCacheSuffix(uri: Uri): String {

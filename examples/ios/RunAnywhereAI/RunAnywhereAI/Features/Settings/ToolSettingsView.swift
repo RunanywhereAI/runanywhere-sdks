@@ -29,27 +29,9 @@ class ToolSettingsViewModel: ObservableObject {
         }
     }
 
-    // Built-in demo tools with REAL API implementations
+    // App-local demo tools with REAL API implementations
     private var demoTools: [(definition: RAToolDefinition, executor: ToolExecutor)] {
         [
-            // Web Search Tool - Uses DuckDuckGo Instant Answer API (free, no API key required)
-            (
-                definition: RAToolDefinition(
-                    name: "search_web",
-                    description: "Searches the web for current information using DuckDuckGo Instant Answer API",
-                    parameters: [
-                        RAToolParameter(
-                            name: "query",
-                            type: .string,
-                            description: "Search query (e.g., 'latest Swift concurrency updates')"
-                        )
-                    ],
-                    category: "Web"
-                ),
-                executor: { args in
-                    try await WebSearchService.search(query: args["query"]?.string ?? "")
-                }
-            ),
             // Weather Tool - Uses Open-Meteo API (free, no API key required)
             (
                 definition: RAToolDefinition(
@@ -170,6 +152,9 @@ class ToolSettingsViewModel: ObservableObject {
     }
 
     func registerDemoTools() async {
+        await RunAnywhere.registerWebSearchTool()
+        logger.info("Registered tool \(RunAnywhere.webSearchToolDefinition.name)")
+
         for tool in demoTools {
             await RunAnywhere.registerTool(tool.definition, executor: tool.executor)
             logger.info("Registered tool \(tool.definition.name)")
@@ -343,228 +328,6 @@ struct ToolRow: View {
             }
         }
         .padding(.vertical, 4)
-    }
-}
-
-// MARK: - Web Search Service
-
-/// Real web lookup service using DuckDuckGo Lite (free, no API key required)
-enum WebSearchService {
-    private static let liteSearchURL = "https://lite.duckduckgo.com/lite/"
-    private static let instantAnswerURL = "https://api.duckduckgo.com/"
-
-    static func search(query: String) async throws -> [String: RAToolValue] {
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedQuery.isEmpty else {
-            return ["error": RAToolValue("Missing search query")]
-        }
-
-        guard let encodedQuery = trimmedQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "\(liteSearchURL)?q=\(encodedQuery)") else {
-            return ["error": RAToolValue("Invalid search query")]
-        }
-
-        // SAMPLE_HTTP_CARVE_OUT: external demo tool call, not SDK auth/download traffic.
-        let (data, _) = try await URLSession.shared.data(for: request(url: url))
-        let html = String(data: data, encoding: .utf8) ?? ""
-        let results = parseLiteResults(html).prefix(5)
-
-        if let first = results.first {
-            return resultPayload(query: trimmedQuery, primary: first, related: Array(results.dropFirst()))
-        }
-
-        return try await instantAnswerFallback(query: trimmedQuery, encodedQuery: encodedQuery)
-    }
-
-    private static func instantAnswerFallback(
-        query: String,
-        encodedQuery: String
-    ) async throws -> [String: RAToolValue] {
-        guard let url = URL(
-            string: "\(instantAnswerURL)?q=\(encodedQuery)&format=json&no_redirect=1&no_html=1&skip_disambig=1"
-        ) else {
-            return ["error": RAToolValue("Invalid search query")]
-        }
-
-        let (data, _) = try await URLSession.shared.data(for: request(url: url))
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return ["error": RAToolValue("Could not parse search response")]
-        }
-
-        let abstract = stringValue(json["AbstractText"])
-        let answer = stringValue(json["Answer"])
-        let heading = stringValue(json["Heading"])
-        let sourceURL = stringValue(json["AbstractURL"])
-        let related = relatedTopics(from: json["RelatedTopics"]).prefix(5)
-
-        var result: [String: RAToolValue] = ["query": RAToolValue(query)]
-
-        if !heading.isEmpty {
-            result["heading"] = RAToolValue(heading)
-        }
-
-        if !abstract.isEmpty {
-            result["summary"] = RAToolValue(abstract)
-        } else if !answer.isEmpty {
-            result["summary"] = RAToolValue(answer)
-        } else if let firstRelated = related.first {
-            result["summary"] = RAToolValue(firstRelated.text)
-        } else {
-            result["summary"] = RAToolValue("No instant answer was returned for this query.")
-        }
-
-        if !sourceURL.isEmpty {
-            result["source_url"] = RAToolValue(sourceURL)
-        }
-
-        let relatedValues = related.map { topic in
-            RAToolValue.object([
-                "title": RAToolValue(topic.title),
-                "text": RAToolValue(topic.text),
-                "url": RAToolValue(topic.url)
-            ])
-        }
-
-        if !relatedValues.isEmpty {
-            result["related_results"] = RAToolValue.array(relatedValues)
-        }
-
-        return result
-    }
-
-    private struct SearchResult {
-        let title: String
-        let url: String
-        let snippet: String
-    }
-
-    private struct RelatedTopic {
-        let title: String
-        let text: String
-        let url: String
-    }
-
-    private static func resultPayload(
-        query: String,
-        primary: SearchResult,
-        related: [SearchResult]
-    ) -> [String: RAToolValue] {
-        var result: [String: RAToolValue] = [
-            "query": RAToolValue(query),
-            "heading": RAToolValue(primary.title),
-            "summary": RAToolValue(primary.snippet),
-            "source_url": RAToolValue(primary.url)
-        ]
-
-        if !related.isEmpty {
-            result["related_results"] = RAToolValue.array(related.map { item in
-                RAToolValue.object([
-                    "title": RAToolValue(item.title),
-                    "text": RAToolValue(item.snippet),
-                    "url": RAToolValue(item.url)
-                ])
-            })
-        }
-
-        return result
-    }
-
-    private static func request(url: URL) -> URLRequest {
-        var request = URLRequest(url: url)
-        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
-        request.timeoutInterval = 15
-        return request
-    }
-
-    private static func parseLiteResults(_ html: String) -> [SearchResult] {
-        let pattern = #"<a[^>]*href="([^"]+)"[^>]*class='result-link'[^>]*>(.*?)</a>[\s\S]*?<td class='result-snippet'>\s*([\s\S]*?)\s*</td>"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
-        let range = NSRange(html.startIndex..<html.endIndex, in: html)
-
-        return regex.matches(in: html, range: range).compactMap { match in
-            guard
-                let href = substring(html, match.range(at: 1)),
-                let title = substring(html, match.range(at: 2)),
-                let snippet = substring(html, match.range(at: 3))
-            else {
-                return nil
-            }
-
-            let resolvedURL = redirectURL(from: decodeHTML(href))
-            let cleanTitle = cleanHTML(title)
-            let cleanSnippet = cleanHTML(snippet)
-            guard !cleanTitle.isEmpty, !cleanSnippet.isEmpty, !resolvedURL.isEmpty else {
-                return nil
-            }
-
-            return SearchResult(title: cleanTitle, url: resolvedURL, snippet: cleanSnippet)
-        }
-    }
-
-    private static func redirectURL(from href: String) -> String {
-        guard let urlRange = href.range(of: "uddg=") else {
-            if href.hasPrefix("//") {
-                return "https:\(href)"
-            }
-            return href
-        }
-
-        let encodedStart = href[urlRange.upperBound...]
-        let encoded = encodedStart.split(separator: "&").first.map(String.init) ?? String(encodedStart)
-        return encoded.removingPercentEncoding ?? encoded
-    }
-
-    private static func relatedTopics(from value: Any?) -> [RelatedTopic] {
-        guard let topics = value as? [[String: Any]] else { return [] }
-        return topics.flatMap { topic -> [RelatedTopic] in
-            if let nestedTopics = topic["Topics"] as? [[String: Any]] {
-                return nestedTopics.compactMap(makeRelatedTopic)
-            }
-            return makeRelatedTopic(topic).map { [$0] } ?? []
-        }
-    }
-
-    private static func makeRelatedTopic(_ topic: [String: Any]) -> RelatedTopic? {
-        let text = stringValue(topic["Text"])
-        guard !text.isEmpty else { return nil }
-
-        let title = text.components(separatedBy: " - ").first ?? text
-        return RelatedTopic(
-            title: title,
-            text: text,
-            url: stringValue(topic["FirstURL"])
-        )
-    }
-
-    private static func stringValue(_ value: Any?) -> String {
-        (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    }
-
-    private static func substring(_ string: String, _ range: NSRange) -> String? {
-        guard let range = Range(range, in: string) else { return nil }
-        return String(string[range])
-    }
-
-    private static func cleanHTML(_ value: String) -> String {
-        let noTags = value.replacingOccurrences(
-            of: #"<[^>]+>"#,
-            with: " ",
-            options: .regularExpression
-        )
-        return decodeHTML(noTags)
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private static func decodeHTML(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&#x27;", with: "'")
-            .replacingOccurrences(of: "&#39;", with: "'")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
-            .replacingOccurrences(of: "&nbsp;", with: " ")
     }
 }
 

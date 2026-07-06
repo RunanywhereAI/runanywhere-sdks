@@ -87,7 +87,6 @@ fun ChatInputBar(
         AttachmentAction("Document", "Ask questions with sources", RACIcons.Outline.FileText, onAttachDocument),
         AttachmentAction("Image", "Ask about a photo", RACIcons.Outline.Eye, onAttachImage),
         AttachmentAction("Live camera", "Look around with vision", RACIcons.Outline.DeviceMobile, onOpenLive),
-        AttachmentAction("Talk mode", "Speak with the assistant", RACIcons.Outline.Microphone, onOpenTalk),
         AttachmentAction("Advanced tools", "SDK demos and diagnostics", RACIcons.Outline.Stack, onOpenAdvanced),
     )
 

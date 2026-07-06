@@ -130,7 +130,7 @@ class ModelListViewModel: ObservableObject {
     }
 
     func loadDefaultChatModelIfAvailable() async {
-        guard currentModel == nil, !attemptedDefaultChatModelLoad else { return }
+        guard !isLoadingModel, currentModel == nil, !attemptedDefaultChatModelLoad else { return }
         guard isAppleFoundationDefaultAvailable else { return }
         guard let defaultModel = availableModels.first(where: {
             $0.isAppleFoundationModel && $0.category == .language
@@ -139,6 +139,8 @@ class ModelListViewModel: ObservableObject {
         }
 
         attemptedDefaultChatModelLoad = true
+        isLoadingModel = true
+        defer { isLoadingModel = false }
 
         do {
             try await loadModel(defaultModel)
