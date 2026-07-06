@@ -349,13 +349,23 @@ function initializePanels(): void {
 function openDrawer(): void {
   drawerOpen = true;
   document.body.classList.add('consumer-drawer-open');
-  document.getElementById('consumer-drawer')?.setAttribute('aria-hidden', 'false');
+  setMobileDrawerAria(false);
 }
 
 function closeDrawer(): void {
   drawerOpen = false;
   document.body.classList.remove('consumer-drawer-open');
-  document.getElementById('consumer-drawer')?.setAttribute('aria-hidden', 'true');
+  setMobileDrawerAria(true);
+}
+
+function setMobileDrawerAria(hidden: boolean): void {
+  const drawer = document.getElementById('consumer-drawer');
+  if (!drawer) return;
+  if (window.matchMedia('(max-width: 920px)').matches) {
+    drawer.setAttribute('aria-hidden', String(hidden));
+  } else {
+    drawer.removeAttribute('aria-hidden');
+  }
 }
 
 function startNewChat(): void {
