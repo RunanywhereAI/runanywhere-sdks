@@ -24,16 +24,24 @@ import {
   ModelCategory,
   RunAnywhere,
   ToolParameterType,
+  VLMModelFamily,
+  VLMStreamEventKind,
   isSDKException,
+  ragQueryOptionsWithQuestion,
   type ToolDefinition,
   type ToolValue,
+  type ModelInfo,
+  type RAGSearchResult,
+  type VLMGenerationOptions,
+  vlmImageFromRawRGB,
 } from '@runanywhere/web';
 import {
   buildGetStartedOverlay,
-  buildToolbarModelButton,
   onModelStateChange,
+  openSheet,
   type OpenSheetOptions,
 } from '../components/model-selection';
+import { showToast } from '../components/dialogs';
 import { getGenerationSettings } from './settings';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
@@ -45,13 +53,34 @@ interface ChatToolCallInfo {
   error?: string;
 }
 
+interface ChatAttachmentInfo {
+  kind: 'image' | 'document';
+  name: string;
+  detail?: string;
+}
+
+interface ChatSourceInfo {
+  document: string;
+  text: string;
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  attachment?: ChatAttachmentInfo;
   /** Reasoning content shown in the collapsible "Thinking" section. */
   thinking?: string;
   /** Tool calls + results when the message came from generateWithTools. */
   toolCalls?: ChatToolCallInfo[];
+  /** RAG citations for document attachments. */
+  sources?: ChatSourceInfo[];
+}
+
+interface PendingAttachment {
+  kind: 'image' | 'document';
+  file: File;
+  name: string;
+  description: string;
 }
 
 // Chat's picker is scoped to LLMs — iOS parity:
@@ -60,6 +89,17 @@ const CHAT_SHEET_OPTIONS: OpenSheetOptions = {
   title: 'Select Model',
   filterCategories: [ModelCategory.MODEL_CATEGORY_LANGUAGE],
 };
+
+const VLM_SHEET_OPTIONS: OpenSheetOptions = {
+  title: 'Choose Image Model',
+  filterCategories: [
+    ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    ModelCategory.MODEL_CATEGORY_VISION,
+  ],
+};
+
+const CAPTURE_DIMENSION = 384;
+const DOCUMENT_TOP_K = 3;
 
 // Minimal localStorage-backed conversation persistence — mirrors iOS
 // ConversationStore (Core/Services/ConversationStore.swift) semantics at MVP
@@ -73,6 +113,7 @@ let messages: ChatMessage[] = [];
 let isGenerating = false;
 let cancelGeneration: (() => void) | null = null;
 let toolsEnabled = false;
+let pendingAttachment: PendingAttachment | null = null;
 
 export function initChatTab(el: HTMLElement): TabLifecycle {
   container = el;
@@ -84,24 +125,52 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   // ToolSettingsViewModel.registerDemoTools (ToolSettingsView.swift:153-159).
   registerDemoTools();
 
+  container.classList.add('chat-panel-consumer');
   container.innerHTML = `
-    <div class="toolbar">
-      <div class="toolbar-title" id="chat-toolbar-title-host"></div>
-      <div class="toolbar-actions" id="chat-toolbar-actions-host"></div>
-    </div>
-    <div class="scroll-area" id="chat-messages"></div>
-    <div class="chat-input-area">
-      <textarea class="chat-input" id="chat-input" placeholder="Message..." rows="1"></textarea>
-      <button class="send-btn" id="chat-send-btn" disabled>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-      </button>
+    <div class="scroll-area chat-scroll" id="chat-messages"></div>
+    <div class="chat-composer-shell">
+      <div class="composer-status-pill hidden" id="chat-attachment-pill"></div>
+      <div class="composer-status-pill composer-status-pill--tools hidden" id="chat-tools-status">
+        ${svgIcon('<path d="M12 2a10 10 0 0 0 0 20 10 10 0 0 0 0-20z"/><path d="M2 12h20"/><path d="M12 2c3 3.2 3 16.8 0 20"/><path d="M12 2c-3 3.2-3 16.8 0 20"/>')}
+        <span><strong>Web & tools on</strong><small>Trace appears in replies</small></span>
+      </div>
+      <div class="chat-input-area">
+        <div class="composer-menu-wrap">
+          <button class="composer-icon-btn" id="chat-attach-btn" type="button" aria-label="Attach or open mode" title="Attach or open mode">
+            ${svgIcon('<path d="M12 5v14"/><path d="M5 12h14"/>')}
+          </button>
+          <div class="composer-menu hidden" id="chat-attach-menu">
+            <button type="button" data-action="document">
+              ${svgIcon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>')}
+              <span><strong>Document</strong><small>Ask questions with sources</small></span>
+            </button>
+            <button type="button" data-action="image">
+              ${svgIcon('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>')}
+              <span><strong>Image</strong><small>Ask about a photo</small></span>
+            </button>
+            <button type="button" data-action="live">
+              ${svgIcon('<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/><path d="M8 6h8v9H8z"/>')}
+              <span><strong>Live camera</strong><small>Look around with vision</small></span>
+            </button>
+            <button type="button" data-action="advanced">
+              ${svgIcon('<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/>')}
+              <span><strong>Advanced tools</strong><small>SDK demos and diagnostics</small></span>
+            </button>
+          </div>
+        </div>
+        <button class="composer-icon-btn" id="chat-tools-btn" type="button" aria-label="Enable web and tools" title="Enable web and tools">
+          ${svgIcon('<path d="M12 2a10 10 0 0 0 0 20 10 10 0 0 0 0-20z"/><path d="M2 12h20"/><path d="M12 2c3 3.2 3 16.8 0 20"/><path d="M12 2c-3 3.2-3 16.8 0 20"/>')}
+        </button>
+        <textarea class="chat-input" id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
+        <button class="composer-icon-btn" id="chat-talk-btn" type="button" aria-label="Talk mode" title="Talk mode">
+          ${svgIcon('<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/><path d="M8 22h8"/>')}
+        </button>
+        <button class="send-btn" id="chat-send-btn" disabled aria-label="Send message"></button>
+      </div>
+      <input type="file" id="chat-image-input" accept="image/*" hidden />
+      <input type="file" id="chat-document-input" accept=".txt,.md,.json,text/plain,text/markdown,application/json" hidden />
     </div>
   `;
-
-  // Mount the toolbar model pill in the title slot so the probe finds the
-  // #chat-toolbar-model element even when the panel becomes the active tab.
-  const titleHost = container.querySelector('#chat-toolbar-title-host') as HTMLElement;
-  titleHost.appendChild(buildToolbarModelButton(CHAT_SHEET_OPTIONS));
 
   // Mount the "Get Started" overlay directly inside the panel host so the
   // readiness probe's overlay visibility check works. The overlay is shown
@@ -112,37 +181,72 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   const messagesEl = container.querySelector('#chat-messages') as HTMLElement;
   const inputEl = container.querySelector('#chat-input') as HTMLTextAreaElement;
   const sendBtn = container.querySelector('#chat-send-btn') as HTMLButtonElement;
-  const actionsHost = container.querySelector('#chat-toolbar-actions-host') as HTMLElement;
-  const toolsBtn = buildToolsToggleButton();
-  const clearBtn = buildClearButton();
-  actionsHost.appendChild(toolsBtn);
-  actionsHost.appendChild(clearBtn);
+  const toolsBtn = container.querySelector('#chat-tools-btn') as HTMLButtonElement;
+  const toolsStatus = container.querySelector('#chat-tools-status') as HTMLElement;
+  const attachBtn = container.querySelector('#chat-attach-btn') as HTMLButtonElement;
+  const attachMenu = container.querySelector('#chat-attach-menu') as HTMLElement;
+  const attachmentPill = container.querySelector('#chat-attachment-pill') as HTMLElement;
+  const imageInput = container.querySelector('#chat-image-input') as HTMLInputElement;
+  const documentInput = container.querySelector('#chat-document-input') as HTMLInputElement;
+  const talkBtn = container.querySelector('#chat-talk-btn') as HTMLButtonElement;
 
   const refreshToolsButton = () => {
-    toolsBtn.textContent = toolsEnabled ? 'Tools: On' : 'Tools: Off';
-    toolsBtn.classList.toggle('btn-primary', toolsEnabled);
-    toolsBtn.classList.toggle('btn-secondary', !toolsEnabled);
+    toolsBtn.classList.toggle('active', toolsEnabled);
+    toolsStatus.classList.toggle('hidden', !toolsEnabled);
+    inputEl.placeholder = toolsEnabled ? 'Ask with web and tools...' : 'Ask anything...';
+    toolsBtn.setAttribute('aria-label', toolsEnabled ? 'Disable web and tools' : 'Enable web and tools');
     toolsBtn.title = toolsEnabled
-      ? 'Tool calling enabled (weather, time, calculator)'
-      : 'Enable tool calling (weather, time, calculator)';
+      ? 'Web and tool calling enabled (weather, time, calculator)'
+      : 'Enable web and tools (weather, time, calculator)';
+  };
+
+  const refreshAttachmentPill = () => {
+    if (!pendingAttachment) {
+      attachmentPill.classList.add('hidden');
+      attachmentPill.innerHTML = '';
+      return;
+    }
+    attachmentPill.classList.remove('hidden');
+    attachmentPill.innerHTML = `
+      ${svgIcon(pendingAttachment.kind === 'image'
+        ? '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>'
+        : '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>')}
+      <span><strong>${escapeHtml(pendingAttachment.name)}</strong><small>${escapeHtml(pendingAttachment.description)}</small></span>
+      <button type="button" id="chat-clear-attachment" aria-label="Remove attachment">
+        ${svgIcon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>')}
+      </button>
+    `;
+    attachmentPill
+      .querySelector('#chat-clear-attachment')
+      ?.addEventListener('click', () => {
+        pendingAttachment = null;
+        refreshAttachmentPill();
+        refreshSendButton();
+      });
   };
   refreshToolsButton();
+  refreshAttachmentPill();
 
   const refreshSendButton = () => {
     const hasInput = inputEl.value.trim().length > 0;
     const modelLoaded = isModelLoaded();
-    sendBtn.disabled = isGenerating || !hasInput || !modelLoaded;
+    const hasAttachment = pendingAttachment !== null;
+    sendBtn.disabled = !isGenerating && ((!hasInput && !hasAttachment) || (!modelLoaded && !hasAttachment));
+    sendBtn.innerHTML = isGenerating
+      ? svgIcon('<rect x="6" y="6" width="12" height="12" rx="2"/>')
+      : svgIcon('<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>');
     // Tooltip clarifies why the button is disabled. The textbox stays
     // enabled so users may compose while a model is loading.
-    if (!modelLoaded) {
+    if (isGenerating) {
+      sendBtn.title = 'Stop';
+    } else if (!modelLoaded && !hasAttachment) {
       sendBtn.title = 'Load a model first';
-    } else if (!hasInput) {
+    } else if (!hasInput && !hasAttachment) {
       sendBtn.title = 'Type a message to send';
-    } else if (isGenerating) {
-      sendBtn.title = 'Generation in progress';
     } else {
       sendBtn.title = 'Send';
     }
+    sendBtn.setAttribute('aria-label', isGenerating ? 'Stop generation' : 'Send message');
   };
 
   inputEl.addEventListener('input', refreshSendButton);
@@ -153,6 +257,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     }
   });
   sendBtn.addEventListener('click', () => {
+    if (isGenerating) {
+      cancelGeneration?.();
+      return;
+    }
     void onSend();
   });
   toolsBtn.addEventListener('click', () => {
@@ -160,11 +268,56 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     saveToolsEnabled(toolsEnabled);
     refreshToolsButton();
   });
-  clearBtn.addEventListener('click', () => {
+  attachBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    attachMenu.classList.toggle('hidden');
+  });
+  attachMenu.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      attachMenu.classList.add('hidden');
+      const action = button.dataset.action;
+      if (action === 'document') documentInput.click();
+      if (action === 'image') imageInput.click();
+      if (action === 'live') navigateTo('vision');
+      if (action === 'advanced') navigateTo('advanced');
+    });
+  });
+  document.addEventListener('click', () => attachMenu.classList.add('hidden'));
+  imageInput.addEventListener('change', () => {
+    const file = imageInput.files?.[0] ?? null;
+    imageInput.value = '';
+    if (!file) return;
+    pendingAttachment = {
+      kind: 'image',
+      file,
+      name: file.name || 'Selected image',
+      description: 'Ask about this image',
+    };
+    refreshAttachmentPill();
+    refreshSendButton();
+  });
+  documentInput.addEventListener('change', () => {
+    const file = documentInput.files?.[0] ?? null;
+    documentInput.value = '';
+    if (!file) return;
+    pendingAttachment = {
+      kind: 'document',
+      file,
+      name: file.name || 'Selected document',
+      description: 'Ask with sources from this document',
+    };
+    refreshAttachmentPill();
+    refreshSendButton();
+  });
+  talkBtn.addEventListener('click', () => navigateTo('voice'));
+  window.addEventListener('runanywhere:new-chat', () => {
     if (cancelGeneration) cancelGeneration();
     messages = [];
+    pendingAttachment = null;
     clearConversation();
     renderMessages(messagesEl);
+    refreshAttachmentPill();
+    refreshSendButton();
   });
 
   renderMessages(messagesEl);
@@ -179,7 +332,15 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
 
   async function onSend(): Promise<void> {
     const prompt = inputEl.value.trim();
-    if (!prompt || isGenerating) return;
+    const attachment = pendingAttachment;
+    if ((!prompt && !attachment) || isGenerating) return;
+
+    if (attachment) {
+      await sendAttachment(attachment, prompt, messagesEl);
+      refreshAttachmentPill();
+      refreshSendButton();
+      return;
+    }
 
     if (!isLLMBackendAvailable()) {
       messages.push({
@@ -211,6 +372,59 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     } catch (error) {
       assistantMsg.content = formatChatError(error);
       renderLastMessage(messagesEl, assistantMsg);
+    } finally {
+      cancelGeneration = null;
+      isGenerating = false;
+      saveConversation();
+      refreshSendButton();
+    }
+  }
+
+  async function sendAttachment(
+    attachment: PendingAttachment,
+    prompt: string,
+    host: HTMLElement,
+  ): Promise<void> {
+    if (attachment.kind === 'image' && !isVLMModelLoaded()) {
+      openSheet(VLM_SHEET_OPTIONS);
+      showToast('Load an image model first, then send the attached image.', 'info', 4200);
+      return;
+    }
+
+    inputEl.value = '';
+    pendingAttachment = null;
+    refreshAttachmentPill();
+    refreshSendButton();
+
+    const fallbackPrompt = attachment.kind === 'image'
+      ? 'Describe this image.'
+      : 'What should I know from this document?';
+    const question = prompt || fallbackPrompt;
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: question,
+      attachment: {
+        kind: attachment.kind,
+        name: attachment.name,
+        detail: attachment.description,
+      },
+    };
+    const assistantMsg: ChatMessage = { role: 'assistant', content: '' };
+    messages.push(userMessage, assistantMsg);
+    saveConversation();
+    renderMessages(host);
+
+    isGenerating = true;
+    refreshSendButton();
+    try {
+      if (attachment.kind === 'image') {
+        await generateImageQuestion(attachment.file, question, assistantMsg, host);
+      } else {
+        await generateDocumentQuestion(attachment.file, question, assistantMsg, host);
+      }
+    } catch (error) {
+      assistantMsg.content = formatChatError(error);
+      renderLastMessage(host, assistantMsg);
     } finally {
       cancelGeneration = null;
       isGenerating = false;
@@ -337,6 +551,121 @@ async function generateWithToolCalling(
     });
   }
   renderLastMessage(messagesEl, assistantMsg);
+}
+
+async function generateImageQuestion(
+  file: File,
+  prompt: string,
+  assistantMsg: ChatMessage,
+  messagesEl: HTMLElement,
+): Promise<void> {
+  assistantMsg.content = 'Reading image...';
+  renderLastMessage(messagesEl, assistantMsg);
+
+  const frame = await decodeImageToRgbFrame(file, CAPTURE_DIMENSION);
+  const image = vlmImageFromRawRGB(frame.rgbPixels, frame.width, frame.height);
+  const options: VLMGenerationOptions = {
+    prompt,
+    maxTokens: 256,
+    temperature: getGenerationSettings().temperature,
+    topP: 0.9,
+    topK: 40,
+    stopSequences: [],
+    streamingEnabled: true,
+    systemPrompt: undefined,
+    maxImageSize: CAPTURE_DIMENSION,
+    nThreads: 0,
+    useGpu: false,
+    modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED,
+    customChatTemplate: undefined,
+    imageMarkerOverride: undefined,
+    seed: 0,
+    repetitionPenalty: 1.1,
+    minP: 0.05,
+    emitImageEmbeddings: false,
+  };
+
+  cancelGeneration = () => {
+    void RunAnywhere.visionLanguage.cancelVLMGeneration();
+  };
+
+  assistantMsg.content = '';
+  renderLastMessage(messagesEl, assistantMsg);
+  const stream = await RunAnywhere.visionLanguage.processImageStream(image, options);
+  for await (const event of stream) {
+    switch (event.kind) {
+      case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN:
+        if (event.token) {
+          assistantMsg.content += event.token;
+          renderLastMessage(messagesEl, assistantMsg);
+        }
+        break;
+      case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR:
+        throw new Error(event.errorMessage || 'Image analysis failed');
+      default:
+        break;
+    }
+  }
+  if (!assistantMsg.content) assistantMsg.content = '(empty response)';
+  renderLastMessage(messagesEl, assistantMsg);
+}
+
+async function generateDocumentQuestion(
+  file: File,
+  question: string,
+  assistantMsg: ChatMessage,
+  messagesEl: HTMLElement,
+): Promise<void> {
+  const models = resolveRAGModels();
+  if (!models.embedding || !models.llm) {
+    throw new Error('Document Q&A needs an embedding model and a chat model in the catalog.');
+  }
+
+  assistantMsg.content = 'Indexing document...';
+  renderLastMessage(messagesEl, assistantMsg);
+
+  const text = await file.text();
+  if (!text.trim()) {
+    throw new Error('The selected document does not contain readable text.');
+  }
+
+  await RunAnywhere.ragCreatePipeline(models.embedding.id, models.llm.id);
+  await RunAnywhere.ragIngest(text, JSON.stringify({
+    docId: createDocumentId(),
+    docName: file.name || 'Document',
+    sourceUri: `web-file:${file.name || 'document'}`,
+    mediaType: file.type || 'text/plain',
+    sizeBytes: String(file.size),
+  }));
+
+  assistantMsg.content = 'Searching document...';
+  renderLastMessage(messagesEl, assistantMsg);
+
+  const settings = getGenerationSettings();
+  const result = await RunAnywhere.ragQuery({
+    ...ragQueryOptionsWithQuestion(question),
+    retrievalTopK: DOCUMENT_TOP_K,
+    maxTokens: Math.min(settings.maxTokens, 1024),
+    temperature: settings.temperature,
+    disableThinking: models.llm.supportsThinking && !settings.thinkingModeEnabled,
+  });
+
+  if (result.errorCode !== 0) {
+    throw new Error(result.errorMessage || 'Document query failed');
+  }
+
+  const split = splitThinking(result.answer);
+  assistantMsg.content = split.content || result.answer || '(no answer)';
+  assistantMsg.thinking = result.thinkingContent || split.thinking || undefined;
+  assistantMsg.sources = result.retrievedChunks.map(sourceFromRAGResult);
+  renderLastMessage(messagesEl, assistantMsg);
+}
+
+function sourceFromRAGResult(result: RAGSearchResult): ChatSourceInfo {
+  return {
+    document: result.sourceDocument || 'Document',
+    text: result.text,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -641,12 +970,14 @@ function saveConversation(): void {
       JSON.stringify({ messages, updatedAt: Date.now() }),
     );
   } catch { /* storage may not be available */ }
+  window.dispatchEvent(new CustomEvent('runanywhere:conversation-updated'));
 }
 
 function clearConversation(): void {
   try {
     localStorage.removeItem(CONVERSATION_STORAGE_KEY);
   } catch { /* storage may not be available */ }
+  window.dispatchEvent(new CustomEvent('runanywhere:conversation-updated'));
 }
 
 function loadToolsEnabled(): boolean {
@@ -673,6 +1004,109 @@ function isLLMBackendAvailable(): boolean {
   } catch {
     return false;
   }
+}
+
+function isVLMModelLoaded(): boolean {
+  try {
+    const categories = [
+      ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+      ModelCategory.MODEL_CATEGORY_VISION,
+    ];
+    return categories.some((category) => {
+      const current = RunAnywhere.currentModel({
+        category,
+        includeModelMetadata: false,
+      });
+      return Boolean(current?.found || current?.modelId);
+    });
+  } catch {
+    return false;
+  }
+}
+
+function resolveRAGModels(): { embedding: ModelInfo | null; llm: ModelInfo | null } {
+  const embedding = firstModelForCategory(ModelCategory.MODEL_CATEGORY_EMBEDDING);
+  const currentLlmId = currentModelIdForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
+  const llm = currentLlmId
+    ? (RunAnywhere.getModel(currentLlmId) ?? null)
+    : firstModelForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
+  return { embedding, llm };
+}
+
+function firstModelForCategory(category: ModelCategory): ModelInfo | null {
+  try {
+    return RunAnywhere.listModels()?.models.find((model) => model.category === category) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function currentModelIdForCategory(category: ModelCategory): string | null {
+  try {
+    const current = RunAnywhere.currentModel({
+      category,
+      includeModelMetadata: false,
+    });
+    return current?.modelId || null;
+  } catch {
+    return null;
+  }
+}
+
+async function decodeImageToRgbFrame(
+  file: File,
+  maxDim: number,
+): Promise<{ rgbPixels: Uint8Array; width: number; height: number }> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await loadImageElement(objectUrl);
+    const longest = Math.max(img.naturalWidth, img.naturalHeight) || 1;
+    const scale = Math.min(1, maxDim / longest);
+    const width = Math.max(1, Math.round(img.naturalWidth * scale));
+    const height = Math.max(1, Math.round(img.naturalHeight * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('2D canvas context unavailable');
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const { data } = ctx.getImageData(0, 0, width, height);
+    const rgbPixels = new Uint8Array(width * height * 3);
+    for (let src = 0, dst = 0; src < data.length; src += 4, dst += 3) {
+      rgbPixels[dst] = data[src];
+      rgbPixels[dst + 1] = data[src + 1];
+      rgbPixels[dst + 2] = data[src + 2];
+    }
+    return { rgbPixels, width, height };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not decode the selected image'));
+    img.src = src;
+  });
+}
+
+function createDocumentId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2);
+}
+
+function navigateTo(tab: string): void {
+  window.dispatchEvent(new CustomEvent('runanywhere:navigate', { detail: { tab } }));
+}
+
+function svgIcon(paths: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
 }
 
 /**
@@ -735,11 +1169,25 @@ function renderMessages(host: HTMLElement): void {
   if (messages.length === 0) {
     host.innerHTML = `
       <div class="chat-empty-state">
-        <h3>Start chatting</h3>
-        <p>Type a message below. Generation streams token-by-token through the
-        proto-byte LLM adapter.</p>
+        <div class="empty-logo">RA</div>
+        <h3>Start a conversation</h3>
+        <p>Ask anything, attach a document or image, turn on web tools, or jump into Talk Mode.</p>
+        <div class="suggestion-chips">
+          <button type="button" class="suggestion-chip" data-prompt="Summarize what RunAnywhere can do in one paragraph.">What can you do?</button>
+          <button type="button" class="suggestion-chip" data-prompt="Help me compare two small local models for private chat.">Compare models</button>
+          <button type="button" class="suggestion-chip" data-prompt="Draft a concise checklist for testing an on-device AI app.">Testing checklist</button>
+        </div>
       </div>
     `;
+    host.querySelectorAll<HTMLButtonElement>('[data-prompt]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const input = container.querySelector<HTMLTextAreaElement>('#chat-input');
+        if (!input) return;
+        input.value = button.dataset.prompt ?? '';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus();
+      });
+    });
     return;
   }
 
@@ -773,16 +1221,47 @@ function renderMessageBody(msg: ChatMessage): string {
     : '';
 
   const toolSection = msg.role === 'assistant' && msg.toolCalls?.length
-    ? msg.toolCalls.map((call) => `
-        <div class="chat-tool-call">
-          <span class="chat-tool-call-name">Tool: ${escapeHtml(call.name)}(${escapeHtml(call.argumentsJson)})</span>
-          ${call.error
-            ? `<span class="error"> failed: ${escapeHtml(call.error)}</span>`
-            : call.resultJson
-              ? `<span class="chat-tool-call-result"> &rarr; ${escapeHtml(call.resultJson)}</span>`
-              : ''}
-        </div>
-      `).join('')
+    ? `
+      <div class="chat-tool-stack">
+        ${msg.toolCalls.map((call) => `
+          <details class="chat-tool-call">
+            <summary>
+              ${svgIcon(call.error
+                ? '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'
+                : '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8z"/>')}
+              <span>${escapeHtml(call.name)}</span>
+              <small>${call.error ? 'failed' : 'completed'}</small>
+            </summary>
+            <pre>Args: ${escapeHtml(call.argumentsJson || '{}')}${call.resultJson ? `\nResult: ${escapeHtml(call.resultJson)}` : ''}${call.error ? `\nError: ${escapeHtml(call.error)}` : ''}</pre>
+          </details>
+        `).join('')}
+      </div>
+    `
+    : '';
+
+  const attachmentSection = msg.attachment
+    ? `
+      <div class="chat-attachment-card chat-attachment-card--${msg.attachment.kind}">
+        ${svgIcon(msg.attachment.kind === 'image'
+          ? '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>'
+          : '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>')}
+        <span><strong>${escapeHtml(msg.attachment.name)}</strong><small>${escapeHtml(msg.attachment.detail ?? '')}</small></span>
+      </div>
+    `
+    : '';
+
+  const sourcesSection = msg.role === 'assistant' && msg.sources?.length
+    ? `
+      <div class="chat-source-strip">
+        <span class="chat-source-strip__label">Sources</span>
+        ${msg.sources.slice(0, 3).map((source, index) => `
+          <div class="chat-source">
+            <strong>${index + 1}. ${escapeHtml(source.document || 'Document')}</strong>
+            <span>${escapeHtml(source.text.slice(0, 180))}${source.text.length > 180 ? '...' : ''}</span>
+          </div>
+        `).join('')}
+      </div>
+    `
     : '';
 
   const body = msg.content
@@ -791,7 +1270,7 @@ function renderMessageBody(msg: ChatMessage): string {
       ? '<span class="chat-bubble-typing">Thinking&hellip;</span>'
       : '<span class="chat-bubble-typing">&hellip;</span>');
 
-  return `${thinkingSection}${toolSection}<div class="chat-bubble">${body}</div>`;
+  return `${thinkingSection}${toolSection}<div class="chat-bubble">${attachmentSection}${body}${sourcesSection}</div>`;
 }
 
 /**
@@ -819,21 +1298,4 @@ function formatChatError(error: unknown): string {
     return `Error: ${error.message}`;
   }
   return `Error: ${formatError(error)}`;
-}
-
-function buildToolsToggleButton(): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.id = 'chat-tools-btn';
-  btn.className = 'btn btn-secondary';
-  return btn;
-}
-
-function buildClearButton(): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.id = 'chat-clear-btn';
-  btn.className = 'btn btn-secondary';
-  btn.textContent = 'Clear';
-  return btn;
 }
