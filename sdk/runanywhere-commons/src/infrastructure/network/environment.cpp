@@ -5,6 +5,7 @@
 
 #include <cctype>
 #include <cstring>
+#include <mutex>
 
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
@@ -16,6 +17,7 @@
 
 static bool g_sdk_initialized = false;
 static rac_sdk_config_t g_sdk_config = {};
+static std::mutex g_sdk_state_mutex;
 
 // Static storage for config strings (to avoid dangling pointers)
 static char g_api_key[256] = {0};
@@ -31,6 +33,27 @@ static char g_app_build[64] = {0};
 static char g_locale[64] = {0};
 static char g_timezone[128] = {0};
 static rac_client_info_t g_client_info = {};
+
+struct ClientInfoSnapshotStorage {
+    char sdk_binding[sizeof(g_sdk_binding)] = {0};
+    char app_identifier[sizeof(g_app_identifier)] = {0};
+    char app_name[sizeof(g_app_name)] = {0};
+    char app_version[sizeof(g_app_version)] = {0};
+    char app_build[sizeof(g_app_build)] = {0};
+    char locale[sizeof(g_locale)] = {0};
+    char timezone[sizeof(g_timezone)] = {0};
+    rac_client_info_t info = {};
+};
+
+struct SdkConfigSnapshotStorage {
+    char api_key[sizeof(g_api_key)] = {0};
+    char base_url[sizeof(g_base_url)] = {0};
+    char device_id[sizeof(g_device_id)] = {0};
+    char platform[sizeof(g_platform)] = {0};
+    char sdk_version[sizeof(g_sdk_version)] = {0};
+    ClientInfoSnapshotStorage client_info;
+    rac_sdk_config_t config = {};
+};
 
 // =============================================================================
 // Environment Query Functions
@@ -305,6 +328,36 @@ static void safe_strcpy(char* dest, size_t dest_size, const char* src) {
     dest[len] = '\0';
 }
 
+static void point_client_info_at_storage(rac_client_info_t* info,
+                                         ClientInfoSnapshotStorage* storage) {
+    info->sdk_binding = storage->sdk_binding;
+    info->app_identifier = storage->app_identifier;
+    info->app_name = storage->app_name;
+    info->app_version = storage->app_version;
+    info->app_build = storage->app_build;
+    info->locale = storage->locale;
+    info->timezone = storage->timezone;
+}
+
+static void snapshot_client_info(ClientInfoSnapshotStorage* snapshot,
+                                 const rac_client_info_t* client_info) {
+    safe_strcpy(snapshot->sdk_binding, sizeof(snapshot->sdk_binding),
+                client_info ? client_info->sdk_binding : nullptr);
+    safe_strcpy(snapshot->app_identifier, sizeof(snapshot->app_identifier),
+                client_info ? client_info->app_identifier : nullptr);
+    safe_strcpy(snapshot->app_name, sizeof(snapshot->app_name),
+                client_info ? client_info->app_name : nullptr);
+    safe_strcpy(snapshot->app_version, sizeof(snapshot->app_version),
+                client_info ? client_info->app_version : nullptr);
+    safe_strcpy(snapshot->app_build, sizeof(snapshot->app_build),
+                client_info ? client_info->app_build : nullptr);
+    safe_strcpy(snapshot->locale, sizeof(snapshot->locale),
+                client_info ? client_info->locale : nullptr);
+    safe_strcpy(snapshot->timezone, sizeof(snapshot->timezone),
+                client_info ? client_info->timezone : nullptr);
+    point_client_info_at_storage(&snapshot->info, snapshot);
+}
+
 static void copy_client_info(const rac_client_info_t* client_info) {
     safe_strcpy(g_sdk_binding, sizeof(g_sdk_binding),
                 client_info ? client_info->sdk_binding : nullptr);
@@ -350,6 +403,8 @@ rac_validation_result_t rac_sdk_init(const rac_sdk_config_t* config) {
         return result;
     }
 
+    std::lock_guard<std::mutex> lock(g_sdk_state_mutex);
+
     // Store configuration with deep copy of strings
     g_sdk_config.environment = config->environment;
 
@@ -378,13 +433,39 @@ rac_validation_result_t rac_sdk_init(const rac_sdk_config_t* config) {
 }
 
 const rac_sdk_config_t* rac_sdk_get_config(void) {
+    thread_local SdkConfigSnapshotStorage snapshot;
+
+    std::lock_guard<std::mutex> lock(g_sdk_state_mutex);
     if (!g_sdk_initialized) {
         return nullptr;
     }
-    return &g_sdk_config;
+
+    snapshot.config = {};
+    snapshot.config.environment = g_sdk_config.environment;
+
+    safe_strcpy(snapshot.api_key, sizeof(snapshot.api_key), g_sdk_config.api_key);
+    snapshot.config.api_key = snapshot.api_key;
+
+    safe_strcpy(snapshot.base_url, sizeof(snapshot.base_url), g_sdk_config.base_url);
+    snapshot.config.base_url = snapshot.base_url;
+
+    safe_strcpy(snapshot.device_id, sizeof(snapshot.device_id), g_sdk_config.device_id);
+    snapshot.config.device_id = snapshot.device_id;
+
+    safe_strcpy(snapshot.platform, sizeof(snapshot.platform), g_sdk_config.platform);
+    snapshot.config.platform = snapshot.platform;
+
+    safe_strcpy(snapshot.sdk_version, sizeof(snapshot.sdk_version), g_sdk_config.sdk_version);
+    snapshot.config.sdk_version = snapshot.sdk_version;
+
+    snapshot_client_info(&snapshot.client_info, &g_client_info);
+    snapshot.config.client_info = snapshot.client_info.info;
+
+    return &snapshot.config;
 }
 
 void rac_sdk_set_client_info(const rac_client_info_t* client_info) {
+    std::lock_guard<std::mutex> lock(g_sdk_state_mutex);
     copy_client_info(client_info);
     if (g_sdk_initialized) {
         g_sdk_config.client_info = g_client_info;
@@ -392,10 +473,15 @@ void rac_sdk_set_client_info(const rac_client_info_t* client_info) {
 }
 
 const rac_client_info_t* rac_sdk_get_client_info(void) {
-    return &g_client_info;
+    thread_local ClientInfoSnapshotStorage snapshot;
+
+    std::lock_guard<std::mutex> lock(g_sdk_state_mutex);
+    snapshot_client_info(&snapshot, &g_client_info);
+    return &snapshot.info;
 }
 
 rac_environment_t rac_sdk_get_environment(void) {
+    std::lock_guard<std::mutex> lock(g_sdk_state_mutex);
     if (!g_sdk_initialized) {
         return RAC_ENV_DEVELOPMENT;
     }
@@ -403,10 +489,12 @@ rac_environment_t rac_sdk_get_environment(void) {
 }
 
 bool rac_sdk_is_initialized(void) {
+    std::lock_guard<std::mutex> lock(g_sdk_state_mutex);
     return g_sdk_initialized;
 }
 
 void rac_sdk_reset(void) {
+    std::lock_guard<std::mutex> lock(g_sdk_state_mutex);
     g_sdk_initialized = false;
     memset(&g_sdk_config, 0, sizeof(g_sdk_config));
     memset(g_api_key, 0, sizeof(g_api_key));

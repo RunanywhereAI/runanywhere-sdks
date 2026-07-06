@@ -5,13 +5,13 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -370,23 +370,8 @@ class DartBridgeTelemetry {
   // ============================================================================
 
   static Future<String> _getDeviceModel() async {
-    try {
-      final deviceInfo = DeviceInfoPlugin();
-
-      if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        return iosInfo.model;
-      } else if (Platform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
-        return '${androidInfo.brand} ${androidInfo.model}';
-      } else if (Platform.isMacOS) {
-        final macInfo = await deviceInfo.macOsInfo;
-        return macInfo.model;
-      }
-      return 'unknown';
-    } catch (e) {
-      return 'unknown';
-    }
+    final deviceModel = DartBridgeDevice.cachedDeviceModel.trim();
+    return deviceModel.isEmpty ? 'unknown' : deviceModel;
   }
 
   static int _environmentToInt(SDKEnvironment env) {

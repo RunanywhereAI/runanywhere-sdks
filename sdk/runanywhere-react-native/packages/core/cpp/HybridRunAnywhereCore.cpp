@@ -33,16 +33,6 @@ namespace margelo::nitro::runanywhere {
 
 using namespace ::runanywhere::bridges;
 
-static const char* defaultNativePlatform() {
-#if defined(__APPLE__)
-    return "ios";
-#elif defined(ANDROID) || defined(__ANDROID__)
-    return "android";
-#else
-    return "unknown";
-#endif
-}
-
 // Constructor / Destructor
 // ============================================================================
 // Constructor / Destructor

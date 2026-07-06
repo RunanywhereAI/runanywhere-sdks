@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
@@ -364,6 +365,9 @@ class DartBridgeDevice {
   /// Get the cached device ID synchronously (null if not yet cached)
   static String? get cachedDeviceId => _cachedDeviceId;
 
+  /// Device model from the canonical registration snapshot.
+  static String get cachedDeviceModel => _cachedRegistrationInfo.deviceModel;
+
   /// Register accurate app/client metadata with commons before Phase 2 device
   /// registration builds its JSON payload.
   static Future<void> _configureClientInfo() async {
@@ -373,6 +377,8 @@ class DartBridgeDevice {
     } catch (e) {
       _logger.debug('PackageInfo unavailable: $e');
     }
+
+    final timezone = await _currentTimezoneIdentifier();
 
     try {
       final lib = PlatformLoader.loadCommons();
@@ -401,7 +407,7 @@ class DartBridgeDevice {
         infoPtr.ref.locale = nativeString(
           Platform.localeName.replaceAll('_', '-'),
         );
-        infoPtr.ref.timezone = nativeString(DateTime.now().timeZoneName);
+        infoPtr.ref.timezone = nativeString(timezone);
         setClientInfo(infoPtr);
       } finally {
         calloc.free(infoPtr);
@@ -925,8 +931,8 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
           ? info.supportedAbis.first
           : 'unknown',
       chipName: chipName,
-      totalMemory: _megabytesToBytes(info.physicalRamSize),
-      availableMemory: _megabytesToBytes(info.availableRamSize),
+      totalMemory: _memoryMegabytesToBytes(info.physicalRamSize),
+      availableMemory: _memoryMegabytesToBytes(info.availableRamSize),
       hasNeuralEngine: false,
       neuralEngineCores: 0,
       gpuFamily: _inferAndroidGpuFamily(chipName, info.manufacturer),
@@ -957,10 +963,10 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
       osVersion:
           _nonEmpty(info.systemVersion) ?? Platform.operatingSystemVersion,
       formFactor: model.toLowerCase().contains('ipad') ? 'tablet' : 'phone',
-      architecture: machine,
+      architecture: _currentAbiArchitecture(),
       chipName: machine,
-      totalMemory: _megabytesToBytes(info.physicalRamSize),
-      availableMemory: _megabytesToBytes(info.availableRamSize),
+      totalMemory: _memoryMegabytesToBytes(info.physicalRamSize),
+      availableMemory: _memoryMegabytesToBytes(info.availableRamSize),
       hasNeuralEngine: hasNeuralEngine,
       neuralEngineCores: hasNeuralEngine ? 16 : 0,
       gpuFamily: 'apple',
@@ -989,7 +995,7 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
       formFactor: 'desktop',
       architecture: _nonEmpty(info.arch) ?? 'unknown',
       chipName: _nonEmpty(info.model) ?? 'unknown',
-      totalMemory: info.memorySize,
+      totalMemory: _memoryBytes(info.memorySize),
       availableMemory: 0,
       hasNeuralEngine: hasNeuralEngine,
       neuralEngineCores: hasNeuralEngine ? 16 : 0,
@@ -1026,8 +1032,34 @@ String _joinDistinct(List<String?> parts) {
   return normalized.isEmpty ? 'unknown' : normalized.join(' ');
 }
 
-int _megabytesToBytes(int megabytes) {
+Future<String?> _currentTimezoneIdentifier() async {
+  try {
+    return _nonEmpty((await FlutterTimezone.getLocalTimezone()).identifier);
+  } catch (e) {
+    DartBridgeDevice._logger.debug('Timezone identifier unavailable: $e');
+    return null;
+  }
+}
+
+String _currentAbiArchitecture() {
+  final abi = Abi.current().toString();
+  final normalized = abi.startsWith('Abi.') ? abi.substring(4) : abi;
+  if (normalized.contains('_')) {
+    return normalized.split('_').last;
+  }
+  if (normalized.endsWith('Arm64')) return 'arm64';
+  if (normalized.endsWith('X64')) return 'x86_64';
+  if (normalized.endsWith('IA32')) return 'x86';
+  if (normalized.endsWith('Arm')) return 'arm';
+  return normalized.isEmpty ? 'unknown' : normalized;
+}
+
+int _memoryMegabytesToBytes(int megabytes) {
   return megabytes > 0 ? megabytes * 1024 * 1024 : 0;
+}
+
+int _memoryBytes(int bytes) {
+  return bytes > 0 ? bytes : 0;
 }
 
 (int, int) _coreDistribution(int coreCount, String model) {

@@ -62,9 +62,6 @@ std::string first_env_value(const char *first, const char *second,
 }
 
 std::string normalize_locale(std::string locale) {
-  if (locale.empty() || locale == "C" || locale == "POSIX") {
-    return {};
-  }
   const std::size_t encoding = locale.find('.');
   if (encoding != std::string::npos) {
     locale.resize(encoding);
@@ -72,6 +69,9 @@ std::string normalize_locale(std::string locale) {
   const std::size_t modifier = locale.find('@');
   if (modifier != std::string::npos) {
     locale.resize(modifier);
+  }
+  if (locale.empty() || locale == "C" || locale == "POSIX") {
+    return {};
   }
   for (char &ch : locale) {
     if (ch == '_') {

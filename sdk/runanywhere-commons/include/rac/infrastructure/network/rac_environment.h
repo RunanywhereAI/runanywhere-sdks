@@ -233,8 +233,8 @@ RAC_API void rac_sdk_set_client_info(const rac_client_info_t* client_info);
 /**
  * @brief Get current client/application metadata.
  *
- * The returned pointer is owned by commons and remains valid until the next
- * rac_sdk_set_client_info(), rac_sdk_init(), or rac_sdk_reset().
+ * The returned pointer is a commons-owned thread-local snapshot and remains
+ * valid until the next rac_sdk_get_client_info() call on the same thread.
  */
 RAC_API const rac_client_info_t* rac_sdk_get_client_info(void);
 

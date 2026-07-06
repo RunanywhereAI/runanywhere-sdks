@@ -856,16 +856,6 @@ static const char* nullableCString(const std::string& value) {
     return value.empty() ? nullptr : value.c_str();
 }
 
-static const char* defaultNativePlatform() {
-#if defined(__APPLE__)
-    return "ios";
-#elif defined(ANDROID) || defined(__ANDROID__)
-    return "android";
-#else
-    return "unknown";
-#endif
-}
-
 #if defined(__APPLE__)
 static std::string takePlatformString(bool (*reader)(char**)) {
     if (!reader) {

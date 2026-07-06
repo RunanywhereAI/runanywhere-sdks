@@ -479,7 +479,9 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         if (request->sdk_version) {
             json.add_string("sdk_version", request->sdk_version);
         }
-        add_client_info_fields(json, request->client_info);
+        if (has_client_info(request->client_info)) {
+            add_client_info_fields(json, request->client_info);
+        }
 
         // Optional fields
         if (request->build_token) {
