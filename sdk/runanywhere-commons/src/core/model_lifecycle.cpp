@@ -50,8 +50,8 @@ std::map<runanywhere::v1::SDKComponent, std::shared_ptr<LoadedModel>> g_loaded;
 
 // Map a model's declared inference framework to the registered plugin engine
 // name (the manifest `.name` each engine publishes). Returns nullptr for
-// frameworks that have no dedicated engine (UNSPECIFIED / built-in / system),
-// which keeps the caller on plain priority selection.
+// frameworks that have no dedicated engine (UNSPECIFIED), which keeps the
+// caller on plain priority selection.
 //
 // Why this exists: plugin selection is plain priority order, so the moment a
 // high-priority specialist backend (e.g. QHexRT, priority 150) registers it
@@ -70,6 +70,9 @@ const char* engine_name_for_framework(runanywhere::v1::InferenceFramework framew
             return "sherpa";
         case runanywhere::v1::INFERENCE_FRAMEWORK_MLX:
             return "mlx";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
+        case runanywhere::v1::INFERENCE_FRAMEWORK_SYSTEM_TTS:
+            return "platform";
         case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
             return "coreml";
         default:

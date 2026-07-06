@@ -48,6 +48,7 @@ int g_create_count = 0;
 int g_initialize_count = 0;
 int g_cleanup_count = 0;
 int g_destroy_count = 0;
+std::string g_last_llm_engine;
 
 struct DummyLlm {
     std::string model_path;
@@ -79,6 +80,16 @@ rac_result_t dummy_llm_create(const char* model_id, const char*, void** out_impl
     *out_impl = impl;
     ++g_create_count;
     return RAC_SUCCESS;
+}
+
+rac_result_t platform_llm_create(const char* model_id, const char* config_json, void** out_impl) {
+    g_last_llm_engine = "platform";
+    return dummy_llm_create(model_id, config_json, out_impl);
+}
+
+rac_result_t mlx_llm_create(const char* model_id, const char* config_json, void** out_impl) {
+    g_last_llm_engine = "mlx";
+    return dummy_llm_create(model_id, config_json, out_impl);
 }
 
 rac_result_t dummy_llm_initialize(void* impl, const char* model_path) {
@@ -201,6 +212,20 @@ runanywhere::v1::ModelInfo build_llm_model_alt() {
     return model;
 }
 
+runanywhere::v1::ModelInfo build_foundation_model() {
+    runanywhere::v1::ModelInfo model;
+    model.set_id("builtin://foundation-models");
+    model.set_name("Apple Foundation Models");
+    model.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
+    model.set_format(runanywhere::v1::MODEL_FORMAT_UNSPECIFIED);
+    model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS);
+    model.set_local_path("builtin://foundation-models");
+    model.set_built_in(true);
+    model.set_is_downloaded(true);
+    model.set_is_available(true);
+    return model;
+}
+
 std::filesystem::path make_temp_dir(const char* prefix) {
     const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
     std::filesystem::path dir = std::filesystem::temp_directory_path() /
@@ -258,6 +283,18 @@ rac_engine_vtable_t make_dummy_llm_vtable(rac_llm_service_ops_t* ops, const uint
     v.metadata.priority = 100;
     v.metadata.formats = formats;
     v.metadata.formats_count = 1;
+    v.llm_ops = ops;
+    return v;
+}
+
+rac_engine_vtable_t make_named_llm_vtable(const char* name, int32_t priority,
+                                          rac_llm_service_ops_t* ops) {
+    rac_engine_vtable_t v{};
+    v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
+    v.metadata.name = name;
+    v.metadata.display_name = name;
+    v.metadata.engine_version = "0.0.0";
+    v.metadata.priority = priority;
     v.llm_ops = ops;
     return v;
 }
@@ -438,6 +475,70 @@ int test_success_current_snapshot_unload_events(rac_model_registry_handle_t regi
     rac_proto_buffer_free(&out);
 
     rac_plugin_unregister("llamacpp");
+    rac_model_lifecycle_reset();
+    return 0;
+}
+
+int test_foundation_model_pins_platform_over_mlx(rac_model_registry_handle_t registry) {
+    g_create_count = g_initialize_count = g_cleanup_count = g_destroy_count = 0;
+    g_last_llm_engine.clear();
+    rac_model_lifecycle_reset();
+    rac_sdk_event_clear_queue();
+    (void)rac_plugin_unregister("platform");
+    (void)rac_plugin_unregister("mlx");
+
+    rac_llm_service_ops_t platform_ops{};
+    platform_ops.create = platform_llm_create;
+    platform_ops.initialize = dummy_llm_initialize;
+    platform_ops.cleanup = dummy_llm_cleanup;
+    platform_ops.destroy = dummy_llm_destroy;
+
+    rac_llm_service_ops_t mlx_ops{};
+    mlx_ops.create = mlx_llm_create;
+    mlx_ops.initialize = dummy_llm_initialize;
+    mlx_ops.cleanup = dummy_llm_cleanup;
+    mlx_ops.destroy = dummy_llm_destroy;
+
+    auto platform_vtable = make_named_llm_vtable("platform", 50, &platform_ops);
+    auto mlx_vtable = make_named_llm_vtable("mlx", 120, &mlx_ops);
+    CHECK(rac_plugin_register(&platform_vtable) == RAC_SUCCESS, "platform LLM plugin registers");
+    CHECK(rac_plugin_register(&mlx_vtable) == RAC_SUCCESS, "higher-priority MLX plugin registers");
+    CHECK(register_model(registry, build_foundation_model()), "Foundation Models entry registers");
+
+    runanywhere::v1::ModelLoadRequest load;
+    load.set_model_id("builtin://foundation-models");
+    std::vector<uint8_t> load_bytes;
+    CHECK(serialize(load, &load_bytes), "Foundation Models load request serializes");
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        rac_model_lifecycle_load_proto(registry, load_bytes.data(), load_bytes.size(), &out);
+    runanywhere::v1::ModelLoadResult load_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &load_result),
+          "Foundation Models load returns parsable ModelLoadResult");
+    CHECK(load_result.success(), "Foundation Models load reports success=true");
+    CHECK(g_last_llm_engine == "platform",
+          "Foundation Models load pins platform instead of priority-selected MLX");
+    CHECK(g_create_count == 1 && g_initialize_count == 1,
+          "Foundation Models load creates exactly one backend impl");
+    rac_proto_buffer_free(&out);
+
+    runanywhere::v1::ModelUnloadRequest unload;
+    unload.set_model_id("builtin://foundation-models");
+    std::vector<uint8_t> unload_bytes;
+    CHECK(serialize(unload, &unload_bytes), "Foundation Models unload request serializes");
+    rac_proto_buffer_init(&out);
+    const rac_result_t unload_rc =
+        rac_model_lifecycle_unload_proto(unload_bytes.data(), unload_bytes.size(), &out);
+    runanywhere::v1::ModelUnloadResult unload_result;
+    CHECK(unload_rc == RAC_SUCCESS && parse_buffer(out, &unload_result),
+          "Foundation Models unload returns parsable ModelUnloadResult");
+    CHECK(unload_result.success(), "Foundation Models unload reports success=true");
+    rac_proto_buffer_free(&out);
+
+    rac_plugin_unregister("platform");
+    rac_plugin_unregister("mlx");
     rac_model_lifecycle_reset();
     return 0;
 }
@@ -638,6 +739,7 @@ int main() {
         test_model_missing(registry);
         test_unsupported_route(registry);
         test_success_current_snapshot_unload_events(registry);
+        test_foundation_model_pins_platform_over_mlx(registry);
         test_vlm_lifecycle_resolved_artifacts(registry);
         test_load_replaces_previous_model(registry);
 
