@@ -93,6 +93,16 @@ private fun hfFiles(repo: String, arch: String, vararg names: String): List<NpuF
         NpuFile("config.json", "$base/config.json")
 }
 
+/**
+ * Like [hfFiles] but WITHOUT the trailing repo-root `config.json` companion.
+ * For bundles whose repo has no root `config.json` (e.g. Kokoro) — appending one
+ * would 404 and fail the download.
+ */
+private fun hfFilesNoConfig(repo: String, arch: String, vararg names: String): List<NpuFile> {
+    val base = "https://huggingface.co/$repo/resolve/main"
+    return names.map { NpuFile(it, "$base/$arch/$it") }
+}
+
 /** The six files that make up the public LFM2.5 230M QHexRT bundle (512-ctx). */
 private fun lfm2_5_230mFiles(arch: String): List<NpuFile> = hfFiles(
     "runanywhere/lfm2_5_230m_HNPU", arch,
@@ -170,6 +180,158 @@ val NPU_MODELS = listOf(
             "qwen3508b_decode_f16.bin",
             "qwen3508b_embed_f16.bin",
             "qwen3508b_lmhead_f16.bin",
+            "tokenizer.json",
+        ),
+    ),
+    NpuModel(
+        id = "llama3_2_1b_v79",
+        name = "Llama 3.2 1B (HNPU)",
+        detail = "LLM · 1B · Hexagon v79",
+        modality = NpuModality.LLM,
+        arch = "v79",
+        files = hfFiles(
+            "runanywhere/llama3_2_1b_HNPU", "v79",
+            "llama-3.2-1b.json",
+            "llama_full_wqo_o3.bin",
+            "llama_dec_wqo_o3.bin",
+            "llama_lmhead.bin",
+            "llama_embed_f16.bin",
+            "tokenizer.json",
+        ),
+    ),
+    NpuModel(
+        id = "phi_tiny_moe_v79",
+        name = "Phi Tiny MoE (HNPU)",
+        detail = "LLM · MoE · Hexagon v79",
+        modality = NpuModality.LLM,
+        arch = "v79",
+        files = hfFiles(
+            "runanywhere/phi_tiny_moe_HNPU", "v79",
+            "phimoe.json",
+            "a_lo.bin",
+            "a_hi.bin",
+            "ffn2.bin",
+            "lmhead_ar1.bin",
+            "pf_lo.bin",
+            "pf_hi.bin",
+            "ffn_pf.bin",
+            "embed_f16.bin",
+            "experts_i8.bin",
+            "experts_scale.f32",
+            "tokenizer.json",
+        ),
+    ),
+    // DeepSeek-R1-Distill-Qwen-1.5B (reasoning distill of Qwen2). Compiled v79 on QAIRT
+    // 2.45; device-validated on S25 (loads, coherent, correct answers, prefill graph active,
+    // ~15 tok/s). fp16 (W8 degrades it); greedy matches HF gold prefix then drifts at fp16
+    // near-ties — expected for a reasoning model on HTP-fp16. Host-op qwen3_generate.
+    NpuModel(
+        id = "deepseek_r1_qwen_1_5b_v79",
+        name = "DeepSeek-R1 Distill Qwen 1.5B (HNPU)",
+        detail = "LLM · 1.5B fp16 · Hexagon v79",
+        modality = NpuModality.LLM,
+        arch = "v79",
+        files = hfFiles(
+            "runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU", "v79",
+            "DeepSeek-R1-Distill-Qwen-1.5B.json",
+            "deepseekr1distillqwen15b_prefill_f16.bin",
+            "deepseekr1distillqwen15b_decode_f16.bin",
+            "deepseekr1distillqwen15b_lmhead_f16.bin",
+            "deepseekr1distillqwen15b_embed_f16.bin",
+            "tokenizer.json",
+        ),
+    ),
+    // Qwen3.5-0.8B GatedDeltaNet hybrid (6 full-attn + 18 linear-attn layers). Compiled
+    // v79 on QAIRT 2.45; device-validated on S25 (3/3 greedy-exact vs HF, 22.7 tok/s).
+    // W8 decode + fp16 lm-head; host-op qwen3_5_generate.
+    NpuModel(
+        id = "qwen3_5_0_8b_v79",
+        name = "Qwen3.5 0.8B (HNPU)",
+        detail = "LLM · 0.8B W8 · Hexagon v79",
+        modality = NpuModality.LLM,
+        arch = "v79",
+        files = hfFiles(
+            "runanywhere/qwen3_5_0_8b_HNPU", "v79",
+            "qwen3.5-0.8b-1024.json",
+            "qwen3508b_decode_w8.bin",
+            "qwen3508b_lmhead_f16.bin",
+            "qwen3508b_embed_f16.bin",
+            "tokenizer.json",
+        ),
+    ),
+    // Qwen3-0.6B. GQA-native W8 decode + W8 lm-head, fp16 prefill; host-op qwen3_generate.
+    // Device-validated on S25/v79 (35.4 tok/s, no-think ChatML chat block).
+    NpuModel(
+        id = "qwen3_0_6b_v79",
+        name = "Qwen3 0.6B (HNPU)",
+        detail = "LLM · 0.6B W8 · Hexagon v79",
+        modality = NpuModality.LLM,
+        arch = "v79",
+        files = hfFiles(
+            "runanywhere/qwen3_0_6b_HNPU", "v79",
+            "qwen3-0.6b-1024final.json",
+            "qwen06_pf_f16.bin",
+            "qwen06_decn1k_w8.bin",
+            "qwen06_lmh_w8.bin",
+            "qwen06_embed_f16.bin",
+            "tokenizer.json",
+        ),
+    ),
+    // Gemma-3n-E4B. AltUp 3-part split decode (W8) + fp16 NPU lm-head + PLE fixtures;
+    // host-op gemma3n_split_generate. Compiled with QAIRT 2.48; device-validated on S25/v79 (3.8 tok/s).
+    NpuModel(
+        id = "gemma3n_e4b_v79",
+        name = "Gemma 3n E4B (HNPU)",
+        detail = "LLM · 3.93B W8 · Hexagon v79",
+        modality = NpuModality.LLM,
+        arch = "v79",
+        files = hfFiles(
+            "runanywhere/gemma3n_e4b_HNPU", "v79",
+            "gemma-3n-E4B-it.json",
+            "gemma3ne4bit_decode_p0_w8.bin",
+            "gemma3ne4bit_decode_p1_w8.bin",
+            "gemma3ne4bit_decode_p2_w8.bin",
+            "gemma3ne4bit_lmh_f16.bin",
+            "gemma3ne4bit_embed_f16.bin",
+            "gemma3ne4bit_ple_table_f16.bin",
+            "gemma3ne4bit_ple_proj_f16.bin",
+            "gemma3ne4bit_ple_norm_f16.bin",
+            "tokenizer.json",
+        ),
+    ),
+    // Qwen3.5-2B GatedDeltaNet hybrid. Compiled v79 on QAIRT 2.45; device-validated on
+    // S25 (3/3 greedy-exact vs HF, 12.7 tok/s). W8 decode + fp16 lm-head; host-op qwen3_5_generate.
+    NpuModel(
+        id = "qwen3_5_2b_v79",
+        name = "Qwen3.5 2B (HNPU)",
+        detail = "LLM · 2B W8 · Hexagon v79",
+        modality = NpuModality.LLM,
+        arch = "v79",
+        files = hfFiles(
+            "runanywhere/qwen3_5_2b_HNPU", "v79",
+            "qwen3.5-2b-1024.json",
+            "qwen352b_decode_w8.bin",
+            "qwen352b_lmhead_f16.bin",
+            "qwen352b_embed_f16.bin",
+            "tokenizer.json",
+        ),
+    ),
+    // Qwen3.5-4B GatedDeltaNet hybrid (8 full + 24 linear layers). Compiled v79 on QAIRT
+    // 2.45; device-validated on S25 (3/3 greedy-exact vs HF, 5.1 tok/s — slow, it's a 4B).
+    // W8 decode is SHARDED (s0+s1) + fp16 lm-head; host-op qwen3_5_generate.
+    NpuModel(
+        id = "qwen3_5_4b_v79",
+        name = "Qwen3.5 4B (HNPU)",
+        detail = "LLM · 4B W8 · Hexagon v79",
+        modality = NpuModality.LLM,
+        arch = "v79",
+        files = hfFiles(
+            "runanywhere/qwen3_5_4b_HNPU", "v79",
+            "qwen3.5-4b-1024.json",
+            "qwen354b_decode_s0_w8.bin",
+            "qwen354b_decode_s1_w8.bin",
+            "qwen354b_lmhead_f16.bin",
+            "qwen354b_embed_f16.bin",
             "tokenizer.json",
         ),
     ),
@@ -325,6 +487,86 @@ val NPU_MODELS = listOf(
             "melo_flow.bin",
             "melo_lexicon.txt",
             "melo_tokens.txt",
+        ),
+    ),
+    // Kokoro-82M StyleTTS2. runanywhere/kokoro_en_HNPU is PRIVATE (make public to
+    // ship) and has no root config.json (hence hfFilesNoConfig). The bundle carries
+    // a custom HVX op-package (libQnnHrtOpPkg.so + a dsp/ skel copy) for the gen_s2
+    // vocoder tail; the SDK adds the model dir to ADSP_LIBRARY_PATH at load so the
+    // DSP finds it. First file is the manifest.
+    NpuModel(
+        id = "kokoro_en_v79",
+        name = "Kokoro EN (HNPU)",
+        detail = "TTS · EN · Hexagon v79",
+        modality = NpuModality.TTS,
+        arch = "v79",
+        files = hfFilesNoConfig(
+            "runanywhere/kokoro_en_HNPU", "v79",
+            "kokoro-en.json",
+            "albertm_2d.bin",
+            "duration_head_2d.bin",
+            "acoustic_convs_2d.bin",
+            "f0nm_2d.bin",
+            "dec_backbonem_2d.bin",
+            "decode3m_2d.bin",
+            "gen_s1m_2d.bin",
+            "gen_s2m_2d.bin",
+            "libQnnHrtOpPkg.so",
+            "dsp/libQnnHrtOpPkg.so",
+            "voices.bin",
+            "kokoro_lexicon.txt",
+            "kokoro_vocab.txt",
+            "host_weights/asr_res_bias.bin",
+            "host_weights/asr_res_weight.bin",
+            "host_weights/embeddings_LayerNorm_bias.bin",
+            "host_weights/embeddings_LayerNorm_weight.bin",
+            "host_weights/embeddings_hidden_mapping_bias.bin",
+            "host_weights/embeddings_hidden_mapping_weight.bin",
+            "host_weights/embeddings_position_embeddings.bin",
+            "host_weights/embeddings_token_type_embeddings.bin",
+            "host_weights/embeddings_word_embeddings.bin",
+            "host_weights/f0_conv_bias.bin",
+            "host_weights/f0_conv_weight.bin",
+            "host_weights/istft_inverse_basis.bin",
+            "host_weights/istft_window_sum.bin",
+            "host_weights/lstm_encoder_B.bin",
+            "host_weights/lstm_encoder_R.bin",
+            "host_weights/lstm_encoder_W.bin",
+            "host_weights/lstm_prosody_0_B.bin",
+            "host_weights/lstm_prosody_0_R.bin",
+            "host_weights/lstm_prosody_0_W.bin",
+            "host_weights/lstm_prosody_2_B.bin",
+            "host_weights/lstm_prosody_2_R.bin",
+            "host_weights/lstm_prosody_2_W.bin",
+            "host_weights/lstm_prosody_4_B.bin",
+            "host_weights/lstm_prosody_4_R.bin",
+            "host_weights/lstm_prosody_4_W.bin",
+            "host_weights/lstm_shared_B.bin",
+            "host_weights/lstm_shared_R.bin",
+            "host_weights/lstm_shared_W.bin",
+            "host_weights/lstm_textenc_B.bin",
+            "host_weights/lstm_textenc_R.bin",
+            "host_weights/lstm_textenc_W.bin",
+            "host_weights/n_conv_bias.bin",
+            "host_weights/n_conv_weight.bin",
+            "host_weights/prosody_adaln_1_fc_bias.bin",
+            "host_weights/prosody_adaln_1_fc_weight.bin",
+            "host_weights/prosody_adaln_3_fc_bias.bin",
+            "host_weights/prosody_adaln_3_fc_weight.bin",
+            "host_weights/prosody_adaln_5_fc_bias.bin",
+            "host_weights/prosody_adaln_5_fc_weight.bin",
+            "host_weights/sine_harmonics.bin",
+            "host_weights/sine_l_linear_bias.bin",
+            "host_weights/sine_l_linear_weight.bin",
+            "host_weights/sine_noise_std_unused.bin",
+            "host_weights/sine_pi.bin",
+            "host_weights/sine_sampling_rate.bin",
+            "host_weights/sine_sine_amp.bin",
+            "host_weights/sine_two.bin",
+            "host_weights/sine_upsample.bin",
+            "host_weights/sine_voiced_threshold.bin",
+            "host_weights/stft_window.bin",
+            "host_weights/textenc_embedding.bin",
         ),
     ),
 )
