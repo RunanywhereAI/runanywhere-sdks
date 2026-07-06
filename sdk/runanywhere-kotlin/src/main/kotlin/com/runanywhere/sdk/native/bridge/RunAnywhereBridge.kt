@@ -968,6 +968,21 @@ object RunAnywhereBridge {
         baseUrl: String?,
     ): Int
 
+    /**
+     * Set SDK binding + host application metadata used by device registration
+     * and telemetry-adjacent backend APIs.
+     */
+    @JvmStatic
+    external fun racSdkSetClientInfo(
+        sdkBinding: String?,
+        appIdentifier: String?,
+        appName: String?,
+        appVersion: String?,
+        appBuild: String?,
+        locale: String?,
+        timezone: String?,
+    )
+
     // TOOL CALLING API (rac_tool_calling.h)
     // Mirrors Swift SDK's CppBridge+ToolCalling.swift
 

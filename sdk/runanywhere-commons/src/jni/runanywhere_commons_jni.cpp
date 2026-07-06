@@ -3364,6 +3364,32 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     return static_cast<jint>(result);
 }
 
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkSetClientInfo(
+    JNIEnv* env, jclass clazz, jstring sdkBinding, jstring appIdentifier, jstring appName,
+    jstring appVersion, jstring appBuild, jstring locale, jstring timezone) {
+    (void)clazz;
+
+    std::string sdkBindingStr = getCString(env, sdkBinding);
+    std::string appIdentifierStr = getCString(env, appIdentifier);
+    std::string appNameStr = getCString(env, appName);
+    std::string appVersionStr = getCString(env, appVersion);
+    std::string appBuildStr = getCString(env, appBuild);
+    std::string localeStr = getCString(env, locale);
+    std::string timezoneStr = getCString(env, timezone);
+
+    rac_client_info_t info = {};
+    info.sdk_binding = sdkBindingStr.empty() ? nullptr : sdkBindingStr.c_str();
+    info.app_identifier = appIdentifierStr.empty() ? nullptr : appIdentifierStr.c_str();
+    info.app_name = appNameStr.empty() ? nullptr : appNameStr.c_str();
+    info.app_version = appVersionStr.empty() ? nullptr : appVersionStr.c_str();
+    info.app_build = appBuildStr.empty() ? nullptr : appBuildStr.c_str();
+    info.locale = localeStr.empty() ? nullptr : localeStr.c_str();
+    info.timezone = timezoneStr.empty() ? nullptr : timezoneStr.c_str();
+
+    rac_sdk_set_client_info(&info);
+}
+
 // =============================================================================
 // TOOL CALLING API (rac_tool_calling.h)
 // Mirrors Swift SDK's CppBridge+ToolCalling.swift

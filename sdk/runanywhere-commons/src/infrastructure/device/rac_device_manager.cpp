@@ -147,6 +147,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
     // Get SDK version from SDK config if available
     const rac_sdk_config_t* sdk_config = rac_sdk_get_config();
     request.sdk_version = sdk_config ? sdk_config->sdk_version : "unknown";
+    request.client_info = sdk_config ? sdk_config->client_info : *rac_sdk_get_client_info();
     request.build_token = (env == RAC_ENV_DEVELOPMENT) ? build_token : nullptr;
     request.last_seen_at_ms = rac_get_current_time_ms();
 

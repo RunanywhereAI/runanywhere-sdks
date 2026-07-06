@@ -467,8 +467,10 @@ _rac_state_shutdown
 
 # SDK init + logging configuration.
 _rac_configure_logging
+_rac_sdk_get_client_info
 _rac_sdk_get_config
 _rac_sdk_init
+_rac_sdk_set_client_info
 
 # SDKEnvironment helpers + URL / API key validators called from
 # Public/Configuration/SDKEnvironment.swift and CppBridge+Environment.swift.

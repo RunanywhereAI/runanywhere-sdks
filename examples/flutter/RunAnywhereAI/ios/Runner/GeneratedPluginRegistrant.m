@@ -72,12 +72,6 @@
 @import runanywhere;
 #endif
 
-#if __has_include(<runanywhere_genie/GeniePlugin.h>)
-#import <runanywhere_genie/GeniePlugin.h>
-#else
-@import runanywhere_genie;
-#endif
-
 #if __has_include(<runanywhere_llamacpp/LlamaCppPlugin.h>)
 #import <runanywhere_llamacpp/LlamaCppPlugin.h>
 #else
@@ -122,7 +116,6 @@
   [PermissionHandlerPlugin registerWithRegistrar:[registry registrarForPlugin:@"PermissionHandlerPlugin"]];
   [RecordIosPlugin registerWithRegistrar:[registry registrarForPlugin:@"RecordIosPlugin"]];
   [RunAnywherePlugin registerWithRegistrar:[registry registrarForPlugin:@"RunAnywherePlugin"]];
-  [GeniePlugin registerWithRegistrar:[registry registrarForPlugin:@"GeniePlugin"]];
   [LlamaCppPlugin registerWithRegistrar:[registry registrarForPlugin:@"LlamaCppPlugin"]];
   [OnnxPlugin registerWithRegistrar:[registry registrarForPlugin:@"OnnxPlugin"]];
   [QhexrtPlugin registerWithRegistrar:[registry registrarForPlugin:@"QhexrtPlugin"]];

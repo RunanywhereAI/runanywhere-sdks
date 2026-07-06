@@ -81,11 +81,6 @@ public final class GeneratedPluginRegistrant {
       Log.e(TAG, "Error registering plugin runanywhere, ai.runanywhere.sdk.RunAnywherePlugin", e);
     }
     try {
-      flutterEngine.getPlugins().add(new ai.runanywhere.sdk.genie.GeniePlugin());
-    } catch (Exception e) {
-      Log.e(TAG, "Error registering plugin runanywhere_genie, ai.runanywhere.sdk.genie.GeniePlugin", e);
-    }
-    try {
       flutterEngine.getPlugins().add(new ai.runanywhere.sdk.llamacpp.LlamaCppPlugin());
     } catch (Exception e) {
       Log.e(TAG, "Error registering plugin runanywhere_llamacpp, ai.runanywhere.sdk.llamacpp.LlamaCppPlugin", e);

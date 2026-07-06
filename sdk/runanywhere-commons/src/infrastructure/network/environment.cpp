@@ -23,6 +23,14 @@ static char g_base_url[512] = {0};
 static char g_device_id[128] = {0};
 static char g_platform[32] = {0};
 static char g_sdk_version[32] = {0};
+static char g_sdk_binding[64] = {0};
+static char g_app_identifier[256] = {0};
+static char g_app_name[256] = {0};
+static char g_app_version[64] = {0};
+static char g_app_build[64] = {0};
+static char g_locale[64] = {0};
+static char g_timezone[128] = {0};
+static rac_client_info_t g_client_info = {};
 
 // =============================================================================
 // Environment Query Functions
@@ -297,6 +305,40 @@ static void safe_strcpy(char* dest, size_t dest_size, const char* src) {
     dest[len] = '\0';
 }
 
+static void copy_client_info(const rac_client_info_t* client_info) {
+    safe_strcpy(g_sdk_binding, sizeof(g_sdk_binding),
+                client_info ? client_info->sdk_binding : nullptr);
+    safe_strcpy(g_app_identifier, sizeof(g_app_identifier),
+                client_info ? client_info->app_identifier : nullptr);
+    safe_strcpy(g_app_name, sizeof(g_app_name), client_info ? client_info->app_name : nullptr);
+    safe_strcpy(g_app_version, sizeof(g_app_version),
+                client_info ? client_info->app_version : nullptr);
+    safe_strcpy(g_app_build, sizeof(g_app_build), client_info ? client_info->app_build : nullptr);
+    safe_strcpy(g_locale, sizeof(g_locale), client_info ? client_info->locale : nullptr);
+    safe_strcpy(g_timezone, sizeof(g_timezone), client_info ? client_info->timezone : nullptr);
+
+    g_client_info.sdk_binding = g_sdk_binding;
+    g_client_info.app_identifier = g_app_identifier;
+    g_client_info.app_name = g_app_name;
+    g_client_info.app_version = g_app_version;
+    g_client_info.app_build = g_app_build;
+    g_client_info.locale = g_locale;
+    g_client_info.timezone = g_timezone;
+}
+
+static bool client_info_has_value(const rac_client_info_t* client_info) {
+    if (!client_info) {
+        return false;
+    }
+    return (client_info->sdk_binding && client_info->sdk_binding[0] != '\0') ||
+           (client_info->app_identifier && client_info->app_identifier[0] != '\0') ||
+           (client_info->app_name && client_info->app_name[0] != '\0') ||
+           (client_info->app_version && client_info->app_version[0] != '\0') ||
+           (client_info->app_build && client_info->app_build[0] != '\0') ||
+           (client_info->locale && client_info->locale[0] != '\0') ||
+           (client_info->timezone && client_info->timezone[0] != '\0');
+}
+
 rac_validation_result_t rac_sdk_init(const rac_sdk_config_t* config) {
     if (!config) {
         return RAC_VALIDATION_API_KEY_REQUIRED;
@@ -326,6 +368,11 @@ rac_validation_result_t rac_sdk_init(const rac_sdk_config_t* config) {
     safe_strcpy(g_sdk_version, sizeof(g_sdk_version), config->sdk_version);
     g_sdk_config.sdk_version = g_sdk_version;
 
+    if (client_info_has_value(&config->client_info)) {
+        copy_client_info(&config->client_info);
+    }
+    g_sdk_config.client_info = g_client_info;
+
     g_sdk_initialized = true;
     return RAC_VALIDATION_OK;
 }
@@ -335,6 +382,17 @@ const rac_sdk_config_t* rac_sdk_get_config(void) {
         return nullptr;
     }
     return &g_sdk_config;
+}
+
+void rac_sdk_set_client_info(const rac_client_info_t* client_info) {
+    copy_client_info(client_info);
+    if (g_sdk_initialized) {
+        g_sdk_config.client_info = g_client_info;
+    }
+}
+
+const rac_client_info_t* rac_sdk_get_client_info(void) {
+    return &g_client_info;
 }
 
 rac_environment_t rac_sdk_get_environment(void) {
@@ -356,4 +414,12 @@ void rac_sdk_reset(void) {
     memset(g_device_id, 0, sizeof(g_device_id));
     memset(g_platform, 0, sizeof(g_platform));
     memset(g_sdk_version, 0, sizeof(g_sdk_version));
+    memset(g_sdk_binding, 0, sizeof(g_sdk_binding));
+    memset(g_app_identifier, 0, sizeof(g_app_identifier));
+    memset(g_app_name, 0, sizeof(g_app_name));
+    memset(g_app_version, 0, sizeof(g_app_version));
+    memset(g_app_build, 0, sizeof(g_app_build));
+    memset(g_locale, 0, sizeof(g_locale));
+    memset(g_timezone, 0, sizeof(g_timezone));
+    memset(&g_client_info, 0, sizeof(g_client_info));
 }

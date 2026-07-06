@@ -133,6 +133,17 @@ bool PlatformAdapter_getGPUFamily(char** outValue);
 bool PlatformAdapter_isTablet(void);
 
 // ============================================================================
+// App / Client Info
+// ============================================================================
+
+bool PlatformAdapter_getAppIdentifier(char** outValue);
+bool PlatformAdapter_getAppName(char** outValue);
+bool PlatformAdapter_getAppVersion(char** outValue);
+bool PlatformAdapter_getAppBuild(char** outValue);
+bool PlatformAdapter_getLocaleIdentifier(char** outValue);
+bool PlatformAdapter_getTimezoneIdentifier(char** outValue);
+
+// ============================================================================
 // HTTP Download (Async Platform Adapter Fallback)
 // ============================================================================
 

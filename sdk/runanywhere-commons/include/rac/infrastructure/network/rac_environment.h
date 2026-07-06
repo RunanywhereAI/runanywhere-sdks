@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 #include "rac/core/rac_types.h"  // For rac_log_level_t
+#include "rac/infrastructure/network/rac_client_info.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,6 +57,7 @@ typedef struct {
     const char* device_id;    // Set by platform (Keychain UUID, etc.)
     const char* platform;     // "ios", "android", "flutter", etc.
     const char* sdk_version;  // SDK version string
+    rac_client_info_t client_info;
 } rac_sdk_config_t;
 
 /**
@@ -219,6 +221,22 @@ RAC_API rac_validation_result_t rac_sdk_init(const rac_sdk_config_t* config);
  * @return Pointer to current config, or NULL if not initialized
  */
 RAC_API const rac_sdk_config_t* rac_sdk_get_config(void);
+
+/**
+ * @brief Set client/application metadata for backend device/telemetry APIs.
+ *
+ * Safe to call before or after rac_sdk_init(); values are copied into commons
+ * owned storage. Pass NULL to clear all fields.
+ */
+RAC_API void rac_sdk_set_client_info(const rac_client_info_t* client_info);
+
+/**
+ * @brief Get current client/application metadata.
+ *
+ * The returned pointer is owned by commons and remains valid until the next
+ * rac_sdk_set_client_info(), rac_sdk_init(), or rac_sdk_reset().
+ */
+RAC_API const rac_client_info_t* rac_sdk_get_client_info(void);
 
 /**
  * @brief Get current environment

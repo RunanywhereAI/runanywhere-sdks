@@ -199,6 +199,35 @@ class JsonBuilder {
     bool first_ = true;
 };
 
+bool has_string(const char* value) {
+    return value != nullptr && value[0] != '\0';
+}
+
+bool has_client_info(const rac_client_info_t& info) {
+    return has_string(info.sdk_binding) || has_string(info.app_identifier) ||
+           has_string(info.app_name) || has_string(info.app_version) ||
+           has_string(info.app_build) || has_string(info.locale) || has_string(info.timezone);
+}
+
+void add_client_info_fields(JsonBuilder& json, const rac_client_info_t& info) {
+    json.add_string("sdk_binding", info.sdk_binding);
+    json.add_string("app_identifier", info.app_identifier);
+    json.add_string("app_name", info.app_name);
+    json.add_string("app_version", info.app_version);
+    json.add_string("app_build", info.app_build);
+    json.add_string("locale", info.locale);
+    json.add_string("timezone", info.timezone);
+}
+
+void add_client_info_object(JsonBuilder& json, const char* key, const rac_client_info_t& info) {
+    if (!has_client_info(info)) {
+        return;
+    }
+    json.start_nested(key);
+    add_client_info_fields(json, info);
+    json.end_object();
+}
+
 }  // namespace
 
 // =============================================================================
@@ -450,6 +479,7 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         if (request->sdk_version) {
             json.add_string("sdk_version", request->sdk_version);
         }
+        add_client_info_fields(json, request->client_info);
 
         // Optional fields
         if (request->build_token) {
@@ -477,6 +507,8 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         // Nested structure for production/staging
         // Matches backend schemas/device.py DeviceInfo schema
         const rac_device_registration_info_t* info = &request->device_info;
+
+        json.add_string("device_id", info->device_id);
 
         // Build device_info as nested object with proper escaping
         json.start_nested("device_info");
@@ -521,6 +553,7 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         json.end_object();  // Close device_info
 
         json.add_string("sdk_version", request->sdk_version);
+        add_client_info_object(json, "client_info", request->client_info);
 
         // Add last_seen_at timestamp for UPSERT to update existing records
         if (request->last_seen_at_ms > 0) {
