@@ -33,6 +33,7 @@ set(RCLI_SOURCES
     src/commands/cmd_serve.cpp
     src/commands/cmd_show.cpp
     src/commands/cmd_stt.cpp
+    src/commands/cmd_embed.cpp
     src/commands/cmd_tts.cpp
     src/commands/cmd_vad.cpp
     src/commands/cmd_voice.cpp

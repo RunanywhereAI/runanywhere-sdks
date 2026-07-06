@@ -28,6 +28,7 @@ void register_pull(CLI::App& app, GlobalOptions& options);
 void register_rm(CLI::App& app, GlobalOptions& options);
 void register_show(CLI::App& app, GlobalOptions& options);
 void register_run(CLI::App& app, GlobalOptions& options);
+void register_embed(CLI::App& app, GlobalOptions& options);
 void register_stt(CLI::App& app, GlobalOptions& options);
 void register_tts(CLI::App& app, GlobalOptions& options);
 void register_vad(CLI::App& app, GlobalOptions& options);

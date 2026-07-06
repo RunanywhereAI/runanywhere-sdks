@@ -51,10 +51,13 @@ struct FakeMlxState {
   int create_count = 0;
   int initialize_count = 0;
   int stream_count = 0;
+  int vlm_process_count = 0;
+  int embed_batch_count = 0;
   int stt_transcribe_count = 0;
   int tts_synthesize_count = 0;
   rac_mlx_session_kind_t last_kind = RAC_MLX_SESSION_KIND_LLM;
   std::string last_model_path;
+  size_t last_embed_batch_size = 0;
   size_t last_audio_size = 0;
   std::string last_tts_text;
 };
@@ -158,6 +161,7 @@ rac_result_t fake_vlm_process(rac_handle_t, const rac_vlm_image_t *,
   out_result->completion_tokens = 3;
   out_result->total_tokens = 8;
   out_result->tokens_per_second = 50.0f;
+  g_mlx_state.vlm_process_count++;
   return out_result->text ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
 }
 
@@ -193,12 +197,15 @@ rac_result_t fake_embed_batch(rac_handle_t, const char *const *texts,
     out_result->embeddings[i].data =
         static_cast<float *>(std::calloc(2, sizeof(float)));
     if (!out_result->embeddings[i].data) {
+      rac_embeddings_result_free(out_result);
       return RAC_ERROR_OUT_OF_MEMORY;
     }
     out_result->embeddings[i].data[0] = texts[i] && texts[i][0] ? 1.0f : 0.0f;
     out_result->embeddings[i].data[1] = 0.5f;
   }
   out_result->total_tokens = static_cast<int32_t>(num_texts);
+  g_mlx_state.embed_batch_count++;
+  g_mlx_state.last_embed_batch_size = num_texts;
   return RAC_SUCCESS;
 }
 
@@ -460,9 +467,11 @@ TestResult test_rcli_mlx_run_end_to_end() {
 
   const std::filesystem::path home = make_temp_dir("rcli-mlx-home");
   const std::filesystem::path llm_dir = make_temp_dir("rcli-mlx-llm");
+  const std::filesystem::path vlm_dir = make_temp_dir("rcli-mlx-vlm");
+  const std::filesystem::path embedding_dir = make_temp_dir("rcli-mlx-embed");
   const std::filesystem::path stt_dir = make_temp_dir("rcli-mlx-stt");
   const std::filesystem::path tts_dir = make_temp_dir("rcli-mlx-tts");
-  for (const auto &dir : {llm_dir, stt_dir, tts_dir}) {
+  for (const auto &dir : {llm_dir, vlm_dir, embedding_dir, stt_dir, tts_dir}) {
     if (!write_file(dir / "config.json", R"({"model_type":"qwen3"})") ||
         !write_file(dir / "model.safetensors", "fake-weights") ||
         !write_file(dir / "tokenizer.json", "{}")) {
@@ -473,6 +482,11 @@ TestResult test_rcli_mlx_run_end_to_end() {
 
   const std::filesystem::path input_wav = home / "input.wav";
   const std::filesystem::path output_wav = home / "output.wav";
+  const std::filesystem::path input_image = home / "image.rgb";
+  if (!write_file(input_image, "fake image")) {
+    result.details = "failed to create fake VLM image";
+    return result;
+  }
   const std::vector<int16_t> pcm_samples = {0,     1024, -1024, 2048,
                                             -2048, 1024, -1024, 0};
   std::string wav_error;
@@ -493,6 +507,11 @@ TestResult test_rcli_mlx_run_end_to_end() {
   }
   if (!register_local_mlx_model(llm_dir, "mlx.fake.llm", "Fake MLX LLM",
                                 v1::MODEL_CATEGORY_LANGUAGE) ||
+      !register_local_mlx_model(vlm_dir, "mlx.fake.vlm", "Fake MLX VLM",
+                                v1::MODEL_CATEGORY_MULTIMODAL) ||
+      !register_local_mlx_model(embedding_dir, "mlx.fake.embed",
+                                "Fake MLX Embeddings",
+                                v1::MODEL_CATEGORY_EMBEDDING) ||
       !register_local_mlx_model(stt_dir, "mlx.fake.stt", "Fake MLX STT",
                                 v1::MODEL_CATEGORY_SPEECH_RECOGNITION) ||
       !register_local_mlx_model(tts_dir, "mlx.fake.tts", "Fake MLX TTS",
@@ -526,12 +545,16 @@ TestResult test_rcli_mlx_run_end_to_end() {
                           home.string(), "list", "--all"},
                          &list_json);
   if (code != 0 ||
+      list_json.find("\"id\":\"mlx.fake.vlm\"") == std::string::npos ||
+      list_json.find("\"modality\":\"vlm\"") == std::string::npos ||
+      list_json.find("\"id\":\"mlx.fake.embed\"") == std::string::npos ||
+      list_json.find("\"modality\":\"embedding\"") == std::string::npos ||
       list_json.find("\"id\":\"mlx.fake.stt\"") == std::string::npos ||
       list_json.find("\"modality\":\"stt\"") == std::string::npos ||
       list_json.find("\"backend\":\"MLX\"") == std::string::npos ||
       list_json.find("\"id\":\"mlx.fake.tts\"") == std::string::npos ||
       list_json.find("\"modality\":\"tts\"") == std::string::npos) {
-    result.expected = "MLX STT/TTS rows from rcli list --all";
+    result.expected = "MLX VLM/embedding/STT/TTS rows from rcli list --all";
     result.actual = list_json;
     rcli::shutdown();
     return result;
@@ -570,6 +593,82 @@ TestResult test_rcli_mlx_run_end_to_end() {
     result.expected = llm_dir.string();
     result.actual = g_mlx_state.last_model_path;
     result.details = "MLX LLM runtime should receive the model folder, not "
+                     "model.safetensors";
+    rcli::shutdown();
+    return result;
+  }
+
+  std::string vlm_json;
+  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
+                          home.string(), "run", "mlx.fake.vlm",
+                          "What is in the image?", "--image",
+                          input_image.string(), "--engine", "mlx", "--max-tokens",
+                          "4"},
+                         &vlm_json);
+  if (code != 0) {
+    result.expected = "VLM exit 0";
+    result.actual = "exit " + std::to_string(code);
+    result.details = vlm_json;
+    rcli::shutdown();
+    return result;
+  }
+  if (vlm_json.find("\"model\":\"mlx.fake.vlm\"") == std::string::npos ||
+      vlm_json.find("\"response\":\"mlx-vlm-stub: What is in the image?\"") ==
+          std::string::npos) {
+    result.expected = "JSON VLM response from MLX callback";
+    result.actual = vlm_json;
+    rcli::shutdown();
+    return result;
+  }
+  if (g_mlx_state.vlm_process_count != 1 ||
+      g_mlx_state.last_kind != RAC_MLX_SESSION_KIND_VLM) {
+    result.details =
+        "MLX VLM callback count/kind was not exercised as expected";
+    rcli::shutdown();
+    return result;
+  }
+  if (g_mlx_state.last_model_path != vlm_dir.string()) {
+    result.expected = vlm_dir.string();
+    result.actual = g_mlx_state.last_model_path;
+    result.details = "MLX VLM runtime should receive the model folder, not "
+                     "model.safetensors";
+    rcli::shutdown();
+    return result;
+  }
+
+  std::string embed_json;
+  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
+                          home.string(), "embed", "mlx.fake.embed",
+                          "Hello MLX embeddings", "--text", "Batch item"},
+                         &embed_json);
+  if (code != 0) {
+    result.expected = "embedding exit 0";
+    result.actual = "exit " + std::to_string(code);
+    result.details = embed_json;
+    rcli::shutdown();
+    return result;
+  }
+  if (embed_json.find("\"model\":\"mlx.fake.embed\"") == std::string::npos ||
+      embed_json.find("\"dimension\":2") == std::string::npos ||
+      embed_json.find("\"count\":2") == std::string::npos ||
+      embed_json.find("\"values\":[1,0.5]") == std::string::npos) {
+    result.expected = "JSON embedding vectors from MLX callback";
+    result.actual = embed_json;
+    rcli::shutdown();
+    return result;
+  }
+  if (g_mlx_state.embed_batch_count != 1 ||
+      g_mlx_state.last_kind != RAC_MLX_SESSION_KIND_EMBEDDINGS ||
+      g_mlx_state.last_embed_batch_size != 2) {
+    result.details =
+        "MLX embedding callback count/kind/batch size was not exercised as expected";
+    rcli::shutdown();
+    return result;
+  }
+  if (g_mlx_state.last_model_path != embedding_dir.string()) {
+    result.expected = embedding_dir.string();
+    result.actual = g_mlx_state.last_model_path;
+    result.details = "MLX embedding runtime should receive the model folder, not "
                      "model.safetensors";
     rcli::shutdown();
     return result;
@@ -645,9 +744,9 @@ TestResult test_rcli_mlx_run_end_to_end() {
                      "model.safetensors";
     return result;
   }
-  if (g_mlx_state.create_count != 3 || g_mlx_state.initialize_count != 3) {
+  if (g_mlx_state.create_count != 5 || g_mlx_state.initialize_count != 5) {
     result.details =
-        "MLX create/initialize should run once per LLM/STT/TTS model";
+        "MLX create/initialize should run once per LLM/VLM/embedding/STT/TTS model";
     return result;
   }
 
