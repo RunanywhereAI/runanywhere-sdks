@@ -41,7 +41,10 @@ extension LLMViewModel {
                 embeddingModel: embeddingModel,
                 llmModel: answerModel
             )
-            try await RunAnywhere.ragIngest(text: document.text)
+            try await RunAnywhere.ragIngest(
+                text: document.text,
+                metadataJSON: document.metadataJSON
+            )
 
             var options = RARAGQueryOptions.defaults(question: prompt)
             let settings = SettingsViewModel.shared

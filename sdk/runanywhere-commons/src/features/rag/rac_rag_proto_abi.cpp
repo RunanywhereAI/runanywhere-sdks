@@ -673,6 +673,11 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
             if (s_item.contains("score") && s_item["score"].is_number()) {
                 chunk->set_similarity_score(s_item["score"].get<float>());
             }
+            if (s_item.contains("source_document") && s_item["source_document"].is_string()) {
+                chunk->set_source_document(s_item["source_document"].get<std::string>());
+            } else if (s_item.contains("source") && s_item["source"].is_string()) {
+                chunk->set_source_document(s_item["source"].get<std::string>());
+            }
         }
     }
 

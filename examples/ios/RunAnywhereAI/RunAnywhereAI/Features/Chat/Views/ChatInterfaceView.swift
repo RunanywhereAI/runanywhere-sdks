@@ -18,6 +18,20 @@ import UIKit
 import AppKit
 #endif
 
+private enum ChatFileImportKind {
+    case document
+    case lora
+
+    var allowedContentTypes: [UTType] {
+        switch self {
+        case .document:
+            return [.pdf, .json]
+        case .lora:
+            return [.data]
+        }
+    }
+}
+
 // MARK: - Chat Interface View
 
 struct ChatInterfaceView: View {
@@ -30,7 +44,8 @@ struct ChatInterfaceView: View {
     @State private var showingAdvancedHub = false
     @State private var showingTalkMode = false
     @State private var showingVisionWorkbench = false
-    @State private var showingDocumentPicker = false
+    @State private var showingFileImporter = false
+    @State private var activeFileImportKind: ChatFileImportKind = .document
     @State private var showingDocumentEmbeddingModelSelection = false
     @State private var showingDocumentAnswerModelSelection = false
     @State private var showingVisionModelSelection = false
@@ -44,7 +59,6 @@ struct ChatInterfaceView: View {
     @State private var showDebugAlert = false
     @State private var debugMessage = ""
     @State private var showModelLoadedToast = false
-    @State private var showingLoRAFilePicker = false
     @State private var showingLoRAScaleSheet = false
     @State private var showingLoRAManagement = false
     @State private var openFilePickerAfterManagementDismiss = false
@@ -166,22 +180,11 @@ struct ChatInterfaceView: View {
             modelName: viewModel.loadedModelName ?? "Model"
         )
         .fileImporter(
-            isPresented: $showingDocumentPicker,
-            allowedContentTypes: [.pdf, .json],
+            isPresented: $showingFileImporter,
+            allowedContentTypes: activeFileImportKind.allowedContentTypes,
             allowsMultipleSelection: false
         ) { result in
-            handleDocumentImport(result)
-        }
-        .fileImporter(
-            isPresented: $showingLoRAFilePicker,
-            allowedContentTypes: [.data],
-            allowsMultipleSelection: false
-        ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                pendingLoRAURL = url
-                loraScale = 1.0
-                showingLoRAScaleSheet = true
-            }
+            handleFileImport(result, kind: activeFileImportKind)
         }
         .sheet(isPresented: $showingLoRAScaleSheet) {
             LoRAScaleSheetView(
@@ -210,7 +213,8 @@ struct ChatInterfaceView: View {
     private func handleLoRAManagementDismiss() {
         if openFilePickerAfterManagementDismiss {
             openFilePickerAfterManagementDismiss = false
-            showingLoRAFilePicker = true
+            activeFileImportKind = .lora
+            showingFileImporter = true
         }
     }
 
@@ -493,10 +497,24 @@ extension ChatInterfaceView {
         showingConversationList = false
     }
 
+    private func handleFileImport(_ result: Result<[URL], Error>, kind: ChatFileImportKind) {
+        switch kind {
+        case .document:
+            handleDocumentImport(result)
+        case .lora:
+            if case .success(let urls) = result, let url = urls.first {
+                pendingLoRAURL = url
+                loraScale = 1.0
+                showingLoRAScaleSheet = true
+            }
+        }
+    }
+
     private func handleComposerAction(_ action: ComposerAction) {
         switch action {
         case .attachFile:
-            showingDocumentPicker = true
+            activeFileImportKind = .document
+            showingFileImporter = true
         case .attachPhoto:
             showingPhotoPicker = true
         case .takePhoto:

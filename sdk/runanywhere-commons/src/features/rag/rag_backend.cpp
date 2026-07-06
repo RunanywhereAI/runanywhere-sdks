@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <initializer_list>
 #include <unordered_set>
 
 #include "rac/core/rac_logger.h"
@@ -24,6 +25,20 @@ static const std::string kSystemPrompt =
     "If the context does not contain enough information, say so.";
 
 namespace runanywhere::rag {
+namespace {
+
+std::string first_string_metadata(const nlohmann::json& metadata,
+                                  std::initializer_list<const char*> keys) {
+    for (const char* key : keys) {
+        auto it = metadata.find(key);
+        if (it != metadata.end() && it->is_string()) {
+            return it->get<std::string>();
+        }
+    }
+    return {};
+}
+
+} // namespace
 
 RAGBackend::RAGBackend(const RAGBackendConfig& config, rac_handle_t llm_service,
                        rac_handle_t embeddings_service, bool owns_services)
@@ -453,6 +468,11 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
         source["id"] = result.id;
         source["score"] = result.score;
         source["text"] = result.text;
+        const std::string source_document =
+            first_string_metadata(result.metadata, {"source_document", "source", "filename"});
+        if (!source_document.empty()) {
+            source["source_document"] = source_document;
+        }
         if (result.metadata.contains("source_text")) {
             source["source"] = result.metadata["source_text"];
         }

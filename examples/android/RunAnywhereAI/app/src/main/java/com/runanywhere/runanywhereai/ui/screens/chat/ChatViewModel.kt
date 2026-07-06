@@ -251,7 +251,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val answer = answerModel ?: error("Choose or download a document answer model first.")
                 val doc = withContext(Dispatchers.IO) { DocumentExtractor.extract(getApplication(), uri) }
                 ensureRagPipeline(embedding, answer)
-                RunAnywhere.ragIngest(doc.text, doc.name)
+                RunAnywhere.ragIngest(doc.text, doc.metadataJSON)
                 runCatching { RunAnywhere.ragGetStatistics() }
                 val result = RunAnywhere.ragQuery(prompt, RAGQueryOptions.defaults(question = prompt))
                 val sources = result.retrieved_chunks.map {
