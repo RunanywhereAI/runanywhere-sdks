@@ -9,11 +9,7 @@
  * but, on the current host / build flavor, must register without advertising
  * any primitive so the router can never select it:
  *
- *   - genie (Qualcomm NPU) — OFF by default and never routable in-tree
- *     (`RAC_GENIE_LLM_OPS_AVAILABLE=0`); the LLM ops are pure shell.
- *   - metalrt — multi-primitive engine whose closed-source binary
- *     (`RAC_METALRT_ENGINE_AVAILABLE`) is usually absent, so its STUB ARM
- *     publishes nothing.
+ *   - qhexrt — private Android NPU engine whose prebuilt archive may be absent.
  *   - coreml — Apple-only; its non-routable arm publishes nothing.
  *
  * Each of those hand-rolls the identical four-part shell:
@@ -46,7 +42,7 @@
  *     no new .cpp / CMake wiring.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * USAGE A — a plain always-unavailable stub (e.g. genie)
+ * USAGE A — a plain always-unavailable stub (e.g. sample)
  *
  * The engine is never routable in-tree, so there is a single arm. Define the
  * capability_check with whatever `#if` gating the engine needs, then emit the
@@ -54,17 +50,16 @@
  *
  * @code
  *   namespace {
- *   rac_result_t genie_capability_check(void) {
- *       // SDK-derived booleans; matches genie's historical 3-way gate.
+ *   rac_result_t sample_capability_check(void) {
+ *       // Build-derived booleans for this engine's host/runtime gate.
  *       return rac_engine_unavailable_capability(
  *   #if defined(__ANDROID__)
  *           1,                          // platform_supported
  *   #else
  *           0,
  *   #endif
- *   #if defined(RAC_GENIE_SDK_AVAILABLE) && RAC_GENIE_SDK_AVAILABLE && \
- *       defined(RAC_GENIE_LLM_OPS_AVAILABLE) && RAC_GENIE_LLM_OPS_AVAILABLE
- *           1                           // backend_present (SDK-backed ops wired)
+ *   #if defined(RAC_SAMPLE_BACKEND_AVAILABLE) && RAC_SAMPLE_BACKEND_AVAILABLE
+ *           1                           // backend_present
  *   #else
  *           0
  *   #endif
@@ -72,35 +67,35 @@
  *   }
  *   }  // namespace
  *
- *   RAC_ENGINE_UNAVAILABLE_PLUGIN(genie, "Qualcomm Genie (NPU)",
- *                                 genie_capability_check)
+ *   RAC_ENGINE_UNAVAILABLE_PLUGIN(sample, "Sample Engine",
+ *                                 sample_capability_check)
  * @endcode
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * USAGE B — an `#if`-gated real/stub engine (e.g. metalrt)
+ * USAGE B — an `#if`-gated real/stub engine (e.g. qhexrt)
  *
- * A multi-primitive engine that is a real plugin when its binary is linked and
+ * An engine that is a real plugin when its binary is linked and
  * a not-routable stub otherwise. The engine guards its real hand-written
  * manifest/vtable under the routable branch and uses this macro for the stub
  * branch, so both branches still expose the SAME `rac_plugin_entry_<name>`
  * symbol and the same all-NULL `.rodata` vtable contract on the stub side:
  *
  * @code
- *   #if defined(__APPLE__) && defined(RAC_METALRT_ENGINE_AVAILABLE) && \
- *       RAC_METALRT_ENGINE_AVAILABLE
- *   #define RAC_METALRT_ROUTABLE 1
+ *   #if defined(__ANDROID__) && defined(RAC_QHEXRT_ENGINE_AVAILABLE) && \
+ *       RAC_QHEXRT_ENGINE_AVAILABLE
+ *   #define RAC_QHEXRT_ROUTABLE 1
  *   #else
- *   #define RAC_METALRT_ROUTABLE 0
+ *   #define RAC_QHEXRT_ROUTABLE 0
  *   #endif
  *
- *   static rac_result_t metalrt_capability_check(void) {
+ *   static rac_result_t qhexrt_capability_check(void) {
  *       return rac_engine_unavailable_capability(
- *   #if defined(__APPLE__)
- *           1,                          // platform_supported (Apple only)
+ *   #if defined(__ANDROID__)
+ *           1,                          // platform_supported (Android only)
  *   #else
  *           0,
  *   #endif
- *   #if defined(RAC_METALRT_ENGINE_AVAILABLE) && RAC_METALRT_ENGINE_AVAILABLE
+ *   #if defined(RAC_QHEXRT_ENGINE_AVAILABLE) && RAC_QHEXRT_ENGINE_AVAILABLE
  *           1                           // backend_present (engine binary linked)
  *   #else
  *           0
@@ -108,10 +103,10 @@
  *       );
  *   }
  *
- *   #if RAC_METALRT_ROUTABLE
+ *   #if RAC_QHEXRT_ROUTABLE
  *       // ... real manifest + multi-primitive vtable + RAC_PLUGIN_ENTRY_DEF ...
  *   #else
- *       RAC_ENGINE_UNAVAILABLE_PLUGIN(metalrt, "MetalRT", metalrt_capability_check)
+ *       RAC_ENGINE_UNAVAILABLE_PLUGIN(qhexrt, "QHexRT", qhexrt_capability_check)
  *   #endif
  * @endcode
  *
@@ -134,10 +129,9 @@ extern "C" {
  *
  * Engines pass their own `#if`-derived booleans (1/0):
  *   - @p platform_supported — is this OS/arch a target for the engine at all?
- *     (e.g. `__ANDROID__` for genie, `__APPLE__` for metalrt / coreml).
+ *     (e.g. `__ANDROID__` for qhexrt, `__APPLE__` for coreml).
  *   - @p backend_present    — is the real engine implementation linked / wired
- *     on this build? (SDK-backed ops for genie, the closed-source binary for
- *     metalrt, the generate path for coreml).
+ *     on this build? (the QHexRT prebuilt archive, the generate path for coreml).
  *
  * Returns, in priority order:
  *   - `RAC_ERROR_CAPABILITY_UNSUPPORTED` when the platform itself is wrong —
@@ -150,7 +144,7 @@ extern "C" {
  *
  * The platform check is evaluated first so a stub build on the wrong OS reports
  * UNSUPPORTED rather than UNAVAILABLE, matching the hand-written gates in
- * genie / metalrt / coreml.
+ * qhexrt / coreml.
  */
 static inline rac_result_t rac_engine_unavailable_capability(int platform_supported,
                                                              int backend_present) {
@@ -245,7 +239,7 @@ static inline rac_result_t rac_engine_unavailable_capability(int platform_suppor
  *                  the `rac_plugin_entry_<name>` symbol. MUST match the engine's
  *                  registration name / library entry-name convention.
  *   @param display human-readable display name as a string literal (e.g.
- *                  "Qualcomm Genie (NPU)"); `" [unavailable]"` is appended for
+ *                  "QHexRT"); `" [unavailable]"` is appended for
  *                  the manifest's `display_name`.
  *   @param cap_fn  the engine-owned `rac_result_t (*)(void)` capability_check.
  *                  Keeping it engine-supplied lets per-engine `#if` gating stay

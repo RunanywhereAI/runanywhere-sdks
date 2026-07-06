@@ -96,7 +96,7 @@ bump_pubspec_version() {
     bump_line "$file" '^version: .+' "version: ${NEW_VERSION}"
 }
 
-# Flutter sub-packages (genie/llamacpp/onnx) depend on the core `runanywhere`
+# Flutter sub-packages (llamacpp/onnx/qhexrt) depend on the core `runanywhere`
 # package via a caret constraint like `runanywhere: ^0.19.13`. When we bump
 # the suite, that constraint must track the FULL NEW_VERSION (patch included)
 # because backend packages ship native binaries that lockstep with the core
@@ -268,7 +268,6 @@ echo ""
 echo ">> Flutter SDK:"
 for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml" \
-    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_genie/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml"; do
@@ -278,7 +277,6 @@ done
 # Sub-packages depend on the core `runanywhere` package; align their
 # dependency floor to match the bumped suite version.
 for pkg in \
-    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_genie/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml"; do
@@ -307,7 +305,6 @@ bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/andr
 # Flutter podspecs hardcode s.version and require an explicit bump here.
 for podspec in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere.podspec" \
-    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_genie/ios/runanywhere_genie.podspec" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp.podspec" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx.podspec" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/ios/runanywhere_qhexrt.podspec"; do

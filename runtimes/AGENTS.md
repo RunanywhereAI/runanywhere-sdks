@@ -8,7 +8,7 @@ This file provides guidance to AI coding assistants (Claude Code, Cursor, etc.) 
 
 A **runtime is a compute substrate / device** — the hardware (or vendor library treated as a device) that math actually runs on: **CPU**, **Apple Metal** (GPU), **Apple Core ML** (ANE/GPU/CPU chosen by Core ML), **ONNX Runtime as a library**, and future targets (CUDA, Vulkan, QNN, NNAPI, WebGPU). A runtime is **named by the device/framework** (`"cpu"`, `"metal"`, `"coreml"`, `"onnxrt"`), keyed by `rac_runtime_id_t` (`sdk/runanywhere-commons/include/rac/plugin/rac_primitive.h:83`).
 
-**A runtime is NOT an engine.** Engines (llamacpp, sherpa, onnx, coreml, metalrt, platform) serve **modalities** — they publish primitive ops (`llm_ops`, `stt_ops`, …) and are *clients* of one or more runtimes. Runtimes provide **compute**; they describe a device and, in exactly one case, host a session. The two registries are separate: engines register a `rac_engine_vtable_t` via `rac_plugin_register`; runtimes register a `rac_runtime_vtable_t` via `rac_runtime_register` (`sdk/runanywhere-commons/include/rac/plugin/rac_runtime_registry.h`).
+**A runtime is NOT an engine.** Engines (llamacpp, sherpa, onnx, coreml, qhexrt, cloud) serve **modalities** — they publish primitive ops (`llm_ops`, `stt_ops`, …) and are *clients* of one or more runtimes. Runtimes provide **compute**; they describe a device and, in exactly one case, host a session. The two registries are separate: engines register a `rac_engine_vtable_t` via `rac_plugin_register`; runtimes register a `rac_runtime_vtable_t` via `rac_runtime_register` (`sdk/runanywhere-commons/include/rac/plugin/rac_runtime_registry.h`).
 
 Promoting runtimes to first-class plugins lets multiple engines share one ORT `Ort::Env`, reuse one Core ML `MLModel` loader, and (eventually) allocate device buffers through one allocator per device instead of one per engine — see the header rationale in `sdk/runanywhere-commons/include/rac/plugin/rac_runtime_vtable.h:1-27`.
 
@@ -30,7 +30,7 @@ Identity + `init` + `destroy` + `device_info` + `capabilities`. **Every runtime 
 
 `create_session` / `run_session` / `destroy_session`, plus the buffer ops (`alloc_buffer` / `free_buffer` and the ABI-v2 buffer extension). A runtime that **actually runs inference** fills these slots **and** advertises `RAC_RUNTIME_CAP_SESSION_EXECUTION` in `capabilities()`. Session execution is **all-or-nothing**: a runtime that provides `create_session` MUST also provide `run_session` and `destroy_session`.
 
-> **Today only the built-in CPU runtime provides this role.** Metal / Core ML / ONNX Runtime are **capability-only** and leave the session slots NULL.
+> **Today only the built-in CPU runtime provides this role.** Core ML / ONNX Runtime are **capability-only** and leave the session slots NULL.
 
 ### The `RAC_RUNTIME_CAP_SESSION_EXECUTION` contract
 
@@ -72,7 +72,7 @@ The ABI boundary is `sdk/runanywhere-commons/include/rac/plugin/rac_runtime_vtab
 
 - Runtime ABI is **independent** of `RAC_PLUGIN_API_VERSION` (engines). Current = `RAC_RUNTIME_ABI_VERSION_V2` (`2u`).
 - The registry accepts **ABI v2 only**. A v1-only vtable (missing the `reserved_slot_0` v2 extension) is **hard-rejected** with `RAC_ERROR_ABI_VERSION_MISMATCH`. `metadata.abi_version` must equal `RAC_RUNTIME_ABI_VERSION` exactly.
-- The v2 extension `rac_runtime_vtable_v2_t` (`rac_runtime_vtable.h:291-318`) hangs off `reserved_slot_0` and carries `run_session_v2` + device-aware buffer ops (`alloc_buffer`/`buffer_info`/`map_buffer`/`unmap_buffer`/`copy_buffer`) + `release_tensor`. Probe it via the inline `rac_runtime_vtable_get_v2()`. Capability-only runtimes still ship a v2 table, but every op slot in it is NULL (Core ML at `coreml/rac_runtime_coreml.mm:85`, Metal at `metal/rac_runtime_metal.mm:103`); **onnxrt leaves `reserved_slot_0` itself NULL** since it offers no session role at all (`onnxrt/rac_runtime_onnxrt.cpp:744-783`).
+- The v2 extension `rac_runtime_vtable_v2_t` (`rac_runtime_vtable.h:291-318`) hangs off `reserved_slot_0` and carries `run_session_v2` + device-aware buffer ops (`alloc_buffer`/`buffer_info`/`map_buffer`/`unmap_buffer`/`copy_buffer`) + `release_tensor`. Probe it via the inline `rac_runtime_vtable_get_v2()`. Capability-only runtimes may ship a v2 table with every op slot NULL; **onnxrt leaves `reserved_slot_0` itself NULL** since it offers no session role.
 
 ### The registry (`rac_runtime_registry.h`)
 
@@ -80,7 +80,7 @@ The ABI boundary is `sdk/runanywhere-commons/include/rac/plugin/rac_runtime_vtab
 
 ### Registration: `RAC_STATIC_RUNTIME_REGISTER` + the CPU bootstrap special-case
 
-Most runtimes self-register with `RAC_STATIC_RUNTIME_REGISTER(<name>)` (`rac_runtime_registry.h:147-157`) — a file-scope constructor that calls `rac_runtime_register(rac_runtime_entry_<name>())` before `main`, plus a `rac_runtime_static_marker_<name>` symbol so a `-force_load` / `--whole-archive` reference can keep the TU alive against dead-symbol stripping. `onnxrt`, `coreml`, and `metal` use this path.
+Most runtimes self-register with `RAC_STATIC_RUNTIME_REGISTER(<name>)` (`rac_runtime_registry.h:147-157`) — a file-scope constructor that calls `rac_runtime_register(rac_runtime_entry_<name>())` before `main`, plus a `rac_runtime_static_marker_<name>` symbol so a `-force_load` / `--whole-archive` reference can keep the TU alive against dead-symbol stripping. `onnxrt` and `coreml` use this path.
 
 **The CPU runtime is the special case.** It does **not** use `RAC_STATIC_RUNTIME_REGISTER`. Instead `rac_commons`' registry TU explicitly bootstraps it (`sdk/runanywhere-commons/src/plugin/rac_runtime_registry.cpp:135-189`, calling `rac_runtime_entry_cpu()` directly). Rationale (`cpu/rac_runtime_cpu.cpp:634-645`, `cpu/CMakeLists.txt:1-11`): this guarantees the registry is non-empty out-of-the-box on **every** build configuration — iOS static xcframework, Android `.so`, plain unit test — with no per-host `-force_load` dance. A failed CPU `init()` is logged and skipped so it can never abort SDK bootstrap. The `RAC_STATIC_RUNTIME_REGISTER` path is still exercised separately by `tests/test_runtime_loader.cpp`.
 
@@ -93,13 +93,12 @@ Most runtimes self-register with `RAC_STATIC_RUNTIME_REGISTER(<name>)` (`rac_run
 | **cpu** | `runtimes/cpu/` | **Yes (the only one)** | **Set** | `llamacpp` (LLM/VLM); any engine registering a CPU provider | Provider registry: engines register a `rac_cpu_runtime_provider_t`; `cpu_create_session`/`cpu_run_session` delegate to it. Folded into `rac_commons` (OBJECT lib). | **Live, core** |
 | **onnxrt** | `runtimes/onnxrt/` | No (slots NULL) | **Not set** | `onnx` engine **only** | Engines call the C++ `runanywhere::runtime::onnxrt::Session` class (`Session::create`/`run`) directly; the vtable half exists to satisfy the router's "runtime registered" gate. Links real `onnxruntime`. | **Live (library), one consumer** |
 | **coreml** | `runtimes/coreml/` | No (slots NULL) | **Not set** | `coreml` engine (diffusion) | Engine calls Core ML **loader helpers** (`rac_coreml_load_model_in_dir`, `rac_coreml_default_model_configuration`, `rac_coreml_find_resource_dir`) + the `rac_coreml_runtime_require_available` anchor. Apple-only. | **Live (loader helpers)** |
-| **metal** | `runtimes/metal/` | No (slots NULL) | **Not set** | `metalrt` engine (Apple, **OFF by default**) | Pure **presence gate**: `rac_metal_runtime_require_available`. Real Metal compute is in ggml, not here. Apple-only. | **Reserved / experimental** (see below) |
 
-Priorities (`metadata.priority`): metal `100`, coreml `90`, onnxrt `80`, cpu `0`. (Used only for same-`id` dedup, not engine selection.)
+Priorities (`metadata.priority`): coreml `90`, onnxrt `80`, cpu `0`. (Used only for same-`id` dedup, not engine selection.)
 
 ### The honest "who uses each" reality
 
-The vtable/registrar machinery is uniform across all four runtimes, but **how much of each runtime is actually load-bearing differs sharply.** Don't assume "registered runtime ⇒ executes inference."
+The vtable/registrar machinery is uniform across all three runtimes, but **how much of each runtime is actually load-bearing differs sharply.** Don't assume "registered runtime ⇒ executes inference."
 
 - **cpu** — the **only** runtime that hosts a session. It is a **dispatch/session-ownership indirection**, not a compute kernel: `cpu_create_session` looks up a registered `rac_cpu_runtime_provider_t` and forwards to it; the actual math is the engine's bundled library (for `llamacpp`, that's llama.cpp/ggml). Real consumer today: **llamacpp**, which registers `k_llamacpp_cpu_provider` and routes its LLM path through the CPU session (`engines/llamacpp/rac_backend_llamacpp_register.cpp:116`, `:402`). The provider registry deliberately keeps `rac_commons` from linking against any engine.
 
@@ -108,8 +107,6 @@ The vtable/registrar machinery is uniform across all four runtimes, but **how mu
   > **`sherpa` does NOT use this runtime.** This is the most common misconception. The `sherpa` engine declares **`RAC_RUNTIME_CPU`** in `k_sherpa_runtimes[]` (`engines/sherpa/rac_plugin_entry_sherpa.cpp:47-48`), links the **sherpa-onnx** library + **raw `onnxruntime`** as static archives (`engines/sherpa/CMakeLists.txt:370-373`), and calls the sherpa-onnx C API directly. Its sources contain **zero** references to `runtime::onnxrt` / `rac_runtime_onnxrt`. So `onnxrt` = a thin ORT wrapper used by **one** engine (`onnx`); sherpa reaches ONNX Runtime transitively through sherpa-onnx, never through `runtimes/onnxrt`.
 
 - **coreml** — a capability runtime **plus a bag of MLModel loader helpers** (`runtimes/coreml/rac_runtime_coreml.mm:141-255`). Real consumer: the **`coreml` engine** (our diffusion pipeline, recently renamed from `diffusion-coreml`) via those loaders + `rac_coreml_runtime_require_available`, in `engines/coreml/rac_diffusion_coreml.mm`. **Same-name, different registry:** engine `coreml` (registers `rac_plugin_entry_coreml` / `RAC_STATIC_PLUGIN_REGISTER(coreml)`, `engines/coreml/rac_static_register_coreml.cpp:27`) and runtime `coreml` (registers `rac_runtime_entry_coreml`, `runtimes/coreml/rac_runtime_coreml.mm:262-266`) share the framework name but live in separate dirs/registries with distinct symbols — a clean illustration of **"an engine uses a same-named device runtime."**
-
-- **metal** — the **least-used** runtime: a **pure presence gate** with no compute. Its only consumer is the `metalrt` engine (`engines/metalrt/*` call `rac_metal_runtime_require_available`), and `RAC_BACKEND_METALRT` is **OFF by default** (`engines/metalrt/CMakeLists.txt:32-36`; the engine itself is a closed-source dependency stubbed out in the public repo) → the gate currently guards a **dormant** engine. Real Metal compute lives inside llama.cpp/ggml, reached via llamacpp's `RAC_RUNTIME_METAL` *hint*, not through this runtime. See **Reserved / experimental** below.
 
 ---
 
@@ -158,20 +155,7 @@ An engine declares which device runtimes it needs in its manifest's `runtimes[]`
 
 Enforcement: `sdk/runanywhere-commons/src/router/rac_engine_router.cpp` (`has_registered_declared_runtime` at `:174`, the hard-reject at `:223,234`) and the C wrapper `rac_route.cpp:25-59`, which promotes the rejection to `RAC_ERROR_RUNTIME_UNAVAILABLE` (marker `"no registered runtime satisfies"`). Descriptor-only legacy engines (`metadata.runtimes == NULL`) stay routable. The router awards `+40` runtime-compat when a declared runtime is registered.
 
-**The thing to internalize:** declaring a runtime ⇒ "I need this device present (registered)." It does **not** mean the runtime executes the session. **Only `cpu` actually executes sessions; `onnxrt`/`coreml` provide a library / loader-helpers; `metal` is a bare presence gate.**
-
----
-
-## Reserved / experimental: `metal`
-
-`runtimes/metal/` (`rac_runtime_metal.mm`, gated Apple-only by `runtimes/metal/CMakeLists.txt:1-3`) is **reserved / experimental**, not unfinished:
-
-- It is **capability-only** — fills only the mandatory role (`metal_init` creates an `MTLDevice`/`MTLCommandQueue` to prove the GPU is real and self-reject on Linux/headless; `metal_device_info` reports `apple-metal` + working-set size; `metal_capabilities` advertises `RAC_RUNTIME_CAP_FP16` + GGUF/CoreML formats). **All session slots are NULL and `RAC_RUNTIME_CAP_SESSION_EXECUTION` is never set** (`rac_runtime_metal.mm:84-101,142-155`).
-- **Do not mistake the NULL session slots for "TODO."** It is a deliberate **presence gate**: `rac_metal_runtime_require_available()` (`:159`) lets an engine assert the Metal device is registered before routing. **Real Metal compute lives in llama.cpp/ggml**, reached through llamacpp's `RAC_RUNTIME_METAL` hint — never through this runtime.
-- Its **only** consumer is the `metalrt` engine, which is **OFF by default** (`RAC_BACKEND_METALRT` defaults OFF; the engine binary is a private/closed-source dependency stubbed in the public repo, `engines/metalrt/CMakeLists.txt:32-36`). So this runtime currently guards a **dormant** engine and is the **least-used** runtime in the tree.
-- A one-line reserved/experimental marker comment sits at the top of `rac_runtime_metal.mm` pointing back here.
-
-If a future first-class Metal runtime (real `create_session`/buffer ops) lands, it would fill the session slots **and** set `RAC_RUNTIME_CAP_SESSION_EXECUTION`, becoming the second session-execution runtime.
+**The thing to internalize:** declaring a runtime ⇒ "I need this device present (registered)." It does **not** mean the runtime executes the session. **Only `cpu` actually executes sessions; `onnxrt`/`coreml` provide a library / loader-helpers.**
 
 ---
 
@@ -179,7 +163,7 @@ If a future first-class Metal runtime (real `create_session`/buffer ops) lands, 
 
 Adding a runtime is uncommon — most new device support arrives via an engine's bundled backend (Pattern 1) or a library wrapper (Pattern 2). Add a first-class runtime only when a **device/substrate** must be shared across engines or exposed to hardware-aware routing.
 
-1. **Decide the role.** Capability-only (describe a device + maybe expose loader/helpers — like `coreml`/`metal`/`onnxrt`) vs session-execution (actually host `create_session`/`run_session` — like `cpu`). **Default to capability-only** unless you genuinely host sessions through the C vtable; if you do, fill *all* of `create_session`/`run_session`/`destroy_session` **and** set `RAC_RUNTIME_CAP_SESSION_EXECUTION`.
+1. **Decide the role.** Capability-only (describe a device + maybe expose loader/helpers — like `coreml`/`onnxrt`) vs session-execution (actually host `create_session`/`run_session` — like `cpu`). **Default to capability-only** unless you genuinely host sessions through the C vtable; if you do, fill *all* of `create_session`/`run_session`/`destroy_session` **and** set `RAC_RUNTIME_CAP_SESSION_EXECUTION`.
 2. **Create `runtimes/<name>/`** with `CMakeLists.txt` + `rac_runtime_<name>.cpp` (`.mm` for Apple frameworks). Fill a `rac_runtime_vtable_t` in `.rodata`: `metadata` (`abi_version = RAC_RUNTIME_ABI_VERSION`, a `rac_runtime_id_t`, `name`, `priority`, formats, devices), mandatory `init`/`destroy`/`device_info`/`capabilities`, session slots only if applicable, and a v2 extension on `reserved_slot_0` (NULL-filled if capability-only, or omit the slot entirely as `onnxrt` does).
 3. **Register.** Define the entry with `RAC_RUNTIME_ENTRY_DEF(<name>)` and add `RAC_STATIC_RUNTIME_REGISTER(<name>);` at namespace scope. (Only the always-on CPU runtime is bootstrapped explicitly by the registry instead.) Add an `rac_<name>_runtime_require_available()` keep-alive anchor if engines need to force-retain the registrar TU under dead-symbol stripping.
 4. **Wire the build.** Append `add_subdirectory(<name>)` in `runtimes/CMakeLists.txt` (guard Apple-only runtimes with `if(NOT APPLE) return() endif()`), behind a `RAC_RUNTIME_<NAME>` option.
@@ -191,5 +175,5 @@ Adding a runtime is uncommon — most new device support arrives via an engine's
 
 - C ABI surface prefixed `rac_`, types `_t`, errors `RAC_ERROR_*`, macros `RAC_*`. C++20 internals, pure C at the boundary. Run `./scripts/lint-cpp.sh` (`--fix`) before committing.
 - Strings/arrays in a vtable must be lifetime-stable (`.rodata`); the registry stores pointers, never copies.
-- An ObjC++ runtime (`.mm`) must **catch every `NSException`** at the C boundary — an uncaught ObjC exception bridging into `extern "C"` aborts the process (see the `@try/@catch` blocks in `coreml`/`metal`).
+- An ObjC++ runtime (`.mm`) must **catch every `NSException`** at the C boundary — an uncaught ObjC exception bridging into `extern "C"` aborts the process (see the `@try/@catch` blocks in `coreml`).
 - Keep this file in sync with [`engines/AGENTS.md`](../engines/AGENTS.md): the **3-pattern engine↔runtime taxonomy** must match across both documents.

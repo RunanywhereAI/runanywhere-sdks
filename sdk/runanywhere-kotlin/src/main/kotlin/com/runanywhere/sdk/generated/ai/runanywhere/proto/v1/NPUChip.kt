@@ -18,7 +18,7 @@ import kotlin.Suppress
 
 /**
  * ---------------------------------------------------------------------------
- * NPU chipset detected on the host device. Used to drive Genie / vendor-NPU
+ * NPU chipset detected on the host device. Used to drive vendor-NPU
  * model-download URL selection and runtime backend wiring.
  * Sources pre-IDL:
  *   Dart   npu_chip.dart:14    (snapdragon8Elite, snapdragon8EliteGen5)

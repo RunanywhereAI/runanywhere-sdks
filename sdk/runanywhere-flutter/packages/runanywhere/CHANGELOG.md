@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tool-calling session ABIs**: Tool-calling now uses session-based proto
   requests (`rac_tool_calling_*_proto`) for parity with Swift/Kotlin.
 - **Plugin loader capability**: New `RunAnywherePluginLoader` surface for
-  registering backend plugins (LlamaCpp/ONNX/Genie) from Dart.
+  registering backend plugins (LlamaCpp/ONNX/QHexRT) from Dart.
 - **Model lifecycle / registry split**: `RunAnywhereModels` (registry) and
   `RunAnywhereModelLifecycle` (load/unload/current) are now separate
   capability classes.
@@ -40,11 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.17.0] - 2026-03-09
 
 ### Added
-- **Genie NPU Backend**: Added `InferenceFramework.genie` enum value for Qualcomm Genie NPU support
+- **QHexRT NPU Backend**: Added NPU framework enum support for Qualcomm Hexagon bundles
 - **RAG Types**: Extended RAG type definitions for enhanced retrieval-augmented generation
 
 ### Changed
-- Updated model type definitions to support Genie NPU framework registration
+- Updated model type definitions to support NPU framework registration
 
 ## [0.16.0] - 2026-02-14
 

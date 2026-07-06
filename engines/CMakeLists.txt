@@ -39,17 +39,6 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/onnx/CMakeLists.txt")
     add_subdirectory(onnx)
 endif()
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metalrt/CMakeLists.txt")
-    add_subdirectory(metalrt)
-endif()
-
-# Qualcomm Genie / NPU LLM engine. OFF by default — requires the
-# Genie SDK headers which are not in-tree. Compiles a shell plugin that
-# surfaces RAC_ERROR_BACKEND_UNAVAILABLE when the SDK isn't linked in.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/genie/CMakeLists.txt")
-    add_subdirectory(genie)
-endif()
-
 # QHexRT — RunAnywhere's PRIVATE Qualcomm Hexagon NPU runtime. OFF by default —
 # consumed as a prebuilt static archive under QHEXRT_ROOT (gitignored); compiles
 # a not-routable shell when the archive is absent (public repo builds clean),

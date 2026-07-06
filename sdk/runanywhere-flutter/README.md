@@ -382,7 +382,7 @@ The RunAnywhere Flutter SDK follows a **modular, provider-based architecture** w
 | `runanywhere` | ~5MB | Core SDK, capability surface, registries, events |
 | `runanywhere_llamacpp` | ~15-25MB | LLM + VLM (GGUF models) |
 | `runanywhere_onnx` | ~50-70MB | STT, TTS, VAD (Sherpa/ONNX models) |
-| `runanywhere_genie` | varies | Qualcomm Genie NPU LLM (Android/Snapdragon only) |
+| `runanywhere_qhexrt` | varies | QHexRT Qualcomm Hexagon NPU models |
 
 ---
 

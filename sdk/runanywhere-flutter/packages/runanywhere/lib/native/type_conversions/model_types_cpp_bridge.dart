@@ -243,14 +243,10 @@ extension ProtoInferenceFrameworkCppBridge on pb.InferenceFramework {
         return 'System TTS';
       case pb.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
         return 'FluidAudio';
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
-        return 'Qualcomm Genie';
       case pb.InferenceFramework.INFERENCE_FRAMEWORK_COREML:
         return 'Core ML';
       case pb.InferenceFramework.INFERENCE_FRAMEWORK_MLX:
         return 'MLX';
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
-        return 'MetalRT';
       case pb.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN:
         return 'Built-in';
       case pb.InferenceFramework.INFERENCE_FRAMEWORK_NONE:

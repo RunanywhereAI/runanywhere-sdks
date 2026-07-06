@@ -262,7 +262,7 @@ runanywhere-commons/
 │   └── jni/                        # JNI bridge for Android
 │
 │   # ML engine plugins live at the monorepo root under ../../engines/
-│   # (llamacpp, sherpa, onnx, metalrt, genie, coreml). Each
+│   # (llamacpp, sherpa, onnx, cloud, qhexrt, coreml). Each
 │   # ships a rac_plugin_entry_<name>.cpp that publishes a
 │   # rac_engine_vtable_t via RAC_STATIC_PLUGIN_REGISTER or a dlopen'd
 │   # entry symbol. See ../../engines/.

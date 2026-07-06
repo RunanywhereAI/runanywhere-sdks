@@ -6,7 +6,7 @@
 # directly from source:
 #   - Kotlin (`src/main/jniLibs`)
 #   - React Native core/llamacpp/onnx (`android/src/main/jniLibs`)
-#   - Flutter runanywhere/runanywhere_llamacpp/runanywhere_onnx/runanywhere_genie
+#   - Flutter runanywhere/runanywhere_llamacpp/runanywhere_onnx/runanywhere_qhexrt
 #     (`android/src/main/jniLibs`)
 #
 # Usage:
@@ -39,7 +39,6 @@ RN_CORE_INCLUDE_DEST="${RN_CORE_JNI_DEST}/include"
 FLUTTER_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/src/main/jniLibs"
 FLUTTER_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/src/main/jniLibs"
 FLUTTER_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/android/src/main/jniLibs"
-FLUTTER_GENIE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_genie/android/src/main/jniLibs"
 FLUTTER_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/jniLibs"
 
 COMMONS_INCLUDE_SRC="${REPO_ROOT}/sdk/runanywhere-commons/include"
@@ -127,8 +126,7 @@ mkdir -p \
     "${FLUTTER_CORE_JNI_DEST}" \
     "${FLUTTER_LLAMA_JNI_DEST}" \
     "${FLUTTER_ONNX_JNI_DEST}" \
-    "${FLUTTER_QHEXRT_JNI_DEST}" \
-    "${FLUTTER_GENIE_JNI_DEST}"
+    "${FLUTTER_QHEXRT_JNI_DEST}"
 
 rm -rf "${RN_CORE_INCLUDE_DEST}"
 mkdir -p "${RN_CORE_INCLUDE_DEST}"
@@ -310,14 +308,13 @@ for ABI in "${ABIS[@]}"; do
     FLUTTER_CORE_DEST="${FLUTTER_CORE_JNI_DEST}/${ABI}"
     FLUTTER_LLAMA_DEST="${FLUTTER_LLAMA_JNI_DEST}/${ABI}"
     FLUTTER_ONNX_DEST="${FLUTTER_ONNX_JNI_DEST}/${ABI}"
-    FLUTTER_GENIE_DEST="${FLUTTER_GENIE_JNI_DEST}/${ABI}"
     FLUTTER_QHEXRT_DEST="${FLUTTER_QHEXRT_JNI_DEST}/${ABI}"
 
     mkdir -p \
         "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" "${KOTLIN_QHEXRT_DEST}" \
         "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
         "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
-        "${FLUTTER_QHEXRT_DEST}" "${FLUTTER_GENIE_DEST}"
+        "${FLUTTER_QHEXRT_DEST}"
 
     # Clean everything we manage before re-staging so stale artifacts from a
     # previous run (e.g. a dropped backend) don't linger.
@@ -328,7 +325,7 @@ for ABI in "${ABIS[@]}"; do
         "${KOTLIN_QHEXRT_DEST}"/*.so \
         "${RN_CORE_DEST}"/*.so "${RN_LLAMA_DEST}"/*.so "${RN_ONNX_DEST}"/*.so "${RN_QHEXRT_DEST}"/*.so \
         "${FLUTTER_CORE_DEST}"/*.so "${FLUTTER_LLAMA_DEST}"/*.so \
-        "${FLUTTER_ONNX_DEST}"/*.so "${FLUTTER_QHEXRT_DEST}"/*.so "${FLUTTER_GENIE_DEST}"/*.so
+        "${FLUTTER_ONNX_DEST}"/*.so "${FLUTTER_QHEXRT_DEST}"/*.so
 
     # -------------------------------------------------------------------------
     # Locate artifacts produced by the CMake build.
@@ -412,7 +409,7 @@ for ABI in "${ABIS[@]}"; do
         "${KOTLIN_QHEXRT_DEST}" \
         "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
         "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
-        "${FLUTTER_QHEXRT_DEST}" "${FLUTTER_GENIE_DEST}" ; do
+        "${FLUTTER_QHEXRT_DEST}" ; do
         cp -v "${LIBCXX_SHARED}" "${dst}/"
     done
 
@@ -432,7 +429,7 @@ for ABI in "${ABIS[@]}"; do
         "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" "${KOTLIN_QHEXRT_DEST}" \
         "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
         "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
-        "${FLUTTER_QHEXRT_DEST}" "${FLUTTER_GENIE_DEST}"
+        "${FLUTTER_QHEXRT_DEST}"
 done
 
 echo ""
@@ -449,5 +446,4 @@ echo "  - ${FLUTTER_CORE_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${FLUTTER_LLAMA_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${FLUTTER_ONNX_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${FLUTTER_QHEXRT_JNI_DEST}/{${ABIS[*]}}"
-echo "  - ${FLUTTER_GENIE_JNI_DEST}/{${ABIS[*]}}"
 echo "✓ React Native headers copied to: ${RN_CORE_INCLUDE_DEST}"

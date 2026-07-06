@@ -31,26 +31,6 @@
 include_guard(GLOBAL)
 
 # -----------------------------------------------------------------------------
-# Engine that intentionally does NOT use this macro:
-#
-#   metalrt — Apple-only, optional, private dependency. It is built as an
-#             OBJECT library and folded into rac_commons because:
-#               (a) the engine itself is closed-source (private vendor lib);
-#                   the public repo only carries stubs that compile to no-ops.
-#               (b) when the real engine is linked (RAC_METALRT_ENGINE_AVAILABLE
-#                   = ON), the wrappers + vtable registration must end up
-#                   inside the host commons binary so static-init runs before
-#                   main() on iOS without a separate .dylib that the App Store
-#                   would reject.
-#               (c) the OBJECT layout naturally folds; STATIC/SHARED branching
-#                   would force either a separate .a no one consumes or a
-#                   .dylib that violates (b).
-#             metalrt registers itself in RAC_REGISTERED_ENGINES the same way
-#             this macro does (see engines/metalrt/CMakeLists.txt) so tooling
-#             (cmake -t graphviz/json) treats it identically.
-# -----------------------------------------------------------------------------
-
-# -----------------------------------------------------------------------------
 # rac_add_engine_plugin(name
 #                       SOURCES <s1> <s2> ...
 #                       [TARGET_NAME <override>]      # e.g. rac_backend_onnx
@@ -76,9 +56,8 @@ include_guard(GLOBAL)
 #       SHARED_ONLY engines (which expose JNI bridges or test-link surfaces)
 #       keep default visibility.
 #
-# Additions to support migrating the hand-rolled engines (onnx,
-# metalrt) without renaming their existing
-# CMake target names — the macro supports TARGET_NAME override + non-17
+# Additions to support migrating hand-rolled engines without renaming their
+# existing CMake target names — the macro supports TARGET_NAME override + non-17
 # C++ standards + SHARED_ONLY (skip the static-fold-into-rac_commons path).
 #
 # AVAILABILITY + ownership are recorded as GLOBAL properties for tooling

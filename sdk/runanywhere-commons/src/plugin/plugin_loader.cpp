@@ -113,7 +113,7 @@ struct DlGuard {
  * Examples:
  *   "/lib/librunanywhere_llamacpp.so"  → "rac_plugin_entry_llamacpp"
  *   "../runanywhere_onnx.dylib"         → "rac_plugin_entry_onnx"
- *   "C:\plugins\runanywhere_metalrt.dll"→ "rac_plugin_entry_metalrt"
+ *   "C:\plugins\runanywhere_qhexrt.dll" → "rac_plugin_entry_qhexrt"
  *   "/foo/myplugin.so"                  → "rac_plugin_entry_myplugin"
  *
  * The "rac_plugin_entry_" prefix is fixed; everything between the last path

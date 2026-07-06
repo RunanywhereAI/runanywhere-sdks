@@ -2,7 +2,7 @@
  * @file test_plugin_entry_coreml.cpp
  * @brief Locks the `coreml` engine plugin-entry / vtable contract.
  *
- * Mirrors the parallel test_plugin_entry_{genie,metalrt}.cpp smoke tests. The
+ * Mirrors the other plugin-entry smoke tests. The
  * coreml engine (named by the FRAMEWORK, serving the DIFFUSION modality today)
  * is the SOLE RAC_PRIMITIVE_DIFFUSION provider — there is no fallback engine for
  * image generation — and the router fans plugin_find(RAC_PRIMITIVE_DIFFUSION)

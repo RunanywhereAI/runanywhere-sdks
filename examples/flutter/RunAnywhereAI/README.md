@@ -49,7 +49,6 @@ Notes:
 
 - `scripts/build/build-core-android.sh` stages JNI libraries into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs`.
 - `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` stages `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, and `RABackendSherpa.xcframework` into the Flutter plugin `ios/Frameworks` directories.
-- `runanywhere_genie` is Android/Snapdragon-only; iOS builds do not expect a Genie XCFramework.
 - If the iOS build reports stale Pods or generated Flutter config, run `cd ios && pod install && cd ..` after `flutter pub get`.
 - `scripts/verify.sh` runs `pub get`, analysis, APK build, and optional iOS/native artifact refresh gates.
 

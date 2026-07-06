@@ -60,14 +60,8 @@ runanywhere::v1::InferenceFramework framework_for_plugin(const rac_engine_vtable
     if (name.find("coreml") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
     }
-    if (name.find("metal") != std::string::npos) {
-        return runanywhere::v1::INFERENCE_FRAMEWORK_METALRT;
-    }
     if (name.find("qhexrt") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
-    }
-    if (name.find("genie") != std::string::npos) {
-        return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
     }
     if (name.find("sherpa") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;

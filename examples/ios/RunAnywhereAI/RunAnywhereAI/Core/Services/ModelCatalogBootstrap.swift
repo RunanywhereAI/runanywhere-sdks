@@ -242,7 +242,7 @@ enum ModelCatalogBootstrap {
         await registerLoraAdapters()
         logger.info("LoRA adapters registered")
 
-        // MetalRT and Diffusion (CoreML) backends are deferred scope for
+        // Diffusion (CoreML) backend is deferred scope for
         // Swift v1. Their model catalog entries are intentionally omitted.
 
         logger.info("All modules and models registered")

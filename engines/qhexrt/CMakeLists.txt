@@ -3,9 +3,7 @@
 #
 # QHexRT runs prebuilt QNN context binaries on Snapdragon Hexagon NPUs (HTP).
 # It is a closed-source, RunAnywhere-owned dependency consumed as a PREBUILT
-# static archive — its source never enters this repo. This mirrors the
-# engines/metalrt private-binary pattern (libmetalrt_engine.a) and the
-# genie routable/shell split.
+# static archive — its source never enters this repo.
 #
 # Two modes:
 #

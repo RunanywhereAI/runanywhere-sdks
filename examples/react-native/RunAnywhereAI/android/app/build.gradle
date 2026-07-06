@@ -179,9 +179,7 @@ android {
             "**/librac_commons.so",
             "**/libomp.so",
             "**/libcdsprpc.so",
-            "**/libGenie.so",
-            "**/libQnn*.so",
-            "**/librac_backend_genie*.so"
+            "**/libQnn*.so"
         ]
     }
 

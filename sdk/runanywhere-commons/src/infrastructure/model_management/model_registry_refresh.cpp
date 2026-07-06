@@ -117,8 +117,8 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
     const rac_inference_framework_t frameworks[] = {
         RAC_FRAMEWORK_LLAMACPP,   RAC_FRAMEWORK_ONNX,        RAC_FRAMEWORK_COREML,
         RAC_FRAMEWORK_MLX,        RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
-        RAC_FRAMEWORK_SYSTEM_TTS, RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
-        RAC_FRAMEWORK_QHEXRT,     RAC_FRAMEWORK_SHERPA,      RAC_FRAMEWORK_UNKNOWN};
+        RAC_FRAMEWORK_SYSTEM_TTS, RAC_FRAMEWORK_QHEXRT,      RAC_FRAMEWORK_SHERPA,
+        RAC_FRAMEWORK_UNKNOWN};
 
     int32_t linked = 0;
     std::vector<rac_directory_entry_t> framework_entries;

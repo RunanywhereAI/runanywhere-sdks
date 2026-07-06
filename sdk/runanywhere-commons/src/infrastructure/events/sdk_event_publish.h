@@ -178,10 +178,6 @@ inline int32_t framework_to_proto_int(rac_inference_framework_t f) {
             return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
         case RAC_FRAMEWORK_COREML:
             return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
-        case RAC_FRAMEWORK_METALRT:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_METALRT;
-        case RAC_FRAMEWORK_GENIE:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
         case RAC_FRAMEWORK_SHERPA:
             return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;
         case RAC_FRAMEWORK_QHEXRT:

@@ -67,10 +67,10 @@ See `docs/RELEASE_INSTRUCTIONS.md`. Key step: after building, run `./scripts/pat
 | 3 | `MoreHubView` | RAG, STT, TTS, VAD, Storage, Voice Keyboard |
 | 4 | `CombinedSettingsView` | Generation params, API keys, tools, storage |
 
-> **Deferred backends.** MetalRT and Diffusion (image generation)
-> are excluded from the v1 build (`RunAnywhereAIApp.swift:12`). Their
-> products, registration calls, feature folders, and `generateImage` APIs are
-> intentionally absent from the shipped sources.
+> **Deferred image generation.** Diffusion/image generation is excluded from the
+> v1 build (`RunAnywhereAIApp.swift:12`). Its products, registration calls,
+> feature folders, and `generateImage` APIs are intentionally absent from the
+> shipped sources.
 
 ### Dependency Injection
 Three layers:

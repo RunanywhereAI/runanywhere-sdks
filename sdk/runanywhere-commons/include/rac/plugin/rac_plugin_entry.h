@@ -67,17 +67,10 @@ extern "C" {
  *                 Plugins built against v2 will be rejected at register
  *                 time with RAC_ERROR_ABI_VERSION_MISMATCH because the
  *                 new `create` slot is unreachable otherwise.
- *                 NOTE: `rac_service_register_provider` /
- *                 `rac_service_unregister_provider` remain as no-op
- *                 deprecation shims (log a WARN, return RAC_SUCCESS) in
- *                 `src/plugin/rac_plugin_registry.cpp` to keep older Genie
- *                 .so / Flutter pre-v3 plugin binaries dlopenable.
  *                 The associated *types* / *fn typedefs /
  *                 `rac_service_create` / `rac_service_list_providers` are
  *                 gone for good; new code MUST use `rac_plugin_register` /
- *                 `rac_plugin_unregister`. The shims can be deleted once
- *                 every shipped Genie / RN / Flutter binary has been
- *                 rebuilt against v3.
+ *                 `rac_plugin_unregister`.
  *   4u — removed the never-implemented rerank_ops vtable slot and the
  *                 RAC_PRIMITIVE_RERANK primitive (wire value 6 retired). All
  *                 engines rebuild against v4; v3 plugins are rejected at
@@ -217,8 +210,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *
  * Some backends need more than the bare
  * `rac_plugin_register(rac_plugin_entry_<name>())` that RAC_STATIC_PLUGIN_REGISTER
- * performs — e.g. llamacpp also hooks up its CPU-runtime provider, and metalrt
- * emits a stub-mode diagnostic when the closed-source engine binary is absent.
+ * performs — e.g. llamacpp also hooks up its CPU-runtime provider.
  * Those backends expose a hand-written `rac_backend_<name>_register()` that does
  * the unified plugin registration *plus* the engine-specific bring-up, and is
  * idempotent on repeat calls (so the dynamic-link path — where the SDK bridge

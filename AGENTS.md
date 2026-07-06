@@ -77,8 +77,8 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | Directory | Contents |
 |-----------|----------|
 | `sdk/runanywhere-commons/` | C/C++ core library — all AI logic, plugin registry, event system |
-| `engines/` | 6 backend plugins: llamacpp, sherpa, onnx, metalrt, genie, coreml |
-| `runtimes/` | 4 runtime adapters: cpu (always), onnxrt, coreml, metal |
+| `engines/` | 6 backend plugins: llamacpp, sherpa, onnx, cloud, qhexrt, coreml |
+| `runtimes/` | 3 runtime adapters: cpu (always), onnxrt, coreml |
 | `idl/` | 23 Protobuf schemas + per-language codegen scripts |
 
 ### Example Applications
@@ -124,8 +124,8 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
                                     │ rac_engine_vtable_t (v4)
           ┌─────────────┬───────────┼───────────┬─────────────┐
           ▼             ▼           ▼           ▼             ▼
-      llamacpp      sherpa-onnx  metalrt    platform        onnx
-     (LLM,VLM)    (STT,TTS,VAD) (Apple)  (Apple FM)   (Embed,WakeWord)
+      llamacpp      sherpa-onnx  qhexrt     coreml/cloud    onnx
+     (LLM,VLM)    (STT,TTS,VAD) (HNPU)     (Apple/HTTP) (Embed,WakeWord)
 ```
 
 ### Key Architectural Patterns
@@ -270,7 +270,7 @@ Backend modules at `modules/runanywhere-core-llamacpp/` and `modules/runanywhere
 
 ### Flutter SDK (`sdk/runanywhere-flutter/`)
 
-Managed by Melos. Four packages: `runanywhere` (core), `runanywhere_llamacpp`, `runanywhere_onnx`, `runanywhere_genie`.
+Managed by Melos. Four packages: `runanywhere` (core), `runanywhere_llamacpp`, `runanywhere_onnx`, `runanywhere_qhexrt`.
 
 ```bash
 cd sdk/runanywhere-flutter/
@@ -475,7 +475,7 @@ All SDKs follow the same pattern:
 3. The registry orders registered plugins by base priority, per primitive
 4. On inference, the highest-priority plugin that serves the primitive is selected via `rac_plugin_find()` (or `rac_plugin_find_for_engine()` for a name-pinned engine)
 
-Backend base priorities: metalrt=120 (highest, Apple-only), llamacpp=100, sherpa=90, onnx=50. Selection is plain priority order — there is no runtime/format scoring or pinned-engine bonus; an explicit engine name is honored via `rac_plugin_find_for_engine()`.
+Backend base priorities: qhexrt=150 (QNN-context models only), llamacpp=100, sherpa=90, onnx/cloud=50. Selection is plain priority order — there is no runtime/format scoring or pinned-engine bonus; an explicit engine name is honored via `rac_plugin_find_for_engine()`.
 
 ### HTTP Transport is Platform-Provided
 libcurl was removed. Each SDK registers a `rac_http_transport_ops_t` vtable: Swift uses URLSession, Kotlin/Flutter/RN use OkHttp (Android) or URLSession (iOS), Web uses `emscripten_fetch`.

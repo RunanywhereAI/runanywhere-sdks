@@ -8,7 +8,7 @@
 #   - idl/                     — protobuf IDL schemas + codegen (no CMake
 #                                target; see idl/codegen/)
 #   - engines/                 — engine plugins (llamacpp, onnx, sherpa,
-#                                metalrt). Each publishes
+#                                qhexrt, coreml). Each publishes
 #                                a `rac_engine_vtable_t` at
 #                                `RAC_PLUGIN_API_VERSION=3u` via
 #                                `RAC_STATIC_PLUGIN_REGISTER` or a dlopen'd
@@ -201,46 +201,25 @@ add_subdirectory(sdk/runanywhere-commons)
 # helper scripts in idl/codegen/, not via CMake.
 
 # runtimes/ — L1 compute-runtime plugins. Mirrors engines/ but scoped
-# to compute targets (CPU, Metal, CoreML, CUDA, …). The built-in CPU runtime
+# to compute targets (CPU, ONNX Runtime, CoreML, CUDA, …). The built-in CPU runtime
 # is always folded into rac_commons; adapter runtimes are linked by their
 # owning engines.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/runtimes/CMakeLists.txt")
     add_subdirectory(runtimes)
 endif()
 
-# engines/ — top-level engine plugin directory. Migrated backends
-# (llamacpp, onnx, metalrt) and net-new
-# entries (sherpa, genie, coreml) live here. Sherpa owns speech
-# primitives and legacy ONNX-named speech compatibility; ONNX owns embeddings
-# and ONNXRT-backed generic services.
+# engines/ — top-level engine plugin directory. LlamaCPP owns GGUF LLM/VLM,
+# Sherpa owns speech primitives and legacy ONNX-named speech compatibility,
+# ONNX owns embeddings and ONNXRT-backed generic services, QHexRT owns
+# Qualcomm Hexagon NPU bundles, and CoreML owns Apple diffusion models.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/engines/CMakeLists.txt")
     add_subdirectory(engines)
 endif()
 
 # Fold the built-in CPU runtime's OBJECTs into rac_commons so there is no
-# separate librac_runtime_cpu to ship (symmetrical with rac_backend_metalrt).
+# separate librac_runtime_cpu to ship.
 if(TARGET rac_runtime_cpu)
     target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_runtime_cpu>)
-endif()
-
-# MetalRT is an OBJECT library rather than a rac_add_engine_plugin()-managed
-# STATIC/SHARED target. When the root build owns engines/, fold its objects into
-# rac_commons here so Apple SDKs still get a single commons archive.
-if(TARGET rac_backend_metalrt)
-    target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)
-    if(TARGET rac_runtime_metal)
-        target_link_libraries(rac_commons PUBLIC rac_runtime_metal)
-    endif()
-    if(APPLE)
-        target_link_libraries(rac_commons PUBLIC
-            "-framework Metal"
-            "-framework Foundation"
-            "-framework Accelerate"
-        )
-    endif()
-    if(DEFINED RAC_METALRT_ENGINE_LIB AND RAC_METALRT_ENGINE_LIB)
-        target_link_libraries(rac_commons PUBLIC ${RAC_METALRT_ENGINE_LIB})
-    endif()
 endif()
 
 # WASM wrapper target — composes rac_commons + any enabled engine plugins into
@@ -267,35 +246,8 @@ endif()
 # from this root option to the commons cache slot of the same name.
 if(RAC_BUILD_TESTS)
     enable_testing()
-    # Commons/tests is configured before engines/ in the root build, so the
-    # Genie plugin-entry test is wired here once rac_backend_genie exists.
-    if(RAC_BACKEND_GENIE AND TARGET rac_backend_genie AND NOT TARGET test_plugin_entry_genie)
-        add_executable(test_plugin_entry_genie
-            sdk/runanywhere-commons/tests/test_plugin_entry_genie.cpp)
-        target_include_directories(test_plugin_entry_genie PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
-            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/genie
-        )
-        target_link_libraries(test_plugin_entry_genie PRIVATE
-            rac_commons
-            rac_backend_genie
-        )
-        if(TARGET archive_static)
-            target_link_libraries(test_plugin_entry_genie PRIVATE archive_static)
-        endif()
-        if(TARGET zlibstatic)
-            target_link_libraries(test_plugin_entry_genie PRIVATE zlibstatic)
-        endif()
-        if(TARGET bz2_bundled)
-            target_link_libraries(test_plugin_entry_genie PRIVATE bz2_bundled)
-        endif()
-        target_compile_features(test_plugin_entry_genie PRIVATE cxx_std_17)
-        add_test(NAME plugin_entry_genie_tests COMMAND test_plugin_entry_genie)
-    endif()
-
-    # commons-010: sherpa plugin-entry smoke test. Mirrors the genie wiring
-    # block above for the same reason — rac_backend_sherpa is built by engines/
+    # commons-010: sherpa plugin-entry smoke test. Wired here because
+    # rac_backend_sherpa is built by engines/
     # which is configured after sdk/runanywhere-commons/, so the target does
     # not exist when commons/tests/CMakeLists.txt runs.
     if(RAC_BACKEND_SHERPA AND TARGET rac_backend_sherpa AND NOT TARGET test_plugin_entry_sherpa)
@@ -320,39 +272,6 @@ if(RAC_BUILD_TESTS)
         endif()
         target_compile_features(test_plugin_entry_sherpa PRIVATE cxx_std_17)
         add_test(NAME plugin_entry_sherpa_tests COMMAND test_plugin_entry_sherpa)
-    endif()
-
-    # commons-009: metalrt plugin-entry smoke test. Apple-gated (the engine is
-    # Apple-only — engines/metalrt/CMakeLists.txt forces RAC_BACKEND_METALRT=OFF
-    # on non-Apple hosts). MetalRT is an OBJECT library folded into rac_commons
-    # (see the `target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)`
-    # block earlier in this file), so the test only needs to link rac_commons —
-    # rac_plugin_entry_metalrt() resolves from the same archive. Wired here
-    # (not in commons/tests/CMakeLists.txt) for the same ordering reason as
-    # sherpa / genie: engines/ is configured
-    # after sdk/runanywhere-commons/. Guards the highest-priority Apple engine
-    # (priority=120, four primitives: LLM/STT/TTS/VLM) against silent vtable
-    # drift that would otherwise surface only at first-inference time.
-    if(APPLE AND RAC_BACKEND_METALRT AND TARGET rac_backend_metalrt
-       AND NOT TARGET test_plugin_entry_metalrt)
-        add_executable(test_plugin_entry_metalrt
-            sdk/runanywhere-commons/tests/test_plugin_entry_metalrt.cpp)
-        target_include_directories(test_plugin_entry_metalrt PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
-            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
-        )
-        target_link_libraries(test_plugin_entry_metalrt PRIVATE rac_commons)
-        if(TARGET archive_static)
-            target_link_libraries(test_plugin_entry_metalrt PRIVATE archive_static)
-        endif()
-        if(TARGET zlibstatic)
-            target_link_libraries(test_plugin_entry_metalrt PRIVATE zlibstatic)
-        endif()
-        if(TARGET bz2_bundled)
-            target_link_libraries(test_plugin_entry_metalrt PRIVATE bz2_bundled)
-        endif()
-        target_compile_features(test_plugin_entry_metalrt PRIVATE cxx_std_17)
-        add_test(NAME plugin_entry_metalrt_tests COMMAND test_plugin_entry_metalrt)
     endif()
 
     if(APPLE AND RAC_BACKEND_COREML
@@ -382,8 +301,8 @@ if(RAC_BUILD_TESTS)
         add_test(NAME diffusion_coreml_generate_tests COMMAND test_diffusion_coreml_generate)
     endif()
 
-    # coreml engine plugin-entry smoke test. Same wiring rationale as the
-    # metalrt block above — rac_backend_coreml is built by engines/ which is
+    # coreml engine plugin-entry smoke test. Same wiring rationale as sherpa:
+    # rac_backend_coreml is built by engines/ which is
     # configured after sdk/runanywhere-commons/. The coreml engine is the sole
     # RAC_PRIMITIVE_DIFFUSION provider, so this locks the manifest's COREML
     # runtime/format + diffusion_ops slot that the EngineRouter routes against;

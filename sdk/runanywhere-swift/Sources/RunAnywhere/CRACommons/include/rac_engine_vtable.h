@@ -4,7 +4,7 @@
  *
  * A single vtable type replaces the per-domain `rac_llm_service_ops_t`,
  * `rac_stt_service_ops_t`, `rac_tts_service_ops_t`, … structs. Every engine
- * backend (llama.cpp, ONNX, sherpa, MetalRT, …)
+ * backend (llama.cpp, ONNX, sherpa, QHexRT, …)
  * populates one of these. Primitives the engine does NOT serve leave the
  * corresponding op-struct pointer NULL; the registry treats NULL as "engine
  * does not support this primitive" and returns `RAC_ERROR_CAPABILITY_UNSUPPORTED`.
@@ -27,10 +27,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "rac_error.h"
-#include "rac_types.h"
-#include "rac_model_format_ids.h"
-#include "rac_primitive.h"
+#include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
+#include "rac/plugin/rac_model_format_ids.h"
+#include "rac/plugin/rac_primitive.h"
 
 // NOLINTBEGIN(modernize-redundant-void-arg,modernize-use-nullptr)
 #ifdef __cplusplus
@@ -97,18 +97,17 @@ typedef struct rac_engine_metadata {
     /* ─────── routing extension ─────── */
 
     /** L1 runtimes this engine can consume (CPU / Metal / CoreML / CUDA /
-     *  QNN / NNAPI / WebGPU / …). MAY be NULL when the plugin doesn't care
-     *  about hardware-aware routing — the router falls back to priority-only
-     *  scoring. The pointer must reference plugin-owned .rodata; the
+     *  QNN / NNAPI / WebGPU / …). Descriptive metadata only — the registry
+     *  does NOT use this list for scoring. Plugin selection is plain priority
+     *  order: the registry picks the highest-priority plugin per primitive
+     *  (see `rac_plugin_find`). MAY be NULL when the plugin doesn't declare
+     *  any runtimes. The pointer must reference plugin-owned .rodata; the
      *  registry does not copy.
      *
-     *  Runtimes are now first-class
-     *  plugins registered via `rac_runtime_register()`. The engine router
-     *  gives plugins a small scoring bonus when at least one of their
-     *  declared runtimes is *registered* in the runtime registry, on top of
-     *  the existing preferred_runtime bonus. Engines that don't wire to the
-     *  runtime registry (e.g. llama.cpp today, which bundles its own Metal
-     *  shaders) simply continue to score off priority + hardware profile. */
+     *  Runtimes are registered as first-class entries via the runtime
+     *  registry (`rac_runtime_register()`), independent of engine selection.
+     *  Engines that don't wire to the runtime registry (e.g. llama.cpp today,
+     *  which bundles its own Metal shaders) simply leave this field NULL. */
     const rac_runtime_id_t* runtimes;
     size_t runtimes_count;
 
@@ -215,14 +214,14 @@ typedef struct rac_engine_vtable {
  *      rac_primitive.h to the named primitive.
  *   3. Bump `RAC_PLUGIN_API_VERSION` in rac_plugin_entry.h (ABI change).
  * =========================================================================== */
-#define RAC_PRIMITIVE_TABLE(X)                                       \
-    X(RAC_PRIMITIVE_GENERATE_TEXT, llm_ops,       "generate_text")   \
-    X(RAC_PRIMITIVE_TRANSCRIBE,    stt_ops,       "transcribe")      \
-    X(RAC_PRIMITIVE_SYNTHESIZE,    tts_ops,       "synthesize")      \
-    X(RAC_PRIMITIVE_DETECT_VOICE,  vad_ops,       "detect_voice")    \
-    X(RAC_PRIMITIVE_EMBED,         embedding_ops, "embed")           \
-    X(RAC_PRIMITIVE_VLM,           vlm_ops,       "vlm")             \
-    X(RAC_PRIMITIVE_DIFFUSION,     diffusion_ops, "diffusion")
+#define RAC_PRIMITIVE_TABLE(X)                               \
+    X(RAC_PRIMITIVE_GENERATE_TEXT, llm_ops, "generate_text") \
+    X(RAC_PRIMITIVE_TRANSCRIBE, stt_ops, "transcribe")       \
+    X(RAC_PRIMITIVE_SYNTHESIZE, tts_ops, "synthesize")       \
+    X(RAC_PRIMITIVE_DETECT_VOICE, vad_ops, "detect_voice")   \
+    X(RAC_PRIMITIVE_EMBED, embedding_ops, "embed")           \
+    X(RAC_PRIMITIVE_VLM, vlm_ops, "vlm")                     \
+    X(RAC_PRIMITIVE_DIFFUSION, diffusion_ops, "diffusion")
 
 /**
  * Lookup the per-primitive ops pointer inside a vtable at runtime, keyed by

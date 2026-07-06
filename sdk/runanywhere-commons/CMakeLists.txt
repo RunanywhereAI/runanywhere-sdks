@@ -1396,8 +1396,8 @@ if(RAC_ENABLE_PROTOBUF)
     else()
         find_package(Protobuf ${PROTOBUF_VERSION} EXACT QUIET)
     endif()
-    # The checked-in C++ gencode hard-checks the protobuf runtime patch line
-    # with `PROTOBUF_VERSION == 7035000`. Do not accept a loose system
+    # The checked-in C++ gencode hard-checks the protobuf runtime patch line.
+    # Do not accept a loose system
     # protobuf fallback here: Homebrew can provide a newer/older 7.x runtime
     # that satisfies `find_package(Protobuf 5.0)` but fails at compile time.
     # If the exact package is unavailable, use the vendored version below.
@@ -1676,7 +1676,7 @@ endif()
 # =============================================================================
 # COMMONS-LOCAL BACKENDS (RAG)
 #
-# Engine plugins (LlamaCPP, ONNX, MetalRT)
+# Engine plugins (LlamaCPP, ONNX, QHexRT, etc.)
 # are wired exclusively from engines/<name>/CMakeLists.txt via the root
 # add_subdirectory(engines) path. Commons no longer instantiates or forwards
 # engine targets — only commons-local OBJECT libraries (RAG) are folded into
