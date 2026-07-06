@@ -804,6 +804,36 @@ static bool jniClearPendingException(JNIEnv* env) {
     return false;
 }
 
+static std::string jniSafeLogString(const char* value, const char* fallback) {
+    const char* source = value != nullptr ? value : fallback;
+    if (source == nullptr) {
+        return "";
+    }
+
+    constexpr size_t kMaxLogChars = 4096;
+    std::string output;
+    output.reserve(std::min(std::strlen(source), kMaxLogChars));
+
+    for (size_t i = 0; source[i] != '\0' && output.size() < kMaxLogChars; ++i) {
+        const auto c = static_cast<unsigned char>(source[i]);
+        if (c == '\n' || c == '\r' || c == '\t' || (c >= 0x20 && c < 0x7f)) {
+            output.push_back(static_cast<char>(c));
+        } else {
+            output.push_back('?');
+        }
+    }
+
+    return output;
+}
+
+static jstring newSafeLogJString(JNIEnv* env, const std::string& value) {
+    jstring result = env->NewStringUTF(value.c_str());
+    if (result == nullptr) {
+        jniClearPendingException(env);
+    }
+    return result;
+}
+
 // =============================================================================
 // Platform Adapter C Callbacks (called by C++ library)
 // =============================================================================
@@ -827,6 +857,9 @@ static rac_platform_adapter_t g_c_adapter;
 static void jni_log_callback(rac_log_level_t level, const char* tag, const char* message,
                              void* user_data) {
     JNIEnv* env = getJNIEnv();
+    const std::string safe_tag = jniSafeLogString(tag, "RAC");
+    const std::string safe_message = jniSafeLogString(message, "");
+
     std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_log == nullptr) {
         // Fallback to direct native logging (NOT through RAC_LOG_* to avoid recursion,
@@ -856,17 +889,32 @@ static void jni_log_callback(rac_log_level_t level, const char* tag, const char*
                 prio = ANDROID_LOG_INFO;
                 break;
         }
-        __android_log_print(prio, tag ? tag : "RAC", "%s", message ? message : "");
+        __android_log_print(prio, safe_tag.c_str(), "%s", safe_message.c_str());
 #else
-        fprintf(stdout, "[DEBUG] [%s] %s\n", tag ? tag : "RAC", message ? message : "");
+        fprintf(stdout, "[DEBUG] [%s] %s\n", safe_tag.c_str(), safe_message.c_str());
 #endif
         return;
     }
 
-    jstring jTag = env->NewStringUTF(tag ? tag : "RAC");
-    jstring jMessage = env->NewStringUTF(message ? message : "");
+    jstring jTag = newSafeLogJString(env, safe_tag);
+    jstring jMessage = newSafeLogJString(env, safe_message);
+    if (jTag == nullptr || jMessage == nullptr) {
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_WARN, safe_tag.c_str(), "%s", safe_message.c_str());
+#else
+        fprintf(stdout, "[WARN] [%s] %s\n", safe_tag.c_str(), safe_message.c_str());
+#endif
+        if (jTag != nullptr) {
+            env->DeleteLocalRef(jTag);
+        }
+        if (jMessage != nullptr) {
+            env->DeleteLocalRef(jMessage);
+        }
+        return;
+    }
 
     env->CallVoidMethod(g_platform_adapter, g_method_log, static_cast<jint>(level), jTag, jMessage);
+    jniClearPendingException(env);
 
     env->DeleteLocalRef(jTag);
     env->DeleteLocalRef(jMessage);

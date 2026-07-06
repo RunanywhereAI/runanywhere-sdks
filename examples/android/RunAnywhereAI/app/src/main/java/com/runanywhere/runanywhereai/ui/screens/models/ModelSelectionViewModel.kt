@@ -98,13 +98,14 @@ class ModelSelectionViewModel(
     suspend fun select(model: RAModelInfo): Boolean {
         state = state.copy(busyModelId = model.id, error = null)
         return try {
-            if (isBuiltIn(model) || context.loadCategory == null) {
+            val loadCategory = context.loadCategoryFor(model)
+            if (isBuiltIn(model) || loadCategory == null) {
                 if (isLlm) GlobalState.model.set(model)
                 state = state.copy(currentModelId = model.id, busyModelId = null)
                 true
             } else {
                 val result = RunAnywhere.loadModel(
-                    RAModelLoadRequest(model_id = model.id, category = context.loadCategory),
+                    RAModelLoadRequest(model_id = model.id, category = loadCategory),
                 )
                 if (result.success) {
                     if (isLlm) {

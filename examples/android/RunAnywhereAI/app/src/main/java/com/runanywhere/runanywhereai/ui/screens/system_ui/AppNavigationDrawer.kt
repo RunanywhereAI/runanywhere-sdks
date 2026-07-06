@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.system_ui
 
+import android.text.format.DateUtils
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,8 +25,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
+import com.runanywhere.runanywhereai.data.conversation.ConversationSummary
 import com.runanywhere.runanywhereai.ui.navigation.ConsumerDestination
 import com.runanywhere.runanywhereai.ui.navigation.ConsumerNavGroup
 import com.runanywhere.runanywhereai.ui.navigation.isSelected
@@ -35,9 +40,13 @@ import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 fun AppNavigationDrawer(
     navController: NavHostController,
     destination: NavDestination?,
+    recentConversations: List<ConversationSummary>,
+    onNewChat: () -> Unit,
+    onOpenConversation: (String) -> Unit,
+    onHistory: () -> Unit,
     onModels: () -> Unit,
     onAdapters: () -> Unit,
-    onDismiss: () -> Unit = {},
+    onDismiss: (afterClose: () -> Unit) -> Unit = { afterClose -> afterClose() },
     permanent: Boolean = true,
 ) {
     val dimens = LocalDimens.current
@@ -50,14 +59,34 @@ fun AppNavigationDrawer(
             modifier = modifier,
             drawerContainerColor = MaterialTheme.colorScheme.surfaceContainer,
         ) {
-            DrawerContent(navController, destination, onModels, onAdapters, onDismiss)
+            DrawerContent(
+                navController = navController,
+                destination = destination,
+                recentConversations = recentConversations,
+                onNewChat = onNewChat,
+                onOpenConversation = onOpenConversation,
+                onHistory = onHistory,
+                onModels = onModels,
+                onAdapters = onAdapters,
+                onDismiss = onDismiss,
+            )
         }
     } else {
         ModalDrawerSheet(
             modifier = modifier,
             drawerContainerColor = MaterialTheme.colorScheme.surfaceContainer,
         ) {
-            DrawerContent(navController, destination, onModels, onAdapters, onDismiss)
+            DrawerContent(
+                navController = navController,
+                destination = destination,
+                recentConversations = recentConversations,
+                onNewChat = onNewChat,
+                onOpenConversation = onOpenConversation,
+                onHistory = onHistory,
+                onModels = onModels,
+                onAdapters = onAdapters,
+                onDismiss = onDismiss,
+            )
         }
     }
 }
@@ -66,18 +95,59 @@ fun AppNavigationDrawer(
 private fun DrawerContent(
     navController: NavHostController,
     destination: NavDestination?,
+    recentConversations: List<ConversationSummary>,
+    onNewChat: () -> Unit,
+    onOpenConversation: (String) -> Unit,
+    onHistory: () -> Unit,
     onModels: () -> Unit,
     onAdapters: () -> Unit,
-    onDismiss: () -> Unit,
+    onDismiss: (afterClose: () -> Unit) -> Unit,
 ) {
     val dimens = LocalDimens.current
     Column(
         modifier = Modifier
             .fillMaxHeight()
+            .verticalScroll(rememberScrollState())
             .padding(vertical = dimens.spacingLg),
     ) {
         DrawerHeader()
         Spacer(Modifier.height(dimens.spacingMd))
+
+        DrawerActionItem(
+            label = "New chat",
+            description = "Start a clean conversation",
+            icon = RACIcons.Outline.Plus,
+            onClick = {
+                onDismiss(onNewChat)
+            },
+        )
+        DrawerActionItem(
+            label = "Search chats",
+            description = "All saved conversations",
+            icon = RACIcons.Outline.Search,
+            onClick = {
+                onDismiss(onHistory)
+            },
+        )
+        if (recentConversations.isNotEmpty()) {
+            Spacer(Modifier.height(dimens.spacingSm))
+            DrawerSectionLabel("Recents")
+            recentConversations.take(MAX_DRAWER_RECENTS).forEach { conversation ->
+                DrawerConversationItem(
+                    conversation = conversation,
+                    onClick = {
+                        onDismiss { onOpenConversation(conversation.id) }
+                    },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(dimens.spacingSm))
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+            modifier = Modifier.padding(horizontal = dimens.spacingLg),
+        )
+        Spacer(Modifier.height(dimens.spacingSm))
 
         ConsumerNavGroup.entries.forEach { group ->
             DrawerSectionLabel(group.title)
@@ -91,8 +161,7 @@ private fun DrawerContent(
                         icon = if (selected) item.selectedIcon else item.icon,
                         selected = selected,
                         onClick = {
-                            onDismiss()
-                            navController.navigateTopLevel(item.route)
+                            onDismiss { navController.navigateTopLevel(item.route) }
                         },
                     )
                 }
@@ -102,8 +171,7 @@ private fun DrawerContent(
                     description = "Chat models and downloads",
                     icon = RACIcons.Outline.Cpu,
                     onClick = {
-                        onDismiss()
-                        onModels()
+                        onDismiss(onModels)
                     },
                 )
                 DrawerActionItem(
@@ -111,8 +179,7 @@ private fun DrawerContent(
                     description = "LoRA personalization",
                     icon = RACIcons.Outline.Adjustments,
                     onClick = {
-                        onDismiss()
-                        onAdapters()
+                        onDismiss(onAdapters)
                     },
                 )
             }
@@ -184,12 +251,63 @@ private fun DrawerRouteItem(
         icon = { Icon(icon, contentDescription = null) },
         label = {
             Column {
-                Text(label, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    description,
+                    text = label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = description,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+            }
+        },
+        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+    )
+}
+
+@Composable
+private fun DrawerConversationItem(
+    conversation: ConversationSummary,
+    onClick: () -> Unit,
+) {
+    NavigationDrawerItem(
+        selected = false,
+        onClick = onClick,
+        icon = {
+            Icon(
+                imageVector = if (conversation.pinned) RACIcons.Outline.Pin else RACIcons.Outline.MessageCircle,
+                contentDescription = null,
+            )
+        },
+        label = {
+            Column {
+                Text(
+                    text = conversation.title.ifBlank { "Untitled chat" },
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = conversation.preview.ifBlank { drawerRelativeTime(conversation.updatedAt) },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (conversation.preview.isNotBlank()) {
+                    Text(
+                        text = drawerRelativeTime(conversation.updatedAt),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         },
         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
@@ -209,14 +327,31 @@ private fun DrawerActionItem(
         icon = { Icon(icon, contentDescription = null) },
         label = {
             Column {
-                Text(label, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    description,
+                    text = label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = description,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         },
         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
     )
 }
+
+private fun drawerRelativeTime(updatedAt: Long): String =
+    DateUtils.getRelativeTimeSpanString(
+        updatedAt,
+        System.currentTimeMillis(),
+        DateUtils.MINUTE_IN_MILLIS,
+        DateUtils.FORMAT_ABBREV_RELATIVE,
+    ).toString()
+
+private const val MAX_DRAWER_RECENTS = 4

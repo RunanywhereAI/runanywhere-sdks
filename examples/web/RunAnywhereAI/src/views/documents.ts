@@ -25,6 +25,7 @@ import {
 } from '@runanywhere/web';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
+import { formatFramework } from '../services/model-display';
 import { getGenerationSettings } from './settings';
 
 const TOP_K = 3;
@@ -233,7 +234,10 @@ function fillSelect(select: HTMLSelectElement, models: ModelInfo[], emptyLabel: 
   }
   select.disabled = false;
   select.innerHTML = models
-    .map((model) => `<option value="${escapeHtml(model.id)}">${escapeHtml(model.name || model.id)}</option>`)
+    .map((model) => {
+      const label = `${model.name || model.id} · ${formatFramework(model.framework)}`;
+      return `<option value="${escapeHtml(model.id)}">${escapeHtml(label)}</option>`;
+    })
     .join('');
 }
 

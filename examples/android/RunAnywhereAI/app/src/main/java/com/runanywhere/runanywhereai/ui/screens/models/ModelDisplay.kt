@@ -2,8 +2,10 @@ package com.runanywhere.runanywhereai.ui.screens.models
 
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.runanywhere.runanywhereai.ui.theme.icons.Brand
 import com.runanywhere.runanywhereai.ui.theme.icons.RACBrands
+import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.types.RAModelInfo
 
@@ -103,6 +105,32 @@ fun InferenceFramework.consumerBackendLabel(): String = when (this) {
     else -> displayName
 }
 
+fun InferenceFramework.backendIcon(): ImageVector = when (this) {
+    InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> RACIcons.Outline.Stack
+    InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> RACIcons.Outline.Activity
+    InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> RACIcons.Filled.Bolt
+    InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> RACIcons.Outline.Robot
+    InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> RACIcons.Outline.Cpu
+    InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> RACIcons.Outline.Bolt
+    InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> RACIcons.Outline.Microphone
+    InferenceFramework.INFERENCE_FRAMEWORK_METALRT -> RACIcons.Outline.Bolt
+    InferenceFramework.INFERENCE_FRAMEWORK_COREML -> RACIcons.Outline.Cpu
+    InferenceFramework.INFERENCE_FRAMEWORK_MLX -> RACIcons.Outline.Cpu
+    InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS -> RACIcons.Outline.Robot
+    InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO -> RACIcons.Outline.Activity
+    InferenceFramework.INFERENCE_FRAMEWORK_TFLITE,
+    InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH,
+    InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE,
+    InferenceFramework.INFERENCE_FRAMEWORK_MLC,
+    InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM,
+    InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS,
+    -> RACIcons.Outline.Stack
+    InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN -> RACIcons.Outline.Check
+    InferenceFramework.INFERENCE_FRAMEWORK_NONE -> RACIcons.Outline.Close
+    InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN -> RACIcons.Outline.InfoCircle
+    else -> RACIcons.Outline.Stack
+}
+
 fun RAModelInfo.consumerGroup(): ConsumerModelGroup = when {
     framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
         framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> ConsumerModelGroup.APPLE_BUILT_IN
@@ -118,7 +146,6 @@ fun RAModelInfo.consumerGroup(): ConsumerModelGroup = when {
 }
 
 fun RAModelInfo.capabilityLabels(): List<String> = buildList {
-    add(framework.shortLabel())
     when (category) {
         ModelCategory.MODEL_CATEGORY_LANGUAGE -> add("Chat")
         ModelCategory.MODEL_CATEGORY_MULTIMODAL,

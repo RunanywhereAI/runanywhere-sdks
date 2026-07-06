@@ -1,5 +1,6 @@
 import { Colors } from '../theme/colors';
 import { RunAnywhere } from '@runanywhere/core';
+import type { IconName } from '../theme/system/icons';
 import {
   InferenceFramework,
   ModelFormat,
@@ -87,6 +88,36 @@ export const getFrameworkIcon = (
       return 'videocam-outline';
     default:
       return 'extension-puzzle-outline';
+  }
+};
+
+export const getFrameworkSystemIcon = (
+  framework?: InferenceFramework | null
+): IconName => {
+  switch (framework) {
+    case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
+      return 'storageDevice';
+    case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
+    case InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
+      return 'transcribe';
+    case InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:
+    case InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
+      return 'speak';
+    case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
+      return 'sparkles';
+    case InferenceFramework.INFERENCE_FRAMEWORK_COREML:
+    case InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
+    case InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
+      return 'cpu';
+    case InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
+    case InferenceFramework.INFERENCE_FRAMEWORK_TFLITE:
+    case InferenceFramework.INFERENCE_FRAMEWORK_MLC:
+      return 'solutions';
+    case InferenceFramework.INFERENCE_FRAMEWORK_MLX:
+    case InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
+      return 'bolt';
+    default:
+      return 'tool';
   }
 };
 

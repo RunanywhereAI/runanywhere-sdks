@@ -8,6 +8,7 @@ import ai.runanywhere.proto.v1.VLMStreamEventKind
 import android.app.Application
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -177,7 +178,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         job = viewModelScope.launch {
             var file: File? = null
             try {
-                file = withContext(Dispatchers.IO) { copyUriToCache(uri, "chat_image_", ".jpg") }
+                file = withContext(Dispatchers.IO) { copyUriToCache(uri, "chat_image_", imageCacheSuffix(uri)) }
                 val image = RAVLMImage(
                     file_path = file.absolutePath,
                     format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
@@ -614,6 +615,15 @@ private fun ChatViewModel.copyUriToCache(uri: Uri, prefix: String, suffix: Strin
         FileOutputStream(file).use { destination -> source.copyTo(destination) }
     }
     return file
+}
+
+private fun ChatViewModel.imageCacheSuffix(uri: Uri): String {
+    val app = getApplication<Application>()
+    val extension = app.contentResolver.getType(uri)
+        ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+        ?.lowercase()
+        ?.takeIf { it in setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "heif") }
+    return ".${extension ?: "jpg"}"
 }
 
 private fun prettyJson(raw: String): String = runCatching {

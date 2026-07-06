@@ -859,9 +859,14 @@ private struct ApiConfigurationSheet: View {
 private struct StoredModelRow: View {
     let model: RAStoredModel
     let onDelete: () async -> Void
+    @ObservedObject private var modelListViewModel = ModelListViewModel.shared
     @State private var showingDetails = false
     @State private var showingDeleteConfirmation = false
     @State private var isDeleting = false
+
+    private var backend: InferenceFramework? {
+        modelListViewModel.availableModels.first { $0.id == model.id }?.framework
+    }
 
     private var isDeletable: Bool {
         !model.id.isEmpty
@@ -874,9 +879,14 @@ private struct StoredModelRow: View {
                     Text(model.name)
                         .font(AppTypography.subheadlineMedium)
 
-                    Text(ByteCountFormatter.string(fromByteCount: model.size, countStyle: .file))
-                        .font(AppTypography.caption2)
-                        .foregroundColor(AppColors.textSecondary)
+                    HStack(spacing: AppSpacing.small) {
+                        Text(ByteCountFormatter.string(fromByteCount: model.size, countStyle: .file))
+                            .font(AppTypography.caption2)
+                            .foregroundColor(AppColors.textSecondary)
+                        if let backend {
+                            backendBadge(backend)
+                        }
+                    }
                 }
 
                 Spacer()
@@ -934,6 +944,20 @@ private struct StoredModelRow: View {
         } message: {
             Text("Are you sure you want to delete \(model.name)? This action cannot be undone.")
         }
+    }
+
+    @ViewBuilder
+    private func backendBadge(_ framework: InferenceFramework) -> some View {
+        HStack(spacing: AppSpacing.xxSmall) {
+            Image(systemName: framework.consumerBackendIcon)
+            Text(framework.consumerBackendLabel)
+        }
+        .font(AppTypography.caption2Medium)
+        .foregroundColor(framework.consumerBackendColor)
+        .padding(.horizontal, AppSpacing.xSmall)
+        .padding(.vertical, 2)
+        .background(framework.consumerBackendColor.opacity(0.12))
+        .cornerRadius(AppSpacing.cornerRadiusSmall)
     }
 
     private var modelDetailsView: some View {

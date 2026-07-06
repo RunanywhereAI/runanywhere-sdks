@@ -19,6 +19,7 @@
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
 #include "commands/model_setup.h"
+#include "commands/model_labels.h"
 #include "io/output.h"
 #include "io/proto.h"
 
@@ -27,47 +28,6 @@ namespace rcli::commands {
 namespace {
 
 namespace v1 = runanywhere::v1;
-
-const char* category_label(v1::ModelCategory category) {
-    switch (category) {
-        case v1::MODEL_CATEGORY_LANGUAGE:
-            return "llm";
-        case v1::MODEL_CATEGORY_MULTIMODAL:
-        case v1::MODEL_CATEGORY_VISION:
-            return "vlm";
-        case v1::MODEL_CATEGORY_SPEECH_RECOGNITION:
-            return "stt";
-        case v1::MODEL_CATEGORY_SPEECH_SYNTHESIS:
-            return "tts";
-        case v1::MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
-            return "vad";
-        case v1::MODEL_CATEGORY_EMBEDDING:
-            return "embedding";
-        case v1::MODEL_CATEGORY_IMAGE_GENERATION:
-            return "diffusion";
-        case v1::MODEL_CATEGORY_AUDIO:
-            return "audio";
-        default:
-            return "?";
-    }
-}
-
-const char* framework_label(v1::InferenceFramework framework) {
-    switch (framework) {
-        case v1::INFERENCE_FRAMEWORK_LLAMA_CPP:
-            return "llamacpp";
-        case v1::INFERENCE_FRAMEWORK_ONNX:
-            return "onnx";
-        case v1::INFERENCE_FRAMEWORK_SHERPA:
-            return "sherpa";
-        case v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-            return "foundation";
-        case v1::INFERENCE_FRAMEWORK_SYSTEM_TTS:
-            return "system-tts";
-        default:
-            return "?";
-    }
-}
 
 int run_list(const GlobalOptions& options, bool show_all) {
     Bootstrapped env;
@@ -116,8 +76,8 @@ int run_list(const GlobalOptions& options, bool show_all) {
             json.begin_array_object()
                 .field("id", model.id())
                 .field("name", model.name())
-                .field("modality", category_label(model.category()))
-                .field("backend", framework_label(model.framework()))
+                .field("modality", model_labels::category(model.category()))
+                .field("backend", model_labels::backend(model.framework()))
                 .field("size_bytes", static_cast<int64_t>(model.download_size_bytes()))
                 .field("downloaded", is_downloaded)
                 .field("local_path", model.local_path())
@@ -134,8 +94,8 @@ int run_list(const GlobalOptions& options, bool show_all) {
         if (!show_all && !is_downloaded) {
             continue;
         }
-        rows.push_back({model.id(), category_label(model.category()),
-                        framework_label(model.framework()),
+        rows.push_back({model.id(), model_labels::category(model.category()),
+                        model_labels::backend(model.framework()),
                         model.download_size_bytes() > 0
                             ? out::human_bytes(static_cast<uint64_t>(model.download_size_bytes()))
                             : "-",

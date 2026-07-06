@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
 import ai.runanywhere.proto.v1.ModelCategory
+import com.runanywhere.sdk.public.types.RAModelInfo
 
 // Which model category a selection sheet is for. UI-layer filter over proto categories.
 enum class ModelSelectionContext(val title: String) {
@@ -32,5 +33,15 @@ enum class ModelSelectionContext(val title: String) {
         VAD -> ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         VLM -> ModelCategory.MODEL_CATEGORY_MULTIMODAL
         RAG_EMBEDDING, RAG_LLM -> null
+    }
+
+    fun loadCategoryFor(model: RAModelInfo): ModelCategory? = when (this) {
+        VLM -> when (model.category) {
+            ModelCategory.MODEL_CATEGORY_VISION,
+            ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+            -> model.category
+            else -> loadCategory
+        }
+        else -> loadCategory
     }
 }

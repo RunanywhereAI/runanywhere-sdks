@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
@@ -52,6 +53,7 @@ import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.runanywhereai.util.readableWidth
+import com.runanywhere.sdk.public.types.RAModelInfo
 import java.text.DateFormat
 import java.util.Date
 
@@ -88,7 +90,7 @@ fun VadScreen() {
     ) {
         Header()
 
-        ModelCard(modelName = model?.name) { showSheet = true }
+        ModelCard(model = model) { showSheet = true }
 
         SpeechIndicator(
             isListening = vadVm.isListening,
@@ -155,7 +157,7 @@ private fun Header() {
 }
 
 @Composable
-private fun ModelCard(modelName: String?, onClick: () -> Unit) {
+private fun ModelCard(model: RAModelInfo?, onClick: () -> Unit) {
     val dimens = LocalDimens.current
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -175,9 +177,15 @@ private fun ModelCard(modelName: String?, onClick: () -> Unit) {
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(dimens.iconMd),
             )
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+            ) {
                 Text("Model", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(modelName ?: "Select a model", style = MaterialTheme.typography.bodyLarge)
+                Text(model?.name ?: "Select a model", style = MaterialTheme.typography.bodyLarge)
+                model?.let {
+                    BackendBadge(framework = it.framework, compact = true)
+                }
             }
             Icon(
                 imageVector = RACIcons.Outline.ChevronRight,

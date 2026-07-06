@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.screens.models.brand
+import com.runanywhere.runanywhereai.ui.screens.models.shortLabel
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
@@ -138,6 +139,11 @@ private fun ModelCard(
         fallbackModelName != null -> "Not loaded"
         else -> "Tap to choose"
     }
+    val backendStatusText = if (model != null && !generating) {
+        "${model.framework.shortLabel()} · $statusText"
+    } else {
+        statusText
+    }
     val dotColor = when {
         generating -> MaterialTheme.colorScheme.primary
         model != null -> primaryGreen
@@ -186,8 +192,10 @@ private fun ModelCard(
                             .background(dotColor, CircleShape),
                     )
                     Text(
-                        text = statusText,
+                        text = backendStatusText,
                         style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

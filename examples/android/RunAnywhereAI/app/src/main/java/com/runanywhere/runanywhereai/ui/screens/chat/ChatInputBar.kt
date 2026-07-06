@@ -39,12 +39,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
+
+data class ComposerAttachment(
+    val name: String,
+    val description: String,
+    val icon: ImageVector,
+)
 
 private data class AttachmentAction(
     val label: String,
@@ -69,6 +78,8 @@ fun ChatInputBar(
     onOpenTalk: () -> Unit,
     onOpenAdvanced: () -> Unit,
     modifier: Modifier = Modifier,
+    pendingAttachment: ComposerAttachment? = null,
+    onClearAttachment: () -> Unit = {},
 ) {
     val dimens = LocalDimens.current
     var menuExpanded by remember { mutableStateOf(false) }
@@ -87,6 +98,23 @@ fun ChatInputBar(
             thickness = 0.5.dp,
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
         )
+        AnimatedVisibility(
+            visible = pendingAttachment != null,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+        ) {
+            pendingAttachment?.let {
+                AttachmentStatusPill(
+                    attachment = it,
+                    onClear = onClearAttachment,
+                    modifier = Modifier.padding(
+                        start = dimens.spacingMd,
+                        top = dimens.spacingSm,
+                        end = dimens.spacingMd,
+                    ),
+                )
+            }
+        }
         AnimatedVisibility(
             visible = toolsEnabled,
             enter = fadeIn() + expandVertically(),
@@ -192,7 +220,9 @@ fun ChatInputBar(
                 BasicTextField(
                     value = input,
                     onValueChange = onInputChange,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = "Message input" },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onSurface,
                     ),
@@ -236,6 +266,53 @@ fun ChatInputBar(
                     contentDescription = if (isGenerating) "Stop" else "Send message",
                     modifier = Modifier.size(dimens.iconMd),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttachmentStatusPill(
+    attachment: ComposerAttachment,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dimens = LocalDimens.current
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(dimens.radiusLg),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.75f),
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                start = dimens.spacingMd,
+                end = dimens.spacingXs,
+                top = dimens.spacingXs,
+                bottom = dimens.spacingXs,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(attachment.icon, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
+            Column(modifier = Modifier.weight(1f, fill = false)) {
+                Text(
+                    attachment.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    attachment.description,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
+                Icon(RACIcons.Outline.Close, contentDescription = "Remove attachment", modifier = Modifier.size(dimens.iconSm))
             }
         }
     }

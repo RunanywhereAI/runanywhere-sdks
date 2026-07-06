@@ -117,6 +117,9 @@ enum class ConsumerDestination(
 fun NavDestination?.isSelected(route: Any): Boolean =
     this?.hierarchy?.any { it.hasRoute(route::class) } == true
 
+fun NavDestination?.isConsumerTopLevel(): Boolean =
+    ConsumerDestination.entries.any { isSelected(it.route) }
+
 fun NavHostController.navigateTopLevel(route: Any) {
     navigate(route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }

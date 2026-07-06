@@ -57,6 +57,7 @@ fun ConversationHistorySheet(
     val conversations = ConversationRepository.summaries
     var query by rememberSaveable { mutableStateOf("") }
     var renaming by remember { mutableStateOf<ConversationSummary?>(null) }
+    var deleting by remember { mutableStateOf<ConversationSummary?>(null) }
 
     LaunchedEffect(Unit) { ConversationRepository.refresh() }
 
@@ -99,7 +100,7 @@ fun ConversationHistorySheet(
                             onClick = { onSelect(conversation.id) },
                             onRename = { renaming = conversation },
                             onTogglePin = { onTogglePin(conversation.id, !conversation.pinned) },
-                            onDelete = { onDelete(conversation.id) },
+                            onDelete = { deleting = conversation },
                         )
                     }
                 }
@@ -115,6 +116,17 @@ fun ConversationHistorySheet(
                 renaming = null
             },
             onDismiss = { renaming = null },
+        )
+    }
+
+    deleting?.let { target ->
+        DeleteDialog(
+            title = target.title,
+            onConfirm = {
+                onDelete(target.id)
+                deleting = null
+            },
+            onDismiss = { deleting = null },
         )
     }
 }
@@ -215,7 +227,7 @@ private fun ConversationRow(
                 IconButton(onClick = { menuOpen = true }) {
                     Icon(
                         imageVector = RACIcons.Outline.DotsVertical,
-                        contentDescription = "More",
+                        contentDescription = "More options for ${conversation.title}",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(dimens.iconSm),
                     )
@@ -240,6 +252,21 @@ private fun ConversationRow(
             }
         }
     }
+}
+
+@Composable
+private fun DeleteDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete conversation?") },
+        text = { Text("Delete \"$title\" from this device? This cannot be undone.") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Delete", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

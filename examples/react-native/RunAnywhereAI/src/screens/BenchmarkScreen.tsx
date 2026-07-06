@@ -38,6 +38,13 @@ import {
   sineWaveAudioWav,
   SYNTHETIC_AUDIO_SAMPLE_RATE,
 } from '../utils/syntheticAudio';
+import {
+  DEFAULT_INFERENCE_FRAMEWORK,
+  getFrameworkColor,
+  getFrameworkDisplayName,
+  getFrameworkSystemIcon,
+  getPrimaryFramework,
+} from '../utils/modelDisplay';
 
 const HISTORY_STORAGE_KEY = 'benchmark.runs';
 
@@ -519,6 +526,8 @@ export const BenchmarkScreen: React.FC = () => {
             <View style={[styles.listCard, { backgroundColor: colors.surfaceContainerHigh }]}>
               {modelsByCategory[category].map((model, i) => {
                 const selected = selectedModelIds.has(model.id);
+                const framework = getPrimaryFramework(model, DEFAULT_INFERENCE_FRAMEWORK);
+                const frameworkColor = getFrameworkColor(framework);
                 return (
                   <View key={model.id}>
                     {i > 0 && (
@@ -543,12 +552,35 @@ export const BenchmarkScreen: React.FC = () => {
                           <Icon name="check" size={12} color={colors.onPrimary} />
                         )}
                       </View>
-                      <Text
-                        style={[typography.bodyLarge, { color: colors.onSurface, flex: 1 }]}
-                        numberOfLines={1}
-                      >
-                        {model.name}
-                      </Text>
+                      <View style={styles.modelText}>
+                        <Text
+                          style={[typography.bodyLarge, { color: colors.onSurface }]}
+                          numberOfLines={1}
+                        >
+                          {model.name}
+                        </Text>
+                        <View
+                          style={[
+                            styles.backendBadge,
+                            { backgroundColor: `${frameworkColor}18` },
+                          ]}
+                        >
+                          <Icon
+                            name={getFrameworkSystemIcon(framework)}
+                            size={12}
+                            color={frameworkColor}
+                          />
+                          <Text
+                            style={[
+                              typography.labelSmall,
+                              styles.backendLabel,
+                              { color: frameworkColor },
+                            ]}
+                          >
+                            {getFrameworkDisplayName(framework)}
+                          </Text>
+                        </View>
+                      </View>
                     </TouchableOpacity>
                   </View>
                 );
@@ -795,6 +827,22 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 14,
     paddingVertical: 13,
+  },
+  modelText: {
+    flex: 1,
+    gap: 5,
+  },
+  backendBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  backendLabel: {
+    fontWeight: '700',
   },
   checkbox: {
     width: 22,

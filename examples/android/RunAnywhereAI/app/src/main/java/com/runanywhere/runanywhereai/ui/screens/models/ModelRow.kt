@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -74,13 +75,7 @@ fun ModelRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    model.framework.consumerBackendLabel(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                BackendBadge(framework = model.framework)
                 Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
                     model.capabilityLabels().take(3).forEach { label ->
                         Pill(label, MaterialTheme.colorScheme.primary)
@@ -117,13 +112,30 @@ private fun TrailingAction(
             color = MaterialTheme.colorScheme.primary,
         )
         isReady -> Pill("Use", primaryGreen)
-        else -> Pill(
-            text = formatModelSize(model.download_size_bytes),
-            color = MaterialTheme.colorScheme.primary,
-            icon = RACIcons.Outline.Download,
-            onClick = onDownload,
-        )
+        else -> DownloadChip(model = model, onDownload = onDownload)
     }
+}
+
+@Composable
+private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
+    val dimens = LocalDimens.current
+    AssistChip(
+        onClick = onDownload,
+        label = {
+            Text(
+                text = formatModelSize(model.download_size_bytes),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = RACIcons.Outline.Download,
+                contentDescription = null,
+                modifier = Modifier.size(dimens.iconSm),
+            )
+        },
+    )
 }
 
 @Composable

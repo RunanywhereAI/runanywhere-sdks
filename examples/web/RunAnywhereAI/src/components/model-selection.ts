@@ -461,7 +461,9 @@ function refreshToolbarLabel(): void {
   const loaded = findLoadedModelId();
   if (loaded) {
     const info = lookupModelInfo(loaded);
-    toolbarText.textContent = info?.name ?? loaded;
+    toolbarText.textContent = info
+      ? `${info.name || loaded} · ${formatFramework(info.framework)}`
+      : loaded;
   } else {
     toolbarText.textContent = catalogRegistered ? 'Select Model' : 'Loading...';
   }

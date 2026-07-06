@@ -107,7 +107,7 @@ public struct ToolCallInfo: Codable, Sendable {
                 toolName: toolCall.name,
                 argumentsJSON: toolCall.argumentsJson,
                 resultJSON: toolResult?.resultJson,
-                success: toolResult?.success ?? toolCallingResult.errorCode == 0,
+                success: toolResult?.success ?? (toolCallingResult.errorCode == 0),
                 error: ToolCallInfo.errorMessage(from: toolResult, fallback: toolCallingResult)
             )
             return
