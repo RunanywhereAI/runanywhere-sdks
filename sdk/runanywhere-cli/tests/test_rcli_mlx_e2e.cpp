@@ -521,6 +521,22 @@ TestResult test_rcli_mlx_run_end_to_end() {
     return result;
   }
 
+  std::string list_json;
+  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
+                          home.string(), "list", "--all"},
+                         &list_json);
+  if (code != 0 ||
+      list_json.find("\"id\":\"mlx.fake.stt\"") == std::string::npos ||
+      list_json.find("\"modality\":\"stt\"") == std::string::npos ||
+      list_json.find("\"backend\":\"mlx\"") == std::string::npos ||
+      list_json.find("\"id\":\"mlx.fake.tts\"") == std::string::npos ||
+      list_json.find("\"modality\":\"tts\"") == std::string::npos) {
+    result.expected = "MLX STT/TTS rows from rcli list --all";
+    result.actual = list_json;
+    rcli::shutdown();
+    return result;
+  }
+
   std::string run_json;
   code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
                           home.string(), "run", "mlx.fake.llm", "Hello MLX",

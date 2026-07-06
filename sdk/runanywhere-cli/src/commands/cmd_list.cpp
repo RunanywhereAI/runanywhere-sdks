@@ -64,6 +64,8 @@ const char* framework_label(v1::InferenceFramework framework) {
             return "foundation";
         case v1::INFERENCE_FRAMEWORK_SYSTEM_TTS:
             return "system-tts";
+        case v1::INFERENCE_FRAMEWORK_MLX:
+            return "mlx";
         default:
             return "?";
     }
