@@ -14,10 +14,10 @@ import android.os.Bundle
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.runanywhere.runanywhereai.data.ModelCatalog
-import com.runanywhere.runanywhereai.data.SingleFileModel
 import com.runanywhere.runanywhereai.state.GlobalState
+import com.runanywhere.sdk.npu.qhexrt.NpuBundle
 import com.runanywhere.sdk.npu.qhexrt.QHexRT
+import com.runanywhere.sdk.npu.qhexrt.qhexrtBundles
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.downloadModel
@@ -68,7 +68,7 @@ import java.security.MessageDigest
  * (one bundle on device at a time). NOT product code — androidTest only.
  *
  * Selection (instrumentation args, `-e key value`):
-     *   -e modelId <catalog-id>                          a row from ModelCatalog.npuCatalog
+     *   -e modelId <catalog-id>                          a row from qhexrtBundles
      *   OR -e hfRepo <catalog-org/repo> -e arch <v81> -e modality <llm|vlm|stt|tts|inpaint> -e manifest <m.json>
  *      (legacy: -e files "m.json,..." — only the first name, the manifest, is used)
  *   -e hfToken <hf_...>   download private runanywhere/<name>_HNPU repos (never committed/logged)
@@ -85,7 +85,6 @@ class NpuModelE2ETest {
         const val LOAD_TIMEOUT_MS = 300_000L
         const val INFER_TIMEOUT_MS = 300_000L   // per inference case
         val THINKING_TAGS = ThinkingTagPattern(open_tag = "<think>", close_tag = "</think>")
-        val ARCH_SUFFIX = Regex("(.+)_(v(?:75|79|81|83))$")
     }
 
     private data class VlmCase(
@@ -124,7 +123,7 @@ class NpuModelE2ETest {
                 return
             }
             val message = requestedModelId?.let {
-                "unknown -e modelId '$it' (expected a ModelCatalog.npuCatalog id, optionally suffixed with _v75/_v79/_v81/_v83)"
+                "unknown -e modelId '$it' (expected a qhexrtBundles id)"
             } ?: "invalid selection for -e hfRepo '$requestedHfRepo': use a catalog-backed repo with modality and manifest"
             Log.i(tag, "NPU_E2E status=FAIL phase=lookup detail=\"$message\"")
             assertTrue(message, false)
@@ -220,7 +219,7 @@ class NpuModelE2ETest {
                             multiFile = localBundle.files.map { it.toDescriptor(model.id, localBundle) },
                             id = model.id,
                             name = model.name,
-                            framework = model.framework,
+                            framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
                             modality = model.category,
                             source =
                                 if (localBundle.mode == "local_adb_import") {
@@ -338,7 +337,7 @@ class NpuModelE2ETest {
                                 ModelUnloadRequest(
                                     model_id = model.id,
                                     category = model.category,
-                                    framework = model.framework,
+                                    framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
                                 ),
                             )
                         val unloadOk = unload.success && model.id in unload.unloaded_model_ids
@@ -642,7 +641,7 @@ class NpuModelE2ETest {
     // ------------------------------------------------------------ INPAINT ----
     private suspend fun runInpaint(
         report: RunReport,
-        model: SingleFileModel,
+        model: NpuBundle,
         suite: NpuSuite?,
         outDir: File?,
     ) {
@@ -867,7 +866,7 @@ class NpuModelE2ETest {
 
     // ------------------------------------------------------------- EMBEDDING ----
     // Canonical retrieval-ranking gate through the public embedding API.
-    private suspend fun runEmbedding(report: RunReport, model: SingleFileModel, suite: NpuSuite?) {
+    private suspend fun runEmbedding(report: RunReport, model: NpuBundle, suite: NpuSuite?) {
         requireNotNull(suite) { "embedding requires a canonical npu_suite/v1" }
         require(suite.metric == "embedding_retrieval_ranking") {
             "embedding suite metric must be embedding_retrieval_ranking, got ${suite.metric}"
@@ -977,7 +976,7 @@ class NpuModelE2ETest {
     }
 
     // ---------------------------------------------------------------- TTS ----
-    private suspend fun runTts(report: RunReport, model: SingleFileModel, outDir: File?, suite: NpuSuite?) {
+    private suspend fun runTts(report: RunReport, model: NpuBundle, outDir: File?, suite: NpuSuite?) {
         requireNotNull(suite) { "TTS requires a canonical npu_suite/v1" }
         require(suite.metric == "audio_sanity_intelligibility") {
             "TTS suite metric must be audio_sanity_intelligibility until independent gold WAV parity is implemented; got ${suite.metric}"
@@ -1030,10 +1029,15 @@ class NpuModelE2ETest {
     }
 
     // ---------------------------------------------------------------- helpers ----
-    private suspend fun register(bundle: SingleFileModel) =
-        requireNotNull(bundle.register()) {
-            "catalog model '${bundle.id}' is not eligible on the detected QHexRT device"
-        }
+    private suspend fun register(bundle: NpuBundle) =
+        RunAnywhere.registerModel(
+            id = bundle.id,
+            name = bundle.name,
+            url = bundle.url,
+            framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+            modality = bundle.category,
+            memoryRequirement = 0L,
+        )
 
     private fun LocalBundleFile.toDescriptor(
         modelId: String,
@@ -1240,18 +1244,15 @@ class NpuModelE2ETest {
         MessageDigest.getInstance("SHA-256").digest(bytes)
             .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
-    /** Catalog id, or a catalog-backed URL override from -e hfRepo/arch/modality/manifest. */
-    private fun resolveModel(args: Bundle): Pair<SingleFileModel, String?>? {
+    /** SDK catalog id, or an ad-hoc bundle synthesized from -e hfRepo/arch/modality/manifest. */
+    private fun resolveModel(args: Bundle): Pair<NpuBundle, String?>? {
         args.getString("modelId")?.takeIf { it.isNotBlank() }?.let { rawId ->
-            val (logicalId, requestedArch) = logicalIdAndArch(rawId)
-            val model = ModelCatalog.npuCatalog.firstOrNull { it.id == rawId }
-                ?: ModelCatalog.npuCatalog.firstOrNull { it.id == logicalId }
-            return model?.let { it to (requestedArch ?: args.getString("arch")?.takeIf { arch -> arch.isNotBlank() }) }
+            val model = qhexrtBundles.firstOrNull { it.id == rawId } ?: return null
+            return model to (args.getString("arch")?.takeIf { arch -> arch.isNotBlank() } ?: model.arch)
         }
         val repo = args.getString("hfRepo") ?: return null
-        val catalogModel = ModelCatalog.npuCatalog.firstOrNull { hfRepoOf(it) == repo } ?: return null
         val arch = args.getString("arch")?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: "v81"
-        if (arch !in setOf("v75", "v79", "v81")) return null
+        if (arch !in setOf("v75", "v79", "v81", "v83")) return null
         val category = when (args.getString("modality")?.lowercase()) {
             "llm" -> ModelCategory.MODEL_CATEGORY_LANGUAGE
             "vlm" -> ModelCategory.MODEL_CATEGORY_MULTIMODAL
@@ -1266,11 +1267,12 @@ class NpuModelE2ETest {
         val manifest = args.getString("manifest")?.trim()?.takeIf { it.isNotEmpty() }
             ?: args.getString("files")?.split(",")?.map { it.trim() }?.firstOrNull { it.isNotEmpty() }
             ?: return null
-        return catalogModel.copy(
+        return NpuBundle(
+            id = "${repo.substringAfterLast('/')}_$arch",
             name = repo,
-            url = "https://huggingface.co/$repo/$manifest",
             category = category,
-            memoryBytes = 0L,
+            arch = arch,
+            url = "https://huggingface.co/$repo/$arch/$manifest",
         ) to arch
     }
 
@@ -1284,13 +1286,8 @@ class NpuModelE2ETest {
         else -> category.name.lowercase()
     }
 
-    private fun hfRepoOf(bundle: SingleFileModel): String =
+    private fun hfRepoOf(bundle: NpuBundle): String =
         bundle.url.removePrefix("https://huggingface.co/").split("/").take(2).joinToString("/")
-
-    private fun logicalIdAndArch(rawId: String): Pair<String, String?> {
-        val match = ARCH_SUFFIX.matchEntire(rawId) ?: return rawId to null
-        return match.groupValues[1] to match.groupValues[2]
-    }
 
     private fun loadSuite(modelId: String, arch: String): NpuSuite? {
         val assets = InstrumentationRegistry.getInstrumentation().context.assets

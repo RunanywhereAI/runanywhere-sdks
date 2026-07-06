@@ -46,6 +46,7 @@
 // NpuCapability / HexagonArch are the generated proto wire types
 // (@runanywhere/proto-ts/hardware_profile) — re-exported for consumers.
 export { QHexRT, NpuCapability, HexagonArch } from './QHexRT';
+export { seedNpuCatalog } from './NpuCatalog';
 
 // =============================================================================
 // Nitrogen Spec Types
