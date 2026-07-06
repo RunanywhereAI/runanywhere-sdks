@@ -332,8 +332,14 @@ rac_result_t rac_infer_model_file_role(const char* filename, int32_t modality_pr
     }
     if (name_equals_any(name, {"config.json", "generation_config.json", "preprocessor_config.json",
                                "processor_config.json", "image_processor_config.json",
-                               "model_config.json"})) {
+                               "model_config.json", "configuration.json", "chat_template.json",
+                               "chat_template.jinja", "model.safetensors.index.json"})) {
         *out_role_proto = RAC_MODEL_FILE_ROLE_CONFIG;
+        return RAC_SUCCESS;
+    }
+    if (has_extension(fs::path(name), "py") || name_equals_any(name, {"readme.md", "license.md",
+                                                                      "trainer_state.json"})) {
+        *out_role_proto = RAC_MODEL_FILE_ROLE_COMPANION;
         return RAC_SUCCESS;
     }
 

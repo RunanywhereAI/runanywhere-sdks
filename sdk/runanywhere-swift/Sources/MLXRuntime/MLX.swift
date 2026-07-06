@@ -28,10 +28,11 @@ public enum MLX {
     public static let mlxSwiftLMVersion = "3.31.4"
 
     @MainActor
-    public static func register(priority _: Int = 100) {
+    @discardableResult
+    public static func register(priority _: Int = 100) -> Bool {
         guard !isRegistered else {
             logger.debug("MLX already registered, returning")
-            return
+            return true
         }
 
         var callbacks = rac_mlx_callbacks_t()
@@ -60,18 +61,19 @@ public enum MLX {
         guard callbackResult == RAC_SUCCESS else {
             let message = String(cString: rac_error_message(callbackResult))
             logger.error("MLX callback registration failed: \(message)")
-            return
+            return false
         }
 
         let registerResult = rac_backend_mlx_register()
         if registerResult != RAC_SUCCESS && registerResult != RAC_ERROR_MODULE_ALREADY_REGISTERED {
             let message = String(cString: rac_error_message(registerResult))
             logger.error("MLX backend registration failed: \(message)")
-            return
+            return false
         }
 
         isRegistered = true
         logger.info("MLX backend registered successfully")
+        return true
     }
 
     @MainActor
@@ -84,7 +86,7 @@ public enum MLX {
 
     public static let autoRegister: Void = {
         Task { @MainActor in
-            MLX.register()
+            _ = MLX.register()
         }
     }()
 }
@@ -210,7 +212,9 @@ private enum MLXSessionCoordinator {
     }
 
     static func unregister(_ session: MLXSession) {
-        lock.withLock { $0.removeValue(forKey: ObjectIdentifier(session)) }
+        lock.withLock {
+            _ = $0.removeValue(forKey: ObjectIdentifier(session))
+        }
     }
 
     static func prepareForLoad(_ session: MLXSession) {
@@ -290,7 +294,7 @@ private final class MLXSession: @unchecked Sendable {
         let restoreMemoryPolicy = MLXMemoryPolicy.prepareForModelLoad(kind)
         defer { restoreMemoryPolicy?() }
 
-        let directory = URL(fileURLWithPath: modelPath, isDirectory: true)
+        let directory = modelDirectoryURL(from: modelPath)
         let tokenizerLoader: any TokenizerLoader = TransformersTokenizerLoader()
         switch kind {
         case .llm:
@@ -322,8 +326,13 @@ private final class MLXSession: @unchecked Sendable {
 
     func generate(prompt: String, options: UnsafePointer<rac_llm_options_t>?) async throws
         -> (String, MLXGenerationMetrics) {
-        let params = generateParameters(from: options?.pointee)
-        return try await collect(input: UserInput(prompt: prompt), parameters: params)
+        let resolvedOptions = options?.pointee
+        let params = generateParameters(from: resolvedOptions)
+        let input = UserInput(
+            prompt: prompt,
+            additionalContext: llmAdditionalContext(from: resolvedOptions)
+        )
+        return try await collect(input: input, parameters: params)
     }
 
     func generateStream(
@@ -332,8 +341,13 @@ private final class MLXSession: @unchecked Sendable {
         callback: rac_llm_stream_callback_fn?,
         userData: UnsafeMutableRawPointer?
     ) async throws -> MLXGenerationMetrics {
-        let params = generateParameters(from: options?.pointee)
-        return try await stream(input: UserInput(prompt: prompt), parameters: params) { token in
+        let resolvedOptions = options?.pointee
+        let params = generateParameters(from: resolvedOptions)
+        let input = UserInput(
+            prompt: prompt,
+            additionalContext: llmAdditionalContext(from: resolvedOptions)
+        )
+        return try await stream(input: input, parameters: params) { token in
             guard let callback else { return false }
             return token.withCString { callback($0, userData) == RAC_TRUE }
         }
@@ -431,22 +445,26 @@ private final class MLXSession: @unchecked Sendable {
         let events = session.streamDetails(to: prompt, images: [image])
         var metrics = MLXGenerationMetrics()
         var repetitionGuard = RepetitionRunGuard()
+        var suppressRunawayTokens = false
         let started = Date()
 
-        for try await event in events {
+        generationLoop: for try await event in events {
             if isCancelled {
                 break
             }
             switch event {
             case .chunk(let token):
+                if suppressRunawayTokens {
+                    continue
+                }
                 if repetitionGuard.shouldStop(after: token) {
-                    mlxRuntimeLogger.warning("Stopping MLX VLM generation after repeated token runaway")
-                    cancel()
-                    break
+                    mlxRuntimeLogger.warning("Suppressing MLX VLM tokens after repeated token runaway")
+                    suppressRunawayTokens = true
+                    continue
                 }
                 if !onToken(token) {
                     cancel()
-                    break
+                    break generationLoop
                 }
             case .info(let info):
                 metrics.promptTokens = info.promptTokenCount
@@ -753,6 +771,15 @@ private final class MLXSession: @unchecked Sendable {
     }
 }
 
+private func modelDirectoryURL(from modelPath: String) -> URL {
+    var isDirectory: ObjCBool = false
+    if FileManager.default.fileExists(atPath: modelPath, isDirectory: &isDirectory),
+       !isDirectory.boolValue {
+        return URL(fileURLWithPath: modelPath).deletingLastPathComponent()
+    }
+    return URL(fileURLWithPath: modelPath, isDirectory: true)
+}
+
 private enum MLXRuntimeError: LocalizedError {
     case simulatorUnsupported
     case notLoaded(String)
@@ -837,6 +864,13 @@ private func generateParameters(from options: rac_llm_options_t?) -> GeneratePar
         frequencyPenalty: options.frequency_penalty == 0.0 ? nil : options.frequency_penalty,
         seed: options.seed > 0 ? UInt64(options.seed) : nil
     )
+}
+
+private func llmAdditionalContext(from options: rac_llm_options_t?) -> [String: any Sendable]? {
+    guard options?.disable_thinking == RAC_TRUE else {
+        return nil
+    }
+    return ["enable_thinking": false]
 }
 
 private func generateParameters(from options: rac_vlm_options_t?) -> GenerateParameters {

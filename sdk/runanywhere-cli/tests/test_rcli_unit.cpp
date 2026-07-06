@@ -255,6 +255,32 @@ TestResult test_catalog_lookup() {
     return result;
   }
 
+  const rcli::catalog::CatalogEntry *mlx_fastvlm =
+      rcli::catalog::find("mlx-fastvlm");
+  if (!mlx_fastvlm ||
+      mlx_fastvlm->category != runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
+      mlx_fastvlm->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      mlx_fastvlm->files == nullptr || mlx_fastvlm->file_count != 14) {
+    result.details = "mlx-fastvlm should be a complete MLX VLM bundle";
+    return result;
+  }
+  bool has_processor_config = false;
+  bool has_fastvlm_companion = false;
+  for (size_t i = 0; i < mlx_fastvlm->file_count; ++i) {
+    const std::string filename = mlx_fastvlm->files[i].filename;
+    has_processor_config =
+        has_processor_config || filename == "processor_config.json";
+    has_fastvlm_companion =
+        has_fastvlm_companion ||
+        (!mlx_fastvlm->files[i].required &&
+         (filename == "processing_fastvlm.py" || filename == "llava_qwen.py"));
+  }
+  if (!has_processor_config || !has_fastvlm_companion) {
+    result.details =
+        "MLX FastVLM catalog entry must include processor config and companions";
+    return result;
+  }
+
   const rcli::catalog::CatalogEntry *mlx_embed =
       rcli::catalog::find("mlx-qwen3-embed");
   if (!mlx_embed || mlx_embed->category !=
@@ -373,6 +399,30 @@ TestResult test_mlx_catalog_registration() {
     return result;
   }
 
+  runanywhere::v1::ModelInfo fastvlm;
+  if (!get_registered_model("mlx-fastvlm-0.5b-bf16", &fastvlm, &error)) {
+    result.details = error;
+    return result;
+  }
+  bool processor_registered = false;
+  bool companion_registered = false;
+  for (const auto &file : fastvlm.multi_file().files()) {
+    processor_registered =
+        processor_registered || file.filename() == "processor_config.json";
+    companion_registered =
+        companion_registered ||
+        (!file.is_required() &&
+         (file.filename() == "processing_fastvlm.py" ||
+          file.filename() == "llava_qwen.py"));
+  }
+  if (fastvlm.category() != runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
+      fastvlm.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      !fastvlm.has_multi_file() || fastvlm.multi_file().files_size() != 14 ||
+      !processor_registered || !companion_registered) {
+    result.details = "registered MLX FastVLM metadata is incomplete";
+    return result;
+  }
+
   runanywhere::v1::ModelInfo embedding;
   if (!get_registered_model("mlx-qwen3-embedding-0.6b-4bit-dwq", &embedding,
                             &error)) {
@@ -390,6 +440,7 @@ TestResult test_mlx_catalog_registration() {
   remove_registered_model("mlx-qwen3-0.6b-4bit");
   remove_registered_model("mlx-llama-3.2-1b-instruct-4bit");
   remove_registered_model("mlx-qwen2-vl-2b-instruct-4bit");
+  remove_registered_model("mlx-fastvlm-0.5b-bf16");
   remove_registered_model("mlx-qwen3-embedding-0.6b-4bit-dwq");
 
   result.passed = true;

@@ -156,6 +156,51 @@ constexpr CatalogFile kMlxQwen2Vl2BFiles[] = {
      "vocab.json", true},
 };
 
+constexpr CatalogFile kMlxFastVlm05BFiles[] = {
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "added_tokens.json",
+     "added_tokens.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "llava_qwen.py",
+     "llava_qwen.py", false},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "merges.txt",
+     "merges.txt", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "preprocessor_config.json",
+     "preprocessor_config.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "processing_fastvlm.py",
+     "processing_fastvlm.py", false},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "processor_config.json",
+     "processor_config.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
 constexpr CatalogFile kMlxQwen3Embedding06BFiles[] = {
     {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
      "resolve/main/"
@@ -441,6 +486,10 @@ constexpr CatalogEntry kCatalog[] = {
      "Qwen2-VL 2B Instruct 4-bit (MLX)", v1::MODEL_CATEGORY_MULTIMODAL,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
      kMlxQwen2Vl2BFiles, 11, 1261853827, 2048, false},
+    {"mlx-fastvlm-0.5b-bf16", "mlx-fastvlm", "FastVLM 0.5B bf16 (MLX)",
+     v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxFastVlm05BFiles, 14,
+     1256926974, 2048, false},
     {"mlx-qwen3-embedding-0.6b-4bit-dwq", "mlx-qwen3-embed",
      "Qwen3 Embedding 0.6B 4-bit DWQ (MLX)", v1::MODEL_CATEGORY_EMBEDDING,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
