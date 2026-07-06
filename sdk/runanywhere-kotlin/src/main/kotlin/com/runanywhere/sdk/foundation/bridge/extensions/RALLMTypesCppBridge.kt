@@ -54,6 +54,13 @@ fun LLMGenerationOptions.Companion.defaults(): RALLMGenerationOptions =
  *   string forms.
  */
 fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerateRequest {
+    val requestOptions =
+        copy(
+            max_tokens = max_tokens.takeIf { it > 0 } ?: 100,
+            temperature = temperature.takeIf { it > 0.0f } ?: 0.8f,
+            top_p = top_p.takeIf { it > 0.0f } ?: 1.0f,
+            repetition_penalty = repetition_penalty.takeIf { it > 0.0f } ?: 1.0f,
+        )
     val so = structured_output
     val schema =
         when {
@@ -66,22 +73,23 @@ fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerate
             StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA -> "json_schema"
             else -> ""
         }
-    val grammar = so?.grammar.orEmpty()
+    val effectiveGrammar = so?.grammar?.takeIf { it.isNotBlank() } ?: grammar.orEmpty()
     return RALLMGenerateRequest(
         prompt = prompt,
-        max_tokens = max_tokens,
-        temperature = temperature,
-        top_p = top_p,
-        top_k = top_k,
-        repetition_penalty = repetition_penalty,
+        max_tokens = requestOptions.max_tokens,
+        temperature = requestOptions.temperature,
+        top_p = requestOptions.top_p,
+        top_k = requestOptions.top_k,
+        repetition_penalty = requestOptions.repetition_penalty,
         stop_sequences = stop_sequences,
         streaming_enabled = streaming_enabled,
         preferred_framework = preferred_framework.wireString,
         system_prompt = system_prompt.orEmpty(),
         json_schema = schema,
         response_format = responseFormat,
-        grammar = grammar,
+        grammar = effectiveGrammar,
         execution_target = execution_target?.wireString.orEmpty(),
+        options = requestOptions,
     )
 }
 

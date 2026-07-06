@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.data.conversation
 
-import ai.runanywhere.proto.v1.ThinkingTagPattern
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -105,7 +104,6 @@ object ConversationRepository {
                     max_tokens = TITLE_MAX_TOKENS,
                     temperature = TITLE_TEMPERATURE,
                     system_prompt = TITLE_INSTRUCTIONS,
-                    thinking_pattern = ThinkingTagPattern(open_tag = "<think>", close_tag = "</think>"),
                 ),
             ).takeIf { it.error_message.isNullOrBlank() }?.text
         }.onFailure { RACLog.w("smart title generation failed: ${it.message}") }

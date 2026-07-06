@@ -38,10 +38,10 @@ fun ToolsScreen(viewModel: ToolsViewModel = viewModel()) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Section("Tool Calling") {
+        Section("Web & Tools") {
             ToggleRow(
-                label = "Enable Tool Calling",
-                description = "Allow the LLM to use registered tools to perform actions " +
+                label = "Enable web and tools",
+                description = "Allow the assistant to use registered tools for actions " +
                     "like getting weather, time, or calculations.",
                 checked = viewModel.toolCallingEnabled,
                 onCheckedChange = viewModel::setEnabled,
@@ -51,7 +51,7 @@ fun ToolsScreen(viewModel: ToolsViewModel = viewModel()) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("Registered Tools", style = MaterialTheme.typography.bodyLarge)
+                    Text("Registered tools", style = MaterialTheme.typography.bodyLarge)
                     Text(
                         text = viewModel.tools.size.toString(),
                         style = RACTextStyles.Metric,

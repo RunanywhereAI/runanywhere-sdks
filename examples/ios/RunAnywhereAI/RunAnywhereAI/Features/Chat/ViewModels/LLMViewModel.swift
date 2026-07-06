@@ -555,9 +555,16 @@ final class LLMViewModel {
         }
         options.streamingEnabled = useStreaming
         // Structured flag — commons applies the model's no-think directive;
-        // the app never injects control tokens into prompts. Same gate as the
-        // RAG path (RAGViewModel.askQuestion).
+        // the app never injects control tokens into prompts. Chat document
+        // attachments use the same gate before calling the SDK RAG pipeline.
         options.disableThinking = loadedModelSupportsThinking && !thinkingModeEnabled
+        if let currentModel = ModelListViewModel.shared.currentModel, currentModel.supportsThinking {
+            options.thinkingPattern = currentModel.hasThinkingPattern
+                ? currentModel.thinkingPattern
+                : .defaultPattern
+        } else if loadedModelSupportsThinking {
+            options.thinkingPattern = .defaultPattern
+        }
         return options
     }
 

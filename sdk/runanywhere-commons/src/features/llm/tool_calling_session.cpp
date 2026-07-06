@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "features/llm/llm_thinking_directive_internal.h"
+#include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -66,13 +67,17 @@ int64_t now_ms() {
 }
 
 void split_display_text_and_thinking(const std::string& raw_text, std::string* out_text,
-                                     std::string* out_thinking) {
+                                     std::string* out_thinking,
+                                     const std::string& thinking_open_tag,
+                                     const std::string& thinking_close_tag) {
     const char* response = nullptr;
     size_t response_len = 0;
     const char* thinking = nullptr;
     size_t thinking_len = 0;
-    if (rac_llm_extract_thinking(raw_text.c_str(), &response, &response_len, &thinking,
-                                 &thinking_len) != RAC_SUCCESS) {
+    if (rac_llm_extract_thinking_with_tags(
+            raw_text.c_str(), thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
+            thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
+            &response_len, &thinking, &thinking_len) != RAC_SUCCESS) {
         if (out_text) {
             *out_text = raw_text;
         }
@@ -133,6 +138,9 @@ struct ToolCallingSession {
     // Suppress the model thinking phase on every generate in the session
     // (ToolCallingSessionCreateRequest.disable_thinking).
     bool disable_thinking = false;
+    bool thinking_tags_resolved = false;
+    std::string thinking_open_tag;
+    std::string thinking_close_tag;
 
     // Request-level tool_choice / forced_tool_name overrides.
     bool has_tool_choice = false;
@@ -510,6 +518,12 @@ bool run_generate_once(ToolCallingSession& session, const std::string& prompt,
         return false;
     }
 
+    if (!session.thinking_tags_resolved) {
+        (void)rac::llm::model_thinking_tags_from_registry(
+            ref.model_id, &session.thinking_open_tag, &session.thinking_close_tag);
+        session.thinking_tags_resolved = true;
+    }
+
     // Publish the in-flight ref so cancel calls from other
     // threads can interrupt this generate. If a cancel arrived before we
     // got here, latch it onto the ref now.
@@ -605,7 +619,9 @@ void run_generate_loop(ToolCallingSession& session) {
             parse_tool_call_from_output(session, response, &clean_text, &parsed_call);
 
         split_display_text_and_thinking(clean_text, &session.final_text,
-                                        &session.final_thinking_content);
+                                        &session.final_thinking_content,
+                                        session.thinking_open_tag,
+                                        session.thinking_close_tag);
         emit_llm_chunk(session, session.final_text, true, "stop");
 
         if (!has_call) {

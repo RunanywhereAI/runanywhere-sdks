@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "features/llm/llm_thinking_directive_internal.h"
+#include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -104,7 +105,9 @@ int64_t now_ms() {
 }
 
 void set_display_text_and_thinking(runanywhere::v1::ToolCallingResult* result,
-                                   const std::string& raw_text) {
+                                   const std::string& raw_text,
+                                   const std::string& thinking_open_tag,
+                                   const std::string& thinking_close_tag) {
     if (!result) {
         return;
     }
@@ -113,8 +116,10 @@ void set_display_text_and_thinking(runanywhere::v1::ToolCallingResult* result,
     size_t response_len = 0;
     const char* thinking = nullptr;
     size_t thinking_len = 0;
-    if (rac_llm_extract_thinking(raw_text.c_str(), &response, &response_len, &thinking,
-                                 &thinking_len) != RAC_SUCCESS) {
+    if (rac_llm_extract_thinking_with_tags(
+            raw_text.c_str(), thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
+            thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
+            &response_len, &thinking, &thinking_len) != RAC_SUCCESS) {
         result->set_text(raw_text);
         return;
     }
@@ -142,6 +147,9 @@ struct LoopContext {
     // Suppress the model thinking phase on every generate in the loop
     // (ToolCallingSessionCreateRequest.disable_thinking).
     bool disable_thinking = false;
+    bool thinking_tags_resolved = false;
+    std::string thinking_open_tag;
+    std::string thinking_close_tag;
 
     // request-level tool_choice / forced_tool_name overrides.
     // When present, build_options_snapshot copies them onto the synthesized
@@ -289,7 +297,7 @@ validate_tool_call(const LoopContext& ctx, const runanywhere::v1::ToolCall& tool
     return result;
 }
 
-bool run_generate_once(const LoopContext& ctx, LoopCancelState* cancel_state,
+bool run_generate_once(LoopContext& ctx, LoopCancelState* cancel_state,
                        const std::string& prompt, std::string* out_response, rac_result_t* out_rc) {
     rac::llm::LifecycleLlmRef ref;
     rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
@@ -320,6 +328,12 @@ bool run_generate_once(const LoopContext& ctx, LoopCancelState* cancel_state,
         if (out_rc)
             *out_rc = RAC_ERROR_NOT_SUPPORTED;
         return false;
+    }
+
+    if (!ctx.thinking_tags_resolved) {
+        (void)rac::llm::model_thinking_tags_from_registry(ref.model_id, &ctx.thinking_open_tag,
+                                                          &ctx.thinking_close_tag);
+        ctx.thinking_tags_resolved = true;
     }
 
     // publish the in-flight ref so a cancel from another
@@ -514,7 +528,8 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
             const bool cancelled = cancel_state->cancel_requested.load(std::memory_order_acquire);
             const rac_result_t report_rc = cancelled ? RAC_ERROR_CANCELLED : rc;
             const char* msg = cancelled ? "LLM generation cancelled" : "LLM generation failed";
-            set_display_text_and_thinking(&final_result, final_text);
+            set_display_text_and_thinking(&final_result, final_text, ctx.thinking_open_tag,
+                                          ctx.thinking_close_tag);
             final_result.set_is_complete(false);
             final_result.set_iterations_used(static_cast<int32_t>(iteration));
             final_result.set_error_code(static_cast<int32_t>(report_rc));
@@ -632,7 +647,8 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
         is_complete = true;
     }
 
-    set_display_text_and_thinking(&final_result, final_text);
+    set_display_text_and_thinking(&final_result, final_text, ctx.thinking_open_tag,
+                                  ctx.thinking_close_tag);
     final_result.set_is_complete(is_complete);
     final_result.set_iterations_used(static_cast<int32_t>(iteration));
 

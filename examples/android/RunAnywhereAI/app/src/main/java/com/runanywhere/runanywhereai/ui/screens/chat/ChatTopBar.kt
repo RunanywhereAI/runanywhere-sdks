@@ -16,16 +16,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -50,13 +54,24 @@ fun ChatTopBar(
     onHistory: () -> Unit,
     onLora: () -> Unit,
     onDetails: () -> Unit,
+    onMenu: () -> Unit,
+    showMenu: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    var overflowExpanded by remember { mutableStateOf(false) }
+
     TopAppBar(
         modifier = modifier,
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
+        navigationIcon = {
+            if (showMenu) {
+                IconButton(onClick = onMenu) {
+                    Icon(RACIcons.Outline.Menu, contentDescription = "Open menu")
+                }
+            }
+        },
         title = {
             ModelCard(
                 model = model,
@@ -66,25 +81,41 @@ fun ChatTopBar(
             )
         },
         actions = {
-            if (model?.supports_lora == true) {
-                IconButton(onClick = onLora) {
-                    Icon(
-                        imageVector = RACIcons.Outline.Adjustments,
-                        contentDescription = "LoRA adapters",
-                        tint = if (loraActive) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                    )
-                }
-            }
-            // Mirrors iOS ChatInterfaceView's info button (disabled until the
-            // chat has messages) that opens the analytics sheet.
-            IconButton(onClick = onDetails, enabled = hasMessages) {
-                Icon(RACIcons.Outline.InfoCircle, contentDescription = "Chat analytics")
-            }
             IconButton(onClick = onHistory) {
-                Icon(RACIcons.Outline.History, contentDescription = "History")
+                Icon(RACIcons.Outline.History, contentDescription = "Saved chats")
             }
             IconButton(onClick = onNewChat) {
                 Icon(RACIcons.Outline.Plus, contentDescription = "New chat")
+            }
+            if (hasMessages || model?.supports_lora == true) {
+                IconButton(onClick = { overflowExpanded = true }) {
+                    Icon(RACIcons.Outline.DotsVertical, contentDescription = "More chat actions")
+                }
+                DropdownMenu(
+                    expanded = overflowExpanded,
+                    onDismissRequest = { overflowExpanded = false },
+                ) {
+                    if (hasMessages) {
+                        DropdownMenuItem(
+                            text = { Text("Chat details") },
+                            leadingIcon = { Icon(RACIcons.Outline.InfoCircle, contentDescription = null) },
+                            onClick = {
+                                overflowExpanded = false
+                                onDetails()
+                            },
+                        )
+                    }
+                    if (model?.supports_lora == true) {
+                        DropdownMenuItem(
+                            text = { Text(if (loraActive) "Adapters active" else "Adapters") },
+                            leadingIcon = { Icon(RACIcons.Outline.Adjustments, contentDescription = null) },
+                            onClick = {
+                                overflowExpanded = false
+                                onLora()
+                            },
+                        )
+                    }
+                }
             }
         },
     )

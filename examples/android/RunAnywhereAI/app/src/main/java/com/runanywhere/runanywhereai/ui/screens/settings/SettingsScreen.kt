@@ -57,7 +57,19 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Section("Generation") {
+        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            Text(
+                text = "Personalize the assistant, manage local models, and keep downloads private.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Section("Assistant") {
             SliderRow(
                 label = "Temperature",
                 valueText = String.format(Locale.US, "%.1f", settings.temperature),
@@ -91,9 +103,15 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 checked = settings.streaming,
                 onCheckedChange = viewModel::setStreaming,
             )
+            ToggleRow(
+                label = "Show reasoning when available",
+                description = "Thinking models can show a collapsible reasoning trace before the answer.",
+                checked = !settings.disableThinking,
+                onCheckedChange = { viewModel.setDisableThinking(!it) },
+            )
         }
 
-        Section("Storage") {
+        Section("Models & Storage") {
             Text(
                 text = "Models ${formatModelSize(storage.modelsBytes)}  ·  ${formatModelSize(storage.freeBytes)} free",
                 style = RACTextStyles.Metric,
@@ -123,9 +141,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             }
         }
 
-        Section("Downloads") {
+        Section("Private Downloads") {
             Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-                Text("HuggingFace token", style = MaterialTheme.typography.bodyLarge)
+                Text("Hugging Face token", style = MaterialTheme.typography.bodyLarge)
                 OutlinedTextField(
                     value = settings.hfToken,
                     onValueChange = viewModel::setHfToken,

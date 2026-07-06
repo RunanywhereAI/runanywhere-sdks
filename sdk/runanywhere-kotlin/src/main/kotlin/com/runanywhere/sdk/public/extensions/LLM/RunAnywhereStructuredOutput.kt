@@ -81,7 +81,7 @@ suspend fun RunAnywhere.generateWithStructuredOutput(
             internalOptions = internalOptions.copy(system_prompt = sys)
         }
     }
-    val request = internalOptions.toRALLMGenerateRequest(prompt).copy(streaming_enabled = false)
+    val request = internalOptions.copy(streaming_enabled = false).toRALLMGenerateRequest(prompt)
     return generate(request)
 }
 
@@ -111,7 +111,7 @@ fun RunAnywhere.generateStructuredStream(
         (options ?: RALLMGenerationOptions.defaults()).copy(
             structured_output = StructuredOutputOptions.defaults(schema = schema),
         )
-    val request = internalOptions.toRALLMGenerateRequest(prompt).copy(streaming_enabled = true)
+    val request = internalOptions.copy(streaming_enabled = true).toRALLMGenerateRequest(prompt)
 
     return flow {
         var accumulated = ""

@@ -144,9 +144,9 @@ private fun Header() {
                 modifier = Modifier.size(dimens.iconLg),
             )
         }
-        Text("Voice Activity Detection", style = MaterialTheme.typography.titleLarge)
+        Text("Turn-taking Detection", style = MaterialTheme.typography.titleLarge)
         Text(
-            text = "Detect speech activity in real-time, all on-device.",
+            text = "Detect when speech starts and ends, all on-device.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

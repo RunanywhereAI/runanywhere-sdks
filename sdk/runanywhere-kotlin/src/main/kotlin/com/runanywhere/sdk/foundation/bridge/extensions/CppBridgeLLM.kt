@@ -56,25 +56,26 @@ private fun RALLMGenerationOptions?.toGenerateRequest(
     streaming: Boolean,
 ): RALLMGenerateRequest {
     val options = this ?: RALLMGenerationOptions()
+    val requestOptions =
+        options.copy(
+            max_tokens = options.max_tokens.takeIf { it > 0 } ?: 100,
+            temperature = options.temperature.takeIf { it > 0.0f } ?: 0.8f,
+            top_p = options.top_p.takeIf { it > 0.0f } ?: 1.0f,
+            repetition_penalty = options.repetition_penalty.takeIf { it > 0.0f } ?: 1.0f,
+            streaming_enabled = streaming || options.streaming_enabled,
+        )
     val schema = options.structured_output?.json_schema ?: options.json_schema.orEmpty()
-    val canonicalOnlyOptions =
-        options.disable_thinking ||
-            options.thinking_pattern != null ||
-            options.structured_output != null ||
-            options.tool_calling != null ||
-            options.enable_real_time_tracking ||
-            options.repeat_last_n != 0
     return RALLMGenerateRequest(
         prompt = prompt,
-        max_tokens = options.max_tokens,
-        temperature = options.temperature,
-        top_p = options.top_p,
-        top_k = options.top_k,
+        max_tokens = requestOptions.max_tokens,
+        temperature = requestOptions.temperature,
+        top_p = requestOptions.top_p,
+        top_k = requestOptions.top_k,
         system_prompt = options.system_prompt.orEmpty(),
         emit_thoughts = options.thinking_pattern != null,
-        repetition_penalty = options.repetition_penalty,
+        repetition_penalty = requestOptions.repetition_penalty,
         stop_sequences = options.stop_sequences,
-        streaming_enabled = streaming || options.streaming_enabled,
+        streaming_enabled = requestOptions.streaming_enabled,
         preferred_framework = options.preferred_framework.name,
         json_schema = schema,
         // Constrained-decoding grammar. Prefer the structured_output grammar, fall back to the top-level
@@ -82,7 +83,7 @@ private fun RALLMGenerationOptions?.toGenerateRequest(
         // path (C++ options_from_request already forwards it to rac_llm_options_t.grammar).
         grammar = options.structured_output?.grammar ?: options.grammar.orEmpty(),
         execution_target = options.execution_target?.name.orEmpty(),
-        options = options.takeIf { canonicalOnlyOptions },
+        options = requestOptions,
     )
 }
 

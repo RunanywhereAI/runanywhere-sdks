@@ -34,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
@@ -93,11 +95,57 @@ private fun UserBubble(message: ChatMessage) {
                 .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
             contentAlignment = Alignment.CenterStart
         ) {
-            Text(
-                text = message.text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onPrimary,
+            Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
+                message.attachment?.let { AttachmentCard(it) }
+                Text(
+                    text = message.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttachmentCard(attachment: ChatAttachment) {
+    val dimens = LocalDimens.current
+    Surface(
+        shape = RoundedCornerShape(dimens.radiusSm),
+        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.14f),
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = dimens.spacingSm, vertical = dimens.spacingXs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+        ) {
+            Icon(
+                imageVector = when (attachment.kind) {
+                    ChatAttachmentKind.IMAGE -> RACIcons.Outline.Eye
+                    ChatAttachmentKind.DOCUMENT -> RACIcons.Outline.FileText
+                },
+                contentDescription = null,
+                modifier = Modifier.size(dimens.iconSm),
             )
+            Column {
+                Text(
+                    text = attachment.name,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                attachment.detail?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }
@@ -136,6 +184,9 @@ private fun AssistantMessage(message: ChatMessage) {
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
+                    if (message.sources.isNotEmpty()) {
+                        SourceStrip(sources = message.sources)
+                    }
                 }
             }
         }
@@ -145,6 +196,55 @@ private fun AssistantMessage(message: ChatMessage) {
 
     if (showToolSheet) {
         message.tool?.let { ToolCallDetailSheet(tool = it, onDismiss = { showToolSheet = false }) }
+    }
+}
+
+@Composable
+private fun SourceStrip(sources: List<ChatSource>) {
+    val dimens = LocalDimens.current
+    Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+        Text(
+            text = "Sources",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+        )
+        sources.take(3).forEach { source ->
+            Surface(
+                shape = RoundedCornerShape(dimens.radiusSm),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = dimens.spacingSm, vertical = dimens.spacingXs),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                ) {
+                    Icon(
+                        imageVector = RACIcons.Outline.FileText,
+                        contentDescription = null,
+                        modifier = Modifier.size(dimens.iconSm),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Column {
+                        Text(
+                            text = source.document.ifBlank { "Document" },
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = source.text,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -176,7 +276,11 @@ private fun TypingDots() {
 }
 
 private val previewMessages = listOf(
-    ChatMessage(text = "What's the weather in Tokyo, and show me some markdown?", isUser = true),
+    ChatMessage(
+        text = "What is this image showing?",
+        isUser = true,
+        attachment = ChatAttachment(ChatAttachmentKind.IMAGE, "demo-photo.jpg", "Image model: Qwen VL"),
+    ),
     ChatMessage(
         text = "Here's a quick rundown.\n\n" +
             "## Markdown\n" +

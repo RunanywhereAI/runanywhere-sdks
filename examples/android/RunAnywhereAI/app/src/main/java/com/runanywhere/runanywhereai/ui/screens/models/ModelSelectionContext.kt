@@ -4,13 +4,13 @@ import ai.runanywhere.proto.v1.ModelCategory
 
 // Which model category a selection sheet is for. UI-layer filter over proto categories.
 enum class ModelSelectionContext(val title: String) {
-    LLM("Select LLM Model"),
-    STT("Select STT Model"),
-    TTS("Select TTS Voice"),
-    VAD("Select VAD Model"),
-    VLM("Select Vision Model"),
-    RAG_EMBEDDING("Select Embedding Model"),
-    RAG_LLM("Select LLM Model"),
+    LLM("Choose Chat Model"),
+    STT("Choose Listening Model"),
+    TTS("Choose Voice"),
+    VAD("Choose Turn-taking Model"),
+    VLM("Choose Image Model"),
+    RAG_EMBEDDING("Choose Document Index Model"),
+    RAG_LLM("Choose Document Answer Model"),
     ;
 
     fun accepts(category: ModelCategory): Boolean = when (this) {

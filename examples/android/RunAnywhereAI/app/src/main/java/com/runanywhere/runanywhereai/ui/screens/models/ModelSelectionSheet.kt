@@ -64,7 +64,7 @@ fun ModelSelectionSheet(
                 Spacer(Modifier.height(dimens.spacingLg))
             }
 
-            SectionLabel("Choose a Model")
+            SectionLabel("Available Models")
             Spacer(Modifier.height(dimens.spacingSm))
 
             when {
@@ -104,22 +104,47 @@ private fun ModelList(
     val sorted = state.models.sortedWith(
         compareBy({ if (viewModel.isReady(it)) 0 else 1 }, { it.name }),
     )
-    sorted.forEach { model ->
-        ModelRow(
-            model = model,
-            isCurrent = state.currentModelId == model.id,
-            isReady = viewModel.isReady(model),
-            isBusy = state.busyModelId == model.id,
-            progressPercent = if (state.busyModelId == model.id) state.progressPercent else null,
-            onSelect = {
-                scope.launch {
-                    if (viewModel.select(model)) onDismiss()
-                }
-            },
-            onDownload = { viewModel.download(model) },
+    val grouped = sorted.groupBy { it.consumerGroup() }
+    ConsumerModelGroup.entries.forEach { group ->
+        val models = grouped[group].orEmpty()
+        if (models.isEmpty()) return@forEach
+        SectionLabel(group.title)
+        Spacer(Modifier.height(dimens.spacingSm))
+        models.forEach { model ->
+            ModelRow(
+                model = model,
+                isCurrent = state.currentModelId == model.id,
+                isReady = viewModel.isReady(model),
+                isBusy = state.busyModelId == model.id,
+                progressPercent = if (state.busyModelId == model.id) state.progressPercent else null,
+                onSelect = {
+                    scope.launch {
+                        if (viewModel.select(model)) onDismiss()
+                    }
+                },
+                onDownload = { viewModel.download(model) },
+                modifier = Modifier.padding(horizontal = dimens.spacingLg),
+            )
+            Spacer(Modifier.height(dimens.spacingSm))
+        }
+        Text(
+            group.footer,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = dimens.spacingLg),
         )
+        Spacer(Modifier.height(dimens.spacingLg))
+    }
+
+    if (state.models.any { it.supports_lora }) {
+        SectionLabel("LoRA & Adapters")
         Spacer(Modifier.height(dimens.spacingSm))
+        Text(
+            "Adapters customize a loaded base chat model. Open Adapters from the drawer after choosing a LoRA-ready chat model.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = dimens.spacingLg),
+        )
     }
 }
 

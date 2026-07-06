@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -30,16 +32,51 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.data.rag.DocumentExtractor
 import com.runanywhere.runanywhereai.state.GlobalState
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
+import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.launch
 
 @Composable
-fun ChatScreen(viewModel: ChatViewModel) {
+fun ChatScreen(
+    viewModel: ChatViewModel,
+    onOpenVision: () -> Unit,
+    onOpenVoice: () -> Unit,
+    onOpenAdvanced: () -> Unit,
+) {
     val dimens = LocalDimens.current
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val messages = viewModel.messages
+    val imageModelVm: ModelSelectionViewModel =
+        viewModel(key = "chat-vlm-model", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.VLM))
+    val documentIndexVm: ModelSelectionViewModel =
+        viewModel(key = "chat-rag-index-model", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.RAG_EMBEDDING))
+    val documentAnswerVm: ModelSelectionViewModel =
+        viewModel(key = "chat-rag-answer-model", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.RAG_LLM))
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        val imageModel = imageModelVm.readySelectedModel()
+        scope.launch {
+            if (imageModel != null && imageModelVm.state.currentModelId != imageModel.id) {
+                imageModelVm.select(imageModel)
+            }
+            viewModel.sendImage(uri, loadedModelName = imageModel?.name)
+        }
+    }
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        viewModel.sendDocument(
+            uri = uri,
+            embeddingModel = documentIndexVm.readySelectedModel(),
+            answerModel = documentAnswerVm.readySelectedModel(),
+        )
+    }
 
     var autoFollow by remember { mutableStateOf(true) }
 
@@ -107,6 +144,11 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         onStop = viewModel::stop,
                         toolsEnabled = viewModel.toolsEnabled,
                         onToggleTools = viewModel::toggleTools,
+                        onAttachDocument = { documentPicker.launch(DocumentExtractor.acceptedMimeTypes) },
+                        onAttachImage = { imagePicker.launch("image/*") },
+                        onOpenLive = onOpenVision,
+                        onOpenTalk = onOpenVoice,
+                        onOpenAdvanced = onOpenAdvanced,
                         modifier = Modifier.widthIn(max = dimens.contentMaxWidth),
                     )
                 }
@@ -139,4 +181,10 @@ fun ChatScreen(viewModel: ChatViewModel) {
             )
         }
     }
+}
+
+private fun ModelSelectionViewModel.readySelectedModel(): RAModelInfo? {
+    val selected = state.currentModelId
+        ?.let { id -> state.models.firstOrNull { it.id == id && isReady(it) } }
+    return selected ?: state.models.firstOrNull { isReady(it) }
 }

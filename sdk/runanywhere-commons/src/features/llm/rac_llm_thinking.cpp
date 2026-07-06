@@ -10,7 +10,6 @@
 
 #include "rac/features/llm/rac_llm_thinking.h"
 
-#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstring>
@@ -20,11 +19,9 @@
 
 namespace {
 
-/* Both `<think>` and `<thinking>` are emitted by upstream models (Qwen3,
- * Hermes variants). Same pair ordering as the streaming path's kOpenTags /
- * kCloseTags in rac_llm_proto_service.cpp so blocking and streaming consumers
- * agree on what a thinking block is. */
-constexpr std::array<std::pair<std::string_view, std::string_view>, 2> kThinkTagPairs = {{
+constexpr std::string_view kDefaultOpenTag{"<think>"};
+constexpr std::string_view kDefaultCloseTag{"</think>"};
+constexpr std::array<std::pair<std::string_view, std::string_view>, 2> kDefaultTagPairs = {{
     {std::string_view{"<think>"}, std::string_view{"</think>"}},
     {std::string_view{"<thinking>"}, std::string_view{"</thinking>"}},
 }};
@@ -49,44 +46,18 @@ std::string trim(std::string_view sv) {
     return std::string(sv.substr(b, e - b));
 }
 
-/** Earliest match of any open tag from kThinkTagPairs in @p sv starting at
- * @p from. Returns npos when no tag matches; otherwise writes the matching
- * pair index to @p out_pair_index. */
-size_t find_earliest_open_tag(std::string_view sv, size_t from, size_t* out_pair_index) {
-    size_t best = std::string_view::npos;
-    size_t best_idx = 0;
-    for (size_t i = 0; i < kThinkTagPairs.size(); ++i) {
-        const size_t pos = sv.find(kThinkTagPairs[i].first, from);
-        if (pos != std::string_view::npos && pos < best) {
-            best = pos;
-            best_idx = i;
-        }
-    }
-    if (best != std::string_view::npos && out_pair_index != nullptr) {
-        *out_pair_index = best_idx;
-    }
-    return best;
-}
-
-}  // namespace
-
-extern "C" {
-
-rac_result_t rac_llm_extract_thinking(const char* text, const char** out_response,
-                                      size_t* out_response_len, const char** out_thinking,
-                                      size_t* out_thinking_len) {
+rac_result_t extract_thinking_with_pair(const char* text, std::string_view open_tag,
+                                        std::string_view close_tag,
+                                        const char** out_response, size_t* out_response_len,
+                                        const char** out_thinking,
+                                        size_t* out_thinking_len) {
     if (text == nullptr || out_response == nullptr || out_response_len == nullptr ||
         out_thinking == nullptr || out_thinking_len == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
 
     std::string_view sv(text);
-    size_t pair_idx = 0;
-    const size_t open = find_earliest_open_tag(sv, 0, &pair_idx);
-    const std::string_view open_tag =
-        (open != std::string_view::npos) ? kThinkTagPairs[pair_idx].first : std::string_view{};
-    const std::string_view close_tag =
-        (open != std::string_view::npos) ? kThinkTagPairs[pair_idx].second : std::string_view{};
+    const size_t open = sv.find(open_tag);
     const size_t close = (open != std::string_view::npos)
                              ? sv.find(close_tag, open + open_tag.size())
                              : std::string_view::npos;
@@ -132,6 +103,76 @@ rac_result_t rac_llm_extract_thinking(const char* text, const char** out_respons
     return RAC_SUCCESS;
 }
 
+rac_result_t extract_thinking_with_pairs(
+    const char* text, const std::pair<std::string_view, std::string_view>* pairs,
+    size_t pair_count, const char** out_response, size_t* out_response_len,
+    const char** out_thinking, size_t* out_thinking_len) {
+    if (text == nullptr || out_response == nullptr || out_response_len == nullptr ||
+        out_thinking == nullptr || out_thinking_len == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    std::string_view sv(text);
+    size_t best_open = std::string_view::npos;
+    std::string_view best_open_tag;
+    std::string_view best_close_tag;
+    for (size_t i = 0; i < pair_count; ++i) {
+        const auto& pair = pairs[i];
+        const size_t open = sv.find(pair.first);
+        if (open != std::string_view::npos && open < best_open) {
+            best_open = open;
+            best_open_tag = pair.first;
+            best_close_tag = pair.second;
+        }
+    }
+    if (best_open == std::string_view::npos) {
+        return extract_thinking_with_pair(text, kDefaultOpenTag, kDefaultCloseTag, out_response,
+                                          out_response_len, out_thinking, out_thinking_len);
+    }
+    return extract_thinking_with_pair(text, best_open_tag, best_close_tag, out_response,
+                                      out_response_len, out_thinking, out_thinking_len);
+}
+
+rac_result_t extract_thinking_with_default_pairs(const char* text, const char** out_response,
+                                                 size_t* out_response_len,
+                                                 const char** out_thinking,
+                                                 size_t* out_thinking_len) {
+    return extract_thinking_with_pairs(text, kDefaultTagPairs.data(), kDefaultTagPairs.size(),
+                                       out_response, out_response_len, out_thinking,
+                                       out_thinking_len);
+}
+
+}  // namespace
+
+extern "C" {
+
+rac_result_t rac_llm_extract_thinking(const char* text, const char** out_response,
+                                      size_t* out_response_len, const char** out_thinking,
+                                      size_t* out_thinking_len) {
+    return extract_thinking_with_default_pairs(text, out_response, out_response_len, out_thinking,
+                                               out_thinking_len);
+}
+
+rac_result_t rac_llm_extract_thinking_with_tags(const char* text, const char* open_tag,
+                                                const char* close_tag,
+                                                const char** out_response,
+                                                size_t* out_response_len,
+                                                const char** out_thinking,
+                                                size_t* out_thinking_len) {
+    if (open_tag == nullptr || open_tag[0] == '\0' || close_tag == nullptr ||
+        close_tag[0] == '\0') {
+        return rac_llm_extract_thinking(text, out_response, out_response_len, out_thinking,
+                                        out_thinking_len);
+    }
+    const std::array<std::pair<std::string_view, std::string_view>, 3> tag_pairs = {{
+        {std::string_view{open_tag}, std::string_view{close_tag}},
+        kDefaultTagPairs[0],
+        kDefaultTagPairs[1],
+    }};
+    return extract_thinking_with_pairs(text, tag_pairs.data(), tag_pairs.size(), out_response,
+                                       out_response_len, out_thinking, out_thinking_len);
+}
+
 rac_result_t rac_llm_strip_thinking(const char* text, const char** out_stripped,
                                     size_t* out_stripped_len) {
     if (text == nullptr || out_stripped == nullptr || out_stripped_len == nullptr) {
@@ -140,38 +181,43 @@ rac_result_t rac_llm_strip_thinking(const char* text, const char** out_stripped,
 
     std::string buf(text);
 
-    /* Remove every complete thinking block. Either tag form is honored. */
+    /* Remove every complete thinking block. */
     while (true) {
-        size_t pair_idx = 0;
-        const size_t open = find_earliest_open_tag(buf, 0, &pair_idx);
-        if (open == std::string::npos)
+        size_t best_open = std::string::npos;
+        std::string_view best_open_tag;
+        std::string_view best_close_tag;
+        for (const auto& pair : kDefaultTagPairs) {
+            const size_t open = buf.find(pair.first);
+            if (open != std::string::npos && open < best_open) {
+                best_open = open;
+                best_open_tag = pair.first;
+                best_close_tag = pair.second;
+            }
+        }
+        if (best_open == std::string::npos)
             break;
-        const std::string_view open_tag = kThinkTagPairs[pair_idx].first;
-        const std::string_view close_tag = kThinkTagPairs[pair_idx].second;
-        const size_t close = buf.find(close_tag, open + open_tag.size());
+        const size_t close = buf.find(best_close_tag, best_open + best_open_tag.size());
         if (close == std::string::npos)
             break;
-        buf.erase(open, (close + close_tag.size()) - open);
+        buf.erase(best_open, (close + best_close_tag.size()) - best_open);
     }
 
-    /* Drop a trailing unclosed opening tag (still streaming). Pick the
-     * latest opening across both tag forms; only strip if no matching close
-     * appears after it. */
+    /* Drop a trailing unclosed opening tag (still streaming). */
     size_t trailing_open = std::string::npos;
-    size_t trailing_idx = 0;
-    for (size_t i = 0; i < kThinkTagPairs.size(); ++i) {
-        const size_t pos = buf.rfind(kThinkTagPairs[i].first);
-        if (pos == std::string::npos)
-            continue;
-        if (trailing_open == std::string::npos || pos > trailing_open) {
-            trailing_open = pos;
-            trailing_idx = i;
+    std::string_view trailing_open_tag;
+    std::string_view trailing_close_tag;
+    for (const auto& pair : kDefaultTagPairs) {
+        const size_t open = buf.rfind(pair.first);
+        if (open != std::string::npos &&
+            (trailing_open == std::string::npos || open > trailing_open)) {
+            trailing_open = open;
+            trailing_open_tag = pair.first;
+            trailing_close_tag = pair.second;
         }
     }
     if (trailing_open != std::string::npos) {
-        const std::string_view open_tag = kThinkTagPairs[trailing_idx].first;
-        const std::string_view close_tag = kThinkTagPairs[trailing_idx].second;
-        if (buf.find(close_tag, trailing_open + open_tag.size()) == std::string::npos) {
+        if (buf.find(trailing_close_tag, trailing_open + trailing_open_tag.size()) ==
+            std::string::npos) {
             buf.erase(trailing_open);
         }
     }

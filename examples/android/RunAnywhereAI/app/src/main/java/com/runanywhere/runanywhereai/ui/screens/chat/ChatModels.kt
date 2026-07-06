@@ -6,8 +6,24 @@ data class ChatMessage(
     val text: String,
     val isUser: Boolean,
     val thinking: String? = null,
+    val attachment: ChatAttachment? = null,
+    val sources: List<ChatSource> = emptyList(),
     val stats: GenerationStats? = null,
     val tool: ToolCallInfo? = null,
+)
+
+data class ChatAttachment(
+    val kind: ChatAttachmentKind,
+    val name: String,
+    val detail: String? = null,
+)
+
+enum class ChatAttachmentKind { IMAGE, DOCUMENT }
+
+data class ChatSource(
+    val text: String,
+    val score: Float,
+    val document: String,
 )
 
 // Mirrors the per-message metrics iOS records in MessageAnalytics.

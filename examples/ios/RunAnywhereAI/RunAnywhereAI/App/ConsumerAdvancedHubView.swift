@@ -11,24 +11,6 @@ struct ConsumerAdvancedHubView: View {
     var body: some View {
         List {
             Section {
-                NavigationLink(destination: DocumentRAGView()) {
-                    AdvancedFeatureRow(
-                        icon: "doc.text.magnifyingglass",
-                        color: .indigo,
-                        title: "Document Q&A",
-                        subtitle: "Ask questions over imported documents"
-                    )
-                }
-
-                NavigationLink(destination: VLMCameraView()) {
-                    AdvancedFeatureRow(
-                        icon: "camera.viewfinder",
-                        color: .purple,
-                        title: "Vision Workbench",
-                        subtitle: "Camera, photo, and live image understanding"
-                    )
-                }
-
                 NavigationLink(destination: VoiceAssistantView()) {
                     AdvancedFeatureRow(
                         icon: "mic.circle",
@@ -40,7 +22,7 @@ struct ConsumerAdvancedHubView: View {
             } header: {
                 Text("Assistant Modes")
             } footer: {
-                Text("These are the same capabilities available from the home composer, kept here for direct access.")
+                Text("Document, image, and Live camera actions now start from the home composer.")
             }
 
             Section("Voice Utilities") {

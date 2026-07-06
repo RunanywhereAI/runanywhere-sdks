@@ -184,7 +184,7 @@ private fun CloudProviderPicker(
             )
             if (options.isEmpty()) {
                 Text(
-                    "Add a provider from More > Cloud Providers before using hybrid transcription.",
+                    "Add a provider from Advanced > Cloud providers before using hybrid transcription.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = dimens.spacingSm),

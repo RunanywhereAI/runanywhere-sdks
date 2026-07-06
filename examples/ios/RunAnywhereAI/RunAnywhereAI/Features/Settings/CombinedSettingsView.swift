@@ -164,7 +164,7 @@ private struct IOSSettingsContent: View {
                         icon: "slider.horizontal.3",
                         color: AppColors.primaryPurple,
                         title: "SDK Workbench",
-                        subtitle: "RAG, Vision, STT, TTS, VAD, tools, storage, and benchmarks"
+                        subtitle: "Voice utilities, tools, storage, benchmarks, and diagnostics"
                     )
                 }
 
@@ -337,7 +337,7 @@ private struct AssistantSettingsCard: View {
                         icon: "slider.horizontal.3",
                         color: AppColors.primaryPurple,
                         title: "SDK Workbench",
-                        subtitle: "RAG, Vision, STT, TTS, VAD, storage, tools, and benchmarks"
+                        subtitle: "Voice utilities, storage, tools, benchmarks, and diagnostics"
                     )
                 }
                 .buttonStyle(.plain)

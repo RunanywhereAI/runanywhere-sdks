@@ -2,6 +2,8 @@ package com.runanywhere.runanywhereai.ui.screens.models
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -60,12 +63,29 @@ fun ModelRow(
             )
             Spacer(Modifier.width(dimens.spacingMd))
 
-            androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+            ) {
                 Text(
                     model.name,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                Text(
+                    model.framework.consumerBackendLabel(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+                    model.capabilityLabels().take(3).forEach { label ->
+                        Pill(label, MaterialTheme.colorScheme.primary)
+                    }
+                }
                 if (isBusy && progressPercent != null) {
                     Text(
                         "Downloading… $progressPercent%",
@@ -75,12 +95,6 @@ fun ModelRow(
                 }
             }
 
-            Spacer(Modifier.width(dimens.spacingSm))
-            Pill(model.framework.shortLabel(), MaterialTheme.colorScheme.primary)
-            if (model.supports_lora) {
-                Spacer(Modifier.width(dimens.spacingXs))
-                Pill("LoRA", MaterialTheme.colorScheme.tertiary)
-            }
             Spacer(Modifier.width(dimens.spacingSm))
             TrailingAction(isCurrent, isReady, isBusy, model, onDownload)
         }

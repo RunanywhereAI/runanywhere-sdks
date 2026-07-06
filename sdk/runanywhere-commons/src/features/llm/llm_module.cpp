@@ -19,6 +19,7 @@
  */
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -34,6 +35,7 @@
 
 #include "features/common/rac_component_lifecycle_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/llm/llm_thinking_tags_internal.h"
 // BUG-STREAMING-001: the canonical 13-field LLM stream emitter shared with the
 // registry-backed path (rac_llm_stream.cpp). The component section invokes
 // `rac::llm::dispatch_llm_stream_event()` once per token and once on terminal
@@ -1399,6 +1401,31 @@ std::string system_prompt_from_request(const LLMGenerateRequest& request) {
     return request.system_prompt();
 }
 
+void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
+                                         const rac::llm::LifecycleLlmRef& ref,
+                                         std::string* out_open_tag,
+                                         std::string* out_close_tag) {
+    if (out_open_tag) {
+        out_open_tag->clear();
+    }
+    if (out_close_tag) {
+        out_close_tag->clear();
+    }
+    if (request.has_options() && request.options().has_thinking_pattern()) {
+        const auto& pattern = request.options().thinking_pattern();
+        if (!pattern.open_tag().empty() && !pattern.close_tag().empty()) {
+            if (out_open_tag) {
+                *out_open_tag = pattern.open_tag();
+            }
+            if (out_close_tag) {
+                *out_close_tag = pattern.close_tag();
+            }
+            return;
+        }
+    }
+    (void)rac::llm::model_thinking_tags_from_registry(ref.model_id, out_open_tag, out_close_tag);
+}
+
 // Fills `options` from `request`. The caller-owned `stop_storage`/`stop_ptrs`
 // must outlive every generate/generate_stream dispatch that observes
 // `options.stop_sequences` — they hold the backing memory the C ABI points
@@ -1406,9 +1433,7 @@ std::string system_prompt_from_request(const LLMGenerateRequest& request) {
 // copies stopSequences into the canonical proto request.
 //
 // Prefer values from the canonical `request.options()` embedded
-// LLMGenerationOptions message when set; fall back to the legacy inline
-// scalar fields for backwards compatibility with callers that have not
-// yet migrated.
+// LLMGenerationOptions message when set; otherwise use direct request fields.
 rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
                                        const std::string& system_prompt,
                                        std::vector<std::string>& stop_storage,
@@ -1623,39 +1648,85 @@ struct ProtoStreamContext {
     std::string pending_text;
     std::string response_text;
     std::string thinking_text;
+    std::string thinking_open_tag;
+    std::string thinking_close_tag;
 };
 
-size_t matching_tag_suffix_len(const std::string& text, const char* const* tags,
-                               size_t tags_count) {
-    size_t best = 0;
-    for (size_t i = 0; i < tags_count; ++i) {
-        const char* tag = tags[i];
-        const size_t tag_len = std::strlen(tag);
-        const size_t max_len = std::min(tag_len - 1, text.size());
-        for (size_t len = 1; len <= max_len; ++len) {
-            if (std::memcmp(text.data() + text.size() - len, tag, len) == 0) {
-                best = std::max(best, len);
-            }
+struct StreamThinkingTagPair {
+    const char* open;
+    const char* close;
+};
+
+constexpr StreamThinkingTagPair kDefaultStreamThinkingTags[] = {
+    {"<think>", "</think>"},
+    {"<thinking>", "</thinking>"},
+};
+
+size_t matching_tag_suffix_len(const std::string& text, const char* tag) {
+    const size_t tag_len = std::strlen(tag);
+    const size_t max_len = std::min(tag_len - 1, text.size());
+    for (size_t len = max_len; len > 0; --len) {
+        if (std::memcmp(text.data() + text.size() - len, tag, len) == 0) {
+            return len;
         }
+    }
+    return 0;
+}
+
+size_t matching_open_suffix_len(const std::string& text, const StreamThinkingTagPair* pairs,
+                                size_t pair_count) {
+    size_t best = 0;
+    for (size_t i = 0; i < pair_count; ++i) {
+        best = std::max(best, matching_tag_suffix_len(text, pairs[i].open));
     }
     return best;
 }
 
-size_t find_earliest_tag(const std::string& text, const char* const* tags, size_t tags_count,
-                         const char** out_tag) {
-    size_t best = std::string::npos;
-    const char* best_tag = nullptr;
-    for (size_t i = 0; i < tags_count; ++i) {
-        const size_t pos = text.find(tags[i]);
-        if (pos != std::string::npos && pos < best) {
-            best = pos;
-            best_tag = tags[i];
-        }
-    }
-    if (out_tag) {
-        *out_tag = best_tag;
+size_t matching_close_suffix_len(const std::string& text, const StreamThinkingTagPair* pairs,
+                                 size_t pair_count) {
+    size_t best = 0;
+    for (size_t i = 0; i < pair_count; ++i) {
+        best = std::max(best, matching_tag_suffix_len(text, pairs[i].close));
     }
     return best;
+}
+
+const StreamThinkingTagPair* find_earliest_open_pair(const std::string& text,
+                                                     const StreamThinkingTagPair* pairs,
+                                                     size_t pair_count,
+                                                     size_t* out_open_pos) {
+    size_t best = std::string::npos;
+    const StreamThinkingTagPair* best_pair = nullptr;
+    for (size_t i = 0; i < pair_count; ++i) {
+        const size_t pos = text.find(pairs[i].open);
+        if (pos != std::string::npos && pos < best) {
+            best = pos;
+            best_pair = &pairs[i];
+        }
+    }
+    if (out_open_pos) {
+        *out_open_pos = best;
+    }
+    return best_pair;
+}
+
+const StreamThinkingTagPair* find_earliest_close_pair(const std::string& text,
+                                                      const StreamThinkingTagPair* pairs,
+                                                      size_t pair_count,
+                                                      size_t* out_close_pos) {
+    size_t best = std::string::npos;
+    const StreamThinkingTagPair* best_pair = nullptr;
+    for (size_t i = 0; i < pair_count; ++i) {
+        const size_t pos = text.find(pairs[i].close);
+        if (pos != std::string::npos && pos < best) {
+            best = pos;
+            best_pair = &pairs[i];
+        }
+    }
+    if (out_close_pos) {
+        *out_close_pos = best;
+    }
+    return best_pair;
 }
 
 // BUG-STREAMING-001 unification: `dispatch_stream_event` now delegates
@@ -1773,30 +1844,42 @@ void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, Toke
 }
 
 void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
-    static const char* const kOpenTags[] = {"<think>", "<thinking>"};
-    static const char* const kCloseTags[] = {"</think>", "</thinking>"};
     if (!ctx || !token || token[0] == '\0') {
         return;
     }
+
+    const bool has_custom_tags =
+        !ctx->thinking_open_tag.empty() && !ctx->thinking_close_tag.empty();
+    const std::array<StreamThinkingTagPair, 3> custom_tag_pairs = {{
+        {has_custom_tags ? ctx->thinking_open_tag.c_str() : "",
+         has_custom_tags ? ctx->thinking_close_tag.c_str() : ""},
+        kDefaultStreamThinkingTags[0],
+        kDefaultStreamThinkingTags[1],
+    }};
+    const StreamThinkingTagPair* tag_pairs =
+        has_custom_tags ? custom_tag_pairs.data() : kDefaultStreamThinkingTags;
+    const size_t tag_pair_count =
+        has_custom_tags ? custom_tag_pairs.size()
+                        : sizeof(kDefaultStreamThinkingTags) /
+                              sizeof(kDefaultStreamThinkingTags[0]);
 
     ctx->raw_text += token;
     ctx->pending_text += token;
     while (!ctx->pending_text.empty()) {
         if (ctx->inside_thinking) {
-            const char* close_tag = nullptr;
-            const size_t close_pos =
-                find_earliest_tag(ctx->pending_text, kCloseTags,
-                                  sizeof(kCloseTags) / sizeof(kCloseTags[0]), &close_tag);
+            size_t close_pos = std::string::npos;
+            const StreamThinkingTagPair* close_pair =
+                find_earliest_close_pair(ctx->pending_text, tag_pairs, tag_pair_count, &close_pos);
             if (close_pos != std::string::npos) {
                 emit_stream_segment(ctx, ctx->pending_text.substr(0, close_pos),
                                     runanywhere::v1::TOKEN_KIND_THOUGHT);
-                ctx->pending_text.erase(0, close_pos + std::strlen(close_tag));
+                ctx->pending_text.erase(0, close_pos + std::strlen(close_pair->close));
                 ctx->inside_thinking = false;
                 continue;
             }
 
-            const size_t keep = matching_tag_suffix_len(ctx->pending_text, kCloseTags,
-                                                        sizeof(kCloseTags) / sizeof(kCloseTags[0]));
+            const size_t keep =
+                matching_close_suffix_len(ctx->pending_text, tag_pairs, tag_pair_count);
             const size_t emit_len = ctx->pending_text.size() - keep;
             if (emit_len == 0) {
                 break;
@@ -1807,19 +1890,18 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
             continue;
         }
 
-        const char* open_tag = nullptr;
-        const size_t open_pos = find_earliest_tag(
-            ctx->pending_text, kOpenTags, sizeof(kOpenTags) / sizeof(kOpenTags[0]), &open_tag);
+        size_t open_pos = std::string::npos;
+        const StreamThinkingTagPair* open_pair =
+            find_earliest_open_pair(ctx->pending_text, tag_pairs, tag_pair_count, &open_pos);
         if (open_pos != std::string::npos) {
             emit_stream_segment(ctx, ctx->pending_text.substr(0, open_pos),
                                 runanywhere::v1::TOKEN_KIND_ANSWER);
-            ctx->pending_text.erase(0, open_pos + std::strlen(open_tag));
+            ctx->pending_text.erase(0, open_pos + std::strlen(open_pair->open));
             ctx->inside_thinking = true;
             continue;
         }
 
-        const size_t keep = matching_tag_suffix_len(ctx->pending_text, kOpenTags,
-                                                    sizeof(kOpenTags) / sizeof(kOpenTags[0]));
+        const size_t keep = matching_open_suffix_len(ctx->pending_text, tag_pairs, tag_pair_count);
         const size_t emit_len = ctx->pending_text.size() - keep;
         if (emit_len == 0) {
             break;
@@ -1985,7 +2067,13 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     const char* thinking = nullptr;
     size_t thinking_len = 0;
     const char* raw_text = raw.text ? raw.text : "";
-    (void)rac_llm_extract_thinking(raw_text, &response, &response_len, &thinking, &thinking_len);
+    std::string thinking_open_tag;
+    std::string thinking_close_tag;
+    thinking_tags_from_request_or_model(request, ref, &thinking_open_tag, &thinking_close_tag);
+    (void)rac_llm_extract_thinking_with_tags(
+        raw_text, thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
+        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
+        &response_len, &thinking, &thinking_len);
 
     int32_t thinking_tokens = 0;
     int32_t response_tokens = raw.completion_tokens;
@@ -2074,6 +2162,8 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.emit_thoughts = request.emit_thoughts();
     ctx.request_id = request.request_id();
     ctx.conversation_id = request.conversation_id();
+    thinking_tags_from_request_or_model(request, ref, &ctx.thinking_open_tag,
+                                        &ctx.thinking_close_tag);
 
     // Defensive: catch any C++ exception that escapes the engine vtable.
     // Each backend (llamacpp, onnx, etc.) already wraps its inference call in

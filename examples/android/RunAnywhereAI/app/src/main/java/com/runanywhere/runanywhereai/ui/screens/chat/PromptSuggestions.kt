@@ -42,14 +42,14 @@ private val toolSuggestions = listOf(
     PromptSuggestion("Quick math", "What is 15% of 240?", RACIcons.Outline.Calculator),
 )
 
-private val uncensoredSuggestions = listOf(
-    PromptSuggestion("Brutally honest", "Give me brutally honest feedback on a weak startup idea.", RACIcons.Outline.Bolt),
-    PromptSuggestion("Dark joke", "Tell me a dark joke.", RACIcons.Outline.Bolt),
-    PromptSuggestion("Hot take", "Give me a controversial tech opinion and defend it hard.", RACIcons.Outline.Bolt),
-    PromptSuggestion("Roast me", "Roast my code in one savage paragraph, no holding back.", RACIcons.Outline.Bolt),
+private val personalizedSuggestions = listOf(
+    PromptSuggestion("Draft reply", "Draft a concise reply to a customer asking for a deadline update.", RACIcons.Outline.User),
+    PromptSuggestion("Improve tone", "Make this message clearer, warmer, and more direct.", RACIcons.Outline.Adjustments),
+    PromptSuggestion("Plan my day", "Help me turn a busy day into a realistic prioritized plan.", RACIcons.Outline.Clock),
+    PromptSuggestion("Review idea", "Give thoughtful feedback on a product idea and call out the risks.", RACIcons.Outline.Bolt),
 )
 
-private enum class PromptMode { GENERAL, TOOLS, UNCENSORED }
+private enum class PromptMode { GENERAL, TOOLS, PERSONALIZED }
 
 @Composable
 fun PromptSuggestions(
@@ -60,7 +60,7 @@ fun PromptSuggestions(
 ) {
     val dimens = LocalDimens.current
     val mode = when {
-        loraActive -> PromptMode.UNCENSORED
+        loraActive -> PromptMode.PERSONALIZED
         toolsEnabled -> PromptMode.TOOLS
         else -> PromptMode.GENERAL
     }
@@ -76,7 +76,7 @@ fun PromptSuggestions(
         val items = when (current) {
             PromptMode.GENERAL -> generalSuggestions
             PromptMode.TOOLS -> toolSuggestions
-            PromptMode.UNCENSORED -> uncensoredSuggestions
+            PromptMode.PERSONALIZED -> personalizedSuggestions
         }
         LazyRow(
             contentPadding = PaddingValues(horizontal = dimens.screenPadding),

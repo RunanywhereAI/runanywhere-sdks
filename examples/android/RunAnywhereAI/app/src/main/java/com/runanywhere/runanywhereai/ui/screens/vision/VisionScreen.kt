@@ -97,11 +97,20 @@ fun VisionScreen() {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
+        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
+            Text("Images & Live", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Attach a photo, capture one, or open live camera mode with an on-device vision model.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         ModelCard(modelName = model?.name, onClick = { showSheet = true })
 
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
-            FilterChip(selected = !liveMode, onClick = { liveMode = false }, label = { Text("Image") })
-            FilterChip(selected = liveMode, onClick = { liveMode = true }, label = { Text("Live") })
+            FilterChip(selected = !liveMode, onClick = { liveMode = false }, label = { Text("Photo") })
+            FilterChip(selected = liveMode, onClick = { liveMode = true }, label = { Text("Live camera") })
         }
 
         if (liveMode) {
@@ -141,7 +150,7 @@ fun VisionScreen() {
                 modifier = Modifier.size(dimens.iconSm),
             )
             Text(
-                text = if (visionVm.isGenerating) "Stop" else "Describe",
+                text = if (visionVm.isGenerating) "Stop" else "Ask about image",
                 modifier = Modifier.padding(start = dimens.spacingSm),
             )
         }
@@ -245,7 +254,7 @@ private fun ModelCard(modelName: String?, onClick: () -> Unit) {
                 modifier = Modifier.size(dimens.iconMd),
             )
             Column(modifier = Modifier.weight(1f)) {
-                Text("Vision model", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Image model", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(modelName ?: "Select a model", style = MaterialTheme.typography.bodyLarge)
             }
             Icon(

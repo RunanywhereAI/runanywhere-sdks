@@ -281,7 +281,7 @@ async function generateStreaming(
   let raw = '';
   for await (const token of stream.stream) {
     raw += token;
-    // Thinking-capable models stream `<think>…</think>` inline; split it
+    // Thinking-capable models can stream thinking tags inline; split them
     // into the collapsible section live (iOS receives the split from
     // commons; the Web stream carries raw tokens).
     const split = splitThinking(raw);
@@ -710,16 +710,16 @@ function loadedModelSupportsThinking(): boolean {
 }
 
 /**
- * Split `<think>…</think>` sections out of raw model text. Handles an
- * unterminated `<think>` while tokens are still streaming. iOS receives the
+ * Split built-in thinking sections out of raw model text. Handles an
+ * unterminated tag while tokens are still streaming. iOS receives the
  * split from commons (result.thinkingContent); the Web stream carries raw
  * tokens, so the view performs the same tag split client-side.
  */
 function splitThinking(raw: string): { content: string; thinking: string } {
   const thinkingParts: string[] = [];
   const content = raw.replace(
-    /<think>([\s\S]*?)(<\/think>|$)/g,
-    (_match, inner: string) => {
+    /<(think|thinking)>([\s\S]*?)(<\/\1>|$)/gi,
+    (_match, _tag: string, inner: string) => {
       if (inner.trim().length > 0) thinkingParts.push(inner.trim());
       return '';
     },

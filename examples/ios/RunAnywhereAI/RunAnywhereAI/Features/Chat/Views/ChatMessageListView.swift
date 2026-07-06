@@ -10,6 +10,9 @@ import os.log
 #if canImport(UIKit)
 import UIKit
 #endif
+#if canImport(AppKit)
+import AppKit
+#endif
 
 enum ComposerAction {
     case attachFile
@@ -202,6 +205,15 @@ struct ChatInputAreaView: View {
     @Binding var showingLoRAManagement: Bool
     @ObservedObject var settingsViewModel: SettingsViewModel
     @ObservedObject var toolSettingsViewModel: ToolSettingsViewModel
+    let imageAttachment: ChatImageAttachment?
+    let documentAttachment: ChatDocumentAttachment?
+    let isVisionModelReady: Bool
+    let areDocumentModelsReady: Bool
+    let canSendCurrentTurn: Bool
+    let onRemoveImageAttachment: () -> Void
+    let onRemoveDocumentAttachment: () -> Void
+    let onChooseVisionModel: () -> Void
+    let onChooseDocumentModels: () -> Void
     let onComposerAction: (ComposerAction) -> Void
     let onSend: () -> Void
 
@@ -218,7 +230,7 @@ struct ChatInputAreaView: View {
                     thinkingModeBadge
                 }
 
-                if viewModel.useToolCalling && !toolSettingsViewModel.registeredTools.isEmpty {
+                if viewModel.useToolCalling {
                     toolCallingBadge
                 }
 
@@ -235,13 +247,41 @@ struct ChatInputAreaView: View {
                 ((settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking)
                     || viewModel.useToolCalling
                     || !viewModel.loraAdapters.isEmpty
-                    || hasModelSelected) ? 8 : 0
+                    || hasModelSelected
+                    || imageAttachment != nil
+                    || documentAttachment != nil) ? 8 : 0
             )
+
+            if let imageAttachment {
+                ImageAttachmentPill(
+                    attachment: imageAttachment,
+                    isVisionModelReady: isVisionModelReady,
+                    onRemove: onRemoveImageAttachment,
+                    onChooseVisionModel: onChooseVisionModel
+                )
+                .padding(.horizontal, AppSpacing.large)
+                .padding(.top, AppSpacing.small)
+            }
+
+            if let documentAttachment {
+                DocumentAttachmentPill(
+                    attachment: documentAttachment,
+                    areModelsReady: areDocumentModelsReady,
+                    onRemove: onRemoveDocumentAttachment,
+                    onChooseModels: onChooseDocumentModels
+                )
+                .padding(.horizontal, AppSpacing.large)
+                .padding(.top, AppSpacing.small)
+            }
 
             HStack(spacing: AppSpacing.mediumLarge) {
                 attachmentMenu
 
-                TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
+                TextField(
+                    inputPlaceholder,
+                    text: $viewModel.currentInput,
+                    axis: .vertical
+                )
                     .textFieldStyle(.plain)
                     .lineLimit(1...4)
                     .focused($isTextFieldFocused)
@@ -249,6 +289,8 @@ struct ChatInputAreaView: View {
                         onSend()
                     }
                     .submitLabel(.send)
+
+                toolToggleButton
 
                 Button {
                     onComposerAction(.talk)
@@ -269,10 +311,10 @@ struct ChatInputAreaView: View {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(AppTypography.system28)
                         .foregroundColor(
-                            viewModel.canSend ? AppColors.primaryAccent : AppColors.statusGray
+                            canSendCurrentTurn ? AppColors.primaryAccent : AppColors.statusGray
                         )
                 }
-                .disabled(!viewModel.canSend)
+                .disabled(!canSendCurrentTurn)
                 .background {
                     if #available(iOS 26.0, macOS 26.0, *) {
                         Circle()
@@ -292,19 +334,19 @@ struct ChatInputAreaView: View {
             Button {
                 onComposerAction(.attachFile)
             } label: {
-                Label("Attach file", systemImage: "folder")
-            }
-
-            Button {
-                onComposerAction(.takePhoto)
-            } label: {
-                Label("Take photo", systemImage: "camera")
+                Label("Attach document", systemImage: "doc.badge.plus")
             }
 
             Button {
                 onComposerAction(.attachPhoto)
             } label: {
-                Label("Attach photo", systemImage: "photo")
+                Label("Attach image", systemImage: "photo")
+            }
+
+            Button {
+                onComposerAction(.takePhoto)
+            } label: {
+                Label("Live camera", systemImage: "livephoto")
             }
         } label: {
             Image(systemName: "plus.circle.fill")
@@ -312,6 +354,41 @@ struct ChatInputAreaView: View {
                 .foregroundColor(AppColors.textSecondary)
         }
         .accessibilityLabel("Attach")
+    }
+
+    private var inputPlaceholder: String {
+        if imageAttachment != nil {
+            return "Ask about this image..."
+        }
+        if documentAttachment != nil {
+            return "Ask about this document..."
+        }
+        return "Type a message..."
+    }
+
+    private var toolToggleButton: some View {
+        Button {
+            toolSettingsViewModel.toolCallingEnabled.toggle()
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(
+                        viewModel.useToolCalling
+                            ? AppColors.primaryAccent.opacity(0.14)
+                            : AppColors.backgroundSecondary
+                    )
+                Image(systemName: "safari")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(
+                        viewModel.useToolCalling
+                            ? AppColors.primaryAccent
+                            : AppColors.textSecondary
+                    )
+            }
+            .frame(width: 32, height: 32)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(viewModel.useToolCalling ? "Disable web tools" : "Enable web tools")
     }
 
     // MARK: - Badges
@@ -335,17 +412,22 @@ struct ChatInputAreaView: View {
     }
 
     private var toolCallingBadge: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "wrench.and.screwdriver")
-                .font(.system(size: 10))
-            Text("Tools enabled")
-                .font(AppTypography.caption2)
+        Button {
+            toolSettingsViewModel.toolCallingEnabled.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "safari")
+                    .font(.system(size: 10))
+                Text(toolSettingsViewModel.registeredTools.isEmpty ? "Setting up tools" : "Web/tools on")
+                    .font(AppTypography.caption2)
+            }
+            .foregroundColor(AppColors.primaryAccent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(AppColors.primaryAccent.opacity(0.1))
+            .cornerRadius(6)
         }
-        .foregroundColor(AppColors.primaryAccent)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(AppColors.primaryAccent.opacity(0.1))
-        .cornerRadius(6)
+        .buttonStyle(.plain)
     }
 
     private var loraAdapterBadge: some View {
@@ -384,6 +466,136 @@ struct ChatInputAreaView: View {
             .background(AppColors.backgroundSecondary)
             .cornerRadius(6)
         }
+    }
+}
+
+private struct ImageAttachmentPill: View {
+    let attachment: ChatImageAttachment
+    let isVisionModelReady: Bool
+    let onRemove: () -> Void
+    let onChooseVisionModel: () -> Void
+
+    var body: some View {
+        HStack(spacing: AppSpacing.mediumLarge) {
+            thumbnail
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Image attached")
+                    .font(AppTypography.subheadlineMedium)
+                    .foregroundColor(AppColors.textPrimary)
+                    .lineLimit(1)
+                Text(isVisionModelReady ? "Ready for a question" : "Choose a vision model")
+                    .font(AppTypography.caption)
+                    .foregroundColor(isVisionModelReady ? AppColors.statusGreen : AppColors.primaryAccent)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: AppSpacing.small)
+
+            if !isVisionModelReady {
+                Button("Model", action: onChooseVisionModel)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.primaryAccent)
+            }
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove image")
+        }
+        .padding(AppSpacing.smallMedium)
+        .background(AppColors.backgroundSecondary)
+        .cornerRadius(AppSpacing.cornerRadiusRegular)
+    }
+
+    @ViewBuilder private var thumbnail: some View {
+        #if canImport(UIKit)
+        if let image = UIImage(data: attachment.data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 42, height: 42)
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+        } else {
+            fallbackThumbnail
+        }
+        #elseif canImport(AppKit)
+        if let image = NSImage(data: attachment.data) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 42, height: 42)
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+        } else {
+            fallbackThumbnail
+        }
+        #else
+        fallbackThumbnail
+        #endif
+    }
+
+    private var fallbackThumbnail: some View {
+        RoundedRectangle(cornerRadius: 7)
+            .fill(AppColors.primaryAccent.opacity(0.12))
+            .frame(width: 42, height: 42)
+            .overlay(
+                Image(systemName: "photo")
+                    .foregroundColor(AppColors.primaryAccent)
+            )
+    }
+}
+
+private struct DocumentAttachmentPill: View {
+    let attachment: ChatDocumentAttachment
+    let areModelsReady: Bool
+    let onRemove: () -> Void
+    let onChooseModels: () -> Void
+
+    var body: some View {
+        HStack(spacing: AppSpacing.mediumLarge) {
+            RoundedRectangle(cornerRadius: 7)
+                .fill(AppColors.primaryPurple.opacity(0.12))
+                .frame(width: 42, height: 42)
+                .overlay(
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(AppColors.primaryPurple)
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(attachment.filename)
+                    .font(AppTypography.subheadlineMedium)
+                    .foregroundColor(AppColors.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(areModelsReady ? "Ready for questions" : "Choose document models")
+                    .font(AppTypography.caption)
+                    .foregroundColor(areModelsReady ? AppColors.statusGreen : AppColors.primaryAccent)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: AppSpacing.small)
+
+            if !areModelsReady {
+                Button("Models", action: onChooseModels)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.primaryAccent)
+            }
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove document")
+        }
+        .padding(AppSpacing.smallMedium)
+        .background(AppColors.backgroundSecondary)
+        .cornerRadius(AppSpacing.cornerRadiusRegular)
     }
 }
 
