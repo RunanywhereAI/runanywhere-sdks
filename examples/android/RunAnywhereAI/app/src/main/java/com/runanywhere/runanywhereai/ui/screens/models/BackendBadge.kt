@@ -56,7 +56,6 @@ fun BackendBadge(
 @Composable
 private fun InferenceFramework.backendBadgeColor(): Color = when (this) {
     InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-    InferenceFramework.INFERENCE_FRAMEWORK_GENIE,
     InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN,
     -> primaryGreen
     InferenceFramework.INFERENCE_FRAMEWORK_ONNX,

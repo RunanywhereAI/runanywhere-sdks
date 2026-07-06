@@ -239,7 +239,9 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_NONE = 6,              /**< No framework needed */
     RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
     RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
-    // Values 9-11 intentionally retired — leave the gaps stable.
+    // Value 9 (WHISPERKIT_COREML) intentionally retired — leave the gap to keep ABI stable.
+    RAC_FRAMEWORK_METALRT = 10, /**< MetalRT (custom Metal GPU kernels, Apple only) */
+    // Value 11 (GENIE) intentionally retired — leave the gap stable.
     RAC_FRAMEWORK_SHERPA = 12,  /**< Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
     RAC_FRAMEWORK_QHEXRT = 13,  /**< QHexRT (Qualcomm Hexagon NPU runtime) */
     RAC_FRAMEWORK_UNKNOWN = 99  /**< Unknown framework */
