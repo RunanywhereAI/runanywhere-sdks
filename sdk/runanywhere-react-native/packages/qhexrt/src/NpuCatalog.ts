@@ -12,6 +12,7 @@
  */
 
 import { RunAnywhere } from '@runanywhere/core';
+import { SDKLogger } from '@runanywhere/core/internal';
 import {
     ModelCategory,
     InferenceFramework,
@@ -175,35 +176,33 @@ export async function seedNpuCatalog(
     try {
         npu = await probeNpu();
     } catch {
-        console.debug('[QHexRT] NPU probe failed; skipping NPU catalog seed');
+        SDKLogger.debug('[QHexRT] NPU probe failed; skipping NPU catalog seed');
         return 0;
     }
 
     if (!npu.qhexrtSupported) {
-        console.debug('[QHexRT] NPU not supported on this device; skipping NPU catalog seed');
+        SDKLogger.debug('[QHexRT] NPU not supported on this device; skipping NPU catalog seed');
         return 0;
     }
 
     const arch = npu.archName;
     const refs = NPU_REFS.filter((r) => r.arch === arch);
     let count = 0;
-    await Promise.all(
-        refs.map(async (r) => {
-            try {
-                await RunAnywhere.registerModel({
-                    id: r.id,
-                    name: r.name,
-                    url: r.url,
-                    framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-                    modality: r.modality,
-                });
-                count++;
-            } catch (error) {
-                console.debug(`[QHexRT] Failed to register NPU bundle ${r.id}: ${String(error)}`);
-            }
-        })
-    );
+    for (const r of refs) {
+        try {
+            await RunAnywhere.registerModel({
+                id: r.id,
+                name: r.name,
+                url: r.url,
+                framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+                modality: r.modality,
+            });
+            count++;
+        } catch (error) {
+            SDKLogger.debug(`[QHexRT] Failed to register NPU bundle ${r.id}: ${String(error)}`);
+        }
+    }
 
-    console.debug(`[QHexRT] NPU bundles registered for ${arch}: ${count}`);
+    SDKLogger.debug(`[QHexRT] NPU bundles registered for ${arch}: ${count}`);
     return count;
 }
