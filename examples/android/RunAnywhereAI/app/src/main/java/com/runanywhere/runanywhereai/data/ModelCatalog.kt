@@ -318,7 +318,7 @@ internal object ModelCatalog {
         ArchiveModel(
             "smolvlm-500m-instruct-q8_0",
             "SmolVLM 500M Instruct",
-            "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
+            "https://github.com/RunAnywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
             LLAMA,
             MULTIMODAL,
             600_000_000,
