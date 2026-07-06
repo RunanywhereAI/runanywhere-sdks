@@ -27,12 +27,9 @@ dependencies:
   # patch >=13 (and any future 0.19.x minor in the caret range), so consumers
   # can still upgrade core within the published patch suite.
   runanywhere: ^0.19.13
-  # Workspace-resolved: actual constraint lives in the
-  # packages/runanywhere pubspec (the workspace source of truth — see
-  # the centralization comment block in sdk/runanywhere-flutter/pubspec.yaml).
-  # `any` defers to that single resolution so we never carry a duplicate
-  # floor that can drift out of lockstep.
-  ffi: any
+  # Keep this bounded for pub.dev publish validation, matching the core
+  # package's major-version range.
+  ffi: '>=2.2.0 <3.0.0'
 
 dev_dependencies:
   flutter_test:
