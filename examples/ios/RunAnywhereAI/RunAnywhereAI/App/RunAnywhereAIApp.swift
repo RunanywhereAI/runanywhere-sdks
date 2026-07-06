@@ -7,9 +7,13 @@
 
 import SwiftUI
 import RunAnywhere
+#if canImport(LlamaCPPRuntime)
 import LlamaCPPRuntime
+#endif
 import MLXRuntime
+#if canImport(ONNXRuntime)
 import ONNXRuntime
+#endif
 // Deferred backends (MetalRT, Diffusion) are excluded from the
 // Swift v1 build. See `thoughts/shared/plans/curious-greeting-panda.md`.
 #if canImport(UIKit)
@@ -87,9 +91,13 @@ struct RunAnywhereAIApp: App {
             // Register backends with C++ registry FIRST, before any await. Otherwise we can
             // suspend at the next line and another task may run loadModel() → ensureServicesReady()
             // → only Platform is registered → -422 "No provider could handle the request".
+            #if canImport(LlamaCPPRuntime)
             LlamaCPP.register(priority: 100)
+            #endif
             MLX.register(priority: 100)
+            #if canImport(ONNXRuntime)
             ONNX.register(priority: 100)
+            #endif
 
             await MainActor.run { initializationError = nil }
 

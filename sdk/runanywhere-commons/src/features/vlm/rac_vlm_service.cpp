@@ -112,7 +112,8 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
          .select_ops = vlm_ops,
          .model_create_id = model_path_owned.c_str(),
          .model_id_for_service = model_id,
-         .config_json = config_json_owned.empty() ? nullptr : config_json_owned.c_str()},
+         .config_json = config_json_owned.empty() ? nullptr : config_json_owned.c_str(),
+         .framework = model_ref.framework},
         &service);
     if (result != RAC_SUCCESS) {
         return result;

@@ -26,6 +26,7 @@
 
 #include "app.h"
 #include "bootstrap.h"
+#include "io/wav_io.h"
 #include "llm_service.pb.h"
 #include "model_types.pb.h"
 #include "rac/backends/rac_mlx.h"
@@ -50,21 +51,27 @@ struct FakeMlxState {
   int create_count = 0;
   int initialize_count = 0;
   int stream_count = 0;
+  int stt_transcribe_count = 0;
+  int tts_synthesize_count = 0;
   rac_mlx_session_kind_t last_kind = RAC_MLX_SESSION_KIND_LLM;
   std::string last_model_path;
+  size_t last_audio_size = 0;
+  std::string last_tts_text;
 };
 
 FakeMlxState g_mlx_state;
 
 std::filesystem::path make_temp_dir(const std::string &name) {
-  const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-  std::filesystem::path dir =
-      std::filesystem::temp_directory_path() / (name + "-" + std::to_string(stamp));
+  const auto stamp =
+      std::chrono::steady_clock::now().time_since_epoch().count();
+  std::filesystem::path dir = std::filesystem::temp_directory_path() /
+                              (name + "-" + std::to_string(stamp));
   std::filesystem::create_directories(dir);
   return dir;
 }
 
-bool write_file(const std::filesystem::path &path, const std::string &contents) {
+bool write_file(const std::filesystem::path &path,
+                const std::string &contents) {
   std::ofstream out(path, std::ios::binary);
   if (!out.is_open()) {
     return false;
@@ -73,7 +80,8 @@ bool write_file(const std::filesystem::path &path, const std::string &contents) 
   return out.good();
 }
 
-bool serialize(const google::protobuf::MessageLite &message, std::vector<uint8_t> *out) {
+bool serialize(const google::protobuf::MessageLite &message,
+               std::vector<uint8_t> *out) {
   out->resize(message.ByteSizeLong());
   if (out->empty()) {
     return true;
@@ -95,7 +103,8 @@ rac_result_t fake_create(rac_mlx_session_kind_t kind, const char *model_id,
   return RAC_SUCCESS;
 }
 
-rac_result_t fake_initialize(rac_handle_t handle, const char *model_path, void *) {
+rac_result_t fake_initialize(rac_handle_t handle, const char *model_path,
+                             void *) {
   if (!handle || !model_path) {
     return RAC_ERROR_NULL_POINTER;
   }
@@ -132,13 +141,14 @@ rac_result_t fake_llm_generate_stream(rac_handle_t, const char *prompt,
   }
   g_mlx_state.stream_count++;
   const std::string token = "mlx-stub: " + std::string(prompt);
-  return callback(token.c_str(), callback_user_data) == RAC_TRUE ? RAC_SUCCESS
-                                                                 : RAC_ERROR_STREAM_CANCELLED;
+  return callback(token.c_str(), callback_user_data) == RAC_TRUE
+             ? RAC_SUCCESS
+             : RAC_ERROR_STREAM_CANCELLED;
 }
 
-rac_result_t fake_vlm_process(rac_handle_t, const rac_vlm_image_t *, const char *prompt,
-                              const rac_vlm_options_t *, rac_vlm_result_t *out_result,
-                              void *) {
+rac_result_t fake_vlm_process(rac_handle_t, const rac_vlm_image_t *,
+                              const char *prompt, const rac_vlm_options_t *,
+                              rac_vlm_result_t *out_result, void *) {
   if (!prompt || !out_result) {
     return RAC_ERROR_NULL_POINTER;
   }
@@ -152,16 +162,19 @@ rac_result_t fake_vlm_process(rac_handle_t, const rac_vlm_image_t *, const char 
 }
 
 rac_result_t fake_vlm_process_stream(rac_handle_t, const rac_vlm_image_t *,
-                                     const char *prompt, const rac_vlm_options_t *,
+                                     const char *prompt,
+                                     const rac_vlm_options_t *,
                                      rac_vlm_stream_callback_fn callback,
                                      void *callback_user_data, void *) {
   if (!prompt || !callback) {
     return RAC_ERROR_NULL_POINTER;
   }
-  return callback(prompt, callback_user_data) == RAC_TRUE ? RAC_SUCCESS : RAC_ERROR_CANCELLED;
+  return callback(prompt, callback_user_data) == RAC_TRUE ? RAC_SUCCESS
+                                                          : RAC_ERROR_CANCELLED;
 }
 
-rac_result_t fake_embed_batch(rac_handle_t, const char *const *texts, size_t num_texts,
+rac_result_t fake_embed_batch(rac_handle_t, const char *const *texts,
+                              size_t num_texts,
                               const rac_embeddings_options_t *,
                               rac_embeddings_result_t *out_result, void *) {
   if (!texts || !out_result) {
@@ -177,7 +190,8 @@ rac_result_t fake_embed_batch(rac_handle_t, const char *const *texts, size_t num
   }
   for (size_t i = 0; i < num_texts; ++i) {
     out_result->embeddings[i].dimension = 2;
-    out_result->embeddings[i].data = static_cast<float *>(std::calloc(2, sizeof(float)));
+    out_result->embeddings[i].data =
+        static_cast<float *>(std::calloc(2, sizeof(float)));
     if (!out_result->embeddings[i].data) {
       return RAC_ERROR_OUT_OF_MEMORY;
     }
@@ -188,7 +202,8 @@ rac_result_t fake_embed_batch(rac_handle_t, const char *const *texts, size_t num
   return RAC_SUCCESS;
 }
 
-rac_result_t fake_embedding_info(rac_handle_t, rac_embeddings_info_t *out_info, void *) {
+rac_result_t fake_embedding_info(rac_handle_t, rac_embeddings_info_t *out_info,
+                                 void *) {
   if (!out_info) {
     return RAC_ERROR_NULL_POINTER;
   }
@@ -199,9 +214,107 @@ rac_result_t fake_embedding_info(rac_handle_t, rac_embeddings_info_t *out_info, 
   return RAC_SUCCESS;
 }
 
+rac_result_t fake_stt_transcribe(rac_handle_t, const void *audio_data,
+                                 size_t audio_size, const rac_stt_options_t *,
+                                 rac_stt_result_t *out_result, void *) {
+  if (!audio_data || audio_size == 0 || !out_result) {
+    return RAC_ERROR_NULL_POINTER;
+  }
+  std::memset(out_result, 0, sizeof(*out_result));
+  const std::string text =
+      "mlx-stt-stub: " + std::to_string(audio_size) + " bytes";
+  out_result->text = strdup(text.c_str());
+  out_result->detected_language = strdup("en");
+  out_result->confidence = 0.95f;
+  out_result->processing_time_ms = 11;
+  g_mlx_state.stt_transcribe_count++;
+  g_mlx_state.last_audio_size = audio_size;
+  if (!out_result->text || !out_result->detected_language) {
+    return RAC_ERROR_OUT_OF_MEMORY;
+  }
+  return RAC_SUCCESS;
+}
+
+rac_result_t fake_stt_transcribe_stream(rac_handle_t, const void *audio_data,
+                                        size_t audio_size,
+                                        const rac_stt_options_t *,
+                                        rac_stt_stream_callback_t callback,
+                                        void *callback_user_data, void *) {
+  if (!audio_data || audio_size == 0 || !callback) {
+    return RAC_ERROR_NULL_POINTER;
+  }
+  callback("mlx-stt-partial", RAC_FALSE, callback_user_data);
+  callback("mlx-stt-final", RAC_TRUE, callback_user_data);
+  return RAC_SUCCESS;
+}
+
+rac_result_t fake_stt_info(rac_handle_t, rac_stt_info_t *out_info, void *) {
+  if (!out_info) {
+    return RAC_ERROR_NULL_POINTER;
+  }
+  std::memset(out_info, 0, sizeof(*out_info));
+  out_info->is_ready = RAC_TRUE;
+  out_info->current_model = "mlx.fake.stt";
+  out_info->supports_streaming = RAC_TRUE;
+  return RAC_SUCCESS;
+}
+
+rac_result_t fake_tts_synthesize(rac_handle_t, const char *text,
+                                 const rac_tts_options_t *,
+                                 rac_tts_result_t *out_result, void *) {
+  if (!text || !out_result) {
+    return RAC_ERROR_NULL_POINTER;
+  }
+  std::memset(out_result, 0, sizeof(*out_result));
+  constexpr size_t kSampleCount = 8;
+  auto *samples =
+      static_cast<float *>(std::calloc(kSampleCount, sizeof(float)));
+  if (!samples) {
+    return RAC_ERROR_OUT_OF_MEMORY;
+  }
+  for (size_t i = 0; i < kSampleCount; ++i) {
+    samples[i] = (i % 2 == 0) ? 0.25f : -0.25f;
+  }
+  out_result->audio_data = samples;
+  out_result->audio_size = kSampleCount * sizeof(float);
+  out_result->audio_format = RAC_AUDIO_FORMAT_PCM;
+  out_result->sample_rate = 22050;
+  out_result->duration_ms = 1;
+  out_result->processing_time_ms = 13;
+  g_mlx_state.tts_synthesize_count++;
+  g_mlx_state.last_tts_text = text;
+  return RAC_SUCCESS;
+}
+
+rac_result_t fake_tts_synthesize_stream(rac_handle_t, const char *text,
+                                        const rac_tts_options_t *,
+                                        rac_tts_stream_callback_t callback,
+                                        void *callback_user_data, void *) {
+  if (!text || !callback) {
+    return RAC_ERROR_NULL_POINTER;
+  }
+  const float samples[2] = {0.1f, -0.1f};
+  callback(samples, sizeof(samples), callback_user_data);
+  return RAC_SUCCESS;
+}
+
+rac_result_t fake_tts_stop(rac_handle_t, void *) { return RAC_SUCCESS; }
+
+rac_result_t fake_tts_info(rac_handle_t, rac_tts_info_t *out_info, void *) {
+  if (!out_info) {
+    return RAC_ERROR_NULL_POINTER;
+  }
+  std::memset(out_info, 0, sizeof(*out_info));
+  out_info->is_ready = RAC_TRUE;
+  out_info->is_synthesizing = RAC_FALSE;
+  return RAC_SUCCESS;
+}
+
 rac_result_t fake_cancel(rac_handle_t, void *) { return RAC_SUCCESS; }
 rac_result_t fake_cleanup(rac_handle_t, void *) { return RAC_SUCCESS; }
-void fake_destroy(rac_handle_t handle, void *) { delete static_cast<FakeMlxSession *>(handle); }
+void fake_destroy(rac_handle_t handle, void *) {
+  delete static_cast<FakeMlxSession *>(handle);
+}
 
 bool install_fake_mlx_callbacks() {
   rac_mlx_callbacks_t callbacks{};
@@ -214,17 +327,26 @@ bool install_fake_mlx_callbacks() {
   callbacks.vlm_process_stream = fake_vlm_process_stream;
   callbacks.embed_batch = fake_embed_batch;
   callbacks.embedding_info = fake_embedding_info;
+  callbacks.stt_transcribe = fake_stt_transcribe;
+  callbacks.stt_transcribe_stream = fake_stt_transcribe_stream;
+  callbacks.stt_info = fake_stt_info;
+  callbacks.tts_synthesize = fake_tts_synthesize;
+  callbacks.tts_synthesize_stream = fake_tts_synthesize_stream;
+  callbacks.tts_stop = fake_tts_stop;
+  callbacks.tts_info = fake_tts_info;
   callbacks.cancel = fake_cancel;
   callbacks.cleanup = fake_cleanup;
   callbacks.destroy = fake_destroy;
   return rac_mlx_set_callbacks(&callbacks) == RAC_SUCCESS;
 }
 
-bool register_local_mlx_model(const std::filesystem::path &model_dir) {
+bool register_local_mlx_model(const std::filesystem::path &model_dir,
+                              const char *id, const char *name,
+                              v1::ModelCategory category) {
   v1::ModelInfo model;
-  model.set_id("mlx.fake.llm");
-  model.set_name("Fake MLX LLM");
-  model.set_category(v1::MODEL_CATEGORY_LANGUAGE);
+  model.set_id(id);
+  model.set_name(name);
+  model.set_category(category);
   model.set_format(v1::MODEL_FORMAT_SAFETENSORS);
   model.set_framework(v1::INFERENCE_FRAMEWORK_MLX);
   model.set_local_path(model_dir.string());
@@ -251,9 +373,9 @@ bool register_local_mlx_model(const std::filesystem::path &model_dir) {
   tokenizer->set_role(v1::MODEL_FILE_ROLE_TOKENIZER);
 
   std::vector<uint8_t> bytes;
-  return serialize(model, &bytes) &&
-         rac_model_registry_register_proto(rac_get_model_registry(), bytes.data(), bytes.size()) ==
-             RAC_SUCCESS;
+  return serialize(model, &bytes) && rac_model_registry_register_proto(
+                                         rac_get_model_registry(), bytes.data(),
+                                         bytes.size()) == RAC_SUCCESS;
 }
 
 class StdoutCapture {
@@ -293,9 +415,11 @@ private:
   int saved_stdout_ = -1;
 };
 
-int run_cli_capture(const std::vector<std::string> &args, std::string *stdout_text) {
+int run_cli_capture(const std::vector<std::string> &args,
+                    std::string *stdout_text) {
   rcli::GlobalOptions options;
-  CLI::App app{"RunAnywhere on-device AI CLI — run, manage and serve local models"};
+  CLI::App app{
+      "RunAnywhere on-device AI CLI — run, manage and serve local models"};
   rcli::configure_app(app, options);
 
   std::vector<std::string> mutable_args = args;
@@ -335,11 +459,26 @@ TestResult test_rcli_mlx_run_end_to_end() {
   }
 
   const std::filesystem::path home = make_temp_dir("rcli-mlx-home");
-  const std::filesystem::path model_dir = make_temp_dir("rcli-mlx-model");
-  if (!write_file(model_dir / "config.json", R"({"model_type":"qwen3"})") ||
-      !write_file(model_dir / "model.safetensors", "fake-weights") ||
-      !write_file(model_dir / "tokenizer.json", "{}")) {
-    result.details = "failed to create local MLX model folder";
+  const std::filesystem::path llm_dir = make_temp_dir("rcli-mlx-llm");
+  const std::filesystem::path stt_dir = make_temp_dir("rcli-mlx-stt");
+  const std::filesystem::path tts_dir = make_temp_dir("rcli-mlx-tts");
+  for (const auto &dir : {llm_dir, stt_dir, tts_dir}) {
+    if (!write_file(dir / "config.json", R"({"model_type":"qwen3"})") ||
+        !write_file(dir / "model.safetensors", "fake-weights") ||
+        !write_file(dir / "tokenizer.json", "{}")) {
+      result.details = "failed to create local MLX model folder";
+      return result;
+    }
+  }
+
+  const std::filesystem::path input_wav = home / "input.wav";
+  const std::filesystem::path output_wav = home / "output.wav";
+  const std::vector<int16_t> pcm_samples = {0,     1024, -1024, 2048,
+                                            -2048, 1024, -1024, 0};
+  std::string wav_error;
+  if (!rcli::wav::write_wav(input_wav.string(), pcm_samples.data(),
+                            pcm_samples.size(), 16000, &wav_error)) {
+    result.details = wav_error;
     return result;
   }
 
@@ -352,53 +491,147 @@ TestResult test_rcli_mlx_run_end_to_end() {
     result.details = "bootstrap failed";
     return result;
   }
-  if (!register_local_mlx_model(model_dir)) {
+  if (!register_local_mlx_model(llm_dir, "mlx.fake.llm", "Fake MLX LLM",
+                                v1::MODEL_CATEGORY_LANGUAGE) ||
+      !register_local_mlx_model(stt_dir, "mlx.fake.stt", "Fake MLX STT",
+                                v1::MODEL_CATEGORY_SPEECH_RECOGNITION) ||
+      !register_local_mlx_model(tts_dir, "mlx.fake.tts", "Fake MLX TTS",
+                                v1::MODEL_CATEGORY_SPEECH_SYNTHESIS)) {
     result.details = "failed to register local MLX model";
     rcli::shutdown();
     return result;
   }
 
   std::string backends_json;
-  int code = run_cli_capture({"rcli", "--json", "--no-progress", "--home", home.string(),
-                              "backends"},
-                             &backends_json);
-  if (code != 0 || backends_json.find("\"name\":\"mlx\"") == std::string::npos ||
+  int code = run_cli_capture(
+      {"rcli", "--json", "--no-progress", "--home", home.string(), "backends"},
+      &backends_json);
+  if (code != 0 ||
+      backends_json.find("\"name\":\"mlx\"") == std::string::npos ||
       backends_json.find("\"name\":\"generate_text\"") == std::string::npos ||
       backends_json.find("\"name\":\"vlm\"") == std::string::npos ||
-      backends_json.find("\"name\":\"embed\"") == std::string::npos) {
-    result.expected = "mlx backend with generate_text/vlm/embed primitives";
+      backends_json.find("\"name\":\"embed\"") == std::string::npos ||
+      backends_json.find("\"name\":\"transcribe\"") == std::string::npos ||
+      backends_json.find("\"name\":\"synthesize\"") == std::string::npos) {
+    result.expected =
+        "mlx backend with generate_text/vlm/embed/transcribe/synthesize "
+        "primitives";
     result.actual = backends_json;
     rcli::shutdown();
     return result;
   }
 
   std::string run_json;
-  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home", home.string(), "run",
-                          "mlx.fake.llm", "Hello MLX", "--engine", "mlx", "--max-tokens", "4"},
+  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
+                          home.string(), "run", "mlx.fake.llm", "Hello MLX",
+                          "--engine", "mlx", "--max-tokens", "4"},
                          &run_json);
-  rcli::shutdown();
 
   if (code != 0) {
     result.expected = "exit 0";
     result.actual = "exit " + std::to_string(code);
     result.details = run_json;
+    rcli::shutdown();
     return result;
   }
   if (run_json.find("\"model\":\"mlx.fake.llm\"") == std::string::npos ||
-      run_json.find("\"response\":\"mlx-stub: Hello MLX\"") == std::string::npos) {
+      run_json.find("\"response\":\"mlx-stub: Hello MLX\"") ==
+          std::string::npos) {
     result.expected = "JSON response from MLX stream callback";
     result.actual = run_json;
+    rcli::shutdown();
     return result;
   }
   if (g_mlx_state.create_count != 1 || g_mlx_state.initialize_count != 1 ||
-      g_mlx_state.stream_count != 1 || g_mlx_state.last_kind != RAC_MLX_SESSION_KIND_LLM) {
-    result.details = "MLX callback counts/kind were not exercised as expected";
+      g_mlx_state.stream_count != 1 ||
+      g_mlx_state.last_kind != RAC_MLX_SESSION_KIND_LLM) {
+    result.details =
+        "MLX LLM callback counts/kind were not exercised as expected";
+    rcli::shutdown();
     return result;
   }
-  if (g_mlx_state.last_model_path != model_dir.string()) {
-    result.expected = model_dir.string();
+  if (g_mlx_state.last_model_path != llm_dir.string()) {
+    result.expected = llm_dir.string();
     result.actual = g_mlx_state.last_model_path;
-    result.details = "MLX runtime should receive the model folder, not model.safetensors";
+    result.details = "MLX LLM runtime should receive the model folder, not "
+                     "model.safetensors";
+    rcli::shutdown();
+    return result;
+  }
+
+  std::string stt_json;
+  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
+                          home.string(), "stt", "mlx.fake.stt", "--input",
+                          input_wav.string()},
+                         &stt_json);
+  if (code != 0) {
+    result.expected = "STT exit 0";
+    result.actual = "exit " + std::to_string(code);
+    result.details = stt_json;
+    rcli::shutdown();
+    return result;
+  }
+  if (stt_json.find("\"model\":\"mlx.fake.stt\"") == std::string::npos ||
+      stt_json.find("\"text\":\"mlx-stt-stub: ") == std::string::npos) {
+    result.expected = "JSON STT response from MLX callback";
+    result.actual = stt_json;
+    rcli::shutdown();
+    return result;
+  }
+  if (g_mlx_state.stt_transcribe_count != 1 ||
+      g_mlx_state.last_kind != RAC_MLX_SESSION_KIND_STT ||
+      g_mlx_state.last_audio_size != pcm_samples.size() * sizeof(int16_t)) {
+    result.details = "MLX STT callback counts/kind/audio size were not "
+                     "exercised as expected";
+    rcli::shutdown();
+    return result;
+  }
+  if (g_mlx_state.last_model_path != stt_dir.string()) {
+    result.expected = stt_dir.string();
+    result.actual = g_mlx_state.last_model_path;
+    result.details = "MLX STT runtime should receive the model folder, not "
+                     "model.safetensors";
+    rcli::shutdown();
+    return result;
+  }
+
+  std::string tts_json;
+  code = run_cli_capture({"rcli", "--json", "--no-progress", "--home",
+                          home.string(), "tts", "mlx.fake.tts", "--text",
+                          "Hello MLX audio", "--output", output_wav.string()},
+                         &tts_json);
+  rcli::shutdown();
+  if (code != 0) {
+    result.expected = "TTS exit 0";
+    result.actual = "exit " + std::to_string(code);
+    result.details = tts_json;
+    return result;
+  }
+  if (tts_json.find("\"voice\":\"mlx.fake.tts\"") == std::string::npos ||
+      tts_json.find("\"sample_rate\":22050") == std::string::npos ||
+      !std::filesystem::exists(output_wav) ||
+      std::filesystem::file_size(output_wav) <= 44) {
+    result.expected = "JSON TTS response and written WAV from MLX callback";
+    result.actual = tts_json;
+    return result;
+  }
+  if (g_mlx_state.tts_synthesize_count != 1 ||
+      g_mlx_state.last_kind != RAC_MLX_SESSION_KIND_TTS ||
+      g_mlx_state.last_tts_text != "Hello MLX audio") {
+    result.details =
+        "MLX TTS callback counts/kind/text were not exercised as expected";
+    return result;
+  }
+  if (g_mlx_state.last_model_path != tts_dir.string()) {
+    result.expected = tts_dir.string();
+    result.actual = g_mlx_state.last_model_path;
+    result.details = "MLX TTS runtime should receive the model folder, not "
+                     "model.safetensors";
+    return result;
+  }
+  if (g_mlx_state.create_count != 3 || g_mlx_state.initialize_count != 3) {
+    result.details =
+        "MLX create/initialize should run once per LLM/STT/TTS model";
     return result;
   }
 
@@ -406,7 +639,7 @@ TestResult test_rcli_mlx_run_end_to_end() {
   return result;
 }
 
-}  // namespace
+} // namespace
 
 int main(int argc, char **argv) {
   TestSuite suite("rcli_mlx_e2e");

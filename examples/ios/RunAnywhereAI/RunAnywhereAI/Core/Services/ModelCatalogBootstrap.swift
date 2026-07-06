@@ -5,8 +5,6 @@
 
 import Foundation
 import RunAnywhere
-import LlamaCPPRuntime
-import ONNXRuntime
 import os
 
 // MARK: - Model Catalog Bootstrap
@@ -225,6 +223,102 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 75_000_000
         )
 
+        // --- STT models (MLX, Apple Metal) -----------------------------------
+        await registerMultiFile(
+            id: "mlx-qwen3-asr-0.6b-8bit",
+            name: "MLX Qwen3-ASR 0.6B 8bit",
+            files: [
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/chat_template.json",
+                    filename: "chat_template.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/config.json",
+                    filename: "config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/generation_config.json",
+                    filename: "generation_config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/merges.txt",
+                    filename: "merges.txt"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/model.safetensors",
+                    filename: "model.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/model.safetensors.index.json",
+                    filename: "model.safetensors.index.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/preprocessor_config.json",
+                    filename: "preprocessor_config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/tokenizer_config.json",
+                    filename: "tokenizer_config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/vocab.json",
+                    filename: "vocab.json"
+                )
+            ],
+            framework: .mlx,
+            modality: .speechRecognition,
+            memoryRequirement: 1_010_773_761
+        )
+        await registerMultiFile(
+            id: "mlx-glm-asr-nano-2512-4bit",
+            name: "MLX GLM-ASR Nano 2512 4bit",
+            files: [
+                .init(
+                    url: "https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/config.json",
+                    filename: "config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/configuration_glmasr.py",
+                    filename: "configuration_glmasr.py",
+                    isRequired: false
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/inference.py",
+                    filename: "inference.py",
+                    isRequired: false
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/model.safetensors",
+                    filename: "model.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/model.safetensors.index.json",
+                    filename: "model.safetensors.index.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/modeling_audio.py",
+                    filename: "modeling_audio.py",
+                    isRequired: false
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/modeling_glmasr.py",
+                    filename: "modeling_glmasr.py",
+                    isRequired: false
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/tokenizer.json",
+                    filename: "tokenizer.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/tokenizer_config.json",
+                    filename: "tokenizer_config.json"
+                )
+            ],
+            framework: .mlx,
+            modality: .speechRecognition,
+            memoryRequirement: 1_288_437_789
+        )
+
         // --- TTS models (Sherpa-ONNX Piper VITS) ------------------------------
         await registerArchive(
             id: "vits-piper-en_US-lessac-medium",
@@ -245,6 +339,102 @@ enum ModelCatalogBootstrap {
             archive: .tarGz,
             structure: .nestedDirectory,
             memoryRequirement: 65_000_000
+        )
+
+        // --- TTS models (MLX, Apple Metal) -----------------------------------
+        await registerMultiFile(
+            id: "mlx-soprano-1.1-80m-5bit",
+            name: "MLX Soprano 1.1 80M 5bit",
+            files: [
+                .init(
+                    url: "https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/config.json",
+                    filename: "config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/generation_config.json",
+                    filename: "generation_config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/model.safetensors",
+                    filename: "model.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/model.safetensors.index.json",
+                    filename: "model.safetensors.index.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/special_tokens_map.json",
+                    filename: "special_tokens_map.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/tokenizer.json",
+                    filename: "tokenizer.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/tokenizer_config.json",
+                    filename: "tokenizer_config.json"
+                )
+            ],
+            framework: .mlx,
+            modality: .speechSynthesis,
+            memoryRequirement: 82_220_814
+        )
+        await registerMultiFile(
+            id: "mlx-qwen3-tts-12hz-0.6b-base-8bit",
+            name: "MLX Qwen3-TTS 12Hz 0.6B Base 8bit",
+            files: [
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/config.json",
+                    filename: "config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/generation_config.json",
+                    filename: "generation_config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/merges.txt",
+                    filename: "merges.txt"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/model.safetensors",
+                    filename: "model.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/model.safetensors.index.json",
+                    filename: "model.safetensors.index.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/preprocessor_config.json",
+                    filename: "preprocessor_config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/speech_tokenizer/config.json",
+                    filename: "speech_tokenizer/config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/speech_tokenizer/configuration.json",
+                    filename: "speech_tokenizer/configuration.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/speech_tokenizer/model.safetensors",
+                    filename: "speech_tokenizer/model.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/speech_tokenizer/preprocessor_config.json",
+                    filename: "speech_tokenizer/preprocessor_config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/tokenizer_config.json",
+                    filename: "tokenizer_config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/vocab.json",
+                    filename: "vocab.json"
+                )
+            ],
+            framework: .mlx,
+            modality: .speechSynthesis,
+            memoryRequirement: 1_991_299_138
         )
 
         // --- VAD (Silero, ONNX) -----------------------------------------------
@@ -323,6 +513,18 @@ enum ModelCatalogBootstrap {
 
     // MARK: - Registration helpers
 
+    private struct CatalogModelFile {
+        let url: String
+        let filename: String
+        let isRequired: Bool
+
+        init(url: String, filename: String, isRequired: Bool = true) {
+            self.url = url
+            self.filename = filename
+            self.isRequired = isRequired
+        }
+    }
+
     private static func registerLLM(
         id: String,
         name: String,
@@ -383,9 +585,27 @@ enum ModelCatalogBootstrap {
         modality: ModelCategory,
         memoryRequirement: Int64
     ) async {
+        await registerMultiFile(
+            id: id,
+            name: name,
+            files: files.map { CatalogModelFile(url: $0.url, filename: $0.filename) },
+            framework: framework,
+            modality: modality,
+            memoryRequirement: memoryRequirement
+        )
+    }
+
+    private static func registerMultiFile(
+        id: String,
+        name: String,
+        files: [CatalogModelFile],
+        framework: InferenceFramework,
+        modality: ModelCategory,
+        memoryRequirement: Int64
+    ) async {
         let descriptors: [RAModelFileDescriptor] = files.compactMap { file in
             guard let fileURL = URL(string: file.url) else { return nil }
-            var descriptor = RAModelFileDescriptor(url: fileURL, filename: file.filename, isRequired: true)
+            var descriptor = RAModelFileDescriptor(url: fileURL, filename: file.filename, isRequired: file.isRequired)
             descriptor.role = RunAnywhere.inferModelFileRole(filename: file.filename, modality: modality)
             return descriptor
         }

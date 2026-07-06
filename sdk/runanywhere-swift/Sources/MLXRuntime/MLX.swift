@@ -3,6 +3,8 @@
 //  MLXRuntime Module
 //
 
+// swiftlint:disable file_length
+
 import CoreImage
 import CRACommons
 import Foundation
@@ -11,7 +13,6 @@ import MLXAudioSTT
 import MLXAudioTTS
 import MLXBackend
 import MLXEmbedders
-import MLXHuggingFace
 import MLXLLM
 import MLXLMCommon
 import MLXVLM
@@ -96,6 +97,57 @@ private enum MLXSessionKind {
     case tts
 }
 
+private struct TransformersTokenizerLoader: TokenizerLoader {
+    func load(from directory: URL) async throws -> any MLXLMCommon.Tokenizer {
+        let upstream = try await Tokenizers.AutoTokenizer.from(modelFolder: directory)
+        return TransformersTokenizerBridge(upstream)
+    }
+}
+
+private struct TransformersTokenizerBridge: MLXLMCommon.Tokenizer {
+    private let upstream: any Tokenizers.Tokenizer
+
+    init(_ upstream: any Tokenizers.Tokenizer) {
+        self.upstream = upstream
+    }
+
+    func encode(text: String, addSpecialTokens: Bool) -> [Int] {
+        upstream.encode(text: text, addSpecialTokens: addSpecialTokens)
+    }
+
+    func decode(tokenIds: [Int], skipSpecialTokens: Bool) -> String {
+        upstream.decode(tokens: tokenIds, skipSpecialTokens: skipSpecialTokens)
+    }
+
+    func convertTokenToId(_ token: String) -> Int? {
+        upstream.convertTokenToId(token)
+    }
+
+    func convertIdToToken(_ id: Int) -> String? {
+        upstream.convertIdToToken(id)
+    }
+
+    var bosToken: String? { upstream.bosToken }
+    var eosToken: String? { upstream.eosToken }
+    var unknownToken: String? { upstream.unknownToken }
+
+    func applyChatTemplate(
+        messages: [[String: any Sendable]],
+        tools: [[String: any Sendable]]?,
+        additionalContext: [String: any Sendable]?
+    ) throws -> [Int] {
+        do {
+            return try upstream.applyChatTemplate(
+                messages: messages,
+                tools: tools,
+                additionalContext: additionalContext
+            )
+        } catch Tokenizers.TokenizerError.missingChatTemplate {
+            throw MLXLMCommon.TokenizerError.missingChatTemplate
+        }
+    }
+}
+
 private struct MLXGenerationMetrics {
     var promptTokens = 0
     var completionTokens = 0
@@ -171,8 +223,12 @@ private enum MLXSessionCoordinator {
         }
 
         for resident in residents {
+            let residentKind = resident.kindDescription
+            let residentModelID = resident.modelID
+            let sessionKind = session.kindDescription
+            let sessionModelID = session.modelID
             mlxRuntimeLogger.info(
-                "Evicting resident MLX \(resident.kindDescription) model '\(resident.modelID)' before loading \(session.kindDescription) model '\(session.modelID)'"
+                "Evicting resident MLX \(residentKind) model '\(residentModelID)' before loading \(sessionKind) model '\(sessionModelID)'"
             )
             resident.releaseResidentGenerationModel()
         }
@@ -201,6 +257,7 @@ private struct RepetitionRunGuard {
     }
 }
 
+// swiftlint:disable:next type_body_length
 private final class MLXSession: @unchecked Sendable {
     private struct State {
         var isCancelled = false
@@ -209,7 +266,9 @@ private final class MLXSession: @unchecked Sendable {
         var isSynthesizing = false
     }
 
+    // swiftlint:disable:next strict_fileprivate
     fileprivate let kind: MLXSessionKind
+    // swiftlint:disable:next strict_fileprivate
     fileprivate let modelID: String
     private let lock = OSAllocatedUnfairLock(initialState: State())
     private var generationContainer: ModelContainer?
@@ -232,7 +291,7 @@ private final class MLXSession: @unchecked Sendable {
         defer { restoreMemoryPolicy?() }
 
         let directory = URL(fileURLWithPath: modelPath, isDirectory: true)
-        let tokenizerLoader: any TokenizerLoader = #huggingFaceTokenizerLoader()
+        let tokenizerLoader: any TokenizerLoader = TransformersTokenizerLoader()
         switch kind {
         case .llm:
             generationContainer = try await LLMModelFactory.shared.loadContainer(
@@ -530,6 +589,7 @@ private final class MLXSession: @unchecked Sendable {
         let audio = try makeSTTAudioArray(audioData: audioData, options: options?.pointee)
         let parameters = sttGenerateParameters(from: options?.pointee)
         var finalText = ""
+        var emittedFinal = false
 
         for try await event in model.generateStream(audio: audio, generationParameters: parameters) {
             if isCancelled {
@@ -538,17 +598,18 @@ private final class MLXSession: @unchecked Sendable {
             switch event {
             case .token(let token):
                 finalText += token
-                callback?(token, RAC_FALSE, userData)
+                token.withCString { callback?($0, RAC_FALSE, userData) }
             case .result(let output):
                 finalText = output.text
-                callback?(output.text, RAC_TRUE, userData)
+                emittedFinal = true
+                output.text.withCString { callback?($0, RAC_TRUE, userData) }
             case .info:
                 break
             }
         }
 
-        if !finalText.isEmpty {
-            callback?(finalText, RAC_TRUE, userData)
+        if !emittedFinal, !finalText.isEmpty {
+            finalText.withCString { callback?($0, RAC_TRUE, userData) }
         }
     }
 
@@ -650,14 +711,17 @@ private final class MLXSession: @unchecked Sendable {
         lock.withLock { $0.isCancelled }
     }
 
+    // swiftlint:disable:next strict_fileprivate
     fileprivate var isGenerationSession: Bool {
         kind == .llm || kind == .vlm || kind == .stt || kind == .tts
     }
 
+    // swiftlint:disable:next strict_fileprivate
     fileprivate var isLoadedSnapshot: Bool {
         lock.withLock { $0.isLoaded }
     }
 
+    // swiftlint:disable:next strict_fileprivate
     fileprivate var kindDescription: String {
         switch kind {
         case .llm:
@@ -673,6 +737,7 @@ private final class MLXSession: @unchecked Sendable {
         }
     }
 
+    // swiftlint:disable:next strict_fileprivate
     fileprivate func releaseResidentGenerationModel() {
         guard isGenerationSession else { return }
         cancel()
@@ -692,6 +757,10 @@ private enum MLXRuntimeError: LocalizedError {
     case simulatorUnsupported
     case notLoaded(String)
     case invalidImage
+    case invalidAudioInput
+    case unsupportedAudioFormat
+    case unsupportedSTTModel([String])
+    case allocationFailed
 
     var errorDescription: String? {
         switch self {
@@ -701,11 +770,31 @@ private enum MLXRuntimeError: LocalizedError {
             return "MLX model is not loaded: \(modelID)"
         case .invalidImage:
             return "Invalid image input for MLX vision inference."
+        case .invalidAudioInput:
+            return "Invalid audio input for MLX speech inference."
+        case .unsupportedAudioFormat:
+            return "MLX speech inference currently accepts 16-bit mono PCM audio."
+        case .unsupportedSTTModel(let hints):
+            return "Unsupported MLX STT model. Supported local loaders: Qwen3-ASR and GLM-ASR. Hints: \(hints.joined(separator: ", "))"
+        case .allocationFailed:
+            return "MLX runtime failed to allocate output memory."
         }
     }
 }
 
 private let mlxRuntimeLogger = SDKLogger(category: "MLX")
+
+private struct MLXModelConfigHints: Decodable {
+    let modelType: String?
+    let architecture: String?
+    let architectures: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case modelType = "model_type"
+        case architecture
+        case architectures
+    }
+}
 
 private func describeMLXError(_ error: Error) -> String {
     let nsError = error as NSError
@@ -774,6 +863,117 @@ private func generateParameters(from options: rac_vlm_options_t?) -> GeneratePar
         repetitionContextSize: 32,
         seed: options.seed > 0 ? UInt64(options.seed) : nil
     )
+}
+
+private func sttGenerateParameters(from options: rac_stt_options_t?) -> STTGenerateParameters {
+    let resolved = options ?? RAC_STT_OPTIONS_DEFAULT
+    let language = string(from: resolved.language)
+    return STTGenerateParameters(language: language)
+}
+
+private func string(from pointer: UnsafePointer<CChar>?) -> String? {
+    guard let pointer else { return nil }
+    let value = String(cString: pointer)
+    return value.isEmpty ? nil : value
+}
+
+private func modelHints(from directory: URL, modelID: String) -> [String] {
+    var hints = [modelID, directory.lastPathComponent]
+    let configURL = directory.appendingPathComponent("config.json")
+    if let data = try? Data(contentsOf: configURL),
+       let config = try? JSONDecoder().decode(MLXModelConfigHints.self, from: data) {
+        if let modelType = config.modelType {
+            hints.append(modelType)
+        }
+        if let architecture = config.architecture {
+            hints.append(architecture)
+        }
+        hints.append(contentsOf: config.architectures ?? [])
+    }
+    return hints.map { $0.lowercased() }
+}
+
+private func loadSpeechRecognitionModel(from directory: URL, modelID: String) async throws
+    -> STTGenerationModel {
+    let hints = modelHints(from: directory, modelID: modelID)
+    let joinedHints = hints.joined(separator: " ")
+
+    if joinedHints.contains("qwen3") && joinedHints.contains("asr") {
+        return try await Qwen3ASRModel.fromModelDirectory(directory)
+    }
+
+    if joinedHints.contains("glm") && joinedHints.contains("asr") {
+        return try await GLMASRModel.fromModelDirectory(directory)
+    }
+
+    throw MLXRuntimeError.unsupportedSTTModel(hints)
+}
+
+private func makeSTTAudioArray(
+    audioData: Data,
+    options: rac_stt_options_t?
+) throws -> MLXArray {
+    let format = options?.audio_format ?? RAC_STT_OPTIONS_DEFAULT.audio_format
+    guard format == RAC_AUDIO_FORMAT_PCM else {
+        throw MLXRuntimeError.unsupportedAudioFormat
+    }
+    guard !audioData.isEmpty, audioData.count.isMultiple(of: MemoryLayout<Int16>.stride) else {
+        throw MLXRuntimeError.invalidAudioInput
+    }
+
+    let sampleCount = audioData.count / MemoryLayout<Int16>.stride
+    var samples: [Float] = []
+    samples.reserveCapacity(sampleCount)
+    audioData.withUnsafeBytes { rawBuffer in
+        guard let base = rawBuffer.bindMemory(to: UInt8.self).baseAddress else { return }
+        for index in 0..<sampleCount {
+            let low = UInt16(base[index * 2])
+            let high = UInt16(base[index * 2 + 1]) << 8
+            let sample = Int16(bitPattern: high | low)
+            samples.append(Float(sample) / Float(Int16.max))
+        }
+    }
+
+    guard samples.count == sampleCount else {
+        throw MLXRuntimeError.invalidAudioInput
+    }
+    return MLXArray(samples)
+}
+
+private func floatPCMData(from samples: [Float]) -> Data {
+    var copy = samples
+    return copy.withUnsafeMutableBufferPointer { buffer in
+        Data(buffer: UnsafeBufferPointer(buffer))
+    }
+}
+
+private func copyFloatPCMResult(
+    samples: [Float],
+    sampleRate: Int,
+    processingTimeMs: Int64,
+    outResult: UnsafeMutablePointer<rac_tts_result_t>
+) -> rac_result_t {
+    outResult.pointee = rac_tts_result_t()
+    let byteCount = samples.count * MemoryLayout<Float>.stride
+    if byteCount > 0 {
+        guard let audioData = malloc(byteCount) else {
+            return RAC_ERROR_OUT_OF_MEMORY
+        }
+        samples.withUnsafeBufferPointer { buffer in
+            if let baseAddress = buffer.baseAddress {
+                audioData.copyMemory(from: baseAddress, byteCount: byteCount)
+            }
+        }
+        outResult.pointee.audio_data = audioData
+    }
+    outResult.pointee.audio_size = byteCount
+    outResult.pointee.audio_format = RAC_AUDIO_FORMAT_PCM
+    outResult.pointee.sample_rate = Int32(sampleRate)
+    if sampleRate > 0 {
+        outResult.pointee.duration_ms = Int64(samples.count * 1000 / sampleRate)
+    }
+    outResult.pointee.processing_time_ms = processingTimeMs
+    return RAC_SUCCESS
 }
 
 private func imageInput(from image: rac_vlm_image_t) throws -> UserInput.Image {
@@ -849,6 +1049,10 @@ private let mlxCreate: rac_mlx_create_fn = { kind, modelIDPtr, _, outHandle, _ i
         sessionKind = .vlm
     case RAC_MLX_SESSION_KIND_EMBEDDINGS:
         sessionKind = .embeddings
+    case RAC_MLX_SESSION_KIND_STT:
+        sessionKind = .stt
+    case RAC_MLX_SESSION_KIND_TTS:
+        sessionKind = .tts
     default:
         sessionKind = .llm
     }
@@ -891,8 +1095,7 @@ private let mlxLLMGenerate: rac_mlx_llm_generate_fn = { handle, promptPtr, optio
     }
 }
 
-private let mlxLLMGenerateStream: rac_mlx_llm_generate_stream_fn = {
-    handle, promptPtr, options, callback, callbackUserData, _ in
+private let mlxLLMGenerateStream: rac_mlx_llm_generate_stream_fn = { handle, promptPtr, options, callback, callbackUserData, _ in
     guard let session = session(from: handle), let promptPtr else {
         return RAC_ERROR_INVALID_PARAMETER
     }
@@ -933,8 +1136,7 @@ private let mlxVLMProcess: rac_mlx_vlm_process_fn = { handle, image, promptPtr, 
     }
 }
 
-private let mlxVLMProcessStream: rac_mlx_vlm_process_stream_fn = {
-    handle, image, promptPtr, options, callback, callbackUserData, _ in
+private let mlxVLMProcessStream: rac_mlx_vlm_process_stream_fn = { handle, image, promptPtr, options, callback, callbackUserData, _ in
     guard let session = session(from: handle), let image, let promptPtr else {
         return RAC_ERROR_INVALID_PARAMETER
     }
@@ -1025,6 +1227,121 @@ private let mlxEmbeddingInfo: rac_mlx_embedding_info_fn = { handle, outInfo, _ i
         return RAC_ERROR_INVALID_PARAMETER
     }
     outInfo.pointee = session.embeddingInfo()
+    return RAC_SUCCESS
+}
+
+private let mlxSTTTranscribe: rac_mlx_stt_transcribe_fn = { handle, audioData, audioSize, options, outResult, _ in
+    guard let session = session(from: handle), let audioData, audioSize > 0, let outResult else {
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    let input = Data(bytes: audioData, count: Int(audioSize))
+    let started = Date()
+    do {
+        let output = try session.transcribe(audioData: input, options: options)
+        outResult.pointee = rac_stt_result_t()
+        outResult.pointee.text = strdup(output.text)
+        if outResult.pointee.text == nil {
+            return RAC_ERROR_OUT_OF_MEMORY
+        }
+        if let language = output.language, !language.isEmpty {
+            outResult.pointee.detected_language = strdup(language)
+            if outResult.pointee.detected_language == nil {
+                rac_stt_result_free(outResult)
+                return RAC_ERROR_OUT_OF_MEMORY
+            }
+        }
+        outResult.pointee.confidence = output.text.isEmpty ? 0.0 : RAC_STT_DEFAULT_CONFIDENCE
+        let outputTimeMs = Int64(output.totalTime * 1000)
+        outResult.pointee.processing_time_ms = outputTimeMs > 0
+            ? outputTimeMs
+            : Int64(Date().timeIntervalSince(started) * 1000)
+        return RAC_SUCCESS
+    } catch {
+        recordMLXFailure("MLX speech transcription", error: error)
+        return RAC_ERROR_INFERENCE_FAILED
+    }
+}
+
+private let mlxSTTTranscribeStream: rac_mlx_stt_transcribe_stream_fn = { handle, audioData, audioSize, options, callback, callbackUserData, _ in
+    guard let session = session(from: handle), let audioData, audioSize > 0 else {
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    let input = Data(bytes: audioData, count: Int(audioSize))
+    switch syncWait({
+        try await session.transcribeStream(
+            audioData: input,
+            options: options,
+            callback: callback,
+            userData: callbackUserData
+        )
+    }) {
+    case .success:
+        return RAC_SUCCESS
+    case .failure(let error):
+        recordMLXFailure("MLX streaming speech transcription", error: error)
+        return RAC_ERROR_INFERENCE_FAILED
+    }
+}
+
+private let mlxSTTInfo: rac_mlx_stt_info_fn = { handle, outInfo, _ in
+    guard let session = session(from: handle), let outInfo else {
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    outInfo.pointee = session.sttInfo()
+    return RAC_SUCCESS
+}
+
+private let mlxTTSSynthesize: rac_mlx_tts_synthesize_fn = { handle, textPtr, options, outResult, _ in
+    guard let session = session(from: handle), let textPtr, let outResult else {
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    let text = String(cString: textPtr)
+    switch syncWait({ try await session.synthesize(text: text, options: options) }) {
+    case .success(let output):
+        return copyFloatPCMResult(
+            samples: output.samples,
+            sampleRate: output.sampleRate,
+            processingTimeMs: output.processingTimeMs,
+            outResult: outResult
+        )
+    case .failure(let error):
+        recordMLXFailure("MLX speech synthesis", error: error)
+        return RAC_ERROR_INFERENCE_FAILED
+    }
+}
+
+private let mlxTTSSynthesizeStream: rac_mlx_tts_synthesize_stream_fn = { handle, textPtr, options, callback, callbackUserData, _ in
+    guard let session = session(from: handle), let textPtr else {
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    let text = String(cString: textPtr)
+    switch syncWait({
+        try await session.synthesizeStream(
+            text: text,
+            options: options,
+            callback: callback,
+            userData: callbackUserData
+        )
+    }) {
+    case .success:
+        return RAC_SUCCESS
+    case .failure(let error):
+        recordMLXFailure("MLX streaming speech synthesis", error: error)
+        return RAC_ERROR_INFERENCE_FAILED
+    }
+}
+
+private let mlxTTSStop: rac_mlx_tts_stop_fn = { handle, _ in
+    guard let session = session(from: handle) else { return RAC_ERROR_INVALID_PARAMETER }
+    session.ttsStop()
+    return RAC_SUCCESS
+}
+
+private let mlxTTSInfo: rac_mlx_tts_info_fn = { handle, outInfo, _ in
+    guard let session = session(from: handle), let outInfo else {
+        return RAC_ERROR_INVALID_PARAMETER
+    }
+    outInfo.pointee = session.ttsInfo()
     return RAC_SUCCESS
 }
 

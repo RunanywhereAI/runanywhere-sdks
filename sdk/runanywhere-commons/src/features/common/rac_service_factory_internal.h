@@ -153,7 +153,46 @@ struct PluginServiceCreateSpec {
     const char* model_create_id;
     const char* model_id_for_service;
     const char* config_json;
+    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
 };
+
+inline const char* plugin_hint_for_framework(rac_inference_framework_t framework,
+                                             rac_primitive_t primitive) {
+    switch (framework) {
+        case RAC_FRAMEWORK_LLAMACPP:
+            return "llamacpp";
+        case RAC_FRAMEWORK_MLX:
+            return "mlx";
+        case RAC_FRAMEWORK_SHERPA:
+            return "sherpa";
+        case RAC_FRAMEWORK_ONNX:
+            if (primitive == RAC_PRIMITIVE_EMBED) {
+                return "onnx";
+            }
+            if (primitive == RAC_PRIMITIVE_TRANSCRIBE || primitive == RAC_PRIMITIVE_SYNTHESIZE ||
+                primitive == RAC_PRIMITIVE_DETECT_VOICE) {
+                return "sherpa";
+            }
+            return nullptr;
+        case RAC_FRAMEWORK_FOUNDATION_MODELS:
+        case RAC_FRAMEWORK_SYSTEM_TTS:
+            return "platform";
+        case RAC_FRAMEWORK_COREML:
+            return primitive == RAC_PRIMITIVE_DIFFUSION ? "coreml" : "platform";
+        case RAC_FRAMEWORK_METALRT:
+            return "metalrt";
+        case RAC_FRAMEWORK_GENIE:
+            return "genie";
+        case RAC_FRAMEWORK_QHEXRT:
+            return "qhexrt";
+        case RAC_FRAMEWORK_FLUID_AUDIO:
+        case RAC_FRAMEWORK_BUILTIN:
+        case RAC_FRAMEWORK_NONE:
+        case RAC_FRAMEWORK_UNKNOWN:
+        default:
+            return nullptr;
+    }
+}
 
 template <typename ServiceT, typename OpsT>
 rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>& spec,
@@ -163,11 +202,19 @@ rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>
     }
     *out_service = nullptr;
 
-    const rac_engine_vtable_t* vt = rac_plugin_find(spec.primitive);
+    const char* engine_hint = plugin_hint_for_framework(spec.framework, spec.primitive);
+    const rac_engine_vtable_t* vt = (engine_hint != nullptr)
+                                        ? rac_plugin_find_for_engine(spec.primitive, engine_hint)
+                                        : rac_plugin_find(spec.primitive);
     const OpsT* ops = (vt && spec.select_ops) ? spec.select_ops(vt) : nullptr;
     if (!vt || !ops || !ops->create) {
-        RAC_LOG_ERROR(spec.log_cat, "no registered plugin serves %s",
-                      rac_primitive_name(spec.primitive));
+        if (engine_hint != nullptr) {
+            RAC_LOG_ERROR(spec.log_cat, "no registered plugin '%s' serves %s", engine_hint,
+                          rac_primitive_name(spec.primitive));
+        } else {
+            RAC_LOG_ERROR(spec.log_cat, "no registered plugin serves %s",
+                          rac_primitive_name(spec.primitive));
+        }
         return RAC_ERROR_BACKEND_NOT_FOUND;
     }
     RAC_LOG_INFO(spec.log_cat, "Routed to plugin: %s", vt->metadata.name);
