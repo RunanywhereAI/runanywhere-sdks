@@ -37,8 +37,12 @@
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/stt/rac_stt_service.h"
+#include "rac/features/tts/rac_tts_service.h"
+#include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/plugin/rac_plugin_entry.h"
 
 namespace {
 
@@ -53,11 +57,19 @@ struct FakeMlxSession {
 struct FakeMlxState {
   int create_count = 0;
   int initialize_count = 0;
+  int llm_generate_count = 0;
   int stream_count = 0;
   int vlm_process_count = 0;
+  int vlm_stream_count = 0;
   int embed_batch_count = 0;
+  int embedding_info_count = 0;
   int stt_transcribe_count = 0;
+  int stt_stream_count = 0;
+  int stt_info_count = 0;
   int tts_synthesize_count = 0;
+  int tts_stream_count = 0;
+  int tts_stop_count = 0;
+  int tts_info_count = 0;
   rac_mlx_session_kind_t last_kind = RAC_MLX_SESSION_KIND_LLM;
   std::string last_model_path;
   size_t last_embed_batch_size = 0;
@@ -135,6 +147,7 @@ rac_result_t fake_llm_generate(rac_handle_t, const char *prompt,
   out_result->total_tokens = 5;
   out_result->total_time_ms = 7;
   out_result->tokens_per_second = 100.0f;
+  g_mlx_state.llm_generate_count++;
   return out_result->text ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
 }
 
@@ -176,6 +189,7 @@ rac_result_t fake_vlm_process_stream(rac_handle_t, const rac_vlm_image_t *,
   if (!prompt || !callback) {
     return RAC_ERROR_NULL_POINTER;
   }
+  g_mlx_state.vlm_stream_count++;
   return callback(prompt, callback_user_data) == RAC_TRUE ? RAC_SUCCESS
                                                           : RAC_ERROR_CANCELLED;
 }
@@ -221,6 +235,7 @@ rac_result_t fake_embedding_info(rac_handle_t, rac_embeddings_info_t *out_info,
   out_info->is_ready = RAC_TRUE;
   out_info->dimension = 2;
   out_info->max_tokens = 512;
+  g_mlx_state.embedding_info_count++;
   return RAC_SUCCESS;
 }
 
@@ -253,6 +268,7 @@ rac_result_t fake_stt_transcribe_stream(rac_handle_t, const void *audio_data,
   if (!audio_data || audio_size == 0 || !callback) {
     return RAC_ERROR_NULL_POINTER;
   }
+  g_mlx_state.stt_stream_count++;
   callback("mlx-stt-partial", RAC_FALSE, callback_user_data);
   callback("mlx-stt-final", RAC_TRUE, callback_user_data);
   return RAC_SUCCESS;
@@ -266,6 +282,7 @@ rac_result_t fake_stt_info(rac_handle_t, rac_stt_info_t *out_info, void *) {
   out_info->is_ready = RAC_TRUE;
   out_info->current_model = "mlx.fake.stt";
   out_info->supports_streaming = RAC_TRUE;
+  g_mlx_state.stt_info_count++;
   return RAC_SUCCESS;
 }
 
@@ -303,12 +320,16 @@ rac_result_t fake_tts_synthesize_stream(rac_handle_t, const char *text,
   if (!text || !callback) {
     return RAC_ERROR_NULL_POINTER;
   }
+  g_mlx_state.tts_stream_count++;
   const float samples[2] = {0.1f, -0.1f};
   callback(samples, sizeof(samples), callback_user_data);
   return RAC_SUCCESS;
 }
 
-rac_result_t fake_tts_stop(rac_handle_t, void *) { return RAC_SUCCESS; }
+rac_result_t fake_tts_stop(rac_handle_t, void *) {
+  g_mlx_state.tts_stop_count++;
+  return RAC_SUCCESS;
+}
 
 rac_result_t fake_tts_info(rac_handle_t, rac_tts_info_t *out_info, void *) {
   if (!out_info) {
@@ -317,6 +338,7 @@ rac_result_t fake_tts_info(rac_handle_t, rac_tts_info_t *out_info, void *) {
   std::memset(out_info, 0, sizeof(*out_info));
   out_info->is_ready = RAC_TRUE;
   out_info->is_synthesizing = RAC_FALSE;
+  g_mlx_state.tts_info_count++;
   return RAC_SUCCESS;
 }
 
@@ -504,6 +526,287 @@ bool run_cli_or_fail(const std::vector<std::string> &args,
   result->actual = "exit " + std::to_string(code);
   result->details = *stdout_text;
   return false;
+}
+
+bool register_mlx_backend_or_fail(TestResult *result) {
+  const rac_result_t rc = rac_backend_mlx_register();
+  if (rc == RAC_SUCCESS || rc == RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+    return true;
+  }
+  result->expected = "rac_backend_mlx_register success";
+  result->actual = std::to_string(rc);
+  return false;
+}
+
+rac_bool_t append_token_callback(const char *token, void *user_data) {
+  auto *out = static_cast<std::string *>(user_data);
+  if (token && out) {
+    out->append(token);
+  }
+  return RAC_TRUE;
+}
+
+void append_stt_callback(const char *text, rac_bool_t is_final,
+                         void *user_data) {
+  auto *out = static_cast<std::string *>(user_data);
+  if (text && out) {
+    if (!out->empty()) {
+      out->append("|");
+    }
+    out->append(is_final == RAC_TRUE ? "final:" : "partial:");
+    out->append(text);
+  }
+}
+
+void count_tts_chunk_callback(const void *, size_t audio_size,
+                              void *user_data) {
+  auto *total = static_cast<size_t *>(user_data);
+  if (total) {
+    *total += audio_size;
+  }
+}
+
+TestResult test_mlx_callback_bridge_all_slots() {
+  TestResult result;
+  result.test_name = "mlx_callback_bridge_all_slots";
+
+  g_mlx_state = {};
+  if (!install_fake_mlx_callbacks() || !register_mlx_backend_or_fail(&result)) {
+    if (result.details.empty()) {
+      result.details = "failed to install/register MLX callbacks";
+    }
+    return result;
+  }
+
+  const rac_engine_vtable_t *llm_vt =
+      rac_plugin_find_for_engine(RAC_PRIMITIVE_GENERATE_TEXT, "mlx");
+  const rac_engine_vtable_t *vlm_vt =
+      rac_plugin_find_for_engine(RAC_PRIMITIVE_VLM, "mlx");
+  const rac_engine_vtable_t *embed_vt =
+      rac_plugin_find_for_engine(RAC_PRIMITIVE_EMBED, "mlx");
+  const rac_engine_vtable_t *stt_vt =
+      rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, "mlx");
+  const rac_engine_vtable_t *tts_vt =
+      rac_plugin_find_for_engine(RAC_PRIMITIVE_SYNTHESIZE, "mlx");
+  if (!llm_vt || !vlm_vt || !embed_vt || !stt_vt || !tts_vt ||
+      !llm_vt->llm_ops || !vlm_vt->vlm_ops || !embed_vt->embedding_ops ||
+      !stt_vt->stt_ops || !tts_vt->tts_ops) {
+    result.expected = "registered MLX vtable with all modality op slots";
+    result.actual = "one or more MLX op slots missing";
+    rac_backend_mlx_unregister();
+    return result;
+  }
+
+  void *llm = nullptr;
+  rac_llm_result_t llm_result{};
+  std::string llm_stream;
+  rac_llm_info_t llm_info{};
+  if (llm_vt->llm_ops->create("mlx.direct.llm", nullptr, &llm) != RAC_SUCCESS ||
+      llm_vt->llm_ops->initialize(llm, "/tmp/mlx-direct-llm") != RAC_SUCCESS ||
+      llm_vt->llm_ops->generate(llm, "direct", nullptr, &llm_result) != RAC_SUCCESS ||
+      llm_vt->llm_ops->generate_stream(llm, "stream", nullptr, append_token_callback,
+                                       &llm_stream) != RAC_SUCCESS ||
+      llm_vt->llm_ops->get_info(llm, &llm_info) != RAC_SUCCESS ||
+      llm_vt->llm_ops->cancel(llm) != RAC_SUCCESS ||
+      llm_vt->llm_ops->cleanup(llm) != RAC_SUCCESS) {
+    result.details = "MLX LLM direct ops failed";
+    if (llm_result.text) {
+      rac_llm_result_free(&llm_result);
+    }
+    if (llm) {
+      llm_vt->llm_ops->destroy(llm);
+    }
+    rac_backend_mlx_unregister();
+    return result;
+  }
+  const bool llm_ok = llm_result.text &&
+                      std::string(llm_result.text) == "mlx-stub: direct" &&
+                      llm_stream == "mlx-stub: stream" &&
+                      llm_info.is_ready == RAC_TRUE &&
+                      g_mlx_state.llm_generate_count == 1 &&
+                      g_mlx_state.stream_count == 1 &&
+                      g_mlx_state.last_kind == RAC_MLX_SESSION_KIND_LLM;
+  rac_llm_result_free(&llm_result);
+  llm_vt->llm_ops->destroy(llm);
+  if (!llm_ok) {
+    result.details = "MLX LLM direct callbacks were not all exercised";
+    rac_backend_mlx_unregister();
+    return result;
+  }
+
+  void *vlm = nullptr;
+  rac_vlm_result_t vlm_result{};
+  std::string vlm_stream;
+  rac_vlm_info_t vlm_info{};
+  rac_vlm_image_t image{};
+  image.format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
+  image.file_path = "/tmp/mlx-direct-image.jpg";
+  if (vlm_vt->vlm_ops->create("mlx.direct.vlm", nullptr, &vlm) != RAC_SUCCESS ||
+      vlm_vt->vlm_ops->initialize(vlm, "/tmp/mlx-direct-vlm", nullptr) != RAC_SUCCESS ||
+      vlm_vt->vlm_ops->process(vlm, &image, "look", nullptr, &vlm_result) != RAC_SUCCESS ||
+      vlm_vt->vlm_ops->process_stream(vlm, &image, "watch", nullptr, append_token_callback,
+                                      &vlm_stream) != RAC_SUCCESS ||
+      vlm_vt->vlm_ops->get_info(vlm, &vlm_info) != RAC_SUCCESS ||
+      vlm_vt->vlm_ops->cancel(vlm) != RAC_SUCCESS ||
+      vlm_vt->vlm_ops->cleanup(vlm) != RAC_SUCCESS) {
+    result.details = "MLX VLM direct ops failed";
+    if (vlm_result.text) {
+      rac_vlm_result_free(&vlm_result);
+    }
+    if (vlm) {
+      vlm_vt->vlm_ops->destroy(vlm);
+    }
+    rac_backend_mlx_unregister();
+    return result;
+  }
+  const bool vlm_ok = vlm_result.text &&
+                      std::string(vlm_result.text) == "mlx-vlm-stub: look" &&
+                      vlm_stream == "watch" &&
+                      vlm_info.is_ready == RAC_TRUE &&
+                      g_mlx_state.vlm_process_count == 1 &&
+                      g_mlx_state.vlm_stream_count == 1 &&
+                      g_mlx_state.last_kind == RAC_MLX_SESSION_KIND_VLM;
+  rac_vlm_result_free(&vlm_result);
+  vlm_vt->vlm_ops->destroy(vlm);
+  if (!vlm_ok) {
+    result.details = "MLX VLM direct callbacks were not all exercised";
+    rac_backend_mlx_unregister();
+    return result;
+  }
+
+  void *embed = nullptr;
+  rac_embeddings_result_t embed_result{};
+  rac_embeddings_info_t embed_info{};
+  const char *embed_texts[] = {"one", "two"};
+  if (embed_vt->embedding_ops->create("mlx.direct.embed", nullptr, &embed) !=
+          RAC_SUCCESS ||
+      embed_vt->embedding_ops->initialize(embed, "/tmp/mlx-direct-embed") !=
+          RAC_SUCCESS ||
+      embed_vt->embedding_ops->embed(embed, "single", nullptr, &embed_result) !=
+          RAC_SUCCESS ||
+      embed_vt->embedding_ops->get_info(embed, &embed_info) != RAC_SUCCESS) {
+    result.details = "MLX embedding direct single ops failed";
+    rac_embeddings_result_free(&embed_result);
+    if (embed) {
+      embed_vt->embedding_ops->destroy(embed);
+    }
+    rac_backend_mlx_unregister();
+    return result;
+  }
+  rac_embeddings_result_free(&embed_result);
+  if (embed_vt->embedding_ops->embed_batch(embed, embed_texts, 2, nullptr,
+                                           &embed_result) != RAC_SUCCESS ||
+      embed_vt->embedding_ops->cleanup(embed) != RAC_SUCCESS) {
+    result.details = "MLX embedding direct batch ops failed";
+    rac_embeddings_result_free(&embed_result);
+    embed_vt->embedding_ops->destroy(embed);
+    rac_backend_mlx_unregister();
+    return result;
+  }
+  const bool embed_ok = embed_result.num_embeddings == 2 &&
+                        embed_info.is_ready == RAC_TRUE &&
+                        g_mlx_state.embed_batch_count == 2 &&
+                        g_mlx_state.embedding_info_count == 1 &&
+                        g_mlx_state.last_kind ==
+                            RAC_MLX_SESSION_KIND_EMBEDDINGS;
+  rac_embeddings_result_free(&embed_result);
+  embed_vt->embedding_ops->destroy(embed);
+  if (!embed_ok) {
+    result.details = "MLX embedding direct callbacks were not all exercised";
+    rac_backend_mlx_unregister();
+    return result;
+  }
+
+  void *stt = nullptr;
+  const int16_t samples[] = {0, 128, -128, 256};
+  rac_stt_result_t stt_result{};
+  std::string stt_stream;
+  rac_stt_info_t stt_info{};
+  if (stt_vt->stt_ops->create("mlx.direct.stt", nullptr, &stt) != RAC_SUCCESS ||
+      stt_vt->stt_ops->initialize(stt, "/tmp/mlx-direct-stt") != RAC_SUCCESS ||
+      stt_vt->stt_ops->transcribe(stt, samples, sizeof(samples), nullptr,
+                                  &stt_result) != RAC_SUCCESS ||
+      stt_vt->stt_ops->transcribe_stream(stt, samples, sizeof(samples), nullptr,
+                                         append_stt_callback,
+                                         &stt_stream) != RAC_SUCCESS ||
+      stt_vt->stt_ops->get_info(stt, &stt_info) != RAC_SUCCESS ||
+      stt_vt->stt_ops->cleanup(stt) != RAC_SUCCESS) {
+    result.details = "MLX STT direct ops failed";
+    if (stt_result.text) {
+      rac_stt_result_free(&stt_result);
+    }
+    if (stt) {
+      stt_vt->stt_ops->destroy(stt);
+    }
+    rac_backend_mlx_unregister();
+    return result;
+  }
+  const bool stt_ok = stt_result.text &&
+                      std::string(stt_result.text).find("mlx-stt-stub") !=
+                          std::string::npos &&
+                      stt_stream == "partial:mlx-stt-partial|final:mlx-stt-final" &&
+                      stt_info.is_ready == RAC_TRUE &&
+                      g_mlx_state.stt_transcribe_count == 1 &&
+                      g_mlx_state.stt_stream_count == 1 &&
+                      g_mlx_state.stt_info_count == 1 &&
+                      g_mlx_state.last_kind == RAC_MLX_SESSION_KIND_STT;
+  rac_stt_result_free(&stt_result);
+  stt_vt->stt_ops->destroy(stt);
+  if (!stt_ok) {
+    result.details = "MLX STT direct callbacks were not all exercised";
+    rac_backend_mlx_unregister();
+    return result;
+  }
+
+  void *tts = nullptr;
+  rac_tts_result_t tts_result{};
+  size_t streamed_tts_bytes = 0;
+  rac_tts_info_t tts_info{};
+  if (tts_vt->tts_ops->create("/tmp/mlx-direct-tts", nullptr, &tts) != RAC_SUCCESS ||
+      tts_vt->tts_ops->initialize(tts) != RAC_SUCCESS ||
+      tts_vt->tts_ops->synthesize(tts, "say it", nullptr, &tts_result) !=
+          RAC_SUCCESS ||
+      tts_vt->tts_ops->synthesize_stream(tts, "stream it", nullptr,
+                                         count_tts_chunk_callback,
+                                         &streamed_tts_bytes) != RAC_SUCCESS ||
+      tts_vt->tts_ops->stop(tts) != RAC_SUCCESS ||
+      tts_vt->tts_ops->get_info(tts, &tts_info) != RAC_SUCCESS ||
+      tts_vt->tts_ops->cleanup(tts) != RAC_SUCCESS) {
+    result.details = "MLX TTS direct ops failed";
+    rac_tts_result_free(&tts_result);
+    if (tts) {
+      tts_vt->tts_ops->destroy(tts);
+    }
+    rac_backend_mlx_unregister();
+    return result;
+  }
+  const bool tts_ok = tts_result.audio_data &&
+                      tts_result.audio_size == 8 * sizeof(float) &&
+                      streamed_tts_bytes == 2 * sizeof(float) &&
+                      tts_info.is_ready == RAC_TRUE &&
+                      g_mlx_state.tts_synthesize_count == 1 &&
+                      g_mlx_state.tts_stream_count == 1 &&
+                      g_mlx_state.tts_stop_count == 1 &&
+                      g_mlx_state.tts_info_count == 1 &&
+                      g_mlx_state.last_kind == RAC_MLX_SESSION_KIND_TTS;
+  rac_tts_result_free(&tts_result);
+  tts_vt->tts_ops->destroy(tts);
+  if (!tts_ok) {
+    result.details = "MLX TTS direct callbacks were not all exercised";
+    rac_backend_mlx_unregister();
+    return result;
+  }
+
+  if (g_mlx_state.create_count != 5 || g_mlx_state.initialize_count != 5) {
+    result.details =
+        "MLX direct bridge should create/initialize one session per modality";
+    rac_backend_mlx_unregister();
+    return result;
+  }
+
+  rac_backend_mlx_unregister();
+  result.passed = true;
+  return result;
 }
 
 TestResult test_rcli_mlx_run_end_to_end() {
@@ -793,6 +1096,7 @@ TestResult test_rcli_mlx_run_end_to_end() {
 
 int main(int argc, char **argv) {
   TestSuite suite("rcli_mlx_e2e");
+  suite.add("mlx_callback_bridge_all_slots", test_mlx_callback_bridge_all_slots);
   suite.add("rcli_mlx_run_end_to_end", test_rcli_mlx_run_end_to_end);
   return suite.run(argc, argv);
 }

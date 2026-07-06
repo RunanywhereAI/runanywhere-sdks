@@ -6,7 +6,6 @@
 // swiftlint:disable file_length
 
 import CoreImage
-import CRACommons
 import Foundation
 import MLX
 import MLXBackend
@@ -15,7 +14,6 @@ import MLXLLM
 import MLXLMCommon
 import MLXVLM
 import os
-import RunAnywhere
 import Tokenizers
 
 #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
@@ -23,12 +21,46 @@ import MLXAudioSTT
 import MLXAudioTTS
 #endif
 
+private struct MLXRuntimeLog {
+    private let category: String
+
+    init(category: String) {
+        self.category = category
+    }
+
+    func debug(_ message: String) {
+        write(level: "debug", message)
+    }
+
+    func info(_ message: String) {
+        write(level: "info", message)
+    }
+
+    func warning(_ message: String) {
+        write(level: "warning", message)
+    }
+
+    func error(_ message: String) {
+        write(level: "error", message)
+    }
+
+    private func write(level: String, _ message: String) {
+        let line = "[RunAnywhereMLX][\(category)][\(level)] \(message)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        FileHandle.standardError.write(data)
+    }
+}
+
 public enum MLX {
-    private static let logger = SDKLogger(category: "MLX")
+    private static let logger = MLXRuntimeLog(category: "MLX")
     private static var isRegistered = false
 
     public static let version = "1.0.0"
     public static let mlxSwiftLMVersion = "3.31.4"
+
+    @MainActor public static var isBackendRegistered: Bool {
+        isRegistered
+    }
 
     @MainActor
     @discardableResult
@@ -92,6 +124,49 @@ public enum MLX {
             _ = MLX.register()
         }
     }()
+}
+
+private func mlxRuntimeMainActorResult<T>(_ body: @MainActor () -> T) -> T {
+    if Thread.isMainThread {
+        return MainActor.assumeIsolated(body)
+    }
+
+    var result: T?
+    DispatchQueue.main.sync {
+        result = MainActor.assumeIsolated(body)
+    }
+    guard let result else {
+        preconditionFailure("Main actor MLX runtime call did not return a result")
+    }
+    return result
+}
+
+@_cdecl("ra_mlx_register_runtime")
+public func raMLXRegisterRuntime(_ priority: Int32) -> Int32 {
+    let registered = mlxRuntimeMainActorResult {
+        MLX.register(priority: Int(priority))
+    }
+    return registered ? RAC_SUCCESS : RAC_ERROR_NOT_SUPPORTED
+}
+
+@_cdecl("ra_mlx_unregister_runtime")
+public func raMLXUnregisterRuntime() -> Int32 {
+    mlxRuntimeMainActorResult {
+        MLX.unregister()
+    }
+    return RAC_SUCCESS
+}
+
+@_cdecl("ra_mlx_runtime_is_registered")
+public func raMLXRuntimeIsRegistered() -> Int32 {
+    mlxRuntimeMainActorResult {
+        MLX.isBackendRegistered ? 1 : 0
+    }
+}
+
+@_cdecl("ra_mlx_runtime_is_available")
+public func raMLXRuntimeIsAvailable() -> Int32 {
+    1
 }
 
 private enum MLXSessionKind {
@@ -890,7 +965,7 @@ private enum MLXRuntimeError: LocalizedError {
     }
 }
 
-private let mlxRuntimeLogger = SDKLogger(category: "MLX")
+private let mlxRuntimeLogger = MLXRuntimeLog(category: "MLX")
 
 private struct MLXModelConfigHints: Decodable {
     let modelType: String?

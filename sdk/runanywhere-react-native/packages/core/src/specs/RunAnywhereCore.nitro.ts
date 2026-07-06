@@ -95,6 +95,18 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   setHfToken(token: string): Promise<void>;
 
+  /**
+   * Apple MLX runtime bridge.
+   *
+   * These methods call the Swift MLX runtime C entrypoints when the host app
+   * links `RunAnywhereMLX`. They return false on platforms or builds where the
+   * Swift runtime is not present.
+   */
+  mlxRuntimeAvailable(): Promise<boolean>;
+  mlxRegisterBackend(priority: number): Promise<boolean>;
+  mlxUnregisterBackend(): Promise<boolean>;
+  mlxIsBackendRegistered(): Promise<boolean>;
+
   // ============================================================================
   // Plugin Loader
   // Matches Swift: RunAnywhere.pluginLoader backed by rac_registry_*.
@@ -912,9 +924,7 @@ export interface RunAnywhereCore extends HybridObject<{
    * `runanywhere.v1.VoiceAgentTranscribeProtoRequest`; the output is a
    * serialized `runanywhere.v1.STTOutput`.
    */
-  voiceAgentTranscribeProto(
-    audioBytes: ArrayBuffer
-  ): Promise<ArrayBuffer>;
+  voiceAgentTranscribeProto(audioBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
    * Synthesize speech using the voice-agent TTS component via the commons

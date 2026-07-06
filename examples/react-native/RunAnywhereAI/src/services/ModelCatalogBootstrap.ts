@@ -23,6 +23,7 @@ const { registerModel, registerMultiFileModel } = RunAnywhere;
 export type BackendRegistrationState = {
   llamaRegistered: boolean;
   onnxRegistered: boolean;
+  mlxRegistered: boolean;
   qhexrtRegistered: boolean;
 };
 
@@ -33,7 +34,8 @@ export type BackendRegistrationState = {
 export async function registerAll(
   backendState: BackendRegistrationState
 ): Promise<void> {
-  const { llamaRegistered, onnxRegistered, qhexrtRegistered } = backendState;
+  const { llamaRegistered, onnxRegistered, mlxRegistered, qhexrtRegistered } =
+    backendState;
   // =========================================================================
   // LlamaCPP backend + LLM models
   // =========================================================================
@@ -154,6 +156,12 @@ export async function registerAll(
     ]);
   } else {
     logDiagnostic('[App] Skipping LlamaCPP models - backend not available');
+  }
+
+  if (mlxRegistered) {
+    await registerAppleMlxModels();
+  } else {
+    logDiagnostic('[App] Skipping MLX models - backend not available');
   }
 
   // =========================================================================
@@ -306,6 +314,227 @@ export async function registerAll(
   }
 
   logDiagnostic('[App] All models registered');
+}
+
+async function registerAppleMlxModels(): Promise<void> {
+  await Promise.all([
+    registerModel({
+      id: 'mlx-qwen3-0.6b-4bit',
+      name: 'MLX Qwen3 0.6B 4bit',
+      url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      memoryRequirement: 650_000_000,
+      supportsThinking: true,
+    }),
+    registerModel({
+      id: 'mlx-llama-3.2-1b-instruct-4bit',
+      name: 'MLX Llama 3.2 1B Instruct 4bit',
+      url: 'https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      memoryRequirement: 900_000_000,
+    }),
+    registerModel({
+      id: 'mlx-qwen3-4b-4bit',
+      name: 'MLX Qwen3 4B 4bit',
+      url: 'https://huggingface.co/mlx-community/Qwen3-4B-4bit',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      memoryRequirement: 2_400_000_000,
+      supportsThinking: true,
+    }),
+    registerModel({
+      id: 'mlx-qwen2-vl-2b-instruct-4bit',
+      name: 'MLX Qwen2-VL 2B Instruct 4bit',
+      url: 'https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+      memoryRequirement: 2_200_000_000,
+    }),
+    registerModel({
+      id: 'mlx-qwen3-vl-4b-instruct-4bit',
+      name: 'MLX Qwen3-VL 4B Instruct 4bit',
+      url: 'https://huggingface.co/lmstudio-community/Qwen3-VL-4B-Instruct-MLX-4bit',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+      memoryRequirement: 4_000_000_000,
+    }),
+    registerMultiFileModel({
+      id: 'mlx-qwen3-asr-0.6b-8bit',
+      name: 'MLX Qwen3-ASR 0.6B 8bit',
+      files: [
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/chat_template.json',
+          filename: 'chat_template.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/config.json',
+          filename: 'config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/generation_config.json',
+          filename: 'generation_config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/merges.txt',
+          filename: 'merges.txt',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/model.safetensors',
+          filename: 'model.safetensors',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/model.safetensors.index.json',
+          filename: 'model.safetensors.index.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/preprocessor_config.json',
+          filename: 'preprocessor_config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/tokenizer_config.json',
+          filename: 'tokenizer_config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/vocab.json',
+          filename: 'vocab.json',
+          isRequired: true,
+        },
+      ],
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+      memoryRequirement: 1_010_773_761,
+    }),
+    registerMultiFileModel({
+      id: 'mlx-soprano-1.1-80m-5bit',
+      name: 'MLX Soprano 1.1 80M 5bit',
+      files: [
+        {
+          url: 'https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/config.json',
+          filename: 'config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/generation_config.json',
+          filename: 'generation_config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/model.safetensors',
+          filename: 'model.safetensors',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/model.safetensors.index.json',
+          filename: 'model.safetensors.index.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/special_tokens_map.json',
+          filename: 'special_tokens_map.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/tokenizer.json',
+          filename: 'tokenizer.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/tokenizer_config.json',
+          filename: 'tokenizer_config.json',
+          isRequired: true,
+        },
+      ],
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+      memoryRequirement: 82_220_814,
+    }),
+    registerMultiFileModel({
+      id: 'mlx-qwen3-tts-12hz-0.6b-base-8bit',
+      name: 'MLX Qwen3-TTS 12Hz 0.6B Base 8bit',
+      files: [
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/config.json',
+          filename: 'config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/generation_config.json',
+          filename: 'generation_config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/merges.txt',
+          filename: 'merges.txt',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/model.safetensors',
+          filename: 'model.safetensors',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/model.safetensors.index.json',
+          filename: 'model.safetensors.index.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/preprocessor_config.json',
+          filename: 'preprocessor_config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/speech_tokenizer/config.json',
+          filename: 'speech_tokenizer/config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/speech_tokenizer/configuration.json',
+          filename: 'speech_tokenizer/configuration.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/speech_tokenizer/model.safetensors',
+          filename: 'speech_tokenizer/model.safetensors',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/speech_tokenizer/preprocessor_config.json',
+          filename: 'speech_tokenizer/preprocessor_config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/tokenizer_config.json',
+          filename: 'tokenizer_config.json',
+          isRequired: true,
+        },
+        {
+          url: 'https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/resolve/main/vocab.json',
+          filename: 'vocab.json',
+          isRequired: true,
+        },
+      ],
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+      memoryRequirement: 1_991_299_138,
+    }),
+    registerModel({
+      id: 'mlx-qwen3-embedding-0.6b-4bit-dwq',
+      name: 'MLX Qwen3 Embedding 0.6B 4bit DWQ',
+      url: 'https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      memoryRequirement: 350_000_000,
+    }),
+  ]);
+
+  logDiagnostic('[App] MLX Apple models registered');
 }
 
 /**

@@ -14,6 +14,67 @@ Model acquisition still flows through the SDK model registry, bundle policy, and
 platform download adapters. The MLX runtime receives a resolved local model
 folder path after commons lifecycle loading has completed.
 
+## RN and Flutter Apple Hosts
+
+React Native and Flutter continue to use their existing core SDK packages for
+model registry, download, lifecycle loading, and C ABI calls. On Apple hosts,
+real MLX execution requires the host Xcode project to link the Swift SPM product
+`RunAnywhereMLX` in addition to the existing CocoaPods package graph. The RN and
+Flutter iOS examples do this with a local SPM package reference to the repository
+root so the Swift MLX runtime and exported C entrypoints are present in the app
+binary.
+
+Registration is still exposed at the framework layer:
+
+```typescript
+import { MLX } from '@runanywhere/mlx';
+
+await MLX.register();
+```
+
+```dart
+import 'package:runanywhere_mlx/runanywhere_mlx.dart';
+
+await MLX.register();
+```
+
+Those calls route through the RN core Nitro bridge or Flutter FFI into the
+Swift runtime C symbol `ra_mlx_register_runtime`, which installs the Swift MLX
+callback table into the C++ MLX backend. Calling only
+`rac_backend_mlx_register()` from JS/Dart is insufficient because the C++ engine
+needs the Swift callbacks before it can execute real MLX models.
+
+The example catalog seeders register MLX models only after `MLX.register()`
+succeeds. Android, Web, or Apple builds that did not link `RunAnywhereMLX` do
+not surface MLX rows, because the C++ MLX plugin without `MLXRuntime` callbacks
+would advertise a backend that cannot execute.
+
+The current RN and Flutter packages in this repo ship iOS CocoaPods targets, not
+macOS host package targets. macOS MLX support is available through the Swift SDK
+and the macOS Swift example/CLI path; adding React Native macOS or Flutter macOS
+host packaging should reuse the same `RunAnywhereMLX` SPM product rather than
+introducing a second MLX runtime.
+
+## Web Feasibility
+
+Official MLX is an Apple-silicon runtime and the Swift runtime depends on Apple
+Metal. There is no official browser, WebAssembly, or WebGPU backend for MLX
+today. The tracked MLX WebGPU backend discussion is a feature request, not a
+supported runtime path.
+
+For Web, keep using the existing Web SDK acceleration paths:
+
+- `@runanywhere/web-llamacpp` WASM/WebGPU for text and vision models where
+  supported.
+- `@runanywhere/web-onnx` / Sherpa WASM for speech paths where supported.
+- A future MLX-like browser experiment should be a separate WebGPU backend
+  (for example `INFERENCE_FRAMEWORK_MLC` / WebLLM style), not an
+  `INFERENCE_FRAMEWORK_MLX` backend that implies official MLX compatibility.
+
+References: `https://github.com/ml-explore/mlx-swift`,
+`https://ml-explore.github.io/mlx/`,
+`https://github.com/ml-explore/mlx/issues/1790`.
+
 ## Default Swift Package Chain
 
 The default MLX package graph is enabled by both the root `Package.swift` and the
@@ -54,8 +115,8 @@ revision pin with a tagged `.upToNextMinor` constraint and refresh all
 ## Update Controls
 
 - Use tagged `.upToNextMinor` constraints for default SPM dependencies.
-- Keep untagged revision pins opt-in only, documented in this file, and absent
-  from the default CI build graph.
+- Keep untagged revision pins documented in this file and gated by MLX-specific
+  Apple CI jobs that use a Swift 6.2+ toolchain.
 - Review every `Package.swift` and `Package.resolved` diff in the same PR as
   the code that consumes the package.
 - Run `swift package resolve` from the repo root and from

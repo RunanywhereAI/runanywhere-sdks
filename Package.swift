@@ -206,7 +206,6 @@ let package = Package(
         .target(
             name: "MLXBackend",
             dependencies: [
-                "CRACommons",
                 "RABackendMLXBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/MLXRuntime/include",
@@ -308,7 +307,6 @@ let package = Package(
         .target(
             name: "MLXRuntime",
             dependencies: [
-                "RunAnywhere",
                 "MLXBackend",
                 "RABackendMLXBinary",
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
