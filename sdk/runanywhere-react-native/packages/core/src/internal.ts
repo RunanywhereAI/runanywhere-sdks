@@ -9,6 +9,12 @@
  */
 
 export {
+  requireNativeModule,
+  isNativeModuleAvailable,
+  type NativeRunAnywhereModule,
+} from './native/NativeRunAnywhereCore';
+
+export {
   getNitroModulesProxySync,
   type NitroProxy,
 } from './native/NitroModulesGlobalInit';

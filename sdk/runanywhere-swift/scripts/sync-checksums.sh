@@ -17,7 +17,7 @@
 #   {name}-v{version}.zip
 # where {name} is one of:
 #   RACommons, RABackendLLAMACPP, RABackendONNX, RABackendSherpa,
-#   onnxruntime-ios, onnxruntime-macos
+#   RABackendMLX
 #
 # and updates the corresponding `checksum: "..."` line in Package.swift.
 # =============================================================================
@@ -54,6 +54,7 @@ declare_mapping() {
     echo "RABackendLlamaCPPBinary|RABackendLLAMACPP-ios"
     echo "RABackendONNXBinary|RABackendONNX-ios"
     echo "RABackendSherpaBinary|RABackendSherpa-ios"
+    echo "RABackendMLXBinary|RABackendMLX-ios"
 }
 
 sha256_of() {

@@ -16,6 +16,8 @@ data class ChatAttachment(
     val kind: ChatAttachmentKind,
     val name: String,
     val detail: String? = null,
+    val localPath: String? = null,
+    val previewText: String? = null,
 )
 
 enum class ChatAttachmentKind { IMAGE, DOCUMENT }

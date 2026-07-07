@@ -14,6 +14,7 @@
 // swiftlint:disable file_length
 
 import CRACommons
+import Darwin
 import Foundation
 import os
 import Security
@@ -135,6 +136,83 @@ private struct PlatformAdapterRegistrationState {
 }
 
 private let platformKeychainService = "com.runanywhere.sdk"
+
+private enum PlatformSecureStore {
+    private static let modeEnv = "RUNANYWHERE_SWIFT_SECURE_STORE"
+    private static let directoryEnv = "RUNANYWHERE_SWIFT_SECURE_STORE_DIR"
+
+    static var usesFileStore: Bool {
+        guard let rawMode = getenv(modeEnv).map({ String(cString: $0).lowercased() }) else {
+            return false
+        }
+        return rawMode == "file" || rawMode == "filesystem"
+    }
+
+    static func get(_ key: String, outValue: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> rac_result_t {
+        do {
+            let url = try url(for: key)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                return RAC_ERROR_FILE_NOT_FOUND
+            }
+            let data = try Data(contentsOf: url)
+            guard let value = String(data: data, encoding: .utf8),
+                  let copy = value.withCString({ rac_strdup($0) }) else {
+                return RAC_ERROR_SECURE_STORAGE_FAILED
+            }
+            outValue.pointee = copy
+            return RAC_SUCCESS
+        } catch {
+            return RAC_ERROR_SECURE_STORAGE_FAILED
+        }
+    }
+
+    static func set(_ key: String, value: String) -> rac_result_t {
+        do {
+            let url = try url(for: key)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try Data(value.utf8).write(to: url, options: [.atomic])
+            return RAC_SUCCESS
+        } catch {
+            return RAC_ERROR_SECURE_STORAGE_FAILED
+        }
+    }
+
+    static func delete(_ key: String) -> rac_result_t {
+        do {
+            let url = try url(for: key)
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+            return RAC_SUCCESS
+        } catch {
+            return RAC_ERROR_SECURE_STORAGE_FAILED
+        }
+    }
+
+    private static func url(for key: String) throws -> URL {
+        let root: URL
+        if let rawDirectory = getenv(directoryEnv).map({ String(cString: $0) }),
+           !rawDirectory.isEmpty {
+            root = URL(fileURLWithPath: (rawDirectory as NSString).expandingTildeInPath, isDirectory: true)
+        } else {
+            root = try FileManager.default.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
+            .appendingPathComponent("RunAnywhere/SecureStore", isDirectory: true)
+        }
+        return root.appendingPathComponent(hexKey(key), isDirectory: false)
+    }
+
+    private static func hexKey(_ key: String) -> String {
+        key.utf8.map { String(format: "%02x", $0) }.joined()
+    }
+}
 
 /// Maps a Foundation file-IO error to the precise `rac_result_t` the commons
 /// file contract expects, instead of collapsing every failure to
@@ -474,6 +552,10 @@ private func platformSecureGetCallback(
     let keyString = String(cString: key)
     outValue.pointee = nil
 
+    if PlatformSecureStore.usesFileStore {
+        return PlatformSecureStore.get(keyString, outValue: outValue)
+    }
+
     // Keychain API requires dictionary with heterogeneous values
     // swiftlint:disable:next avoid_any_type prefer_concrete_types
     let query: [String: Any] = [
@@ -523,6 +605,10 @@ private func platformSecureSetCallback(
         return RAC_ERROR_SECURE_STORAGE_FAILED
     }
 
+    if PlatformSecureStore.usesFileStore {
+        return PlatformSecureStore.set(keyString, value: valueString)
+    }
+
     // Delete existing item first
     // swiftlint:disable:next avoid_any_type prefer_concrete_types
     let deleteQuery: [String: Any] = [
@@ -558,6 +644,10 @@ private func platformSecureDeleteCallback(
     }
 
     let keyString = String(cString: key)
+
+    if PlatformSecureStore.usesFileStore {
+        return PlatformSecureStore.delete(keyString)
+    }
 
     // Keychain API requires dictionary with heterogeneous values
     // swiftlint:disable:next avoid_any_type prefer_concrete_types

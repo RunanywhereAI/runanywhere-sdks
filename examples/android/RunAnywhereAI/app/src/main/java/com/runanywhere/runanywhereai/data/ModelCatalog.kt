@@ -146,6 +146,15 @@ internal object ModelCatalog {
             supportsThinking = true
         ),
         SingleFileModel(
+            "qwen3.5-0.8b-q4_k_m",
+            "Qwen3.5 0.8B Q4_K_M",
+            "https://huggingface.co/bartowski/Qwen_Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
+            LLAMA,
+            LANGUAGE,
+            620_000_000,
+            supportsThinking = true
+        ),
+        SingleFileModel(
             "qwen3-1.7b-q4_k_m",
             "Qwen3 1.7B Q4_K_M",
             "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf",
@@ -180,6 +189,14 @@ internal object ModelCatalog {
             400_000_000
         ),
         SingleFileModel(
+            "lfm2.5-1.2b-instruct-q4_k_m",
+            "LiquidAI LFM2.5 1.2B Instruct Q4_K_M",
+            "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
+            LLAMA,
+            LANGUAGE,
+            900_000_000
+        ),
+        SingleFileModel(
             "lfm2-1.2b-tool-q4_k_m",
             "LiquidAI LFM2 1.2B Tool Q4_K_M",
             "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf",
@@ -198,6 +215,32 @@ internal object ModelCatalog {
     )
 
     private val vlm = listOf(
+        MultiFileModel(
+            "smolvlm2-256m-video-instruct-q8_0", "SmolVLM2 256M Video Instruct Q8_0", LLAMA, MULTIMODAL, 450_000_000,
+            files = listOf(
+                ModelFile(
+                    "https://huggingface.co/ggml-org/SmolVLM2-256M-Video-Instruct-GGUF/resolve/main/SmolVLM2-256M-Video-Instruct-Q8_0.gguf",
+                    "SmolVLM2-256M-Video-Instruct-Q8_0.gguf"
+                ),
+                ModelFile(
+                    "https://huggingface.co/ggml-org/SmolVLM2-256M-Video-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf",
+                    "mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf"
+                ),
+            ),
+        ),
+        MultiFileModel(
+            "smolvlm2-500m-video-instruct-q8_0", "SmolVLM2 500M Video Instruct Q8_0", LLAMA, MULTIMODAL, 800_000_000,
+            files = listOf(
+                ModelFile(
+                    "https://huggingface.co/ggml-org/SmolVLM2-500M-Video-Instruct-GGUF/resolve/main/SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+                    "SmolVLM2-500M-Video-Instruct-Q8_0.gguf"
+                ),
+                ModelFile(
+                    "https://huggingface.co/ggml-org/SmolVLM2-500M-Video-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+                    "mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf"
+                ),
+            ),
+        ),
         MultiFileModel(
             "lfm2-vl-450m-q8_0", "LFM2-VL 450M", LLAMA, MULTIMODAL, 600_000_000,
             files = listOf(
@@ -225,15 +268,41 @@ internal object ModelCatalog {
             ),
         ),
         MultiFileModel(
-            "qwen3.5-0.8b-q4_k_m", "Qwen 3.5 0.8B", LLAMA, MULTIMODAL, 786_962_240,
+            "qwen2.5-vl-3b-instruct-q4_k_m", "Qwen2.5-VL 3B Instruct Q4_K_M", LLAMA, MULTIMODAL, 2_800_000_000,
             files = listOf(
                 ModelFile(
-                    "https://huggingface.co/bartowski/Qwen_Qwen3.5-0.8B-GGUF/resolve/main/Qwen_Qwen3.5-0.8B-Q4_K_M.gguf",
-                    "Qwen_Qwen3.5-0.8B-Q4_K_M.gguf"
+                    "https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf",
+                    "Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf"
                 ),
                 ModelFile(
-                    "https://huggingface.co/bartowski/Qwen_Qwen3.5-0.8B-GGUF/resolve/main/mmproj-Qwen_Qwen3.5-0.8B-bf16.gguf",
-                    "mmproj-Qwen_Qwen3.5-0.8B-bf16.gguf"
+                    "https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf",
+                    "mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf"
+                ),
+            ),
+        ),
+        MultiFileModel(
+            "gemma-4-e2b-it-q8_0", "Gemma 4 E2B IT Q8_0 (Experimental)", LLAMA, MULTIMODAL, 3_000_000_000,
+            files = listOf(
+                ModelFile(
+                    "https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q8_0.gguf",
+                    "gemma-4-E2B-it-Q8_0.gguf"
+                ),
+                ModelFile(
+                    "https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main/mmproj-gemma-4-E2B-it-Q8_0.gguf",
+                    "mmproj-gemma-4-E2B-it-Q8_0.gguf"
+                ),
+            ),
+        ),
+        MultiFileModel(
+            "gemma-4-e4b-it-q4_k_m", "Gemma 4 E4B IT Q4_K_M (Experimental)", LLAMA, MULTIMODAL, 5_500_000_000,
+            files = listOf(
+                ModelFile(
+                    "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf",
+                    "gemma-4-E4B-it-Q4_K_M.gguf"
+                ),
+                ModelFile(
+                    "https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/mmproj-gemma-4-E4B-it-Q8_0.gguf",
+                    "mmproj-gemma-4-E4B-it-Q8_0.gguf"
                 ),
             ),
         ),

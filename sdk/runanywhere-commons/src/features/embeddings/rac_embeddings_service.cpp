@@ -92,7 +92,8 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
          .select_ops = embedding_ops,
          .model_create_id = model_ref.path.c_str(),
          .model_id_for_service = model_id,
-         .config_json = config_json},
+         .config_json = config_json,
+         .framework = model_ref.framework},
         &service);
     if (result != RAC_SUCCESS) {
         EMBED_LOGE("Plugin create failed: result=%d", result);

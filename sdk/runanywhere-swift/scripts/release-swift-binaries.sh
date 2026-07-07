@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # release-swift-binaries.sh — builds + zips + checksums all Swift binary
-# target xcframeworks (RACommons / RABackendLLAMACPP / RABackendONNX) for
-# iOS (device + simulator) and patches Package.swift checksums to match.
+# target xcframeworks (RACommons / RABackendLLAMACPP / RABackendONNX /
+# RABackendSherpa / RABackendMLX) for iOS (device + simulator) and patches
+# Package.swift checksums to match.
 #
 # Pre-requisites (manual, one-time on the release machine):
 #   1. Xcode 15+ with iOS SDK installed.
@@ -29,6 +30,7 @@
 #   release-artifacts/native-ios-macos/RACommons-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RABackendLLAMACPP-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RABackendONNX-ios-v${VERSION}.zip    (if ONNX enabled)
+#   release-artifacts/native-ios-macos/RABackendMLX-ios-v${VERSION}.zip     (if MLX enabled)
 #
 # Why this isn't fully automated (no `gh release upload` here):
 #   - Publishing requires `gh auth` on a release machine with the proper
@@ -47,7 +49,8 @@ DEST="${REPO_ROOT}/release-artifacts/native-ios-macos"
 
 DRY_RUN="${DRY_RUN:-0}"
 RAC_BACKEND_ONNX="${RAC_BACKEND_ONNX:-ON}"
-export DRY_RUN RAC_BACKEND_ONNX
+RAC_BACKEND_MLX="${RAC_BACKEND_MLX:-ON}"
+export DRY_RUN RAC_BACKEND_ONNX RAC_BACKEND_MLX
 
 if [ "$(uname -s)" != "Darwin" ]; then
     echo "error: $0 only runs on macOS" >&2
@@ -87,7 +90,7 @@ mkdir -p "${DEST}"
 # ────────────────────────────────────────────────────────────────────────────
 # 1. Build all three xcframeworks (RACommons + per-backend).
 # ────────────────────────────────────────────────────────────────────────────
-echo "▶ [1/3] Building iOS xcframeworks (DRY_RUN=${DRY_RUN}, RAC_BACKEND_ONNX=${RAC_BACKEND_ONNX})"
+echo "▶ [1/3] Building iOS xcframeworks (DRY_RUN=${DRY_RUN}, RAC_BACKEND_ONNX=${RAC_BACKEND_ONNX}, RAC_BACKEND_MLX=${RAC_BACKEND_MLX})"
 "${REPO_ROOT}/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -142,6 +145,11 @@ if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     zip_target "RABackendSherpa.xcframework" "RABackendSherpa-ios"
 else
     echo "  ▶ Skipping RABackendONNX zip (RAC_BACKEND_ONNX=OFF)"
+fi
+if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
+    zip_target "RABackendMLX.xcframework" "RABackendMLX-ios"
+else
+    echo "  ▶ Skipping RABackendMLX zip (RAC_BACKEND_MLX=OFF)"
 fi
 
 # ────────────────────────────────────────────────────────────────────────────

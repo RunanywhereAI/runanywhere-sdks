@@ -148,10 +148,6 @@ extension InferenceFrameworkDisplay on LLMFramework {
         return 'System';
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
         return 'QHexRT';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
-        return 'Genie';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
-        return 'MetalRT';
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_COREML:
         return 'Core ML';
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_MLX:
@@ -195,12 +191,9 @@ extension InferenceFrameworkDisplay on LLMFramework {
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:
         return Icons.volume_up;
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_COREML:
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_MLX:
         return Icons.memory;
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
-        return Icons.bolt;
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
         return Icons.graphic_eq;
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_TFLITE:
@@ -222,7 +215,6 @@ extension InferenceFrameworkDisplay on LLMFramework {
   Color get backendColor {
     switch (this) {
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
         return AppColors.primaryBlue;
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_COREML:
@@ -234,11 +226,10 @@ extension InferenceFrameworkDisplay on LLMFramework {
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
         return AppColors.primaryOrange;
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN:
         return AppColors.primaryGreen;
       case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return Colors.black;
+        return AppColors.statusGray;
       default:
         return AppColors.statusGray;
     }

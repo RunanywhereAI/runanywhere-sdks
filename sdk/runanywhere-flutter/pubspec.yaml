@@ -7,6 +7,7 @@ environment:
 workspace:
   - packages/runanywhere
   - packages/runanywhere_llamacpp
+  - packages/runanywhere_mlx
   - packages/runanywhere_onnx
   - packages/runanywhere_qhexrt
 

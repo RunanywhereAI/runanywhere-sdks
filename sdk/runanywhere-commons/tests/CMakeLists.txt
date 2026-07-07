@@ -144,6 +144,28 @@ rac_link_archive_deps(test_device_identity)
 target_compile_features(test_device_identity PRIVATE cxx_std_17)
 add_test(NAME device_identity_tests COMMAND test_device_identity --run-all)
 
+# --- Model path layout tests ----------------------------------------
+add_executable(test_model_paths test_model_paths.cpp)
+target_include_directories(test_model_paths PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_paths PRIVATE rac_commons)
+rac_link_archive_deps(test_model_paths)
+target_compile_features(test_model_paths PRIVATE cxx_std_17)
+add_test(NAME model_paths_tests COMMAND test_model_paths)
+
+# --- VLM default generation options ---------------------------------
+add_executable(test_vlm_options_defaults test_vlm_options_defaults.cpp)
+target_include_directories(test_vlm_options_defaults PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_vlm_options_defaults PRIVATE rac_commons)
+rac_link_archive_deps(test_vlm_options_defaults)
+target_compile_features(test_vlm_options_defaults PRIVATE cxx_std_17)
+add_test(NAME vlm_options_defaults_tests COMMAND test_vlm_options_defaults)
+
 # --- MemoryPool<T> tests ------------------------------
 # Header-only template; verifies acquire/release, blocking, cancel, and a
 # concurrent stress test.

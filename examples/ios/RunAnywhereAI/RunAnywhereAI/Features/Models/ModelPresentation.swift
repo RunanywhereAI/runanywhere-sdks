@@ -69,7 +69,7 @@ extension InferenceFramework {
     var consumerBackendLabel: String {
         switch self {
         case .llamaCpp:
-            return "Local Llama"
+            return "Llama CPP"
         case .onnx:
             return "ONNX Voice"
         case .foundationModels:
@@ -82,10 +82,6 @@ extension InferenceFramework {
             return "Core ML"
         case .mlx:
             return "MLX"
-        case .metalrt:
-            return "Apple Metal"
-        case .genie:
-            return "Qualcomm Genie"
         case .sherpa:
             return "Sherpa Voice"
         case .qhexrt:
@@ -131,10 +127,6 @@ extension InferenceFramework {
             return "Core ML"
         case .mlx:
             return "MLX"
-        case .metalrt:
-            return "Metal"
-        case .genie:
-            return "Genie"
         case .sherpa:
             return "Sherpa"
         case .qhexrt:
@@ -180,10 +172,6 @@ extension InferenceFramework {
             return "Apple-optimized model runtime"
         case .mlx:
             return "Apple Silicon local models"
-        case .metalrt:
-            return "Apple GPU acceleration"
-        case .genie:
-            return "Qualcomm accelerated runtime"
         case .sherpa:
             return "Private speech models"
         case .qhexrt:
@@ -229,10 +217,6 @@ extension InferenceFramework {
             return AppColors.primaryOrange
         case .mlx:
             return AppColors.primaryPurple
-        case .metalrt:
-            return AppColors.primaryBlue
-        case .genie:
-            return AppColors.statusGreen
         case .sherpa:
             return AppColors.primaryPurple
         case .qhexrt:
@@ -270,10 +254,6 @@ extension InferenceFramework {
             return "cpu"
         case .mlx:
             return "memorychip"
-        case .metalrt:
-            return "bolt.fill"
-        case .genie:
-            return "sparkles"
         case .sherpa:
             return "waveform.badge.mic"
         case .qhexrt:
@@ -441,6 +421,32 @@ extension RAModelInfo {
         }
 
         return badges
+    }
+
+    var quantizationLabel: String {
+        let haystack = [
+            id,
+            name,
+            downloadURL
+        ]
+        .joined(separator: " ")
+        .lowercased()
+
+        let knownLabels = [
+            ("q4_k_m", "Q4_K_M"),
+            ("q4_k_s", "Q4_K_S"),
+            ("q5_k_m", "Q5_K_M"),
+            ("q6_k", "Q6_K"),
+            ("q8_0", "Q8_0"),
+            ("4bit", "4bit"),
+            ("5bit", "5bit"),
+            ("8bit", "8bit"),
+            ("f16", "F16"),
+            ("fp16", "FP16"),
+            ("dwq", "DWQ")
+        ]
+
+        return knownLabels.first { haystack.contains($0.0) }?.1 ?? "Default"
     }
 }
 

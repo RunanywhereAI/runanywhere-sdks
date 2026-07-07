@@ -2098,6 +2098,19 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@runanywhere/mlx@workspace:packages/mlx":
+  version: 0.0.0-use.local
+  resolution: "@runanywhere/mlx@workspace:packages/mlx"
+  dependencies:
+    typescript: ^5.9.3
+  peerDependencies:
+    "@runanywhere/core": ">=0.19.13"
+    react: ">=19.0.0"
+    react-native: ">=0.83.1"
+    react-native-nitro-modules: ^0.33.9
+  languageName: unknown
+  linkType: soft
+
 "@runanywhere/onnx@workspace:packages/onnx":
   version: 0.0.0-use.local
   resolution: "@runanywhere/onnx@workspace:packages/onnx"

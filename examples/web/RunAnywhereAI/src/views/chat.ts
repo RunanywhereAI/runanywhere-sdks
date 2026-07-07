@@ -24,16 +24,9 @@ import {
   ModelCategory,
   RunAnywhere,
   ToolParameterType,
-  VLMModelFamily,
-  VLMStreamEventKind,
   isSDKException,
-  ragQueryOptionsWithQuestion,
   type ToolDefinition,
   type ToolValue,
-  type ModelInfo,
-  type RAGSearchResult,
-  type VLMGenerationOptions,
-  vlmImageFromRawRGB,
 } from '@runanywhere/web';
 import {
   buildGetStartedOverlay,
@@ -43,6 +36,13 @@ import {
 } from '../components/model-selection';
 import { showToast } from '../components/dialogs';
 import { getGenerationSettings } from './settings';
+import {
+  answerDocumentAttachment,
+  answerImageAttachment,
+  canAnswerImageAttachment,
+  cancelActiveImageAttachmentAnswer,
+  validateChatAttachmentFile,
+} from '../services/chat-attachments';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
@@ -97,9 +97,6 @@ const VLM_SHEET_OPTIONS: OpenSheetOptions = {
     ModelCategory.MODEL_CATEGORY_VISION,
   ],
 };
-
-const CAPTURE_DIMENSION = 384;
-const DOCUMENT_TOP_K = 3;
 
 // Minimal localStorage-backed conversation persistence — mirrors iOS
 // ConversationStore (Core/Services/ConversationStore.swift) semantics at MVP
@@ -189,6 +186,8 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   const imageInput = container.querySelector('#chat-image-input') as HTMLInputElement;
   const documentInput = container.querySelector('#chat-document-input') as HTMLInputElement;
   const talkBtn = container.querySelector('#chat-talk-btn') as HTMLButtonElement;
+  const listenerScope = new AbortController();
+  const listenerOptions: AddEventListenerOptions = { signal: listenerScope.signal };
 
   const refreshToolsButton = () => {
     toolsBtn.classList.toggle('active', toolsEnabled);
@@ -222,7 +221,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         pendingAttachment = null;
         refreshAttachmentPill();
         refreshSendButton();
-      });
+      }, listenerOptions);
   };
   refreshToolsButton();
   refreshAttachmentPill();
@@ -249,29 +248,29 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     sendBtn.setAttribute('aria-label', isGenerating ? 'Stop generation' : 'Send message');
   };
 
-  inputEl.addEventListener('input', refreshSendButton);
+  inputEl.addEventListener('input', refreshSendButton, listenerOptions);
   inputEl.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       void onSend();
     }
-  });
+  }, listenerOptions);
   sendBtn.addEventListener('click', () => {
     if (isGenerating) {
       cancelGeneration?.();
       return;
     }
     void onSend();
-  });
+  }, listenerOptions);
   toolsBtn.addEventListener('click', () => {
     toolsEnabled = !toolsEnabled;
     saveToolsEnabled(toolsEnabled);
     refreshToolsButton();
-  });
+  }, listenerOptions);
   attachBtn.addEventListener('click', (event) => {
     event.stopPropagation();
     attachMenu.classList.toggle('hidden');
-  });
+  }, listenerOptions);
   attachMenu.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) => {
     button.addEventListener('click', () => {
       attachMenu.classList.add('hidden');
@@ -280,13 +279,19 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       if (action === 'image') imageInput.click();
       if (action === 'live') navigateTo('vision');
       if (action === 'advanced') navigateTo('advanced');
-    });
+    }, listenerOptions);
   });
-  document.addEventListener('click', () => attachMenu.classList.add('hidden'));
+  const closeAttachMenu = () => attachMenu.classList.add('hidden');
+  document.addEventListener('click', closeAttachMenu, listenerOptions);
   imageInput.addEventListener('change', () => {
     const file = imageInput.files?.[0] ?? null;
     imageInput.value = '';
     if (!file) return;
+    const error = validateChatAttachmentFile('image', file);
+    if (error) {
+      showToast(error, 'warning', 4200);
+      return;
+    }
     pendingAttachment = {
       kind: 'image',
       file,
@@ -295,11 +300,16 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     };
     refreshAttachmentPill();
     refreshSendButton();
-  });
+  }, listenerOptions);
   documentInput.addEventListener('change', () => {
     const file = documentInput.files?.[0] ?? null;
     documentInput.value = '';
     if (!file) return;
+    const error = validateChatAttachmentFile('document', file);
+    if (error) {
+      showToast(error, 'warning', 4200);
+      return;
+    }
     pendingAttachment = {
       kind: 'document',
       file,
@@ -308,9 +318,9 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     };
     refreshAttachmentPill();
     refreshSendButton();
-  });
-  talkBtn.addEventListener('click', () => navigateTo('voice'));
-  window.addEventListener('runanywhere:new-chat', () => {
+  }, listenerOptions);
+  talkBtn.addEventListener('click', () => navigateTo('voice'), listenerOptions);
+  const resetChat = () => {
     if (cancelGeneration) cancelGeneration();
     messages = [];
     pendingAttachment = null;
@@ -318,7 +328,8 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     renderMessages(messagesEl);
     refreshAttachmentPill();
     refreshSendButton();
-  });
+  };
+  window.addEventListener('runanywhere:new-chat', resetChat, listenerOptions);
 
   renderMessages(messagesEl);
 
@@ -385,7 +396,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     prompt: string,
     host: HTMLElement,
   ): Promise<void> {
-    if (attachment.kind === 'image' && !isVLMModelLoaded()) {
+    if (attachment.kind === 'image' && !canAnswerImageAttachment()) {
       openSheet(VLM_SHEET_OPTIONS);
       showToast('Load an image model first, then send the attached image.', 'info', 4200);
       return;
@@ -417,11 +428,24 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     isGenerating = true;
     refreshSendButton();
     try {
+      const settings = getGenerationSettings();
+      const onProgress = ({ content }: { content: string }) => {
+        assistantMsg.content = content;
+        renderLastMessage(host, assistantMsg);
+      };
       if (attachment.kind === 'image') {
-        await generateImageQuestion(attachment.file, question, assistantMsg, host);
+        cancelGeneration = cancelActiveImageAttachmentAnswer;
+        const answer = await answerImageAttachment(attachment.file, question, settings, onProgress);
+        assistantMsg.content = answer.content;
+        assistantMsg.thinking = answer.thinking;
+        assistantMsg.sources = answer.sources;
       } else {
-        await generateDocumentQuestion(attachment.file, question, assistantMsg, host);
+        const answer = await answerDocumentAttachment(attachment.file, question, settings, onProgress);
+        assistantMsg.content = answer.content;
+        assistantMsg.thinking = answer.thinking;
+        assistantMsg.sources = answer.sources;
       }
+      renderLastMessage(host, assistantMsg);
     } catch (error) {
       assistantMsg.content = formatChatError(error);
       renderLastMessage(host, assistantMsg);
@@ -439,6 +463,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   const disposeObserver = new MutationObserver(() => {
     if (!container.isConnected) {
       disposeObserver.disconnect();
+      listenerScope.abort();
       unsubscribeState();
     }
   });
@@ -551,121 +576,6 @@ async function generateWithToolCalling(
     });
   }
   renderLastMessage(messagesEl, assistantMsg);
-}
-
-async function generateImageQuestion(
-  file: File,
-  prompt: string,
-  assistantMsg: ChatMessage,
-  messagesEl: HTMLElement,
-): Promise<void> {
-  assistantMsg.content = 'Reading image...';
-  renderLastMessage(messagesEl, assistantMsg);
-
-  const frame = await decodeImageToRgbFrame(file, CAPTURE_DIMENSION);
-  const image = vlmImageFromRawRGB(frame.rgbPixels, frame.width, frame.height);
-  const options: VLMGenerationOptions = {
-    prompt,
-    maxTokens: 256,
-    temperature: getGenerationSettings().temperature,
-    topP: 0.9,
-    topK: 40,
-    stopSequences: [],
-    streamingEnabled: true,
-    systemPrompt: undefined,
-    maxImageSize: CAPTURE_DIMENSION,
-    nThreads: 0,
-    useGpu: false,
-    modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED,
-    customChatTemplate: undefined,
-    imageMarkerOverride: undefined,
-    seed: 0,
-    repetitionPenalty: 1.1,
-    minP: 0.05,
-    emitImageEmbeddings: false,
-  };
-
-  cancelGeneration = () => {
-    void RunAnywhere.visionLanguage.cancelVLMGeneration();
-  };
-
-  assistantMsg.content = '';
-  renderLastMessage(messagesEl, assistantMsg);
-  const stream = await RunAnywhere.visionLanguage.processImageStream(image, options);
-  for await (const event of stream) {
-    switch (event.kind) {
-      case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN:
-        if (event.token) {
-          assistantMsg.content += event.token;
-          renderLastMessage(messagesEl, assistantMsg);
-        }
-        break;
-      case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR:
-        throw new Error(event.errorMessage || 'Image analysis failed');
-      default:
-        break;
-    }
-  }
-  if (!assistantMsg.content) assistantMsg.content = '(empty response)';
-  renderLastMessage(messagesEl, assistantMsg);
-}
-
-async function generateDocumentQuestion(
-  file: File,
-  question: string,
-  assistantMsg: ChatMessage,
-  messagesEl: HTMLElement,
-): Promise<void> {
-  const models = resolveRAGModels();
-  if (!models.embedding || !models.llm) {
-    throw new Error('Document Q&A needs an embedding model and a chat model in the catalog.');
-  }
-
-  assistantMsg.content = 'Indexing document...';
-  renderLastMessage(messagesEl, assistantMsg);
-
-  const text = await file.text();
-  if (!text.trim()) {
-    throw new Error('The selected document does not contain readable text.');
-  }
-
-  await RunAnywhere.ragCreatePipeline(models.embedding.id, models.llm.id);
-  await RunAnywhere.ragIngest(text, JSON.stringify({
-    docId: createDocumentId(),
-    docName: file.name || 'Document',
-    sourceUri: `web-file:${file.name || 'document'}`,
-    mediaType: file.type || 'text/plain',
-    sizeBytes: String(file.size),
-  }));
-
-  assistantMsg.content = 'Searching document...';
-  renderLastMessage(messagesEl, assistantMsg);
-
-  const settings = getGenerationSettings();
-  const result = await RunAnywhere.ragQuery({
-    ...ragQueryOptionsWithQuestion(question),
-    retrievalTopK: DOCUMENT_TOP_K,
-    maxTokens: Math.min(settings.maxTokens, 1024),
-    temperature: settings.temperature,
-    disableThinking: models.llm.supportsThinking && !settings.thinkingModeEnabled,
-  });
-
-  if (result.errorCode !== 0) {
-    throw new Error(result.errorMessage || 'Document query failed');
-  }
-
-  const split = splitThinking(result.answer);
-  assistantMsg.content = split.content || result.answer || '(no answer)';
-  assistantMsg.thinking = result.thinkingContent || split.thinking || undefined;
-  assistantMsg.sources = result.retrievedChunks.map(sourceFromRAGResult);
-  renderLastMessage(messagesEl, assistantMsg);
-}
-
-function sourceFromRAGResult(result: RAGSearchResult): ChatSourceInfo {
-  return {
-    document: result.sourceDocument || 'Document',
-    text: result.text,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1004,101 +914,6 @@ function isLLMBackendAvailable(): boolean {
   } catch {
     return false;
   }
-}
-
-function isVLMModelLoaded(): boolean {
-  try {
-    const categories = [
-      ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-      ModelCategory.MODEL_CATEGORY_VISION,
-    ];
-    return categories.some((category) => {
-      const current = RunAnywhere.currentModel({
-        category,
-        includeModelMetadata: false,
-      });
-      return Boolean(current?.found || current?.modelId);
-    });
-  } catch {
-    return false;
-  }
-}
-
-function resolveRAGModels(): { embedding: ModelInfo | null; llm: ModelInfo | null } {
-  const embedding = firstModelForCategory(ModelCategory.MODEL_CATEGORY_EMBEDDING);
-  const currentLlmId = currentModelIdForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
-  const llm = currentLlmId
-    ? (RunAnywhere.getModel(currentLlmId) ?? null)
-    : firstModelForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
-  return { embedding, llm };
-}
-
-function firstModelForCategory(category: ModelCategory): ModelInfo | null {
-  try {
-    return RunAnywhere.listModels()?.models.find((model) => model.category === category) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function currentModelIdForCategory(category: ModelCategory): string | null {
-  try {
-    const current = RunAnywhere.currentModel({
-      category,
-      includeModelMetadata: false,
-    });
-    return current?.modelId || null;
-  } catch {
-    return null;
-  }
-}
-
-async function decodeImageToRgbFrame(
-  file: File,
-  maxDim: number,
-): Promise<{ rgbPixels: Uint8Array; width: number; height: number }> {
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    const img = await loadImageElement(objectUrl);
-    const longest = Math.max(img.naturalWidth, img.naturalHeight) || 1;
-    const scale = Math.min(1, maxDim / longest);
-    const width = Math.max(1, Math.round(img.naturalWidth * scale));
-    const height = Math.max(1, Math.round(img.naturalHeight * scale));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) throw new Error('2D canvas context unavailable');
-    ctx.drawImage(img, 0, 0, width, height);
-
-    const { data } = ctx.getImageData(0, 0, width, height);
-    const rgbPixels = new Uint8Array(width * height * 3);
-    for (let src = 0, dst = 0; src < data.length; src += 4, dst += 3) {
-      rgbPixels[dst] = data[src];
-      rgbPixels[dst + 1] = data[src + 1];
-      rgbPixels[dst + 2] = data[src + 2];
-    }
-    return { rgbPixels, width, height };
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
-function loadImageElement(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Could not decode the selected image'));
-    img.src = src;
-  });
-}
-
-function createDocumentId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).slice(2);
 }
 
 function navigateTo(tab: string): void {

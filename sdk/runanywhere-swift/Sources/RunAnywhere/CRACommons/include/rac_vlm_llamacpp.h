@@ -191,12 +191,12 @@ RAC_LLAMACPP_VLM_API void rac_vlm_llamacpp_destroy(rac_handle_t handle);
 // BACKEND REGISTRATION
 // =============================================================================
 
-/**
-/* Note: VLM is registered as part of the unified llama.cpp plugin via
- * rac_backend_llamacpp_register() (declared in rac_llm_llamacpp.h). There
- * is no longer a separate VLM register function -- llama.cpp is one engine
- * that publishes a single plugin vtable with both llm_ops and vlm_ops slots
- * filled. */
+//
+// VLM is registered as part of the unified llama.cpp plugin via
+// rac_backend_llamacpp_register() (declared in rac_llm_llamacpp.h). There
+// is no longer a separate VLM register function -- llama.cpp is one engine
+// that publishes a single plugin vtable with both llm_ops and vlm_ops slots
+// filled.
 
 #ifdef __cplusplus
 }

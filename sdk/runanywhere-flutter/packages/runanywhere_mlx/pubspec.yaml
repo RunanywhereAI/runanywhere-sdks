@@ -1,0 +1,29 @@
+name: runanywhere_mlx
+description: MLX backend registration for RunAnywhere Flutter SDK on Apple platforms.
+version: 0.19.13
+homepage: https://runanywhere.ai
+repository: https://github.com/RunanywhereAI/runanywhere-sdks
+issue_tracker: https://github.com/RunanywhereAI/runanywhere-sdks/issues
+topics:
+  - ai
+  - mlx
+  - apple
+  - metal
+  - on-device
+
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  runanywhere: ^0.19.13
+  ffi: '>=2.2.0 <3.0.0'
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: any

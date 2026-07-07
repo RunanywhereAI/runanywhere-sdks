@@ -104,7 +104,6 @@ export const getFrameworkSystemIcon = (
     case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
       return 'sparkles';
     case InferenceFramework.INFERENCE_FRAMEWORK_COREML:
-    case InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
     case InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
       return 'cpu';
     case InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
@@ -112,7 +111,6 @@ export const getFrameworkSystemIcon = (
     case InferenceFramework.INFERENCE_FRAMEWORK_MLC:
       return 'solutions';
     case InferenceFramework.INFERENCE_FRAMEWORK_MLX:
-    case InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
       return 'bolt';
     default:
       return 'tool';

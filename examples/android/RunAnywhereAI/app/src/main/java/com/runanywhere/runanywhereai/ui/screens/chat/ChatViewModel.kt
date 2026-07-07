@@ -164,12 +164,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         activeGenerationMetrics = null
 
         job = viewModelScope.launch {
-            var file: File? = null
             var replyIndex: Int? = null
             try {
                 val name = withContext(Dispatchers.IO) {
                     runCatching { displayName(uri) }.getOrNull()
                 } ?: "Selected image"
+                val file = withContext(Dispatchers.IO) {
+                    copyUriToAttachmentFile(uri, "chat_image_", imageCacheSuffix(uri))
+                }
                 messages += ChatMessage(
                     text = prompt,
                     isUser = true,
@@ -177,11 +179,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         kind = ChatAttachmentKind.IMAGE,
                         name = name,
                         detail = loadedModelName?.let { "Image model: $it" },
+                        localPath = file.absolutePath,
                     ),
                 )
-                replyIndex = messages.size
+                val imageReplyIndex = messages.size
+                replyIndex = imageReplyIndex
                 messages += ChatMessage("", isUser = false)
-                file = withContext(Dispatchers.IO) { copyUriToCache(uri, "chat_image_", imageCacheSuffix(uri)) }
                 val image = RAVLMImage(
                     file_path = file.absolutePath,
                     format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
@@ -193,27 +196,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN -> {
                             if (event.token.isNotEmpty()) {
                                 accumulated += event.token
-                                replyIndex?.let { index ->
-                                    messages[index] = messages[index].copy(text = accumulated)
-                                }
+                                messages[imageReplyIndex] = messages[imageReplyIndex].copy(text = accumulated)
                             }
                         }
                         VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED -> {
                             val result = event.result ?: return@collect
                             val text = result.text.ifBlank { accumulated }
-                            replyIndex?.let { index ->
-                                messages[index] = messages[index].copy(
-                                    text = text.ifBlank { "I could not read that image." },
-                                    stats = GenerationStats(
-                                        tokens = result.completion_tokens,
-                                        tokensPerSecond = result.tokens_per_second.toDouble(),
-                                        timeToFirstTokenMs = result.time_to_first_token_ms.takeIf { it > 0 },
-                                        totalTimeMs = result.processing_time_ms,
-                                        modelName = loadedModelName,
-                                        mode = GenerationMode.STREAMING,
-                                    ),
-                                )
-                            }
+                            messages[imageReplyIndex] = messages[imageReplyIndex].copy(
+                                text = text.ifBlank { "I could not read that image." },
+                                stats = GenerationStats(
+                                    tokens = result.completion_tokens,
+                                    tokensPerSecond = result.tokens_per_second.toDouble(),
+                                    timeToFirstTokenMs = result.time_to_first_token_ms.takeIf { it > 0 },
+                                    totalTimeMs = result.processing_time_ms,
+                                    modelName = loadedModelName,
+                                    mode = GenerationMode.STREAMING,
+                                ),
+                            )
                         }
                         else -> Unit
                     }
@@ -229,7 +228,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     messages += ChatMessage("Error: ${e.message}", isUser = false)
                 }
             } finally {
-                file?.delete()
                 isGenerating = false
                 persist()
             }
@@ -251,6 +249,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     runCatching { displayName(uri) }.getOrNull()
                 } ?: "Selected document"
                 val answerModelName = answerModel?.name
+                val doc = withContext(Dispatchers.IO) { DocumentExtractor.extract(getApplication(), uri) }
+                val file = withContext(Dispatchers.IO) {
+                    writeAttachmentTextFile(name, doc.text)
+                }
                 messages += ChatMessage(
                     text = prompt,
                     isUser = true,
@@ -258,13 +260,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         kind = ChatAttachmentKind.DOCUMENT,
                         name = name,
                         detail = answerModelName?.let { "Answer model: $it" },
+                        localPath = file.absolutePath,
+                        previewText = doc.text.take(4_000),
                     ),
                 )
-                replyIndex = messages.size
+                val documentReplyIndex = messages.size
+                replyIndex = documentReplyIndex
                 messages += ChatMessage("", isUser = false)
                 val embedding = embeddingModel ?: error("Choose or download a document index model first.")
                 val answer = answerModel ?: error("Choose or download a document answer model first.")
-                val doc = withContext(Dispatchers.IO) { DocumentExtractor.extract(getApplication(), uri) }
                 ensureRagPipeline(embedding, answer)
                 RunAnywhere.ragIngest(doc.text, doc.metadataJSON)
                 runCatching { RunAnywhere.ragGetStatistics() }
@@ -276,20 +280,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         document = it.source_document.orEmpty(),
                     )
                 }
-                replyIndex?.let { index ->
-                    messages[index] = messages[index].copy(
-                        text = result.answer.ifBlank { "I could not find an answer in that document." },
-                        sources = sources,
-                        stats = GenerationStats(
-                            tokens = 0,
-                            tokensPerSecond = 0.0,
-                            timeToFirstTokenMs = null,
-                            totalTimeMs = result.total_time_ms,
-                            modelName = answer.name,
-                            mode = GenerationMode.NON_STREAMING,
-                        ),
-                    )
-                }
+                messages[documentReplyIndex] = messages[documentReplyIndex].copy(
+                    text = result.answer.ifBlank { "I could not find an answer in that document." },
+                    sources = sources,
+                    stats = GenerationStats(
+                        tokens = 0,
+                        tokensPerSecond = 0.0,
+                        timeToFirstTokenMs = null,
+                        totalTimeMs = result.total_time_ms,
+                        modelName = answer.name,
+                        mode = GenerationMode.NON_STREAMING,
+                    ),
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -573,6 +575,8 @@ private fun ChatMessage.toStored() = StoredMessage(
             },
             name = it.name,
             detail = it.detail,
+            localPath = it.localPath,
+            previewText = it.previewText,
         )
     },
     sources = sources.map { StoredSource(it.text, it.score, it.document) },
@@ -603,6 +607,8 @@ private fun StoredMessage.toUi() = ChatMessage(
             },
             name = it.name,
             detail = it.detail,
+            localPath = it.localPath,
+            previewText = it.previewText,
         )
     },
     sources = sources.map { ChatSource(it.text, it.score, it.document) },
@@ -629,9 +635,9 @@ private fun ChatViewModel.displayName(uri: Uri): String? =
             if (cursor.moveToFirst() && index >= 0) cursor.getString(index)?.takeIf { it.isNotBlank() } else null
         }
 
-private fun ChatViewModel.copyUriToCache(uri: Uri, prefix: String, suffix: String): File {
+private fun ChatViewModel.copyUriToAttachmentFile(uri: Uri, prefix: String, suffix: String): File {
     val app = getApplication<Application>()
-    val file = File.createTempFile(prefix, suffix, app.cacheDir)
+    val file = File.createTempFile(prefix, suffix, attachmentDirectory())
     try {
         val input = app.contentResolver.openInputStream(uri) ?: error("Could not open the selected file.")
         input.use { source ->
@@ -642,6 +648,18 @@ private fun ChatViewModel.copyUriToCache(uri: Uri, prefix: String, suffix: Strin
         file.delete()
         throw e
     }
+}
+
+private fun ChatViewModel.writeAttachmentTextFile(filename: String, text: String): File {
+    val safeName = filename.replace(Regex("""[/:\\?%*|"<>]"""), "-").ifBlank { "document" }
+    val file = File(attachmentDirectory(), "${UUID.randomUUID()}-$safeName.txt")
+    file.writeText(text)
+    return file
+}
+
+private fun ChatViewModel.attachmentDirectory(): File {
+    val app = getApplication<Application>()
+    return File(app.filesDir, "conversation_attachments").also { it.mkdirs() }
 }
 
 private fun ChatViewModel.imageCacheSuffix(uri: Uri): String {
