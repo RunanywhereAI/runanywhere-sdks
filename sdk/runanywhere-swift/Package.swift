@@ -150,6 +150,7 @@ let package = Package(
         .target(
             name: "MLXBackend",
             dependencies: [
+                "CRACommons",
                 "RABackendMLXBinary",
             ],
             path: "Sources/MLXRuntime/include",
