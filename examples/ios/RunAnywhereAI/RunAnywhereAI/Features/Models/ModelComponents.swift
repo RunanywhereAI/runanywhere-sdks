@@ -45,6 +45,8 @@ struct FrameworkRow: View {
             return "apple.logo"
         case .llamaCpp:
             return "cpu"
+        case .mlx:
+            return "bolt.horizontal"
         case .onnx:
             return "brain"
         case .fluidAudio:
@@ -60,6 +62,8 @@ struct FrameworkRow: View {
             return AppColors.textPrimary
         case .llamaCpp:
             return AppColors.primaryAccent
+        case .mlx:
+            return .teal
         case .onnx:
             return AppColors.statusGray
         default:
@@ -73,6 +77,8 @@ struct FrameworkRow: View {
             return "Apple's pre-installed system models"
         case .llamaCpp:
             return "Efficient LLM inference with GGUF models"
+        case .mlx:
+            return "Apple MLX inference with safetensors models"
         case .onnx:
             return "ONNX Runtime for STT/TTS models"
         case .fluidAudio:

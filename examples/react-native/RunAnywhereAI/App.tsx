@@ -80,6 +80,13 @@ try {
   logDiagnostic('[App] ONNX backend not available - speech features disabled');
 }
 
+let MLX: OptionalBackend | null = null;
+try {
+  MLX = require('@runanywhere/mlx').MLX as OptionalBackend;
+} catch {
+  logDiagnostic('[App] MLX backend not available - Apple MLX disabled');
+}
+
 // QHexRT (Qualcomm Hexagon NPU) — Android arm64 only. On other platforms the
 // native hybrid is absent, so the app falls back.
 let QHexRT: OptionalBackend | null = null;
@@ -87,7 +94,9 @@ try {
   const qhexrtModule = require('@runanywhere/qhexrt');
   QHexRT = qhexrtModule.QHexRT as OptionalBackend;
 } catch {
-  logDiagnostic('[App] QHexRT backend not available - NPU disabled on this platform');
+  logDiagnostic(
+    '[App] QHexRT backend not available - NPU disabled on this platform'
+  );
 }
 import {
   getStoredApiKey,
@@ -150,6 +159,24 @@ async function registerBackends(): Promise<BackendRegistrationState> {
     );
   }
 
+  let mlxRegistered = false;
+  if (MLX) {
+    try {
+      mlxRegistered = (await MLX.register()) !== false;
+      if (mlxRegistered) {
+        logDiagnostic(
+          '[App] MLX backend registered (LLM + VLM + STT + TTS + Embeddings)'
+        );
+      } else {
+        logDiagnostic(
+          '[App] MLX.register() returned false - Apple MLX unavailable'
+        );
+      }
+    } catch (error) {
+      logDiagnostic(`[App] MLX backend not available: ${String(error)}`);
+    }
+  }
+
   // QHexRT registers all NPU modalities (LLM/VLM/STT/TTS) in one call. The SDK
   // resolves logical HNPU URLs to the current Hexagon arch during registration.
   let qhexrtRegistered = false;
@@ -159,14 +186,16 @@ async function registerBackends(): Promise<BackendRegistrationState> {
       if (qhexrtRegistered) {
         logDiagnostic('[App] QHexRT (NPU) backend registered');
       } else {
-        logDiagnostic('[App] QHexRT.register() returned false - NPU unavailable on this device');
+        logDiagnostic(
+          '[App] QHexRT.register() returned false - NPU unavailable on this device'
+        );
       }
     } catch (error) {
       logDiagnostic(`[App] QHexRT backend not available: ${String(error)}`);
     }
   }
 
-  return { llamaRegistered, onnxRegistered, qhexrtRegistered };
+  return { llamaRegistered, onnxRegistered, mlxRegistered, qhexrtRegistered };
 }
 
 const App: React.FC = () => {
@@ -210,7 +239,9 @@ const App: React.FC = () => {
           baseURL: effectiveBaseURL,
           environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
         });
-        console.log('[App] SDK initialized with backend configuration (staging)');
+        console.log(
+          '[App] SDK initialized with backend configuration (staging)'
+        );
       } else {
         await RunAnywhere.initialize({
           apiKey: '',

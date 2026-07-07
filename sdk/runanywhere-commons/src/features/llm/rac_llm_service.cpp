@@ -72,7 +72,8 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
          .select_ops = llm_ops,
          .model_create_id = model_ref.path.c_str(),
          .model_id_for_service = model_id,
-         .config_json = nullptr},
+         .config_json = nullptr,
+         .framework = model_ref.framework},
         &service);
     if (result != RAC_SUCCESS) {
         return result;

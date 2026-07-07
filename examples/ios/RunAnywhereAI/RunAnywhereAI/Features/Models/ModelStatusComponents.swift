@@ -149,6 +149,7 @@ struct ModelStatusBanner: View {
     private func frameworkIcon(for framework: InferenceFramework) -> String {
         switch framework {
         case .llamaCpp: return "cpu"
+        case .mlx: return "bolt.horizontal"
         case .onnx: return "square.stack.3d.up"
         case .foundationModels: return "apple.logo"
         default: return "cube"
@@ -158,6 +159,7 @@ struct ModelStatusBanner: View {
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
         case .llamaCpp: return AppColors.primaryAccent
+        case .mlx: return .teal
         case .onnx: return .purple
         case .foundationModels: return .primary
         default: return .gray
@@ -684,6 +686,7 @@ struct CompactModelIndicator: View {
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
         case .llamaCpp: return AppColors.primaryAccent
+        case .mlx: return .teal
         case .onnx: return .purple
         case .foundationModels: return .primary
         default: return .gray

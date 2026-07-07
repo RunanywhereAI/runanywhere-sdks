@@ -446,7 +446,7 @@ void install_mock_plugin() {
 
     g_speech_vtable = {};
     g_speech_vtable.metadata.abi_version = RAC_PLUGIN_API_VERSION;
-    g_speech_vtable.metadata.name = "onnx";
+    g_speech_vtable.metadata.name = "sherpa";
     g_speech_vtable.metadata.display_name = "CPP10A Mock Speech";
     g_speech_vtable.metadata.engine_version = "0.0.0";
     g_speech_vtable.metadata.priority = 10000;
@@ -468,6 +468,7 @@ void install_mock_plugin() {
 
     (void)rac_plugin_unregister("llamacpp");
     (void)rac_plugin_unregister("onnx");
+    (void)rac_plugin_unregister("sherpa");
     CHECK(rac_plugin_register(&g_speech_vtable) == RAC_SUCCESS, "mock speech plugin registers");
     CHECK(rac_plugin_register(&g_llm_vtable) == RAC_SUCCESS, "mock LLM plugin registers");
 }

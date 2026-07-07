@@ -60,9 +60,9 @@ enum ModelSelectionContext {
     var allowedFrameworks: Set<InferenceFramework>? {
         switch self {
         case .ragEmbedding:
-            return [.onnx]
+            return [.onnx, .mlx]
         case .ragLLM:
-            return [.llamaCpp]
+            return [.llamaCpp, .mlx]
         default:
             return nil
         }
@@ -127,8 +127,10 @@ struct ModelSelectionSheet: View {
     }
 
     private func modelPriority(_ model: RAModelInfo) -> Int {
-        if unavailableReason(for: model) != nil { return 3 }
-        return model.framework == .foundationModels ? 0 : (model.localPathURL != nil ? 1 : 2)
+        if unavailableReason(for: model) != nil { return 4 }
+        if model.framework == .foundationModels { return 0 }
+        if model.localPathURL != nil { return 1 }
+        return model.framework == .mlx ? 2 : 3
     }
 
     private func unavailableReason(for model: RAModelInfo) -> String? {

@@ -39,6 +39,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/onnx/CMakeLists.txt")
     add_subdirectory(onnx)
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/mlx/CMakeLists.txt")
+    add_subdirectory(mlx)
+endif()
+
 # QHexRT — RunAnywhere's PRIVATE Qualcomm Hexagon NPU runtime. OFF by default —
 # consumed as a prebuilt static archive under QHEXRT_ROOT (gitignored); compiles
 # a not-routable shell when the archive is absent (public repo builds clean),

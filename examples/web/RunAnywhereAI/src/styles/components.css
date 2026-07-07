@@ -878,7 +878,7 @@
 .composer-status-pill button svg {
   width: 15px;
   height: 15px;
-  color: currentColor;
+  color: currentcolor;
 }
 
 .composer-status-pill--tools {
@@ -1005,7 +1005,7 @@
 .chat-code,
 .chat-source span {
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .chat-tool-call pre {

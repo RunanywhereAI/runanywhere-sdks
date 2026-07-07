@@ -22,6 +22,8 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/http/rac_http_transport.h"
+#include "rac/infrastructure/model_management/rac_bundle_policy.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
@@ -74,6 +76,60 @@ void install_noop_adapter() {
 void clear_adapter() {
     rac_set_platform_adapter(nullptr);
 }
+
+rac_bool_t mlx_test_is_manifest(const char* relative_path) {
+    return relative_path != nullptr && std::strcmp(relative_path, "config.json") == 0 ? RAC_TRUE
+                                                                                      : RAC_FALSE;
+}
+
+const rac_bundle_policy_t kTestMlxPolicy = {
+    /* .struct_size                = */ (uint32_t)sizeof(rac_bundle_policy_t),
+    /* .framework                  = */ RAC_FRAMEWORK_MLX,
+    /* .model_format               = */ RAC_MODEL_FORMAT_SAFETENSORS,
+    /* .manifest_extension         = */ ".json",
+    /* .manifest_leaf_names_bundle = */ RAC_FALSE,
+    /* .is_bundle_manifest         = */ mlx_test_is_manifest,
+    /* .reserved_0                 = */ 0,
+    /* .reserved_1                 = */ 0,
+};
+
+const char* kMlxFolderTreeJson = R"JSON([
+  {"type":"file","path":".gitattributes","size":100},
+  {"type":"file","path":"README.md","size":200},
+  {"type":"file","path":"config.json","size":42},
+  {"type":"file","path":"model.safetensors","size":1234,
+   "lfs":{"oid":"abc123","size":1234}},
+  {"type":"file","path":"tokenizer_config.json","size":99}
+])JSON";
+
+rac_result_t fake_hf_tree_send(void*, const rac_http_request_t* req, rac_http_response_t* out_resp) {
+    if (!req || !req->url || !out_resp) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    std::memset(out_resp, 0, sizeof(*out_resp));
+    if (std::string(req->url).find("/api/models/mlx-community/FastVLM-0.5B-BF16/tree/main") ==
+        std::string::npos) {
+        out_resp->status = 404;
+        return RAC_SUCCESS;
+    }
+    const size_t len = std::strlen(kMlxFolderTreeJson);
+    out_resp->body_bytes = static_cast<uint8_t*>(std::malloc(len));
+    if (!out_resp->body_bytes) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    std::memcpy(out_resp->body_bytes, kMlxFolderTreeJson, len);
+    out_resp->body_len = len;
+    out_resp->status = 200;
+    return RAC_SUCCESS;
+}
+
+const rac_http_transport_ops_t kFakeHfTreeTransport = {
+    /* .request_send   = */ fake_hf_tree_send,
+    /* .request_stream = */ nullptr,
+    /* .request_resume = */ nullptr,
+    /* .init           = */ nullptr,
+    /* .destroy        = */ nullptr,
+};
 
 // ---------------------------------------------------------------------------
 // Helpers.
@@ -258,6 +314,49 @@ int test_register_with_source_override() {
     ASSERT_EQ(retrieved.source(), saved.source());
 
     remove_by_id(saved.id());
+    clear_adapter();
+    return 0;
+}
+
+int test_register_mlx_repo_root_uses_folder_bundle_policy() {
+    install_noop_adapter();
+    ASSERT_EQ(rac_bundle_policy_register(&kTestMlxPolicy), RAC_SUCCESS);
+    ASSERT_EQ(rac_http_transport_register(&kFakeHfTreeTransport, nullptr), RAC_SUCCESS);
+
+    RegisterArgs args;
+    args.url = "https://huggingface.co/mlx-community/FastVLM-0.5B-BF16";
+    args.name = "FastVLM";
+    args.has_framework = true;
+    args.framework = runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
+    args.has_category = true;
+    args.category = runanywhere::v1::MODEL_CATEGORY_MULTIMODAL;
+
+    runanywhere::v1::ModelInfo saved;
+    ASSERT_TRUE(register_proto(args, &saved));
+
+    ASSERT_EQ(saved.id(), std::string("fastvlm-0.5b-bf16"));
+    ASSERT_EQ(saved.name(), std::string("FastVLM"));
+    ASSERT_EQ(saved.framework(), runanywhere::v1::INFERENCE_FRAMEWORK_MLX);
+    ASSERT_EQ(saved.format(), runanywhere::v1::MODEL_FORMAT_SAFETENSORS);
+    ASSERT_EQ(saved.category(), runanywhere::v1::MODEL_CATEGORY_MULTIMODAL);
+    ASSERT_EQ(saved.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE);
+    ASSERT_TRUE(saved.has_multi_file());
+    ASSERT_EQ(saved.multi_file().files_size(), 3);
+    ASSERT_EQ(saved.multi_file().files(0).filename(), std::string("config.json"));
+    ASSERT_EQ(saved.multi_file().files(0).role(),
+              runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
+    ASSERT_EQ(saved.multi_file().files(1).filename(), std::string("model.safetensors"));
+    ASSERT_EQ(saved.multi_file().files(1).checksum_sha256(), std::string("abc123"));
+    ASSERT_EQ(saved.multi_file().files(2).filename(), std::string("tokenizer_config.json"));
+
+    runanywhere::v1::ModelInfo retrieved;
+    ASSERT_TRUE(read_back_by_id(saved.id(), &retrieved));
+    ASSERT_EQ(retrieved.framework(), runanywhere::v1::INFERENCE_FRAMEWORK_MLX);
+    ASSERT_TRUE(retrieved.has_multi_file());
+
+    remove_by_id(saved.id());
+    rac_http_transport_register(nullptr, nullptr);
+    rac_bundle_policy_unregister(RAC_FRAMEWORK_MLX);
     clear_adapter();
     return 0;
 }
@@ -467,6 +566,8 @@ int main(int /*argc*/, char** /*argv*/) {
         {"register_gguf_round_trip", test_register_gguf_round_trip},
         {"register_archive_round_trip", test_register_archive_round_trip},
         {"register_with_source_override", test_register_with_source_override},
+        {"register_mlx_repo_root_uses_folder_bundle_policy",
+         test_register_mlx_repo_root_uses_folder_bundle_policy},
         {"null_out_pointer", test_null_out_pointer},
         {"invalid_input_bytes", test_invalid_input_bytes},
         {"empty_input_rejected", test_empty_input_rejected},

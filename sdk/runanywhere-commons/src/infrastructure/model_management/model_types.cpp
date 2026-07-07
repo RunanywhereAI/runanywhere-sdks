@@ -102,6 +102,10 @@ rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t
         case RAC_FRAMEWORK_LLAMACPP:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return RAC_MODEL_CATEGORY_LANGUAGE;
+        case RAC_FRAMEWORK_MLX:
+            // MLX serves language, VLM, embedding, STT, and TTS folders; the
+            // model entry must carry the concrete category.
+            return RAC_MODEL_CATEGORY_UNKNOWN;
         case RAC_FRAMEWORK_QHEXRT:
             // QHexRT serves LLM/VLM/STT/TTS bundles alike — no single category
             // is implied by the framework; the registered model's explicit
@@ -174,6 +178,8 @@ rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t frame
     static const rac_model_format_t fluid_audio_formats[] = {RAC_MODEL_FORMAT_BIN};
     static const rac_model_format_t coreml_formats[] = {
         RAC_MODEL_FORMAT_COREML, RAC_MODEL_FORMAT_MLMODEL, RAC_MODEL_FORMAT_MLPACKAGE};
+    static const rac_model_format_t mlx_formats[] = {RAC_MODEL_FORMAT_SAFETENSORS,
+                                                     RAC_MODEL_FORMAT_FOLDER};
     static const rac_model_format_t qhexrt_formats[] = {RAC_MODEL_FORMAT_QNN_CONTEXT};
 
     switch (framework) {
@@ -186,6 +192,8 @@ rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t frame
             return copy_supported_formats(fluid_audio_formats, 1, out_formats, out_count);
         case RAC_FRAMEWORK_COREML:
             return copy_supported_formats(coreml_formats, 3, out_formats, out_count);
+        case RAC_FRAMEWORK_MLX:
+            return copy_supported_formats(mlx_formats, 2, out_formats, out_count);
         case RAC_FRAMEWORK_QHEXRT:
             return copy_supported_formats(qhexrt_formats, 1, out_formats, out_count);
         default:
@@ -211,6 +219,10 @@ rac_bool_t rac_framework_supports_format(rac_inference_framework_t framework,
                     format == RAC_MODEL_FORMAT_MLPACKAGE)
                        ? RAC_TRUE
                        : RAC_FALSE;
+        case RAC_FRAMEWORK_MLX:
+            return (format == RAC_MODEL_FORMAT_SAFETENSORS || format == RAC_MODEL_FORMAT_FOLDER)
+                       ? RAC_TRUE
+                       : RAC_FALSE;
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return (format == RAC_MODEL_FORMAT_BIN) ? RAC_TRUE : RAC_FALSE;
         default:
@@ -225,6 +237,7 @@ rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t f
         case RAC_FRAMEWORK_SHERPA:   // Sherpa-ONNX speech models extract to directories
                                      // (encoder/decoder/tokens.txt)
         case RAC_FRAMEWORK_COREML:   // CoreML compiled models (.mlmodelc) are directories
+        case RAC_FRAMEWORK_MLX:      // MLX models are local HF-style folders
         case RAC_FRAMEWORK_QHEXRT:   // QHexRT models are directories (manifest.json + bin files)
             return RAC_TRUE;
         default:
@@ -239,6 +252,7 @@ rac_bool_t rac_framework_supports_llm(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_QHEXRT:
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
+        case RAC_FRAMEWORK_MLX:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -250,6 +264,7 @@ rac_bool_t rac_framework_supports_stt(rac_inference_framework_t framework) {
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_SHERPA:
+        case RAC_FRAMEWORK_MLX:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -262,6 +277,7 @@ rac_bool_t rac_framework_supports_tts(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_SYSTEM_TTS:
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_SHERPA:
+        case RAC_FRAMEWORK_MLX:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -810,6 +826,12 @@ rac_result_t rac_model_format_for_framework(rac_inference_framework_t framework,
             break;
         case RAC_FRAMEWORK_COREML:
             match = matches_any({"mlmodelc", "mlpackage", "mlmodel"});
+            break;
+        case RAC_FRAMEWORK_MLX:
+            // MLX folders intentionally accept auxiliary files as model members:
+            // config/tokenizer JSON, chat templates, SentencePiece models, and
+            // safetensors shards all belong to the same folder bundle.
+            match = matches_any({"safetensors", "json", "jinja", "model"});
             break;
         case RAC_FRAMEWORK_FLUID_AUDIO:
             match = matches_any({"bin"});

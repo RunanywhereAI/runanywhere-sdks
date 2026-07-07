@@ -9,7 +9,7 @@ import Foundation
 import RunAnywhere
 
 extension LLMViewModel {
-    func sendImageQuestion(image: RAVLMImage, prompt rawPrompt: String) async {
+    func sendImageQuestion(attachment: ChatImageAttachment, prompt rawPrompt: String) async {
         let prompt = rawPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty, !isGenerating else { return }
 
@@ -21,7 +21,8 @@ extension LLMViewModel {
             setCurrentConversation(conversationStore.createConversation())
         }
 
-        let userMessage = Message(role: .user, content: "Image attached\n\(prompt)")
+        let savedAttachment = persistImageAttachment(attachment)
+        let userMessage = Message(role: .user, content: prompt, attachment: savedAttachment)
         let assistantMessage = Message(role: .assistant, content: "")
         setMessages(messagesValue + [userMessage, assistantMessage])
 
@@ -37,7 +38,7 @@ extension LLMViewModel {
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
             options.maxTokens = 500
 
-            let stream = try await RunAnywhere.processImageStream(image, options: options)
+            let stream = try await RunAnywhere.processImageStream(attachment.image, options: options)
             let response = try await consumeVisionStream(stream, messageIndex: messageIndex)
             updateVisionMessage(at: messageIndex, response: response)
         } catch {
@@ -45,6 +46,25 @@ extension LLMViewModel {
         }
 
         await finalizeGeneration(at: messageIndex)
+    }
+
+    private func persistImageAttachment(_ attachment: ChatImageAttachment) -> MessageAttachment {
+        let detail = ByteCountFormatter.string(fromByteCount: Int64(attachment.data.count), countStyle: .file)
+        guard let conversationID = currentConversation?.id else {
+            return MessageAttachment(kind: .image, filename: attachment.filename, detail: detail)
+        }
+
+        do {
+            return try conversationStore.saveAttachment(
+                data: attachment.data,
+                filename: attachment.filename,
+                kind: .image,
+                conversationID: conversationID,
+                detail: detail
+            )
+        } catch {
+            return MessageAttachment(kind: .image, filename: attachment.filename, detail: detail)
+        }
     }
 
     private func ensureVisionModelLoaded() throws {
@@ -101,7 +121,8 @@ extension LLMViewModel {
             thinkingContent: currentMessage.thinkingContent,
             timestamp: currentMessage.timestamp,
             analytics: nil,
-            modelInfo: currentVisionModelInfo()
+            modelInfo: currentVisionModelInfo(),
+            attachment: currentMessage.attachment
         )
         updateMessage(at: index, with: updatedMessage)
     }

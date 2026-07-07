@@ -25,15 +25,18 @@ class ConversationStore: ObservableObject {
         return url
     }
     private let conversationsDirectory: URL
+    private let attachmentsDirectory: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
     private init() {
         documentsDirectory = Self.getDocumentsDirectory()
         conversationsDirectory = documentsDirectory.appendingPathComponent("Conversations")
+        attachmentsDirectory = conversationsDirectory.appendingPathComponent("Attachments")
 
         // Create conversations directory if it doesn't exist
         try? FileManager.default.createDirectory(at: conversationsDirectory, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: attachmentsDirectory, withIntermediateDirectories: true)
 
         // Set up encoder/decoder
         encoder.outputFormatting = .prettyPrinted
@@ -93,6 +96,7 @@ class ConversationStore: ObservableObject {
         // Delete file
         let fileURL = conversationFileURL(for: conversation.id)
         try? FileManager.default.removeItem(at: fileURL)
+        try? FileManager.default.removeItem(at: attachmentDirectory(for: conversation.id))
     }
 
     func addMessage(_ message: Message, to conversation: Conversation) {
@@ -117,6 +121,30 @@ class ConversationStore: ObservableObject {
                 await self.generateSmartTitleIfNeeded(for: conversationId)
             }
         }
+    }
+
+    func saveAttachment(
+        data: Data,
+        filename: String,
+        kind: MessageAttachment.Kind,
+        conversationID: String,
+        detail: String? = nil,
+        previewText: String? = nil
+    ) throws -> MessageAttachment {
+        let directory = attachmentDirectory(for: conversationID)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let storedFilename = "\(UUID().uuidString)-\(safeAttachmentFilename(filename))"
+        let fileURL = directory.appendingPathComponent(storedFilename)
+        try data.write(to: fileURL, options: [.atomic])
+
+        return MessageAttachment(
+            kind: kind,
+            filename: filename,
+            detail: detail,
+            relativePath: "Conversations/Attachments/\(conversationID)/\(storedFilename)",
+            previewText: previewText
+        )
     }
 
     // MARK: - Foundation Models Title Generation
@@ -269,6 +297,18 @@ class ConversationStore: ObservableObject {
 
     private func conversationFileURL(for id: String) -> URL {
         conversationsDirectory.appendingPathComponent("\(id).json")
+    }
+
+    private func attachmentDirectory(for id: String) -> URL {
+        attachmentsDirectory.appendingPathComponent(id)
+    }
+
+    private func safeAttachmentFilename(_ filename: String) -> String {
+        let cleaned = filename
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: CharacterSet(charactersIn: "/:\\?%*|\"<>"))
+            .joined(separator: "-")
+        return cleaned.isEmpty ? "attachment" : cleaned
     }
 
     private func generateTitle(from content: String) -> String {

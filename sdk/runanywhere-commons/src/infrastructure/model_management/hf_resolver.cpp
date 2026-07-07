@@ -363,6 +363,11 @@ std::string normalize_explicit_file_ref(const std::string& ref) {
     if (rest.find("/resolve/") != std::string::npos) {
         return "https://huggingface.co/" + rest;
     }
+    const size_t blob_pos = rest.find("/blob/");
+    if (blob_pos != std::string::npos) {
+        return "https://huggingface.co/" + rest.substr(0, blob_pos) + "/resolve/" +
+               rest.substr(blob_pos + std::string("/blob/").size());
+    }
     ParsedRef parsed;
     if (!parse_ref(ref, &parsed) || parsed.file_path.empty()) {
         return {};
@@ -687,7 +692,7 @@ rac_result_t resolve_repo_folder(const std::string& ref, const char* manifest_le
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     ParsedRef parsed;
-    if (!parse_ref(ref, &parsed) || parsed.file_path.empty()) {
+    if (!parse_ref(ref, &parsed)) {
         *error = "not a folder-level Hugging Face reference: " + ref;
         return RAC_ERROR_INVALID_ARGUMENT;
     }

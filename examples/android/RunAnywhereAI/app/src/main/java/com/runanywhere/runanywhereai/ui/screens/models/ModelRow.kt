@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,6 +40,7 @@ fun ModelRow(
     progressPercent: Int?,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
+    onDelete: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
@@ -77,6 +79,7 @@ fun ModelRow(
                 )
                 BackendBadge(framework = model.framework)
                 Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+                    Pill(model.quantizationLabel(), MaterialTheme.colorScheme.onSurfaceVariant)
                     model.capabilityLabels().take(3).forEach { label ->
                         Pill(label, MaterialTheme.colorScheme.primary)
                     }
@@ -91,7 +94,19 @@ fun ModelRow(
             }
 
             Spacer(Modifier.width(dimens.spacingSm))
-            TrailingAction(isCurrent, isReady, isBusy, model, onDownload)
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+                TrailingAction(isCurrent, isReady, isBusy, model, onDownload)
+                if (onDelete != null && isReady) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = RACIcons.Outline.Trash,
+                            contentDescription = "Delete ${model.name}",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(dimens.iconSm),
+                        )
+                    }
+                }
+            }
         }
     }
 }

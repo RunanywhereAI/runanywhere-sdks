@@ -275,6 +275,7 @@ bool extractBoolValue(const std::string& json, const std::string& key, bool defa
 rac_inference_framework_t frameworkFromString(const std::string& framework) {
     if (framework == "LlamaCpp" || framework == "llamacpp") return RAC_FRAMEWORK_LLAMACPP;
     if (framework == "ONNX" || framework == "onnx") return RAC_FRAMEWORK_ONNX;
+    if (framework == "MLX" || framework == "mlx") return RAC_FRAMEWORK_MLX;
 #ifdef __APPLE__
     if (framework == "CoreML" || framework == "coreml") return RAC_FRAMEWORK_COREML;
 #endif

@@ -126,28 +126,6 @@ private struct IOSSettingsContent: View {
                     .font(AppTypography.caption)
             }
 
-            Section("Voice & Input") {
-                NavigationLink(destination: VoiceAssistantView()) {
-                    SettingsNavigationRow(
-                        icon: "mic.circle",
-                        color: AppColors.primaryAccent,
-                        title: "Talk Mode",
-                        subtitle: "Set up speech, conversation, and voice models"
-                    )
-                }
-
-                #if os(iOS)
-                NavigationLink(destination: VoiceDictationManagementView()) {
-                    SettingsNavigationRow(
-                        icon: "keyboard",
-                        color: .indigo,
-                        title: "Private Dictation Keyboard",
-                        subtitle: "Dictate into other apps on-device"
-                    )
-                }
-                #endif
-            }
-
             Section("Privacy") {
                 Label("Chats and downloads stay on this device", systemImage: "lock.shield")
                     .foregroundColor(AppColors.textPrimary)
@@ -164,7 +142,7 @@ private struct IOSSettingsContent: View {
                         icon: "slider.horizontal.3",
                         color: AppColors.primaryPurple,
                         title: "SDK Workbench",
-                        subtitle: "Voice utilities, tools, storage, benchmarks, and diagnostics"
+                        subtitle: "Voice utilities, benchmarks, and diagnostics"
                     )
                 }
 
@@ -236,6 +214,12 @@ private struct IOSSettingsContent: View {
                 if let docsURL = URL(string: "https://docs.runanywhere.ai") {
                     Link(destination: docsURL) {
                         Label("Documentation", systemImage: "book")
+                    }
+                }
+
+                if let xURL = URL(string: "https://x.com/RunanywhereAI") {
+                    Link(destination: xURL) {
+                        Label("Follow on X", systemImage: "person.crop.circle.badge.plus")
                     }
                 }
             } header: {
@@ -322,22 +306,12 @@ private struct AssistantSettingsCard: View {
                 }
                 .buttonStyle(.plain)
 
-                NavigationLink(destination: VoiceAssistantView()) {
-                    SettingsNavigationRow(
-                        icon: "mic.circle",
-                        color: AppColors.primaryAccent,
-                        title: "Talk Mode",
-                        subtitle: "Configure speech, conversation, and voice models"
-                    )
-                }
-                .buttonStyle(.plain)
-
                 NavigationLink(destination: ConsumerAdvancedHubView()) {
                     SettingsNavigationRow(
                         icon: "slider.horizontal.3",
                         color: AppColors.primaryPurple,
                         title: "SDK Workbench",
-                        subtitle: "Voice utilities, storage, tools, benchmarks, and diagnostics"
+                        subtitle: "Voice utilities, benchmarks, and diagnostics"
                     )
                 }
                 .buttonStyle(.plain)
@@ -637,6 +611,15 @@ private struct AboutCard: View {
                         HStack {
                             Image(systemName: "book")
                             Text("Documentation")
+                        }
+                    }
+                }
+
+                if let xURL = URL(string: "https://x.com/RunanywhereAI") {
+                    Link(destination: xURL) {
+                        HStack {
+                            Image(systemName: "person.crop.circle.badge.plus")
+                            Text("Follow on X")
                         }
                     }
                 }

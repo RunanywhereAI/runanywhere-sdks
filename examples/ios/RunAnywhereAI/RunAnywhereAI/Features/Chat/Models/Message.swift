@@ -19,6 +19,7 @@ public struct Message: Identifiable, Codable, Sendable {
     public let analytics: MessageAnalytics?
     public let modelInfo: MessageModelInfo?
     public let toolCallInfo: ToolCallInfo?
+    public let attachment: MessageAttachment?
 
     public enum Role: String, Codable, Sendable {
         case system
@@ -34,7 +35,8 @@ public struct Message: Identifiable, Codable, Sendable {
         timestamp: Date = Date(),
         analytics: MessageAnalytics? = nil,
         modelInfo: MessageModelInfo? = nil,
-        toolCallInfo: ToolCallInfo? = nil
+        toolCallInfo: ToolCallInfo? = nil,
+        attachment: MessageAttachment? = nil
     ) {
         self.id = id
         self.role = role
@@ -44,6 +46,47 @@ public struct Message: Identifiable, Codable, Sendable {
         self.analytics = analytics
         self.modelInfo = modelInfo
         self.toolCallInfo = toolCallInfo
+        self.attachment = attachment
+    }
+}
+
+// MARK: - Message Attachment
+
+public struct MessageAttachment: Identifiable, Codable, Sendable {
+    public enum Kind: String, Codable, Sendable {
+        case image
+        case document
+    }
+
+    public let id: UUID
+    public let kind: Kind
+    public let filename: String
+    public let detail: String?
+    public let relativePath: String?
+    public let previewText: String?
+
+    public init(
+        id: UUID = UUID(),
+        kind: Kind,
+        filename: String,
+        detail: String? = nil,
+        relativePath: String? = nil,
+        previewText: String? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.filename = filename
+        self.detail = detail
+        self.relativePath = relativePath
+        self.previewText = previewText
+    }
+
+    public var fileURL: URL? {
+        guard let relativePath, !relativePath.isEmpty,
+              let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        return documentsURL.appendingPathComponent(relativePath)
     }
 }
 

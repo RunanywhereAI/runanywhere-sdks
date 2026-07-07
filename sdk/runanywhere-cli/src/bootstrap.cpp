@@ -28,6 +28,9 @@
 #if defined(RCLI_HAS_SHERPA)
 #include "rac/plugin/rac_plugin_entry_sherpa.h"
 #endif
+#if defined(RCLI_HAS_MLX)
+#include "rac/backends/rac_mlx.h"
+#endif
 
 namespace rcli {
 
@@ -238,6 +241,15 @@ rac_result_t bootstrap(const GlobalOptions &options, Bootstrapped *out) {
 #if defined(RCLI_HAS_SHERPA)
     if (rac_backend_sherpa_register() != RAC_SUCCESS) {
       out::status_line("warning: sherpa backend failed to register");
+    }
+#endif
+#if defined(RCLI_HAS_MLX)
+    if (rac_mlx_is_available() != RAC_TRUE) {
+      out::status_line(
+          "warning: mlx backend requires MLX runtime callbacks; skipping registration");
+    } else if (rac_backend_mlx_register() != RAC_SUCCESS) {
+      out::status_line(
+          "warning: mlx backend requires MLX runtime callbacks; backend failed to register");
     }
 #endif
 

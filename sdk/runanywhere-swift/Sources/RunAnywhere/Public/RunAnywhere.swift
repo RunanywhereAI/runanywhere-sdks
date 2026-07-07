@@ -15,6 +15,7 @@
 //    * URLSession HTTP transport implementation and adapter configuration
 //
 
+import Darwin
 import Foundation
 import os
 
@@ -48,6 +49,13 @@ public enum RunAnywhere {
     internal static var hasCompletedServicesInit: Bool { state.withLock { $0.hasCompletedServicesInit } }
     /// Track if HTTP/auth setup succeeded (separate from core services so auth can be retried on reconnect).
     internal static var hasCompletedHTTPSetup: Bool { state.withLock { $0.hasCompletedHTTPSetup } }
+    internal static var isLocalOnlyMode: Bool {
+        guard let rawValue = getenv("RUNANYWHERE_SWIFT_LOCAL_ONLY") else {
+            return false
+        }
+        let value = String(cString: rawValue).lowercased()
+        return value == "1" || value == "true" || value == "yes"
+    }
 
     // MARK: - SDK State
 
@@ -214,7 +222,14 @@ public enum RunAnywhere {
             let initDurationMs = (CFAbsoluteTimeGetCurrent() - initStartTime) * 1000
             logger.info("Phase 1 complete in \(String(format: "%.1f", initDurationMs))ms (\(params.environment.description))")
 
-            if startBackgroundServices {
+            if isLocalOnlyMode {
+                state.withLock {
+                    $0.hasCompletedServicesInit = true
+                    $0.hasCompletedHTTPSetup = false
+                    $0.httpSetupApplicable = false
+                }
+                logger.debug("Phase 2 skipped for local-only Swift process")
+            } else if startBackgroundServices {
                 logger.debug("Starting Phase 2 (services) in background...")
                 Task.detached(priority: .userInitiated) {
                     do {
@@ -329,6 +344,10 @@ public enum RunAnywhere {
     /// O(1) after first successful initialization with HTTP configured.
     /// If core services are done but HTTP/auth failed (offline init), retries auth only.
     internal static func ensureServicesReady() async throws {
+        if isLocalOnlyMode && isInitializedFlag {
+            return
+        }
+
         let readiness = state.withLock {
             (
                 services: $0.hasCompletedServicesInit,

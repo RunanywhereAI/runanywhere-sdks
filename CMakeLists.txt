@@ -236,6 +236,11 @@ if(RAC_BUILD_PLUGIN_SMOKE
     add_subdirectory(tools/plugin-loader-smoke)
 endif()
 
+# Enable CTest before SDK subdirectories that register their own tests.
+if(RAC_BUILD_TESTS)
+    enable_testing()
+endif()
+
 # rcli desktop CLI. Added after engines/ because it links the
 # rac_backend_* targets that only exist once the engine subdirs configured.
 if(RAC_BUILD_CLI)

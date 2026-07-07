@@ -6,6 +6,12 @@
 //
 
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
 
 // MARK: - Typing Indicator
 
@@ -68,6 +74,7 @@ struct MessageBubbleView: View {
     let isGenerating: Bool
     @State private var isThinkingExpanded = false
     @State private var showToolCallSheet = false
+    @State private var previewAttachment: MessageAttachment?
 
     var hasThinking: Bool {
         message.thinkingContent != nil && !(message.thinkingContent?.isEmpty ?? true)
@@ -112,6 +119,29 @@ struct MessageBubbleView: View {
             if let toolCallInfo = message.toolCallInfo {
                 ToolCallDetailSheet(toolCallInfo: toolCallInfo)
                     .adaptiveSheetFrame()
+            }
+        }
+        .adaptiveSheet(isPresented: isAttachmentPreviewPresented) {
+            if let previewAttachment {
+                MessageAttachmentPreviewSheet(attachment: previewAttachment)
+                    .adaptiveSheetFrame(
+                        minWidth: 420,
+                        idealWidth: 640,
+                        maxWidth: 900,
+                        minHeight: 360,
+                        idealHeight: 560,
+                        maxHeight: 800
+                    )
+            }
+        }
+    }
+
+    private var isAttachmentPreviewPresented: Binding<Bool> {
+        Binding {
+            previewAttachment != nil
+        } set: { isPresented in
+            if !isPresented {
+                previewAttachment = nil
             }
         }
     }
@@ -371,8 +401,7 @@ extension MessageBubbleView {
     }
 
     @ViewBuilder var mainMessageBubble: some View {
-        // Only show message bubble if there's content
-        if !message.content.isEmpty {
+        if !message.content.isEmpty || message.attachment != nil {
             ZStack(alignment: .bottomTrailing) {
                 // Intelligent adaptive rendering: Content analysis → Best renderer
                 Group {
@@ -393,9 +422,20 @@ extension MessageBubbleView {
                             }
                         }
                     } else {
-                        Text(message.content)
-                            .foregroundColor(AppColors.textWhite)
-                            .fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
+                            if let attachment = message.attachment {
+                                MessageAttachmentInlineCard(attachment: attachment, role: message.role) {
+                                    previewAttachment = attachment
+                                }
+                            }
+
+                            if !message.content.isEmpty {
+                                Text(message.content)
+                                    .foregroundColor(AppColors.textWhite)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .padding(.horizontal, AppSpacing.large)
@@ -417,5 +457,251 @@ extension MessageBubbleView {
             .background(messageBubbleBackground)
             .animation(nil, value: message.content)
         }
+    }
+}
+
+// MARK: - Message Attachments
+
+private struct MessageAttachmentInlineCard: View {
+    let attachment: MessageAttachment
+    let role: Message.Role
+    let onOpen: () -> Void
+
+    private var foreground: Color {
+        role == .user ? AppColors.textWhite : AppColors.textPrimary
+    }
+
+    private var secondary: Color {
+        role == .user ? AppColors.textWhite.opacity(0.8) : AppColors.textSecondary
+    }
+
+    private var background: Color {
+        role == .user ? AppColors.textWhite.opacity(0.16) : AppColors.backgroundTertiary
+    }
+
+    var body: some View {
+        Button(action: onOpen) {
+            HStack(spacing: AppSpacing.smallMedium) {
+                attachmentIcon
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(attachment.filename)
+                        .font(AppTypography.captionMedium)
+                        .foregroundColor(foreground)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Text(attachment.detail ?? defaultDetail)
+                        .font(AppTypography.caption2)
+                        .foregroundColor(secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: AppSpacing.xSmall)
+
+                Image(systemName: "arrow.up.right")
+                    .font(AppTypography.caption2)
+                    .foregroundColor(secondary)
+            }
+            .padding(AppSpacing.smallMedium)
+            .background(background)
+            .cornerRadius(AppSpacing.cornerRadiusRegular)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open \(attachment.filename)")
+    }
+
+    @ViewBuilder private var attachmentIcon: some View {
+        switch attachment.kind {
+        case .image:
+            MessageAttachmentThumbnail(attachment: attachment)
+        case .document:
+            RoundedRectangle(cornerRadius: 7)
+                .fill(AppColors.primaryPurple.opacity(role == .user ? 0.28 : 0.14))
+                .frame(width: 42, height: 42)
+                .overlay(
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(role == .user ? AppColors.textWhite : AppColors.primaryPurple)
+                )
+        }
+    }
+
+    private var defaultDetail: String {
+        switch attachment.kind {
+        case .image:
+            return "Image"
+        case .document:
+            return "Document"
+        }
+    }
+}
+
+private struct MessageAttachmentThumbnail: View {
+    let attachment: MessageAttachment
+    @State private var imageData: Data?
+
+    var body: some View {
+        Group {
+            #if canImport(UIKit)
+            if let image = imageData.flatMap(UIImage.init(data:)) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                fallback
+            }
+            #elseif canImport(AppKit)
+            if let image = imageData.flatMap(NSImage.init(data:)) {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                fallback
+            }
+            #else
+            fallback
+            #endif
+        }
+        .frame(width: 42, height: 42)
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .task(id: attachment.previewIdentity) {
+            imageData = await attachment.loadImageData()
+        }
+    }
+
+    private var fallback: some View {
+        RoundedRectangle(cornerRadius: 7)
+            .fill(AppColors.textWhite.opacity(0.2))
+            .overlay(
+                Image(systemName: "photo")
+                    .foregroundColor(AppColors.textWhite)
+            )
+    }
+}
+
+private struct MessageAttachmentPreviewSheet: View {
+    let attachment: MessageAttachment
+    @Environment(\.dismiss) private var dismiss
+    @State private var imageData: Data?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppSpacing.large) {
+                    switch attachment.kind {
+                    case .image:
+                        imagePreview
+                    case .document:
+                        documentPreview
+                    }
+                }
+                .padding(AppSpacing.large)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(AppColors.backgroundPrimary)
+            .navigationTitle(attachment.filename)
+            #if os(iOS)
+            .navigationBarTitleDisplayModeCompat(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .task(id: attachment.previewIdentity) {
+            imageData = await attachment.loadImageData()
+        }
+    }
+
+    @ViewBuilder private var imagePreview: some View {
+        #if canImport(UIKit)
+        if let image = imageData.flatMap(UIImage.init(data:)) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .cornerRadius(AppSpacing.cornerRadiusRegular)
+        } else {
+            missingPreview
+        }
+        #elseif canImport(AppKit)
+        if let image = imageData.flatMap(NSImage.init(data:)) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .cornerRadius(AppSpacing.cornerRadiusRegular)
+        } else {
+            missingPreview
+        }
+        #else
+        missingPreview
+        #endif
+    }
+
+    private var documentPreview: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
+            HStack(spacing: AppSpacing.mediumLarge) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(AppColors.primaryPurple)
+                    .frame(width: 48, height: 48)
+                    .background(AppColors.primaryPurple.opacity(0.12))
+                    .cornerRadius(AppSpacing.cornerRadiusRegular)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(attachment.filename)
+                        .font(AppTypography.subheadlineMedium)
+                        .lineLimit(2)
+                    if let detail = attachment.detail {
+                        Text(detail)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+            }
+
+            Text(attachment.previewText ?? attachment.textFromDisk ?? "No preview text is available for this document.")
+                .font(AppTypography.body)
+                .foregroundColor(AppColors.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var missingPreview: some View {
+        VStack(spacing: AppSpacing.mediumLarge) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 32))
+                .foregroundColor(AppColors.primaryOrange)
+            Text("Preview is unavailable")
+                .font(AppTypography.subheadlineMedium)
+                .foregroundColor(AppColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 220)
+    }
+}
+
+private extension MessageAttachment {
+    var previewIdentity: String {
+        relativePath ?? id.uuidString
+    }
+
+    func loadImageData() async -> Data? {
+        guard kind == .image, let fileURL else { return nil }
+        return await Task.detached(priority: .utility) {
+            try? Data(contentsOf: fileURL)
+        }.value
+    }
+
+    var textFromDisk: String? {
+        guard let fileURL,
+              let data = try? Data(contentsOf: fileURL),
+              let text = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return text
     }
 }

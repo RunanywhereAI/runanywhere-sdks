@@ -168,7 +168,7 @@ echo ""
 download_header() {
     local url="$1"
     local output="$2"
-    if ! curl -sfL "${url}" -o "${output}"; then
+    if ! curl -sfL --retry 3 --retry-delay 2 --retry-all-errors --connect-timeout 15 "${url}" -o "${output}"; then
         echo -e "${RED}ERROR: Failed to download ${url}${NC}" >&2
         rm -f "${output}"
         return 1
