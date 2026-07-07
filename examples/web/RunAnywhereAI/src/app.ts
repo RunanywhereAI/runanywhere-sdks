@@ -124,7 +124,45 @@ const ICONS = {
   advanced: '<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/>',
   stack: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
   gauge: '<path d="M12 14l4-4"/><path d="M4.93 19.07A10 10 0 1 1 19.07 19.07"/><path d="M12 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
 } as const;
+
+// ---------------------------------------------------------------------------
+// Theme
+// ---------------------------------------------------------------------------
+
+const THEME_STORAGE_KEY = 'runanywhere-theme';
+const THEME_COLORS = { dark: '#191817', light: '#FCFBFA' } as const;
+
+type ThemeName = 'dark' | 'light';
+
+function effectiveTheme(): ThemeName {
+  const explicit = document.documentElement.dataset.theme;
+  if (explicit === 'light' || explicit === 'dark') return explicit;
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+function applyTheme(theme: ThemeName): void {
+  document.documentElement.dataset.theme = theme;
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch { /* storage may not be available */ }
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', THEME_COLORS[theme]);
+  refreshThemeButton();
+}
+
+function refreshThemeButton(): void {
+  const button = document.getElementById('consumer-theme-btn');
+  if (!button) return;
+  const theme = effectiveTheme();
+  button.innerHTML = icon(theme === 'dark' ? ICONS.sun : ICONS.moon);
+  const label = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+}
 
 function navSections(): NavSection[] {
   return [
@@ -199,6 +237,7 @@ export function buildAppShell(): void {
       <button type="button" class="shell-icon-btn" id="consumer-new-chat-btn" aria-label="New chat" title="New chat">
         ${icon(ICONS.newChat)}
       </button>
+      <button type="button" class="shell-icon-btn" id="consumer-theme-btn" aria-label="Switch theme" title="Switch theme"></button>
       <button type="button" class="shell-icon-btn" id="consumer-settings-btn" aria-label="Settings" title="Settings">
         ${icon(ICONS.settings)}
       </button>
@@ -316,6 +355,11 @@ function renderNav(): void {
 }
 
 function wireShellActions(): void {
+  refreshThemeButton();
+  document.getElementById('consumer-theme-btn')?.addEventListener('click', () => {
+    applyTheme(effectiveTheme() === 'dark' ? 'light' : 'dark');
+  });
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', refreshThemeButton);
   document.getElementById('consumer-menu-btn')?.addEventListener('click', openDrawer);
   document.getElementById('consumer-close-drawer-btn')?.addEventListener('click', closeDrawer);
   document.getElementById('consumer-drawer-scrim')?.addEventListener('click', closeDrawer);

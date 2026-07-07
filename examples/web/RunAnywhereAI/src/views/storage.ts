@@ -54,12 +54,12 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
       </div>
     </div>
     <div class="scroll-area" id="storage-scroll">
-      <div id="storage-info-header" style="padding: 12px 16px; margin-bottom: 12px; border-radius: 8px; background: var(--surface-secondary, #1a1a2e);"></div>
+      <div id="storage-info-header" style="padding: 12px 16px; margin-bottom: 12px; border-radius: 8px; background: var(--bg-secondary);"></div>
 
       <div
         class="storage-location"
         id="storage-location"
-        style="padding: 12px 16px; margin-bottom: 12px; border-radius: 8px; background: var(--surface-secondary, #1a1a2e); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;"
+        style="padding: 12px 16px; margin-bottom: 12px; border-radius: 8px; background: var(--bg-secondary); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;"
       >
         <div style="flex: 1; min-width: 200px;">
           <div style="font-size: 0.75rem; opacity: 0.6; margin-bottom: 2px;">Storage Location</div>

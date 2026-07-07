@@ -167,14 +167,28 @@ export function buildGetStartedOverlay(sheetOptions: OpenSheetOptions = {}): HTM
   overlay.className = 'chat-model-overlay';
   overlay.innerHTML = `
     <div class="chat-model-overlay-card">
-      <h3 class="chat-model-overlay-title">Get started</h3>
+      <div class="chat-model-overlay-glyph">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/>
+          <path d="M5 3l.8 2.2L8 6l-2.2.8L5 9l-.8-2.2L2 6l2.2-.8L5 3z"/>
+          <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/>
+        </svg>
+      </div>
+      <h3 class="chat-model-overlay-title">Welcome</h3>
       <p class="chat-model-overlay-description">
-        Pick a model to download and load. Models run fully on-device via
-        WebAssembly &mdash; no server round-trips.
+        Choose your AI model and start chatting. Everything runs privately
+        in your browser &mdash; nothing leaves this device.
       </p>
       <button type="button" id="chat-get-started-btn" class="btn btn-primary btn-lg">
         Choose a Model
       </button>
+      <div class="chat-model-overlay-privacy">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <span>100% private &middot; Runs on your device</span>
+      </div>
     </div>
   `;
 
@@ -284,30 +298,34 @@ function renderRows(): void {
     return;
   }
 
-  host.innerHTML = entries.map((entry) => {
-    const state = rowStates.get(entry.id) ?? { status: 'registered' as RowStatus };
-    const progressBar = state.status === 'downloading'
-      ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
-      : '';
-    const errorBar = state.error
-      ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
-      : '';
-    return `
-      <div class="model-row" data-model-id="${entry.id}">
-        <div class="model-logo">${modalityEmoji(entry.category)}</div>
-        <div class="model-info">
-          <div class="model-name">${escapeHtml(entry.name)}</div>
-          <div class="model-meta">
-            <span class="model-framework-badge">${formatFramework(entry.framework)}</span>
-            <span class="model-size">${formatBytes(entry.memoryRequiredBytes)}</span>
-          </div>
-          ${progressBar}
-          ${errorBar}
-        </div>
-        ${actionButton(entry.id, state)}
+  // Consumer catalog sections by state: what's running, what's on the
+  // device, what can be downloaded — matches the iOS picker grouping.
+  const stateOf = (id: string): RowState => rowStates.get(id) ?? { status: 'registered' as RowStatus };
+  const sections: Array<{ title: string; hint?: string; rows: typeof entries }> = [
+    {
+      title: 'Active',
+      rows: entries.filter((entry) => ['loaded', 'loading'].includes(stateOf(entry.id).status)),
+    },
+    {
+      title: 'On this device',
+      hint: 'Ready to use — no download needed',
+      rows: entries.filter((entry) => stateOf(entry.id).status === 'downloaded'),
+    },
+    {
+      title: 'Available to download',
+      hint: 'Stored in your browser, runs fully offline',
+      rows: entries.filter((entry) => ['registered', 'downloading', 'error'].includes(stateOf(entry.id).status)),
+    },
+  ];
+
+  host.innerHTML = sections
+    .filter((section) => section.rows.length > 0)
+    .map((section) => `
+      <div class="model-section">
+        <div class="model-section__title">${section.title}${section.hint ? `<small>${section.hint}</small>` : ''}</div>
+        ${section.rows.map((entry) => renderModelRow(entry, stateOf(entry.id))).join('')}
       </div>
-    `;
-  }).join('');
+    `).join('');
 
   host.querySelectorAll('[data-action]').forEach((el) => {
     const btn = el as HTMLButtonElement;
@@ -320,18 +338,45 @@ function renderRows(): void {
   });
 }
 
+function renderModelRow(entry: ReturnType<typeof getCatalog>[number], state: RowState): string {
+  const progressBar = state.status === 'downloading'
+    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
+    : '';
+  const errorBar = state.error
+    ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
+    : '';
+  const badges = [
+    `<span class="model-framework-badge">${formatFramework(entry.framework)}</span>`,
+    entry.supportsThinking ? '<span class="model-capability-badge model-capability-badge--thinking">Thinking</span>' : '',
+    `<span class="model-size">${formatBytes(entry.memoryRequiredBytes)}</span>`,
+  ].filter(Boolean).join('');
+  return `
+    <div class="model-row model-row--${state.status}" data-model-id="${entry.id}">
+      <div class="model-logo">${modalityEmoji(entry.category)}</div>
+      <div class="model-info">
+        <div class="model-name">${escapeHtml(entry.name)}</div>
+        <div class="model-description">${escapeHtml(entry.description)}</div>
+        <div class="model-meta">${badges}</div>
+        ${progressBar}
+        ${errorBar}
+      </div>
+      ${actionButton(entry.id, state)}
+    </div>
+  `;
+}
+
 function actionButton(modelId: string, state: RowState): string {
   switch (state.status) {
     case 'registered':
       return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${modelId}">Download</button>`;
     case 'downloading':
-      return `<button type="button" class="model-action-btn" disabled>${Math.round((state.progress ?? 0) * 100)}%</button>`;
+      return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>${Math.round((state.progress ?? 0) * 100)}%</button>`;
     case 'downloaded':
-      return `<button type="button" class="model-action-btn load" data-action="load" data-model-id="${modelId}">Load</button>`;
+      return `<button type="button" class="model-action-btn load" data-action="load" data-model-id="${modelId}">Use</button>`;
     case 'loading':
-      return `<button type="button" class="model-action-btn" disabled>Loading...</button>`;
+      return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>Loading&hellip;</button>`;
     case 'loaded':
-      return `<button type="button" class="model-action-btn loaded" data-action="unload" data-model-id="${modelId}">Loaded</button>`;
+      return `<button type="button" class="model-action-btn loaded" data-action="unload" data-model-id="${modelId}" title="Tap to unload">&#10003; Active</button>`;
     case 'error':
       return `<button type="button" class="model-action-btn model-action-btn--retry" data-action="download" data-model-id="${modelId}">Retry</button>`;
   }

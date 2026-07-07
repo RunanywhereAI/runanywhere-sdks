@@ -248,7 +248,28 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     sendBtn.setAttribute('aria-label', isGenerating ? 'Stop generation' : 'Send message');
   };
 
-  inputEl.addEventListener('input', refreshSendButton, listenerOptions);
+  const autoGrowInput = () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = `${inputEl.scrollHeight}px`;
+  };
+  inputEl.addEventListener('input', () => {
+    refreshSendButton();
+    autoGrowInput();
+  }, listenerOptions);
+  // Copy action on assistant replies (delegated — the list re-renders often).
+  messagesEl.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-copy-idx]');
+    if (!button) return;
+    const message = messages[Number(button.dataset.copyIdx)];
+    if (!message?.content) return;
+    void navigator.clipboard.writeText(message.content).then(() => {
+      const label = button.querySelector('span');
+      if (label) {
+        label.textContent = 'Copied';
+        setTimeout(() => { label.textContent = 'Copy'; }, 1500);
+      }
+    }).catch(() => showToast('Could not copy to clipboard', 'warning', 2600));
+  }, listenerOptions);
   inputEl.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -363,6 +384,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     }
 
     inputEl.value = '';
+    inputEl.style.height = 'auto';
     refreshSendButton();
 
     messages.push({ role: 'user', content: prompt });
@@ -388,6 +410,8 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       isGenerating = false;
       saveConversation();
       refreshSendButton();
+      // Full re-render drops the streaming cursor and adds hover actions.
+      renderMessages(messagesEl);
     }
   }
 
@@ -403,6 +427,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     }
 
     inputEl.value = '';
+    inputEl.style.height = 'auto';
     pendingAttachment = null;
     refreshAttachmentPill();
     refreshSendButton();
@@ -454,6 +479,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       isGenerating = false;
       saveConversation();
       refreshSendButton();
+      renderMessages(host);
     }
   }
 
@@ -980,17 +1006,51 @@ function splitThinking(raw: string): { content: string; thinking: string } {
 // Rendering
 // ---------------------------------------------------------------------------
 
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 5) return 'Working late?';
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+const STARTER_PROMPTS: Array<{ label: string; prompt: string; icon: string }> = [
+  {
+    label: 'Draft a message',
+    prompt: 'Help me draft a short, friendly message to my team about shipping our next release this Friday.',
+    icon: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  },
+  {
+    label: 'Explain a topic',
+    prompt: 'Explain how on-device AI keeps my data private, in simple terms.',
+    icon: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+  },
+  {
+    label: 'Compare options',
+    prompt: 'Help me compare two small local models for private chat.',
+    icon: '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/>',
+  },
+  {
+    label: 'Make a checklist',
+    prompt: 'Draft a concise checklist for testing an on-device AI app.',
+    icon: '<path d="M3 17l2 2 4-4"/><path d="M3 7l2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+  },
+];
+
 function renderMessages(host: HTMLElement): void {
   if (messages.length === 0) {
     host.innerHTML = `
       <div class="chat-empty-state">
-        <div class="empty-logo">RA</div>
-        <h3>Start a conversation</h3>
-        <p>Ask anything, attach a document or image, turn on web tools, or jump into Talk Mode.</p>
+        <div class="empty-logo">${svgIcon('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M5 3l.8 2.2L8 6l-2.2.8L5 9l-.8-2.2L2 6l2.2-.8L5 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/>')}</div>
+        <h3>${greeting()}</h3>
+        <p>Ask anything — everything runs privately on this device.</p>
         <div class="suggestion-chips">
-          <button type="button" class="suggestion-chip" data-prompt="Summarize what RunAnywhere can do in one paragraph.">What can you do?</button>
-          <button type="button" class="suggestion-chip" data-prompt="Help me compare two small local models for private chat.">Compare models</button>
-          <button type="button" class="suggestion-chip" data-prompt="Draft a concise checklist for testing an on-device AI app.">Testing checklist</button>
+          ${STARTER_PROMPTS.map((starter) => `
+            <button type="button" class="suggestion-chip" data-prompt="${escapeHtml(starter.prompt)}">
+              ${svgIcon(starter.icon)}
+              <span>${starter.label}</span>
+            </button>
+          `).join('')}
         </div>
       </div>
     `;
@@ -1009,21 +1069,34 @@ function renderMessages(host: HTMLElement): void {
   host.innerHTML = messages.map((msg, idx) => `
     <div class="chat-message chat-message--${msg.role}" data-idx="${idx}">
       ${renderMessageBody(msg)}
+      ${renderMessageActions(msg, idx)}
     </div>
   `).join('');
 
   host.scrollTop = host.scrollHeight;
 }
 
+function renderMessageActions(msg: ChatMessage, idx: number): string {
+  if (msg.role !== 'assistant' || !msg.content) return '';
+  return `
+    <div class="chat-msg-actions">
+      <button type="button" class="chat-action-btn" data-copy-idx="${idx}" aria-label="Copy reply">
+        ${svgIcon('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>')}
+        <span>Copy</span>
+      </button>
+    </div>
+  `;
+}
+
 function renderLastMessage(host: HTMLElement, msg: ChatMessage): void {
   const last = host.lastElementChild;
   if (last) {
-    last.innerHTML = renderMessageBody(msg);
+    last.innerHTML = renderMessageBody(msg, isGenerating);
   }
   host.scrollTop = host.scrollHeight;
 }
 
-function renderMessageBody(msg: ChatMessage): string {
+function renderMessageBody(msg: ChatMessage, streaming = false): string {
   // Collapsible thinking section — iOS parity:
   // ChatMessageComponents.swift:128-181 (thinkingSection).
   const thinkingSection = msg.role === 'assistant' && msg.thinking
@@ -1079,11 +1152,14 @@ function renderMessageBody(msg: ChatMessage): string {
     `
     : '';
 
+  const cursor = streaming && msg.role === 'assistant'
+    ? '<span class="chat-cursor" aria-hidden="true"></span>'
+    : '';
   const body = msg.content
-    ? renderMarkdownLite(msg.content)
+    ? renderMarkdownLite(msg.content) + cursor
     : (msg.thinking
-      ? '<span class="chat-bubble-typing">Thinking&hellip;</span>'
-      : '<span class="chat-bubble-typing">&hellip;</span>');
+      ? `<span class="chat-bubble-typing">Thinking&hellip;</span>${cursor}`
+      : cursor || '<span class="chat-bubble-typing">&hellip;</span>');
 
   return `${thinkingSection}${toolSection}<div class="chat-bubble">${attachmentSection}${body}${sourcesSection}</div>`;
 }
