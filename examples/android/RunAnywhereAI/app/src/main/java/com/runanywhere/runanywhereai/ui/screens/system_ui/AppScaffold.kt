@@ -24,11 +24,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.runanywhere.runanywhereai.RunAnywhereApplication
-import com.runanywhere.runanywhereai.data.conversation.ConversationRepository
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.ui.navigation.AppNavHost
 import com.runanywhere.runanywhereai.ui.navigation.Chat
 import com.runanywhere.runanywhereai.ui.navigation.More
+import com.runanywhere.runanywhereai.ui.navigation.Settings
 import com.runanywhere.runanywhereai.ui.navigation.Vision
 import com.runanywhere.runanywhereai.ui.navigation.Voice
 import com.runanywhere.runanywhereai.ui.navigation.isConsumerTopLevel
@@ -69,16 +69,11 @@ fun AppScaffold() {
 
     val isExpanded = isExpandedScreen()
     val showNav = destination != null
-    val recentConversations = ConversationRepository.summaries
     val canNavigateBack = destination != null &&
         !destination.isConsumerTopLevel() &&
         navController.previousBackStackEntry != null
     val startNewChat = {
         chatViewModel.clearChat()
-        navController.navigateTopLevel(Chat)
-    }
-    val openConversation = { id: String ->
-        chatViewModel.loadConversation(id)
         navController.navigateTopLevel(Chat)
     }
 
@@ -111,6 +106,7 @@ fun AppScaffold() {
                 AppNavHost(
                     navController = navController,
                     chatViewModel = chatViewModel,
+                    onOpenModels = { showModelSheet = true },
                     onOpenVision = { navController.navigateTopLevel(Vision) },
                     onOpenVoice = { navController.navigateTopLevel(Voice) },
                     onOpenAdvanced = { navController.navigateTopLevel(More) },
@@ -126,14 +122,10 @@ fun AppScaffold() {
                 PermanentNavigationDrawer(
                     drawerContent = {
                         AppNavigationDrawer(
-                            navController = navController,
                             destination = destination,
-                            recentConversations = recentConversations,
                             onNewChat = startNewChat,
-                            onOpenConversation = openConversation,
                             onHistory = { showHistorySheet = true },
-                            onModels = { showModelSheet = true },
-                            onAdapters = { showLoraSheet = true },
+                            onSettings = { navController.navigateTopLevel(Settings) },
                             permanent = true,
                         )
                     },
@@ -147,14 +139,10 @@ fun AppScaffold() {
                     gesturesEnabled = showNav,
                     drawerContent = {
                         AppNavigationDrawer(
-                            navController = navController,
                             destination = destination,
-                            recentConversations = recentConversations,
                             onNewChat = startNewChat,
-                            onOpenConversation = openConversation,
                             onHistory = { showHistorySheet = true },
-                            onModels = { showModelSheet = true },
-                            onAdapters = { showLoraSheet = true },
+                            onSettings = { navController.navigateTopLevel(Settings) },
                             onDismiss = { afterClose ->
                                 scope.launch {
                                     drawerState.close()

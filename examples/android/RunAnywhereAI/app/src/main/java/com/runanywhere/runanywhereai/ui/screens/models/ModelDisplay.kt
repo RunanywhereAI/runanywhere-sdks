@@ -11,6 +11,8 @@ import com.runanywhere.sdk.public.types.RAModelInfo
 
 // Pure model -> display mappers. No Compose, no state.
 
+private val privateHfTags = setOf("private", "requires-hf-auth", "hf-auth", "gated")
+
 enum class ConsumerModelGroup(val title: String, val footer: String) {
     CHAT_MODELS(
         "Chat Models",
@@ -151,6 +153,13 @@ private fun RAModelInfo.isLoraAdapterEntry(): Boolean =
                 tag.equals("lora", ignoreCase = true)
         }
 
+fun RAModelInfo.requiresHfAuth(): Boolean {
+    val tags = metadata?.tags.orEmpty().map { it.lowercase() }
+    return tags.any { it in privateHfTags } ||
+        framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
+        download_url.contains("_HNPU", ignoreCase = true)
+}
+
 fun RAModelInfo.capabilityLabels(): List<String> = buildList {
     when (category) {
         ModelCategory.MODEL_CATEGORY_LANGUAGE -> add("Chat")
@@ -165,6 +174,7 @@ fun RAModelInfo.capabilityLabels(): List<String> = buildList {
     }
     if (supports_thinking) add("Thinking")
     if (supports_lora) add("LoRA-ready")
+    if (requiresHfAuth()) add("HF auth")
 }.distinct()
 
 fun RAModelInfo.quantizationLabel(): String {
@@ -223,33 +233,6 @@ fun ModelGroupFilter.matches(model: RAModelInfo): Boolean = when (this) {
     ModelGroupFilter.VOICE -> model.consumerGroup() == ConsumerModelGroup.VOICE_MODELS
     ModelGroupFilter.DOCUMENTS -> model.consumerGroup() == ConsumerModelGroup.DOCUMENT_MODELS
     ModelGroupFilter.ADAPTERS -> model.consumerGroup() == ConsumerModelGroup.LORA_ADAPTERS
-}
-
-enum class ModelQuantizationFilter(val title: String) {
-    ALL("All"),
-    Q4("Q4"),
-    Q5("Q5"),
-    Q6("Q6"),
-    Q8("Q8"),
-    FOUR_BIT("4bit"),
-    FIVE_BIT("5bit"),
-    EIGHT_BIT("8bit"),
-    F16("F16"),
-}
-
-fun ModelQuantizationFilter.matches(model: RAModelInfo): Boolean {
-    val label = model.quantizationLabel().lowercase()
-    return when (this) {
-        ModelQuantizationFilter.ALL -> true
-        ModelQuantizationFilter.Q4 -> "q4" in label
-        ModelQuantizationFilter.Q5 -> "q5" in label
-        ModelQuantizationFilter.Q6 -> "q6" in label
-        ModelQuantizationFilter.Q8 -> "q8" in label
-        ModelQuantizationFilter.FOUR_BIT -> "4bit" in label
-        ModelQuantizationFilter.FIVE_BIT -> "5bit" in label
-        ModelQuantizationFilter.EIGHT_BIT -> "8bit" in label
-        ModelQuantizationFilter.F16 -> "f16" in label
-    }
 }
 
 fun formatModelSize(bytes: Long): String {

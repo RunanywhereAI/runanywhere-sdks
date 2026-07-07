@@ -29,24 +29,24 @@ import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 data class PromptSuggestion(val label: String, val prompt: String, val icon: ImageVector? = null)
 
 private val generalSuggestions = listOf(
-    PromptSuggestion("Explain LLMs", "Explain how large language models work, in simple terms."),
-    PromptSuggestion("Write a poem", "Write a short poem about the ocean at night."),
-    PromptSuggestion("Summarize a story", "Summarize Romeo and Juliet in three sentences."),
-    PromptSuggestion("Name ideas", "Give me five creative names for a coffee shop."),
+    PromptSuggestion("Plan my day", "Turn this messy list into a realistic plan with the top three priorities:"),
+    PromptSuggestion("Rewrite clearly", "Rewrite this so it is clear, warm, and concise:"),
+    PromptSuggestion("Compare options", "Compare these options, explain the tradeoffs, and recommend one:"),
+    PromptSuggestion("Summarize notes", "Summarize these notes into decisions, action items, and open questions:"),
 )
 
 private val toolSuggestions = listOf(
-    PromptSuggestion("Weather in Tokyo", "What's the weather in Tokyo right now?", RACIcons.Outline.Cloud),
-    PromptSuggestion("Current time", "What time is it right now?", RACIcons.Outline.Clock),
-    PromptSuggestion("Battery level", "What's my battery level?", RACIcons.Outline.Battery),
-    PromptSuggestion("Quick math", "What is 15% of 240?", RACIcons.Outline.Calculator),
+    PromptSuggestion("Weather plan", "Check the weather for my city and suggest what to wear today.", RACIcons.Outline.Cloud),
+    PromptSuggestion("Time check", "What time is it in London, Tokyo, and San Francisco?", RACIcons.Outline.Clock),
+    PromptSuggestion("Device status", "Check my battery level and tell me if I should charge before leaving.", RACIcons.Outline.Battery),
+    PromptSuggestion("Quick math", "Calculate 15% of 240, then show the shortcut.", RACIcons.Outline.Calculator),
 )
 
 private val personalizedSuggestions = listOf(
-    PromptSuggestion("Draft reply", "Draft a concise reply to a customer asking for a deadline update.", RACIcons.Outline.User),
-    PromptSuggestion("Improve tone", "Make this message clearer, warmer, and more direct.", RACIcons.Outline.Adjustments),
-    PromptSuggestion("Plan my day", "Help me turn a busy day into a realistic prioritized plan.", RACIcons.Outline.Clock),
-    PromptSuggestion("Review idea", "Give thoughtful feedback on a product idea and call out the risks.", RACIcons.Outline.Bolt),
+    PromptSuggestion("Draft reply", "Draft a concise, kind reply to this message:", RACIcons.Outline.User),
+    PromptSuggestion("Tighten tone", "Make this message more direct while keeping it friendly:", RACIcons.Outline.Adjustments),
+    PromptSuggestion("Decision memo", "Turn this into a one-page decision memo with risks and next steps:", RACIcons.Outline.Clock),
+    PromptSuggestion("Coach me", "Help me think through this situation and suggest my next move:", RACIcons.Outline.Bolt),
 )
 
 private enum class PromptMode { GENERAL, TOOLS, PERSONALIZED }

@@ -19,6 +19,8 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -36,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
+import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.launch
 
@@ -149,17 +152,13 @@ private fun ModelList(
     val dimens = LocalDimens.current
     var query by remember { mutableStateOf("") }
     var backendFilter by remember { mutableStateOf(ModelBackendFilter.ALL) }
-    var groupFilter by remember { mutableStateOf(ModelGroupFilter.ALL) }
-    var quantizationFilter by remember { mutableStateOf(ModelQuantizationFilter.ALL) }
 
     val sorted = state.models.sortedWith(
         compareBy({ if (viewModel.isReady(it)) 0 else 1 }, { it.name }),
     )
     val filtered = sorted.filter {
         it.matchesQuery(query) &&
-            backendFilter.matches(it) &&
-            groupFilter.matches(it) &&
-            quantizationFilter.matches(it)
+            backendFilter.matches(it)
     }
     val recommended = filtered.filter { it.id in recommendedModelIds }
     val grouped = filtered.filterNot { it.id in recommendedModelIds }.groupBy { it.consumerGroup() }
@@ -169,10 +168,6 @@ private fun ModelList(
         onQueryChange = { query = it },
         backendFilter = backendFilter,
         onBackendFilter = { backendFilter = it },
-        groupFilter = groupFilter,
-        onGroupFilter = { groupFilter = it },
-        quantizationFilter = quantizationFilter,
-        onQuantizationFilter = { quantizationFilter = it },
         shownCount = filtered.size,
         totalCount = sorted.size,
     )
@@ -265,10 +260,6 @@ private fun FilterSection(
     onQueryChange: (String) -> Unit,
     backendFilter: ModelBackendFilter,
     onBackendFilter: (ModelBackendFilter) -> Unit,
-    groupFilter: ModelGroupFilter,
-    onGroupFilter: (ModelGroupFilter) -> Unit,
-    quantizationFilter: ModelQuantizationFilter,
-    onQuantizationFilter: (ModelQuantizationFilter) -> Unit,
     shownCount: Int,
     totalCount: Int,
 ) {
@@ -282,8 +273,18 @@ private fun FilterSection(
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("Search models") },
-            placeholder = { Text("Backend, modality, quantization") },
+            shape = RoundedCornerShape(dimens.radiusLg),
+            leadingIcon = {
+                Icon(RACIcons.Outline.Search, contentDescription = null)
+            },
+            trailingIcon = {
+                if (query.isNotBlank()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(RACIcons.Outline.Close, contentDescription = "Clear search")
+                    }
+                }
+            },
+            placeholder = { Text("Search models, backends, private access") },
         )
 
         FilterRow("Backend") {
@@ -291,19 +292,6 @@ private fun FilterSection(
                 FilterChip(text = filter.title, selected = backendFilter == filter) { onBackendFilter(filter) }
             }
         }
-        FilterRow("Modality") {
-            ModelGroupFilter.entries.forEach { filter ->
-                FilterChip(text = filter.title, selected = groupFilter == filter) { onGroupFilter(filter) }
-            }
-        }
-        FilterRow("Quantization") {
-            ModelQuantizationFilter.entries.forEach { filter ->
-                FilterChip(text = filter.title, selected = quantizationFilter == filter) {
-                    onQuantizationFilter(filter)
-                }
-            }
-        }
-
         Text(
             "$shownCount of $totalCount models shown",
             style = MaterialTheme.typography.bodySmall,
@@ -347,6 +335,7 @@ private fun RAModelInfo.matchesQuery(query: String): Boolean {
         framework.shortLabel(),
         consumerGroup().title,
         quantizationLabel(),
+        if (requiresHfAuth()) "private hf auth hugging face" else "",
     ).joinToString(" ").lowercase().contains(trimmed)
 }
 

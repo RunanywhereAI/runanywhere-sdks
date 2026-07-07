@@ -172,12 +172,7 @@ struct FlatModelRow: View {
     }
 
     private var downloadAccessibilityLabel: String {
-        let size = model.downloadSizeBytes
-        if size > 0 {
-            let formatted = ByteCountFormatter.string(fromByteCount: size, countStyle: .memory)
-            return "Get \(formatted)"
-        }
-        return "Get"
+        "Get \(model.consumerSizeLabel)"
     }
 
     private var statusIcon: String {
@@ -266,6 +261,7 @@ struct FlatModelRow: View {
         HStack(spacing: AppSpacing.xxSmall) {
             Image(systemName: model.framework.consumerBackendIcon)
             Text(frameworkName)
+                .lineLimit(1)
         }
         .font(AppTypography.caption2)
         .fontWeight(.medium)
@@ -277,12 +273,48 @@ struct FlatModelRow: View {
     }
 
     private var statusRowView: some View {
-        HStack(spacing: AppSpacing.smallMedium) {
-            statusIndicator
+        VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
+            HStack(spacing: AppSpacing.smallMedium) {
+                Label(model.consumerSizeLabel, systemImage: "memorychip")
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textSecondary)
+
+                statusIndicator
+            }
 
             if !hasBlockingStatus {
-                ForEach(model.consumerCapabilityBadges) { badge in
+                capabilityBadgeRows
+            }
+        }
+    }
+
+    @ViewBuilder private var capabilityBadgeRows: some View {
+        let badges = model.consumerCapabilityBadges
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: AppSpacing.smallMedium) {
+                ForEach(badges) { badge in
                     ConsumerBadge(badge: badge)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
+                HStack(spacing: AppSpacing.smallMedium) {
+                    ForEach(Array(badges.prefix(2))) { badge in
+                        ConsumerBadge(badge: badge)
+                    }
+                }
+
+                if badges.count > 2 {
+                    HStack(spacing: AppSpacing.smallMedium) {
+                        ForEach(Array(badges.dropFirst(2).prefix(2))) { badge in
+                            ConsumerBadge(badge: badge)
+                        }
+                        if badges.count > 4 {
+                            Text("+\(badges.count - 4)")
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    }
                 }
             }
         }
@@ -343,13 +375,7 @@ struct FlatModelRow: View {
                 } label: {
                     HStack(spacing: AppSpacing.xxSmall) {
                         Image(systemName: "arrow.down.circle.fill")
-                        // Show file size instead of "Get"
-                        let size = model.downloadSizeBytes
-                        if size > 0 {
-                            Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .memory))
-                        } else {
-                            Text("Get")
-                        }
+                        Text(model.consumerSizeLabel)
                     }
                 }
                 .font(AppTypography.caption)

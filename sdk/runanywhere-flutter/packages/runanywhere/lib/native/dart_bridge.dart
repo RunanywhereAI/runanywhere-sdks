@@ -159,6 +159,7 @@ class DartBridge {
     // Step 1: Load native library
     _lib = PlatformLoader.loadCommons();
     _logger.debug('Native library loaded');
+    PlatformLoader.tryLoadFlutterNativePortHelpers();
 
     // Step 2: Register platform adapter FIRST (file ops, logging, keychain)
     // C++ needs these callbacks before any other operations

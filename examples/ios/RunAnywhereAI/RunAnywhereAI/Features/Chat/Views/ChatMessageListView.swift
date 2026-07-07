@@ -114,18 +114,23 @@ struct ChatMessageListView: View {
     private var starterPrompts: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: AppSpacing.mediumLarge) {
-                StarterPromptChip(title: "Explain", subtitle: "a complex topic simply") {
-                    viewModel.currentInput = "Explain a complex topic simply"
+                StarterPromptChip(title: "Plan", subtitle: "turn notes into priorities") {
+                    viewModel.currentInput = "Turn this messy list into a realistic plan with the top three priorities:"
                     isTextFieldFocused = true
                 }
 
-                StarterPromptChip(title: "Summarize", subtitle: "my notes or document") {
-                    viewModel.currentInput = "Summarize this clearly:"
+                StarterPromptChip(title: "Rewrite", subtitle: "make text clear and warm") {
+                    viewModel.currentInput = "Rewrite this so it is clear, warm, and concise:"
                     isTextFieldFocused = true
                 }
 
-                StarterPromptChip(title: "Draft", subtitle: "a polished response") {
-                    viewModel.currentInput = "Draft a polished response for:"
+                StarterPromptChip(title: "Compare", subtitle: "weigh options and tradeoffs") {
+                    viewModel.currentInput = "Compare these options, explain the tradeoffs, and recommend one:"
+                    isTextFieldFocused = true
+                }
+
+                StarterPromptChip(title: "Summarize", subtitle: "decisions and next steps") {
+                    viewModel.currentInput = "Summarize these notes into decisions, action items, and open questions:"
                     isTextFieldFocused = true
                 }
             }

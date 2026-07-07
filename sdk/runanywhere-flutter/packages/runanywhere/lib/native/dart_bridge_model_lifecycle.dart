@@ -23,13 +23,14 @@ import 'package:runanywhere/native/types/basic_types.dart';
 /// isolate — an earlier `Isolate.run` wrap caused universal model-load
 /// SIGABRTs on both Android and iOS
 /// because `model_lifecycle.cpp` publishes events via Dart-side
-/// `NativeCallable` that's registered on the main isolate; calling it from
-/// a worker isolate trips Dart 3.10's `DLRT_GetFfiCallbackMetadata` assert.
-/// The earlier Piper-on-iOS crash may recur; track
-/// separately. Long-term fix is commons-side: either (a) queue events
-/// instead of publishing synchronously during load, or (b) ensure the Dart
-/// SDK event-publish callback uses `NativeCallable.listener` (cross-isolate
-/// safe) rather than `isolateLocal`.
+/// Dart FFI callbacks registered on the main isolate; calling those callbacks
+/// from a worker isolate trips Dart 3.10's `DLRT_GetFfiCallbackMetadata`
+/// assert. SDK events are already delivered through `NativeCallable.listener`;
+/// the remaining blockers are synchronous `Pointer.fromFunction` platform
+/// adapter slots such as file, secure-storage, and memory callbacks. The
+/// long-term fix belongs in the platform SDK bridge layer: move those
+/// synchronous services to native platform helpers or another cross-thread
+/// safe adapter design before moving lifecycle load back off the UI isolate.
 class DartBridgeModelLifecycle {
   DartBridgeModelLifecycle._();
 
@@ -62,11 +63,9 @@ class DartBridgeModelLifecycle {
     }
 
     // Main-isolate FFI call (reverts an earlier `Isolate.run` wrap).
-    // See class-level note: cross-isolate event publish from
-    // `model_lifecycle.cpp` is unsafe with Dart 3.10's stricter callback
-    // metadata checks. We accept the main-isolate cost (≤30s for Piper /
-    // Sherpa init) until commons routes event publishes through
-    // `NativeCallable.listener` instead of `isolateLocal`.
+    // See class-level note: synchronous platform-adapter callbacks are still
+    // main-isolate callbacks. We accept the main-isolate cost until those
+    // adapter services are bridged through a cross-thread-safe design.
     final bytes = request.writeToBuffer();
     final requestPtr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
     final out = calloc<RacProtoBuffer>();

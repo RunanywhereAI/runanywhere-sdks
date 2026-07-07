@@ -165,13 +165,13 @@ class DartBridgeLLM {
   /// with TRUE incremental token delivery (FLUTTER-IOS-006 resolved).
   ///
   /// Threading model: the blocking `rac_llm_generate_stream_proto` call runs
-  /// inside a short-lived worker isolate (`Isolate.run`). On iOS, the Flutter
-  /// plugin exports a native-port helper that copies proto bytes inside the C
-  /// callback and posts owned `Uint8List` messages to the main isolate. That
-  /// path is safe for MLX, whose Swift/Metal runtime can invoke stream
-  /// callbacks from native worker threads. Older binaries/platforms fall back
-  /// to the worker-owned `NativeCallable.isolateLocal` path, which is still
-  /// valid for same-thread backend callbacks.
+  /// inside a short-lived worker isolate (`Isolate.run`). On iOS and Android,
+  /// the Flutter plugin exports a native-port helper that copies proto bytes
+  /// inside the C callback and posts owned `Uint8List` messages to the main
+  /// isolate. That path is safe for MLX/Swift async and for native backends
+  /// that invoke stream callbacks from worker threads. Older or unsupported
+  /// binaries fall back to the worker-owned `NativeCallable.isolateLocal` path,
+  /// which is valid only for same-thread backend callbacks.
   ///
   /// Cancellation: `onCancel` → `rac_llm_cancel_proto` sets the lifecycle
   /// cancel flag checked per token; the engine aborts, the worker's blocking
@@ -314,12 +314,12 @@ class DartBridgeLLM {
 //
 // Worker-isolate safety: the generation path's only Dart-bound callbacks are
 // SDK events and logging, both registered as `NativeCallable.listener`
-// (cross-isolate safe). The `Pointer.fromFunction` platform-adapter
-// trampolines (file/secure/memory) that SIGABRTed the earlier model-LOAD
-// `Isolate.run` wrap (see dart_bridge_model_lifecycle.dart) are never invoked
-// during generation. If a future commons change adds one to this path, fix
-// that callback to `.listener` — do not move the blocking call back onto the
-// main isolate.
+// (cross-isolate safe). The synchronous `Pointer.fromFunction`
+// platform-adapter trampolines (file/secure/memory) that SIGABRTed the
+// earlier model-LOAD `Isolate.run` wrap (see dart_bridge_model_lifecycle.dart)
+// are never invoked during generation. If a future commons change adds one to
+// this path, fix it in the platform adapter/native bridge layer before moving
+// the blocking call back onto the main isolate.
 
 /// Runs [_llmStreamWorker] in a worker isolate. Hoisted to top level so the
 /// `Isolate.run` closure captures ONLY its two sendable parameters
@@ -330,9 +330,9 @@ class DartBridgeLLM {
 Future<int> _runLlmStreamWorker(Uint8List requestBytes, SendPort port) =>
     Isolate.run(() => _llmStreamWorker(requestBytes, port));
 
-/// Runs the iOS Flutter native-port stream helper in a worker isolate. The
-/// helper itself posts copied token bytes to [nativePort] and posts the return
-/// code as the final sentinel.
+/// Runs the Flutter native-port stream helper in a worker isolate. The helper
+/// itself posts copied token bytes to [nativePort] and posts the return code as
+/// the final sentinel.
 Future<int> _runLlmStreamNativePortWorker(
   Uint8List requestBytes,
   int nativePort,

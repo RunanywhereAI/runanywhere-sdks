@@ -17,6 +17,8 @@ internal object ModelCatalog {
 
     private val LANGUAGE = ModelCategory.MODEL_CATEGORY_LANGUAGE
     private val MULTIMODAL = ModelCategory.MODEL_CATEGORY_MULTIMODAL
+    private val VISION = ModelCategory.MODEL_CATEGORY_VISION
+    private val EMBEDDING = ModelCategory.MODEL_CATEGORY_EMBEDDING
     private val STT = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
     private val TTS = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
     private val TAR_GZ = ArchiveType.ARCHIVE_TYPE_TAR_GZ
@@ -48,9 +50,14 @@ internal object ModelCatalog {
         SingleFileModel("llama3_2_1b", "Llama 3.2 1B (HNPU)", "https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json", QHEXRT, LANGUAGE, 0L),
         SingleFileModel("ternary_bonsai_1_7b", "Ternary Bonsai 1.7B (HNPU)", "https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json", QHEXRT, LANGUAGE, 0L),
         SingleFileModel("phi_tiny_moe", "Phi Tiny MoE (HNPU)", "https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("embeddinggemma_300m", "EmbeddingGemma 300M (HNPU)", "https://huggingface.co/runanywhere/embeddinggemma_300m_HNPU", QHEXRT, EMBEDDING, 0L),
         SingleFileModel("gemma3n_e4b", "Gemma 3n E4B (HNPU)", "https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json", QHEXRT, LANGUAGE, 0L),
         SingleFileModel("gemma4_e2b", "Gemma 4 E2B (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json", QHEXRT, LANGUAGE, 0L),
         SingleFileModel("gemma4_e4b", "Gemma 4 E4B (HNPU)", "https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json", QHEXRT, LANGUAGE, 0L),
+        SingleFileModel("llama_embed_nemotron_8b", "Llama Embed Nemotron 8B (HNPU)", "https://huggingface.co/runanywhere/llama_embed_nemotron_8b_HNPU", QHEXRT, EMBEDDING, 0L),
+        SingleFileModel("nv_embedcode_7b", "NV-EmbedCode 7B (HNPU)", "https://huggingface.co/runanywhere/nv_embedcode_7b_HNPU", QHEXRT, EMBEDDING, 0L),
+        SingleFileModel("nv_embedqa_1b", "NV-EmbedQA 1B (HNPU)", "https://huggingface.co/runanywhere/nv_embedqa_1b_HNPU", QHEXRT, EMBEDDING, 0L),
+        SingleFileModel("nv_rerankqa_1b", "NV-RerankQA 1B (HNPU)", "https://huggingface.co/runanywhere/nv_rerankqa_1b_HNPU", QHEXRT, EMBEDDING, 0L),
         SingleFileModel("deepseek_r1_distill_qwen_1_5b", "DeepSeek R1 Distill Qwen 1.5B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json", QHEXRT, LANGUAGE, 0L, supportsThinking = true),
         SingleFileModel("deepseek_r1_distill_qwen_7b", "DeepSeek R1 Distill Qwen 7B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json", QHEXRT, LANGUAGE, 0L, supportsThinking = true),
         SingleFileModel("nemotron_nano_8b", "Llama 3.1 Nemotron Nano 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json", QHEXRT, LANGUAGE, 0L),
@@ -61,6 +68,11 @@ internal object ModelCatalog {
         SingleFileModel("internvl3_5_1b", "InternVL3.5 1B (HNPU)", "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU", QHEXRT, MULTIMODAL, 0L),
         SingleFileModel("gemma4_e2b_vlm", "Gemma 4 E2B Image (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json", QHEXRT, MULTIMODAL, 0L),
         SingleFileModel("nemotron_nano_vl_8b", "Llama 3.1 Nemotron Nano VL 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json", QHEXRT, MULTIMODAL, 0L),
+        SingleFileModel("lama_dilated", "LaMa Dilated (HNPU)", "https://huggingface.co/runanywhere/lama_dilated_HNPU", QHEXRT, VISION, 0L),
+        SingleFileModel("nemotron_ocr", "Nemotron OCR (HNPU)", "https://huggingface.co/runanywhere/nemotron_ocr_HNPU", QHEXRT, MULTIMODAL, 0L),
+        SingleFileModel("nemotron_ocr_v1", "Nemotron OCR v1 (HNPU)", "https://huggingface.co/runanywhere/nemotron_ocr_v1_HNPU", QHEXRT, MULTIMODAL, 0L),
+        SingleFileModel("nemotron_parse", "Nemotron Parse (HNPU)", "https://huggingface.co/runanywhere/nemotron_parse_HNPU", QHEXRT, MULTIMODAL, 0L),
+        SingleFileModel("siglip2_base", "SigLIP2 Base (HNPU)", "https://huggingface.co/runanywhere/siglip2_base_HNPU", QHEXRT, VISION, 0L),
         SingleFileModel("whisper_base", "Whisper Base (HNPU)", "https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json", QHEXRT, STT, 0L),
         SingleFileModel("whisper_small", "Whisper Small (HNPU)", "https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json", QHEXRT, STT, 0L),
         SingleFileModel("moonshine_tiny", "Moonshine Tiny (HNPU)", "https://huggingface.co/runanywhere/moonshine_tiny_HNPU/moonshine-tiny.json", QHEXRT, STT, 0L),

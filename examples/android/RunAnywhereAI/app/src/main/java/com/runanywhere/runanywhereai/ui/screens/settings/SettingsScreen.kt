@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -25,6 +26,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
@@ -35,12 +37,17 @@ import com.runanywhere.runanywhereai.BuildConfig
 import com.runanywhere.runanywhereai.ui.screens.models.formatModelSize
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
+import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.util.readableWidth
 import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel = viewModel(),
+    onOpenModels: () -> Unit = {},
+    onOpenAdvanced: () -> Unit = {},
+) {
     val dimens = LocalDimens.current
     val settings = viewModel.settings
     val storage = viewModel.storage
@@ -62,6 +69,21 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 text = "Personalize the assistant, manage local models, and keep downloads private.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Section("App") {
+            SettingsLinkRow(
+                label = "Manage models",
+                description = "Download, switch, and remove local models",
+                icon = RACIcons.Outline.Cpu,
+                onClick = onOpenModels,
+            )
+            SettingsLinkRow(
+                label = "Advanced workbench",
+                description = "Voice, documents, tools, and diagnostics",
+                icon = RACIcons.Outline.Stack,
+                onClick = onOpenAdvanced,
             )
         }
 
@@ -136,7 +158,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("hf_…") },
                     supportingText = {
-                        Text("Used to download private Hugging Face model repos, including HNPU/QHexRT NPU bundles")
+                        Text("Stored securely and used only for private Hugging Face repos, including HNPU/QHexRT bundles")
                     },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
@@ -262,6 +284,45 @@ private fun ToggleRow(label: String, description: String, checked: Boolean, onCh
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+@Composable
+private fun SettingsLinkRow(
+    label: String,
+    description: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    val dimens = LocalDimens.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = dimens.spacingXs),
+        horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(dimens.iconMd),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = RACIcons.Outline.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(dimens.iconSm),
+        )
     }
 }
 

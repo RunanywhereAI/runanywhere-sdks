@@ -29,6 +29,13 @@ class SettingsViewModel: ObservableObject {
     @Published var isApiKeyConfigured: Bool = false
     @Published var isBaseURLConfigured: Bool = false
 
+    // Private model downloads
+    @Published var hfToken: String = ""
+    @Published var isHfTokenConfigured: Bool = false
+    @Published var isSavingHfToken: Bool = false
+    @Published var hfTokenMessage: String?
+    @Published var hfTokenMessageIsError: Bool = false
+
     // Logging Configuration
     @Published var analyticsLogToLocal: Bool = false
 
@@ -51,6 +58,7 @@ class SettingsViewModel: ObservableObject {
     private let keychainService = KeychainService.shared
     private let apiKeyStorageKey = "runanywhere_api_key"
     private let baseURLStorageKey = "runanywhere_base_url"
+    private let hfTokenStorageKey = "runanywhere_hf_token"
     private let temperatureDefaultsKey = "defaultTemperature"
     private let maxTokensDefaultsKey = "defaultMaxTokens"
     private let systemPromptDefaultsKey = "defaultSystemPrompt"
@@ -85,6 +93,16 @@ class SettingsViewModel: ObservableObject {
             return trimmed
         }
         return "https://\(trimmed)"
+    }
+
+    /// Get stored Hugging Face token (for private model downloads at launch)
+    nonisolated static func getStoredHfToken() -> String? {
+        guard let data = try? KeychainService.shared.retrieve(key: "runanywhere_hf_token"),
+              let value = String(data: data, encoding: .utf8),
+              !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Check if custom configuration is set
@@ -184,6 +202,7 @@ class SettingsViewModel: ObservableObject {
     func loadSettings() {
         loadGenerationSettings()
         loadApiKeyConfiguration()
+        loadHfTokenConfiguration()
         loadLoggingConfiguration()
     }
 
@@ -229,6 +248,18 @@ class SettingsViewModel: ObservableObject {
         } else {
             baseURL = ""
             isBaseURLConfigured = false
+        }
+    }
+
+    private func loadHfTokenConfiguration() {
+        if let tokenData = try? keychainService.retrieve(key: hfTokenStorageKey),
+           let savedToken = String(data: tokenData, encoding: .utf8),
+           !savedToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            hfToken = savedToken
+            isHfTokenConfigured = true
+        } else {
+            hfToken = ""
+            isHfTokenConfigured = false
         }
     }
 
@@ -371,6 +402,48 @@ class SettingsViewModel: ObservableObject {
     /// Check if API configuration is complete (both key and URL set)
     var isApiConfigurationComplete: Bool {
         isApiKeyConfigured && isBaseURLConfigured
+    }
+
+    // MARK: - Private Download Configuration
+
+    func saveHfToken() {
+        let trimmed = hfToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        isSavingHfToken = true
+        hfTokenMessage = nil
+        hfTokenMessageIsError = false
+
+        do {
+            if trimmed.isEmpty {
+                try keychainService.delete(key: hfTokenStorageKey)
+                hfToken = ""
+                isHfTokenConfigured = false
+                RunAnywhere.setHfToken("")
+                hfTokenMessage = "Hugging Face token cleared"
+            } else if let tokenData = trimmed.data(using: .utf8) {
+                try keychainService.save(key: hfTokenStorageKey, data: tokenData)
+                hfToken = trimmed
+                isHfTokenConfigured = true
+                RunAnywhere.setHfToken(trimmed)
+                hfTokenMessage = "Hugging Face token saved"
+            }
+
+            Task {
+                await ModelCatalogBootstrap.registerPrivateHnpuModels()
+                await ModelListViewModel.shared.loadModels()
+            }
+        } catch {
+            hfTokenMessage = trimmed.isEmpty
+                ? "Could not clear Hugging Face token"
+                : "Could not save Hugging Face token"
+            hfTokenMessageIsError = true
+        }
+
+        isSavingHfToken = false
+    }
+
+    func clearHfToken() {
+        hfToken = ""
+        saveHfToken()
     }
 
     // MARK: - Logging Configuration

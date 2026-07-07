@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.data.ModelCatalog
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
@@ -56,8 +57,14 @@ class ModelSelectionViewModel(
 
     private suspend fun reload() {
         try {
-            val models = RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
+            val registryModels = RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
                 .filter { context.accepts(it) }
+            val registryIds = registryModels.mapTo(mutableSetOf()) { it.id }
+            val fallbackNpuModels = ModelCatalog.npuModels()
+                .map { it.toModelInfo() }
+                .filter { context.accepts(it) }
+                .filterNot { it.id in registryIds }
+            val models = registryModels + fallbackNpuModels
             state = state.copy(models = models, isLoading = false, error = null)
             syncCurrent(models)
             autoLoadIfNeeded(models)

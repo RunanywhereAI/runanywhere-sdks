@@ -5,8 +5,11 @@
 //  Consumer-facing labels for SDK model metadata.
 //
 
+import Foundation
 import SwiftUI
 import RunAnywhere
+
+private let privateHfTags: Set<String> = ["private", "requires-hf-auth", "hf-auth", "gated"]
 
 struct ModelCapabilityBadge: Identifiable {
     let id: String
@@ -337,6 +340,22 @@ extension RAModelInfo {
         return metadata.tags.contains(where: { $0.lowercased() == "lora-adapter" || $0.lowercased() == "lora" })
     }
 
+    var requiresHfAuth: Bool {
+        metadata.tags.contains { privateHfTags.contains($0.lowercased()) } ||
+            framework == .qhexrt && downloadURL.localizedCaseInsensitiveContains("_HNPU")
+    }
+
+    var consumerSizeLabel: String {
+        if isBuiltIn {
+            return "No download"
+        }
+        let bytes = max(downloadSizeBytes, memoryRequiredBytes)
+        if bytes > 0 {
+            return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory)
+        }
+        return requiresHfAuth ? "Size varies" : "Size unknown"
+    }
+
     var consumerModelGroup: ConsumerModelGroup {
         if isAppleFoundationModel {
             return .appleBuiltIn
@@ -411,6 +430,15 @@ extension RAModelInfo {
             ))
         }
 
+        if requiresHfAuth {
+            badges.append(ModelCapabilityBadge(
+                id: "hf-auth",
+                label: "Private HF",
+                systemImage: "lock.fill",
+                color: AppColors.statusOrange
+            ))
+        }
+
         if isBuiltIn {
             badges.append(ModelCapabilityBadge(
                 id: "builtin",
@@ -457,6 +485,7 @@ struct ConsumerBadge: View {
         HStack(spacing: AppSpacing.xxSmall) {
             Image(systemName: badge.systemImage)
             Text(badge.label)
+                .lineLimit(1)
         }
         .font(AppTypography.caption2)
         .padding(.horizontal, AppSpacing.small)

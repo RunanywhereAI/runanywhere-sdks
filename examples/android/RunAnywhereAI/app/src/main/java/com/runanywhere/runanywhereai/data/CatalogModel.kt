@@ -10,11 +10,16 @@ import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFileRole
 import ai.runanywhere.proto.v1.ModelInfo
+import ai.runanywhere.proto.v1.ModelInfoMetadata
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.MultiFileArtifact
 import ai.runanywhere.proto.v1.SingleFileArtifact
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.registerModel
+
+private const val HNPU_TAG = "hnpu"
+private const val PRIVATE_TAG = "private"
+private const val HF_AUTH_TAG = "requires-hf-auth"
 
 internal sealed interface CatalogModel {
     val id: String
@@ -34,6 +39,19 @@ internal data class SingleFileModel(
     val supportsLora: Boolean = false,
     val supportsThinking: Boolean = false,
 ) : CatalogModel {
+    private val requiresHfAuth: Boolean
+        get() = framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
+            url.contains("_HNPU", ignoreCase = true)
+
+    private fun catalogMetadata(): ModelInfoMetadata? {
+        if (!requiresHfAuth) return null
+        return ModelInfoMetadata(
+            description = "Private HNPU bundle. Add a Hugging Face token in Settings before downloading.",
+            author = "RunAnywhere",
+            tags = listOf(PRIVATE_TAG, HF_AUTH_TAG, HNPU_TAG),
+        )
+    }
+
     override suspend fun register() {
         RunAnywhere.registerModel(
             id = id,
@@ -58,6 +76,8 @@ internal data class SingleFileModel(
         download_size_bytes = memoryBytes,
         supports_lora = supportsLora,
         supports_thinking = supportsThinking,
+        description = catalogMetadata()?.description.orEmpty(),
+        metadata = catalogMetadata(),
         single_file = SingleFileArtifact(),
     )
 }

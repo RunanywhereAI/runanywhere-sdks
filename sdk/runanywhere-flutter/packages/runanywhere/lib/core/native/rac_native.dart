@@ -109,8 +109,9 @@ typedef RacLlmGenerateStreamProtoDart =
 typedef RacDartPostCObjectNative =
     ffi.Int8 Function(ffi.Int64, ffi.Pointer<ffi.Dart_CObject>);
 
-/// Flutter iOS helper that copies LLM stream events natively and posts them to
-/// a Dart ReceivePort. Exported by the Flutter pod, not by RACommons.
+/// Flutter platform helper that copies LLM stream events natively and posts
+/// them to a Dart ReceivePort. Exported by the Flutter pod/helper library,
+/// not by RACommons.
 typedef RaFlutterLlmGenerateStreamNativePortNative =
     ffi.Int32 Function(
       ffi.Pointer<ffi.Uint8>,
@@ -125,6 +126,83 @@ typedef RaFlutterLlmGenerateStreamNativePortDart =
       int,
       ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
     );
+
+/// Flutter platform helper that copies VLM stream events natively and posts
+/// them to a Dart ReceivePort. Exported by the Flutter pod/helper library,
+/// not by RACommons.
+typedef RaFlutterVlmStreamNativePortNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Int64,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+typedef RaFlutterVlmStreamNativePortDart =
+    int Function(
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+
+/// Flutter platform helper that copies TTS stream events natively and posts
+/// them to a Dart ReceivePort. Exported by the Flutter pod/helper library,
+/// not by RACommons.
+typedef RaFlutterTtsSynthesizeStreamNativePortNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Int64,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+typedef RaFlutterTtsSynthesizeStreamNativePortDart =
+    int Function(
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+
+/// Flutter platform helper that copies voice-agent turn events natively and
+/// posts them to a Dart ReceivePort. Exported by the Flutter pod/helper
+/// library, not by RACommons.
+typedef RaFlutterVoiceAgentProcessTurnNativePortNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Int64,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+typedef RaFlutterVoiceAgentProcessTurnNativePortDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+
+/// Flutter platform helper that registers the raw voice-agent handle callback
+/// through a Dart native port. Exported by the Flutter pod/helper library,
+/// not by RACommons.
+typedef RaFlutterVoiceAgentSetProtoCallbackNativePortNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Int64,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+typedef RaFlutterVoiceAgentSetProtoCallbackNativePortDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+
+typedef RaFlutterVoiceAgentUnsetProtoCallbackNativePortNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Void>);
+typedef RaFlutterVoiceAgentUnsetProtoCallbackNativePortDart =
+    int Function(ffi.Pointer<ffi.Void>);
 
 typedef RacLlmCancelProtoNative =
     ffi.Int32 Function(ffi.Pointer<RacProtoBuffer>);
@@ -597,6 +675,27 @@ typedef RacSttSetStreamProtoCallbackDart =
 typedef RacSttUnsetStreamProtoCallbackNative =
     ffi.Int32 Function(ffi.Pointer<ffi.Void>);
 typedef RacSttUnsetStreamProtoCallbackDart =
+    int Function(ffi.Pointer<ffi.Void>);
+
+/// Flutter platform helper that registers an STT stream callback which posts
+/// copied events to a Dart ReceivePort. Exported by the Flutter pod/helper
+/// library, not by RACommons.
+typedef RaFlutterSttSetStreamNativePortNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Int64,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+typedef RaFlutterSttSetStreamNativePortDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+
+typedef RaFlutterSttUnsetStreamNativePortNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Void>);
+typedef RaFlutterSttUnsetStreamNativePortDart =
     int Function(ffi.Pointer<ffi.Void>);
 
 typedef RacSttStreamStartProtoNative =
@@ -1191,9 +1290,30 @@ T? _lookupOptional<T extends Function>(T Function() lookup) {
   }
 }
 
+T? _lookupOptionalIn<T extends Function>(
+  Iterable<ffi.DynamicLibrary> libraries,
+  T Function(ffi.DynamicLibrary) lookup,
+) {
+  for (final library in libraries) {
+    try {
+      return lookup(library);
+    } catch (_) {
+      // Try the next candidate library.
+    }
+  }
+  return null;
+}
+
+List<ffi.DynamicLibrary> _helperLookupLibraries(
+  ffi.DynamicLibrary commons,
+  ffi.DynamicLibrary? helpers,
+) => helpers == null
+    ? <ffi.DynamicLibrary>[commons]
+    : <ffi.DynamicLibrary>[helpers, commons];
+
 /// Typed bindings for the commons C ABI surfaces this file owns.
 class RacBindings {
-  RacBindings(ffi.DynamicLibrary lib)
+  RacBindings(ffi.DynamicLibrary lib, [ffi.DynamicLibrary? helperLib])
     : rac_proto_buffer_init = lib
           .lookupFunction<RacProtoBufferInitNative, RacProtoBufferInitDart>(
             'rac_proto_buffer_init',
@@ -1229,12 +1349,62 @@ class RacBindings {
                 >('rac_llm_generate_stream_proto'),
           ),
       ra_flutter_llm_generate_stream_proto_native_port =
-          _lookupOptional<RaFlutterLlmGenerateStreamNativePortDart>(
-            () =>
-                lib.lookupFunction<
+          _lookupOptionalIn<RaFlutterLlmGenerateStreamNativePortDart>(
+            _helperLookupLibraries(lib, helperLib),
+            (library) =>
+                library.lookupFunction<
                   RaFlutterLlmGenerateStreamNativePortNative,
                   RaFlutterLlmGenerateStreamNativePortDart
                 >('ra_flutter_llm_generate_stream_proto_native_port'),
+          ),
+      ra_flutter_vlm_stream_proto_native_port =
+          _lookupOptionalIn<RaFlutterVlmStreamNativePortDart>(
+            _helperLookupLibraries(lib, helperLib),
+            (library) =>
+                library.lookupFunction<
+                  RaFlutterVlmStreamNativePortNative,
+                  RaFlutterVlmStreamNativePortDart
+                >('ra_flutter_vlm_stream_proto_native_port'),
+          ),
+      ra_flutter_tts_synthesize_stream_lifecycle_proto_native_port =
+          _lookupOptionalIn<RaFlutterTtsSynthesizeStreamNativePortDart>(
+            _helperLookupLibraries(lib, helperLib),
+            (library) =>
+                library.lookupFunction<
+                  RaFlutterTtsSynthesizeStreamNativePortNative,
+                  RaFlutterTtsSynthesizeStreamNativePortDart
+                >(
+                  'ra_flutter_tts_synthesize_stream_lifecycle_proto_native_port',
+                ),
+          ),
+      ra_flutter_voice_agent_process_turn_proto_native_port =
+          _lookupOptionalIn<RaFlutterVoiceAgentProcessTurnNativePortDart>(
+            _helperLookupLibraries(lib, helperLib),
+            (library) =>
+                library.lookupFunction<
+                  RaFlutterVoiceAgentProcessTurnNativePortNative,
+                  RaFlutterVoiceAgentProcessTurnNativePortDart
+                >('ra_flutter_voice_agent_process_turn_proto_native_port'),
+          ),
+      ra_flutter_voice_agent_set_proto_callback_native_port =
+          _lookupOptionalIn<RaFlutterVoiceAgentSetProtoCallbackNativePortDart>(
+            _helperLookupLibraries(lib, helperLib),
+            (library) =>
+                library.lookupFunction<
+                  RaFlutterVoiceAgentSetProtoCallbackNativePortNative,
+                  RaFlutterVoiceAgentSetProtoCallbackNativePortDart
+                >('ra_flutter_voice_agent_set_proto_callback_native_port'),
+          ),
+      ra_flutter_voice_agent_unset_proto_callback_native_port =
+          _lookupOptionalIn<
+            RaFlutterVoiceAgentUnsetProtoCallbackNativePortDart
+          >(
+            _helperLookupLibraries(lib, helperLib),
+            (library) =>
+                library.lookupFunction<
+                  RaFlutterVoiceAgentUnsetProtoCallbackNativePortNative,
+                  RaFlutterVoiceAgentUnsetProtoCallbackNativePortDart
+                >('ra_flutter_voice_agent_unset_proto_callback_native_port'),
           ),
       rac_llm_cancel_proto = _lookupOptional<RacLlmCancelProtoDart>(
         () =>
@@ -2018,6 +2188,24 @@ class RacBindings {
                   RacSttUnsetStreamProtoCallbackDart
                 >('rac_stt_unset_stream_proto_callback'),
           ),
+      ra_flutter_stt_set_stream_proto_native_port =
+          _lookupOptionalIn<RaFlutterSttSetStreamNativePortDart>(
+            _helperLookupLibraries(lib, helperLib),
+            (library) =>
+                library.lookupFunction<
+                  RaFlutterSttSetStreamNativePortNative,
+                  RaFlutterSttSetStreamNativePortDart
+                >('ra_flutter_stt_set_stream_proto_native_port'),
+          ),
+      ra_flutter_stt_unset_stream_proto_native_port =
+          _lookupOptionalIn<RaFlutterSttUnsetStreamNativePortDart>(
+            _helperLookupLibraries(lib, helperLib),
+            (library) =>
+                library.lookupFunction<
+                  RaFlutterSttUnsetStreamNativePortNative,
+                  RaFlutterSttUnsetStreamNativePortDart
+                >('ra_flutter_stt_unset_stream_proto_native_port'),
+          ),
       rac_stt_stream_start_proto = _lookupOptional<RacSttStreamStartProtoDart>(
         () =>
             lib.lookupFunction<
@@ -2266,6 +2454,21 @@ class RacBindings {
 
   final RaFlutterLlmGenerateStreamNativePortDart?
   ra_flutter_llm_generate_stream_proto_native_port;
+
+  final RaFlutterVlmStreamNativePortDart?
+  ra_flutter_vlm_stream_proto_native_port;
+
+  final RaFlutterTtsSynthesizeStreamNativePortDart?
+  ra_flutter_tts_synthesize_stream_lifecycle_proto_native_port;
+
+  final RaFlutterVoiceAgentProcessTurnNativePortDart?
+  ra_flutter_voice_agent_process_turn_proto_native_port;
+
+  final RaFlutterVoiceAgentSetProtoCallbackNativePortDart?
+  ra_flutter_voice_agent_set_proto_callback_native_port;
+
+  final RaFlutterVoiceAgentUnsetProtoCallbackNativePortDart?
+  ra_flutter_voice_agent_unset_proto_callback_native_port;
 
   final RacLlmCancelProtoDart? rac_llm_cancel_proto;
 
@@ -2548,6 +2751,14 @@ class RacBindings {
   /// `rac_stt_unset_stream_proto_callback(handle)`.
   final RacSttUnsetStreamProtoCallbackDart? rac_stt_unset_stream_proto_callback;
 
+  /// Flutter platform helper: register stream callback via Dart native port.
+  final RaFlutterSttSetStreamNativePortDart?
+  ra_flutter_stt_set_stream_proto_native_port;
+
+  /// Flutter platform helper: unset stream callback and free native-port context.
+  final RaFlutterSttUnsetStreamNativePortDart?
+  ra_flutter_stt_unset_stream_proto_native_port;
+
   /// `rac_stt_stream_start_proto(handle, options_bytes, size, out_session)`.
   final RacSttStreamStartProtoDart? rac_stt_stream_start_proto;
 
@@ -2706,5 +2917,8 @@ class RacBindings {
 class RacNative {
   RacNative._();
 
-  static final RacBindings bindings = RacBindings(PlatformLoader.loadCommons());
+  static final RacBindings bindings = RacBindings(
+    PlatformLoader.loadCommons(),
+    PlatformLoader.tryLoadFlutterNativePortHelpers(),
+  );
 }

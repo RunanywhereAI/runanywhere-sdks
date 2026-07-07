@@ -82,6 +82,7 @@ struct ModelSelectionSheet: View {
     @State private var isLoadingModel = false
     @State private var loadingProgress: String = ""
     @State private var loadErrorMessage: String?
+    @State private var searchText = ""
 
     let context: ModelSelectionContext
     let onModelSelected: (RAModelInfo) async -> Void
@@ -94,7 +95,7 @@ struct ModelSelectionSheet: View {
         self.onModelSelected = onModelSelected
     }
 
-    private var availableModels: [RAModelInfo] {
+    private var candidateModels: [RAModelInfo] {
         viewModel.availableModels
             .filter { model in
                 guard context.relevantCategories.contains(model.category) else { return false }
@@ -118,6 +119,24 @@ struct ModelSelectionSheet: View {
             }
     }
 
+    private var availableModels: [RAModelInfo] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return candidateModels }
+        return candidateModels.filter { model in
+            [
+                model.name,
+                model.id,
+                model.framework.consumerBackendLabel,
+                model.framework.consumerBackendDescription,
+                model.consumerModelGroup.title,
+                model.requiresHfAuth ? "private hf auth hugging face" : ""
+            ]
+            .joined(separator: " ")
+            .lowercased()
+            .contains(query)
+        }
+    }
+
     private var groupedModels: [ConsumerModelGroup: [RAModelInfo]] {
         Dictionary(grouping: availableModels, by: \.consumerModelGroup)
     }
@@ -134,6 +153,9 @@ struct ModelSelectionSheet: View {
     }
 
     private func unavailableReason(for model: RAModelInfo) -> String? {
+        if model.framework == .qhexrt {
+            return "Requires a Qualcomm Hexagon NPU Android device."
+        }
         guard model.framework == .foundationModels else { return nil }
         return SystemFoundationModels.unavailableReason
     }
@@ -142,6 +164,7 @@ struct ModelSelectionSheet: View {
         NavigationStack {
             ZStack {
                 List {
+                    modelSearchSection
                     deviceStatusSection
                     modelsListSection
                 }
@@ -208,6 +231,38 @@ struct ModelSelectionSheet: View {
     }
 }
 
+// MARK: - Search Section
+
+extension ModelSelectionSheet {
+    private var modelSearchSection: some View {
+        Section {
+            HStack(spacing: AppSpacing.smallMedium) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(AppColors.textSecondary)
+                TextField("Search models, backends, private access", text: $searchText)
+                    .disableAutocorrection(true)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
+                }
+            }
+            .padding(.horizontal, AppSpacing.medium)
+            .padding(.vertical, AppSpacing.smallMedium)
+            .background(AppColors.backgroundSecondary)
+            .cornerRadius(AppSpacing.cornerRadiusRegular)
+        } footer: {
+            Text("\(availableModels.count) of \(candidateModels.count) models shown")
+                .font(AppTypography.caption)
+        }
+    }
+}
+
 // MARK: - Device Status Section
 
 extension ModelSelectionSheet {
@@ -253,8 +308,14 @@ extension ModelSelectionSheet {
 
     private var loadingModelsView: some View {
         VStack(alignment: .center, spacing: AppSpacing.mediumLarge) {
-            ProgressView()
-            Text("Loading available models...")
+            if candidateModels.isEmpty {
+                ProgressView()
+            } else {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(AppColors.textSecondary.opacity(0.7))
+            }
+            Text(candidateModels.isEmpty ? "Loading available models..." : "No models match your search")
                 .font(AppTypography.subheadline)
                 .foregroundColor(AppColors.textSecondary)
         }

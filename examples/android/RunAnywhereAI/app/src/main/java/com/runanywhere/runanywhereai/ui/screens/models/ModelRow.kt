@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,11 +28,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.sdk.public.types.RAModelInfo
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ModelRow(
     model: RAModelInfo,
@@ -45,6 +49,7 @@ fun ModelRow(
 ) {
     val dimens = LocalDimens.current
     val brand = model.brand()
+    val hasHfToken = SettingsRepository.settings.hfToken.isNotBlank()
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -78,9 +83,23 @@ fun ModelRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 BackendBadge(framework = model.framework)
-                Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-                    Pill(model.quantizationLabel(), MaterialTheme.colorScheme.onSurfaceVariant)
-                    model.capabilityLabels().take(3).forEach { label ->
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+                    verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+                ) {
+                    Pill(model.sizeLabel(), MaterialTheme.colorScheme.onSurfaceVariant)
+                    val quantization = model.quantizationLabel()
+                    if (quantization != "Default") {
+                        Pill(quantization, MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (model.requiresHfAuth()) {
+                        Pill(
+                            "Private",
+                            if (hasHfToken) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    model.capabilityLabels().filterNot { it == "HF auth" }.take(2).forEach { label ->
                         Pill(label, MaterialTheme.colorScheme.primary)
                     }
                 }
@@ -134,11 +153,13 @@ private fun TrailingAction(
 @Composable
 private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
     val dimens = LocalDimens.current
+    val needsHfToken = model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()
     AssistChip(
         onClick = onDownload,
+        enabled = !needsHfToken,
         label = {
             Text(
-                text = formatModelSize(model.download_size_bytes),
+                text = if (needsHfToken) "HF token" else model.sizeLabel(),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -151,6 +172,12 @@ private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
             )
         },
     )
+}
+
+private fun RAModelInfo.sizeLabel(): String {
+    val bytes = maxOf(download_size_bytes, memory_required_bytes ?: 0L)
+    if (bytes > 0) return formatModelSize(bytes)
+    return if (requiresHfAuth()) "Size varies" else "Size unknown"
 }
 
 @Composable
@@ -178,6 +205,8 @@ private fun Pill(
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

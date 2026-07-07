@@ -324,3 +324,21 @@ Both engines share the **underlying ONNX Runtime** (`libonnxruntime.so` / equiva
 | llama.cpp engine | b7199 |
 | ONNX Runtime | 1.23.2 |
 | Canonical version source | `sdk/runanywhere-commons/VERSION` (0.19.13) |
+
+## 2026-07 Callback Architecture Update
+
+Flutter streaming callbacks now use plugin-owned native-port helpers for every high-risk proto stream path: LLM, VLM, STT, TTS, and voice-agent turns/handle callbacks. iOS helpers live under `packages/runanywhere/ios/Classes/*NativePort.mm`; Android helpers live in `packages/runanywhere/android/src/main/cpp/NativePortHelpers.cpp` and build into `librunanywhere_flutter_helpers.so`. Both implementations copy borrowed C++ proto bytes inside the native callback and post owned `Uint8List` messages to Dart `ReceivePort`s with `Dart_PostCObject`.
+
+This exists because Dart `NativeCallable.isolateLocal` is only safe when native invokes the callback on the registering isolate thread, while MLX/Swift async and other native runtimes may emit from worker threads. `NativeCallable.listener` is cross-thread safe but runs later on the Dart event loop, which is too late for borrowed buffers that commons may reuse immediately after the callback returns. The native-port helper is the bridge-layer fix that preserves the existing architecture: examples keep calling SDK APIs directly, the Flutter SDK still uses FFI rather than platform channels for inference, and C++ commons remains the owner of inference/model orchestration.
+
+Current pattern:
+
+1. `rac_native.dart` looks up optional `ra_flutter_*_native_port` symbols exported by the Flutter iOS pod or Android helper library.
+2. Dart bridge slices prefer the native-port helper when present.
+3. Native helper copies bytes synchronously during the C callback.
+4. Dart receives owned bytes on a `ReceivePort`, decodes generated protobuf types, and emits normal SDK streams.
+5. Older or unsupported binaries may fall back to same-thread `isolateLocal` paths only where explicitly documented.
+
+On Android, `DartBridge.initialize()` warm-loads optional helpers through `PlatformLoader.tryLoadFlutterNativePortHelpers()`, which opens `librunanywhere_flutter_helpers.so`; `RacBindings` then searches that helper library before RACommons for `ra_flutter_*_native_port` symbols. The helper library links against the packaged `librac_commons.so`; local builds filter helper ABIs to the staged RACommons ABI directories, while remote/release mode targets the full supported ABI set after `downloadNativeLibs`.
+
+When adding a new Flutter stream callback, do not read borrowed C callback bytes asynchronously from Dart. Add a small native-port helper at the platform SDK layer, copy bytes before returning to commons, expose it as an optional FFI symbol in `rac_native.dart`, and keep example apps thin. Do this before moving model lifecycle or stream feeding back to worker isolates, especially for qhexrt or other backends that may call from native worker threads.

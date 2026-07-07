@@ -104,6 +104,9 @@ struct RunAnywhereAIApp: App {
             let startTime = Date()
             try runSDKInitialize()
             _ = HybridDeviceState.setProvider(AppleDeviceStateProvider())
+            if let hfToken = SettingsViewModel.getStoredHfToken() {
+                RunAnywhere.setHfToken(hfToken)
+            }
 
             await ModelCatalogBootstrap.registerAll()
             await refreshSDKCatalogs()

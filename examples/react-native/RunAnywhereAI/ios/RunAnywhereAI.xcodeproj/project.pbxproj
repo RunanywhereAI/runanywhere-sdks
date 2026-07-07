@@ -254,7 +254,7 @@
 			);
 			mainGroup = 83CBB9F61A601CBA00E9B192;
 			packageReferences = (
-				3ED127FFF6CD4917AD48F6A2 /* XCLocalSwiftPackageReference "../../../.." */,
+				3ED127FFF6CD4917AD48F6A2 /* XCLocalSwiftPackageReference ".." */,
 			);
 			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
 			projectDirPath = "";
@@ -769,7 +769,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		3ED127FFF6CD4917AD48F6A2 /* XCLocalSwiftPackageReference "../../../.." */ = {
+		3ED127FFF6CD4917AD48F6A2 /* XCLocalSwiftPackageReference ".." */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../../..;
 		};
@@ -778,7 +778,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		0E4353DAE3384B84B32B72FE /* RunAnywhereMLX */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 3ED127FFF6CD4917AD48F6A2 /* XCLocalSwiftPackageReference "../../../.." */;
+			package = 3ED127FFF6CD4917AD48F6A2 /* XCLocalSwiftPackageReference ".." */;
 			productName = RunAnywhereMLX;
 		};
 /* End XCSwiftPackageProductDependency section */

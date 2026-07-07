@@ -55,7 +55,7 @@ object PlatformAdapterBridge {
     private val httpDownloadTasks = ConcurrentHashMap<String, HttpDownloadTask>()
 
     private val httpDownloadExecutor =
-        Executors.newCachedThreadPool { runnable ->
+        Executors.newFixedThreadPool(2) { runnable ->
             Thread(runnable, "runanywhere-http-download").apply {
                 isDaemon = true
             }

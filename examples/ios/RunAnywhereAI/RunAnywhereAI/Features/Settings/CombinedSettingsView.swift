@@ -126,6 +126,15 @@ private struct IOSSettingsContent: View {
                     .font(AppTypography.caption)
             }
 
+            Section {
+                PrivateDownloadsControls(viewModel: viewModel)
+            } header: {
+                Text("Private Downloads")
+            } footer: {
+                Text("Add a Hugging Face token to download private HNPU/QHexRT model bundles.")
+                    .font(AppTypography.caption)
+            }
+
             Section("Privacy") {
                 Label("Chats and downloads stay on this device", systemImage: "lock.shield")
                     .foregroundColor(AppColors.textPrimary)
@@ -276,6 +285,7 @@ private struct MacOSSettingsContent: View {
                 GenerationSettingsCard(viewModel: viewModel)
                 ToolSettingsCard(viewModel: toolViewModel)
                 APIConfigurationCard(viewModel: viewModel)
+                PrivateDownloadsCard(viewModel: viewModel)
                 LoggingConfigurationCard(viewModel: viewModel)
                 BenchmarksCard()
                 AboutCard()
@@ -461,6 +471,66 @@ private struct APIConfigurationCard: View {
                 Text("Configure custom API key and base URL for testing. Requires app restart.")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.textSecondary)
+            }
+        }
+    }
+}
+
+private struct PrivateDownloadsCard: View {
+    @ObservedObject var viewModel: SettingsViewModel
+
+    var body: some View {
+        SettingsCard(title: "Private Downloads") {
+            PrivateDownloadsControls(viewModel: viewModel)
+        }
+    }
+}
+
+private struct PrivateDownloadsControls: View {
+    @ObservedObject var viewModel: SettingsViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.padding15) {
+            HStack {
+                Text("Hugging Face Token")
+                Spacer()
+                Text(viewModel.isHfTokenConfigured ? "Configured" : "Not Set")
+                    .font(AppTypography.caption)
+                    .foregroundColor(viewModel.isHfTokenConfigured ? AppColors.statusGreen : AppColors.statusOrange)
+            }
+
+            SecureField("hf_...", text: $viewModel.hfToken)
+                .textFieldStyle(.roundedBorder)
+                .disabled(viewModel.isSavingHfToken)
+
+            Text("Used only for private Hugging Face repos, including HNPU/QHexRT bundles.")
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.textSecondary)
+
+            HStack(spacing: AppSpacing.smallMedium) {
+                Button("Save Token") {
+                    viewModel.saveHfToken()
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.primaryAccent)
+                .disabled(viewModel.isSavingHfToken)
+
+                Button("Clear") {
+                    viewModel.clearHfToken()
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.primaryRed)
+                .disabled(viewModel.isSavingHfToken)
+
+                if viewModel.isSavingHfToken {
+                    ProgressView()
+                }
+            }
+
+            if let message = viewModel.hfTokenMessage {
+                Text(message)
+                    .font(AppTypography.caption)
+                    .foregroundColor(viewModel.hfTokenMessageIsError ? AppColors.primaryRed : AppColors.statusGreen)
             }
         }
     }

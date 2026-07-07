@@ -43,7 +43,7 @@ class DartBridgeSTT {
   String? _loadedModelId;
   final _logger = SDKLogger('DartBridge.STT');
   static STTOutput Function(STTTranscriptionRequest)?
-      _transcribeLifecycleProtoForTesting;
+  _transcribeLifecycleProtoForTesting;
 
   static void setTranscribeLifecycleProtoForTesting(
     STTOutput Function(STTTranscriptionRequest)? override,
@@ -166,8 +166,9 @@ class DartBridgeSTT {
     }
 
     final requestBytes = request.writeToBuffer();
-    final resultBytes =
-        await Isolate.run(() => _sttTranscribeWorker(requestBytes));
+    final resultBytes = await Isolate.run(
+      () => _sttTranscribeWorker(requestBytes),
+    );
     return STTOutput.fromBuffer(resultBytes);
   }
 
@@ -187,7 +188,8 @@ class DartBridgeSTT {
     final fn = RacNative.bindings.rac_stt_component_transcribe_proto;
     if (fn == null) {
       throw UnsupportedError(
-          'rac_stt_component_transcribe_proto is unavailable');
+        'rac_stt_component_transcribe_proto is unavailable',
+      );
     }
 
     final optionsBytes = options.writeToBuffer();
@@ -268,24 +270,26 @@ class DartBridgeSTT {
   /// Swift `CppBridge.STT.transcribeSessionStream` over the
   /// `rac_stt_stream_*_proto` ABI (rac_stt_stream.h).
   ///
-  /// Events fire synchronously during `feed`/`stop` on this isolate
-  /// (`NativeCallable.isolateLocal` — same UAF rationale as the one-shot
-  /// `transcribeStream`); teardown follows the header contract:
-  /// unset callback → `rac_stt_proto_quiesce()` → close the callable.
+  /// On iOS and Android, events are delivered through a native-port helper
+  /// that copies bytes before posting to Dart, so MLX/Swift async and native
+  /// worker-thread callbacks do not need to enter a Dart `isolateLocal`
+  /// trampoline from a non-Dart thread. Older or unsupported binaries fall
+  /// back to `NativeCallable.isolateLocal`, valid only for same-thread backend
+  /// callbacks. Teardown follows the header contract: unset callback →
+  /// `rac_stt_proto_quiesce()` → free callback context.
   Stream<STTPartialResult> transcribeSessionStream(
     Stream<Uint8List> audio,
     STTOptions options,
   ) {
     final controller = StreamController<STTPartialResult>();
     NativeCallable<RacSttStreamEventCallbackNative>? nativeCb;
+    ReceivePort? nativePortEvents;
     var cancelled = false;
     var sessionId = 0;
 
     void emitFailure(String message) {
       if (controller.isClosed) return;
-      controller.add(
-        STTPartialResult(text: message, isFinal: true),
-      );
+      controller.add(STTPartialResult(text: message, isFinal: true));
     }
 
     controller
@@ -293,20 +297,26 @@ class DartBridgeSTT {
         final bindings = RacNative.bindings;
         final setCallback = bindings.rac_stt_set_stream_proto_callback;
         final unsetCallback = bindings.rac_stt_unset_stream_proto_callback;
+        final setNativePortCallback =
+            bindings.ra_flutter_stt_set_stream_proto_native_port;
+        final unsetNativePortCallback =
+            bindings.ra_flutter_stt_unset_stream_proto_native_port;
         final start = bindings.rac_stt_stream_start_proto;
         final feed = bindings.rac_stt_stream_feed_audio_proto;
         final stop = bindings.rac_stt_stream_stop_proto;
         final cancel = bindings.rac_stt_stream_cancel_proto;
-        if (setCallback == null ||
-            unsetCallback == null ||
+        if ((setCallback == null && setNativePortCallback == null) ||
+            (unsetCallback == null && unsetNativePortCallback == null) ||
             start == null ||
             feed == null ||
             stop == null ||
             cancel == null) {
-          controller.addError(UnsupportedError(
-            'rac_stt_stream_*_proto session ABI is unavailable in this '
-            'commons binary',
-          ));
+          controller.addError(
+            UnsupportedError(
+              'rac_stt_stream_*_proto session ABI is unavailable in this '
+              'commons binary',
+            ),
+          );
           unawaited(controller.close());
           return;
         }
@@ -315,53 +325,81 @@ class DartBridgeSTT {
         try {
           handle = getHandle();
 
-          nativeCb = NativeCallable<RacSttStreamEventCallbackNative>.isolateLocal(
-            (Pointer<Uint8> bytesPtr, int bytesLen, Pointer<Void> _) {
-              if (controller.isClosed ||
-                  cancelled ||
-                  bytesLen <= 0 ||
-                  bytesPtr == nullptr) {
-                return;
-              }
-              final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-              try {
-                final event = STTStreamEvent.fromBuffer(copy);
-                switch (event.kind) {
-                  case STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL:
-                  case STTStreamEventKind.STT_STREAM_EVENT_KIND_ENDPOINT:
-                    if (event.hasPartial()) {
-                      controller.add(event.partial);
+          void dispatchEventBytes(Uint8List copy) {
+            if (controller.isClosed || cancelled || copy.isEmpty) {
+              return;
+            }
+            try {
+              final event = STTStreamEvent.fromBuffer(copy);
+              switch (event.kind) {
+                case STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL:
+                case STTStreamEventKind.STT_STREAM_EVENT_KIND_ENDPOINT:
+                  if (event.hasPartial()) {
+                    controller.add(event.partial);
+                  }
+                case STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL:
+                  // `event` is a local decode of copied bytes; mutating its
+                  // submessage in place is safe.
+                  final partial = event.hasPartial()
+                      ? event.partial
+                      : STTPartialResult();
+                  partial.isFinal = true;
+                  if (event.hasFinalOutput()) {
+                    partial.finalOutput = event.finalOutput;
+                    if (partial.text.isEmpty) {
+                      partial.text = event.finalOutput.text;
                     }
-                  case STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL:
-                    // `event` is a local decode of copied bytes; mutating its
-                    // submessage in place is safe.
-                    final partial =
-                        event.hasPartial() ? event.partial : STTPartialResult();
-                    partial.isFinal = true;
-                    if (event.hasFinalOutput()) {
-                      partial.finalOutput = event.finalOutput;
-                      if (partial.text.isEmpty) {
-                        partial.text = event.finalOutput.text;
-                      }
-                    }
-                    controller.add(partial);
-                  case STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR:
-                    emitFailure(
-                      event.hasErrorMessage()
-                          ? event.errorMessage
-                          : 'STT stream failed',
-                    );
-                  default:
-                    break;
-                }
-              } catch (e, st) {
-                controller.addError(e, st);
+                  }
+                  controller.add(partial);
+                case STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR:
+                  emitFailure(
+                    event.hasErrorMessage()
+                        ? event.errorMessage
+                        : 'STT stream failed',
+                  );
+                default:
+                  break;
               }
-            },
-          );
+            } catch (e, st) {
+              controller.addError(e, st);
+            }
+          }
 
-          final registerCode =
-              setCallback(handle, nativeCb!.nativeFunction, nullptr);
+          final registerCode = setNativePortCallback != null
+              ? (() {
+                  nativePortEvents = ReceivePort();
+                  nativePortEvents!.listen((Object? message) {
+                    if (message is Uint8List) {
+                      dispatchEventBytes(message);
+                    }
+                  });
+                  return setNativePortCallback(
+                    handle!,
+                    nativePortEvents!.sendPort.nativePort,
+                    NativeApi.postCObject,
+                  );
+                })()
+              : (() {
+                  nativeCb =
+                      NativeCallable<
+                        RacSttStreamEventCallbackNative
+                      >.isolateLocal((
+                        Pointer<Uint8> bytesPtr,
+                        int bytesLen,
+                        Pointer<Void> _,
+                      ) {
+                        if (bytesPtr == nullptr || bytesLen <= 0) return;
+                        final copy = Uint8List.fromList(
+                          bytesPtr.asTypedList(bytesLen),
+                        );
+                        dispatchEventBytes(copy);
+                      });
+                  return setCallback!(
+                    handle!,
+                    nativeCb!.nativeFunction,
+                    nullptr,
+                  );
+                })();
           if (registerCode != RAC_SUCCESS) {
             emitFailure(
               'STT stream callback registration failed: $registerCode',
@@ -418,9 +456,16 @@ class DartBridgeSTT {
           controller.addError(e, st);
         } finally {
           if (handle != null) {
-            unsetCallback(handle);
+            if (unsetNativePortCallback != null &&
+                setNativePortCallback != null) {
+              unsetNativePortCallback(handle);
+            } else {
+              unsetCallback?.call(handle);
+              bindings.rac_stt_proto_quiesce?.call();
+            }
           }
-          bindings.rac_stt_proto_quiesce?.call();
+          nativePortEvents?.close();
+          nativePortEvents = null;
           nativeCb?.close();
           nativeCb = null;
           unawaited(controller.close());

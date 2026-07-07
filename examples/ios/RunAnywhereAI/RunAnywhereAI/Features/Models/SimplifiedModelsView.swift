@@ -20,7 +20,6 @@ struct SimplifiedModelsView: View {
     @State private var searchText = ""
     @State private var selectedBackendFilter: ModelBackendFilter = .all
     @State private var selectedGroupFilter: ModelGroupFilter = .all
-    @State private var selectedQuantizationFilter: ModelQuantizationFilter = .all
 
     private let recommendedModelIds: Set<String> = [
         "mlx-qwen3-0.6b-4bit",
@@ -71,7 +70,6 @@ struct SimplifiedModelsView: View {
             searchMatches(model)
                 && selectedBackendFilter.matches(model)
                 && selectedGroupFilter.matches(model)
-                && selectedQuantizationFilter.matches(model)
         }
     }
 
@@ -79,7 +77,6 @@ struct SimplifiedModelsView: View {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || selectedBackendFilter != .all
             || selectedGroupFilter != .all
-            || selectedQuantizationFilter != .all
     }
 
     private var emptyModelsMessage: String {
@@ -134,7 +131,8 @@ struct SimplifiedModelsView: View {
             model.framework.consumerBackendLabel,
             model.framework.consumerBackendDescription,
             model.consumerModelGroup.title,
-            model.quantizationLabel
+            model.quantizationLabel,
+            model.requiresHfAuth ? "private hf auth hugging face" : ""
         ]
         .joined(separator: " ")
         .lowercased()
@@ -277,7 +275,7 @@ struct SimplifiedModelsView: View {
             HStack(spacing: AppSpacing.smallMedium) {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(AppColors.textSecondary)
-                TextField("Search models, backends, or quantization", text: $searchText)
+                TextField("Search models, backends, or private access", text: $searchText)
                     .disableAutocorrection(true)
                 if !searchText.isEmpty {
                     Button {
@@ -289,6 +287,10 @@ struct SimplifiedModelsView: View {
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, AppSpacing.medium)
+            .padding(.vertical, AppSpacing.smallMedium)
+            .background(AppColors.backgroundSecondary)
+            .cornerRadius(AppSpacing.cornerRadiusRegular)
 
             filterScrollRow(title: "Backend") {
                 ForEach(ModelBackendFilter.allCases) { filter in
@@ -306,13 +308,6 @@ struct SimplifiedModelsView: View {
                 }
             }
 
-            filterScrollRow(title: "Quantization") {
-                ForEach(ModelQuantizationFilter.allCases) { filter in
-                    filterChip(title: filter.title, isSelected: selectedQuantizationFilter == filter) {
-                        selectedQuantizationFilter = filter
-                    }
-                }
-            }
         } header: {
             Text("Find Models")
         } footer: {
@@ -396,6 +391,9 @@ struct SimplifiedModelsView: View {
     }
 
     private func unavailableReason(for model: RAModelInfo) -> String? {
+        if model.framework == .qhexrt {
+            return "Requires a Qualcomm Hexagon NPU Android device."
+        }
         guard model.framework == .foundationModels else { return nil }
         return SystemFoundationModels.unavailableReason
     }
@@ -564,59 +562,6 @@ private enum ModelGroupFilter: String, CaseIterable, Identifiable {
             return model.consumerModelGroup == .documentModels
         case .adapters:
             return model.consumerModelGroup == .modelAdapters
-        }
-    }
-}
-
-private enum ModelQuantizationFilter: String, CaseIterable, Identifiable {
-    case all
-    case q4
-    case q5
-    case q6
-    case q8
-    case fourBit
-    case fiveBit
-    case eightBit
-    case f16
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .all: return "All"
-        case .q4: return "Q4"
-        case .q5: return "Q5"
-        case .q6: return "Q6"
-        case .q8: return "Q8"
-        case .fourBit: return "4bit"
-        case .fiveBit: return "5bit"
-        case .eightBit: return "8bit"
-        case .f16: return "F16"
-        }
-    }
-
-    func matches(_ model: RAModelInfo) -> Bool {
-        guard self != .all else { return true }
-        let label = model.quantizationLabel.lowercased()
-        switch self {
-        case .all:
-            return true
-        case .q4:
-            return label.contains("q4")
-        case .q5:
-            return label.contains("q5")
-        case .q6:
-            return label.contains("q6")
-        case .q8:
-            return label.contains("q8")
-        case .fourBit:
-            return label.contains("4bit")
-        case .fiveBit:
-            return label.contains("5bit")
-        case .eightBit:
-            return label.contains("8bit")
-        case .f16:
-            return label.contains("f16")
         }
     }
 }
@@ -800,15 +745,9 @@ private struct SimplifiedModelRow: View {
     private var statusRowView: some View {
         VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
             HStack(spacing: AppSpacing.smallMedium) {
-                let size = model.downloadSizeBytes
-                if size > 0 {
-                    Label(
-                        ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
-                        systemImage: "memorychip"
-                    )
+                Label(model.consumerSizeLabel, systemImage: "memorychip")
                     .font(AppTypography.caption2)
                     .foregroundColor(AppColors.textSecondary)
-                }
 
                 statusIndicator
             }
@@ -821,9 +760,12 @@ private struct SimplifiedModelRow: View {
 
     @ViewBuilder private var capabilityBadgeRows: some View {
         let badges = model.consumerCapabilityBadges
+        let showQuantization = model.quantizationLabel != "Default"
         ViewThatFits(in: .horizontal) {
             HStack(spacing: AppSpacing.smallMedium) {
-                quantizationPill
+                if showQuantization {
+                    quantizationPill
+                }
                 ForEach(badges) { badge in
                     ConsumerBadge(badge: badge)
                 }
@@ -831,7 +773,9 @@ private struct SimplifiedModelRow: View {
 
             VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
                 HStack(spacing: AppSpacing.smallMedium) {
-                    quantizationPill
+                    if showQuantization {
+                        quantizationPill
+                    }
                     ForEach(Array(badges.prefix(2))) { badge in
                         ConsumerBadge(badge: badge)
                     }
@@ -839,8 +783,13 @@ private struct SimplifiedModelRow: View {
 
                 if badges.count > 2 {
                     HStack(spacing: AppSpacing.smallMedium) {
-                        ForEach(Array(badges.dropFirst(2))) { badge in
+                        ForEach(Array(badges.dropFirst(2).prefix(2))) { badge in
                             ConsumerBadge(badge: badge)
+                        }
+                        if badges.count > 4 {
+                            Text("+\(badges.count - 4)")
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.textSecondary)
                         }
                     }
                 }

@@ -37,6 +37,16 @@ repositories {
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
+def runAnywhereAndroidAbis = ['arm64-v8a', 'armeabi-v7a', 'x86_64']
+if (testLocal) {
+    def localAbiDirs = file('src/main/jniLibs').listFiles()?.findAll { candidate ->
+        candidate.isDirectory() && new File(candidate, 'librac_commons.so').isFile()
+    }?.collect { it.name }?.sort()
+    if (localAbiDirs && !localAbiDirs.isEmpty()) {
+        runAnywhereAndroidAbis = localAbiDirs
+    }
+}
+
 android {
     namespace 'ai.runanywhere.sdk'
     compileSdk 36
@@ -52,7 +62,15 @@ android {
 
         // ABI filters for native libraries
         ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+            abiFilters(*runAnywhereAndroidAbis)
+        }
+
+        externalNativeBuild {
+            cmake {
+                abiFilters(*runAnywhereAndroidAbis)
+                cppFlags '-frtti -fexceptions'
+                arguments "-DRAC_FLUTTER_JNILIBS_DIR=${testLocal ? file('src/main/jniLibs').absolutePath : file('build/jniLibs').absolutePath}"
+            }
         }
 
         // Consumer proguard rules
@@ -72,6 +90,12 @@ android {
         main {
             // Native libraries location - use downloaded libs or local libs based on config
             jniLibs.srcDirs = [testLocal ? 'src/main/jniLibs' : 'build/jniLibs']
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path 'src/main/cpp/CMakeLists.txt'
         }
     }
 
@@ -206,3 +230,9 @@ task downloadNativeLibs {
 
 // Run downloadNativeLibs before preBuild (RAG pipeline is now part of RACommons)
 preBuild.dependsOn downloadNativeLibs
+
+tasks.matching { task ->
+    task.name.startsWith('configureCMake') || task.name.startsWith('externalNativeBuild')
+}.configureEach {
+    dependsOn downloadNativeLibs
+}

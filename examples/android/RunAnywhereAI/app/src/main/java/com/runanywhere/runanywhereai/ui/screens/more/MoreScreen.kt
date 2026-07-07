@@ -82,8 +82,6 @@ fun MoreScreen(onNavigate: (Any) -> Unit) {
             )
         }
 
-        HexagonNpuCard()
-
         AdvancedGroup.entries.forEach { group ->
             AdvancedSection(group.title) {
                 entries.filter { it.group == group }.forEach { entry ->

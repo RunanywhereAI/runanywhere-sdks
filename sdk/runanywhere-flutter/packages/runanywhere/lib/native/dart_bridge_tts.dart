@@ -44,7 +44,7 @@ class DartBridgeTTS {
   String? _loadedVoiceId;
   final _logger = SDKLogger('DartBridge.TTS');
   static TTSOutput Function(TTSSynthesisRequest)?
-      _synthesizeLifecycleProtoForTesting;
+  _synthesizeLifecycleProtoForTesting;
 
   static void setSynthesizeLifecycleProtoForTesting(
     TTSOutput Function(TTSSynthesisRequest)? override,
@@ -194,8 +194,9 @@ class DartBridgeTTS {
     }
 
     final requestBytes = request.writeToBuffer();
-    final resultBytes =
-        await Isolate.run(() => _ttsSynthesizeWorker(requestBytes));
+    final resultBytes = await Isolate.run(
+      () => _ttsSynthesizeWorker(requestBytes),
+    );
     return TTSOutput.fromBuffer(resultBytes);
   }
 
@@ -220,8 +221,11 @@ class DartBridgeTTS {
       return _synthesizeStreamViaTestSeam(request, streamOverride);
     }
 
-    final fn = RacNative.bindings.rac_tts_synthesize_stream_lifecycle_proto;
-    if (fn == null) {
+    final bindings = RacNative.bindings;
+    final fn = bindings.rac_tts_synthesize_stream_lifecycle_proto;
+    final nativePortFn =
+        bindings.ra_flutter_tts_synthesize_stream_lifecycle_proto_native_port;
+    if (fn == null && nativePortFn == null) {
       return Stream<TTSStreamEvent>.error(
         UnsupportedError(
           'rac_tts_synthesize_stream_lifecycle_proto is unavailable',
@@ -229,15 +233,14 @@ class DartBridgeTTS {
       );
     }
 
-    // Production path: the blocking `rac_tts_synthesize_stream_lifecycle_proto`
-    // call runs inside a short-lived worker isolate (`Isolate.run`), where a
-    // worker-owned `NativeCallable.isolateLocal` fires synchronously per chunk
-    // (commons serializes each event into a `thread_local` scratch buffer that
-    // is reused on the next emission, so the callback must copy eagerly and
-    // same-thread) and sends the copy over a `SendPort`. The calling isolate —
-    // usually the Flutter UI isolate — decodes and emits each event as it
-    // arrives and is never blocked for the synthesis duration. This is the
-    // Dart equivalent of `dart_bridge_llm.dart`'s `generateStreamProto`.
+    // Production path: the blocking TTS stream call runs inside a short-lived
+    // worker isolate (`Isolate.run`). On iOS and Android, the Flutter plugin
+    // exports a native-port helper that copies event bytes inside the C
+    // callback and posts owned `Uint8List` messages here, which is safe for
+    // MLX/Swift async and native worker-thread callbacks. Older or unsupported
+    // binaries fall back to a worker-owned `NativeCallable.isolateLocal`, valid
+    // only for same-thread backend callbacks. The calling isolate stays
+    // responsive either way.
     final controller = StreamController<TTSStreamEvent>(sync: false);
     final receivePort = ReceivePort();
     var sawTerminalEvent = false;
@@ -256,7 +259,8 @@ class DartBridgeTTS {
         if (controller.isClosed) return;
         try {
           final event = TTSStreamEvent.fromBuffer(message);
-          final isTerminal = event.kind ==
+          final isTerminal =
+              event.kind ==
                   TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED ||
               event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR;
           sawTerminalEvent = sawTerminalEvent || isTerminal;
@@ -291,9 +295,12 @@ class DartBridgeTTS {
 
     final requestBytes = request.writeToBuffer();
     final sendPort = receivePort.sendPort;
+    final useNativePortWorker = nativePortFn != null;
+    final worker = useNativePortWorker
+        ? _runTtsStreamNativePortWorker(requestBytes, sendPort.nativePort)
+        : _runTtsStreamWorker(requestBytes, sendPort);
     unawaited(
-      _runTtsStreamWorker(requestBytes, sendPort)
-          .catchError((Object e, StackTrace st) {
+      worker.catchError((Object e, StackTrace st) {
         // Worker isolate crashed (RemoteError) before the rc sentinel.
         if (!controller.isClosed) {
           controller.addError(e, st);
@@ -336,7 +343,8 @@ class DartBridgeTTS {
 
     void dispatchEvent(TTSStreamEvent event) {
       if (controller.isClosed) return;
-      sawTerminalEvent = sawTerminalEvent ||
+      sawTerminalEvent =
+          sawTerminalEvent ||
           event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED ||
           event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR;
       controller.add(event);
@@ -351,10 +359,12 @@ class DartBridgeTTS {
         );
         await drainPendingStreamCallbacks(() => sawTerminalEvent);
         if (rc != RAC_SUCCESS && !controller.isClosed) {
-          controller.addError(StateError(
-            'rac_tts_synthesize_stream_lifecycle_proto (test fake) failed: '
-            '${RacResultCode.getMessage(rc)}',
-          ));
+          controller.addError(
+            StateError(
+              'rac_tts_synthesize_stream_lifecycle_proto (test fake) failed: '
+              '${RacResultCode.getMessage(rc)}',
+            ),
+          );
         }
         if (!controller.isClosed) {
           await controller.close();
@@ -403,7 +413,8 @@ class DartBridgeTTS {
     final fn = RacNative.bindings.rac_tts_component_list_voices_proto;
     if (fn == null) {
       throw UnsupportedError(
-          'rac_tts_component_list_voices_proto is unavailable');
+        'rac_tts_component_list_voices_proto is unavailable',
+      );
     }
 
     final voices = <TTSVoiceInfo>[];
@@ -452,7 +463,8 @@ class DartBridgeTTS {
     final fn = RacNative.bindings.rac_tts_component_synthesize_proto;
     if (fn == null) {
       throw UnsupportedError(
-          'rac_tts_component_synthesize_proto is unavailable');
+        'rac_tts_component_synthesize_proto is unavailable',
+      );
     }
 
     final textPtr = text.toNativeUtf8();
@@ -492,7 +504,8 @@ class DartBridgeTTS {
     if (fn == null) {
       return Stream<TTSOutput>.error(
         UnsupportedError(
-            'rac_tts_component_synthesize_stream_proto is unavailable'),
+          'rac_tts_component_synthesize_stream_proto is unavailable',
+        ),
       );
     }
 
@@ -536,10 +549,12 @@ class DartBridgeTTS {
           nullptr,
         );
         if (rc != RAC_SUCCESS && !controller.isClosed) {
-          controller.addError(StateError(
-            'rac_tts_component_synthesize_stream_proto failed: '
-            '${RacResultCode.getMessage(rc)}',
-          ));
+          controller.addError(
+            StateError(
+              'rac_tts_component_synthesize_stream_proto failed: '
+              '${RacResultCode.getMessage(rc)}',
+            ),
+          );
         }
         if (!controller.isClosed) {
           await controller.close();
@@ -611,11 +626,12 @@ class DartBridgeTTS {
 ///     listener body (drain loop + closed-controller guard intact).
 ///   - [terminalObserved]: closure the fake can check to short-circuit.
 /// Returning a non-zero result code drives the wrapper's error branch.
-typedef TTSStreamFakeFFI = Future<int> Function(
-  TTSSynthesisRequest request,
-  void Function(TTSStreamEvent) dispatch,
-  bool Function() terminalObserved,
-);
+typedef TTSStreamFakeFFI =
+    Future<int> Function(
+      TTSSynthesisRequest request,
+      void Function(TTSStreamEvent) dispatch,
+      bool Function() terminalObserved,
+    );
 
 // MARK: - Worker-isolate entry points
 //
@@ -662,6 +678,37 @@ Uint8List _ttsSynthesizeWorker(Uint8List requestBytes) {
 Future<int> _runTtsStreamWorker(Uint8List requestBytes, SendPort port) =>
     Isolate.run(() => _ttsStreamWorker(requestBytes, port));
 
+/// Runs the Flutter native-port stream helper in a worker isolate. The helper
+/// itself posts copied stream bytes to [nativePort] and posts the return code
+/// as the final sentinel.
+Future<int> _runTtsStreamNativePortWorker(
+  Uint8List requestBytes,
+  int nativePort,
+) => Isolate.run(() => _ttsStreamNativePortWorker(requestBytes, nativePort));
+
+int _ttsStreamNativePortWorker(Uint8List requestBytes, int nativePort) {
+  final fn = RacNative
+      .bindings
+      .ra_flutter_tts_synthesize_stream_lifecycle_proto_native_port;
+  if (fn == null) {
+    throw UnsupportedError(
+      'ra_flutter_tts_synthesize_stream_lifecycle_proto_native_port is unavailable',
+    );
+  }
+
+  final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
+  try {
+    return fn(
+      requestPtr,
+      requestBytes.length,
+      nativePort,
+      NativeApi.postCObject,
+    );
+  } finally {
+    calloc.free(requestPtr);
+  }
+}
+
 /// Blocking body of [DartBridgeTTS.synthesizeStreamLifecycleProto]. Runs the
 /// single-call streaming ABI on the worker isolate; the worker-owned
 /// `isolateLocal` callback fires synchronously per chunk (commons passes a
@@ -681,14 +728,16 @@ int _ttsStreamWorker(Uint8List requestBytes, SendPort port) {
   final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
   NativeCallable<RacTtsStreamEventCallbackNative>? callback;
   try {
-    callback = NativeCallable<RacTtsStreamEventCallbackNative>.isolateLocal(
-      (Pointer<Uint8> bytesPtr, int bytesLen, Pointer<Void> _) {
-        if (bytesPtr == nullptr || bytesLen <= 0) return;
-        // Copy INSIDE the synchronous callback — commons reuses the scratch
-        // buffer the moment we return. The copy is what crosses isolates.
-        port.send(Uint8List.fromList(bytesPtr.asTypedList(bytesLen)));
-      },
-    );
+    callback = NativeCallable<RacTtsStreamEventCallbackNative>.isolateLocal((
+      Pointer<Uint8> bytesPtr,
+      int bytesLen,
+      Pointer<Void> _,
+    ) {
+      if (bytesPtr == nullptr || bytesLen <= 0) return;
+      // Copy INSIDE the synchronous callback — commons reuses the scratch
+      // buffer the moment we return. The copy is what crosses isolates.
+      port.send(Uint8List.fromList(bytesPtr.asTypedList(bytesLen)));
+    });
 
     final rc = fn(
       requestPtr,

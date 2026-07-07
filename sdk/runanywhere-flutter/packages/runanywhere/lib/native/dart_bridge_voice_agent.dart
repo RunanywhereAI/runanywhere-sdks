@@ -61,8 +61,9 @@ class DartBridgeVoiceAgent {
   /// `HandleFanOutAttachRole` / `HandleFanOut.attach`. Do NOT insert an
   /// `await` between the null-checks and the `_initFuture` assignment —
   /// that would open a real race window.
-  Future<RacHandle> getHandle(
-      [voice_agent_pb.VoiceAgentComposeConfig? config]) async {
+  Future<RacHandle> getHandle([
+    voice_agent_pb.VoiceAgentComposeConfig? config,
+  ]) async {
     if (_handle != null) return _handle!;
     if (_initFuture != null) return _initFuture!;
 
@@ -162,7 +163,7 @@ class DartBridgeVoiceAgent {
   }
 
   Future<voice_events_pb.VoiceAgentComponentStates>
-      componentStatesProto() async {
+  componentStatesProto() async {
     final handle = await getHandle();
     final fn = RacNative.bindings.rac_voice_agent_component_states_proto;
     if (fn == null) {
@@ -171,7 +172,8 @@ class DartBridgeVoiceAgent {
       );
     }
     return DartBridgeProtoUtils.callOut<
-        voice_events_pb.VoiceAgentComponentStates>(
+      voice_events_pb.VoiceAgentComponentStates
+    >(
       invoke: (out) => fn(handle, out),
       decode: voice_events_pb.VoiceAgentComponentStates.fromBuffer,
       symbol: 'rac_voice_agent_component_states_proto',
@@ -198,7 +200,8 @@ class DartBridgeVoiceAgent {
     final handle = await getHandle();
     if (!isReady) {
       throw StateError(
-          'Voice agent not ready. Load models and initialize first.');
+        'Voice agent not ready. Load models and initialize first.',
+      );
     }
 
     final fn = RacNative.bindings.rac_voice_agent_process_voice_turn_proto;
@@ -246,20 +249,29 @@ class DartBridgeVoiceAgent {
   /// early `userSaid` transcript) is only delivered AFTER the LLM+TTS finish,
   /// so the transcript appears seconds late. Running on a worker isolate (the
   /// canonical pattern from `dart_bridge_llm.generateStreamProto`) lets the
-  /// worker-owned `isolateLocal` callback fire synchronously per event, copy
-  /// the bytes, and forward them over a `SendPort`; the main isolate decodes
-  /// and emits each as it arrives — transcript shows the instant STT finishes,
-  /// then LLM tokens stream, then audio. Mirrors Kotlin's `Dispatchers.IO`
-  /// placement of the same single-call ABI.
+  /// stream deliver incrementally. On iOS and Android, the Flutter plugin
+  /// exports a native-port helper that copies event bytes inside the C callback
+  /// and posts owned `Uint8List` messages here, which is safe if a composed
+  /// backend invokes callbacks from native worker threads. Older or unsupported
+  /// binaries fall back to the worker-owned `isolateLocal` path, valid only for
+  /// same-thread callback delivery. Mirrors Kotlin's `Dispatchers.IO` placement
+  /// of the same single-call ABI.
   Stream<voice_events_pb.VoiceEvent> processTurnStream(
     voice_agent_pb.VoiceAgentTurnRequest request,
   ) {
-    if (RacNative.bindings.rac_voice_agent_process_turn_proto == null) {
-      return Stream<voice_events_pb.VoiceEvent>.error(UnsupportedError(
-          'rac_voice_agent_process_turn_proto is unavailable'));
+    final bindings = RacNative.bindings;
+    final hasProcessTurn =
+        bindings.rac_voice_agent_process_turn_proto != null ||
+        bindings.ra_flutter_voice_agent_process_turn_proto_native_port != null;
+    if (!hasProcessTurn) {
+      return Stream<voice_events_pb.VoiceEvent>.error(
+        UnsupportedError('rac_voice_agent_process_turn_proto is unavailable'),
+      );
     }
 
-    final controller = StreamController<voice_events_pb.VoiceEvent>(sync: false);
+    final controller = StreamController<voice_events_pb.VoiceEvent>(
+      sync: false,
+    );
     final receivePort = ReceivePort();
     var sawError = false;
     var tornDown = false;
@@ -284,8 +296,11 @@ class DartBridgeVoiceAgent {
       } else if (message is int) {
         // rc sentinel — always LAST (same port as events ⇒ FIFO).
         if (message != 0 && !sawError && !controller.isClosed) {
-          controller.addError(StateError(
-              'rac_voice_agent_process_turn_proto failed: code=$message'));
+          controller.addError(
+            StateError(
+              'rac_voice_agent_process_turn_proto failed: code=$message',
+            ),
+          );
         }
         if (!controller.isClosed) {
           unawaited(controller.close());
@@ -299,10 +314,22 @@ class DartBridgeVoiceAgent {
         try {
           final handle = await getHandle();
           final requestBytes = request.writeToBuffer();
+          final nativePortFn = RacNative
+              .bindings
+              .ra_flutter_voice_agent_process_turn_proto_native_port;
+          final worker = nativePortFn != null
+              ? _runVoiceTurnNativePortWorker(
+                  handle.address,
+                  requestBytes,
+                  receivePort.sendPort.nativePort,
+                )
+              : _runVoiceTurnWorker(
+                  handle.address,
+                  requestBytes,
+                  receivePort.sendPort,
+                );
           unawaited(
-            _runVoiceTurnWorker(
-                    handle.address, requestBytes, receivePort.sendPort)
-                .catchError((Object e, StackTrace st) {
+            worker.catchError((Object e, StackTrace st) {
               // Worker isolate crashed before the rc sentinel.
               if (!controller.isClosed) {
                 controller.addError(e, st);
@@ -369,10 +396,14 @@ class DartBridgeVoiceAgent {
     final resultPtr = calloc<Pointer<Utf8>>();
     try {
       final status = NativeFunctions.voiceAgentGenerateResponse(
-          handle, promptPtr, resultPtr);
+        handle,
+        promptPtr,
+        resultPtr,
+      );
       if (status != RAC_SUCCESS) {
         throw StateError(
-            'Response generation failed: ${RacResultCode.getMessage(status)}');
+          'Response generation failed: ${RacResultCode.getMessage(status)}',
+        );
       }
       return resultPtr.value != nullptr ? resultPtr.value.toDartString() : '';
     } finally {
@@ -389,10 +420,12 @@ class DartBridgeVoiceAgent {
     final fn = RacNative.bindings.rac_voice_agent_synthesize_speech_proto;
     if (fn == null) {
       throw UnsupportedError(
-          'rac_voice_agent_synthesize_speech_proto is unavailable');
+        'rac_voice_agent_synthesize_speech_proto is unavailable',
+      );
     }
-    final request =
-        voice_agent_pb.VoiceAgentSynthesizeSpeechProtoRequest(text: text);
+    final request = voice_agent_pb.VoiceAgentSynthesizeSpeechProtoRequest(
+      text: text,
+    );
     final bytes = request.writeToBuffer();
     final reqPtr = DartBridgeProtoUtils.copyBytes(bytes);
     final out = calloc<RacProtoBuffer>();
@@ -495,14 +528,55 @@ void _safeRacFree(Pointer<Void> ptr) {
 // are `.listener` (cross-isolate safe). The `Pointer.fromFunction`
 // platform-adapter trampolines that SIGABRT under `Isolate.run` (model LOAD)
 // are not invoked during a turn; if a future commons change adds one to this
-// path, make that callback `.listener` rather than moving the turn back to
-// the main isolate.
+// path, fix it in the platform adapter/native bridge layer before moving the
+// turn back to the main isolate.
 
 /// Runs [_voiceTurnWorker] in a worker isolate. Hoisted to top level so the
 /// closure captures only its three sendable parameters.
 Future<int> _runVoiceTurnWorker(
-        int handleAddress, Uint8List requestBytes, SendPort port) =>
-    Isolate.run(() => _voiceTurnWorker(handleAddress, requestBytes, port));
+  int handleAddress,
+  Uint8List requestBytes,
+  SendPort port,
+) => Isolate.run(() => _voiceTurnWorker(handleAddress, requestBytes, port));
+
+/// Runs the Flutter native-port stream helper in a worker isolate. The helper
+/// itself posts copied voice-event bytes to [nativePort] and posts the return
+/// code as the final sentinel.
+Future<int> _runVoiceTurnNativePortWorker(
+  int handleAddress,
+  Uint8List requestBytes,
+  int nativePort,
+) => Isolate.run(
+  () => _voiceTurnNativePortWorker(handleAddress, requestBytes, nativePort),
+);
+
+int _voiceTurnNativePortWorker(
+  int handleAddress,
+  Uint8List requestBytes,
+  int nativePort,
+) {
+  final fn =
+      RacNative.bindings.ra_flutter_voice_agent_process_turn_proto_native_port;
+  if (fn == null) {
+    throw UnsupportedError(
+      'ra_flutter_voice_agent_process_turn_proto_native_port is unavailable',
+    );
+  }
+
+  final handle = Pointer<Void>.fromAddress(handleAddress);
+  final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
+  try {
+    return fn(
+      handle,
+      requestPtr,
+      requestBytes.length,
+      nativePort,
+      NativeApi.postCObject,
+    );
+  } finally {
+    calloc.free(requestPtr);
+  }
+}
 
 /// Blocking body of [DartBridgeVoiceAgent.processTurnStream]. The worker-owned
 /// `isolateLocal` callback fires synchronously per VoiceEvent (commons passes
@@ -521,14 +595,16 @@ int _voiceTurnWorker(int handleAddress, Uint8List requestBytes, SendPort port) {
   NativeCallable<RacVoiceAgentProtoEventCallbackNative>? callback;
   try {
     callback =
-        NativeCallable<RacVoiceAgentProtoEventCallbackNative>.isolateLocal(
-      (Pointer<Uint8> bytesPtr, int bytesLen, Pointer<Void> _) {
-        if (bytesPtr == nullptr || bytesLen <= 0) return;
-        // Copy inside the synchronous callback — commons reuses the scratch
-        // buffer the moment we return. The copy is what crosses isolates.
-        port.send(Uint8List.fromList(bytesPtr.asTypedList(bytesLen)));
-      },
-    );
+        NativeCallable<RacVoiceAgentProtoEventCallbackNative>.isolateLocal((
+          Pointer<Uint8> bytesPtr,
+          int bytesLen,
+          Pointer<Void> _,
+        ) {
+          if (bytesPtr == nullptr || bytesLen <= 0) return;
+          // Copy inside the synchronous callback — commons reuses the scratch
+          // buffer the moment we return. The copy is what crosses isolates.
+          port.send(Uint8List.fromList(bytesPtr.asTypedList(bytesLen)));
+        });
 
     final rc = fn(
       handle,

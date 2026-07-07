@@ -2,9 +2,10 @@
 //  ConversationDrawerView.swift
 //  RunAnywhereAI
 //
-//  Lightweight consumer drawer for recents, search, settings, and new chat.
+//  Lightweight consumer drawer for chat creation, search, and settings.
 //
 
+import Foundation
 import SwiftUI
 
 struct ConversationDrawerView: View {
@@ -12,6 +13,7 @@ struct ConversationDrawerView: View {
     @State private var searchQuery = ""
     @State private var conversationToDelete: Conversation?
     @State private var showingDeleteConfirmation = false
+    @State private var isSearchingChats = false
     @FocusState private var isSearchFocused: Bool
 
     let onSelectConversation: (Conversation) -> Void
@@ -26,10 +28,15 @@ struct ConversationDrawerView: View {
     var body: some View {
         VStack(spacing: 0) {
             drawerHeader
-            searchField
-            settingsButton
-            conversationList
-            bottomActions
+            drawerActions
+
+            if isSearchingChats {
+                Divider()
+                searchField
+                conversationList
+            } else {
+                Spacer(minLength: 0)
+            }
         }
         .background(AppColors.backgroundPrimary)
         .alert("Delete Conversation?", isPresented: $showingDeleteConfirmation) {
@@ -75,6 +82,80 @@ struct ConversationDrawerView: View {
         .padding(.bottom, AppSpacing.mediumLarge)
     }
 
+    private var drawerActions: some View {
+        VStack(spacing: AppSpacing.smallMedium) {
+            drawerActionButton(
+                title: "New Chat",
+                subtitle: "Start a clean conversation",
+                systemImage: "square.and.pencil",
+                accent: AppColors.primaryAccent,
+                action: onCreateConversation
+            )
+
+            drawerActionButton(
+                title: "Search Chats",
+                subtitle: "Find saved conversations",
+                systemImage: "magnifyingglass",
+                accent: AppColors.primaryAccent
+            ) {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    isSearchingChats = true
+                }
+                DispatchQueue.main.async {
+                    isSearchFocused = true
+                }
+            }
+
+            drawerActionButton(
+                title: "Settings",
+                subtitle: "Models, tools, privacy, and downloads",
+                systemImage: "gearshape.fill",
+                accent: AppColors.primaryAccent,
+                action: onOpenSettings
+            )
+        }
+        .padding(.horizontal, AppSpacing.large)
+        .padding(.bottom, AppSpacing.large)
+    }
+
+    private func drawerActionButton(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        accent: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: AppSpacing.mediumLarge) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(accent)
+                    .frame(width: 28, height: 28)
+                    .background(accent.opacity(0.12))
+                    .cornerRadius(AppSpacing.cornerRadiusMedium)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(AppTypography.subheadlineMedium)
+                        .foregroundColor(AppColors.textPrimary)
+                    Text(subtitle)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            .padding(.horizontal, AppSpacing.mediumLarge)
+            .padding(.vertical, AppSpacing.mediumLarge)
+            .background(AppColors.backgroundSecondary)
+            .cornerRadius(AppSpacing.cornerRadiusRegular)
+        }
+        .buttonStyle(.plain)
+    }
+
     private var searchField: some View {
         HStack(spacing: AppSpacing.smallMedium) {
             Image(systemName: "magnifyingglass")
@@ -102,36 +183,6 @@ struct ConversationDrawerView: View {
         .cornerRadius(AppSpacing.cornerRadiusRegular)
         .padding(.horizontal, AppSpacing.large)
         .padding(.bottom, AppSpacing.mediumLarge)
-    }
-
-    private var settingsButton: some View {
-        Button(action: onOpenSettings) {
-            HStack(spacing: AppSpacing.mediumLarge) {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(AppColors.primaryAccent)
-                    .frame(width: 28, height: 28)
-                    .background(AppColors.primaryAccent.opacity(0.12))
-                    .cornerRadius(AppSpacing.cornerRadiusMedium)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Settings")
-                        .font(AppTypography.subheadlineMedium)
-                        .foregroundColor(AppColors.textPrimary)
-                    Text("Personalization, models, privacy")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
-            }
-            .padding(.horizontal, AppSpacing.large)
-            .padding(.vertical, AppSpacing.mediumLarge)
-        }
-        .buttonStyle(.plain)
     }
 
     private var conversationList: some View {
@@ -175,30 +226,6 @@ struct ConversationDrawerView: View {
         .padding(.vertical, AppSpacing.xxxLarge)
     }
 
-    private var bottomActions: some View {
-        VStack(spacing: AppSpacing.smallMedium) {
-            Divider()
-
-            Button(action: onCreateConversation) {
-                HStack {
-                    Image(systemName: "square.and.pencil")
-                    Text("New Chat")
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(AppTypography.caption)
-                }
-                .font(AppTypography.subheadlineMedium)
-                .foregroundColor(AppColors.textWhite)
-                .padding(.horizontal, AppSpacing.large)
-                .padding(.vertical, AppSpacing.mediumLarge)
-                .background(AppColors.primaryAccent)
-                .cornerRadius(AppSpacing.cornerRadiusRegular)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, AppSpacing.large)
-            .padding(.bottom, AppSpacing.large)
-        }
-    }
 }
 
 private struct DrawerConversationRow: View {

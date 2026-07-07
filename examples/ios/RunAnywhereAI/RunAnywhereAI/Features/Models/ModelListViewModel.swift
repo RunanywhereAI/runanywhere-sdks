@@ -96,6 +96,7 @@ class ModelListViewModel: ObservableObject {
                 print("iOS < 26 - Foundation Models not available")
             }
 
+            filteredModels = mergePrivateHnpuCatalog(into: filteredModels)
             availableModels = filteredModels
             print("Loaded \(availableModels.count) models from registry")
 
@@ -113,6 +114,44 @@ class ModelListViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    private func mergePrivateHnpuCatalog(into models: [RAModelInfo]) -> [RAModelInfo] {
+        var merged = models
+        for fallback in ModelCatalogBootstrap.privateHnpuModels {
+            guard let index = merged.firstIndex(where: { $0.id == fallback.id }) else {
+                merged.append(fallback)
+                continue
+            }
+
+            var model = merged[index]
+            if model.downloadURL.isEmpty {
+                model.downloadURL = fallback.downloadURL
+            }
+            if model.description_p.isEmpty {
+                model.description_p = fallback.description_p
+            }
+            if model.source == .unspecified {
+                model.source = fallback.source
+            }
+            if !model.supportsThinking {
+                model.supportsThinking = fallback.supportsThinking
+            }
+
+            var metadata = model.metadata
+            if metadata.description_p.isEmpty {
+                metadata.description_p = fallback.metadata.description_p
+            }
+            if metadata.author.isEmpty {
+                metadata.author = fallback.metadata.author
+            }
+            let existingTags = Set(metadata.tags.map { $0.lowercased() })
+            let missingTags = fallback.metadata.tags.filter { !existingTags.contains($0.lowercased()) }
+            metadata.tags.append(contentsOf: missingTags)
+            model.metadata = metadata
+            merged[index] = model
+        }
+        return merged
     }
 
     /// Sync current model state with SDK
