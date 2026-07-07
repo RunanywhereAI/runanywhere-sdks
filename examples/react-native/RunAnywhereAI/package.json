@@ -75,6 +75,7 @@
     "knip": "^5.76.0",
     "patch-package": "^8.0.1",
     "prettier": "^3.8.3",
+    "react-native-dotenv": "^3.4.11",
     "react-native-monorepo-config": "^0.3.0",
     "typescript": "^5.9.3"
   },

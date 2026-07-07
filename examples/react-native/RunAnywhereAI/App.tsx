@@ -96,12 +96,14 @@ import {
   hasCustomConfiguration,
 } from './src/screens/SettingsScreen';
 import { logDiagnostic } from './src/utils/diagnostics';
+import { RUNANYWHERE_BASE_URL, RUNANYWHERE_API_KEY } from '@env';
 
-// Default backend config for the development Railway backend (mirrors the
-// Android example's gitignored local.properties -> BuildConfig.RUNANYWHERE_*).
-// Used when no custom configuration has been saved in Settings.
-const DEFAULT_BASE_URL = 'YOUR_PRODUCTION_BASE_URL';
-const DEFAULT_API_KEY = 'YOUR_PRODUCTION_API_KEY';
+// Default backend config, injected at build time from the gitignored .env via
+// react-native-dotenv (mirrors the Flutter example's --dart-define and the
+// Android example's local.properties -> BuildConfig.RUNANYWHERE_*). Used when
+// no custom configuration has been saved in Settings.
+const DEFAULT_BASE_URL = RUNANYWHERE_BASE_URL ?? '';
+const DEFAULT_API_KEY = RUNANYWHERE_API_KEY ?? '';
 
 type InitState = 'loading' | 'ready' | 'error';
 
