@@ -5,7 +5,7 @@ import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.registerModel
-import kotlinx.coroutines.cancellation.CancellationException
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * One NPU (QHexRT) bundle = one manifest-pinned hf.co folder ref
