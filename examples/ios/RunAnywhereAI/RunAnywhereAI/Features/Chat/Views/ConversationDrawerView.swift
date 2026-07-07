@@ -13,7 +13,6 @@ struct ConversationDrawerView: View {
     @State private var searchQuery = ""
     @State private var conversationToDelete: Conversation?
     @State private var showingDeleteConfirmation = false
-    @State private var isSearchingChats = false
     @FocusState private var isSearchFocused: Bool
 
     let onSelectConversation: (Conversation) -> Void
@@ -28,15 +27,22 @@ struct ConversationDrawerView: View {
     var body: some View {
         VStack(spacing: 0) {
             drawerHeader
-            drawerActions
+            newChatButton
+            searchField
 
-            if isSearchingChats {
-                Divider()
-                searchField
-                conversationList
-            } else {
-                Spacer(minLength: 0)
-            }
+            Text("Recent")
+                .font(AppTypography.caption2Bold)
+                .foregroundColor(AppColors.textSecondary)
+                .textCase(.uppercase)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, AppSpacing.large)
+                .padding(.top, AppSpacing.smallMedium)
+
+            conversationList
+
+            Divider()
+
+            settingsRow
         }
         .background(AppColors.backgroundPrimary)
         .alert("Delete Conversation?", isPresented: $showingDeleteConfirmation) {
@@ -82,76 +88,54 @@ struct ConversationDrawerView: View {
         .padding(.bottom, AppSpacing.mediumLarge)
     }
 
-    private var drawerActions: some View {
-        VStack(spacing: AppSpacing.smallMedium) {
-            drawerActionButton(
-                title: "New Chat",
-                subtitle: "Start a clean conversation",
-                systemImage: "square.and.pencil",
-                accent: AppColors.primaryAccent,
-                action: onCreateConversation
-            )
-
-            drawerActionButton(
-                title: "Search Chats",
-                subtitle: "Find saved conversations",
-                systemImage: "magnifyingglass",
-                accent: AppColors.primaryAccent
-            ) {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    isSearchingChats = true
-                }
-                DispatchQueue.main.async {
-                    isSearchFocused = true
-                }
+    private var newChatButton: some View {
+        Button {
+            Haptics.light()
+            onCreateConversation()
+        } label: {
+            HStack(spacing: AppSpacing.smallMedium) {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("New chat")
+                    .font(AppTypography.subheadlineSemibold)
             }
-
-            drawerActionButton(
-                title: "Settings",
-                subtitle: "Models, tools, privacy, and downloads",
-                systemImage: "gearshape.fill",
-                accent: AppColors.primaryAccent,
-                action: onOpenSettings
+            .foregroundColor(AppColors.textWhite)
+            .frame(maxWidth: .infinity)
+            .frame(height: 42)
+            .background(
+                Capsule()
+                    .fill(AppColors.primaryAccent)
+                    .shadow(color: AppColors.primaryAccent.opacity(0.3), radius: 6, x: 0, y: 3)
             )
         }
+        .buttonStyle(.plain)
         .padding(.horizontal, AppSpacing.large)
-        .padding(.bottom, AppSpacing.large)
+        .padding(.bottom, AppSpacing.mediumLarge)
     }
 
-    private func drawerActionButton(
-        title: String,
-        subtitle: String,
-        systemImage: String,
-        accent: Color,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
+    private var settingsRow: some View {
+        Button {
+            Haptics.light()
+            onOpenSettings()
+        } label: {
             HStack(spacing: AppSpacing.mediumLarge) {
-                Image(systemName: systemImage)
+                Image(systemName: "gearshape.fill")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(accent)
-                    .frame(width: 28, height: 28)
-                    .background(accent.opacity(0.12))
-                    .cornerRadius(AppSpacing.cornerRadiusMedium)
+                    .foregroundColor(AppColors.textSecondary)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(AppTypography.subheadlineMedium)
-                        .foregroundColor(AppColors.textPrimary)
-                    Text(subtitle)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                }
+                Text("Settings")
+                    .font(AppTypography.subheadlineMedium)
+                    .foregroundColor(AppColors.textPrimary)
 
                 Spacer()
+
                 Image(systemName: "chevron.right")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.textSecondary)
             }
-            .padding(.horizontal, AppSpacing.mediumLarge)
-            .padding(.vertical, AppSpacing.mediumLarge)
-            .background(AppColors.backgroundSecondary)
-            .cornerRadius(AppSpacing.cornerRadiusRegular)
+            .padding(.horizontal, AppSpacing.large)
+            .padding(.vertical, AppSpacing.regular)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -196,6 +180,7 @@ struct ConversationDrawerView: View {
                             conversation: conversation,
                             isSelected: store.currentConversation?.id == conversation.id
                         ) {
+                            Haptics.selection()
                             onSelectConversation(conversation)
                         } onDelete: {
                             conversationToDelete = conversation

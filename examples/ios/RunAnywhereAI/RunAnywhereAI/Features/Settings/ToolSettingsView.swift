@@ -301,7 +301,7 @@ struct ToolRow: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Image(systemName: "wrench.and.screwdriver")
-                    .font(.system(size: 12))
+                    .font(AppTypography.system12)
                     .foregroundColor(AppColors.primaryAccent)
                 Text(tool.name)
                     .font(AppTypography.subheadlineMedium)
@@ -322,7 +322,7 @@ struct ToolRow: View {
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(AppColors.backgroundTertiary)
-                            .cornerRadius(4)
+                            .cornerRadius(AppSpacing.cornerRadiusSmall)
                     }
                 }
             }

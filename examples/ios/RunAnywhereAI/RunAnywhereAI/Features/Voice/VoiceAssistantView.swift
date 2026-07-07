@@ -241,7 +241,7 @@ extension VoiceAssistantView {
                 showModelSelection = true
             }, label: {
                 Image(systemName: "cube")
-                    .font(.system(size: 18))
+                    .font(AppTypography.system18)
                     .foregroundColor(.secondary)
                     .padding(10)
                     .background(Color(.tertiarySystemBackground))
@@ -256,7 +256,7 @@ extension VoiceAssistantView {
                 }
             }, label: {
                 Image(systemName: showModelInfo ? "info.circle.fill" : "info.circle")
-                    .font(.system(size: 18))
+                    .font(AppTypography.system18)
                     .foregroundColor(.secondary)
                     .padding(10)
                     .background(Color(.tertiarySystemBackground))
@@ -332,7 +332,7 @@ extension VoiceAssistantView {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(AppColors.statusRed.opacity(0.1))
-            .cornerRadius(4)
+            .cornerRadius(AppSpacing.cornerRadiusSmall)
 
             AdaptiveAudioLevelIndicator(level: viewModel.audioLevel)
         }
@@ -376,7 +376,7 @@ extension VoiceAssistantView {
     private func emptyStatePlaceholder(text: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "mic.circle")
-                .font(.system(size: 48))
+                .font(AppTypography.system48)
                 .foregroundColor(.secondary.opacity(0.3))
             Text(text)
                 .font(.subheadline)

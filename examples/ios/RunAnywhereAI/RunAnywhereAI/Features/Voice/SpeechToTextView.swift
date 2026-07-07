@@ -136,7 +136,7 @@ struct SpeechToTextView: View {
                                                 .padding(.horizontal, 8)
                                                 .padding(.vertical, 4)
                                                 .background(AppColors.statusRed.opacity(0.1))
-                                                .cornerRadius(4)
+                                                .cornerRadius(AppSpacing.cornerRadiusSmall)
                                             } else if viewModel.isTranscribing {
                                                 HStack(spacing: 6) {
                                                     ProgressView()
@@ -149,7 +149,7 @@ struct SpeechToTextView: View {
                                                 .padding(.horizontal, 8)
                                                 .padding(.vertical, 4)
                                                 .background(AppColors.statusOrange.opacity(0.1))
-                                                .cornerRadius(4)
+                                                .cornerRadius(AppSpacing.cornerRadiusSmall)
                                             }
                                         }
 
@@ -163,7 +163,7 @@ struct SpeechToTextView: View {
                                             #else
                                             .background(Color(NSColor.controlBackgroundColor))
                                             #endif
-                                            .cornerRadius(12)
+                                            .cornerRadius(AppSpacing.cornerRadiusXLarge)
 
                                         if let routing = viewModel.hybridRouting {
                                             hybridRoutingSummary(routing)
@@ -303,7 +303,7 @@ struct SpeechToTextView: View {
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
                 Text(subtitle)
-                    .font(.system(size: 10))
+                    .font(AppTypography.system10)
                     .opacity(0.7)
             }
             .frame(maxWidth: .infinity)
@@ -318,13 +318,13 @@ struct SpeechToTextView: View {
                     ? AppColors.primaryAccent
                     : .secondary
             )
-            .cornerRadius(12)
+            .cornerRadius(AppSpacing.cornerRadiusXLarge)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(
                         viewModel.selectedMode == mode
                             ? AppColors.primaryAccent.opacity(0.3)
-                            : Color.gray.opacity(0.2),
+                            : AppColors.statusGray.opacity(0.2),
                         lineWidth: 1
                     )
             )
@@ -357,7 +357,7 @@ struct SpeechToTextView: View {
         #else
         .background(Color(NSColor.controlBackgroundColor))
         #endif
-        .cornerRadius(12)
+        .cornerRadius(AppSpacing.cornerRadiusXLarge)
     }
 
     private func hybridRoutingSummary(_ routing: HybridRoutedMetadata) -> some View {
@@ -379,7 +379,7 @@ struct SpeechToTextView: View {
         #else
         .background(Color(NSColor.controlBackgroundColor).opacity(0.8))
         #endif
-        .cornerRadius(10)
+        .cornerRadius(AppSpacing.cornerRadiusLarge)
     }
 
     private var modelButton: some View {
@@ -393,10 +393,10 @@ struct SpeechToTextView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 36, height: 36)
-                        .cornerRadius(4)
+                        .cornerRadius(AppSpacing.cornerRadiusSmall)
                 } else {
                     Image(systemName: "cube")
-                        .font(.system(size: 14))
+                        .font(AppTypography.system14)
                 }
 
                 if let modelName = viewModel.selectedModelName {
@@ -436,9 +436,9 @@ struct SpeechToTextView: View {
 
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
-        case .onnx: return .purple
+        case .onnx: return AppColors.primaryPurple
         case .foundationModels: return .primary
-        default: return .gray
+        default: return AppColors.statusGray
         }
     }
 }

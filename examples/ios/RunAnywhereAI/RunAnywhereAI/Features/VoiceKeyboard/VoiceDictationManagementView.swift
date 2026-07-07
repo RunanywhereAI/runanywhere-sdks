@@ -79,9 +79,9 @@ struct VoiceDictationManagementView: View {
 
     private var permissionColor: Color {
         switch viewModel.microphonePermission {
-        case .granted: return .green
-        case .denied:  return .red
-        case .unknown: return .orange
+        case .granted: return AppColors.statusGreen
+        case .denied:  return AppColors.statusRed
+        case .unknown: return AppColors.statusOrange
         }
     }
 
@@ -109,7 +109,7 @@ struct VoiceDictationManagementView: View {
             } else if let name = viewModel.loadedModelName {
                 HStack {
                     Image(systemName: "checkmark.seal.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(AppColors.statusGreen)
                     Text(name)
                         .font(.subheadline)
                     Spacer()

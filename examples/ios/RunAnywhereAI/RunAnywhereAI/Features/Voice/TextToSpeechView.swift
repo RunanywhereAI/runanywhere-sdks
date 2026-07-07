@@ -184,7 +184,7 @@ struct TextToSpeechView: View {
                     )
                 )
                 #endif
-                .cornerRadius(16)
+                .cornerRadius(AppSpacing.cornerRadiusCard)
                 .background {
                     if #available(iOS 26.0, macOS 26.0, *) {
                         RoundedRectangle(cornerRadius: 16)
@@ -209,7 +209,7 @@ struct TextToSpeechView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")
-                            .font(.system(size: 11))
+                            .font(AppTypography.system11)
                         Text("Surprise me")
                             .font(.system(size: 12, weight: .semibold))
                     }
@@ -217,7 +217,7 @@ struct TextToSpeechView: View {
                     .padding(.vertical, 6)
                     .background(AppColors.primaryPurple.opacity(0.15))
                     .foregroundColor(AppColors.primaryPurple)
-                    .cornerRadius(8)
+                    .cornerRadius(AppSpacing.cornerRadiusRegular)
                 }
             }
         }
@@ -247,7 +247,7 @@ struct TextToSpeechView: View {
         }
         .padding(20)
         .background(AppColors.backgroundTertiary)
-        .cornerRadius(16)
+        .cornerRadius(AppSpacing.cornerRadiusCard)
     }
 
     /// Speech info section showing result details
@@ -288,7 +288,7 @@ struct TextToSpeechView: View {
         }
         .padding()
         .background(AppColors.backgroundSecondary)
-        .cornerRadius(12)
+        .cornerRadius(AppSpacing.cornerRadiusXLarge)
     }
 
     /// Controls section with waveform visualization and speak button
@@ -453,10 +453,10 @@ struct TextToSpeechView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 36, height: 36)
-                        .cornerRadius(4)
+                        .cornerRadius(AppSpacing.cornerRadiusSmall)
                 } else {
                     Image(systemName: "cube")
-                        .font(.system(size: 14))
+                        .font(AppTypography.system14)
                 }
 
                 if let modelName = viewModel.selectedModelName {
@@ -535,7 +535,7 @@ struct TextToSpeechView: View {
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
         case .foundationModels: return .primary
-        default: return .gray
+        default: return AppColors.statusGray
         }
     }
 }

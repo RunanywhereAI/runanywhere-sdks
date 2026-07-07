@@ -101,7 +101,7 @@ struct VLMCameraView: View {
                         }
                         .padding(12)
                         .background(.ultraThinMaterial)
-                        .cornerRadius(20)
+                        .cornerRadius(AppSpacing.cornerRadiusModal)
                         .padding(.bottom, 16)
                     }
                 }
@@ -116,7 +116,7 @@ struct VLMCameraView: View {
 
     private var cameraPermissionView: some View {
         VStack(spacing: 12) {
-            Image(systemName: "camera.fill").font(.largeTitle).foregroundColor(.gray)
+            Image(systemName: "camera.fill").font(.largeTitle).foregroundColor(AppColors.statusGray)
             Text("Camera Access Required").font(.headline).foregroundColor(.white)
             #if os(iOS)
             Button("Open Settings") {
@@ -140,12 +140,12 @@ struct VLMCameraView: View {
                     if viewModel.isAutoStreamingEnabled {
                         HStack(spacing: 4) {
                             Circle()
-                                .fill(Color.green)
+                                .fill(AppColors.statusGreen)
                                 .frame(width: 8, height: 8)
                             Text("LIVE")
                                 .font(.caption2)
                                 .fontWeight(.bold)
-                                .foregroundColor(.green)
+                                .foregroundColor(AppColors.statusGreen)
                         }
                     }
                 }
@@ -179,7 +179,7 @@ struct VLMCameraView: View {
             if let error = viewModel.error {
                 Text(error.localizedDescription)
                     .font(.caption)
-                    .foregroundColor(.red)
+                    .foregroundColor(AppColors.statusRed)
             }
         }
         .padding(.horizontal, 16)
@@ -230,7 +230,7 @@ struct VLMCameraView: View {
                         .symbolEffect(.pulse, isActive: viewModel.isAutoStreamingEnabled)
                     Text("Live").font(.caption2)
                 }
-                .foregroundColor(viewModel.isAutoStreamingEnabled ? .green : .white)
+                .foregroundColor(viewModel.isAutoStreamingEnabled ? AppColors.statusGreen : .white)
             }
 
             // Model button
@@ -251,14 +251,14 @@ struct VLMCameraView: View {
     private var modelRequiredContent: some View {
         VStack(spacing: 20) {
             Spacer()
-            Image(systemName: "camera.viewfinder").font(.system(size: 60)).foregroundColor(.orange)
+            Image(systemName: "camera.viewfinder").font(AppTypography.system60).foregroundColor(AppColors.primaryAccent)
             Text("Live Mode").font(.title).fontWeight(.bold).foregroundColor(.white)
-            Text("Choose a vision model to understand the camera").foregroundColor(.gray)
+            Text("Choose a vision model to understand the camera").foregroundColor(AppColors.statusGray)
             Button { showingModelSelection = true } label: {
                 HStack { Image(systemName: "sparkles"); Text("Choose Vision Model") }
                     .font(.headline).frame(width: 200).padding(.vertical, 12)
             }
-            .buttonStyle(.borderedProminent).tint(.orange)
+            .buttonStyle(.borderedProminent).tint(AppColors.primaryAccent)
             Spacer()
         }
     }
@@ -269,13 +269,13 @@ struct VLMCameraView: View {
         #if os(iOS)
         ToolbarItem(placement: .navigationBarTrailing) {
             if let name = viewModel.loadedModelName {
-                Text(name).font(.caption).foregroundColor(.gray)
+                Text(name).font(.caption).foregroundColor(AppColors.statusGray)
             }
         }
         #else
         ToolbarItem(placement: .automatic) {
             if let name = viewModel.loadedModelName {
-                Text(name).font(.caption).foregroundColor(.gray)
+                Text(name).font(.caption).foregroundColor(AppColors.statusGray)
             }
         }
         #endif
@@ -285,11 +285,11 @@ struct VLMCameraView: View {
 
     private var buttonColor: Color {
         if viewModel.isAutoStreamingEnabled {
-            return .red
+            return AppColors.statusRed
         } else if viewModel.isProcessing {
-            return .gray
+            return AppColors.statusGray
         } else {
-            return .orange
+            return AppColors.primaryAccent
         }
     }
 

@@ -63,7 +63,7 @@ struct FrameworkRow: View {
         case .llamaCpp:
             return AppColors.primaryAccent
         case .mlx:
-            return .teal
+            return AppColors.primaryBlue
         case .onnx:
             return AppColors.statusGray
         default:

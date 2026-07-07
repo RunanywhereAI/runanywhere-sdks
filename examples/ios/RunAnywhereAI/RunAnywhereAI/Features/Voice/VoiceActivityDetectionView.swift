@@ -142,7 +142,7 @@ struct VoiceActivityDetectionView: View {
                 // Outer pulse ring (only when speech detected)
                 if viewModel.isSpeechDetected {
                     Circle()
-                        .stroke(Color.green.opacity(0.3), lineWidth: 2)
+                        .stroke(AppColors.statusGreen.opacity(0.3), lineWidth: 2)
                         .frame(width: 120, height: 120)
                         .scaleEffect(pulseAnimation ? 1.3 : 1.0)
                         .opacity(pulseAnimation ? 0.0 : 0.6)
@@ -152,7 +152,7 @@ struct VoiceActivityDetectionView: View {
                         )
 
                     Circle()
-                        .stroke(Color.green.opacity(0.2), lineWidth: 1.5)
+                        .stroke(AppColors.statusGreen.opacity(0.2), lineWidth: 1.5)
                         .frame(width: 120, height: 120)
                         .scaleEffect(pulseAnimation ? 1.6 : 1.0)
                         .opacity(pulseAnimation ? 0.0 : 0.4)
@@ -166,8 +166,8 @@ struct VoiceActivityDetectionView: View {
                 Circle()
                     .fill(
                         viewModel.isSpeechDetected
-                            ? Color.green.opacity(0.2)
-                            : Color.gray.opacity(0.1)
+                            ? AppColors.statusGreen.opacity(0.2)
+                            : AppColors.statusGray.opacity(0.1)
                     )
                     .frame(width: 100, height: 100)
 
@@ -175,8 +175,8 @@ struct VoiceActivityDetectionView: View {
                 Circle()
                     .fill(
                         viewModel.isSpeechDetected
-                            ? Color.green
-                            : Color.gray.opacity(0.3)
+                            ? AppColors.statusGreen
+                            : AppColors.statusGray.opacity(0.3)
                     )
                     .frame(width: 60, height: 60)
 
@@ -197,7 +197,7 @@ struct VoiceActivityDetectionView: View {
             // Status label
             Text(viewModel.isSpeechDetected ? "Speech Detected" : "Silence")
                 .font(.system(size: 17, weight: .semibold, design: .rounded))
-                .foregroundColor(viewModel.isSpeechDetected ? .green : .secondary)
+                .foregroundColor(viewModel.isSpeechDetected ? AppColors.statusGreen : .secondary)
                 .animation(.easeInOut(duration: 0.2), value: viewModel.isSpeechDetected)
 
             // Audio level
@@ -228,8 +228,8 @@ struct VoiceActivityDetectionView: View {
             ForEach(viewModel.activityLog) { entry in
                 HStack(spacing: 12) {
                     Image(systemName: entry.type.icon)
-                        .font(.system(size: 14))
-                        .foregroundColor(entry.type == .speechStarted ? .green : .secondary)
+                        .font(AppTypography.system14)
+                        .foregroundColor(entry.type == .speechStarted ? AppColors.statusGreen : .secondary)
                         .frame(width: 24)
 
                     Text(entry.type.label)
@@ -249,7 +249,7 @@ struct VoiceActivityDetectionView: View {
                 #else
                 .background(Color(NSColor.controlBackgroundColor))
                 #endif
-                .cornerRadius(8)
+                .cornerRadius(AppSpacing.cornerRadiusRegular)
             }
         }
     }
@@ -272,7 +272,7 @@ struct VoiceActivityDetectionView: View {
                 isActive: viewModel.isListening,
                 isPulsing: viewModel.isSpeechDetected,
                 isLoading: viewModel.isProcessing,
-                activeColor: .green,
+                activeColor: AppColors.statusGreen,
                 inactiveColor: .cyan,
                 icon: viewModel.isListening ? "stop.fill" : "mic.fill"
             ) {
@@ -311,10 +311,10 @@ struct VoiceActivityDetectionView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 36, height: 36)
-                        .cornerRadius(4)
+                        .cornerRadius(AppSpacing.cornerRadiusSmall)
                 } else {
                     Image(systemName: "cube")
-                        .font(.system(size: 14))
+                        .font(AppTypography.system14)
                 }
 
                 if let modelName = viewModel.selectedModelName {
@@ -331,7 +331,7 @@ struct VoiceActivityDetectionView: View {
                                 Text(framework.displayName)
                                     .font(.system(size: 8, weight: .medium))
                             }
-                            .foregroundColor(.gray)
+                            .foregroundColor(AppColors.statusGray)
                         }
                     }
                 } else {

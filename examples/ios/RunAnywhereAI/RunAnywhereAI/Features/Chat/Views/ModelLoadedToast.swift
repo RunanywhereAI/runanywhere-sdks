@@ -78,6 +78,7 @@ struct ToastModifier: ViewModifier {
         }
         .onChange(of: isShowing) { _, newValue in
             if newValue {
+                Haptics.success()
                 // Auto-dismiss after duration
                 DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
                     withAnimation {

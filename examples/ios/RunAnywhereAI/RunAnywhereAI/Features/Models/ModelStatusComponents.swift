@@ -64,7 +64,7 @@ struct ModelStatusBanner: View {
                 // Model loaded state
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(AppColors.statusGreen)
                         .font(.system(size: 14, weight: .semibold))
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -97,7 +97,7 @@ struct ModelStatusBanner: View {
                 // No model state
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundColor(AppColors.statusOrange)
 
                     Text("No model selected")
                         .font(.subheadline)
@@ -126,7 +126,7 @@ struct ModelStatusBanner: View {
         #else
         .background(Color(NSColor.controlBackgroundColor))
         #endif
-        .cornerRadius(12)
+        .cornerRadius(AppSpacing.cornerRadiusXLarge)
     }
 
     /// Streaming mode indicator badge
@@ -137,12 +137,12 @@ struct ModelStatusBanner: View {
             Text(supportsStreaming ? "Streaming" : "Batch")
                 .font(.system(size: 9, weight: .medium))
         }
-        .foregroundColor(supportsStreaming ? .green : .orange)
+        .foregroundColor(supportsStreaming ? AppColors.statusGreen : AppColors.statusOrange)
         .padding(.horizontal, 5)
         .padding(.vertical, 2)
         .background(
             Capsule()
-                .fill(supportsStreaming ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+                .fill(supportsStreaming ? AppColors.statusGreen.opacity(0.15) : AppColors.statusOrange.opacity(0.15))
         )
     }
 
@@ -159,10 +159,10 @@ struct ModelStatusBanner: View {
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
         case .llamaCpp: return AppColors.primaryAccent
-        case .mlx: return .teal
-        case .onnx: return .purple
+        case .mlx: return AppColors.primaryBlue
+        case .onnx: return AppColors.primaryPurple
         case .foundationModels: return .primary
-        default: return .gray
+        default: return AppColors.statusGray
         }
     }
 }
@@ -229,7 +229,7 @@ struct ModelRequiredOverlay: View {
                         .frame(width: 120, height: 120)
 
                     Image(systemName: modalityIcon)
-                        .font(.system(size: 48))
+                        .font(AppTypography.system48)
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [modalityColor, modalityColor.opacity(0.7)],
@@ -326,12 +326,12 @@ struct ModelRequiredOverlay: View {
     private var modalityColor: Color {
         switch modality {
         case .llm: return AppColors.primaryAccent
-        case .stt: return .green
+        case .stt: return AppColors.statusGreen
         case .tts: return AppColors.primaryPurple
         case .vad: return .cyan
         case .voice: return AppColors.primaryAccent
-        case .vlm: return .orange
-        case .ragEmbedding: return .teal
+        case .vlm: return AppColors.primaryAccent
+        case .ragEmbedding: return AppColors.primaryBlue
         case .ragLLM: return AppColors.primaryAccent
         }
     }
@@ -394,7 +394,7 @@ struct VoicePipelineSetupView: View {
             // Header
             VStack(spacing: 8) {
                 Image(systemName: "mic.circle.fill")
-                    .font(.system(size: 48))
+                    .font(AppTypography.system48)
                     .foregroundColor(AppColors.primaryAccent)
 
                 Text("Voice Assistant Setup")
@@ -415,7 +415,7 @@ struct VoicePipelineSetupView: View {
                     title: "Speech Recognition",
                     subtitle: "Converts your voice to text",
                     icon: "waveform",
-                    color: .green,
+                    color: AppColors.statusGreen,
                     selectedFramework: sttModel?.framework,
                     selectedModel: sttModel?.name,
                     loadState: sttLoadState,
@@ -441,7 +441,7 @@ struct VoicePipelineSetupView: View {
                     title: "Text to Speech",
                     subtitle: "Converts responses to audio",
                     icon: "speaker.wave.2",
-                    color: .purple,
+                    color: AppColors.primaryPurple,
                     selectedFramework: ttsModel?.framework,
                     selectedModel: ttsModel?.name,
                     loadState: ttsLoadState,
@@ -477,12 +477,12 @@ struct VoicePipelineSetupView: View {
             } else if !allModelsLoaded {
                 Text("Waiting for models to load...")
                     .font(.caption)
-                    .foregroundColor(.orange)
+                    .foregroundColor(AppColors.statusOrange)
                     .padding(.bottom, 10)
             } else {
                 Text("All models loaded and ready!")
                     .font(.caption)
-                    .foregroundColor(.green)
+                    .foregroundColor(AppColors.statusGreen)
                     .padding(.bottom, 10)
             }
         }
@@ -538,7 +538,7 @@ struct ModelSetupCard: View {
                     } else {
                         Text("\(step)")
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.gray)
+                            .foregroundColor(AppColors.statusGray)
                     }
                 }
 
@@ -563,11 +563,11 @@ struct ModelSetupCard: View {
                             if isLoaded {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.caption2)
-                                    .foregroundColor(.green)
+                                    .foregroundColor(AppColors.statusGreen)
                             } else if isLoading {
                                 Text("Loading...")
                                     .font(.caption2)
-                                    .foregroundColor(.orange)
+                                    .foregroundColor(AppColors.statusOrange)
                             }
                         }
                     } else {
@@ -586,10 +586,10 @@ struct ModelSetupCard: View {
                 } else if isLoaded {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
+                            .foregroundColor(AppColors.statusGreen)
                         Text("Loaded")
                             .font(.caption)
-                            .foregroundColor(.green)
+                            .foregroundColor(AppColors.statusGreen)
                     }
                 } else if isConfigured {
                     Text("Change")
@@ -611,7 +611,7 @@ struct ModelSetupCard: View {
             #else
             .background(Color(NSColor.controlBackgroundColor))
             #endif
-            .cornerRadius(12)
+            .cornerRadius(AppSpacing.cornerRadiusXLarge)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(borderColor, lineWidth: 2)
@@ -622,21 +622,21 @@ struct ModelSetupCard: View {
 
     private var stepIndicatorColor: Color {
         if isLoading {
-            return .orange
+            return AppColors.statusOrange
         } else if isLoaded {
-            return .green
+            return AppColors.statusGreen
         } else if isConfigured {
             return color
         } else {
-            return Color.gray.opacity(0.2)
+            return AppColors.statusGray.opacity(0.2)
         }
     }
 
     private var borderColor: Color {
         if isLoaded {
-            return .green.opacity(0.5)
+            return AppColors.statusGreen.opacity(0.5)
         } else if isLoading {
-            return .orange.opacity(0.5)
+            return AppColors.statusOrange.opacity(0.5)
         } else if isConfigured {
             return color.opacity(0.5)
         } else {
@@ -679,17 +679,17 @@ struct CompactModelIndicator: View {
             .padding(.vertical, 6)
             .background(framework != nil ? AppColors.primaryAccent.opacity(0.1) : AppColors.primaryAccent.opacity(0.2))
             .foregroundColor(AppColors.primaryAccent)
-            .cornerRadius(8)
+            .cornerRadius(AppSpacing.cornerRadiusRegular)
         }
     }
 
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
         case .llamaCpp: return AppColors.primaryAccent
-        case .mlx: return .teal
-        case .onnx: return .purple
+        case .mlx: return AppColors.primaryBlue
+        case .onnx: return AppColors.primaryPurple
         case .foundationModels: return .primary
-        default: return .gray
+        default: return AppColors.statusGray
         }
     }
 }

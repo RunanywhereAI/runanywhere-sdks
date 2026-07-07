@@ -123,7 +123,7 @@ struct AddModelFromURLView: View {
         if let error = errorMessage {
             Section {
                 Text(error)
-                    .foregroundColor(.red)
+                    .foregroundColor(AppColors.statusRed)
                     .font(.caption)
             }
         }

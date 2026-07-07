@@ -79,14 +79,22 @@ private struct IOSSettingsContent: View {
                     .lineLimit(3...8)
 
                 VStack(alignment: .leading) {
-                    Text("Creativity: \(String(format: "%.2f", viewModel.temperature))")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
+                    Label(
+                        "Creativity: \(String(format: "%.2f", viewModel.temperature))",
+                        systemImage: "dial.medium"
+                    )
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
                     Slider(value: $viewModel.temperature, in: 0...2, step: 0.1)
                 }
 
-                Toggle("Thinking Mode", isOn: $viewModel.thinkingModeEnabled)
-                    .disabled(!viewModel.loadedModelSupportsThinking)
+                Toggle(isOn: $viewModel.thinkingModeEnabled) {
+                    Label("Thinking Mode", systemImage: "brain")
+                }
+                .disabled(!viewModel.loadedModelSupportsThinking)
+                .onChange(of: viewModel.thinkingModeEnabled) { _, _ in
+                    Haptics.light()
+                }
 
                 Text(thinkingModeDescription(for: viewModel))
                     .font(AppTypography.caption)
@@ -122,27 +130,29 @@ private struct IOSSettingsContent: View {
             } header: {
                 Text("Models")
             } footer: {
-                Text("RunAnywhere supports multiple backends. Model labels explain which engine powers each capability.")
-                    .font(AppTypography.caption)
+                Text(
+                    "RunAnywhere supports multiple backends. "
+                    + "Model labels explain which engine powers each capability."
+                )
+                .font(AppTypography.caption)
             }
+
+            ToolSettingsSection(viewModel: toolViewModel)
 
             Section {
-                PrivateDownloadsControls(viewModel: viewModel)
-            } header: {
-                Text("Private Downloads")
-            } footer: {
-                Text("Add a Hugging Face token to download private HNPU/QHexRT model bundles.")
-                    .font(AppTypography.caption)
-            }
-
-            Section("Privacy") {
                 Label("Chats and downloads stay on this device", systemImage: "lock.shield")
                     .foregroundColor(AppColors.textPrimary)
-                Toggle("Log Analytics Locally", isOn: $viewModel.analyticsLogToLocal)
-
+                Toggle(isOn: $viewModel.analyticsLogToLocal) {
+                    Label("Log Analytics Locally", systemImage: "chart.bar.doc.horizontal")
+                }
+                .onChange(of: viewModel.analyticsLogToLocal) { _, _ in
+                    Haptics.light()
+                }
+            } header: {
+                Text("Privacy")
+            } footer: {
                 Text("When enabled, analytics events are saved locally on your device.")
                     .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
             }
 
             Section {
@@ -159,7 +169,7 @@ private struct IOSSettingsContent: View {
                     action: { viewModel.showApiKeySheet() },
                     label: {
                         HStack {
-                            Text("API Key")
+                            Label("API Key", systemImage: "key")
                             Spacer()
                             if viewModel.isApiKeyConfigured {
                                 Text("Configured")
@@ -175,7 +185,7 @@ private struct IOSSettingsContent: View {
                 )
 
                 HStack {
-                    Text("Base URL")
+                    Label("Base URL", systemImage: "link")
                     Spacer()
                     if viewModel.isBaseURLConfigured {
                         Text("Configured")
@@ -201,14 +211,21 @@ private struct IOSSettingsContent: View {
                         }
                     )
                 }
+
+                DisclosureGroup {
+                    PrivateDownloadsControls(viewModel: viewModel)
+                } label: {
+                    Label("Private Downloads", systemImage: "key.icloud")
+                }
             } header: {
                 Text("Advanced")
             } footer: {
-                Text("Developer controls are kept here so the main app stays assistant-first.")
-                    .font(AppTypography.caption)
+                Text(
+                    "Developer controls are kept here so the main app stays assistant-first. "
+                    + "Add a Hugging Face token to download private HNPU/QHexRT model bundles."
+                )
+                .font(AppTypography.caption)
             }
-
-            ToolSettingsSection(viewModel: toolViewModel)
 
             // About
             Section {

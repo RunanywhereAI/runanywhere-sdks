@@ -14,7 +14,7 @@ struct ConsumerAdvancedHubView: View {
                 NavigationLink(destination: SpeechToTextView()) {
                     AdvancedFeatureRow(
                         icon: "waveform",
-                        color: .blue,
+                        color: AppColors.primaryBlue,
                         title: "Transcribe",
                         subtitle: "Speech-to-text utility"
                     )
@@ -23,7 +23,7 @@ struct ConsumerAdvancedHubView: View {
                 NavigationLink(destination: TextToSpeechView()) {
                     AdvancedFeatureRow(
                         icon: "speaker.wave.2",
-                        color: .green,
+                        color: AppColors.statusGreen,
                         title: "Read Aloud",
                         subtitle: "Text-to-speech utility"
                     )

@@ -19,51 +19,48 @@ struct TypingIndicatorView: View {
     @State private var animationPhase = 0
 
     var body: some View {
-        HStack {
-            Spacer(minLength: AppSpacing.padding60)
-
-            HStack(spacing: AppSpacing.mediumLarge) {
-                HStack(spacing: AppSpacing.xSmall) {
-                    ForEach(0..<3) { index in
-                        Circle()
-                            .fill(AppColors.primaryAccent.opacity(0.7))
-                            .frame(width: AppSpacing.iconSmall, height: AppSpacing.iconSmall)
-                            .scaleEffect(animationPhase == index ? 1.3 : 0.8)
-                            .animation(
-                                Animation.easeInOut(duration: AppLayout.animationVerySlow)
-                                    .repeatForever(autoreverses: true)
-                                    .delay(Double(index) * 0.2),
-                                value: animationPhase
-                            )
-                    }
-                }
-                .padding(.horizontal, AppSpacing.mediumLarge)
-                .padding(.vertical, AppSpacing.smallMedium)
-                .background(typingIndicatorBackground)
-
-                Text("AI is thinking...")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
-                    .opacity(0.8)
+        HStack(spacing: AppSpacing.xSmall) {
+            ForEach(0..<3) { index in
+                Circle()
+                    .fill(AppColors.primaryAccent.opacity(0.7))
+                    .frame(width: AppSpacing.iconSmall, height: AppSpacing.iconSmall)
+                    .scaleEffect(animationPhase == index ? 1.3 : 0.8)
+                    .animation(
+                        Animation.easeInOut(duration: AppLayout.animationVerySlow)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.2),
+                        value: animationPhase
+                    )
             }
 
             Spacer(minLength: AppSpacing.padding60)
         }
+        .padding(.vertical, AppSpacing.smallMedium)
         .onAppear {
             withAnimation {
                 animationPhase = 1
             }
         }
     }
+}
 
-    private var typingIndicatorBackground: some View {
-        RoundedRectangle(cornerRadius: AppSpacing.large)
-            .fill(AppColors.backgroundGray5)
-            .shadow(color: AppColors.shadowLight, radius: 3, x: 0, y: 2)
-            .overlay(
-                RoundedRectangle(cornerRadius: AppSpacing.large)
-                    .strokeBorder(AppColors.borderLight, lineWidth: AppSpacing.strokeThin)
+// MARK: - Streaming Cursor
+
+/// Pulsing brand dot shown while tokens stream into the tail message.
+struct StreamingCursorDot: View {
+    @State private var pulsing = false
+
+    var body: some View {
+        Circle()
+            .fill(AppColors.primaryAccent)
+            .frame(width: 9, height: 9)
+            .scaleEffect(pulsing ? 0.75 : 1.0)
+            .opacity(pulsing ? 0.4 : 1.0)
+            .animation(
+                .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
+                value: pulsing
             )
+            .onAppear { pulsing = true }
     }
 }
 
@@ -72,6 +69,8 @@ struct TypingIndicatorView: View {
 struct MessageBubbleView: View {
     let message: Message
     let isGenerating: Bool
+    /// True only for the assistant message currently receiving tokens.
+    var isStreamingTail: Bool = false
     @State private var isThinkingExpanded = false
     @State private var showToolCallSheet = false
     @State private var previewAttachment: MessageAttachment?
@@ -383,17 +382,16 @@ extension MessageBubbleView {
         )
     }
 
-    var messageBubbleBackground: some View {
-        RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
-            .fill(message.role == .user ? userBubbleGradient : assistantBubbleGradient)
-            .shadow(color: AppColors.shadowMedium, radius: 4, x: 0, y: 2)
-            .overlay(
-                RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
-                    .strokeBorder(
-                        message.role == .user ? AppColors.borderLight : AppColors.borderMedium,
-                        lineWidth: AppSpacing.strokeThin
-                    )
-            )
+    /// User turns keep a brand bubble; assistant replies read as a document
+    /// (full-width, no bubble) — the consumer chat idiom.
+    @ViewBuilder var messageBubbleBackground: some View {
+        if message.role == .user {
+            RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
+                .fill(userBubbleGradient)
+                .shadow(color: AppColors.shadowLight, radius: 3, x: 0, y: 2)
+        } else {
+            Color.clear
+        }
     }
 
     var shouldPulse: Bool {
@@ -402,61 +400,60 @@ extension MessageBubbleView {
 
     @ViewBuilder var mainMessageBubble: some View {
         if !message.content.isEmpty || message.attachment != nil {
-            ZStack(alignment: .bottomTrailing) {
-                // Intelligent adaptive rendering: Content analysis → Best renderer
-                Group {
-                    if message.role == .assistant {
-                        VStack(alignment: .leading, spacing: 0) {
-                            AdaptiveMarkdownText(
-                                message.content,
-                                font: AppTypography.body,
-                                color: AppColors.textPrimary
-                            )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                            // Extra spacing at bottom for model badge
-                            if message.modelInfo != nil {
-                                Spacer()
-                                    .frame(height: 16)
-                            }
-                        }
-                    } else {
-                        VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
-                            if let attachment = message.attachment {
-                                MessageAttachmentInlineCard(attachment: attachment, role: message.role) {
-                                    previewAttachment = attachment
-                                }
-                            }
-
-                            if !message.content.isEmpty {
-                                Text(message.content)
-                                    .foregroundColor(AppColors.textWhite)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
+            Group {
+                if message.role == .assistant {
+                    VStack(alignment: .leading, spacing: 0) {
+                        AdaptiveMarkdownText(
+                            message.content,
+                            font: AppTypography.body,
+                            color: AppColors.textPrimary
+                        )
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                .padding(.horizontal, AppSpacing.large)
-                .padding(.vertical, AppSpacing.mediumLarge)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                // Model name badge in bottom-right corner (assistant only)
-                if message.role == .assistant, let modelInfo = message.modelInfo {
-                    HStack(spacing: 3) {
-                        Image(systemName: "cube")
-                            .font(.system(size: 8))
-                        Text(modelInfo.modelName)
-                            .font(.system(size: 9, weight: .medium))
+                        if isStreamingTail {
+                            StreamingCursorDot()
+                                .padding(.top, AppSpacing.small)
+                        }
                     }
-                    .foregroundColor(AppColors.textSecondary.opacity(0.6))
-                    .padding(.trailing, AppSpacing.mediumLarge)
-                    .padding(.bottom, AppSpacing.small)
+                    .padding(.vertical, AppSpacing.smallMedium)
+                } else {
+                    VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
+                        if let attachment = message.attachment {
+                            MessageAttachmentInlineCard(attachment: attachment, role: message.role) {
+                                previewAttachment = attachment
+                            }
+                        }
+
+                        if !message.content.isEmpty {
+                            Text(message.content)
+                                .foregroundColor(AppColors.textWhite)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(.horizontal, AppSpacing.large)
+                    .padding(.vertical, AppSpacing.mediumLarge)
                 }
             }
             .background(messageBubbleBackground)
             .animation(nil, value: message.content)
+            .contextMenu {
+                Button {
+                    copyMessageContent()
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                }
+            }
         }
+    }
+
+    private func copyMessageContent() {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = message.content
+        #elseif canImport(AppKit)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(message.content, forType: .string)
+        #endif
     }
 }
 

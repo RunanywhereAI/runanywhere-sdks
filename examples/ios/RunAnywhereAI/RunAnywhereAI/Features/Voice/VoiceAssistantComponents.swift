@@ -65,6 +65,6 @@ struct ModelBadge: View {
         .padding(.horizontal, AdaptiveSizing.badgePaddingH)
         .padding(.vertical, AdaptiveSizing.badgePaddingV)
         .background(color.opacity(0.1))
-        .cornerRadius(6)
+        .cornerRadius(AppSpacing.cornerRadiusMedium)
     }
 }
