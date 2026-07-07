@@ -204,6 +204,9 @@ class ModelListViewModel: ObservableObject {
                 ]
             )
         }
+        if currentModel?.id == model.id {
+            currentModel = nil
+        }
         // Reload models after deletion
         await loadModelsFromRegistry()
     }

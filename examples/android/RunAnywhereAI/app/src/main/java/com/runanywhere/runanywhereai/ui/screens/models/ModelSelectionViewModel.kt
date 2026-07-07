@@ -13,6 +13,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.extensions.currentModel
+import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.downloadModelStream
 import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.loadModel
@@ -91,6 +92,27 @@ class ModelSelectionViewModel(
         }
     }
 
+    fun delete(model: RAModelInfo) {
+        viewModelScope.launch {
+            state = state.copy(busyModelId = model.id, progressPercent = null, error = null)
+            try {
+                RunAnywhere.deleteModel(model.id)
+                if (state.currentModelId == model.id || GlobalState.model.loaded?.id == model.id) {
+                    GlobalState.model.clear()
+                    state = state.copy(currentModelId = null)
+                }
+                reload()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RACLog.e("delete failed: ${model.id}", e)
+                state = state.copy(error = e.message ?: "Delete failed")
+            } finally {
+                state = state.copy(busyModelId = null, progressPercent = null)
+            }
+        }
+    }
+
     // Loads the model into memory and marks it current. Returns true on success so the caller
     // can dismiss. Built-in frameworks and RAG are selected by reference (no load).
     suspend fun select(model: RAModelInfo): Boolean {
@@ -128,6 +150,8 @@ class ModelSelectionViewModel(
     }
 
     fun isReady(model: RAModelInfo): Boolean = model.isBuiltIn || model.isDownloadedOnDisk
+
+    fun isDeletable(model: RAModelInfo): Boolean = !model.isBuiltIn && model.isDownloadedOnDisk
 
     private suspend fun syncCurrent(models: List<RAModelInfo>) {
         val loadedId = RunAnywhere.currentModel(models)?.model_id ?: return

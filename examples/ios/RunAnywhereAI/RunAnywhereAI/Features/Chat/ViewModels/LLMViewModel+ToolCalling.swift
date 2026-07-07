@@ -58,7 +58,8 @@ extension LLMViewModel {
                 timestamp: currentMessage.timestamp,
                 analytics: nil, // Tool calling doesn't use standard analytics
                 modelInfo: modelInfo,
-                toolCallInfo: toolCallInfo
+                toolCallInfo: toolCallInfo,
+                attachment: currentMessage.attachment
             )
 
             self.updateMessage(at: index, with: updatedMessage)

@@ -564,7 +564,7 @@ extension ChatInterfaceView {
         pendingImageAttachment = nil
 
         Task {
-            await viewModel.sendImageQuestion(image: attachment.image, prompt: viewModel.currentInput)
+            await viewModel.sendImageQuestion(attachment: attachment, prompt: viewModel.currentInput)
             await refreshVisionModelStatus()
 
             Task {

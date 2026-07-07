@@ -10,21 +10,6 @@ import SwiftUI
 struct ConsumerAdvancedHubView: View {
     var body: some View {
         List {
-            Section {
-                NavigationLink(destination: VoiceAssistantView()) {
-                    AdvancedFeatureRow(
-                        icon: "mic.circle",
-                        color: AppColors.primaryAccent,
-                        title: "Talk Mode",
-                        subtitle: "Full STT + LLM + TTS voice assistant"
-                    )
-                }
-            } header: {
-                Text("Assistant Modes")
-            } footer: {
-                Text("Document, image, and Live camera actions now start from the home composer.")
-            }
-
             Section("Voice Utilities") {
                 NavigationLink(destination: SpeechToTextView()) {
                     AdvancedFeatureRow(
@@ -55,15 +40,6 @@ struct ConsumerAdvancedHubView: View {
             }
 
             Section {
-                NavigationLink(destination: StorageView()) {
-                    AdvancedFeatureRow(
-                        icon: "externaldrive",
-                        color: .orange,
-                        title: "Storage",
-                        subtitle: "Models, cache, and local files"
-                    )
-                }
-
                 NavigationLink(destination: BenchmarkDashboardView()) {
                     AdvancedFeatureRow(
                         icon: "gauge.with.dots.needle.33percent",
@@ -72,30 +48,10 @@ struct ConsumerAdvancedHubView: View {
                         subtitle: "Measure local model performance"
                     )
                 }
-
-                NavigationLink(destination: ToolCallingAdvancedView()) {
-                    AdvancedFeatureRow(
-                        icon: "wrench.and.screwdriver",
-                        color: AppColors.primaryPurple,
-                        title: "Tool Calling",
-                        subtitle: "Register demo tools for the chat model"
-                    )
-                }
-
-                #if os(iOS)
-                NavigationLink(destination: VoiceDictationManagementView()) {
-                    AdvancedFeatureRow(
-                        icon: "keyboard",
-                        color: .indigo,
-                        title: "Voice Keyboard",
-                        subtitle: "Private dictation in other apps"
-                    )
-                }
-                #endif
             } header: {
                 Text("Management")
             } footer: {
-                Text("Advanced tools stay available without competing with the main assistant experience.")
+                Text("Storage and tool calling live in Settings and Manage Models.")
             }
         }
         .navigationTitle("Advanced")
@@ -131,22 +87,5 @@ private struct AdvancedFeatureRow: View {
             }
         }
         .padding(.vertical, AppSpacing.small)
-    }
-}
-
-private struct ToolCallingAdvancedView: View {
-    @StateObject private var viewModel = ToolSettingsViewModel.shared
-
-    var body: some View {
-        Form {
-            ToolSettingsSection(viewModel: viewModel)
-        }
-        .navigationTitle("Tool Calling")
-        #if os(iOS)
-        .navigationBarTitleDisplayModeCompat(.inline)
-        #endif
-        .task {
-            await viewModel.refreshRegisteredTools()
-        }
     }
 }

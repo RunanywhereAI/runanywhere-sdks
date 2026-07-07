@@ -31,6 +31,8 @@ data class StoredAttachment(
     val kind: StoredAttachmentKind,
     val name: String,
     val detail: String? = null,
+    val localPath: String? = null,
+    val previewText: String? = null,
 )
 
 @Serializable

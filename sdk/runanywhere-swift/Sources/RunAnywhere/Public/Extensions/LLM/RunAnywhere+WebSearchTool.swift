@@ -40,6 +40,7 @@ private enum WebSearchTool {
         static let heading = "heading"
         static let summary = "summary"
         static let sourceURL = "source_url"
+        static let searchURL = "search_url"
         static let relatedResults = "related_results"
         static let title = "title"
         static let text = "text"
@@ -121,11 +122,16 @@ private enum WebSearchTool {
         } else if let firstRelated = related.first {
             result[PayloadKey.summary] = RAToolValue(firstRelated.text)
         } else {
-            result[PayloadKey.summary] = RAToolValue("No instant answer was returned for this query.")
+            result[PayloadKey.summary] = RAToolValue(
+                "No direct answer was available. Open the search results for current sources."
+            )
         }
 
         if !response.abstractURL.isEmpty {
             result[PayloadKey.sourceURL] = RAToolValue(response.abstractURL)
+        } else if let searchURL = makeSearchResultsURL(query: query)?.absoluteString {
+            result[PayloadKey.sourceURL] = RAToolValue(searchURL)
+            result[PayloadKey.searchURL] = RAToolValue(searchURL)
         }
 
         let relatedValues = related.map { topic in
@@ -167,6 +173,15 @@ private enum WebSearchTool {
         return components.url
     }
 
+    private static func makeSearchResultsURL(query: String) -> URL? {
+        var components = URLComponents()
+        components.scheme = URLConstants.scheme
+        components.host = "duckduckgo.com"
+        components.path = "/"
+        components.queryItems = [URLQueryItem(name: Parameter.query, value: query)]
+        return components.url
+    }
+
     private static func request(url: URL) -> URLRequest {
         var request = URLRequest(url: url)
         request.setValue(URLConstants.userAgent, forHTTPHeaderField: URLConstants.userAgentHeader)
@@ -200,28 +215,43 @@ private enum WebSearchTool {
     }
 
     private static func parseLiteResults(_ html: String) -> [SearchResult] {
-        let pattern = #"<a[^>]*href="([^"]+)"[^>]*class='result-link'[^>]*>(.*?)</a>[\s\S]*?<td class='result-snippet'>\s*([\s\S]*?)\s*</td>"#
+        let pattern = #"<a(?=[^>]*class=['"][^'"]*result-link[^'"]*['"])(?=[^>]*href=['"]([^'"]+)['"])[^>]*>(.*?)</a>"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
         let range = NSRange(html.startIndex..<html.endIndex, in: html)
 
         return regex.matches(in: html, range: range).compactMap { match in
             guard
                 let href = substring(html, match.range(at: 1)),
-                let title = substring(html, match.range(at: 2)),
-                let snippet = substring(html, match.range(at: 3))
+                let title = substring(html, match.range(at: 2))
             else {
                 return nil
             }
 
             let resolvedURL = redirectURL(from: decodeHTML(href))
             let cleanTitle = cleanHTML(title)
-            let cleanSnippet = cleanHTML(snippet)
-            guard !cleanTitle.isEmpty, !cleanSnippet.isEmpty, !resolvedURL.isEmpty else {
+            let cleanSnippet = snippet(after: match.range, in: html) ?? cleanTitle
+            guard !cleanTitle.isEmpty, !resolvedURL.isEmpty else {
                 return nil
             }
 
             return SearchResult(title: cleanTitle, url: resolvedURL, snippet: cleanSnippet)
         }
+    }
+
+    private static func snippet(after matchRange: NSRange, in html: String) -> String? {
+        guard let endIndex = Range(matchRange, in: html)?.upperBound else { return nil }
+        let tail = String(html[endIndex...].prefix(1_500))
+        let pattern = #"<td[^>]*class=['"][^'"]*result-snippet[^'"]*['"][^>]*>\s*([\s\S]*?)\s*</td>"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(tail.startIndex..<tail.endIndex, in: tail)
+        guard
+            let match = regex.firstMatch(in: tail, range: range),
+            let rawSnippet = substring(tail, match.range(at: 1))
+        else {
+            return nil
+        }
+        let cleanSnippet = cleanHTML(rawSnippet)
+        return cleanSnippet.isEmpty ? nil : cleanSnippet
     }
 
     private static func redirectURL(from href: String) -> String {

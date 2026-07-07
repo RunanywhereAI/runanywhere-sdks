@@ -251,7 +251,7 @@
 			mainGroup = 97C146E51CF9000F007C117D;
 			packageReferences = (
 				781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "FlutterGeneratedPluginSwiftPackage" */,
-				FDCB2F925F68458996AD1722 /* XCLocalSwiftPackageReference "../../../.." */,
+				FDCB2F925F68458996AD1722 /* XCLocalSwiftPackageReference ".." */,
 			);
 			productRefGroup = 97C146EF1CF9000F007C117D /* Products */;
 			projectDirPath = "";
@@ -774,21 +774,21 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage;
 		};
-		FDCB2F925F68458996AD1722 /* XCLocalSwiftPackageReference "../../../.." */ = {
+		FDCB2F925F68458996AD1722 /* XCLocalSwiftPackageReference ".." */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../../..;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		4D5EA495B871483BB35C5200 /* RunAnywhereMLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FDCB2F925F68458996AD1722 /* XCLocalSwiftPackageReference ".." */;
+			productName = RunAnywhereMLX;
+		};
 		78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FlutterGeneratedPluginSwiftPackage;
-		};
-		4D5EA495B871483BB35C5200 /* RunAnywhereMLX */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = FDCB2F925F68458996AD1722 /* XCLocalSwiftPackageReference "../../../.." */;
-			productName = RunAnywhereMLX;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

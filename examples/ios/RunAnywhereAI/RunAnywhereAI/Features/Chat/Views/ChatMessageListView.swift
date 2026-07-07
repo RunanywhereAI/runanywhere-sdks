@@ -237,17 +237,12 @@ struct ChatInputAreaView: View {
                 if !viewModel.loraAdapters.isEmpty {
                     loraAdapterBadge
                 }
-
-                if hasModelSelected {
-                    loraAddButton
-                }
             }
             .padding(
                 .top,
                 ((settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking)
                     || viewModel.useToolCalling
                     || !viewModel.loraAdapters.isEmpty
-                    || hasModelSelected
                     || imageAttachment != nil
                     || documentAttachment != nil) ? 8 : 0
             )
@@ -343,11 +338,13 @@ struct ChatInputAreaView: View {
                 Label("Attach image", systemImage: "photo")
             }
 
+            #if os(iOS)
             Button {
                 onComposerAction(.takePhoto)
             } label: {
                 Label("Live camera", systemImage: "livephoto")
             }
+            #endif
         } label: {
             Image(systemName: "plus.circle.fill")
                 .font(AppTypography.system28)
@@ -449,24 +446,6 @@ struct ChatInputAreaView: View {
         }
     }
 
-    private var loraAddButton: some View {
-        Button {
-            Task { await viewModel.refreshAvailableAdapters() }
-            showingLoRAManagement = true
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "plus")
-                    .font(.system(size: 9, weight: .bold))
-                Text("LoRA")
-                    .font(AppTypography.caption2)
-            }
-            .foregroundColor(AppColors.textSecondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(AppColors.backgroundSecondary)
-            .cornerRadius(6)
-        }
-    }
 }
 
 private struct ImageAttachmentPill: View {

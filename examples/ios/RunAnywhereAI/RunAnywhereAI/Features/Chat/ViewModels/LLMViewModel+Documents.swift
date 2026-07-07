@@ -26,7 +26,8 @@ extension LLMViewModel {
             setCurrentConversation(conversationStore.createConversation())
         }
 
-        let userMessage = Message(role: .user, content: "Document attached: \(document.filename)\n\(prompt)")
+        let savedAttachment = persistDocumentAttachment(document)
+        let userMessage = Message(role: .user, content: prompt, attachment: savedAttachment)
         let assistantMessage = Message(role: .assistant, content: "")
         setMessages(messagesValue + [userMessage, assistantMessage])
 
@@ -60,6 +61,38 @@ extension LLMViewModel {
         }
 
         await finalizeGeneration(at: messageIndex)
+    }
+
+    private func persistDocumentAttachment(_ document: ChatDocumentAttachment) -> MessageAttachment {
+        let detail = "\(document.characterCount) characters"
+        let previewText = String(document.text.prefix(4_000))
+        guard let conversationID = currentConversation?.id,
+              let data = document.text.data(using: .utf8) else {
+            return MessageAttachment(
+                kind: .document,
+                filename: document.filename,
+                detail: detail,
+                previewText: previewText
+            )
+        }
+
+        do {
+            return try conversationStore.saveAttachment(
+                data: data,
+                filename: document.filename,
+                kind: .document,
+                conversationID: conversationID,
+                detail: detail,
+                previewText: previewText
+            )
+        } catch {
+            return MessageAttachment(
+                kind: .document,
+                filename: document.filename,
+                detail: detail,
+                previewText: previewText
+            )
+        }
     }
 
     private func prepareDocumentRAGPipelineIfNeeded(
@@ -103,7 +136,8 @@ extension LLMViewModel {
             thinkingContent: thinkingContent,
             timestamp: currentMessage.timestamp,
             analytics: nil,
-            modelInfo: MessageModelInfo(from: answerModel)
+            modelInfo: MessageModelInfo(from: answerModel),
+            attachment: currentMessage.attachment
         )
         updateMessage(at: index, with: updatedMessage)
     }

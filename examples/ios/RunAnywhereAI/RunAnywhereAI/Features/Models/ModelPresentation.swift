@@ -69,7 +69,7 @@ extension InferenceFramework {
     var consumerBackendLabel: String {
         switch self {
         case .llamaCpp:
-            return "Local Llama"
+            return "Llama CPP"
         case .onnx:
             return "ONNX Voice"
         case .foundationModels:
@@ -421,6 +421,32 @@ extension RAModelInfo {
         }
 
         return badges
+    }
+
+    var quantizationLabel: String {
+        let haystack = [
+            id,
+            name,
+            downloadURL
+        ]
+        .joined(separator: " ")
+        .lowercased()
+
+        let knownLabels = [
+            ("q4_k_m", "Q4_K_M"),
+            ("q4_k_s", "Q4_K_S"),
+            ("q5_k_m", "Q5_K_M"),
+            ("q6_k", "Q6_K"),
+            ("q8_0", "Q8_0"),
+            ("4bit", "4bit"),
+            ("5bit", "5bit"),
+            ("8bit", "8bit"),
+            ("f16", "F16"),
+            ("fp16", "FP16"),
+            ("dwq", "DWQ")
+        ]
+
+        return knownLabels.first { haystack.contains($0.0) }?.1 ?? "Default"
     }
 }
 

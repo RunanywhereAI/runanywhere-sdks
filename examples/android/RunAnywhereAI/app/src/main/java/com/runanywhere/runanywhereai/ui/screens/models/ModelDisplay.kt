@@ -83,7 +83,7 @@ fun InferenceFramework.shortLabel(): String = when (this) {
 }
 
 fun InferenceFramework.consumerBackendLabel(): String = when (this) {
-    InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "Local Llama"
+    InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "Llama CPP"
     InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> "ONNX Runtime"
     InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "Apple Built-in"
     InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> "System Voice"
@@ -166,6 +166,91 @@ fun RAModelInfo.capabilityLabels(): List<String> = buildList {
     if (supports_thinking) add("Thinking")
     if (supports_lora) add("LoRA-ready")
 }.distinct()
+
+fun RAModelInfo.quantizationLabel(): String {
+    val haystack = listOf(id, name, download_url).joinToString(" ").lowercase()
+    val known = listOf(
+        "q4_k_m" to "Q4_K_M",
+        "q4_k_s" to "Q4_K_S",
+        "q5_k_m" to "Q5_K_M",
+        "q6_k" to "Q6_K",
+        "q8_0" to "Q8_0",
+        "4bit" to "4bit",
+        "5bit" to "5bit",
+        "8bit" to "8bit",
+        "f16" to "F16",
+        "fp16" to "FP16",
+        "dwq" to "DWQ",
+    )
+    return known.firstOrNull { haystack.contains(it.first) }?.second ?: "Default"
+}
+
+enum class ModelBackendFilter(val title: String) {
+    ALL("All"),
+    MLX("MLX"),
+    LLAMA_CPP("Llama CPP"),
+    QHEXRT("QHexRT"),
+    ONNX("ONNX"),
+    SHERPA("Sherpa"),
+    APPLE("Apple"),
+}
+
+fun ModelBackendFilter.matches(model: RAModelInfo): Boolean = when (this) {
+    ModelBackendFilter.ALL -> true
+    ModelBackendFilter.MLX -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_MLX
+    ModelBackendFilter.LLAMA_CPP -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+    ModelBackendFilter.QHEXRT -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
+    ModelBackendFilter.ONNX -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+    ModelBackendFilter.SHERPA -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
+    ModelBackendFilter.APPLE -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
+        model.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
+}
+
+enum class ModelGroupFilter(val title: String) {
+    ALL("All"),
+    CHAT("Chat"),
+    VISION("Vision"),
+    VOICE("Voice"),
+    DOCUMENTS("Documents"),
+    ADAPTERS("Adapters"),
+}
+
+fun ModelGroupFilter.matches(model: RAModelInfo): Boolean = when (this) {
+    ModelGroupFilter.ALL -> true
+    ModelGroupFilter.CHAT -> model.consumerGroup() == ConsumerModelGroup.CHAT_MODELS ||
+        model.consumerGroup() == ConsumerModelGroup.APPLE_BUILT_IN
+    ModelGroupFilter.VISION -> model.consumerGroup() == ConsumerModelGroup.VISION_MODELS
+    ModelGroupFilter.VOICE -> model.consumerGroup() == ConsumerModelGroup.VOICE_MODELS
+    ModelGroupFilter.DOCUMENTS -> model.consumerGroup() == ConsumerModelGroup.DOCUMENT_MODELS
+    ModelGroupFilter.ADAPTERS -> model.consumerGroup() == ConsumerModelGroup.LORA_ADAPTERS
+}
+
+enum class ModelQuantizationFilter(val title: String) {
+    ALL("All"),
+    Q4("Q4"),
+    Q5("Q5"),
+    Q6("Q6"),
+    Q8("Q8"),
+    FOUR_BIT("4bit"),
+    FIVE_BIT("5bit"),
+    EIGHT_BIT("8bit"),
+    F16("F16"),
+}
+
+fun ModelQuantizationFilter.matches(model: RAModelInfo): Boolean {
+    val label = model.quantizationLabel().lowercase()
+    return when (this) {
+        ModelQuantizationFilter.ALL -> true
+        ModelQuantizationFilter.Q4 -> "q4" in label
+        ModelQuantizationFilter.Q5 -> "q5" in label
+        ModelQuantizationFilter.Q6 -> "q6" in label
+        ModelQuantizationFilter.Q8 -> "q8" in label
+        ModelQuantizationFilter.FOUR_BIT -> "4bit" in label
+        ModelQuantizationFilter.FIVE_BIT -> "5bit" in label
+        ModelQuantizationFilter.EIGHT_BIT -> "8bit" in label
+        ModelQuantizationFilter.F16 -> "f16" in label
+    }
+}
 
 fun formatModelSize(bytes: Long): String {
     if (bytes <= 0) return "—"

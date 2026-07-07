@@ -15,8 +15,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -31,17 +29,13 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.BuildConfig
-import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
 import com.runanywhere.runanywhereai.ui.screens.models.formatModelSize
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
-import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.util.readableWidth
-import com.runanywhere.sdk.public.types.RAModelInfo
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -113,27 +107,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             )
         }
 
-        Section("Models & Storage") {
+        Section("Storage") {
             Text(
                 text = "Models ${formatModelSize(storage.modelsBytes)}  ·  ${formatModelSize(storage.freeBytes)} free",
                 style = RACTextStyles.Metric,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (storage.downloaded.isEmpty() && !storage.isLoading) {
-                Text(
-                    "No downloaded models",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                storage.downloaded.forEach { model ->
-                    DownloadedModelRow(
-                        model = model,
-                        busy = storage.busyId == model.id,
-                        onDelete = { viewModel.deleteModel(model) },
-                    )
-                }
-            }
+            Text(
+                "Downloaded models are managed from the Models sheet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
                 TextButton(onClick = viewModel::clearCache) { Text("Clear cache") }
                 TextButton(onClick = viewModel::cleanTempFiles) { Text("Clean temp files") }
@@ -203,6 +187,15 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     .clickable { uriHandler.openUri("https://docs.runanywhere.ai") }
                     .padding(vertical = dimens.spacingXs),
             )
+            Text(
+                text = "Follow on X",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { uriHandler.openUri("https://x.com/RunanywhereAI") }
+                    .padding(vertical = dimens.spacingXs),
+            )
         }
     }
 }
@@ -269,53 +262,6 @@ private fun ToggleRow(label: String, description: String, checked: Boolean, onCh
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = null)
-    }
-}
-
-@Composable
-private fun DownloadedModelRow(model: RAModelInfo, busy: Boolean, onDelete: () -> Unit) {
-    val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(dimens.radiusMd),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(start = dimens.spacingMd, top = dimens.spacingSm, bottom = dimens.spacingSm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(model.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
-                ) {
-                    BackendBadge(framework = model.framework, compact = true)
-                    Text(
-                        formatModelSize(model.download_size_bytes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (busy) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .padding(horizontal = dimens.spacingMd)
-                        .size(dimens.iconSm),
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = RACIcons.Outline.Trash,
-                        contentDescription = "Delete ${model.name}",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(dimens.iconSm),
-                    )
-                }
-            }
-        }
     }
 }
 

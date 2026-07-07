@@ -27,7 +27,6 @@ import com.runanywhere.runanywhereai.ui.navigation.Documents
 import com.runanywhere.runanywhereai.ui.navigation.Settings
 import com.runanywhere.runanywhereai.ui.navigation.Solutions
 import com.runanywhere.runanywhereai.ui.navigation.Stt
-import com.runanywhere.runanywhereai.ui.navigation.Tools
 import com.runanywhere.runanywhereai.ui.navigation.Tts
 import com.runanywhere.runanywhereai.ui.navigation.Vad
 import com.runanywhere.runanywhereai.ui.navigation.Vision
@@ -52,8 +51,7 @@ private data class AdvancedEntry(
 fun MoreScreen(onNavigate: (Any) -> Unit) {
     val dimens = LocalDimens.current
     val entries = listOf(
-        AdvancedEntry("Settings", "Personalization, downloads, and storage", RACIcons.Outline.Settings, AdvancedGroup.ASSISTANT, Settings),
-        AdvancedEntry("Web & tools", "Registered tools, calculator, time, weather, and device tools", RACIcons.Outline.Cloud, AdvancedGroup.ASSISTANT, Tools),
+        AdvancedEntry("Settings", "Personalization, privacy, and account controls", RACIcons.Outline.Settings, AdvancedGroup.ASSISTANT, Settings),
         AdvancedEntry("Document workbench", "Inspect document Q&A setup and sources", RACIcons.Outline.FileText, AdvancedGroup.ASSISTANT, Documents),
         AdvancedEntry("Vision workbench", "Photo prompts, camera mode, and VLM metrics", RACIcons.Outline.Eye, AdvancedGroup.ASSISTANT, Vision),
         AdvancedEntry("Read aloud", "Generate speech and preview voices", RACIcons.Outline.Robot, AdvancedGroup.SPEECH, Tts),

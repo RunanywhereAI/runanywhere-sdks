@@ -106,6 +106,14 @@ enum ModelCatalogBootstrap {
             supportsThinking: true
         )
         await registerLLM(
+            id: "qwen3.5-0.8b-q4_k_m",
+            name: "Qwen3.5 0.8B Q4_K_M",
+            url: "https://huggingface.co/bartowski/Qwen_Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 620_000_000,
+            supportsThinking: true
+        )
+        await registerLLM(
             id: "qwen3-1.7b-q4_k_m",
             name: "Qwen3 1.7B Q4_K_M",
             url: "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf",
@@ -140,11 +148,33 @@ enum ModelCatalogBootstrap {
             supportsThinking: true
         )
         await registerLLM(
+            id: "mlx-qwen3.5-0.8b-mlx-4bit",
+            name: "MLX Qwen3.5 0.8B 4bit",
+            url: "https://huggingface.co/mlx-community/Qwen3.5-0.8B-MLX-4bit",
+            framework: .mlx,
+            memoryRequirement: 622_000_000,
+            supportsThinking: true
+        )
+        await registerLLM(
             id: "mlx-llama-3.2-1b-instruct-4bit",
             name: "MLX Llama 3.2 1B Instruct 4bit",
             url: "https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit",
             framework: .mlx,
             memoryRequirement: 900_000_000
+        )
+        await registerLLM(
+            id: "mlx-lfm2-350m",
+            name: "MLX LFM2 350M",
+            url: "https://huggingface.co/mlx-community/LFM2-350M-MLX",
+            framework: .mlx,
+            memoryRequirement: 709_000_000
+        )
+        await registerLLM(
+            id: "mlx-lfm2.5-1.2b-instruct-4bit",
+            name: "MLX LFM2.5 1.2B Instruct 4bit",
+            url: "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-MLX-4bit",
+            framework: .mlx,
+            memoryRequirement: 628_000_000
         )
         await registerLLM(
             id: "mlx-qwen3-4b-4bit",
@@ -153,6 +183,22 @@ enum ModelCatalogBootstrap {
             framework: .mlx,
             memoryRequirement: 2_400_000_000,
             supportsThinking: true
+        )
+        await registerLLM(
+            id: "mlx-gemma-4-e2b-it-4bit",
+            name: "MLX Gemma 4 E2B IT 4bit (Experimental)",
+            url: "https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit",
+            framework: .mlx,
+            modality: .multimodal,
+            memoryRequirement: 2_200_000_000
+        )
+        await registerLLM(
+            id: "mlx-gemma-4-e4b-it-4bit",
+            name: "MLX Gemma 4 E4B IT 4bit (Experimental)",
+            url: "https://huggingface.co/mlx-community/gemma-4-e4b-it-4bit",
+            framework: .mlx,
+            modality: .multimodal,
+            memoryRequirement: 4_000_000_000
         )
         await registerLLM(
             id: "mlx-qwen2-vl-2b-instruct-4bit",
@@ -173,6 +219,32 @@ enum ModelCatalogBootstrap {
         logger.info("MLX models registered")
 
         // --- VLM models (multi-modal, multi-file) -----------------------------
+        await registerMultiFile(
+            id: "smolvlm2-256m-video-instruct-q8_0",
+            name: "SmolVLM2 256M Video Instruct Q8_0",
+            files: [
+                ("https://huggingface.co/ggml-org/SmolVLM2-256M-Video-Instruct-GGUF/resolve/main/SmolVLM2-256M-Video-Instruct-Q8_0.gguf",
+                 "SmolVLM2-256M-Video-Instruct-Q8_0.gguf"),
+                ("https://huggingface.co/ggml-org/SmolVLM2-256M-Video-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf",
+                 "mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf")
+            ],
+            framework: .llamaCpp,
+            modality: .multimodal,
+            memoryRequirement: 450_000_000
+        )
+        await registerMultiFile(
+            id: "smolvlm2-500m-video-instruct-q8_0",
+            name: "SmolVLM2 500M Video Instruct Q8_0",
+            files: [
+                ("https://huggingface.co/ggml-org/SmolVLM2-500M-Video-Instruct-GGUF/resolve/main/SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+                 "SmolVLM2-500M-Video-Instruct-Q8_0.gguf"),
+                ("https://huggingface.co/ggml-org/SmolVLM2-500M-Video-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+                 "mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf")
+            ],
+            framework: .llamaCpp,
+            modality: .multimodal,
+            memoryRequirement: 800_000_000
+        )
         await registerArchive(
             id: "smolvlm-500m-instruct-q8_0",
             name: "SmolVLM 500M Instruct",
@@ -195,6 +267,45 @@ enum ModelCatalogBootstrap {
             framework: .llamaCpp,
             modality: .multimodal,
             memoryRequirement: 1_800_000_000
+        )
+        await registerMultiFile(
+            id: "qwen2.5-vl-3b-instruct-q4_k_m",
+            name: "Qwen2.5-VL 3B Instruct Q4_K_M",
+            files: [
+                ("https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf",
+                 "Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf"),
+                ("https://huggingface.co/ggml-org/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf",
+                 "mmproj-Qwen2.5-VL-3B-Instruct-Q8_0.gguf")
+            ],
+            framework: .llamaCpp,
+            modality: .multimodal,
+            memoryRequirement: 2_800_000_000
+        )
+        await registerMultiFile(
+            id: "gemma-4-e2b-it-q8_0",
+            name: "Gemma 4 E2B IT Q8_0 (Experimental)",
+            files: [
+                ("https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q8_0.gguf",
+                 "gemma-4-E2B-it-Q8_0.gguf"),
+                ("https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main/mmproj-gemma-4-E2B-it-Q8_0.gguf",
+                 "mmproj-gemma-4-E2B-it-Q8_0.gguf")
+            ],
+            framework: .llamaCpp,
+            modality: .multimodal,
+            memoryRequirement: 3_000_000_000
+        )
+        await registerMultiFile(
+            id: "gemma-4-e4b-it-q4_k_m",
+            name: "Gemma 4 E4B IT Q4_K_M (Experimental)",
+            files: [
+                ("https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf",
+                 "gemma-4-E4B-it-Q4_K_M.gguf"),
+                ("https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/mmproj-gemma-4-E4B-it-Q8_0.gguf",
+                 "mmproj-gemma-4-E4B-it-Q8_0.gguf")
+            ],
+            framework: .llamaCpp,
+            modality: .multimodal,
+            memoryRequirement: 5_500_000_000
         )
         await registerMultiFile(
             id: "lfm2-vl-450m-q8_0",
