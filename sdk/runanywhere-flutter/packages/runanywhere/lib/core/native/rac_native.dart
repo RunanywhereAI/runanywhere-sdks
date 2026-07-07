@@ -41,19 +41,13 @@ base class RacProtoBuffer extends ffi.Struct {
   external ffi.Pointer<Utf8> errorMessage;
 }
 
-typedef RacProtoBufferInitNative = ffi.Void Function(
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacProtoBufferInitDart = void Function(
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacProtoBufferInitNative =
+    ffi.Void Function(ffi.Pointer<RacProtoBuffer>);
+typedef RacProtoBufferInitDart = void Function(ffi.Pointer<RacProtoBuffer>);
 
-typedef RacProtoBufferFreeNative = ffi.Void Function(
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacProtoBufferFreeDart = void Function(
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacProtoBufferFreeNative =
+    ffi.Void Function(ffi.Pointer<RacProtoBuffer>);
+typedef RacProtoBufferFreeDart = void Function(ffi.Pointer<RacProtoBuffer>);
 
 // ============================================================================
 // Voice agent + LLM proto streaming
@@ -61,211 +55,219 @@ typedef RacProtoBufferFreeDart = void Function(
 
 /// Matches `rac_voice_agent_proto_event_callback_fn` in
 /// `rac/features/voice_agent/rac_voice_event_abi.h`.
-typedef RacVoiceAgentProtoEventCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacVoiceAgentProtoEventCallbackNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
-typedef RacVoiceAgentSetProtoCallbackNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacVoiceAgentSetProtoCallbackNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
-typedef RacVoiceAgentSetProtoCallbackDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacVoiceAgentSetProtoCallbackDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
 /// Matches `rac_llm_stream_proto_callback_fn` in
 /// `rac/features/llm/rac_llm_stream.h`.
-typedef RacLlmStreamProtoCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacLlmStreamProtoCallbackNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
 // ============================================================================
 // Generated-proto modality APIs
 // ============================================================================
 
-typedef RacLlmGenerateProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacLlmGenerateProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacLlmGenerateProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacLlmGenerateProtoDart =
+    int Function(ffi.Pointer<ffi.Uint8>, int, ffi.Pointer<RacProtoBuffer>);
 
-typedef RacLlmGenerateStreamProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.NativeFunction<RacLlmStreamProtoCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacLlmGenerateStreamProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.NativeFunction<RacLlmStreamProtoCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacLlmGenerateStreamProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.NativeFunction<RacLlmStreamProtoCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacLlmGenerateStreamProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacLlmStreamProtoCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
-typedef RacLlmCancelProtoNative = ffi.Int32 Function(
-  ffi.Pointer<RacProtoBuffer>,
-);
+/// Matches `bool Dart_PostCObject(Dart_Port, Dart_CObject*)`.
+typedef RacDartPostCObjectNative =
+    ffi.Int8 Function(ffi.Int64, ffi.Pointer<ffi.Dart_CObject>);
+
+/// Flutter iOS helper that copies LLM stream events natively and posts them to
+/// a Dart ReceivePort. Exported by the Flutter pod, not by RACommons.
+typedef RaFlutterLlmGenerateStreamNativePortNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Int64,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+typedef RaFlutterLlmGenerateStreamNativePortDart =
+    int Function(
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacDartPostCObjectNative>>,
+    );
+
+typedef RacLlmCancelProtoNative =
+    ffi.Int32 Function(ffi.Pointer<RacProtoBuffer>);
 typedef RacLlmCancelProtoDart = int Function(ffi.Pointer<RacProtoBuffer>);
 
-typedef RacLifecycleRequestProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacLifecycleRequestProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacLifecycleRequestProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacLifecycleRequestProtoDart =
+    int Function(ffi.Pointer<ffi.Uint8>, int, ffi.Pointer<RacProtoBuffer>);
 
-typedef RacSttProtoPartialCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacSttProtoPartialCallbackNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
-typedef RacSttTranscribeProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Size,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacSttTranscribeProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Void>,
-  int,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacSttTranscribeProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Size,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacSttTranscribeProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Void>,
+      int,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<RacProtoBuffer>,
+    );
 
-typedef RacSttTranscribeStreamProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Size,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.NativeFunction<RacSttProtoPartialCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacSttTranscribeStreamProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Void>,
-  int,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.NativeFunction<RacSttProtoPartialCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacSttTranscribeStreamProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Size,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.NativeFunction<RacSttProtoPartialCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacSttTranscribeStreamProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Void>,
+      int,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacSttProtoPartialCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
-typedef RacTtsProtoVoiceCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacTtsProtoVoiceCallbackNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
-typedef RacTtsProtoChunkCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacTtsProtoChunkCallbackNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
-typedef RacTtsListVoicesProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.NativeFunction<RacTtsProtoVoiceCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacTtsListVoicesProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.NativeFunction<RacTtsProtoVoiceCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacTtsListVoicesProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.NativeFunction<RacTtsProtoVoiceCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacTtsListVoicesProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.NativeFunction<RacTtsProtoVoiceCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
-typedef RacTtsSynthesizeProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacTtsSynthesizeProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacTtsSynthesizeProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacTtsSynthesizeProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<RacProtoBuffer>,
+    );
 
-typedef RacTtsSynthesizeStreamProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.NativeFunction<RacTtsProtoChunkCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacTtsSynthesizeStreamProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.NativeFunction<RacTtsProtoChunkCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacTtsSynthesizeStreamProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.NativeFunction<RacTtsProtoChunkCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacTtsSynthesizeStreamProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacTtsProtoChunkCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
 /// Native callback signature for `rac_tts_lifecycle_stream_event_callback_fn`.
-typedef RacTtsStreamEventCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacTtsStreamEventCallbackNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
-typedef RacTtsSynthesizeStreamLifecycleProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.NativeFunction<RacTtsStreamEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacTtsSynthesizeStreamLifecycleProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.NativeFunction<RacTtsStreamEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacTtsSynthesizeStreamLifecycleProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.NativeFunction<RacTtsStreamEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacTtsSynthesizeStreamLifecycleProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacTtsStreamEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
 /// Single-arg out-only proto-buffer ABI (used by tts_stop_lifecycle /
 /// vad_start_lifecycle / vad_stop_lifecycle / vad_reset_lifecycle).
-typedef RacOutOnlyProtoNative = ffi.Int32 Function(
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacOutOnlyProtoNative = ffi.Int32 Function(ffi.Pointer<RacProtoBuffer>);
 typedef RacOutOnlyProtoDart = int Function(ffi.Pointer<RacProtoBuffer>);
 
 /// `rac_result_to_proto_error(rac_result_t code, rac_proto_buffer_t* out)` —
 /// canonical mapping from a signed C ABI error code to a serialized
 /// `runanywhere.v1.SDKError` proto buffer.
-typedef RacResultToProtoErrorNative = ffi.Int32 Function(
-  ffi.Int32,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacResultToProtoErrorDart = int Function(
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacResultToProtoErrorNative =
+    ffi.Int32 Function(ffi.Int32, ffi.Pointer<RacProtoBuffer>);
+typedef RacResultToProtoErrorDart =
+    int Function(int, ffi.Pointer<RacProtoBuffer>);
 
 /// `void (*)(void)` quiesce ABI exposed by every modality stream header
 /// (rac_llm_stream.h, rac_stt_stream.h, rac_tts_stream.h, rac_vad_stream.h,
@@ -275,116 +277,111 @@ typedef RacResultToProtoErrorDart = int Function(
 typedef RacProtoQuiesceNative = ffi.Void Function();
 typedef RacProtoQuiesceDart = void Function();
 
-typedef RacVadProtoActivityCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacVadProtoActivityCallbackNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
-typedef RacVadConfigureProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-);
-typedef RacVadConfigureProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-);
+typedef RacVadConfigureProtoNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Uint8>, ffi.Size);
+typedef RacVadConfigureProtoDart =
+    int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Uint8>, int);
 
-typedef RacVadProcessProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Float>,
-  ffi.Size,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacVadProcessProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Float>,
-  int,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacVadProcessProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Float>,
+      ffi.Size,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacVadProcessProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Float>,
+      int,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<RacProtoBuffer>,
+    );
 
-typedef RacHandleOutProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacHandleOutProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacHandleOutProtoNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Pointer<RacProtoBuffer>);
+typedef RacHandleOutProtoDart =
+    int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<RacProtoBuffer>);
 
-typedef RacVadSetActivityProtoCallbackNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.NativeFunction<RacVadProtoActivityCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacVadSetActivityProtoCallbackDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.NativeFunction<RacVadProtoActivityCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacVadSetActivityProtoCallbackNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.NativeFunction<RacVadProtoActivityCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacVadSetActivityProtoCallbackDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.NativeFunction<RacVadProtoActivityCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
-typedef RacVoiceAgentInitializeProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacVoiceAgentInitializeProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacVoiceAgentInitializeProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacVoiceAgentInitializeProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<RacProtoBuffer>,
+    );
 
-typedef RacVoiceAgentProcessTurnProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacVoiceAgentProcessTurnProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Void>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacVoiceAgentProcessTurnProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacVoiceAgentProcessTurnProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Void>,
+      int,
+      ffi.Pointer<RacProtoBuffer>,
+    );
 
-typedef RacCreateWithModelNative = ffi.Int32 Function(
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
-typedef RacCreateWithModelDart = int Function(
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
+typedef RacCreateWithModelNative =
+    ffi.Int32 Function(ffi.Pointer<Utf8>, ffi.Pointer<ffi.Pointer<ffi.Void>>);
+typedef RacCreateWithModelDart =
+    int Function(ffi.Pointer<Utf8>, ffi.Pointer<ffi.Pointer<ffi.Void>>);
 
-typedef RacCreateWithModelConfigNative = ffi.Int32 Function(
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
-typedef RacCreateWithModelConfigDart = int Function(
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
+typedef RacCreateWithModelConfigNative =
+    ffi.Int32 Function(
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    );
+typedef RacCreateWithModelConfigDart =
+    int Function(
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    );
 
-typedef RacCreateWithModelStructConfigNative = ffi.Int32 Function(
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
-typedef RacCreateWithModelStructConfigDart = int Function(
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
+typedef RacCreateWithModelStructConfigNative =
+    ffi.Int32 Function(
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    );
+typedef RacCreateWithModelStructConfigDart =
+    int Function(
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    );
 
 typedef RacDestroyHandleNative = ffi.Void Function(ffi.Pointer<ffi.Void>);
 typedef RacDestroyHandleDart = void Function(ffi.Pointer<ffi.Void>);
@@ -392,164 +389,150 @@ typedef RacDestroyHandleDart = void Function(ffi.Pointer<ffi.Void>);
 typedef RacHandleStatusNative = ffi.Int32 Function(ffi.Pointer<ffi.Void>);
 typedef RacHandleStatusDart = int Function(ffi.Pointer<ffi.Void>);
 
-typedef RacHandleCapabilitiesNative = ffi.Uint32 Function(
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacHandleCapabilitiesNative =
+    ffi.Uint32 Function(ffi.Pointer<ffi.Void>);
 typedef RacHandleCapabilitiesDart = int Function(ffi.Pointer<ffi.Void>);
 
-typedef RacDiffusionInitializeNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacDiffusionInitializeDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacDiffusionInitializeNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacDiffusionInitializeDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Void>,
+    );
 
-typedef RacHandleBytesToProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacHandleBytesToProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacHandleBytesToProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacHandleBytesToProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<RacProtoBuffer>,
+    );
 
-typedef RacDiffusionProgressProtoCallbackNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacDiffusionProgressProtoCallbackNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
-typedef RacDiffusionGenerateWithProgressProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.NativeFunction<RacDiffusionProgressProtoCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacDiffusionGenerateWithProgressProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.NativeFunction<RacDiffusionProgressProtoCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacDiffusionGenerateWithProgressProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.NativeFunction<RacDiffusionProgressProtoCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacDiffusionGenerateWithProgressProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacDiffusionProgressProtoCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<RacProtoBuffer>,
+    );
 
-typedef RacRagSessionCreateProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
-typedef RacRagSessionCreateProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
+typedef RacRagSessionCreateProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    );
+typedef RacRagSessionCreateProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    );
 
 typedef RacLoraRegistryGetNative = ffi.Pointer<ffi.Void> Function();
 typedef RacLoraRegistryGetDart = ffi.Pointer<ffi.Void> Function();
 
-typedef RacEmbeddingsInitializeNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-);
-typedef RacEmbeddingsInitializeDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-);
+typedef RacEmbeddingsInitializeNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Pointer<Utf8>);
+typedef RacEmbeddingsInitializeDart =
+    int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<Utf8>);
 
 // ============================================================================
 // Tool-calling proto APIs
 // ============================================================================
 
-typedef RacToolCallProtoRequestNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacToolCallProtoRequestDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacToolCallProtoRequestNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacToolCallProtoRequestDart =
+    int Function(ffi.Pointer<ffi.Uint8>, int, ffi.Pointer<RacProtoBuffer>);
 
 /// `void (*)(const uint8_t*, size_t, void*)` matching
 /// `rac_tool_calling_session_event_callback_fn`.
-typedef RacToolCallingSessionEventCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacToolCallingSessionEventCallbackNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
-typedef RacToolCallingSessionCreateProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint64>,
-);
-typedef RacToolCallingSessionCreateProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint64>,
-);
+typedef RacToolCallingSessionCreateProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint64>,
+    );
+typedef RacToolCallingSessionCreateProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint64>,
+    );
 
-typedef RacToolCallingSessionStepWithResultProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-);
-typedef RacToolCallingSessionStepWithResultProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-);
+typedef RacToolCallingSessionStepWithResultProtoNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Uint8>, ffi.Size);
+typedef RacToolCallingSessionStepWithResultProtoDart =
+    int Function(ffi.Pointer<ffi.Uint8>, int);
 
-typedef RacToolCallingSessionDestroyProtoNative = ffi.Int32 Function(
-  ffi.Uint64,
-);
+typedef RacToolCallingSessionDestroyProtoNative =
+    ffi.Int32 Function(ffi.Uint64);
 typedef RacToolCallingSessionDestroyProtoDart = int Function(int);
 
 // Cancel ABI for the tool-calling session.
-typedef RacToolCallingSessionCancelProtoNative = ffi.Int32 Function(
-  ffi.Uint64,
-);
+typedef RacToolCallingSessionCancelProtoNative = ffi.Int32 Function(ffi.Uint64);
 typedef RacToolCallingSessionCancelProtoDart = int Function(int);
 
 // ============================================================================
 // Model format + artifact inference proto APIs
 // ============================================================================
 
-typedef RacModelFormatFromUrlProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacModelFormatFromUrlProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacModelFormatFromUrlProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacModelFormatFromUrlProtoDart =
+    int Function(ffi.Pointer<ffi.Uint8>, int, ffi.Pointer<RacProtoBuffer>);
 
-typedef RacArtifactInferFromUrlProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacArtifactInferFromUrlProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacArtifactInferFromUrlProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacArtifactInferFromUrlProtoDart =
+    int Function(ffi.Pointer<ffi.Uint8>, int, ffi.Pointer<RacProtoBuffer>);
 
 // ============================================================================
 // STT stream lifecycle proto API
@@ -557,24 +540,23 @@ typedef RacArtifactInferFromUrlProtoDart = int Function(
 
 /// `void (*)(const uint8_t*, size_t, void*)` matching
 /// `rac_stt_stream_event_callback_fn`.
-typedef RacSttStreamEventCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacSttStreamEventCallbackNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
-typedef RacSttTranscribeStreamLifecycleProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacSttTranscribeStreamLifecycleProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacSttTranscribeStreamLifecycleProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacSttTranscribeStreamLifecycleProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
 // ---------------------------------------------------------------------------
 // Chunk-feed streaming STT sessions (rac_stt_stream.h). Mirrors Swift
@@ -584,60 +566,58 @@ typedef RacSttTranscribeStreamLifecycleProtoDart = int Function(
 // header contract: unset callback → rac_stt_proto_quiesce() → free user_data.
 // ---------------------------------------------------------------------------
 
-typedef RacSttComponentLoadModelNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-);
-typedef RacSttComponentLoadModelDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-);
+typedef RacSttComponentLoadModelNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<Utf8>,
+    );
+typedef RacSttComponentLoadModelDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<Utf8>,
+    );
 
-typedef RacSttSetStreamProtoCallbackNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacSttSetStreamProtoCallbackDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacSttSetStreamProtoCallbackNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacSttSetStreamProtoCallbackDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
-typedef RacSttUnsetStreamProtoCallbackNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacSttUnsetStreamProtoCallbackDart = int Function(
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacSttUnsetStreamProtoCallbackNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Void>);
+typedef RacSttUnsetStreamProtoCallbackDart =
+    int Function(ffi.Pointer<ffi.Void>);
 
-typedef RacSttStreamStartProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Uint64>,
-);
-typedef RacSttStreamStartProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.Uint64>,
-);
+typedef RacSttStreamStartProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.Uint64>,
+    );
+typedef RacSttStreamStartProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.Uint64>,
+    );
 
-typedef RacSttStreamFeedAudioProtoNative = ffi.Int32 Function(
-  ffi.Uint64,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-);
-typedef RacSttStreamFeedAudioProtoDart = int Function(
-  int,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-);
+typedef RacSttStreamFeedAudioProtoNative =
+    ffi.Int32 Function(ffi.Uint64, ffi.Pointer<ffi.Uint8>, ffi.Size);
+typedef RacSttStreamFeedAudioProtoDart =
+    int Function(int, ffi.Pointer<ffi.Uint8>, int);
 
 typedef RacSttStreamFinishProtoNative = ffi.Int32 Function(ffi.Uint64);
 typedef RacSttStreamFinishProtoDart = int Function(int);
@@ -646,51 +626,55 @@ typedef RacSttStreamFinishProtoDart = int Function(int);
 // Voice agent proto APIs (session + helpers + lifecycle-owned handle)
 // ============================================================================
 
-typedef RacVoiceAgentProcessTurnProto2Native = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacVoiceAgentProcessTurnProto2Dart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacVoiceAgentProcessTurnProto2Native =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacVoiceAgentProcessTurnProto2Dart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
-typedef RacVoiceAgentHelperProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacVoiceAgentHelperProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacVoiceAgentHelperProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacVoiceAgentHelperProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<RacProtoBuffer>,
+    );
 
-typedef RacVoiceAgentComponentCreateProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
-typedef RacVoiceAgentComponentCreateProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
+typedef RacVoiceAgentComponentCreateProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    );
+typedef RacVoiceAgentComponentCreateProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    );
 
-typedef RacVoiceAgentComponentDestroyProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacVoiceAgentComponentDestroyProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacVoiceAgentComponentDestroyProtoNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Void>);
+typedef RacVoiceAgentComponentDestroyProtoDart =
+    int Function(ffi.Pointer<ffi.Void>);
 
 // ============================================================================
 // HTTP client (rac_http_client.h)
@@ -744,40 +728,44 @@ base class RacHttpResponse extends ffi.Struct {
   external int elapsedMs;
 }
 
-typedef RacHttpClientCreateNative = ffi.Int32 Function(
-    ffi.Pointer<ffi.Pointer<ffi.Void>>);
-typedef RacHttpClientCreateDart = int Function(
-    ffi.Pointer<ffi.Pointer<ffi.Void>>);
+typedef RacHttpClientCreateNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Pointer<ffi.Void>>);
+typedef RacHttpClientCreateDart =
+    int Function(ffi.Pointer<ffi.Pointer<ffi.Void>>);
 
 typedef RacHttpClientDestroyNative = ffi.Void Function(ffi.Pointer<ffi.Void>);
 typedef RacHttpClientDestroyDart = void Function(ffi.Pointer<ffi.Void>);
 
-typedef RacHttpRequestSendNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<RacHttpRequest>,
-  ffi.Pointer<RacHttpResponse>,
-);
-typedef RacHttpRequestSendDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<RacHttpRequest>,
-  ffi.Pointer<RacHttpResponse>,
-);
+typedef RacHttpRequestSendNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<RacHttpRequest>,
+      ffi.Pointer<RacHttpResponse>,
+    );
+typedef RacHttpRequestSendDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<RacHttpRequest>,
+      ffi.Pointer<RacHttpResponse>,
+    );
 
-typedef RacHttpResponseFreeNative = ffi.Void Function(
-    ffi.Pointer<RacHttpResponse>);
+typedef RacHttpResponseFreeNative =
+    ffi.Void Function(ffi.Pointer<RacHttpResponse>);
 typedef RacHttpResponseFreeDart = void Function(ffi.Pointer<RacHttpResponse>);
 
 /// Matches `rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_kvs, size_t* out_count)`.
 ///
 /// The returned array is statically allocated inside commons — DO NOT free.
-typedef RacHttpDefaultHeadersNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Pointer<RacHttpHeaderKv>>,
-  ffi.Pointer<ffi.Size>,
-);
-typedef RacHttpDefaultHeadersDart = int Function(
-  ffi.Pointer<ffi.Pointer<RacHttpHeaderKv>>,
-  ffi.Pointer<ffi.Size>,
-);
+typedef RacHttpDefaultHeadersNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Pointer<RacHttpHeaderKv>>,
+      ffi.Pointer<ffi.Size>,
+    );
+typedef RacHttpDefaultHeadersDart =
+    int Function(
+      ffi.Pointer<ffi.Pointer<RacHttpHeaderKv>>,
+      ffi.Pointer<ffi.Size>,
+    );
 
 // ============================================================================
 // HTTP download (rac_http_download.h)
@@ -808,24 +796,23 @@ base class RacHttpDownloadRequest extends ffi.Struct {
 ///
 ///   rac_bool_t (*)(uint64_t bytes_written, uint64_t total_bytes,
 ///                  void* user_data)
-typedef RacHttpDownloadProgressNative = ffi.Int32 Function(
-  ffi.Uint64,
-  ffi.Uint64,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacHttpDownloadProgressNative =
+    ffi.Int32 Function(ffi.Uint64, ffi.Uint64, ffi.Pointer<ffi.Void>);
 
-typedef RacHttpDownloadExecuteNative = ffi.Int32 Function(
-  ffi.Pointer<RacHttpDownloadRequest>,
-  ffi.Pointer<ffi.NativeFunction<RacHttpDownloadProgressNative>>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Int32>,
-);
-typedef RacHttpDownloadExecuteDart = int Function(
-  ffi.Pointer<RacHttpDownloadRequest>,
-  ffi.Pointer<ffi.NativeFunction<RacHttpDownloadProgressNative>>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Int32>,
-);
+typedef RacHttpDownloadExecuteNative =
+    ffi.Int32 Function(
+      ffi.Pointer<RacHttpDownloadRequest>,
+      ffi.Pointer<ffi.NativeFunction<RacHttpDownloadProgressNative>>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Int32>,
+    );
+typedef RacHttpDownloadExecuteDart =
+    int Function(
+      ffi.Pointer<RacHttpDownloadRequest>,
+      ffi.Pointer<ffi.NativeFunction<RacHttpDownloadProgressNative>>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Int32>,
+    );
 
 // ============================================================================
 // Model registry proto-byte API (rac_model_registry.h)
@@ -838,159 +825,144 @@ typedef RacHttpDownloadExecuteDart = int Function(
 // `rac_model_registry_refresh` / `rac_model_registry_refresh_opts_t` were
 // removed from commons.
 
-typedef RacModelRegistryRegisterProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-);
-typedef RacModelRegistryRegisterProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-);
+typedef RacModelRegistryRegisterProtoNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Uint8>, ffi.Size);
+typedef RacModelRegistryRegisterProtoDart =
+    int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Uint8>, int);
 
-typedef RacModelRegistryUpdateProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-);
-typedef RacModelRegistryUpdateProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-);
+typedef RacModelRegistryUpdateProtoNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Uint8>, ffi.Size);
+typedef RacModelRegistryUpdateProtoDart =
+    int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Uint8>, int);
 
-typedef RacModelRegistryGetProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
-  ffi.Pointer<ffi.Size>,
-);
-typedef RacModelRegistryGetProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
-  ffi.Pointer<ffi.Size>,
-);
+typedef RacModelRegistryGetProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+      ffi.Pointer<ffi.Size>,
+    );
+typedef RacModelRegistryGetProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+      ffi.Pointer<ffi.Size>,
+    );
 
-typedef RacModelRegistryListProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
-  ffi.Pointer<ffi.Size>,
-);
-typedef RacModelRegistryListProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
-  ffi.Pointer<ffi.Size>,
-);
+typedef RacModelRegistryListProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+      ffi.Pointer<ffi.Size>,
+    );
+typedef RacModelRegistryListProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+      ffi.Pointer<ffi.Size>,
+    );
 
-typedef RacModelRegistryQueryProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
-  ffi.Pointer<ffi.Size>,
-);
-typedef RacModelRegistryQueryProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
-  ffi.Pointer<ffi.Size>,
-);
+typedef RacModelRegistryQueryProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+      ffi.Pointer<ffi.Size>,
+    );
+typedef RacModelRegistryQueryProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+      ffi.Pointer<ffi.Size>,
+    );
 
-typedef RacModelRegistryListDownloadedProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
-  ffi.Pointer<ffi.Size>,
-);
-typedef RacModelRegistryListDownloadedProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
-  ffi.Pointer<ffi.Size>,
-);
+typedef RacModelRegistryListDownloadedProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+      ffi.Pointer<ffi.Size>,
+    );
+typedef RacModelRegistryListDownloadedProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Pointer<ffi.Uint8>>,
+      ffi.Pointer<ffi.Size>,
+    );
 
-typedef RacModelRegistryRemoveProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-);
-typedef RacModelRegistryRemoveProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-);
+typedef RacModelRegistryRemoveProtoNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Pointer<Utf8>);
+typedef RacModelRegistryRemoveProtoDart =
+    int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<Utf8>);
 
-typedef RacModelRegistryProtoFreeNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-);
-typedef RacModelRegistryProtoFreeDart = void Function(
-  ffi.Pointer<ffi.Uint8>,
-);
+typedef RacModelRegistryProtoFreeNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>);
+typedef RacModelRegistryProtoFreeDart = void Function(ffi.Pointer<ffi.Uint8>);
 
 /// Matches `rac_register_model_from_url_proto(in_bytes, in_size, out_proto)`.
 /// Shape is identical to `RacLifecycleRequestProtoDart` (no handle) — see
 /// `runanywhere-commons/src/infrastructure/model_management/register_model_from_url.cpp`.
-typedef RacRegisterModelFromUrlProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacRegisterModelFromUrlProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacRegisterModelFromUrlProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacRegisterModelFromUrlProtoDart =
+    int Function(ffi.Pointer<ffi.Uint8>, int, ffi.Pointer<RacProtoBuffer>);
 
 /// Matches `rac_model_registry_import_proto(handle, in_bytes, in_size,
 /// out_proto)`. Same shape as `RacHandleBytesToProtoDart`.
-typedef RacModelRegistryImportProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacModelRegistryImportProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacModelRegistryImportProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacModelRegistryImportProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<RacProtoBuffer>,
+    );
 
 // ============================================================================
 // Model lifecycle proto-byte API (rac_model_lifecycle.h)
 // ============================================================================
 
-typedef RacModelLifecycleLoadProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacModelLifecycleLoadProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacModelLifecycleLoadProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacModelLifecycleLoadProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<RacProtoBuffer>,
+    );
 
-typedef RacModelLifecycleRequestProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacModelLifecycleRequestProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacModelLifecycleRequestProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacModelLifecycleRequestProtoDart =
+    int Function(ffi.Pointer<ffi.Uint8>, int, ffi.Pointer<RacProtoBuffer>);
 
-typedef RacComponentLifecycleSnapshotProtoNative = ffi.Int32 Function(
-  ffi.Uint32,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacComponentLifecycleSnapshotProtoDart = int Function(
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacComponentLifecycleSnapshotProtoNative =
+    ffi.Int32 Function(ffi.Uint32, ffi.Pointer<RacProtoBuffer>);
+typedef RacComponentLifecycleSnapshotProtoDart =
+    int Function(int, ffi.Pointer<RacProtoBuffer>);
 
 typedef RacModelLifecycleResetNative = ffi.Void Function();
 typedef RacModelLifecycleResetDart = void Function();
@@ -999,143 +971,131 @@ typedef RacModelLifecycleResetDart = void Function();
 // Storage analyzer proto-byte API (rac_storage_analyzer.h)
 // ============================================================================
 
-typedef RacStorageCalculateDirSizeNative = ffi.Int64 Function(
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacStorageCalculateDirSizeNative =
+    ffi.Int64 Function(ffi.Pointer<Utf8>, ffi.Pointer<ffi.Void>);
 
-typedef RacStorageGetFileSizeNative = ffi.Int64 Function(
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacStorageGetFileSizeNative =
+    ffi.Int64 Function(ffi.Pointer<Utf8>, ffi.Pointer<ffi.Void>);
 
-typedef RacStoragePathExistsNative = ffi.Int32 Function(
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Int32>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacStoragePathExistsNative =
+    ffi.Int32 Function(
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Int32>,
+      ffi.Pointer<ffi.Void>,
+    );
 
-typedef RacStorageGetSpaceNative = ffi.Int64 Function(
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacStorageGetSpaceNative = ffi.Int64 Function(ffi.Pointer<ffi.Void>);
 
-typedef RacStorageDeletePathNative = ffi.Int32 Function(
-  ffi.Pointer<Utf8>,
-  ffi.Int32,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacStorageDeletePathNative =
+    ffi.Int32 Function(ffi.Pointer<Utf8>, ffi.Int32, ffi.Pointer<ffi.Void>);
 
-typedef RacStorageIsModelLoadedNative = ffi.Int32 Function(
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Int32>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacStorageIsModelLoadedNative =
+    ffi.Int32 Function(
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<ffi.Int32>,
+      ffi.Pointer<ffi.Void>,
+    );
 
-typedef RacStorageUnloadModelNative = ffi.Int32 Function(
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacStorageUnloadModelNative =
+    ffi.Int32 Function(ffi.Pointer<Utf8>, ffi.Pointer<ffi.Void>);
 
 /// Matches `rac_storage_callbacks_t`.
 base class RacStorageCallbacks extends ffi.Struct {
   external ffi.Pointer<ffi.NativeFunction<RacStorageCalculateDirSizeNative>>
-      calculateDirSize;
+  calculateDirSize;
   external ffi.Pointer<ffi.NativeFunction<RacStorageGetFileSizeNative>>
-      getFileSize;
+  getFileSize;
   external ffi.Pointer<ffi.NativeFunction<RacStoragePathExistsNative>>
-      pathExists;
+  pathExists;
   external ffi.Pointer<ffi.NativeFunction<RacStorageGetSpaceNative>>
-      getAvailableSpace;
+  getAvailableSpace;
   external ffi.Pointer<ffi.NativeFunction<RacStorageGetSpaceNative>>
-      getTotalSpace;
+  getTotalSpace;
   external ffi.Pointer<ffi.NativeFunction<RacStorageDeletePathNative>>
-      deletePath;
+  deletePath;
   external ffi.Pointer<ffi.NativeFunction<RacStorageIsModelLoadedNative>>
-      isModelLoaded;
+  isModelLoaded;
   external ffi.Pointer<ffi.NativeFunction<RacStorageUnloadModelNative>>
-      unloadModel;
+  unloadModel;
   external ffi.Pointer<ffi.Void> userData;
 }
 
-typedef RacStorageAnalyzerCreateNative = ffi.Int32 Function(
-  ffi.Pointer<RacStorageCallbacks>,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
-typedef RacStorageAnalyzerCreateDart = int Function(
-  ffi.Pointer<RacStorageCallbacks>,
-  ffi.Pointer<ffi.Pointer<ffi.Void>>,
-);
+typedef RacStorageAnalyzerCreateNative =
+    ffi.Int32 Function(
+      ffi.Pointer<RacStorageCallbacks>,
+      ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    );
+typedef RacStorageAnalyzerCreateDart =
+    int Function(
+      ffi.Pointer<RacStorageCallbacks>,
+      ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    );
 
-typedef RacStorageAnalyzerDestroyNative = ffi.Void Function(
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacStorageAnalyzerDestroyDart = void Function(
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacStorageAnalyzerDestroyNative =
+    ffi.Void Function(ffi.Pointer<ffi.Void>);
+typedef RacStorageAnalyzerDestroyDart = void Function(ffi.Pointer<ffi.Void>);
 
-typedef RacStorageProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacStorageProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacStorageProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacStorageProtoDart =
+    int Function(
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Void>,
+      ffi.Pointer<ffi.Uint8>,
+      int,
+      ffi.Pointer<RacProtoBuffer>,
+    );
 
 // ============================================================================
 // Download proto-byte API (rac_download_orchestrator.h)
 // ============================================================================
 
-typedef RacDownloadProtoProgressCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacDownloadProtoProgressCallbackNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
-typedef RacDownloadSetProgressProtoCallbackNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.NativeFunction<RacDownloadProtoProgressCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacDownloadSetProgressProtoCallbackDart = int Function(
-  ffi.Pointer<ffi.NativeFunction<RacDownloadProtoProgressCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacDownloadSetProgressProtoCallbackNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.NativeFunction<RacDownloadProtoProgressCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacDownloadSetProgressProtoCallbackDart =
+    int Function(
+      ffi.Pointer<ffi.NativeFunction<RacDownloadProtoProgressCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
-typedef RacDownloadProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacDownloadProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacDownloadProtoNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Uint8>,
+      ffi.Size,
+      ffi.Pointer<RacProtoBuffer>,
+    );
+typedef RacDownloadProtoDart =
+    int Function(ffi.Pointer<ffi.Uint8>, int, ffi.Pointer<RacProtoBuffer>);
 
 // ============================================================================
 // SDK event stream proto-byte API (rac_sdk_event_stream.h)
 // ============================================================================
 
-typedef RacSdkEventCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacSdkEventCallbackNative =
+    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
-typedef RacSdkEventSubscribeNative = ffi.Uint64 Function(
-  ffi.Pointer<ffi.NativeFunction<RacSdkEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-typedef RacSdkEventSubscribeDart = int Function(
-  ffi.Pointer<ffi.NativeFunction<RacSdkEventCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
+typedef RacSdkEventSubscribeNative =
+    ffi.Uint64 Function(
+      ffi.Pointer<ffi.NativeFunction<RacSdkEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
+typedef RacSdkEventSubscribeDart =
+    int Function(
+      ffi.Pointer<ffi.NativeFunction<RacSdkEventCallbackNative>>,
+      ffi.Pointer<ffi.Void>,
+    );
 
 typedef RacSdkEventUnsubscribeNative = ffi.Void Function(ffi.Uint64);
 typedef RacSdkEventUnsubscribeDart = void Function(int);
@@ -1143,36 +1103,29 @@ typedef RacSdkEventUnsubscribeDart = void Function(int);
 typedef RacSdkEventQuiesceNative = ffi.Void Function();
 typedef RacSdkEventQuiesceDart = void Function();
 
-typedef RacSdkEventPublishProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-);
-typedef RacSdkEventPublishProtoDart = int Function(
-  ffi.Pointer<ffi.Uint8>,
-  int,
-);
+typedef RacSdkEventPublishProtoNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Uint8>, ffi.Size);
+typedef RacSdkEventPublishProtoDart = int Function(ffi.Pointer<ffi.Uint8>, int);
 
-typedef RacSdkEventPollNative = ffi.Int32 Function(
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacSdkEventPollDart = int Function(
-  ffi.Pointer<RacProtoBuffer>,
-);
+typedef RacSdkEventPollNative = ffi.Int32 Function(ffi.Pointer<RacProtoBuffer>);
+typedef RacSdkEventPollDart = int Function(ffi.Pointer<RacProtoBuffer>);
 
-typedef RacSdkEventPublishFailureNative = ffi.Int32 Function(
-  ffi.Int32,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-  ffi.Int32,
-);
-typedef RacSdkEventPublishFailureDart = int Function(
-  int,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-  int,
-);
+typedef RacSdkEventPublishFailureNative =
+    ffi.Int32 Function(
+      ffi.Int32,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<Utf8>,
+      ffi.Int32,
+    );
+typedef RacSdkEventPublishFailureDart =
+    int Function(
+      int,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<Utf8>,
+      ffi.Pointer<Utf8>,
+      int,
+    );
 
 // ============================================================================
 // Audio utils (rac_audio_utils.h)
@@ -1181,16 +1134,14 @@ typedef RacSdkEventPublishFailureDart = int Function(
 /// Matches `rac_audio_compute_level_db(const float*, size_t, float*)` →
 /// `rac_result_t`. Centralises the RMS→dB DSP that used to be hand-rolled in
 /// each platform SDK.
-typedef RacAudioComputeLevelDbNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Float>,
-  ffi.Size,
-  ffi.Pointer<ffi.Float>,
-);
-typedef RacAudioComputeLevelDbDart = int Function(
-  ffi.Pointer<ffi.Float>,
-  int,
-  ffi.Pointer<ffi.Float>,
-);
+typedef RacAudioComputeLevelDbNative =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Float>,
+      ffi.Size,
+      ffi.Pointer<ffi.Float>,
+    );
+typedef RacAudioComputeLevelDbDart =
+    int Function(ffi.Pointer<ffi.Float>, int, ffi.Pointer<ffi.Float>);
 
 // ============================================================================
 // SDK metadata + enum convenience helpers (rac_core.h / rac_environment.h /
@@ -1211,14 +1162,10 @@ typedef RacEnvPredicateDart = bool Function(int);
 /// `rac_result_t rac_inference_framework_analytics_key(
 ///     rac_inference_framework_t f, const char** out)`.
 /// `out` receives a statically-allocated literal — do NOT free.
-typedef RacEnumToCStringNative = ffi.Int32 Function(
-  ffi.Int32,
-  ffi.Pointer<ffi.Pointer<Utf8>>,
-);
-typedef RacEnumToCStringDart = int Function(
-  int,
-  ffi.Pointer<ffi.Pointer<Utf8>>,
-);
+typedef RacEnumToCStringNative =
+    ffi.Int32 Function(ffi.Int32, ffi.Pointer<ffi.Pointer<Utf8>>);
+typedef RacEnumToCStringDart =
+    int Function(int, ffi.Pointer<ffi.Pointer<Utf8>>);
 
 /// `rac_inference_framework_t rac_model_category_default_framework(
 ///     rac_model_category_t)` and
@@ -1247,846 +1194,1053 @@ T? _lookupOptional<T extends Function>(T Function() lookup) {
 /// Typed bindings for the commons C ABI surfaces this file owns.
 class RacBindings {
   RacBindings(ffi.DynamicLibrary lib)
-      : rac_proto_buffer_init = lib.lookupFunction<RacProtoBufferInitNative,
-            RacProtoBufferInitDart>('rac_proto_buffer_init'),
-        rac_proto_buffer_free = lib.lookupFunction<RacProtoBufferFreeNative,
-            RacProtoBufferFreeDart>('rac_proto_buffer_free'),
-        rac_result_to_proto_error =
-            _lookupOptional<RacResultToProtoErrorDart>(
-          () => lib.lookupFunction<RacResultToProtoErrorNative,
-              RacResultToProtoErrorDart>('rac_result_to_proto_error'),
-        ),
-        rac_voice_agent_set_proto_callback = lib.lookupFunction<
-                RacVoiceAgentSetProtoCallbackNative,
-                RacVoiceAgentSetProtoCallbackDart>(
-            'rac_voice_agent_set_proto_callback'),
-        rac_llm_generate_proto = _lookupOptional<RacLlmGenerateProtoDart>(
-          () => lib.lookupFunction<RacLlmGenerateProtoNative,
-              RacLlmGenerateProtoDart>('rac_llm_generate_proto'),
-        ),
-        rac_llm_generate_stream_proto =
-            _lookupOptional<RacLlmGenerateStreamProtoDart>(
-          () => lib.lookupFunction<RacLlmGenerateStreamProtoNative,
-              RacLlmGenerateStreamProtoDart>('rac_llm_generate_stream_proto'),
-        ),
-        rac_llm_cancel_proto = _lookupOptional<RacLlmCancelProtoDart>(
-          () => lib.lookupFunction<RacLlmCancelProtoNative,
-              RacLlmCancelProtoDart>('rac_llm_cancel_proto'),
-        ),
-        rac_stt_transcribe_lifecycle_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>(
-            'rac_stt_transcribe_lifecycle_proto',
+    : rac_proto_buffer_init = lib
+          .lookupFunction<RacProtoBufferInitNative, RacProtoBufferInitDart>(
+            'rac_proto_buffer_init',
           ),
-        ),
-        rac_stt_component_transcribe_proto =
-            _lookupOptional<RacSttTranscribeProtoDart>(
-          () => lib.lookupFunction<RacSttTranscribeProtoNative,
-              RacSttTranscribeProtoDart>(
-            'rac_stt_component_transcribe_proto',
+      rac_proto_buffer_free = lib
+          .lookupFunction<RacProtoBufferFreeNative, RacProtoBufferFreeDart>(
+            'rac_proto_buffer_free',
           ),
-        ),
-        rac_stt_component_transcribe_stream_proto =
-            _lookupOptional<RacSttTranscribeStreamProtoDart>(
-          () => lib.lookupFunction<RacSttTranscribeStreamProtoNative,
-              RacSttTranscribeStreamProtoDart>(
-            'rac_stt_component_transcribe_stream_proto',
+      rac_result_to_proto_error = _lookupOptional<RacResultToProtoErrorDart>(
+        () =>
+            lib.lookupFunction<
+              RacResultToProtoErrorNative,
+              RacResultToProtoErrorDart
+            >('rac_result_to_proto_error'),
+      ),
+      rac_voice_agent_set_proto_callback = lib
+          .lookupFunction<
+            RacVoiceAgentSetProtoCallbackNative,
+            RacVoiceAgentSetProtoCallbackDart
+          >('rac_voice_agent_set_proto_callback'),
+      rac_llm_generate_proto = _lookupOptional<RacLlmGenerateProtoDart>(
+        () => lib
+            .lookupFunction<RacLlmGenerateProtoNative, RacLlmGenerateProtoDart>(
+              'rac_llm_generate_proto',
+            ),
+      ),
+      rac_llm_generate_stream_proto =
+          _lookupOptional<RacLlmGenerateStreamProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLlmGenerateStreamProtoNative,
+                  RacLlmGenerateStreamProtoDart
+                >('rac_llm_generate_stream_proto'),
           ),
-        ),
-        rac_tts_synthesize_lifecycle_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>(
-            'rac_tts_synthesize_lifecycle_proto',
+      ra_flutter_llm_generate_stream_proto_native_port =
+          _lookupOptional<RaFlutterLlmGenerateStreamNativePortDart>(
+            () =>
+                lib.lookupFunction<
+                  RaFlutterLlmGenerateStreamNativePortNative,
+                  RaFlutterLlmGenerateStreamNativePortDart
+                >('ra_flutter_llm_generate_stream_proto_native_port'),
           ),
-        ),
-        rac_tts_component_list_voices_proto =
-            _lookupOptional<RacTtsListVoicesProtoDart>(
-          () => lib.lookupFunction<RacTtsListVoicesProtoNative,
-              RacTtsListVoicesProtoDart>(
-            'rac_tts_component_list_voices_proto',
+      rac_llm_cancel_proto = _lookupOptional<RacLlmCancelProtoDart>(
+        () =>
+            lib.lookupFunction<RacLlmCancelProtoNative, RacLlmCancelProtoDart>(
+              'rac_llm_cancel_proto',
+            ),
+      ),
+      rac_stt_transcribe_lifecycle_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_stt_transcribe_lifecycle_proto'),
           ),
-        ),
-        rac_tts_component_synthesize_proto =
-            _lookupOptional<RacTtsSynthesizeProtoDart>(
-          () => lib.lookupFunction<RacTtsSynthesizeProtoNative,
-              RacTtsSynthesizeProtoDart>(
-            'rac_tts_component_synthesize_proto',
+      rac_stt_component_transcribe_proto =
+          _lookupOptional<RacSttTranscribeProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSttTranscribeProtoNative,
+                  RacSttTranscribeProtoDart
+                >('rac_stt_component_transcribe_proto'),
           ),
-        ),
-        rac_tts_component_synthesize_stream_proto =
-            _lookupOptional<RacTtsSynthesizeStreamProtoDart>(
-          () => lib.lookupFunction<RacTtsSynthesizeStreamProtoNative,
-              RacTtsSynthesizeStreamProtoDart>(
-            'rac_tts_component_synthesize_stream_proto',
+      rac_stt_component_transcribe_stream_proto =
+          _lookupOptional<RacSttTranscribeStreamProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSttTranscribeStreamProtoNative,
+                  RacSttTranscribeStreamProtoDart
+                >('rac_stt_component_transcribe_stream_proto'),
           ),
-        ),
-        rac_vad_process_lifecycle_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>(
-            'rac_vad_process_lifecycle_proto',
+      rac_tts_synthesize_lifecycle_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_tts_synthesize_lifecycle_proto'),
           ),
-        ),
-        rac_tts_synthesize_stream_lifecycle_proto =
-            _lookupOptional<RacTtsSynthesizeStreamLifecycleProtoDart>(
-          () => lib.lookupFunction<RacTtsSynthesizeStreamLifecycleProtoNative,
-              RacTtsSynthesizeStreamLifecycleProtoDart>(
-            'rac_tts_synthesize_stream_lifecycle_proto',
+      rac_tts_component_list_voices_proto =
+          _lookupOptional<RacTtsListVoicesProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacTtsListVoicesProtoNative,
+                  RacTtsListVoicesProtoDart
+                >('rac_tts_component_list_voices_proto'),
           ),
-        ),
-        rac_tts_stop_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
-          () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
-            'rac_tts_stop_lifecycle_proto',
+      rac_tts_component_synthesize_proto =
+          _lookupOptional<RacTtsSynthesizeProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacTtsSynthesizeProtoNative,
+                  RacTtsSynthesizeProtoDart
+                >('rac_tts_component_synthesize_proto'),
           ),
-        ),
-        rac_vad_configure_lifecycle_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>(
-            'rac_vad_configure_lifecycle_proto',
+      rac_tts_component_synthesize_stream_proto =
+          _lookupOptional<RacTtsSynthesizeStreamProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacTtsSynthesizeStreamProtoNative,
+                  RacTtsSynthesizeStreamProtoDart
+                >('rac_tts_component_synthesize_stream_proto'),
           ),
-        ),
-        rac_vad_start_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
-          () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
-            'rac_vad_start_lifecycle_proto',
+      rac_vad_process_lifecycle_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_vad_process_lifecycle_proto'),
           ),
-        ),
-        rac_vad_stop_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
-          () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
-            'rac_vad_stop_lifecycle_proto',
+      rac_tts_synthesize_stream_lifecycle_proto =
+          _lookupOptional<RacTtsSynthesizeStreamLifecycleProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacTtsSynthesizeStreamLifecycleProtoNative,
+                  RacTtsSynthesizeStreamLifecycleProtoDart
+                >('rac_tts_synthesize_stream_lifecycle_proto'),
           ),
+      rac_tts_stop_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+        () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+          'rac_tts_stop_lifecycle_proto',
         ),
-        rac_vad_reset_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
-          () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
-            'rac_vad_reset_lifecycle_proto',
+      ),
+      rac_vad_configure_lifecycle_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_vad_configure_lifecycle_proto'),
           ),
+      rac_vad_start_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+        () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+          'rac_vad_start_lifecycle_proto',
         ),
-        rac_vad_component_configure_proto =
-            _lookupOptional<RacVadConfigureProtoDart>(
-          () => lib.lookupFunction<RacVadConfigureProtoNative,
-              RacVadConfigureProtoDart>(
-            'rac_vad_component_configure_proto',
+      ),
+      rac_vad_stop_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+        () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+          'rac_vad_stop_lifecycle_proto',
+        ),
+      ),
+      rac_vad_reset_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+        () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+          'rac_vad_reset_lifecycle_proto',
+        ),
+      ),
+      rac_vad_component_configure_proto =
+          _lookupOptional<RacVadConfigureProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacVadConfigureProtoNative,
+                  RacVadConfigureProtoDart
+                >('rac_vad_component_configure_proto'),
           ),
-        ),
-        rac_vad_component_process_proto =
-            _lookupOptional<RacVadProcessProtoDart>(
-          () => lib
-              .lookupFunction<RacVadProcessProtoNative, RacVadProcessProtoDart>(
-            'rac_vad_component_process_proto',
+      rac_vad_component_process_proto = _lookupOptional<RacVadProcessProtoDart>(
+        () => lib
+            .lookupFunction<RacVadProcessProtoNative, RacVadProcessProtoDart>(
+              'rac_vad_component_process_proto',
+            ),
+      ),
+      rac_vad_component_get_statistics_proto =
+          _lookupOptional<RacHandleOutProtoDart>(
+            () => lib
+                .lookupFunction<RacHandleOutProtoNative, RacHandleOutProtoDart>(
+                  'rac_vad_component_get_statistics_proto',
+                ),
           ),
-        ),
-        rac_vad_component_get_statistics_proto =
-            _lookupOptional<RacHandleOutProtoDart>(
-          () => lib
-              .lookupFunction<RacHandleOutProtoNative, RacHandleOutProtoDart>(
-            'rac_vad_component_get_statistics_proto',
+      rac_vad_component_set_activity_proto_callback =
+          _lookupOptional<RacVadSetActivityProtoCallbackDart>(
+            () =>
+                lib.lookupFunction<
+                  RacVadSetActivityProtoCallbackNative,
+                  RacVadSetActivityProtoCallbackDart
+                >('rac_vad_component_set_activity_proto_callback'),
           ),
-        ),
-        rac_vad_component_set_activity_proto_callback =
-            _lookupOptional<RacVadSetActivityProtoCallbackDart>(
-          () => lib.lookupFunction<RacVadSetActivityProtoCallbackNative,
-              RacVadSetActivityProtoCallbackDart>(
-            'rac_vad_component_set_activity_proto_callback',
+      rac_voice_agent_initialize_proto =
+          _lookupOptional<RacVoiceAgentInitializeProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacVoiceAgentInitializeProtoNative,
+                  RacVoiceAgentInitializeProtoDart
+                >('rac_voice_agent_initialize_proto'),
           ),
-        ),
-        rac_voice_agent_initialize_proto =
-            _lookupOptional<RacVoiceAgentInitializeProtoDart>(
-          () => lib.lookupFunction<RacVoiceAgentInitializeProtoNative,
-              RacVoiceAgentInitializeProtoDart>(
-            'rac_voice_agent_initialize_proto',
+      rac_voice_agent_component_states_proto =
+          _lookupOptional<RacHandleOutProtoDart>(
+            () => lib
+                .lookupFunction<RacHandleOutProtoNative, RacHandleOutProtoDart>(
+                  'rac_voice_agent_component_states_proto',
+                ),
           ),
-        ),
-        rac_voice_agent_component_states_proto =
-            _lookupOptional<RacHandleOutProtoDart>(
-          () => lib
-              .lookupFunction<RacHandleOutProtoNative, RacHandleOutProtoDart>(
-            'rac_voice_agent_component_states_proto',
+      rac_voice_agent_process_voice_turn_proto =
+          _lookupOptional<RacVoiceAgentProcessTurnProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacVoiceAgentProcessTurnProtoNative,
+                  RacVoiceAgentProcessTurnProtoDart
+                >('rac_voice_agent_process_voice_turn_proto'),
           ),
+      rac_vlm_cancel_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+        () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+          'rac_vlm_cancel_lifecycle_proto',
         ),
-        rac_voice_agent_process_voice_turn_proto =
-            _lookupOptional<RacVoiceAgentProcessTurnProtoDart>(
-          () => lib.lookupFunction<RacVoiceAgentProcessTurnProtoNative,
-              RacVoiceAgentProcessTurnProtoDart>(
-            'rac_voice_agent_process_voice_turn_proto',
+      ),
+      rac_embeddings_create = _lookupOptional<RacCreateWithModelDart>(
+        () => lib
+            .lookupFunction<RacCreateWithModelNative, RacCreateWithModelDart>(
+              'rac_embeddings_create',
+            ),
+      ),
+      rac_embeddings_create_with_config =
+          _lookupOptional<RacCreateWithModelConfigDart>(
+            () =>
+                lib.lookupFunction<
+                  RacCreateWithModelConfigNative,
+                  RacCreateWithModelConfigDart
+                >('rac_embeddings_create_with_config'),
           ),
-        ),
-        rac_vlm_cancel_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
-          () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
-            'rac_vlm_cancel_lifecycle_proto',
+      rac_embeddings_initialize = _lookupOptional<RacEmbeddingsInitializeDart>(
+        () =>
+            lib.lookupFunction<
+              RacEmbeddingsInitializeNative,
+              RacEmbeddingsInitializeDart
+            >('rac_embeddings_initialize'),
+      ),
+      rac_embeddings_embed_batch_proto =
+          _lookupOptional<RacHandleBytesToProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacHandleBytesToProtoNative,
+                  RacHandleBytesToProtoDart
+                >('rac_embeddings_embed_batch_proto'),
           ),
-        ),
-        rac_embeddings_create = _lookupOptional<RacCreateWithModelDart>(
-          () => lib.lookupFunction<RacCreateWithModelNative,
-              RacCreateWithModelDart>('rac_embeddings_create'),
-        ),
-        rac_embeddings_create_with_config =
-            _lookupOptional<RacCreateWithModelConfigDart>(
-          () => lib.lookupFunction<RacCreateWithModelConfigNative,
-              RacCreateWithModelConfigDart>(
-            'rac_embeddings_create_with_config',
+      rac_embeddings_embed_batch_lifecycle_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_embeddings_embed_batch_lifecycle_proto'),
           ),
+      rac_embeddings_destroy = _lookupOptional<RacDestroyHandleDart>(
+        () => lib.lookupFunction<RacDestroyHandleNative, RacDestroyHandleDart>(
+          'rac_embeddings_destroy',
         ),
-        rac_embeddings_initialize =
-            _lookupOptional<RacEmbeddingsInitializeDart>(
-          () => lib.lookupFunction<RacEmbeddingsInitializeNative,
-              RacEmbeddingsInitializeDart>('rac_embeddings_initialize'),
-        ),
-        rac_embeddings_embed_batch_proto =
-            _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>(
-            'rac_embeddings_embed_batch_proto',
+      ),
+      rac_diffusion_create = _lookupOptional<RacCreateWithModelDart>(
+        () => lib
+            .lookupFunction<RacCreateWithModelNative, RacCreateWithModelDart>(
+              'rac_diffusion_create',
+            ),
+      ),
+      rac_diffusion_create_with_config =
+          _lookupOptional<RacCreateWithModelStructConfigDart>(
+            () =>
+                lib.lookupFunction<
+                  RacCreateWithModelStructConfigNative,
+                  RacCreateWithModelStructConfigDart
+                >('rac_diffusion_create_with_config'),
           ),
-        ),
-        rac_embeddings_embed_batch_lifecycle_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>(
-            'rac_embeddings_embed_batch_lifecycle_proto',
+      rac_diffusion_initialize = _lookupOptional<RacDiffusionInitializeDart>(
+        () =>
+            lib.lookupFunction<
+              RacDiffusionInitializeNative,
+              RacDiffusionInitializeDart
+            >('rac_diffusion_initialize'),
+      ),
+      rac_diffusion_generate_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart
+            >('rac_diffusion_generate_proto'),
+      ),
+      rac_diffusion_generate_lifecycle_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_diffusion_generate_lifecycle_proto'),
           ),
-        ),
-        rac_embeddings_destroy = _lookupOptional<RacDestroyHandleDart>(
-          () =>
-              lib.lookupFunction<RacDestroyHandleNative, RacDestroyHandleDart>(
-                  'rac_embeddings_destroy'),
-        ),
-        rac_diffusion_create = _lookupOptional<RacCreateWithModelDart>(
-          () => lib.lookupFunction<RacCreateWithModelNative,
-              RacCreateWithModelDart>('rac_diffusion_create'),
-        ),
-        rac_diffusion_create_with_config =
-            _lookupOptional<RacCreateWithModelStructConfigDart>(
-          () => lib.lookupFunction<RacCreateWithModelStructConfigNative,
-              RacCreateWithModelStructConfigDart>(
-            'rac_diffusion_create_with_config',
+      rac_diffusion_generate_with_progress_proto =
+          _lookupOptional<RacDiffusionGenerateWithProgressProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacDiffusionGenerateWithProgressProtoNative,
+                  RacDiffusionGenerateWithProgressProtoDart
+                >('rac_diffusion_generate_with_progress_proto'),
           ),
+      rac_diffusion_cancel_proto = _lookupOptional<RacHandleStatusDart>(
+        () => lib.lookupFunction<RacHandleStatusNative, RacHandleStatusDart>(
+          'rac_diffusion_cancel_proto',
         ),
-        rac_diffusion_initialize = _lookupOptional<RacDiffusionInitializeDart>(
-          () => lib.lookupFunction<RacDiffusionInitializeNative,
-              RacDiffusionInitializeDart>('rac_diffusion_initialize'),
-        ),
-        rac_diffusion_generate_proto =
-            _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>('rac_diffusion_generate_proto'),
-        ),
-        rac_diffusion_generate_lifecycle_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>(
-            'rac_diffusion_generate_lifecycle_proto',
+      ),
+      rac_diffusion_get_capabilities =
+          _lookupOptional<RacHandleCapabilitiesDart>(
+            () =>
+                lib.lookupFunction<
+                  RacHandleCapabilitiesNative,
+                  RacHandleCapabilitiesDart
+                >('rac_diffusion_get_capabilities'),
           ),
+      rac_diffusion_destroy = _lookupOptional<RacDestroyHandleDart>(
+        () => lib.lookupFunction<RacDestroyHandleNative, RacDestroyHandleDart>(
+          'rac_diffusion_destroy',
         ),
-        rac_diffusion_generate_with_progress_proto =
-            _lookupOptional<RacDiffusionGenerateWithProgressProtoDart>(
-          () => lib.lookupFunction<RacDiffusionGenerateWithProgressProtoNative,
-              RacDiffusionGenerateWithProgressProtoDart>(
-            'rac_diffusion_generate_with_progress_proto',
+      ),
+      rac_rag_session_create_proto =
+          _lookupOptional<RacRagSessionCreateProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacRagSessionCreateProtoNative,
+                  RacRagSessionCreateProtoDart
+                >('rac_rag_session_create_proto'),
           ),
+      rac_rag_session_destroy_proto = _lookupOptional<RacDestroyHandleDart>(
+        () => lib.lookupFunction<RacDestroyHandleNative, RacDestroyHandleDart>(
+          'rac_rag_session_destroy_proto',
         ),
-        rac_diffusion_cancel_proto = _lookupOptional<RacHandleStatusDart>(
-          () => lib.lookupFunction<RacHandleStatusNative, RacHandleStatusDart>(
-            'rac_diffusion_cancel_proto',
+      ),
+      rac_rag_ingest_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart
+            >('rac_rag_ingest_proto'),
+      ),
+      rac_rag_query_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart
+            >('rac_rag_query_proto'),
+      ),
+      rac_rag_clear_proto = _lookupOptional<RacHandleOutProtoDart>(
+        () =>
+            lib.lookupFunction<RacHandleOutProtoNative, RacHandleOutProtoDart>(
+              'rac_rag_clear_proto',
+            ),
+      ),
+      rac_rag_stats_proto = _lookupOptional<RacHandleOutProtoDart>(
+        () =>
+            lib.lookupFunction<RacHandleOutProtoNative, RacHandleOutProtoDart>(
+              'rac_rag_stats_proto',
+            ),
+      ),
+      rac_get_lora_registry = _lookupOptional<RacLoraRegistryGetDart>(
+        () => lib
+            .lookupFunction<RacLoraRegistryGetNative, RacLoraRegistryGetDart>(
+              'rac_get_lora_registry',
+            ),
+      ),
+      rac_lora_register_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart
+            >('rac_lora_register_proto'),
+      ),
+      rac_lora_catalog_list_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart
+            >('rac_lora_catalog_list_proto'),
+      ),
+      rac_lora_catalog_query_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart
+            >('rac_lora_catalog_query_proto'),
+      ),
+      rac_lora_catalog_get_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart
+            >('rac_lora_catalog_get_proto'),
+      ),
+      rac_lora_catalog_mark_download_completed_proto =
+          _lookupOptional<RacHandleBytesToProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacHandleBytesToProtoNative,
+                  RacHandleBytesToProtoDart
+                >('rac_lora_catalog_mark_download_completed_proto'),
           ),
-        ),
-        rac_diffusion_get_capabilities =
-            _lookupOptional<RacHandleCapabilitiesDart>(
-          () => lib.lookupFunction<RacHandleCapabilitiesNative,
-              RacHandleCapabilitiesDart>('rac_diffusion_get_capabilities'),
-        ),
-        rac_diffusion_destroy = _lookupOptional<RacDestroyHandleDart>(
-          () =>
-              lib.lookupFunction<RacDestroyHandleNative, RacDestroyHandleDart>(
-                  'rac_diffusion_destroy'),
-        ),
-        rac_rag_session_create_proto =
-            _lookupOptional<RacRagSessionCreateProtoDart>(
-          () => lib.lookupFunction<RacRagSessionCreateProtoNative,
-              RacRagSessionCreateProtoDart>(
-            'rac_rag_session_create_proto',
+      rac_lora_adapter_import_proto =
+          _lookupOptional<RacHandleBytesToProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacHandleBytesToProtoNative,
+                  RacHandleBytesToProtoDart
+                >('rac_lora_adapter_import_proto'),
           ),
-        ),
-        rac_rag_session_destroy_proto = _lookupOptional<RacDestroyHandleDart>(
-          () =>
-              lib.lookupFunction<RacDestroyHandleNative, RacDestroyHandleDart>(
-                  'rac_rag_session_destroy_proto'),
-        ),
-        rac_rag_ingest_proto = _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>('rac_rag_ingest_proto'),
-        ),
-        rac_rag_query_proto = _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>('rac_rag_query_proto'),
-        ),
-        rac_rag_clear_proto = _lookupOptional<RacHandleOutProtoDart>(
-          () => lib.lookupFunction<RacHandleOutProtoNative,
-              RacHandleOutProtoDart>('rac_rag_clear_proto'),
-        ),
-        rac_rag_stats_proto = _lookupOptional<RacHandleOutProtoDart>(
-          () => lib.lookupFunction<RacHandleOutProtoNative,
-              RacHandleOutProtoDart>('rac_rag_stats_proto'),
-        ),
-        rac_get_lora_registry = _lookupOptional<RacLoraRegistryGetDart>(
-          () => lib.lookupFunction<RacLoraRegistryGetNative,
-              RacLoraRegistryGetDart>('rac_get_lora_registry'),
-        ),
-        rac_lora_register_proto = _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>('rac_lora_register_proto'),
-        ),
-        rac_lora_catalog_list_proto =
-            _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>('rac_lora_catalog_list_proto'),
-        ),
-        rac_lora_catalog_query_proto =
-            _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>('rac_lora_catalog_query_proto'),
-        ),
-        rac_lora_catalog_get_proto = _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>('rac_lora_catalog_get_proto'),
-        ),
-        rac_lora_catalog_mark_download_completed_proto =
-            _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>(
-            'rac_lora_catalog_mark_download_completed_proto',
+      rac_lora_compatibility_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_lora_compatibility_proto'),
           ),
-        ),
-        rac_lora_adapter_import_proto =
-            _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>('rac_lora_adapter_import_proto'),
-        ),
-        rac_lora_compatibility_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>('rac_lora_compatibility_proto'),
-        ),
-        rac_lora_apply_proto = _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>('rac_lora_apply_proto'),
-        ),
-        rac_lora_remove_proto = _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>('rac_lora_remove_proto'),
-        ),
-        rac_lora_list_proto = _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>('rac_lora_list_proto'),
-        ),
-        rac_lora_state_proto = _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>('rac_lora_state_proto'),
-        ),
-        rac_http_client_create = lib.lookupFunction<RacHttpClientCreateNative,
-            RacHttpClientCreateDart>('rac_http_client_create'),
-        rac_http_client_destroy = lib.lookupFunction<RacHttpClientDestroyNative,
-            RacHttpClientDestroyDart>('rac_http_client_destroy'),
-        rac_http_request_send = lib.lookupFunction<RacHttpRequestSendNative,
-            RacHttpRequestSendDart>('rac_http_request_send'),
-        rac_http_response_free = lib.lookupFunction<RacHttpResponseFreeNative,
-            RacHttpResponseFreeDart>('rac_http_response_free'),
-        rac_http_default_headers =
-            _lookupOptional<RacHttpDefaultHeadersDart>(
-          () => lib.lookupFunction<RacHttpDefaultHeadersNative,
-              RacHttpDefaultHeadersDart>('rac_http_default_headers'),
-        ),
-        rac_http_download_execute = lib.lookupFunction<
+      rac_lora_apply_proto = _lookupOptional<RacLifecycleRequestProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart
+            >('rac_lora_apply_proto'),
+      ),
+      rac_lora_remove_proto = _lookupOptional<RacLifecycleRequestProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart
+            >('rac_lora_remove_proto'),
+      ),
+      rac_lora_list_proto = _lookupOptional<RacLifecycleRequestProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart
+            >('rac_lora_list_proto'),
+      ),
+      rac_lora_state_proto = _lookupOptional<RacLifecycleRequestProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart
+            >('rac_lora_state_proto'),
+      ),
+      rac_http_client_create = lib
+          .lookupFunction<RacHttpClientCreateNative, RacHttpClientCreateDart>(
+            'rac_http_client_create',
+          ),
+      rac_http_client_destroy = lib
+          .lookupFunction<RacHttpClientDestroyNative, RacHttpClientDestroyDart>(
+            'rac_http_client_destroy',
+          ),
+      rac_http_request_send = lib
+          .lookupFunction<RacHttpRequestSendNative, RacHttpRequestSendDart>(
+            'rac_http_request_send',
+          ),
+      rac_http_response_free = lib
+          .lookupFunction<RacHttpResponseFreeNative, RacHttpResponseFreeDart>(
+            'rac_http_response_free',
+          ),
+      rac_http_default_headers = _lookupOptional<RacHttpDefaultHeadersDart>(
+        () =>
+            lib.lookupFunction<
+              RacHttpDefaultHeadersNative,
+              RacHttpDefaultHeadersDart
+            >('rac_http_default_headers'),
+      ),
+      rac_http_download_execute = lib
+          .lookupFunction<
             RacHttpDownloadExecuteNative,
-            RacHttpDownloadExecuteDart>('rac_http_download_execute'),
-        rac_model_registry_refresh_proto =
-            _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>('rac_model_registry_refresh_proto'),
-        ),
-        rac_model_registry_register_proto =
-            _lookupOptional<RacModelRegistryRegisterProtoDart>(
-          () => lib.lookupFunction<RacModelRegistryRegisterProtoNative,
-              RacModelRegistryRegisterProtoDart>(
-            'rac_model_registry_register_proto',
+            RacHttpDownloadExecuteDart
+          >('rac_http_download_execute'),
+      rac_model_registry_refresh_proto =
+          _lookupOptional<RacHandleBytesToProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacHandleBytesToProtoNative,
+                  RacHandleBytesToProtoDart
+                >('rac_model_registry_refresh_proto'),
           ),
-        ),
-        rac_model_registry_update_proto =
-            _lookupOptional<RacModelRegistryUpdateProtoDart>(
-          () => lib.lookupFunction<RacModelRegistryUpdateProtoNative,
-              RacModelRegistryUpdateProtoDart>(
-            'rac_model_registry_update_proto',
+      rac_model_registry_register_proto =
+          _lookupOptional<RacModelRegistryRegisterProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelRegistryRegisterProtoNative,
+                  RacModelRegistryRegisterProtoDart
+                >('rac_model_registry_register_proto'),
           ),
-        ),
-        rac_model_registry_get_proto =
-            _lookupOptional<RacModelRegistryGetProtoDart>(
-          () => lib.lookupFunction<RacModelRegistryGetProtoNative,
-              RacModelRegistryGetProtoDart>(
-            'rac_model_registry_get_proto',
+      rac_model_registry_update_proto =
+          _lookupOptional<RacModelRegistryUpdateProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelRegistryUpdateProtoNative,
+                  RacModelRegistryUpdateProtoDart
+                >('rac_model_registry_update_proto'),
           ),
-        ),
-        rac_model_registry_list_proto =
-            _lookupOptional<RacModelRegistryListProtoDart>(
-          () => lib.lookupFunction<RacModelRegistryListProtoNative,
-              RacModelRegistryListProtoDart>(
-            'rac_model_registry_list_proto',
+      rac_model_registry_get_proto =
+          _lookupOptional<RacModelRegistryGetProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelRegistryGetProtoNative,
+                  RacModelRegistryGetProtoDart
+                >('rac_model_registry_get_proto'),
           ),
-        ),
-        rac_model_registry_query_proto =
-            _lookupOptional<RacModelRegistryQueryProtoDart>(
-          () => lib.lookupFunction<RacModelRegistryQueryProtoNative,
-              RacModelRegistryQueryProtoDart>(
-            'rac_model_registry_query_proto',
+      rac_model_registry_list_proto =
+          _lookupOptional<RacModelRegistryListProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelRegistryListProtoNative,
+                  RacModelRegistryListProtoDart
+                >('rac_model_registry_list_proto'),
           ),
-        ),
-        rac_model_registry_list_downloaded_proto =
-            _lookupOptional<RacModelRegistryListDownloadedProtoDart>(
-          () => lib.lookupFunction<RacModelRegistryListDownloadedProtoNative,
-              RacModelRegistryListDownloadedProtoDart>(
-            'rac_model_registry_list_downloaded_proto',
+      rac_model_registry_query_proto =
+          _lookupOptional<RacModelRegistryQueryProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelRegistryQueryProtoNative,
+                  RacModelRegistryQueryProtoDart
+                >('rac_model_registry_query_proto'),
           ),
-        ),
-        rac_model_registry_remove_proto =
-            _lookupOptional<RacModelRegistryRemoveProtoDart>(
-          () => lib.lookupFunction<RacModelRegistryRemoveProtoNative,
-              RacModelRegistryRemoveProtoDart>(
-            'rac_model_registry_remove_proto',
+      rac_model_registry_list_downloaded_proto =
+          _lookupOptional<RacModelRegistryListDownloadedProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelRegistryListDownloadedProtoNative,
+                  RacModelRegistryListDownloadedProtoDart
+                >('rac_model_registry_list_downloaded_proto'),
           ),
-        ),
-        rac_model_registry_proto_free =
-            _lookupOptional<RacModelRegistryProtoFreeDart>(
-          () => lib.lookupFunction<RacModelRegistryProtoFreeNative,
-              RacModelRegistryProtoFreeDart>(
-            'rac_model_registry_proto_free',
+      rac_model_registry_remove_proto =
+          _lookupOptional<RacModelRegistryRemoveProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelRegistryRemoveProtoNative,
+                  RacModelRegistryRemoveProtoDart
+                >('rac_model_registry_remove_proto'),
           ),
-        ),
-        rac_register_model_from_url_proto =
-            _lookupOptional<RacRegisterModelFromUrlProtoDart>(
-          () => lib.lookupFunction<RacRegisterModelFromUrlProtoNative,
-              RacRegisterModelFromUrlProtoDart>(
-            'rac_register_model_from_url_proto',
+      rac_model_registry_proto_free =
+          _lookupOptional<RacModelRegistryProtoFreeDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelRegistryProtoFreeNative,
+                  RacModelRegistryProtoFreeDart
+                >('rac_model_registry_proto_free'),
           ),
-        ),
-        rac_register_multi_file_model_proto =
-            _lookupOptional<RacRegisterModelFromUrlProtoDart>(
-          () => lib.lookupFunction<RacRegisterModelFromUrlProtoNative,
-              RacRegisterModelFromUrlProtoDart>(
-            'rac_register_multi_file_model_proto',
+      rac_register_model_from_url_proto =
+          _lookupOptional<RacRegisterModelFromUrlProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacRegisterModelFromUrlProtoNative,
+                  RacRegisterModelFromUrlProtoDart
+                >('rac_register_model_from_url_proto'),
           ),
-        ),
-        rac_model_registry_import_proto =
-            _lookupOptional<RacModelRegistryImportProtoDart>(
-          () => lib.lookupFunction<RacModelRegistryImportProtoNative,
-              RacModelRegistryImportProtoDart>(
-            'rac_model_registry_import_proto',
+      rac_register_multi_file_model_proto =
+          _lookupOptional<RacRegisterModelFromUrlProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacRegisterModelFromUrlProtoNative,
+                  RacRegisterModelFromUrlProtoDart
+                >('rac_register_multi_file_model_proto'),
           ),
-        ),
-        rac_model_registry_discover_proto =
-            _lookupOptional<RacHandleBytesToProtoDart>(
-          () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>(
-            'rac_model_registry_discover_proto',
+      rac_model_registry_import_proto =
+          _lookupOptional<RacModelRegistryImportProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelRegistryImportProtoNative,
+                  RacModelRegistryImportProtoDart
+                >('rac_model_registry_import_proto'),
           ),
-        ),
-        rac_model_lifecycle_load_proto =
-            _lookupOptional<RacModelLifecycleLoadProtoDart>(
-          () => lib.lookupFunction<RacModelLifecycleLoadProtoNative,
-              RacModelLifecycleLoadProtoDart>(
-            'rac_model_lifecycle_load_proto',
+      rac_model_registry_discover_proto =
+          _lookupOptional<RacHandleBytesToProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacHandleBytesToProtoNative,
+                  RacHandleBytesToProtoDart
+                >('rac_model_registry_discover_proto'),
           ),
-        ),
-        rac_model_lifecycle_unload_proto =
-            _lookupOptional<RacModelLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacModelLifecycleRequestProtoNative,
-              RacModelLifecycleRequestProtoDart>(
-            'rac_model_lifecycle_unload_proto',
+      rac_model_lifecycle_load_proto =
+          _lookupOptional<RacModelLifecycleLoadProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelLifecycleLoadProtoNative,
+                  RacModelLifecycleLoadProtoDart
+                >('rac_model_lifecycle_load_proto'),
           ),
-        ),
-        rac_model_lifecycle_current_model_proto =
-            _lookupOptional<RacModelLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacModelLifecycleRequestProtoNative,
-              RacModelLifecycleRequestProtoDart>(
-            'rac_model_lifecycle_current_model_proto',
+      rac_model_lifecycle_unload_proto =
+          _lookupOptional<RacModelLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelLifecycleRequestProtoNative,
+                  RacModelLifecycleRequestProtoDart
+                >('rac_model_lifecycle_unload_proto'),
           ),
-        ),
-        rac_component_lifecycle_snapshot_proto =
-            _lookupOptional<RacComponentLifecycleSnapshotProtoDart>(
-          () => lib.lookupFunction<RacComponentLifecycleSnapshotProtoNative,
-              RacComponentLifecycleSnapshotProtoDart>(
-            'rac_component_lifecycle_snapshot_proto',
+      rac_model_lifecycle_current_model_proto =
+          _lookupOptional<RacModelLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelLifecycleRequestProtoNative,
+                  RacModelLifecycleRequestProtoDart
+                >('rac_model_lifecycle_current_model_proto'),
           ),
-        ),
-        rac_model_lifecycle_reset = _lookupOptional<RacModelLifecycleResetDart>(
-          () => lib.lookupFunction<RacModelLifecycleResetNative,
-              RacModelLifecycleResetDart>(
-            'rac_model_lifecycle_reset',
+      rac_component_lifecycle_snapshot_proto =
+          _lookupOptional<RacComponentLifecycleSnapshotProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacComponentLifecycleSnapshotProtoNative,
+                  RacComponentLifecycleSnapshotProtoDart
+                >('rac_component_lifecycle_snapshot_proto'),
           ),
-        ),
-        rac_storage_analyzer_create =
-            _lookupOptional<RacStorageAnalyzerCreateDart>(
-          () => lib.lookupFunction<RacStorageAnalyzerCreateNative,
-              RacStorageAnalyzerCreateDart>('rac_storage_analyzer_create'),
-        ),
-        rac_storage_analyzer_destroy =
-            _lookupOptional<RacStorageAnalyzerDestroyDart>(
-          () => lib.lookupFunction<RacStorageAnalyzerDestroyNative,
-              RacStorageAnalyzerDestroyDart>('rac_storage_analyzer_destroy'),
-        ),
-        rac_storage_analyzer_info_proto = _lookupOptional<RacStorageProtoDart>(
-          () => lib.lookupFunction<RacStorageProtoNative, RacStorageProtoDart>(
-            'rac_storage_analyzer_info_proto',
+      rac_model_lifecycle_reset = _lookupOptional<RacModelLifecycleResetDart>(
+        () =>
+            lib.lookupFunction<
+              RacModelLifecycleResetNative,
+              RacModelLifecycleResetDart
+            >('rac_model_lifecycle_reset'),
+      ),
+      rac_storage_analyzer_create =
+          _lookupOptional<RacStorageAnalyzerCreateDart>(
+            () =>
+                lib.lookupFunction<
+                  RacStorageAnalyzerCreateNative,
+                  RacStorageAnalyzerCreateDart
+                >('rac_storage_analyzer_create'),
           ),
-        ),
-        rac_storage_analyzer_availability_proto =
-            _lookupOptional<RacStorageProtoDart>(
-          () => lib.lookupFunction<RacStorageProtoNative, RacStorageProtoDart>(
-            'rac_storage_analyzer_availability_proto',
+      rac_storage_analyzer_destroy =
+          _lookupOptional<RacStorageAnalyzerDestroyDart>(
+            () =>
+                lib.lookupFunction<
+                  RacStorageAnalyzerDestroyNative,
+                  RacStorageAnalyzerDestroyDart
+                >('rac_storage_analyzer_destroy'),
           ),
+      rac_storage_analyzer_info_proto = _lookupOptional<RacStorageProtoDart>(
+        () => lib.lookupFunction<RacStorageProtoNative, RacStorageProtoDart>(
+          'rac_storage_analyzer_info_proto',
         ),
-        rac_storage_analyzer_delete_plan_proto =
-            _lookupOptional<RacStorageProtoDart>(
-          () => lib.lookupFunction<RacStorageProtoNative, RacStorageProtoDart>(
-            'rac_storage_analyzer_delete_plan_proto',
+      ),
+      rac_storage_analyzer_availability_proto =
+          _lookupOptional<RacStorageProtoDart>(
+            () =>
+                lib.lookupFunction<RacStorageProtoNative, RacStorageProtoDart>(
+                  'rac_storage_analyzer_availability_proto',
+                ),
           ),
-        ),
-        rac_storage_analyzer_delete_proto =
-            _lookupOptional<RacStorageProtoDart>(
-          () => lib.lookupFunction<RacStorageProtoNative, RacStorageProtoDart>(
-            'rac_storage_analyzer_delete_proto',
+      rac_storage_analyzer_delete_plan_proto =
+          _lookupOptional<RacStorageProtoDart>(
+            () =>
+                lib.lookupFunction<RacStorageProtoNative, RacStorageProtoDart>(
+                  'rac_storage_analyzer_delete_plan_proto',
+                ),
           ),
+      rac_storage_analyzer_delete_proto = _lookupOptional<RacStorageProtoDart>(
+        () => lib.lookupFunction<RacStorageProtoNative, RacStorageProtoDart>(
+          'rac_storage_analyzer_delete_proto',
         ),
-        rac_download_set_progress_proto_callback =
-            _lookupOptional<RacDownloadSetProgressProtoCallbackDart>(
-          () => lib.lookupFunction<RacDownloadSetProgressProtoCallbackNative,
-              RacDownloadSetProgressProtoCallbackDart>(
-            'rac_download_set_progress_proto_callback',
+      ),
+      rac_download_set_progress_proto_callback =
+          _lookupOptional<RacDownloadSetProgressProtoCallbackDart>(
+            () =>
+                lib.lookupFunction<
+                  RacDownloadSetProgressProtoCallbackNative,
+                  RacDownloadSetProgressProtoCallbackDart
+                >('rac_download_set_progress_proto_callback'),
           ),
+      rac_download_plan_proto = _lookupOptional<RacDownloadProtoDart>(
+        () => lib.lookupFunction<RacDownloadProtoNative, RacDownloadProtoDart>(
+          'rac_download_plan_proto',
         ),
-        rac_download_plan_proto = _lookupOptional<RacDownloadProtoDart>(
-          () =>
-              lib.lookupFunction<RacDownloadProtoNative, RacDownloadProtoDart>(
-            'rac_download_plan_proto',
+      ),
+      rac_download_start_proto = _lookupOptional<RacDownloadProtoDart>(
+        () => lib.lookupFunction<RacDownloadProtoNative, RacDownloadProtoDart>(
+          'rac_download_start_proto',
+        ),
+      ),
+      rac_download_cancel_proto = _lookupOptional<RacDownloadProtoDart>(
+        () => lib.lookupFunction<RacDownloadProtoNative, RacDownloadProtoDart>(
+          'rac_download_cancel_proto',
+        ),
+      ),
+      rac_download_resume_proto = _lookupOptional<RacDownloadProtoDart>(
+        () => lib.lookupFunction<RacDownloadProtoNative, RacDownloadProtoDart>(
+          'rac_download_resume_proto',
+        ),
+      ),
+      rac_download_progress_poll_proto = _lookupOptional<RacDownloadProtoDart>(
+        () => lib.lookupFunction<RacDownloadProtoNative, RacDownloadProtoDart>(
+          'rac_download_progress_poll_proto',
+        ),
+      ),
+      rac_sdk_event_subscribe = _lookupOptional<RacSdkEventSubscribeDart>(
+        () =>
+            lib.lookupFunction<
+              RacSdkEventSubscribeNative,
+              RacSdkEventSubscribeDart
+            >('rac_sdk_event_subscribe'),
+      ),
+      rac_sdk_event_unsubscribe = _lookupOptional<RacSdkEventUnsubscribeDart>(
+        () =>
+            lib.lookupFunction<
+              RacSdkEventUnsubscribeNative,
+              RacSdkEventUnsubscribeDart
+            >('rac_sdk_event_unsubscribe'),
+      ),
+      rac_sdk_event_quiesce = _lookupOptional<RacSdkEventQuiesceDart>(
+        () => lib
+            .lookupFunction<RacSdkEventQuiesceNative, RacSdkEventQuiesceDart>(
+              'rac_sdk_event_quiesce',
+            ),
+      ),
+      rac_sdk_event_publish_proto =
+          _lookupOptional<RacSdkEventPublishProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSdkEventPublishProtoNative,
+                  RacSdkEventPublishProtoDart
+                >('rac_sdk_event_publish_proto'),
           ),
+      rac_sdk_event_poll = _lookupOptional<RacSdkEventPollDart>(
+        () => lib.lookupFunction<RacSdkEventPollNative, RacSdkEventPollDart>(
+          'rac_sdk_event_poll',
         ),
-        rac_download_start_proto = _lookupOptional<RacDownloadProtoDart>(
-          () =>
-              lib.lookupFunction<RacDownloadProtoNative, RacDownloadProtoDart>(
-            'rac_download_start_proto',
+      ),
+      rac_sdk_event_publish_failure =
+          _lookupOptional<RacSdkEventPublishFailureDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSdkEventPublishFailureNative,
+                  RacSdkEventPublishFailureDart
+                >('rac_sdk_event_publish_failure'),
           ),
-        ),
-        rac_download_cancel_proto = _lookupOptional<RacDownloadProtoDart>(
-          () =>
-              lib.lookupFunction<RacDownloadProtoNative, RacDownloadProtoDart>(
-            'rac_download_cancel_proto',
+      rac_tool_call_parse_proto = _lookupOptional<RacToolCallProtoRequestDart>(
+        () =>
+            lib.lookupFunction<
+              RacToolCallProtoRequestNative,
+              RacToolCallProtoRequestDart
+            >('rac_tool_call_parse_proto'),
+      ),
+      rac_tool_call_format_prompt_proto =
+          _lookupOptional<RacToolCallProtoRequestDart>(
+            () =>
+                lib.lookupFunction<
+                  RacToolCallProtoRequestNative,
+                  RacToolCallProtoRequestDart
+                >('rac_tool_call_format_prompt_proto'),
           ),
-        ),
-        rac_download_resume_proto = _lookupOptional<RacDownloadProtoDart>(
-          () =>
-              lib.lookupFunction<RacDownloadProtoNative, RacDownloadProtoDart>(
-            'rac_download_resume_proto',
+      rac_tool_call_validate_proto =
+          _lookupOptional<RacToolCallProtoRequestDart>(
+            () =>
+                lib.lookupFunction<
+                  RacToolCallProtoRequestNative,
+                  RacToolCallProtoRequestDart
+                >('rac_tool_call_validate_proto'),
           ),
-        ),
-        rac_download_progress_poll_proto =
-            _lookupOptional<RacDownloadProtoDart>(
-          () =>
-              lib.lookupFunction<RacDownloadProtoNative, RacDownloadProtoDart>(
-            'rac_download_progress_poll_proto',
+      rac_tool_calling_session_create_proto =
+          _lookupOptional<RacToolCallingSessionCreateProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacToolCallingSessionCreateProtoNative,
+                  RacToolCallingSessionCreateProtoDart
+                >('rac_tool_calling_session_create_proto'),
           ),
-        ),
-        rac_sdk_event_subscribe = _lookupOptional<RacSdkEventSubscribeDart>(
-          () => lib.lookupFunction<RacSdkEventSubscribeNative,
-              RacSdkEventSubscribeDart>('rac_sdk_event_subscribe'),
-        ),
-        rac_sdk_event_unsubscribe = _lookupOptional<RacSdkEventUnsubscribeDart>(
-          () => lib.lookupFunction<RacSdkEventUnsubscribeNative,
-              RacSdkEventUnsubscribeDart>('rac_sdk_event_unsubscribe'),
-        ),
-        rac_sdk_event_quiesce = _lookupOptional<RacSdkEventQuiesceDart>(
-          () => lib.lookupFunction<RacSdkEventQuiesceNative,
-              RacSdkEventQuiesceDart>('rac_sdk_event_quiesce'),
-        ),
-        rac_sdk_event_publish_proto =
-            _lookupOptional<RacSdkEventPublishProtoDart>(
-          () => lib.lookupFunction<RacSdkEventPublishProtoNative,
-              RacSdkEventPublishProtoDart>('rac_sdk_event_publish_proto'),
-        ),
-        rac_sdk_event_poll = _lookupOptional<RacSdkEventPollDart>(
-          () => lib.lookupFunction<RacSdkEventPollNative, RacSdkEventPollDart>(
-              'rac_sdk_event_poll'),
-        ),
-        rac_sdk_event_publish_failure =
-            _lookupOptional<RacSdkEventPublishFailureDart>(
-          () => lib.lookupFunction<RacSdkEventPublishFailureNative,
-              RacSdkEventPublishFailureDart>(
-            'rac_sdk_event_publish_failure',
+      rac_tool_calling_session_step_with_result_proto =
+          _lookupOptional<RacToolCallingSessionStepWithResultProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacToolCallingSessionStepWithResultProtoNative,
+                  RacToolCallingSessionStepWithResultProtoDart
+                >('rac_tool_calling_session_step_with_result_proto'),
           ),
-        ),
-        rac_tool_call_parse_proto =
-            _lookupOptional<RacToolCallProtoRequestDart>(
-          () => lib.lookupFunction<RacToolCallProtoRequestNative,
-              RacToolCallProtoRequestDart>('rac_tool_call_parse_proto'),
-        ),
-        rac_tool_call_format_prompt_proto =
-            _lookupOptional<RacToolCallProtoRequestDart>(
-          () => lib.lookupFunction<RacToolCallProtoRequestNative,
-              RacToolCallProtoRequestDart>('rac_tool_call_format_prompt_proto'),
-        ),
-        rac_tool_call_validate_proto =
-            _lookupOptional<RacToolCallProtoRequestDart>(
-          () => lib.lookupFunction<RacToolCallProtoRequestNative,
-              RacToolCallProtoRequestDart>('rac_tool_call_validate_proto'),
-        ),
-        rac_tool_calling_session_create_proto =
-            _lookupOptional<RacToolCallingSessionCreateProtoDart>(
-          () => lib.lookupFunction<RacToolCallingSessionCreateProtoNative,
-              RacToolCallingSessionCreateProtoDart>(
-            'rac_tool_calling_session_create_proto',
+      rac_tool_calling_session_destroy_proto =
+          _lookupOptional<RacToolCallingSessionDestroyProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacToolCallingSessionDestroyProtoNative,
+                  RacToolCallingSessionDestroyProtoDart
+                >('rac_tool_calling_session_destroy_proto'),
           ),
-        ),
-        rac_tool_calling_session_step_with_result_proto =
-            _lookupOptional<RacToolCallingSessionStepWithResultProtoDart>(
-          () => lib.lookupFunction<
-              RacToolCallingSessionStepWithResultProtoNative,
-              RacToolCallingSessionStepWithResultProtoDart>(
-            'rac_tool_calling_session_step_with_result_proto',
+      // Cancel ABI lookup. Optional so older xcframework
+      // bundles without the cancel symbol fall back to destroy-only.
+      rac_tool_calling_session_cancel_proto =
+          _lookupOptional<RacToolCallingSessionCancelProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacToolCallingSessionCancelProtoNative,
+                  RacToolCallingSessionCancelProtoDart
+                >('rac_tool_calling_session_cancel_proto'),
           ),
-        ),
-        rac_tool_calling_session_destroy_proto =
-            _lookupOptional<RacToolCallingSessionDestroyProtoDart>(
-          () => lib.lookupFunction<RacToolCallingSessionDestroyProtoNative,
-              RacToolCallingSessionDestroyProtoDart>(
-            'rac_tool_calling_session_destroy_proto',
+      rac_model_format_from_url_proto =
+          _lookupOptional<RacModelFormatFromUrlProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacModelFormatFromUrlProtoNative,
+                  RacModelFormatFromUrlProtoDart
+                >('rac_model_format_from_url_proto'),
           ),
-        ),
-        // Cancel ABI lookup. Optional so older xcframework
-        // bundles without the cancel symbol fall back to destroy-only.
-        rac_tool_calling_session_cancel_proto =
-            _lookupOptional<RacToolCallingSessionCancelProtoDart>(
-          () => lib.lookupFunction<RacToolCallingSessionCancelProtoNative,
-              RacToolCallingSessionCancelProtoDart>(
-            'rac_tool_calling_session_cancel_proto',
+      rac_artifact_infer_from_url_proto =
+          _lookupOptional<RacArtifactInferFromUrlProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacArtifactInferFromUrlProtoNative,
+                  RacArtifactInferFromUrlProtoDart
+                >('rac_artifact_infer_from_url_proto'),
           ),
-        ),
-        rac_model_format_from_url_proto =
-            _lookupOptional<RacModelFormatFromUrlProtoDart>(
-          () => lib.lookupFunction<RacModelFormatFromUrlProtoNative,
-              RacModelFormatFromUrlProtoDart>(
-            'rac_model_format_from_url_proto',
+      rac_stt_transcribe_stream_lifecycle_proto =
+          _lookupOptional<RacSttTranscribeStreamLifecycleProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSttTranscribeStreamLifecycleProtoNative,
+                  RacSttTranscribeStreamLifecycleProtoDart
+                >('rac_stt_transcribe_stream_lifecycle_proto'),
           ),
-        ),
-        rac_artifact_infer_from_url_proto =
-            _lookupOptional<RacArtifactInferFromUrlProtoDart>(
-          () => lib.lookupFunction<RacArtifactInferFromUrlProtoNative,
-              RacArtifactInferFromUrlProtoDart>(
-            'rac_artifact_infer_from_url_proto',
+      rac_stt_component_load_model =
+          _lookupOptional<RacSttComponentLoadModelDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSttComponentLoadModelNative,
+                  RacSttComponentLoadModelDart
+                >('rac_stt_component_load_model'),
           ),
-        ),
-        rac_stt_transcribe_stream_lifecycle_proto =
-            _lookupOptional<RacSttTranscribeStreamLifecycleProtoDart>(
-          () => lib.lookupFunction<RacSttTranscribeStreamLifecycleProtoNative,
-              RacSttTranscribeStreamLifecycleProtoDart>(
-            'rac_stt_transcribe_stream_lifecycle_proto',
+      rac_stt_set_stream_proto_callback =
+          _lookupOptional<RacSttSetStreamProtoCallbackDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSttSetStreamProtoCallbackNative,
+                  RacSttSetStreamProtoCallbackDart
+                >('rac_stt_set_stream_proto_callback'),
           ),
-        ),
-        rac_stt_component_load_model =
-            _lookupOptional<RacSttComponentLoadModelDart>(
-          () => lib.lookupFunction<RacSttComponentLoadModelNative,
-              RacSttComponentLoadModelDart>('rac_stt_component_load_model'),
-        ),
-        rac_stt_set_stream_proto_callback =
-            _lookupOptional<RacSttSetStreamProtoCallbackDart>(
-          () => lib.lookupFunction<RacSttSetStreamProtoCallbackNative,
-              RacSttSetStreamProtoCallbackDart>(
-            'rac_stt_set_stream_proto_callback',
+      rac_stt_unset_stream_proto_callback =
+          _lookupOptional<RacSttUnsetStreamProtoCallbackDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSttUnsetStreamProtoCallbackNative,
+                  RacSttUnsetStreamProtoCallbackDart
+                >('rac_stt_unset_stream_proto_callback'),
           ),
-        ),
-        rac_stt_unset_stream_proto_callback =
-            _lookupOptional<RacSttUnsetStreamProtoCallbackDart>(
-          () => lib.lookupFunction<RacSttUnsetStreamProtoCallbackNative,
-              RacSttUnsetStreamProtoCallbackDart>(
-            'rac_stt_unset_stream_proto_callback',
+      rac_stt_stream_start_proto = _lookupOptional<RacSttStreamStartProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacSttStreamStartProtoNative,
+              RacSttStreamStartProtoDart
+            >('rac_stt_stream_start_proto'),
+      ),
+      rac_stt_stream_feed_audio_proto =
+          _lookupOptional<RacSttStreamFeedAudioProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSttStreamFeedAudioProtoNative,
+                  RacSttStreamFeedAudioProtoDart
+                >('rac_stt_stream_feed_audio_proto'),
           ),
-        ),
-        rac_stt_stream_start_proto =
-            _lookupOptional<RacSttStreamStartProtoDart>(
-          () => lib.lookupFunction<RacSttStreamStartProtoNative,
-              RacSttStreamStartProtoDart>('rac_stt_stream_start_proto'),
-        ),
-        rac_stt_stream_feed_audio_proto =
-            _lookupOptional<RacSttStreamFeedAudioProtoDart>(
-          () => lib.lookupFunction<RacSttStreamFeedAudioProtoNative,
-              RacSttStreamFeedAudioProtoDart>(
-            'rac_stt_stream_feed_audio_proto',
+      rac_stt_stream_stop_proto = _lookupOptional<RacSttStreamFinishProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacSttStreamFinishProtoNative,
+              RacSttStreamFinishProtoDart
+            >('rac_stt_stream_stop_proto'),
+      ),
+      rac_stt_stream_cancel_proto =
+          _lookupOptional<RacSttStreamFinishProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSttStreamFinishProtoNative,
+                  RacSttStreamFinishProtoDart
+                >('rac_stt_stream_cancel_proto'),
           ),
-        ),
-        rac_stt_stream_stop_proto = _lookupOptional<RacSttStreamFinishProtoDart>(
-          () => lib.lookupFunction<RacSttStreamFinishProtoNative,
-              RacSttStreamFinishProtoDart>('rac_stt_stream_stop_proto'),
-        ),
-        rac_stt_stream_cancel_proto =
-            _lookupOptional<RacSttStreamFinishProtoDart>(
-          () => lib.lookupFunction<RacSttStreamFinishProtoNative,
-              RacSttStreamFinishProtoDart>('rac_stt_stream_cancel_proto'),
-        ),
-        rac_voice_agent_process_turn_proto =
-            _lookupOptional<RacVoiceAgentProcessTurnProto2Dart>(
-          () => lib.lookupFunction<RacVoiceAgentProcessTurnProto2Native,
-              RacVoiceAgentProcessTurnProto2Dart>(
-            'rac_voice_agent_process_turn_proto',
+      rac_voice_agent_process_turn_proto =
+          _lookupOptional<RacVoiceAgentProcessTurnProto2Dart>(
+            () =>
+                lib.lookupFunction<
+                  RacVoiceAgentProcessTurnProto2Native,
+                  RacVoiceAgentProcessTurnProto2Dart
+                >('rac_voice_agent_process_turn_proto'),
           ),
-        ),
-        rac_voice_agent_transcribe_proto =
-            _lookupOptional<RacVoiceAgentHelperProtoDart>(
-          () => lib.lookupFunction<RacVoiceAgentHelperProtoNative,
-              RacVoiceAgentHelperProtoDart>(
-            'rac_voice_agent_transcribe_proto',
+      rac_voice_agent_transcribe_proto =
+          _lookupOptional<RacVoiceAgentHelperProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacVoiceAgentHelperProtoNative,
+                  RacVoiceAgentHelperProtoDart
+                >('rac_voice_agent_transcribe_proto'),
           ),
-        ),
-        rac_voice_agent_synthesize_speech_proto =
-            _lookupOptional<RacVoiceAgentHelperProtoDart>(
-          () => lib.lookupFunction<RacVoiceAgentHelperProtoNative,
-              RacVoiceAgentHelperProtoDart>(
-            'rac_voice_agent_synthesize_speech_proto',
+      rac_voice_agent_synthesize_speech_proto =
+          _lookupOptional<RacVoiceAgentHelperProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacVoiceAgentHelperProtoNative,
+                  RacVoiceAgentHelperProtoDart
+                >('rac_voice_agent_synthesize_speech_proto'),
           ),
-        ),
-        rac_voice_agent_component_create_proto =
-            _lookupOptional<RacVoiceAgentComponentCreateProtoDart>(
-          () => lib.lookupFunction<RacVoiceAgentComponentCreateProtoNative,
-              RacVoiceAgentComponentCreateProtoDart>(
-            'rac_voice_agent_component_create_proto',
+      rac_voice_agent_component_create_proto =
+          _lookupOptional<RacVoiceAgentComponentCreateProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacVoiceAgentComponentCreateProtoNative,
+                  RacVoiceAgentComponentCreateProtoDart
+                >('rac_voice_agent_component_create_proto'),
           ),
-        ),
-        rac_voice_agent_component_destroy_proto =
-            _lookupOptional<RacVoiceAgentComponentDestroyProtoDart>(
-          () => lib.lookupFunction<RacVoiceAgentComponentDestroyProtoNative,
-              RacVoiceAgentComponentDestroyProtoDart>(
-            'rac_voice_agent_component_destroy_proto',
+      rac_voice_agent_component_destroy_proto =
+          _lookupOptional<RacVoiceAgentComponentDestroyProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacVoiceAgentComponentDestroyProtoNative,
+                  RacVoiceAgentComponentDestroyProtoDart
+                >('rac_voice_agent_component_destroy_proto'),
           ),
-        ),
-        rac_structured_output_parse_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>(
-            'rac_structured_output_parse_proto',
+      rac_structured_output_parse_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_structured_output_parse_proto'),
           ),
-        ),
-        rac_structured_output_generate_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>(
-            'rac_structured_output_generate_proto',
+      rac_structured_output_generate_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_structured_output_generate_proto'),
           ),
-        ),
-        rac_structured_output_prepare_prompt_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>(
-            'rac_structured_output_prepare_prompt_proto',
+      rac_structured_output_prepare_prompt_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_structured_output_prepare_prompt_proto'),
           ),
-        ),
-        rac_structured_output_schema_to_json_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>(
-            'rac_structured_output_schema_to_json_proto',
+      rac_structured_output_schema_to_json_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_structured_output_schema_to_json_proto'),
           ),
+      rac_audio_compute_level_db = _lookupOptional<RacAudioComputeLevelDbDart>(
+        () =>
+            lib.lookupFunction<
+              RacAudioComputeLevelDbNative,
+              RacAudioComputeLevelDbDart
+            >('rac_audio_compute_level_db'),
+      ),
+      rac_tool_value_to_json_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_tool_value_to_json_proto'),
+          ),
+      rac_tool_value_from_json_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_tool_value_from_json_proto'),
+          ),
+      rac_llm_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+          'rac_llm_proto_quiesce',
         ),
-        rac_audio_compute_level_db =
-            _lookupOptional<RacAudioComputeLevelDbDart>(
-          () => lib.lookupFunction<RacAudioComputeLevelDbNative,
-              RacAudioComputeLevelDbDart>('rac_audio_compute_level_db'),
+      ),
+      rac_stt_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+          'rac_stt_proto_quiesce',
         ),
-        rac_tool_value_to_json_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>('rac_tool_value_to_json_proto'),
+      ),
+      rac_tts_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+          'rac_tts_proto_quiesce',
         ),
-        rac_tool_value_from_json_proto =
-            _lookupOptional<RacLifecycleRequestProtoDart>(
-          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
-              RacLifecycleRequestProtoDart>('rac_tool_value_from_json_proto'),
+      ),
+      rac_vad_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+          'rac_vad_proto_quiesce',
         ),
-        rac_llm_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-              'rac_llm_proto_quiesce'),
+      ),
+      rac_vlm_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+          'rac_vlm_proto_quiesce',
         ),
-        rac_stt_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-              'rac_stt_proto_quiesce'),
+      ),
+      rac_voice_agent_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+          'rac_voice_agent_proto_quiesce',
         ),
-        rac_tts_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-              'rac_tts_proto_quiesce'),
+      ),
+      rac_tool_calling_session_proto_quiesce =
+          _lookupOptional<RacProtoQuiesceDart>(
+            () =>
+                lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+                  'rac_tool_calling_session_proto_quiesce',
+                ),
+          ),
+      rac_sdk_get_version = _lookupOptional<RacSdkGetVersionDart>(
+        () => lib.lookupFunction<RacSdkGetVersionNative, RacSdkGetVersionDart>(
+          'rac_sdk_get_version',
         ),
-        rac_vad_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-              'rac_vad_proto_quiesce'),
+      ),
+      rac_env_is_production = _lookupOptional<RacEnvPredicateDart>(
+        () => lib.lookupFunction<RacEnvPredicateNative, RacEnvPredicateDart>(
+          'rac_env_is_production',
         ),
-        rac_vlm_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-              'rac_vlm_proto_quiesce'),
+      ),
+      rac_env_is_testing = _lookupOptional<RacEnvPredicateDart>(
+        () => lib.lookupFunction<RacEnvPredicateNative, RacEnvPredicateDart>(
+          'rac_env_is_testing',
         ),
-        rac_voice_agent_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-              'rac_voice_agent_proto_quiesce'),
+      ),
+      rac_env_requires_auth = _lookupOptional<RacEnvPredicateDart>(
+        () => lib.lookupFunction<RacEnvPredicateNative, RacEnvPredicateDart>(
+          'rac_env_requires_auth',
         ),
-        rac_tool_calling_session_proto_quiesce =
-            _lookupOptional<RacProtoQuiesceDart>(
-          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-              'rac_tool_calling_session_proto_quiesce'),
+      ),
+      rac_env_requires_backend_url = _lookupOptional<RacEnvPredicateDart>(
+        () => lib.lookupFunction<RacEnvPredicateNative, RacEnvPredicateDart>(
+          'rac_env_requires_backend_url',
         ),
-        rac_sdk_get_version = _lookupOptional<RacSdkGetVersionDart>(
-          () => lib.lookupFunction<RacSdkGetVersionNative,
-              RacSdkGetVersionDart>('rac_sdk_get_version'),
+      ),
+      rac_env_should_send_telemetry = _lookupOptional<RacEnvPredicateDart>(
+        () => lib.lookupFunction<RacEnvPredicateNative, RacEnvPredicateDart>(
+          'rac_env_should_send_telemetry',
         ),
-        rac_env_is_production = _lookupOptional<RacEnvPredicateDart>(
-          () => lib.lookupFunction<RacEnvPredicateNative,
-              RacEnvPredicateDart>('rac_env_is_production'),
+      ),
+      rac_env_should_sync_with_backend = _lookupOptional<RacEnvPredicateDart>(
+        () => lib.lookupFunction<RacEnvPredicateNative, RacEnvPredicateDart>(
+          'rac_env_should_sync_with_backend',
         ),
-        rac_env_is_testing = _lookupOptional<RacEnvPredicateDart>(
-          () => lib.lookupFunction<RacEnvPredicateNative,
-              RacEnvPredicateDart>('rac_env_is_testing'),
+      ),
+      rac_inference_framework_analytics_key =
+          _lookupOptional<RacEnumToCStringDart>(
+            () => lib
+                .lookupFunction<RacEnumToCStringNative, RacEnumToCStringDart>(
+                  'rac_inference_framework_analytics_key',
+                ),
+          ),
+      rac_model_category_default_framework = _lookupOptional<RacEnumToIntDart>(
+        () => lib.lookupFunction<RacEnumToIntNative, RacEnumToIntDart>(
+          'rac_model_category_default_framework',
         ),
-        rac_env_requires_auth = _lookupOptional<RacEnvPredicateDart>(
-          () => lib.lookupFunction<RacEnvPredicateNative,
-              RacEnvPredicateDart>('rac_env_requires_auth'),
-        ),
-        rac_env_requires_backend_url = _lookupOptional<RacEnvPredicateDart>(
-          () => lib.lookupFunction<RacEnvPredicateNative,
-              RacEnvPredicateDart>('rac_env_requires_backend_url'),
-        ),
-        rac_env_should_send_telemetry = _lookupOptional<RacEnvPredicateDart>(
-          () => lib.lookupFunction<RacEnvPredicateNative,
-              RacEnvPredicateDart>('rac_env_should_send_telemetry'),
-        ),
-        rac_env_should_sync_with_backend =
-            _lookupOptional<RacEnvPredicateDart>(
-          () => lib.lookupFunction<RacEnvPredicateNative,
-              RacEnvPredicateDart>('rac_env_should_sync_with_backend'),
-        ),
-        rac_inference_framework_analytics_key =
-            _lookupOptional<RacEnumToCStringDart>(
-          () => lib.lookupFunction<RacEnumToCStringNative,
-                  RacEnumToCStringDart>(
-              'rac_inference_framework_analytics_key'),
-        ),
-        rac_model_category_default_framework =
-            _lookupOptional<RacEnumToIntDart>(
-          () => lib.lookupFunction<RacEnumToIntNative, RacEnumToIntDart>(
-              'rac_model_category_default_framework'),
-        ),
-        rac_model_category_requires_context_length =
-            _lookupOptional<RacEnumToIntDart>(
-          () => lib.lookupFunction<RacEnumToIntNative, RacEnumToIntDart>(
-              'rac_model_category_requires_context_length'),
-        ),
-        rac_tool_call_format_hint_from_format_name =
-            _lookupOptional<RacToolCallFormatHintDart>(
-          () => lib.lookupFunction<RacToolCallFormatHintNative,
-                  RacToolCallFormatHintDart>(
-              'rac_tool_call_format_hint_from_format_name'),
-        );
+      ),
+      rac_model_category_requires_context_length =
+          _lookupOptional<RacEnumToIntDart>(
+            () => lib.lookupFunction<RacEnumToIntNative, RacEnumToIntDart>(
+              'rac_model_category_requires_context_length',
+            ),
+          ),
+      rac_tool_call_format_hint_from_format_name =
+          _lookupOptional<RacToolCallFormatHintDart>(
+            () =>
+                lib.lookupFunction<
+                  RacToolCallFormatHintNative,
+                  RacToolCallFormatHintDart
+                >('rac_tool_call_format_hint_from_format_name'),
+          );
 
   // Shared proto buffers -----------------------------------------------------
 
@@ -2110,6 +2264,9 @@ class RacBindings {
 
   final RacLlmGenerateStreamProtoDart? rac_llm_generate_stream_proto;
 
+  final RaFlutterLlmGenerateStreamNativePortDart?
+  ra_flutter_llm_generate_stream_proto_native_port;
+
   final RacLlmCancelProtoDart? rac_llm_cancel_proto;
 
   final RacLifecycleRequestProtoDart? rac_stt_transcribe_lifecycle_proto;
@@ -2117,7 +2274,7 @@ class RacBindings {
   final RacSttTranscribeProtoDart? rac_stt_component_transcribe_proto;
 
   final RacSttTranscribeStreamProtoDart?
-      rac_stt_component_transcribe_stream_proto;
+  rac_stt_component_transcribe_stream_proto;
 
   final RacLifecycleRequestProtoDart? rac_tts_synthesize_lifecycle_proto;
 
@@ -2126,12 +2283,12 @@ class RacBindings {
   final RacTtsSynthesizeProtoDart? rac_tts_component_synthesize_proto;
 
   final RacTtsSynthesizeStreamProtoDart?
-      rac_tts_component_synthesize_stream_proto;
+  rac_tts_component_synthesize_stream_proto;
 
   final RacLifecycleRequestProtoDart? rac_vad_process_lifecycle_proto;
 
   final RacTtsSynthesizeStreamLifecycleProtoDart?
-      rac_tts_synthesize_stream_lifecycle_proto;
+  rac_tts_synthesize_stream_lifecycle_proto;
 
   final RacOutOnlyProtoDart? rac_tts_stop_lifecycle_proto;
 
@@ -2150,14 +2307,14 @@ class RacBindings {
   final RacHandleOutProtoDart? rac_vad_component_get_statistics_proto;
 
   final RacVadSetActivityProtoCallbackDart?
-      rac_vad_component_set_activity_proto_callback;
+  rac_vad_component_set_activity_proto_callback;
 
   final RacVoiceAgentInitializeProtoDart? rac_voice_agent_initialize_proto;
 
   final RacHandleOutProtoDart? rac_voice_agent_component_states_proto;
 
   final RacVoiceAgentProcessTurnProtoDart?
-      rac_voice_agent_process_voice_turn_proto;
+  rac_voice_agent_process_voice_turn_proto;
 
   /// `rac_vlm_cancel_lifecycle_proto` — cancel lifecycle-owned VLM
   /// generation and return a serialized SDKEvent describing the
@@ -2173,7 +2330,7 @@ class RacBindings {
   final RacHandleBytesToProtoDart? rac_embeddings_embed_batch_proto;
 
   final RacLifecycleRequestProtoDart?
-      rac_embeddings_embed_batch_lifecycle_proto;
+  rac_embeddings_embed_batch_lifecycle_proto;
 
   final RacDestroyHandleDart? rac_embeddings_destroy;
 
@@ -2188,7 +2345,7 @@ class RacBindings {
   final RacLifecycleRequestProtoDart? rac_diffusion_generate_lifecycle_proto;
 
   final RacDiffusionGenerateWithProgressProtoDart?
-      rac_diffusion_generate_with_progress_proto;
+  rac_diffusion_generate_with_progress_proto;
 
   final RacHandleStatusDart? rac_diffusion_cancel_proto;
 
@@ -2219,7 +2376,7 @@ class RacBindings {
   final RacHandleBytesToProtoDart? rac_lora_catalog_get_proto;
 
   final RacHandleBytesToProtoDart?
-      rac_lora_catalog_mark_download_completed_proto;
+  rac_lora_catalog_mark_download_completed_proto;
 
   final RacHandleBytesToProtoDart? rac_lora_adapter_import_proto;
 
@@ -2271,7 +2428,7 @@ class RacBindings {
   final RacModelRegistryQueryProtoDart? rac_model_registry_query_proto;
 
   final RacModelRegistryListDownloadedProtoDart?
-      rac_model_registry_list_downloaded_proto;
+  rac_model_registry_list_downloaded_proto;
 
   final RacModelRegistryRemoveProtoDart? rac_model_registry_remove_proto;
 
@@ -2297,10 +2454,10 @@ class RacBindings {
   final RacModelLifecycleRequestProtoDart? rac_model_lifecycle_unload_proto;
 
   final RacModelLifecycleRequestProtoDart?
-      rac_model_lifecycle_current_model_proto;
+  rac_model_lifecycle_current_model_proto;
 
   final RacComponentLifecycleSnapshotProtoDart?
-      rac_component_lifecycle_snapshot_proto;
+  rac_component_lifecycle_snapshot_proto;
 
   final RacModelLifecycleResetDart? rac_model_lifecycle_reset;
 
@@ -2321,7 +2478,7 @@ class RacBindings {
   // Download proto-byte API --------------------------------------------------
 
   final RacDownloadSetProgressProtoCallbackDart?
-      rac_download_set_progress_proto_callback;
+  rac_download_set_progress_proto_callback;
 
   final RacDownloadProtoDart? rac_download_plan_proto;
 
@@ -2356,17 +2513,17 @@ class RacBindings {
   final RacToolCallProtoRequestDart? rac_tool_call_validate_proto;
 
   final RacToolCallingSessionCreateProtoDart?
-      rac_tool_calling_session_create_proto;
+  rac_tool_calling_session_create_proto;
 
   final RacToolCallingSessionStepWithResultProtoDart?
-      rac_tool_calling_session_step_with_result_proto;
+  rac_tool_calling_session_step_with_result_proto;
 
   final RacToolCallingSessionDestroyProtoDart?
-      rac_tool_calling_session_destroy_proto;
+  rac_tool_calling_session_destroy_proto;
 
   // Cancel an in-flight tool-calling session.
   final RacToolCallingSessionCancelProtoDart?
-      rac_tool_calling_session_cancel_proto;
+  rac_tool_calling_session_cancel_proto;
 
   // Model format + artifact inference proto APIs -----------------
 
@@ -2377,7 +2534,7 @@ class RacBindings {
   // STT stream lifecycle proto API -------------------------------
 
   final RacSttTranscribeStreamLifecycleProtoDart?
-      rac_stt_transcribe_stream_lifecycle_proto;
+  rac_stt_transcribe_stream_lifecycle_proto;
 
   // Chunk-feed streaming STT sessions (rac_stt_stream.h) ----------
   // Null fields tolerate commons binaries that predate the exports.
@@ -2412,10 +2569,10 @@ class RacBindings {
   final RacVoiceAgentHelperProtoDart? rac_voice_agent_synthesize_speech_proto;
 
   final RacVoiceAgentComponentCreateProtoDart?
-      rac_voice_agent_component_create_proto;
+  rac_voice_agent_component_create_proto;
 
   final RacVoiceAgentComponentDestroyProtoDart?
-      rac_voice_agent_component_destroy_proto;
+  rac_voice_agent_component_destroy_proto;
 
   /// `rac_structured_output_parse_proto` — parses structured output JSON from
   /// raw model text. Takes a serialized `StructuredOutputParseRequest` and
@@ -2434,7 +2591,7 @@ class RacBindings {
   /// `StructuredOutputRequest` and returns a `StructuredOutputPromptResult`.
   /// Null when the commons binary predates the proto-byte API.
   final RacLifecycleRequestProtoDart?
-      rac_structured_output_prepare_prompt_proto;
+  rac_structured_output_prepare_prompt_proto;
 
   /// `rac_structured_output_schema_to_json_proto` — serializes a
   /// `JSONSchema` proto to canonical compact, key-sorted JSON Schema text.
@@ -2443,7 +2600,7 @@ class RacBindings {
   /// directly from the `rac_proto_buffer_t` data field. Null when the
   /// commons binary predates the export.
   final RacLifecycleRequestProtoDart?
-      rac_structured_output_schema_to_json_proto;
+  rac_structured_output_schema_to_json_proto;
 
   // Audio utils (rac_audio_utils.h) -------------------------------
 

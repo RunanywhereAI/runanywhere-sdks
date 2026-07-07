@@ -9,6 +9,13 @@
 #
 
 Pod::Spec.new do |s|
+  flutter_root = ENV['FLUTTER_ROOT']
+  if flutter_root.nil? || flutter_root.empty?
+    flutter_bin = `which flutter`.strip
+    flutter_root = File.expand_path('..', File.dirname(File.realpath(flutter_bin))) unless flutter_bin.empty?
+  end
+  dart_sdk_include = flutter_root.nil? || flutter_root.empty? ? nil : File.join(flutter_root, 'bin/cache/dart-sdk/include')
+
   s.name             = 'runanywhere'
   s.version          = '0.19.13'
   s.summary          = 'RunAnywhere: Privacy-first, on-device AI SDK for Flutter'
@@ -91,7 +98,8 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
     'HEADER_SEARCH_PATHS' => [
       '"${PODS_TARGET_SRCROOT}/Frameworks/RACommons.xcframework/ios-arm64/Headers"',
       '"${PODS_TARGET_SRCROOT}/Frameworks/RACommons.xcframework/ios-arm64-simulator/Headers"',
-    ].join(' '),
+      dart_sdk_include.nil? ? nil : "\"#{dart_sdk_include}\"",
+    ].compact.join(' '),
     'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited)',
   }
 
