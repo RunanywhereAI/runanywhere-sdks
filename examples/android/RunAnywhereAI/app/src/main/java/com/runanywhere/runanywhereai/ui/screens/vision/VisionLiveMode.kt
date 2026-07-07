@@ -202,7 +202,7 @@ fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF34C759)))
+                Box(Modifier.size(8.dp).clip(CircleShape).background(com.runanywhere.runanywhereai.ui.theme.primaryGreen))
                 Text("LIVE", color = Color.White, style = MaterialTheme.typography.labelMedium)
             }
 

@@ -249,8 +249,12 @@ fun ChatInputBar(
                 )
             }
 
+            val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
             IconButton(
-                onClick = if (isGenerating) onStop else onSend,
+                onClick = {
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    if (isGenerating) onStop() else onSend()
+                },
                 enabled = isGenerating || canSend,
                 modifier = Modifier.size(dimens.inputBarMinHeight),
                 colors = IconButtonDefaults.iconButtonColors(

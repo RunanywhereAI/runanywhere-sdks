@@ -22,6 +22,7 @@ data class Dimens(
     val inputBarMinHeight: Dp,
     val contentMaxWidth: Dp,
     val navDrawerWidth: Dp,
+    val bubbleMaxWidth: Dp,
 )
 
 val CompactDimens = Dimens(
@@ -41,6 +42,7 @@ val CompactDimens = Dimens(
     inputBarMinHeight = 48.dp,
     contentMaxWidth = 760.dp,
     navDrawerWidth = 260.dp,
+    bubbleMaxWidth = 320.dp,
 )
 
 val LocalDimens = staticCompositionLocalOf { CompactDimens }

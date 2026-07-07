@@ -235,6 +235,7 @@ fun ChatScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .widthIn(max = dimens.contentMaxWidth),
+                isGenerating = viewModel.isGenerating,
             )
             ScrollToBottomButton(
                 visible = !autoFollow && messages.isNotEmpty(),

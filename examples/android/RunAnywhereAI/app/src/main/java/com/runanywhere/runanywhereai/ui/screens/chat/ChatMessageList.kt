@@ -55,27 +55,12 @@ fun ChatMessageList(
     messages: List<ChatMessage>,
     listState: LazyListState,
     modifier: Modifier = Modifier,
+    isGenerating: Boolean = false,
 ) {
     val dimens = LocalDimens.current
 
     if (messages.isEmpty()) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-            ) {
-                Icon(
-                    imageVector = RACIcons.Outline.Robot,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    text = "Start a conversation",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        EmptyChatHero(modifier = modifier)
         return
     }
 
@@ -83,10 +68,64 @@ fun ChatMessageList(
         modifier = modifier,
         state = listState,
         contentPadding = PaddingValues(dimens.screenPadding),
-        verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
+        verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
         items(messages) { message ->
-            if (message.isUser) UserBubble(message) else AssistantMessage(message)
+            if (message.isUser) {
+                UserBubble(message)
+            } else {
+                AssistantMessage(
+                    message = message,
+                    isStreamingTail = isGenerating && message === messages.lastOrNull(),
+                )
+            }
+        }
+    }
+}
+
+private fun greeting(hour: Int): String = when (hour) {
+    in 0..4 -> "Working late?"
+    in 5..11 -> "Good morning"
+    in 12..17 -> "Good afternoon"
+    else -> "Good evening"
+}
+
+@Composable
+private fun EmptyChatHero(modifier: Modifier = Modifier) {
+    val dimens = LocalDimens.current
+    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = RACIcons.Outline.Bolt,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Text(
+                text = greeting(hour),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Ask anything — everything runs privately on your device.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.widthIn(max = 280.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
         }
     }
 }
@@ -97,10 +136,17 @@ private fun UserBubble(message: ChatMessage) {
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
         Box(
             modifier = Modifier
-                .widthIn(max = 320.dp)
-                .clip(RoundedCornerShape(dimens.radiusMd))
+                .widthIn(max = dimens.bubbleMaxWidth)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = dimens.radiusLg,
+                        topEnd = dimens.radiusLg,
+                        bottomStart = dimens.radiusLg,
+                        bottomEnd = dimens.radiusSm,
+                    )
+                )
                 .background(MaterialTheme.colorScheme.primary)
-                .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
+                .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingMd),
             contentAlignment = Alignment.CenterStart
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
@@ -218,44 +264,40 @@ private fun DocumentAttachmentPreview(attachment: ChatAttachment) {
 }
 
 @Composable
-private fun AssistantMessage(message: ChatMessage) {
+private fun AssistantMessage(message: ChatMessage, isStreamingTail: Boolean = false) {
     val dimens = LocalDimens.current
     var showToolSheet by remember { mutableStateOf(false) }
     val isWaiting = message.text.isEmpty() && message.thinking == null && message.tool == null && message.stats == null
-    val hasBubble = message.text.isNotEmpty() || message.tool != null || isWaiting
 
+    // Assistant replies read as a document: full-width, no bubble — the
+    // consumer chat idiom shared with the iOS and web examples.
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+        verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
     ) {
         message.thinking?.let {
             ThinkingSection(thinking = it, inProgress = message.text.isEmpty() && message.stats == null)
         }
 
-        if (hasBubble) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(dimens.radiusMd))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
-                    message.tool?.let { tool ->
-                        ToolCallChip(tool = tool, onClick = { showToolSheet = true })
-                    }
-                    when {
-                        isWaiting -> TypingDots()
-                        message.text.isNotEmpty() -> MarkdownText(
-                            markdown = message.text,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    if (message.sources.isNotEmpty()) {
-                        SourceStrip(sources = message.sources)
-                    }
-                }
-            }
+        message.tool?.let { tool ->
+            ToolCallChip(tool = tool, onClick = { showToolSheet = true })
+        }
+
+        when {
+            isWaiting -> TypingDots()
+            message.text.isNotEmpty() -> MarkdownText(
+                markdown = message.text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+
+        if (isStreamingTail && message.text.isNotEmpty()) {
+            StreamingCursorDot()
+        }
+
+        if (message.sources.isNotEmpty()) {
+            SourceStrip(sources = message.sources)
         }
 
         message.stats?.let { AnalyticsFooter(stats = it, modifier = Modifier.padding(start = dimens.spacingXs)) }
@@ -264,6 +306,26 @@ private fun AssistantMessage(message: ChatMessage) {
     if (showToolSheet) {
         message.tool?.let { ToolCallDetailSheet(tool = it, onDismiss = { showToolSheet = false }) }
     }
+}
+
+@Composable
+private fun StreamingCursorDot() {
+    val transition = rememberInfiniteTransition(label = "cursor")
+    val alpha by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 450),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "cursorAlpha",
+    )
+    Box(
+        modifier = Modifier
+            .size(9.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha)),
+    )
 }
 
 @Composable
@@ -336,7 +398,7 @@ private fun TypingDots() {
                 modifier = Modifier
                     .size(6.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha)),
             )
         }
     }
