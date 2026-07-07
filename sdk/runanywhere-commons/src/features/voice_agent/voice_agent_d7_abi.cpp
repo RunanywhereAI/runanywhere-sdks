@@ -429,13 +429,31 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         if (llm_ref.framework_name != nullptr)
             turn_metrics.framework = llm_ref.framework_name;
     }
+    // Build a proper voice-assistant turn: a spoken-style system prompt, a
+    // brevity cap, and the prior conversation so replies stay short, on-topic,
+    // and context-aware — instead of feeding the raw transcript with no guidance
+    // (which is why responses were rambly/useless).
+    std::vector<const char*> history_ptrs;
+    history_ptrs.reserve(handle->conversation_history.size());
+    for (const auto& entry : handle->conversation_history) {
+        history_ptrs.push_back(entry.c_str());
+    }
+    rac_llm_options_t llm_opts = {};
+    llm_opts.max_tokens = kVoiceAgentMaxTokens;
+    llm_opts.temperature = 0.7f;
+    llm_opts.system_prompt = kVoiceAgentSystemPrompt;
+    if (!history_ptrs.empty()) {
+        llm_opts.history = history_ptrs.data();
+        llm_opts.n_history = static_cast<int32_t>(history_ptrs.size());
+    }
+
     rac_llm_result_t llm = {};
     const auto t_llm = std::chrono::steady_clock::now();
     if (have_lifecycle_llm) {
         rac_llm_service_t llm_service{llm_ref.ops, llm_ref.impl, llm_ref.model_id};
-        rc = rac_llm_generate(&llm_service, stt.text, nullptr, &llm);
+        rc = rac_llm_generate(&llm_service, stt.text, &llm_opts, &llm);
     } else {
-        rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
+        rc = rac_llm_component_generate(handle->llm_handle, stt.text, &llm_opts, &llm);
     }
     turn_metrics.llm_ms =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_llm).count();
@@ -456,6 +474,23 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         return rc;
     }
     turn_metrics.response_chars = llm.text ? static_cast<int32_t>(std::strlen(llm.text)) : 0;
+
+    // Remember this turn so the next one has context. Order matters:
+    // rac_llm_options_t.history is alternating user,assistant — append the user
+    // transcript first, then the assistant reply. Bound to the most recent
+    // turns so the prompt stays within the context window.
+    if (stt.text != nullptr && stt.text[0] != '\0') {
+        handle->conversation_history.emplace_back(stt.text);
+        handle->conversation_history.emplace_back(llm.text ? llm.text : "");
+        if (handle->conversation_history.size() > kVoiceAgentMaxHistoryEntries) {
+            const size_t excess =
+                handle->conversation_history.size() - kVoiceAgentMaxHistoryEntries;
+            handle->conversation_history.erase(
+                handle->conversation_history.begin(),
+                handle->conversation_history.begin() + static_cast<std::ptrdiff_t>(excess));
+        }
+    }
+
     d7_emit_assistant_token(handle, llm.text, true, session_id, turn_id, request_id, event_callback,
                             user_data);
 
