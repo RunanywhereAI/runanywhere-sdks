@@ -364,7 +364,21 @@ extension RARAGQueryOptions {
         r.maxTokens = 512
         r.temperature = 0.7
         r.topP = 1.0
+        r.multiQueryCount = 3
         return r
+    }
+}
+
+extension RARAGQueryOptions {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        let effectiveMultiQueryCount = hasMultiQueryCount ? multiQueryCount : 3
+        if effectiveMultiQueryCount < 1 {
+            throw SDKException.validationFailed(
+                fieldPath: "RAGQueryOptions.multi_query_count",
+                message: "multi_query_count must be in >= 1 (got \(effectiveMultiQueryCount))"
+            )
+        }
     }
 }
 

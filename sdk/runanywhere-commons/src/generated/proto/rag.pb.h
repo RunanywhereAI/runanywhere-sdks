@@ -1457,7 +1457,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_top_k(::int32_t value);
 
   public:
-  // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   [[nodiscard]] bool has_similarity_threshold()
       const;
   void clear_similarity_threshold() ;
@@ -4193,7 +4193,7 @@ inline void RAGConfiguration::_internal_set_top_k(::int32_t value) {
   _impl_.top_k_ = value;
 }
 
-// optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+// optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
 inline bool RAGConfiguration::has_similarity_threshold() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
   return value;
