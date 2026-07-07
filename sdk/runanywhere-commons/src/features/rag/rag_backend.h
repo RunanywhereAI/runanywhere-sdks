@@ -41,9 +41,11 @@ struct RAGBackendConfig {
     // at session create. 384 applies only if that derivation fails.
     size_t embedding_dimension = 384;
     size_t top_k = 5;
-    // 0.3, not 0.7 — MiniLM-class cosine similarities rarely exceed ~0.5 for
-    // relevant chunks; a 0.7 floor returns nothing (matches idl/rag.proto).
-    float similarity_threshold = 0.3f;
+    // 0.0 (accept-everything) — MiniLM-class cosine similarities rarely exceed
+    // ~0.5, and chunking lowers per-chunk similarity, so any positive floor
+    // filters out real matches (multi-chunk docs return nothing). top_k bounds
+    // the result count instead (matches idl/rag.proto).
+    float similarity_threshold = 0.0f;
     size_t max_context_tokens = 2048;
     size_t chunk_size = 512;
     size_t chunk_overlap = 64;
@@ -52,12 +54,6 @@ struct RAGBackendConfig {
     // relevance scoring before context assembly (RAGConfiguration.rerank_results).
     bool rerank = false;
 
-    // Persistence (RAGConfiguration.index_path / persist_index). When persist
-    // is true and index_path is set, the index is snapshotted after every
-    // ingest and reloaded (fingerprint-guarded) at session create so a restart
-    // never re-embeds the corpus. embedding_model_id feeds the fingerprint.
-    bool persist_index = false;
-    std::string index_path;
     std::string embedding_model_id;
 };
 
@@ -131,29 +127,7 @@ class RAGBackend {
     nlohmann::json get_statistics() const;
     size_t document_count() const;
 
-    /**
-     * @brief Load a fingerprint-guarded index snapshot from config_.index_path
-     * via the platform adapter. Rebuilds the BM25 index from the restored
-     * chunks. No-op (returns false) when persistence is disabled, the file is
-     * absent, or the fingerprint (embedding model + dim + format version) does
-     * not match — in which case the caller proceeds with an empty index and
-     * re-embeds on ingest.
-     */
-    bool load_index();
-
-    /**
-     * @brief Serialize the current index to config_.index_path via the platform
-     * adapter, prefixed with the fingerprint. No-op when persistence is off.
-     */
-    bool save_index() const;
-
-    /** Remove the on-disk snapshot (explicit clear only, not on teardown). */
-    void delete_snapshot() const;
-
    private:
-    std::string index_fingerprint() const;
-
-
     std::vector<float> embed_text(const std::string& text) const;
     std::vector<std::vector<float>> embed_texts_batch(const std::vector<std::string>& texts) const;
 
@@ -181,7 +155,7 @@ class RAGBackend {
 
     // Content-addressed dedup: sha256 of the normalized document text for every
     // ingested doc. A re-ingest of the same input is skipped (no re-chunk, no
-    // re-embed). Rebuilt from restored chunk metadata on load_index().
+    // re-embed). In-memory only — lives for the session, gone on teardown.
     std::unordered_set<std::string> ingested_content_hashes_;
 };
 

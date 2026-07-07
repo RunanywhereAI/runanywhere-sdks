@@ -368,7 +368,7 @@ extension RAGConfigurationConvenience on RAGConfiguration {
   static RAGConfiguration defaults() {
     final r = RAGConfiguration();
     r.topK = 5;
-    r.similarityThreshold = 0.3;
+    r.similarityThreshold = 0.0;
     r.chunkSize = 512;
     r.chunkOverlap = 64;
     return r;

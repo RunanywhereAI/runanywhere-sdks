@@ -84,13 +84,18 @@ class RAGViewModel extends ChangeNotifier {
   Future<void> setRerankEnabled(bool value) async {
     if (_rerankEnabled == value) return;
     _rerankEnabled = value;
-    if (_isDocumentLoaded) {
-      await RunAnywhere.rag.destroyPipeline();
-      _isDocumentLoaded = false;
-      _documentName = null;
-      _messages = [];
+    try {
+      if (_isDocumentLoaded) {
+        await RunAnywhere.rag.destroyPipeline();
+        _isDocumentLoaded = false;
+        _documentName = null;
+        _messages = [];
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   bool get canAskQuestion =>

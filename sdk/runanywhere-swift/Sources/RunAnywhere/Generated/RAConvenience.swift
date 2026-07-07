@@ -316,7 +316,7 @@ extension RARAGConfiguration {
     public static func defaults() -> RARAGConfiguration {
         var r = RARAGConfiguration()
         r.topK = 5
-        r.similarityThreshold = 0.3
+        r.similarityThreshold = 0.0
         r.chunkSize = 512
         r.chunkOverlap = 64
         return r
@@ -333,7 +333,7 @@ extension RARAGConfiguration {
                 message: "top_k must be in >= 1 (got \(effectiveTopK))"
             )
         }
-        let effectiveSimilarityThreshold = hasSimilarityThreshold ? similarityThreshold : 0.3
+        let effectiveSimilarityThreshold = hasSimilarityThreshold ? similarityThreshold : 0.0
         if effectiveSimilarityThreshold < 0.0 || effectiveSimilarityThreshold > 1.0 {
             throw SDKException.validationFailed(
                 fieldPath: "RAGConfiguration.similarity_threshold",

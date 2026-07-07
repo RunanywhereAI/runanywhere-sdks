@@ -1121,7 +1121,7 @@ constexpr RAGConfiguration::ParseTableT_ RAGConfiguration::InternalGenerateParse
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGConfiguration, _impl_.top_k_), 8>(),
        {32, 8, 0,
         PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.top_k_)}},
-      // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
        {45, 9, 0,
         PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.similarity_threshold_)}},
@@ -1176,7 +1176,7 @@ constexpr RAGConfiguration::ParseTableT_ RAGConfiguration::InternalGenerateParse
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.embedding_dimension_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5", (.runanywhere.v1.rac_min) = 1];
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.top_k_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.similarity_threshold_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.chunk_size_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
@@ -3297,7 +3297,7 @@ const char descriptor_table_protodef_rag_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIAB
     "_model_id\030\001 \001(\t\022\024\n\014llm_model_id\030\002 \001(\t\022 \n"
     "\023embedding_dimension\030\003 \001(\005H\000\210\001\001\022\035\n\005top_k"
     "\030\004 \001(\005B\t\212\265\030\0015\240\265\030\001H\001\210\001\001\022@\n\024similarity_thr"
-    "eshold\030\005 \001(\002B\035\212\265\030\0030.3\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000"
+    "eshold\030\005 \001(\002B\035\212\265\030\0030.0\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000"
     "\000\360\?H\002\210\001\001\022$\n\nchunk_size\030\006 \001(\005B\013\212\265\030\003512\240\265\030"
     "\001H\003\210\001\001\022&\n\rchunk_overlap\030\007 \001(\005B\n\212\265\030\00264\240\265\030"
     "\000H\004\210\001\001\022\037\n\022max_context_tokens\030\010 \001(\005H\005\210\001\001\022"
@@ -3656,7 +3656,7 @@ PROTOBUF_NOINLINE void RAGConfiguration::Clear() {
             stream, this_._internal_top_k(), target);
   }
 
-  // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteFloatToArray(

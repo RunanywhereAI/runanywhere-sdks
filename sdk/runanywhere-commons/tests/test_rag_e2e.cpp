@@ -14,8 +14,8 @@
  *   RAG_TEST_EMBED_VOCAB  path to vocab.txt
  *   RAG_TEST_LLM_MODEL    path to the GGUF LLM
  *
- * This is the harness all subsequent RAG feature work (rerank, persistence,
- * multi-query, scoping) extends.
+ * This is the harness all subsequent RAG feature work (rerank, multi-query,
+ * scoping) extends.
  */
 
 #include <chrono>
@@ -55,7 +55,7 @@ int g_failures = 0;
     } while (0)
 
 // --------------------------------------------------------------------------
-// Real file-backed platform adapter (persistence tests need genuine file I/O).
+// Real file-backed platform adapter (model files need genuine file I/O).
 // --------------------------------------------------------------------------
 
 void adapter_log(rac_log_level_t level, const char* category, const char* message, void*) {
@@ -80,6 +80,8 @@ rac_result_t adapter_file_read(const char* path, void** out_data, size_t* out_si
     if (!f)
         return RAC_ERROR_FILE_NOT_FOUND;
     const std::streamsize n = f.tellg();
+    if (n < 0)
+        return RAC_ERROR_FILE_NOT_FOUND;
     f.seekg(0);
     auto* buf = static_cast<uint8_t*>(std::malloc(n > 0 ? static_cast<size_t>(n) : 1));
     if (!buf)
@@ -238,79 +240,6 @@ std::string run_rag_case(const std::string& embed_id, const std::string& llm_id,
 
     rac_rag_session_destroy_proto(session);
     return result.answer();
-}
-
-// Item 3a: ingest under a persistent index in session A, then open session B
-// against the same index_path and query WITHOUT re-ingesting. Chunks coming back
-// in session B prove the snapshot was reloaded (no re-embedding).
-void run_persistence_case(const std::string& embed_id, const std::string& llm_id,
-                          const std::string& embed_vocab, const std::string& doc_text,
-                          const std::string& question) {
-    std::fprintf(stdout, "\n--- case: persistence (snapshot reload, no re-embed) ---\n");
-    std::error_code ec;
-    const std::string index_path =
-        (std::filesystem::temp_directory_path(ec) / "rag_e2e_index.bin").string();
-    std::filesystem::remove(index_path, ec);
-
-    auto make_cfg = [&]() {
-        runanywhere::v1::RAGConfiguration cfg;
-        cfg.set_embedding_model_id(embed_id);
-        cfg.set_llm_model_id(llm_id);
-        cfg.set_embedding_config_json(std::string("{\"vocab_path\":\"") + embed_vocab + "\"}");
-        cfg.set_top_k(4);
-        cfg.set_persist_index(true);
-        cfg.set_index_path(index_path);
-        return cfg.SerializeAsString();
-    };
-
-    // Session A: ingest (snapshot saved on ingest).
-    {
-        const std::string cb = make_cfg();
-        rac_handle_t s = nullptr;
-        rac_rag_session_create_proto(reinterpret_cast<const uint8_t*>(cb.data()), cb.size(), &s);
-        CHECK(s != nullptr, "persist: session A created");
-        if (s) {
-            runanywhere::v1::RAGDocument doc;
-            doc.set_id("zephyr-protocol");
-            doc.set_text(doc_text);
-            const std::string db = doc.SerializeAsString();
-            rac_proto_buffer_t sb;
-            rac_proto_buffer_init(&sb);
-            rac_rag_ingest_proto(s, reinterpret_cast<const uint8_t*>(db.data()), db.size(), &sb);
-            rac_proto_buffer_free(&sb);
-            rac_rag_session_destroy_proto(s);
-        }
-    }
-    CHECK(std::filesystem::exists(index_path, ec), "persist: snapshot file written");
-
-    // Session B: no ingest — must answer from the reloaded snapshot.
-    {
-        const std::string cb = make_cfg();
-        rac_handle_t s = nullptr;
-        rac_rag_session_create_proto(reinterpret_cast<const uint8_t*>(cb.data()), cb.size(), &s);
-        CHECK(s != nullptr, "persist: session B created (snapshot reloaded)");
-        if (s) {
-            runanywhere::v1::RAGQueryOptions q;
-            q.set_question(question);
-            q.set_max_tokens(160);
-            q.set_temperature(0.0f);
-            const std::string qb = q.SerializeAsString();
-            rac_proto_buffer_t rb;
-            rac_proto_buffer_init(&rb);
-            rac_result_t rc = rac_rag_query_proto(s, reinterpret_cast<const uint8_t*>(qb.data()),
-                                                  qb.size(), &rb);
-            runanywhere::v1::RAGResult result;
-            if (rb.data && rb.size > 0)
-                result.ParseFromArray(rb.data, static_cast<int>(rb.size));
-            rac_proto_buffer_free(&rb);
-            CHECK(rc == RAC_SUCCESS, "persist: query on reloaded index succeeded");
-            CHECK(result.retrieved_chunks_size() > 0, "persist: chunks retrieved WITHOUT re-ingest");
-            CHECK(!result.answer().empty(), "persist: non-empty answer from reloaded index");
-            std::fprintf(stdout, "  answer: %s\n", result.answer().c_str());
-            rac_rag_session_destroy_proto(s);
-        }
-    }
-    std::filesystem::remove(index_path, ec);
 }
 
 // Item 3b: ingesting the same document twice must not re-chunk / re-embed —
@@ -545,7 +474,6 @@ int main() {
                  /*multi_query=*/false, "llm-pointwise rerank");
     run_rag_case(embed_id, llm_id, embed_vocab, doc_text, question, /*rerank=*/false,
                  /*multi_query=*/true, "multi-query expansion");
-    run_persistence_case(embed_id, llm_id, embed_vocab, doc_text, question);
     run_dedup_case(embed_id, llm_id, embed_vocab, doc_text);
     run_scoping_case(embed_id, llm_id, embed_vocab, doc_text);
     run_threshold_override_case(embed_id, llm_id, embed_vocab, doc_text);

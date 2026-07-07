@@ -227,12 +227,7 @@ RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& p
     if (proto.has_prompt_template() && !proto.prompt_template().empty())
         bc.prompt_template = proto.prompt_template();
     bc.rerank = proto.rerank_results();
-    // Persistence: index_path + persist_index drive fingerprint-guarded
-    // snapshotting; embedding_model_id feeds the fingerprint.
     bc.embedding_model_id = proto.embedding_model_id();
-    bc.persist_index = proto.persist_index();
-    if (proto.has_index_path())
-        bc.index_path = proto.index_path();
     return bc;
 }
 
@@ -300,9 +295,6 @@ runanywhere::v1::RAGStatistics make_stats(RAGBackend& backend) {
         if (stats.contains("total_tokens_indexed") &&
             stats["total_tokens_indexed"].is_number_integer()) {
             out.set_total_tokens_indexed(stats["total_tokens_indexed"].get<int64_t>());
-        }
-        if (stats.contains("index_path") && stats["index_path"].is_string()) {
-            out.set_index_path(stats["index_path"].get<std::string>());
         }
     } catch (...) {
         // Keep the structural counters gathered above.
@@ -456,14 +448,6 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
                             "RAG pipeline failed to initialize");
             // session destructor clears owned services.
             return RAC_ERROR_INITIALIZATION_FAILED;
-        }
-        // Fingerprint-guarded snapshot restore: on a hit this avoids re-embedding
-        // the corpus; on a miss/mismatch the index stays empty and re-embeds on
-        // ingest.
-        if (backend_config.persist_index && !backend_config.index_path.empty()) {
-            if (session->backend->load_index()) {
-                LOGI("Restored RAG index snapshot from %s", backend_config.index_path.c_str());
-            }
         }
         *out_session = reinterpret_cast<rac_handle_t>(session.release());
         LOGI("RAG session created");
@@ -619,8 +603,17 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     overrides.has_similarity_threshold = query_proto.has_similarity_threshold();
     overrides.similarity_threshold = query_proto.similarity_threshold();
     overrides.enable_multi_query = query_proto.enable_multi_query();
-    overrides.multi_query_count =
-        query_proto.has_multi_query_count() ? query_proto.multi_query_count() : 0;
+    // Clamp to a sane ceiling: each variant triggers an extra LLM rewrite +
+    // retrieval pass, so an unbounded value would let a caller fan out into
+    // arbitrarily many inference passes. 0 = use the session default; values
+    // <= 0 are treated as "use default" downstream (RAGBackend::query).
+    constexpr int32_t kMaxMultiQueryCount = 8;
+    if (query_proto.has_multi_query_count()) {
+        const int32_t n = query_proto.multi_query_count();
+        overrides.multi_query_count = n > kMaxMultiQueryCount ? kMaxMultiQueryCount : n;
+    } else {
+        overrides.multi_query_count = 0;
+    }
     if (query_proto.has_scope_prefix())
         overrides.scope_prefix = query_proto.scope_prefix();
 
@@ -744,8 +737,6 @@ rac_result_t rac_rag_clear_proto(rac_handle_t session, rac_proto_buffer_t* out_s
     }
     try {
         s->backend->clear();
-        // Explicit clear also drops the persisted snapshot (unlike teardown).
-        s->backend->delete_snapshot();
     } catch (const std::exception& e) {
         LOGE("rag.clear exception: %s", e.what());
         publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.clear", e.what());

@@ -186,11 +186,15 @@ export const RAGScreen: React.FC = () => {
         rerankResults: rerankEnabled,
       });
 
+      // Each document is queried in isolation. ragCreatePipeline destroys the
+      // prior session, so the fresh index holds only this document — replace the
+      // list rather than appending, which would misrepresent a wiped corpus as
+      // multiple loaded documents and answer "not enough info" for earlier ones.
       await RunAnywhere.ragCreatePipeline(config);
       await RunAnywhere.ragIngest(text);
 
       const name = result.name || 'Document';
-      setDocuments((prev) => [...prev, name]);
+      setDocuments([name]);
     } catch (err: unknown) {
       if (
         typeof err === 'object' &&
@@ -210,7 +214,14 @@ export const RAGScreen: React.FC = () => {
   }, [areModelsReady, isNitroReady, selectedEmbeddingModel, selectedLLMModel, rerankEnabled]);
 
   const handleClearAll = useCallback(async () => {
-    await RunAnywhere.ragDestroyPipeline();
+    // Reset local state even if teardown fails, so the UI never references a
+    // pipeline that may already be gone (and no unhandled rejection escapes to
+    // the Switch/onValueChange caller).
+    try {
+      await RunAnywhere.ragDestroyPipeline();
+    } catch (err) {
+      console.error('[RAGScreen] Pipeline destroy failed:', err);
+    }
     setDocuments([]);
     setMessages([]);
     setError(null);
@@ -316,7 +327,7 @@ export const RAGScreen: React.FC = () => {
 
   // MARK: - Render
 
-  const addLabel = documents.length === 0 ? 'Add document' : 'Add another';
+  const addLabel = documents.length === 0 ? 'Add document' : 'Replace document';
 
   return (
     <View style={[styles.fill, { backgroundColor: colors.background, paddingTop: insets.top }]}>

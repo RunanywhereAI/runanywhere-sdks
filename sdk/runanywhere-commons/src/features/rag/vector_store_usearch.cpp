@@ -163,7 +163,13 @@ class VectorStoreUSearch::Impl {
         RAC_LOG_INFO(LOG_TAG, "USearch returned %zu matches from %zu total vectors", matches.size(),
                      index_.size());
 
-        float effective_threshold = threshold;
+        // Real-RAG retrieval: let top_k (+ downstream fusion/rerank) do the
+        // selecting rather than an absolute cosine floor. all-MiniLM-class
+        // scores are low and often near-zero/negative even for relevant chunks,
+        // so any positive floor silently drops real matches (a multi-chunk doc
+        // then retrieves nothing). Only apply a floor when the caller explicitly
+        // set a positive threshold; <= 0 means accept-all, ranked by score.
+        const bool apply_floor = threshold > 0.0f;
         if (threshold > 0.5f) {
             LOGW(
                 "Similarity threshold %.2f is high — dense embeddings (e.g. all-MiniLM) rarely "
@@ -182,7 +188,7 @@ class VectorStoreUSearch::Impl {
             // USearch cosine distance is 1 - cosine_similarity
             float similarity = 1.0f - distance;
 
-            if (similarity < effective_threshold) {
+            if (apply_floor && similarity < threshold) {
                 continue;
             }
 
@@ -245,6 +251,11 @@ class VectorStoreUSearch::Impl {
     void clear() {
         std::lock_guard<std::mutex> lock(mutex_);
         index_.clear();
+        // USearch clear() releases the internal capacity buffers (vectors_lookup_),
+        // so a subsequent add() would write past an unreserved slot and crash.
+        // Re-reserve the configured headroom to leave the store usable, matching
+        // the constructor.
+        index_.reserve(config_.max_elements);
         chunks_.clear();
         id_to_key_.clear();
         next_key_ = 0;  // Reset counter
@@ -272,116 +283,6 @@ class VectorStoreUSearch::Impl {
         stats["max_elements"] = config_.max_elements;
 
         return stats;
-    }
-
-    bool serialize_to_bytes(std::vector<uint8_t>& out) const {
-        std::lock_guard<std::mutex> lock(mutex_);
-
-        // USearch binary → in-memory buffer (no filesystem access).
-        const std::size_t idx_len = index_.serialized_length();
-        std::vector<uint8_t> idx_buf(idx_len);
-        if (idx_len > 0) {
-            memory_mapped_file_t mmf(reinterpret_cast<byte_t*>(idx_buf.data()), idx_len);
-            auto r = index_.save(std::move(mmf));
-            if (!r) {
-                LOGE("serialize: USearch save failed: %s", r.error.what());
-                return false;
-            }
-        }
-
-        nlohmann::json metadata;
-        metadata["next_key"] = next_key_;
-        metadata["chunks"] = nlohmann::json::array();
-        for (const auto& [key, chunk] : chunks_) {
-            nlohmann::json chunk_json;
-            chunk_json["key"] = key;
-            chunk_json["id"] = chunk.id;
-            chunk_json["text"] = chunk.text;
-            chunk_json["metadata"] = chunk.metadata;
-            metadata["chunks"].push_back(chunk_json);
-        }
-        const std::string js = metadata.dump();
-
-        // Frame: [u64 idx_len][idx bytes][u64 json_len][json bytes], little-endian.
-        out.clear();
-        out.reserve(16 + idx_len + js.size());
-        auto put_u64 = [&out](uint64_t v) {
-            for (int i = 0; i < 8; ++i)
-                out.push_back(static_cast<uint8_t>((v >> (i * 8)) & 0xff));
-        };
-        put_u64(idx_len);
-        out.insert(out.end(), idx_buf.begin(), idx_buf.end());
-        put_u64(js.size());
-        out.insert(out.end(), js.begin(), js.end());
-        return true;
-    }
-
-    bool load_from_bytes(const uint8_t* data, size_t size) {
-        std::lock_guard<std::mutex> lock(mutex_);
-
-        size_t pos = 0;
-        auto get_u64 = [&](uint64_t& v) -> bool {
-            if (pos + 8 > size)
-                return false;
-            v = 0;
-            for (int i = 0; i < 8; ++i)
-                v |= static_cast<uint64_t>(data[pos++]) << (i * 8);
-            return true;
-        };
-
-        uint64_t idx_len = 0;
-        if (!get_u64(idx_len) || pos + idx_len > size) {
-            LOGE("load: truncated index section");
-            return false;
-        }
-        const uint8_t* idx_ptr = data + pos;
-        pos += idx_len;
-
-        uint64_t js_len = 0;
-        if (!get_u64(js_len) || pos + js_len > size) {
-            LOGE("load: truncated metadata section");
-            return false;
-        }
-        const std::string js(reinterpret_cast<const char*>(data + pos), js_len);
-
-        if (idx_len > 0) {
-            memory_mapped_file_t mmf(const_cast<byte_t*>(reinterpret_cast<const byte_t*>(idx_ptr)),
-                                     idx_len);
-            auto r = index_.load(std::move(mmf));
-            if (!r) {
-                LOGE("load: USearch load failed: %s", r.error.what());
-                return false;
-            }
-        }
-
-        try {
-            const auto metadata = nlohmann::json::parse(js);
-            decltype(chunks_) new_chunks;
-            decltype(id_to_key_) new_id_to_key;
-            for (const auto& chunk_json : metadata.at("chunks")) {
-                const std::size_t key = chunk_json.at("key").get<std::size_t>();
-                DocumentChunk chunk;
-                chunk.id = chunk_json.at("id").get<std::string>();
-                chunk.text = chunk_json.at("text").get<std::string>();
-                chunk.metadata = chunk_json.at("metadata");
-                const std::string id = chunk.id;
-                new_chunks[key] = std::move(chunk);
-                new_id_to_key[id] = key;
-            }
-            next_key_ = metadata.at("next_key").get<std::size_t>();
-            chunks_ = std::move(new_chunks);
-            id_to_key_ = std::move(new_id_to_key);
-        } catch (const std::exception& e) {
-            LOGE("load: metadata parse failed: %s", e.what());
-            index_.clear();
-            chunks_.clear();
-            id_to_key_.clear();
-            next_key_ = 0;
-            return false;
-        }
-
-        LOGI("load: restored %zu chunks (next_key=%zu)", chunks_.size(), next_key_);
-        return true;
     }
 
     std::vector<std::pair<std::string, std::string>> all_chunk_texts() const {
@@ -456,14 +357,6 @@ size_t VectorStoreUSearch::memory_usage() const {
 
 nlohmann::json VectorStoreUSearch::get_statistics() const {
     return impl_->get_statistics();
-}
-
-bool VectorStoreUSearch::serialize_to_bytes(std::vector<uint8_t>& out) const {
-    return impl_->serialize_to_bytes(out);
-}
-
-bool VectorStoreUSearch::load_from_bytes(const uint8_t* data, size_t size) {
-    return impl_->load_from_bytes(data, size);
 }
 
 std::vector<std::pair<std::string, std::string>> VectorStoreUSearch::all_chunk_texts() const {

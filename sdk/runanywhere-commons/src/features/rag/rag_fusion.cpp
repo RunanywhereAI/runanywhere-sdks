@@ -70,14 +70,23 @@ std::vector<std::string> parse_query_variants(const std::string& llm_text,
         std::string line = llm_text.substr(pos, eol - pos);
         pos = eol + 1;
 
-        // Strip leading list markers / numbering / whitespace.
+        // Strip a leading list marker only: a bullet (-, *) or an explicit
+        // numbered prefix (digits followed by '.' or ')'). Bare leading digits
+        // are kept so variants like "2024 tax deadlines" survive intact.
         size_t s = 0;
-        while (s < line.size() &&
-               (std::isspace(static_cast<unsigned char>(line[s])) || line[s] == '-' ||
-                line[s] == '*' || line[s] == '.' || line[s] == ')' ||
-                std::isdigit(static_cast<unsigned char>(line[s])))) {
+        while (s < line.size() && std::isspace(static_cast<unsigned char>(line[s])))
             ++s;
+        if (s < line.size() && (line[s] == '-' || line[s] == '*')) {
+            ++s;
+        } else {
+            size_t d = s;
+            while (d < line.size() && std::isdigit(static_cast<unsigned char>(line[d])))
+                ++d;
+            if (d > s && d < line.size() && (line[d] == '.' || line[d] == ')'))
+                s = d + 1;
         }
+        while (s < line.size() && std::isspace(static_cast<unsigned char>(line[s])))
+            ++s;
         size_t e = line.size();
         while (e > s && std::isspace(static_cast<unsigned char>(line[e - 1])))
             --e;

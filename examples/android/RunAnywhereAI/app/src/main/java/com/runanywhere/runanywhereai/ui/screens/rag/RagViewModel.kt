@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.data.rag.DocumentExtractor
+import com.runanywhere.runanywhereai.data.rag.ExtractedDocument
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.defaults
@@ -61,9 +62,9 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
     private var pipelineKey: Pair<String, String>? = null
     private var job: Job? = null
 
-    // On-device index snapshot. Persistence means chunks survive an app restart
-    // (the fingerprint-guarded snapshot is reloaded instead of re-embedding).
-    private val indexPath: String = getApplication<Application>().filesDir.resolve("rag_index.bin").absolutePath
+    // The currently loaded document, cached so a pipeline recreate (rerank toggle)
+    // can re-ingest it — without persistence the recreated index starts empty.
+    private var loadedDoc: ExtractedDocument? = null
 
     val hasDocuments: Boolean get() = documents.isNotEmpty()
 
@@ -75,10 +76,16 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val doc = withContext(Dispatchers.IO) { DocumentExtractor.extract(getApplication(), uri) }
                 ensurePipeline(embeddingId, llmId)
+                // Each document is queried in isolation: replace the previous
+                // corpus instead of accumulating, which would blend unrelated
+                // documents in retrieval.
+                RunAnywhere.ragClearDocuments()
+                documents.clear()
                 RunAnywhere.ragIngest(doc.text, doc.metadataJSON)
+                loadedDoc = doc
                 documents += doc.name
                 chunkCount = runCatching { RunAnywhere.ragGetStatistics().indexed_chunks.toInt() }
-                    .getOrDefault(chunkCount)
+                    .getOrDefault(0)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -95,18 +102,29 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Rerank is set on the pipeline (RAGConfiguration), so flipping it recreates
-    // the pipeline. With persistence on, the snapshot is reloaded — the ingested
-    // corpus survives the recreate without re-embedding.
+    // the pipeline. The recreated index starts empty, so re-ingest the loaded
+    // document to keep it queryable after the change.
     fun updateRerank(value: Boolean) {
         if (rerankEnabled == value) return
+        val previous = rerankEnabled
         rerankEnabled = value
         val key = pipelineKey ?: return
         viewModelScope.launch {
             runCatching {
                 RunAnywhere.ragDestroyPipeline()
                 RunAnywhere.ragCreatePipeline(buildConfig(key.first, key.second))
+                loadedDoc?.let { RunAnywhere.ragIngest(it.text, it.metadataJSON) }
                 chunkCount = RunAnywhere.ragGetStatistics().indexed_chunks.toInt()
-            }.onFailure { RACLog.e("rag rerank toggle failed", it) }
+            }.onFailure {
+                RACLog.e("rag rerank toggle failed", it)
+                // The old pipeline is already torn down; roll the toggle back and
+                // drop the (now gone) corpus so the UI reflects the real state.
+                rerankEnabled = previous
+                documents.clear()
+                loadedDoc = null
+                chunkCount = 0
+                error = it.message ?: "Could not apply the rerank change."
+            }
         }
     }
 
@@ -146,6 +164,7 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
         documents.clear()
         messages.clear()
         chunkCount = 0
+        loadedDoc = null
         error = null
     }
 
@@ -159,15 +178,13 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
         documents.clear()
         messages.clear()
         chunkCount = 0
+        loadedDoc = null
     }
 
-    // Pipeline config: rerank + fingerprint-guarded persistence layered onto the
-    // model defaults. index_path makes the vector index survive app restarts.
+    // Pipeline config: rerank layered onto the model defaults.
     private fun buildConfig(embeddingId: String, llmId: String): RAGConfiguration =
         RAGConfiguration.defaults(embeddingModelId = embeddingId, llmModelId = llmId).copy(
             rerank_results = rerankEnabled,
-            persist_index = true,
-            index_path = indexPath,
         )
 
     private suspend fun ensurePipeline(embeddingId: String, llmId: String) {
