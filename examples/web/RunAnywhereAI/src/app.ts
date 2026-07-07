@@ -167,7 +167,7 @@ function refreshThemeButton(): void {
 function navSections(): NavSection[] {
   return [
     {
-      title: 'RunAnywhere',
+      title: '',
       items: [
         navTab('assistant', 'Assistant', 'Private chat with local models', ICONS.sparkles, 'chat'),
         {
@@ -179,14 +179,6 @@ function navSections(): NavSection[] {
           action: () => openSheet(CHAT_SHEET_OPTIONS),
         },
         navTab('downloads', 'Manage downloads', 'Models, cache, and local files', ICONS.storage, 'storage'),
-      ],
-    },
-    {
-      title: 'Ask With',
-      items: [
-        navTab('documents', 'Documents', 'Ask with sources from files', ICONS.file, 'documents'),
-        navTab('images', 'Images & Live', 'Photo and camera understanding', ICONS.image, 'vision'),
-        navTab('talk', 'Talk Mode', 'Voice assistant mode', ICONS.mic, 'voice'),
       ],
     },
     {
@@ -319,7 +311,7 @@ function renderNav(): void {
 
   nav.innerHTML = navSections().map((section) => `
     <div class="consumer-nav-section">
-      <div class="consumer-section-title">${section.title}</div>
+      ${section.title ? `<div class="consumer-section-title">${section.title}</div>` : ''}
       ${section.items.map((item) => `
         <button
           type="button"

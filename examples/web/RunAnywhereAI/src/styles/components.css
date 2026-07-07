@@ -154,19 +154,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-regular);
-  background: var(--bg-tertiary);
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
+  transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
 }
 
 .shell-icon-btn:hover,
 .composer-icon-btn:hover,
 .composer-icon-btn.active {
   color: var(--color-primary);
-  border-color: var(--color-primary);
   background: var(--color-primary-light);
 }
 
@@ -184,7 +183,7 @@
 .consumer-new-chat {
   height: 42px;
   border: none;
-  border-radius: var(--radius-regular);
+  border-radius: var(--radius-full);
   background: var(--color-primary);
   color: var(--text-white);
   display: flex;
@@ -192,7 +191,19 @@
   justify-content: center;
   gap: var(--space-sm);
   font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
   cursor: pointer;
+  box-shadow: 0 3px 12px var(--shadow-accent);
+  transition: filter var(--duration-quick), transform var(--duration-quick);
+}
+
+.consumer-new-chat:hover {
+  filter: brightness(1.06);
+}
+
+.consumer-new-chat:active {
+  transform: scale(0.98);
 }
 
 .consumer-new-chat svg {
@@ -208,12 +219,17 @@
 
 .consumer-recent-row {
   text-align: left;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-regular);
-  background: var(--bg-tertiary);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: transparent;
   color: var(--text-primary);
   padding: var(--space-md);
   cursor: pointer;
+  transition: background var(--duration-quick);
+}
+
+.consumer-recent-row:hover {
+  background: var(--bg-tertiary);
 }
 
 .consumer-recent-row__title,
@@ -256,14 +272,14 @@
 
 .tab-item.consumer-nav-item {
   width: 100%;
-  min-height: 52px;
+  min-height: 42px;
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: 30px minmax(0, 1fr);
   align-items: center;
   gap: var(--space-md);
-  padding: var(--space-sm-md);
+  padding: var(--space-sm) var(--space-sm-md);
   border: 1px solid transparent;
-  border-radius: var(--radius-regular);
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
@@ -300,10 +316,10 @@
 }
 
 .consumer-nav-item__icon {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: var(--radius-regular);
-  background: var(--bg-gray5);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -330,13 +346,9 @@
   white-space: nowrap;
 }
 
+/* Descriptions add dashboard noise — the labels are self-explanatory. */
 .consumer-nav-item__description {
-  margin-top: 1px;
-  color: var(--text-tertiary);
-  font-size: var(--font-size-xs);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none;
 }
 
 /* =============================================================================
@@ -2484,6 +2496,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 /* ---- Chat Empty State (hero) ---- */
 .chat-empty-state {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2493,6 +2506,24 @@ input[type="range"]::-webkit-slider-thumb {
   text-align: center;
   gap: var(--space-md);
   animation: chat-message-in var(--duration-regular) var(--ease-out);
+}
+
+/* Soft ambient brand glow behind the hero. */
+.chat-empty-state::before {
+  content: '';
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, 90%);
+  height: 420px;
+  background: radial-gradient(ellipse at center, var(--color-primary-light), transparent 70%);
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+.chat-empty-state > * {
+  position: relative;
 }
 .chat-empty-state .empty-logo {
   width: 72px;
@@ -3491,7 +3522,9 @@ input[type="range"]::-webkit-slider-thumb {
 
 @media (min-width: 921px) {
   .consumer-drawer-scrim,
-  .shell-menu-btn {
+  .shell-menu-btn,
+  /* Topbar already carries the brand on desktop — avoid repeating it. */
+  .consumer-drawer__header {
     display: none;
   }
 }

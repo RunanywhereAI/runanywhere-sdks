@@ -149,10 +149,6 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
               ${svgIcon('<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/><path d="M8 6h8v9H8z"/>')}
               <span><strong>Live camera</strong><small>Look around with vision</small></span>
             </button>
-            <button type="button" data-action="advanced">
-              ${svgIcon('<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/>')}
-              <span><strong>Advanced tools</strong><small>SDK demos and diagnostics</small></span>
-            </button>
           </div>
         </div>
         <button class="composer-icon-btn" id="chat-tools-btn" type="button" aria-label="Enable web and tools" title="Enable web and tools">
