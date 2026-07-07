@@ -1525,19 +1525,28 @@ if(RAC_ENABLE_PROTOBUF)
     # found". The probe below keeps the link line correct on every host
     # (Homebrew absl, Ubuntu 24.04 libabsl-dev, vendored protobuf).
     if(NOT DEFINED RAC_ABSL_LIBS)
-        find_package(absl QUIET CONFIG)
         set(RAC_ABSL_LIBS "")
-        if(absl_FOUND)
-            foreach(_rac_absl_component
-                    absl::log
-                    absl::log_internal_check_op
-                    absl::hash
-                    absl::strings
-                    absl::status)
-                if(TARGET ${_rac_absl_component})
-                    list(APPEND RAC_ABSL_LIBS ${_rac_absl_component})
-                endif()
-            endforeach()
+        # When protobuf is vendored via FetchContent it already defines the
+        # absl:: targets in this build. Calling find_package(absl CONFIG) then
+        # re-imports the system absl export set on top of them and fails with
+        # "Some (but not all) targets in this export set were already defined".
+        # So only probe the system package when absl isn't already present; in
+        # the vendored case protobuf::libprotobuf propagates absl transitively,
+        # so no explicit absl link is required.
+        if(NOT TARGET absl::strings)
+            find_package(absl QUIET CONFIG)
+            if(absl_FOUND)
+                foreach(_rac_absl_component
+                        absl::log
+                        absl::log_internal_check_op
+                        absl::hash
+                        absl::strings
+                        absl::status)
+                    if(TARGET ${_rac_absl_component})
+                        list(APPEND RAC_ABSL_LIBS ${_rac_absl_component})
+                    endif()
+                endforeach()
+            endif()
         endif()
     endif()
     if(RAC_ABSL_LIBS)
