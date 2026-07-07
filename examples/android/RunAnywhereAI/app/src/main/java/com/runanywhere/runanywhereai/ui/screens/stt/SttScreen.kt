@@ -46,6 +46,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.sdk.hybrid.HybridRoutedMetadata
 import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
+import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
@@ -54,6 +55,7 @@ import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.runanywhereai.util.readableWidth
+import com.runanywhere.sdk.public.types.RAModelInfo
 import java.util.Locale
 
 @Composable
@@ -95,11 +97,11 @@ fun SttScreen() {
         ModeSelector(mode = sttVm.mode, enabled = !busy, onSelect = sttVm::selectMode)
 
         if (sttVm.mode == SttMode.HYBRID) {
-            ModelCard("On-device model", model?.name, RACIcons.Outline.Brain) { showSheet = true }
-            ModelCard("Cloud model", onlineLabel, RACIcons.Outline.Cloud) { showProviderPicker = true }
+            ModelCard("On-device model", model, null, RACIcons.Outline.Brain) { showSheet = true }
+            ModelCard("Cloud model", null, onlineLabel, RACIcons.Outline.Cloud) { showProviderPicker = true }
             PolicyCard(sttVm)
         } else {
-            ModelCard("Model", model?.name, RACIcons.Outline.Brain) { showSheet = true }
+            ModelCard("Model", model, null, RACIcons.Outline.Brain) { showSheet = true }
         }
 
         RecordButton(
@@ -184,7 +186,7 @@ private fun CloudProviderPicker(
             )
             if (options.isEmpty()) {
                 Text(
-                    "Add a provider from More > Cloud Providers before using hybrid transcription.",
+                    "Add a provider from Advanced > Cloud providers before using hybrid transcription.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = dimens.spacingSm),
@@ -327,7 +329,13 @@ private fun RoutingStat(label: String, value: String) {
 }
 
 @Composable
-private fun ModelCard(label: String, modelName: String?, icon: ImageVector, onClick: (() -> Unit)?) {
+private fun ModelCard(
+    label: String,
+    model: RAModelInfo?,
+    fallbackName: String?,
+    icon: ImageVector,
+    onClick: (() -> Unit)?,
+) {
     val dimens = LocalDimens.current
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -347,9 +355,15 @@ private fun ModelCard(label: String, modelName: String?, icon: ImageVector, onCl
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(dimens.iconMd),
             )
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+            ) {
                 Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(modelName ?: "Select a model", style = MaterialTheme.typography.bodyLarge)
+                Text(model?.name ?: fallbackName ?: "Select a model", style = MaterialTheme.typography.bodyLarge)
+                model?.let {
+                    BackendBadge(framework = it.framework, compact = true)
+                }
             }
             if (onClick != null) {
                 Icon(

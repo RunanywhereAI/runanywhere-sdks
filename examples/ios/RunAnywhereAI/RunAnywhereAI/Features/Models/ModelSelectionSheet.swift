@@ -24,14 +24,14 @@ enum ModelSelectionContext {
 
     var title: String {
         switch self {
-        case .llm: return "Select LLM Model"
-        case .stt: return "Select STT Model"
-        case .tts: return "Select TTS Model"
-        case .vad: return "Select VAD Model"
-        case .voice: return "Select Model"
-        case .vlm: return "Select Vision Model"
-        case .ragEmbedding: return "Select Embedding Model"
-        case .ragLLM: return "Select LLM Model"
+        case .llm: return "Choose Chat Model"
+        case .stt: return "Choose Dictation Model"
+        case .tts: return "Choose Voice Model"
+        case .vad: return "Choose Speech Detector"
+        case .voice: return "Choose Voice Component"
+        case .vlm: return "Choose Vision Model"
+        case .ragEmbedding: return "Choose Document Model"
+        case .ragLLM: return "Choose Answer Model"
         }
     }
 
@@ -60,9 +60,9 @@ enum ModelSelectionContext {
     var allowedFrameworks: Set<InferenceFramework>? {
         switch self {
         case .ragEmbedding:
-            return [.onnx]
+            return [.onnx, .mlx]
         case .ragLLM:
-            return [.llamaCpp]
+            return [.llamaCpp, .mlx]
         default:
             return nil
         }
@@ -118,9 +118,19 @@ struct ModelSelectionSheet: View {
             }
     }
 
+    private var groupedModels: [ConsumerModelGroup: [RAModelInfo]] {
+        Dictionary(grouping: availableModels, by: \.consumerModelGroup)
+    }
+
+    private var visibleModelGroups: [ConsumerModelGroup] {
+        ConsumerModelGroup.allCases.filter { !(groupedModels[$0] ?? []).isEmpty }
+    }
+
     private func modelPriority(_ model: RAModelInfo) -> Int {
-        if unavailableReason(for: model) != nil { return 3 }
-        return model.framework == .foundationModels ? 0 : (model.localPathURL != nil ? 1 : 2)
+        if unavailableReason(for: model) != nil { return 4 }
+        if model.framework == .foundationModels { return 0 }
+        if model.localPathURL != nil { return 1 }
+        return model.framework == .mlx ? 2 : 3
     }
 
     private func unavailableReason(for model: RAModelInfo) -> String? {
@@ -228,21 +238,16 @@ extension ModelSelectionSheet {
 
 extension ModelSelectionSheet {
     private var modelsListSection: some View {
-        Section {
+        Group {
             if availableModels.isEmpty {
-                loadingModelsView
+                Section {
+                    loadingModelsView
+                } header: {
+                    Text("Choose a Model")
+                }
             } else {
                 modelsContent
             }
-        } header: {
-            Text("Choose a Model")
-        } footer: {
-            Text(
-                "All models run privately on your device. " +
-                "Larger models may provide better quality but use more memory."
-            )
-            .font(AppTypography.caption)
-            .foregroundColor(AppColors.textSecondary)
         }
     }
 
@@ -258,17 +263,28 @@ extension ModelSelectionSheet {
     }
 
     @ViewBuilder private var modelsContent: some View {
-        // System TTS is now registered via C++ platform backend and shown in model list
-        ForEach(availableModels, id: \.id) { model in
-            FlatModelRow(
-                model: model,
-                availabilityReason: unavailableReason(for: model),
-                isSelected: selectedModel?.id == model.id,
-                isLoading: isLoadingModel,
-                onDownloadCompleted: { Task { await viewModel.loadModels() } },
-                onSelectModel: { Task { await selectAndLoadModel(model) } },
-                onModelUpdated: { Task { await viewModel.loadModels() } }
-            )
+        ForEach(visibleModelGroups) { group in
+            if let models = groupedModels[group] {
+                Section {
+                    ForEach(models, id: \.id) { model in
+                        FlatModelRow(
+                            model: model,
+                            availabilityReason: unavailableReason(for: model),
+                            isSelected: selectedModel?.id == model.id,
+                            isLoading: isLoadingModel,
+                            onDownloadCompleted: { Task { await viewModel.loadModels() } },
+                            onSelectModel: { Task { await selectAndLoadModel(model) } },
+                            onModelUpdated: { Task { await viewModel.loadModels() } }
+                        )
+                    }
+                } header: {
+                    Text(group.title)
+                } footer: {
+                    Text(group.footer)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+            }
         }
     }
 }

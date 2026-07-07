@@ -417,6 +417,23 @@ export const RunAnywhere = {
   },
 
   /**
+   * Supply a Hugging Face bearer token so the SDK can download **private**
+   * model repos (e.g. gated `runanywhere/<name>_HNPU` NPU bundles). Auth
+   * lives in the C++ commons layer, which attaches it ONLY to https
+   * `huggingface.co`/`hf.co` requests — downloads, HEAD size preflight,
+   * resumable transfers, and HF repo registration — on every platform
+   * uniformly. Kotlin parity: `RunAnywhere.setHfToken`.
+   *
+   * Pass an empty string to clear the token and restore the public no-auth
+   * behavior (also disables the `HF_TOKEN` env fallback).
+   */
+  async setHfToken(token: string): Promise<void> {
+    if (!isNativeModuleAvailable()) return;
+    const native = requireNativeModule();
+    await native.setHfToken(token);
+  },
+
+  /**
    * Get current organization ID from authentication.
    *
    * Matches Swift `RunAnywhere.getOrganizationId() -> String?`. RN

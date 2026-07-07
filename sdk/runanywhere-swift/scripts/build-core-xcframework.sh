@@ -8,6 +8,7 @@
 #   sdk/runanywhere-swift/Binaries/RACommons.xcframework
 #   sdk/runanywhere-swift/Binaries/RABackendLLAMACPP.xcframework
 #   sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework          (skipped if RAC_BACKEND_ONNX=OFF)
+#   sdk/runanywhere-swift/Binaries/RABackendMLX.xcframework           (Apple-only, skipped if RAC_BACKEND_MLX=OFF)
 #
 # Engine plugins under engines/{llamacpp,onnx} use SHARED_ONLY inside
 # rac_add_engine_plugin(...), so on iOS (RAC_STATIC_PLUGINS=ON) they still
@@ -20,6 +21,7 @@
 # Environment knobs:
 #   RAC_BACKEND_ONNX=OFF     skip the ONNX backend (used when the operator
 #                            hasn't extracted third_party/onnxruntime-ios)
+#   RAC_BACKEND_MLX=OFF      skip the MLX backend bridge
 #   DRY_RUN=1                only print the planned commands, don't invoke
 #                            cmake/xcodebuild. Useful in CI preflight and
 #                            the `release-swift-binaries.sh DRY_RUN=1` path.
@@ -35,6 +37,7 @@ fi
 
 DRY_RUN="${DRY_RUN:-0}"
 RAC_BACKEND_ONNX="${RAC_BACKEND_ONNX:-ON}"
+RAC_BACKEND_MLX="${RAC_BACKEND_MLX:-ON}"
 COMMONS_HEADERS="${REPO_ROOT}/sdk/runanywhere-commons/include"
 STAGING_DIR="${REPO_ROOT}/build/ios-xcframework-staging"
 
@@ -363,6 +366,43 @@ merge_sherpa_backend_slice() {
     merge_static_archives "${output}" "${prepared[@]}"
 }
 
+merge_mlx_backend_slice() {
+    local build_root="$1"
+    local slice_dir="$2"
+    local output="$3"
+    local arch="$4"
+    local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/mlx"
+    local inputs=(
+        "${build_root}/engines/mlx/${slice_dir}/librac_backend_mlx.a"
+    )
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
+}
+
+merge_mlx_backend_macos_slice() {
+    local build_root="$1"
+    local output="$2"
+    local arch="$3"
+    local scratch_dir="${STAGING_DIR}/prepared/Release-macos/mlx"
+    local inputs=(
+        "${build_root}/engines/mlx/librac_backend_mlx.a"
+    )
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
+}
+
 # ────────────────────────────────────────────────────────────────────────────
 # Prereq: the iOS ONNX Runtime xcframework. Only when ONNX is enabled.
 # ────────────────────────────────────────────────────────────────────────────
@@ -421,10 +461,12 @@ cmake_extra=(
 )
 ios_cmake_extra=(
     "-DRAC_BACKEND_COREML=OFF"
-    "-DRAC_BACKEND_METALRT=OFF"
 )
 if [ "${RAC_BACKEND_ONNX}" = "OFF" ]; then
     cmake_extra+=("-DRAC_BACKEND_ONNX=OFF")
+fi
+if [ "${RAC_BACKEND_MLX}" = "OFF" ]; then
+    cmake_extra+=("-DRAC_BACKEND_MLX=OFF")
 fi
 
 echo "▶ Configure ios-device"
@@ -436,6 +478,9 @@ if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
 fi
 if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
     ios_build_targets+=(rac_backend_sherpa)
+fi
+if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
+    ios_build_targets+=(rac_backend_mlx)
 fi
 run cmake --build --preset ios-device --config Release --target "${ios_build_targets[@]}" --parallel 2
 
@@ -458,7 +503,6 @@ macos_cmake_args=(
     "-DRAC_BACKEND_ONNX=OFF"
     "-DRAC_BACKEND_SHERPA=OFF"
     "-DRAC_BACKEND_COREML=OFF"
-    "-DRAC_BACKEND_METALRT=OFF"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_absl=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_CURL=TRUE"
@@ -470,7 +514,11 @@ macos_cmake_args=(
 )
 run cmake --preset macos-release "${macos_cmake_args[@]}"
 echo "▶ Build macos-release"
-run cmake --build --preset macos-release --target rac_commons --parallel 2
+macos_build_targets=(rac_commons)
+if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
+    macos_build_targets+=(rac_backend_mlx)
+fi
+run cmake --build --preset macos-release --target "${macos_build_targets[@]}" --parallel 2
 
 # ────────────────────────────────────────────────────────────────────────────
 # 3. Locate archives and package each target as an xcframework with both
@@ -604,6 +652,20 @@ else
     echo "▶ Skipping RABackendSherpa.xcframework (RAC_BACKEND_SHERPA=OFF)"
 fi
 
+# RABackendMLX.xcframework provides the C++ callback-backed plugin shell. The
+# Swift MLXRuntime target links this archive plus mlx-swift-lm.
+if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
+    MLX_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_mlx.a"
+    MLX_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_mlx.a"
+    MLX_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_mlx.a"
+    merge_mlx_backend_slice "${DEV_BIN}" "Release-iphoneos" "${MLX_DEV_LIB}" "arm64"
+    merge_mlx_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${MLX_SIM_LIB}" "arm64"
+    merge_mlx_backend_macos_slice "${MAC_BIN}" "${MLX_MAC_LIB}" "arm64"
+    build_xcframework_from_paths_with_macos "${MLX_DEV_LIB}" "${MLX_SIM_LIB}" "${MLX_MAC_LIB}" "RABackendMLX.xcframework"
+else
+    echo "▶ Skipping RABackendMLX.xcframework (RAC_BACKEND_MLX=OFF)"
+fi
+
 sync_react_native_frameworks() {
     local rn_root="${REPO_ROOT}/sdk/runanywhere-react-native/packages"
     if [ ! -d "${rn_root}" ]; then
@@ -651,7 +713,6 @@ sync_react_native_frameworks() {
 #   runanywhere             ← RACommons.xcframework
 #   runanywhere_llamacpp    ← RABackendLLAMACPP.xcframework
 #   runanywhere_onnx        ← RABackendONNX.xcframework
-#   runanywhere_genie       ← (no iOS binary; Android/Snapdragon only)
 sync_flutter_frameworks() {
     local flutter_root="${REPO_ROOT}/sdk/runanywhere-flutter/packages"
     if [ ! -d "${flutter_root}" ]; then
@@ -691,8 +752,6 @@ sync_flutter_frameworks() {
         run rm -rf "${flutter_onnx}/RABackendSherpa.xcframework"
         run cp -R "${DEST}/RABackendSherpa.xcframework" "${flutter_onnx}/"
     fi
-
-    # runanywhere_genie has no iOS binary — soft-skip.
 }
 
 sync_react_native_frameworks

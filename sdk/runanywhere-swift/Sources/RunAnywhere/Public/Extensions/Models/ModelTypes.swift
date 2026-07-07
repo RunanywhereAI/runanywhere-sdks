@@ -232,7 +232,7 @@ public extension RAInferenceFramework {
     static var knownCases: [RAInferenceFramework] {
         [
             .onnx, .sherpa, .llamaCpp, .foundationModels, .systemTts, .fluidAudio,
-            .coreml, .mlx, .metalrt, .genie,
+            .coreml, .mlx, .qhexrt,
             .tflite, .executorch, .mediapipe, .mlc, .picoLlm,
             .piperTts, .swiftTransformers,
             .builtIn, .none, .unknown

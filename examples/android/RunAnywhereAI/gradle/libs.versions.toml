@@ -42,6 +42,9 @@ okhttp = "5.4.0"
 # Document parsing (RAG ingestion)
 pdfbox = "2.0.27.0"
 
+# CameraX (Vision live mode)
+camerax = "1.4.2"
+
 
 [libraries]
 # AndroidX core / lifecycle / activity
@@ -78,6 +81,12 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 
 # Document parsing (RAG ingestion)
 pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfbox" }
+
+# CameraX — live camera preview + frame analysis for the Vision screen's Live mode
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

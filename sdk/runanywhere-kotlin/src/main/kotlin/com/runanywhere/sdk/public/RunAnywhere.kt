@@ -35,10 +35,10 @@ import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.generated.convenience.wireString
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
 import com.runanywhere.sdk.public.events.EventBus
-import java.net.URL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,6 +47,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.net.URL
 
 /**
  * The RunAnywhere SDK - Single entry point for on-device AI
@@ -223,6 +224,27 @@ object RunAnywhere {
      */
     val deviceId: String
         get() = platformDeviceId()
+
+    // HuggingFace model-download authentication
+
+    /**
+     * Supply a HuggingFace bearer token so the SDK can download **private**
+     * model repos (e.g. gated `runanywhere/<name>_HNPU` NPU bundles that are
+     * otherwise 401/403). Auth lives in the C++ commons layer
+     * (`rac_http_hf_token_set`), so every path — downloads, HEAD size
+     * preflight, resumable transfers, and HF repo registration — attaches
+     * `Authorization: Bearer <token>` ONLY to https `huggingface.co`/`hf.co`
+     * requests (never subdomains/CDN hosts, never overriding a caller
+     * Authorization, never logged) on every platform uniformly.
+     *
+     * Pass an empty string to clear the token and restore the public no-auth
+     * behavior; pass `null` to reset to the default state, where the
+     * `HF_TOKEN` environment variable acts as the fallback.
+     */
+    fun setHfToken(token: String?) {
+        RunAnywhereBridge.ensureNativeLibraryLoaded()
+        RunAnywhereBridge.racHttpHfTokenSet(token)
+    }
 
     // Phase 1: core initialization (synchronous)
 

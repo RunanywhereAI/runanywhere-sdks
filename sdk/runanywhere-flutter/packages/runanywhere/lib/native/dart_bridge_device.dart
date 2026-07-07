@@ -8,7 +8,10 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:runanywhere/adapters/http_client_adapter.dart';
+import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -44,6 +47,8 @@ class DartBridgeDevice {
   static bool _isRegistered = false;
   static String? _cachedDeviceId;
   static Pointer<RacDeviceCallbacksStruct>? _callbacksPtr;
+  static _DeviceRegistrationInfoSnapshot _cachedRegistrationInfo =
+      _DeviceRegistrationInfoSnapshot.defaults();
 
   /// SharedPreferences key for registration status
   static const _keyIsRegistered = 'com.runanywhere.sdk.device.isRegistered';
@@ -180,6 +185,8 @@ class DartBridgeDevice {
 
     // Pre-cache device ID
     await _getOrCreateDeviceId();
+    await _configureClientInfo();
+    await _refreshDeviceInfoSnapshot();
 
     // Callbacks are already registered (Phase 1 or the guard above).
     // Re-register with the canonical C++ symbol so the device manager
@@ -358,6 +365,72 @@ class DartBridgeDevice {
   /// Get the cached device ID synchronously (null if not yet cached)
   static String? get cachedDeviceId => _cachedDeviceId;
 
+  /// Device model from the canonical registration snapshot.
+  static String get cachedDeviceModel => _cachedRegistrationInfo.deviceModel;
+
+  /// Register accurate app/client metadata with commons before Phase 2 device
+  /// registration builds its JSON payload.
+  static Future<void> _configureClientInfo() async {
+    PackageInfo? packageInfo;
+    try {
+      packageInfo = await PackageInfo.fromPlatform();
+    } catch (e) {
+      _logger.debug('PackageInfo unavailable: $e');
+    }
+
+    final timezone = await _currentTimezoneIdentifier();
+
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final setClientInfo = lib
+          .lookupFunction<
+            Void Function(Pointer<RacClientInfoStruct>),
+            void Function(Pointer<RacClientInfoStruct>)
+          >('rac_sdk_set_client_info');
+
+      final allocatedStrings = <Pointer<Utf8>>[];
+      Pointer<Utf8> nativeString(String? value) {
+        final normalized = value?.trim();
+        if (normalized == null || normalized.isEmpty) return nullptr;
+        final ptr = normalized.toNativeUtf8();
+        allocatedStrings.add(ptr);
+        return ptr;
+      }
+
+      final infoPtr = calloc<RacClientInfoStruct>();
+      try {
+        infoPtr.ref.sdkBinding = nativeString('flutter');
+        infoPtr.ref.appIdentifier = nativeString(packageInfo?.packageName);
+        infoPtr.ref.appName = nativeString(packageInfo?.appName);
+        infoPtr.ref.appVersion = nativeString(packageInfo?.version);
+        infoPtr.ref.appBuild = nativeString(packageInfo?.buildNumber);
+        infoPtr.ref.locale = nativeString(
+          Platform.localeName.replaceAll('_', '-'),
+        );
+        infoPtr.ref.timezone = nativeString(timezone);
+        setClientInfo(infoPtr);
+      } finally {
+        calloc.free(infoPtr);
+        for (final ptr in allocatedStrings) {
+          calloc.free(ptr);
+        }
+      }
+    } catch (e) {
+      _logger.debug('rac_sdk_set_client_info unavailable: $e');
+    }
+  }
+
+  static Future<void> _refreshDeviceInfoSnapshot() async {
+    try {
+      _cachedRegistrationInfo = await _collectDeviceInfoSnapshot();
+    } catch (e) {
+      _logger.debug('Device info snapshot failed: $e');
+      _cachedRegistrationInfo = _DeviceRegistrationInfoSnapshot.defaults(
+        deviceId: _cachedDeviceId,
+      );
+    }
+  }
+
   // ============================================================================
   // Internal Helpers
   // ============================================================================
@@ -490,60 +563,40 @@ void _getDeviceInfoCallback(
     }
     _cachedDeviceInfoPtrs = [];
 
-    // Fill in device info synchronously from cached values
-    // Note: Real values are populated asynchronously during registration
+    final snapshot = DartBridgeDevice._cachedRegistrationInfo.withDeviceId(
+      DartBridgeDevice._cachedDeviceId,
+    );
 
-    // Device type
-    final deviceType = Platform.isIOS
-        ? 'iphone'
-        : Platform.isAndroid
-        ? 'android'
-        : Platform.isMacOS
-        ? 'macos'
-        : 'unknown';
-    final deviceTypePtr = deviceType.toNativeUtf8();
-    _cachedDeviceInfoPtrs.add(deviceTypePtr);
-    outInfo.ref.deviceType = deviceTypePtr;
+    Pointer<Utf8> cacheString(String? value) {
+      final normalized = value?.trim();
+      if (normalized == null || normalized.isEmpty) return nullptr;
+      final ptr = normalized.toNativeUtf8();
+      _cachedDeviceInfoPtrs.add(ptr);
+      return ptr;
+    }
 
-    // OS name
-    final osName = Platform.operatingSystem;
-    final osNamePtr = osName.toNativeUtf8();
-    _cachedDeviceInfoPtrs.add(osNamePtr);
-    outInfo.ref.osName = osNamePtr;
-
-    // OS version
-    final osVersion = Platform.operatingSystemVersion;
-    final osVersionPtr = osVersion.toNativeUtf8();
-    _cachedDeviceInfoPtrs.add(osVersionPtr);
-    outInfo.ref.osVersion = osVersionPtr;
-
-    // SDK version
-    const sdkVersion = '0.19.13';
-    final sdkVersionPtr = sdkVersion.toNativeUtf8();
-    _cachedDeviceInfoPtrs.add(sdkVersionPtr);
-    outInfo.ref.sdkVersion = sdkVersionPtr;
-
-    // App version (not available in Flutter without package_info)
-    final appVersionPtr = '1.0.0'.toNativeUtf8();
-    _cachedDeviceInfoPtrs.add(appVersionPtr);
-    outInfo.ref.appVersion = appVersionPtr;
-
-    // App identifier
-    final appIdPtr = 'com.runanywhere.flutter'.toNativeUtf8();
-    _cachedDeviceInfoPtrs.add(appIdPtr);
-    outInfo.ref.appIdentifier = appIdPtr;
-
-    // Platform = OS family (matches iOS/Kotlin + backend contract), not binding.
-    final platformName = Platform.isAndroid
-        ? 'android'
-        : Platform.isIOS
-            ? 'ios'
-            : Platform.isMacOS
-                ? 'macos'
-                : 'flutter';
-    final platformPtr = platformName.toNativeUtf8();
-    _cachedDeviceInfoPtrs.add(platformPtr);
-    outInfo.ref.platform = platformPtr;
+    outInfo.ref.deviceId = cacheString(snapshot.deviceId);
+    outInfo.ref.deviceModel = cacheString(snapshot.deviceModel);
+    outInfo.ref.deviceName = cacheString(snapshot.deviceName);
+    outInfo.ref.platform = cacheString(snapshot.platform);
+    outInfo.ref.osVersion = cacheString(snapshot.osVersion);
+    outInfo.ref.formFactor = cacheString(snapshot.formFactor);
+    outInfo.ref.architecture = cacheString(snapshot.architecture);
+    outInfo.ref.chipName = cacheString(snapshot.chipName);
+    outInfo.ref.totalMemory = snapshot.totalMemory;
+    outInfo.ref.availableMemory = snapshot.availableMemory;
+    outInfo.ref.hasNeuralEngine = snapshot.hasNeuralEngine
+        ? RAC_TRUE
+        : RAC_FALSE;
+    outInfo.ref.neuralEngineCores = snapshot.neuralEngineCores;
+    outInfo.ref.gpuFamily = cacheString(snapshot.gpuFamily);
+    outInfo.ref.batteryLevel = snapshot.batteryLevel;
+    outInfo.ref.batteryState = cacheString(snapshot.batteryState);
+    outInfo.ref.isLowPowerMode = snapshot.isLowPowerMode ? RAC_TRUE : RAC_FALSE;
+    outInfo.ref.coreCount = snapshot.coreCount;
+    outInfo.ref.performanceCores = snapshot.performanceCores;
+    outInfo.ref.efficiencyCores = snapshot.efficiencyCores;
+    outInfo.ref.deviceFingerprint = cacheString(snapshot.deviceFingerprint);
   } catch (e) {
     SDKLogger('DartBridge.Device').error('Error in device info callback: $e');
   }
@@ -688,13 +741,58 @@ base class RacDeviceCallbacksStruct extends Struct {
 
 /// Device registration info struct matching rac_device_registration_info_t
 base class RacDeviceRegistrationInfoStruct extends Struct {
-  external Pointer<Utf8> deviceType;
-  external Pointer<Utf8> osName;
-  external Pointer<Utf8> osVersion;
-  external Pointer<Utf8> sdkVersion;
-  external Pointer<Utf8> appVersion;
-  external Pointer<Utf8> appIdentifier;
+  external Pointer<Utf8> deviceId;
+  external Pointer<Utf8> deviceModel;
+  external Pointer<Utf8> deviceName;
   external Pointer<Utf8> platform;
+  external Pointer<Utf8> osVersion;
+  external Pointer<Utf8> formFactor;
+  external Pointer<Utf8> architecture;
+  external Pointer<Utf8> chipName;
+
+  @Int64()
+  external int totalMemory;
+
+  @Int64()
+  external int availableMemory;
+
+  @Int32()
+  external int hasNeuralEngine;
+
+  @Int32()
+  external int neuralEngineCores;
+
+  external Pointer<Utf8> gpuFamily;
+
+  @Double()
+  external double batteryLevel;
+
+  external Pointer<Utf8> batteryState;
+
+  @Int32()
+  external int isLowPowerMode;
+
+  @Int32()
+  external int coreCount;
+
+  @Int32()
+  external int performanceCores;
+
+  @Int32()
+  external int efficiencyCores;
+
+  external Pointer<Utf8> deviceFingerprint;
+}
+
+/// Client/app metadata matching rac_client_info_t.
+base class RacClientInfoStruct extends Struct {
+  external Pointer<Utf8> sdkBinding;
+  external Pointer<Utf8> appIdentifier;
+  external Pointer<Utf8> appName;
+  external Pointer<Utf8> appVersion;
+  external Pointer<Utf8> appBuild;
+  external Pointer<Utf8> locale;
+  external Pointer<Utf8> timezone;
 }
 
 /// HTTP response struct matching rac_device_http_response_t
@@ -707,4 +805,323 @@ base class RacDeviceHttpResponseStruct extends Struct {
 
   external Pointer<Utf8> responseBody;
   external Pointer<Utf8> errorMessage;
+}
+
+class _DeviceRegistrationInfoSnapshot {
+  const _DeviceRegistrationInfoSnapshot({
+    required this.deviceId,
+    required this.deviceModel,
+    required this.deviceName,
+    required this.platform,
+    required this.osVersion,
+    required this.formFactor,
+    required this.architecture,
+    required this.chipName,
+    required this.totalMemory,
+    required this.availableMemory,
+    required this.hasNeuralEngine,
+    required this.neuralEngineCores,
+    required this.gpuFamily,
+    required this.batteryLevel,
+    required this.batteryState,
+    required this.isLowPowerMode,
+    required this.coreCount,
+    required this.performanceCores,
+    required this.efficiencyCores,
+    required this.deviceFingerprint,
+  });
+
+  factory _DeviceRegistrationInfoSnapshot.defaults({String? deviceId}) {
+    final coreCount = Platform.numberOfProcessors;
+    final coreSplit = _coreDistribution(coreCount, '');
+    return _DeviceRegistrationInfoSnapshot(
+      deviceId: deviceId ?? '',
+      deviceModel: 'unknown',
+      deviceName: 'unknown',
+      platform: SDKConstants.platform,
+      osVersion: Platform.operatingSystemVersion,
+      formFactor: _defaultFormFactor(),
+      architecture: 'unknown',
+      chipName: 'unknown',
+      totalMemory: 0,
+      availableMemory: 0,
+      hasNeuralEngine: false,
+      neuralEngineCores: 0,
+      gpuFamily: 'unknown',
+      batteryLevel: -1,
+      batteryState: '',
+      isLowPowerMode: false,
+      coreCount: coreCount,
+      performanceCores: coreSplit.$1,
+      efficiencyCores: coreSplit.$2,
+      deviceFingerprint: deviceId ?? '',
+    );
+  }
+
+  final String deviceId;
+  final String deviceModel;
+  final String deviceName;
+  final String platform;
+  final String osVersion;
+  final String formFactor;
+  final String architecture;
+  final String chipName;
+  final int totalMemory;
+  final int availableMemory;
+  final bool hasNeuralEngine;
+  final int neuralEngineCores;
+  final String gpuFamily;
+  final double batteryLevel;
+  final String batteryState;
+  final bool isLowPowerMode;
+  final int coreCount;
+  final int performanceCores;
+  final int efficiencyCores;
+  final String deviceFingerprint;
+
+  _DeviceRegistrationInfoSnapshot withDeviceId(String? overrideDeviceId) {
+    final resolved = overrideDeviceId ?? deviceId;
+    if (resolved == deviceId) return this;
+    return _DeviceRegistrationInfoSnapshot(
+      deviceId: resolved,
+      deviceModel: deviceModel,
+      deviceName: deviceName,
+      platform: platform,
+      osVersion: osVersion,
+      formFactor: formFactor,
+      architecture: architecture,
+      chipName: chipName,
+      totalMemory: totalMemory,
+      availableMemory: availableMemory,
+      hasNeuralEngine: hasNeuralEngine,
+      neuralEngineCores: neuralEngineCores,
+      gpuFamily: gpuFamily,
+      batteryLevel: batteryLevel,
+      batteryState: batteryState,
+      isLowPowerMode: isLowPowerMode,
+      coreCount: coreCount,
+      performanceCores: performanceCores,
+      efficiencyCores: efficiencyCores,
+      deviceFingerprint: deviceFingerprint.isEmpty
+          ? resolved
+          : deviceFingerprint,
+    );
+  }
+}
+
+Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
+  final deviceId = DartBridgeDevice._cachedDeviceId ?? '';
+  final plugin = DeviceInfoPlugin();
+
+  if (Platform.isAndroid) {
+    final info = await plugin.androidInfo;
+    final model = _joinDistinct([info.manufacturer, info.model]);
+    final coreCount = Platform.numberOfProcessors;
+    final coreSplit = _coreDistribution(coreCount, model);
+    final chipName = _nonEmpty(info.hardware) ?? 'unknown';
+    return _DeviceRegistrationInfoSnapshot(
+      deviceId: deviceId,
+      deviceModel: model,
+      deviceName: _nonEmpty(info.name) ?? model,
+      platform: 'android',
+      osVersion:
+          _nonEmpty(info.version.release) ?? Platform.operatingSystemVersion,
+      formFactor: _androidFormFactor(info.systemFeatures),
+      architecture: info.supportedAbis.isNotEmpty
+          ? info.supportedAbis.first
+          : 'unknown',
+      chipName: chipName,
+      totalMemory: _memoryMegabytesToBytes(info.physicalRamSize),
+      availableMemory: _memoryMegabytesToBytes(info.availableRamSize),
+      hasNeuralEngine: false,
+      neuralEngineCores: 0,
+      gpuFamily: _inferAndroidGpuFamily(chipName, info.manufacturer),
+      batteryLevel: -1,
+      batteryState: '',
+      isLowPowerMode: false,
+      coreCount: coreCount,
+      performanceCores: coreSplit.$1,
+      efficiencyCores: coreSplit.$2,
+      deviceFingerprint: _nonEmpty(info.fingerprint) ?? deviceId,
+    );
+  }
+
+  if (Platform.isIOS) {
+    final info = await plugin.iosInfo;
+    final model = _nonEmpty(info.modelName) ?? info.model;
+    final coreCount = Platform.numberOfProcessors;
+    final coreSplit = _coreDistribution(coreCount, model);
+    final machine = _nonEmpty(info.utsname.machine) ?? 'unknown';
+    final hasNeuralEngine =
+        info.isPhysicalDevice &&
+        (machine.startsWith('iPhone') || machine.startsWith('iPad'));
+    return _DeviceRegistrationInfoSnapshot(
+      deviceId: deviceId,
+      deviceModel: model,
+      deviceName: _nonEmpty(info.name) ?? model,
+      platform: 'ios',
+      osVersion:
+          _nonEmpty(info.systemVersion) ?? Platform.operatingSystemVersion,
+      formFactor: model.toLowerCase().contains('ipad') ? 'tablet' : 'phone',
+      architecture: _currentAbiArchitecture(),
+      chipName: machine,
+      totalMemory: _memoryMegabytesToBytes(info.physicalRamSize),
+      availableMemory: _memoryMegabytesToBytes(info.availableRamSize),
+      hasNeuralEngine: hasNeuralEngine,
+      neuralEngineCores: hasNeuralEngine ? 16 : 0,
+      gpuFamily: 'apple',
+      batteryLevel: -1,
+      batteryState: '',
+      isLowPowerMode: false,
+      coreCount: coreCount,
+      performanceCores: coreSplit.$1,
+      efficiencyCores: coreSplit.$2,
+      deviceFingerprint: _nonEmpty(info.identifierForVendor) ?? deviceId,
+    );
+  }
+
+  if (Platform.isMacOS) {
+    final info = await plugin.macOsInfo;
+    final model = _nonEmpty(info.modelName) ?? info.model;
+    final coreSplit = _coreDistribution(info.activeCPUs, model);
+    final hasNeuralEngine = info.arch == 'arm64';
+    return _DeviceRegistrationInfoSnapshot(
+      deviceId: deviceId,
+      deviceModel: model,
+      deviceName: _nonEmpty(info.computerName) ?? model,
+      platform: 'macos',
+      osVersion:
+          '${info.majorVersion}.${info.minorVersion}.${info.patchVersion}',
+      formFactor: 'desktop',
+      architecture: _nonEmpty(info.arch) ?? 'unknown',
+      chipName: _nonEmpty(info.model) ?? 'unknown',
+      totalMemory: _memoryBytes(info.memorySize),
+      availableMemory: 0,
+      hasNeuralEngine: hasNeuralEngine,
+      neuralEngineCores: hasNeuralEngine ? 16 : 0,
+      gpuFamily: 'apple',
+      batteryLevel: -1,
+      batteryState: '',
+      isLowPowerMode: false,
+      coreCount: info.activeCPUs,
+      performanceCores: coreSplit.$1,
+      efficiencyCores: coreSplit.$2,
+      deviceFingerprint: _nonEmpty(info.systemGUID) ?? deviceId,
+    );
+  }
+
+  return _DeviceRegistrationInfoSnapshot.defaults(deviceId: deviceId);
+}
+
+String? _nonEmpty(String? value) {
+  final normalized = value?.trim();
+  if (normalized == null || normalized.isEmpty) return null;
+  return normalized;
+}
+
+String _joinDistinct(List<String?> parts) {
+  final normalized = <String>[];
+  for (final part in parts) {
+    final value = _nonEmpty(part);
+    if (value == null) continue;
+    if (normalized.any((seen) => seen.toLowerCase() == value.toLowerCase())) {
+      continue;
+    }
+    normalized.add(value);
+  }
+  return normalized.isEmpty ? 'unknown' : normalized.join(' ');
+}
+
+Future<String?> _currentTimezoneIdentifier() async {
+  try {
+    return _nonEmpty((await FlutterTimezone.getLocalTimezone()).identifier);
+  } catch (e) {
+    DartBridgeDevice._logger.debug('Timezone identifier unavailable: $e');
+    return null;
+  }
+}
+
+String _currentAbiArchitecture() {
+  final abi = Abi.current().toString();
+  final normalized = abi.startsWith('Abi.') ? abi.substring(4) : abi;
+  if (normalized.contains('_')) {
+    return normalized.split('_').last;
+  }
+  if (normalized.endsWith('Arm64')) return 'arm64';
+  if (normalized.endsWith('X64')) return 'x86_64';
+  if (normalized.endsWith('IA32')) return 'x86';
+  if (normalized.endsWith('Arm')) return 'arm';
+  return normalized.isEmpty ? 'unknown' : normalized;
+}
+
+int _memoryMegabytesToBytes(int megabytes) {
+  return megabytes > 0 ? megabytes * 1024 * 1024 : 0;
+}
+
+int _memoryBytes(int bytes) {
+  return bytes > 0 ? bytes : 0;
+}
+
+(int, int) _coreDistribution(int coreCount, String model) {
+  if (coreCount <= 0) return (0, 0);
+  final lowerModel = model.toLowerCase();
+  int performance;
+  if (lowerModel.startsWith('iphone')) {
+    performance = 2;
+  } else if (lowerModel.startsWith('ipad') || lowerModel.startsWith('mac')) {
+    performance = (coreCount * 2 ~/ 5).clamp(2, coreCount).toInt();
+  } else {
+    performance = (coreCount ~/ 3).clamp(1, coreCount).toInt();
+  }
+  performance = performance.clamp(0, coreCount).toInt();
+  return (performance, coreCount - performance);
+}
+
+String _defaultFormFactor() {
+  if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    return 'desktop';
+  }
+  return 'unknown';
+}
+
+String _androidFormFactor(List<String> systemFeatures) {
+  final features = systemFeatures.toSet();
+  if (features.contains('android.hardware.type.watch')) return 'watch';
+  if (features.contains('android.hardware.type.television')) return 'tv';
+  if (features.contains('android.hardware.type.automotive')) {
+    return 'automotive';
+  }
+  if (!features.contains('android.hardware.telephony') &&
+      features.contains('android.hardware.touchscreen')) {
+    return 'tablet';
+  }
+  return 'phone';
+}
+
+String _inferAndroidGpuFamily(String chipName, String manufacturer) {
+  final chip = chipName.toLowerCase();
+  final maker = manufacturer.toLowerCase();
+  if (chip.contains('snapdragon') ||
+      chip.contains('qualcomm') ||
+      chip.contains('sdm') ||
+      chip.contains('sm8') ||
+      chip.contains('sm7') ||
+      chip.contains('sm6') ||
+      chip.contains('msm') ||
+      maker.contains('qualcomm')) {
+    return 'adreno';
+  }
+  if (chip.contains('exynos') ||
+      chip.contains('tensor') ||
+      chip.contains('mediatek') ||
+      chip.contains('dimensity') ||
+      chip.contains('helio') ||
+      chip.contains('kirin') ||
+      maker.contains('google') ||
+      maker.contains('samsung')) {
+    return 'mali';
+  }
+  if (chip.contains('intel')) return 'intel';
+  if (chip.contains('nvidia') || chip.contains('tegra')) return 'nvidia';
+  return 'unknown';
 }

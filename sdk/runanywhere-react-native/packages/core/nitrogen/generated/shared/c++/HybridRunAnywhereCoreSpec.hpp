@@ -47,7 +47,7 @@ namespace margelo::nitro::runanywhere {
 
     public:
       // Properties
-      
+
 
     public:
       // Methods
@@ -57,6 +57,11 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<void>> destroy() = 0;
       virtual std::shared_ptr<Promise<bool>> isInitialized() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> resultToProtoErrorProto(double code) = 0;
+      virtual std::shared_ptr<Promise<void>> setHfToken(const std::string& token) = 0;
+      virtual std::shared_ptr<Promise<bool>> mlxRuntimeAvailable() = 0;
+      virtual std::shared_ptr<Promise<bool>> mlxRegisterBackend(double priority) = 0;
+      virtual std::shared_ptr<Promise<bool>> mlxUnregisterBackend() = 0;
+      virtual std::shared_ptr<Promise<bool>> mlxIsBackendRegistered() = 0;
       virtual std::shared_ptr<Promise<double>> pluginLoaderApiVersion() = 0;
       virtual std::shared_ptr<Promise<double>> pluginLoaderRegisteredCount() = 0;
       virtual std::shared_ptr<Promise<std::string>> pluginLoaderRegisteredNames() = 0;

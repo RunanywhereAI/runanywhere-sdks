@@ -781,7 +781,11 @@ static TestResult test_proto_plan_resume_metadata() {
     request.set_verify_checksums(true);
     request.set_storage_namespace("cpp04");
     request.set_required_free_bytes_after_download(256);
-    request.set_available_storage_bytes(2048);
+    // Free space must clear the planner's free-space margin (a 128 MiB floor for
+    // FS metadata / extraction temp), so use a realistic device value here — the
+    // tiny synthetic 1 KiB model is otherwise dwarfed by that margin and would
+    // trip the insufficient-storage gate this test isn't exercising.
+    request.set_available_storage_bytes(1LL << 30);  // 1 GiB
     std::string bytes = serialize_msg(request);
 
     rac_proto_buffer_t buffer;

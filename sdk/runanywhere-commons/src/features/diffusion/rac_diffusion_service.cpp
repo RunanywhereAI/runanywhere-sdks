@@ -129,7 +129,8 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
              .select_ops = diffusion_ops,
              .model_create_id = model_path_owned.c_str(),
              .model_id_for_service = model_id,
-             .config_json = nullptr},
+             .config_json = nullptr,
+             .framework = framework},
             &service);
     if (result != RAC_SUCCESS) {
         return result;

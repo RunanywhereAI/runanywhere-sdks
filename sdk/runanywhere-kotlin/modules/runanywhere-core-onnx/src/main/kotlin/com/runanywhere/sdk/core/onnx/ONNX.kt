@@ -164,12 +164,17 @@ internal fun ONNX.registerNative(): Int {
     logger.debug("Calling native ONNX register")
     val result = ONNXBridge.nativeRegister()
     logger.debug("Native ONNX register returned: $result")
-    val sherpaResult = ONNXBridge.nativeRegisterSherpa()
-    if (sherpaResult == 0 || sherpaResult == -4) {
-        ONNX.markSherpaRegistered()
-        logger.info("Sherpa backend registered successfully")
+
+    if (ONNXBridge.isSherpaLoaded) {
+        val sherpaResult = ONNXBridge.nativeRegisterSherpa()
+        if (sherpaResult == 0 || sherpaResult == -4) {
+            ONNX.markSherpaRegistered()
+            logger.info("Sherpa backend registered successfully")
+        } else {
+            logger.warning("Sherpa registration returned code: $sherpaResult")
+        }
     } else {
-        logger.warning("Sherpa registration returned code: $sherpaResult")
+        logger.info("Sherpa backend library not packaged; continuing with ONNX backend only")
     }
     return result
 }

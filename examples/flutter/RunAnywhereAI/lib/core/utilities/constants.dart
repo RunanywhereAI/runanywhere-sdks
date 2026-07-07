@@ -13,10 +13,12 @@
 class DefaultConfig {
   DefaultConfig._();
 
-  static const String runanywhereApiKey =
-      String.fromEnvironment('RUNANYWHERE_API_KEY');
-  static const String runanywhereBaseUrl =
-      String.fromEnvironment('RUNANYWHERE_BASE_URL');
+  static const String runanywhereApiKey = String.fromEnvironment(
+    'RUNANYWHERE_API_KEY',
+  );
+  static const String runanywhereBaseUrl = String.fromEnvironment(
+    'RUNANYWHERE_BASE_URL',
+  );
 }
 
 /// Keychain keys for secure storage
@@ -26,6 +28,7 @@ class KeychainKeys {
   static const String apiKey = 'runanywhere_api_key';
   static const String baseURL = 'runanywhere_base_url';
   static const String analyticsLogToLocal = 'analyticsLogToLocal';
+  static const String hfToken = 'hf_token';
 }
 
 /// UserDefaults keys for preferences
@@ -39,4 +42,12 @@ class PreferenceKeys {
   static const String thinkingModeEnabled = 'thinkingModeEnabled';
   static const String toolCallingEnabled = 'toolCallingEnabled';
   static const String deviceRegistered = 'com.runanywhere.sdk.deviceRegistered';
+  static const String hfToken = 'hf_token';
 }
+
+/// Default system prompt applied across every chat surface (main Chat + NPU
+/// Chat) when the user has not set their own in Settings. A concrete persona
+/// keeps small on-device models anchored as a conversational assistant.
+const String kDefaultSystemPrompt =
+    'You are a helpful, friendly AI assistant. Answer the user clearly and '
+    'concisely.';

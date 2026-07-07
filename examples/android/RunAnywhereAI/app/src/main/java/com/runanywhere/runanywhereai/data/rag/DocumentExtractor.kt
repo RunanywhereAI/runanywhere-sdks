@@ -10,7 +10,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
 
-data class ExtractedDocument(val name: String, val text: String)
+data class ExtractedDocument(val name: String, val text: String) {
+    val metadataJSON: String
+        get() = JSONObject()
+            .put("source", name)
+            .put("filename", name)
+            .toString()
+}
 
 // Pulls plain text out of a picked file for RAG ingestion. Supports PDF, JSON and any text/* file.
 object DocumentExtractor {

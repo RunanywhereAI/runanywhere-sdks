@@ -125,7 +125,7 @@ Proto-generated types (`RA*` prefix from `.pb.swift` files in `Generated/`) are 
 
 ### Model Management
 
-Models stored at `Documents/RunAnywhere/Models/{framework}/{modelId}/`. Path computation delegated to C++ via `rac_model_paths_*`. Model registry is a Swift actor wrapping the C++ global registry. Model file type detection: `.gguf`/`.bin` → LlamaCPP, `.onnx`/`.ort` → ONNX, `.mlmodelc`/`.mlpackage` → CoreML, `.safetensors`/`.json` → MetalRT.
+Models stored at `Documents/RunAnywhere/Models/{framework}/{modelId}/`. Path computation delegated to C++ via `rac_model_paths_*`. Model registry is a Swift actor wrapping the C++ global registry. Model file type detection: `.gguf`/`.bin` → LlamaCPP, `.onnx`/`.ort` → ONNX, `.mlmodelc`/`.mlpackage` → CoreML, `.json` QNN bundles → QHexRT when explicitly registered as that framework.
 
 Download orchestration runs `rac_http_download_execute` on a concurrent `DispatchQueue`. Cancellation via `OSAllocatedUnfairLock<Bool>` polled by the C++ progress callback.
 

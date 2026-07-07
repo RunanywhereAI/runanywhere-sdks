@@ -66,7 +66,7 @@ enum ModelFormat {
     MODEL_FORMAT_MLPACKAGE   = 8;   // Apple platforms only
     MODEL_FORMAT_TFLITE      = 9;
     MODEL_FORMAT_SAFETENSORS = 10;
-    MODEL_FORMAT_QNN_CONTEXT = 11;  // Qualcomm Genie
+    MODEL_FORMAT_QNN_CONTEXT = 11;  // Qualcomm Hexagon NPU context
     MODEL_FORMAT_ZIP         = 12;  // Archive wrapping one of the above
     MODEL_FORMAT_FOLDER      = 13;
     MODEL_FORMAT_PROPRIETARY = 14;  // Built-in system models
@@ -77,10 +77,8 @@ enum ModelFormat {
 // Inference framework / runtime. Same name used across all SDKs (RN names it
 // LLMFramework; we canonicalize on InferenceFramework).
 // Sources pre-IDL:
-//   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML,
-//                                       metalrt)
-//   Kotlin ComponentTypes.kt:122      (9 cases incl. GENIE; no coreml / mlx / whisperKit /
-//                                       metalrt)
+//   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML)
+//   Kotlin ComponentTypes.kt:122      (9 cases; no coreml / mlx / whisperKit)
 //   Dart   model_types.dart:106       (9 cases, matches Kotlin)
 //   RN     enums.ts:30 (LLMFramework) (16 cases)
 //   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
@@ -94,8 +92,6 @@ enum InferenceFramework {
     INFERENCE_FRAMEWORK_FLUID_AUDIO        = 5;
     INFERENCE_FRAMEWORK_COREML             = 6;   // Apple
     INFERENCE_FRAMEWORK_MLX                = 7;   // Apple Silicon
-    INFERENCE_FRAMEWORK_METALRT            = 9;   // Apple
-    INFERENCE_FRAMEWORK_GENIE              = 10;  // Qualcomm
     INFERENCE_FRAMEWORK_TFLITE             = 11;
     INFERENCE_FRAMEWORK_EXECUTORCH         = 12;
     INFERENCE_FRAMEWORK_MEDIAPIPE          = 13;
@@ -107,9 +103,9 @@ enum InferenceFramework {
     INFERENCE_FRAMEWORK_NONE               = 21;
     INFERENCE_FRAMEWORK_UNKNOWN            = 22;
     INFERENCE_FRAMEWORK_SHERPA             = 23;  // Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
+    INFERENCE_FRAMEWORK_QHEXRT             = 24;  // Qualcomm Hexagon NPU (QHexRT runtime)
 
-    reserved 8, 17, 18;
-    reserved "INFERENCE_FRAMEWORK_WHISPERKIT_COREML", "INFERENCE_FRAMEWORK_WHISPERKIT", "INFERENCE_FRAMEWORK_OPENAI_WHISPER";
+    reserved 8, 9, 10, 17, 18;
 }
 
 // ---------------------------------------------------------------------------

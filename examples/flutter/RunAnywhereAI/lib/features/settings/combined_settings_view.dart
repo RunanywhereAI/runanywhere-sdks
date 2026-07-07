@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:runanywhere/runanywhere.dart' show ToolDefinition;
+import 'package:runanywhere/runanywhere.dart' show RunAnywhere, ToolDefinition;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/services/hf_token_store.dart';
+import 'package:runanywhere_ai/core/services/model_catalog_bootstrap.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere_ai/core/utilities/url_utils.dart';
@@ -41,18 +43,24 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   bool _thinkingModeEnabled = true;
   late final TextEditingController _systemPromptController;
 
+  // Downloads
+  late final TextEditingController _hfTokenController;
+
   @override
   void initState() {
     super.initState();
     _systemPromptController = TextEditingController();
+    _hfTokenController = TextEditingController();
     unawaited(_loadSettings());
     unawaited(_loadGenerationSettings());
     unawaited(_loadApiConfiguration());
+    unawaited(_loadHfToken());
   }
 
   @override
   void dispose() {
     _systemPromptController.dispose();
+    _hfTokenController.dispose();
     super.dispose();
   }
 
@@ -76,8 +84,12 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         _maxTokens = (prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000)
             .clamp(500, 20000)
             .toInt();
-        _systemPrompt =
-            prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
+        final storedPrompt = prefs.getString(
+          PreferenceKeys.defaultSystemPrompt,
+        );
+        // Prefill a meaningful default the first time (null) so it's applied and
+        // editable everywhere; respect an explicit empty string the user saved.
+        _systemPrompt = storedPrompt ?? kDefaultSystemPrompt;
         _thinkingModeEnabled =
             prefs.getBool(PreferenceKeys.thinkingModeEnabled) ?? true;
         _systemPromptController.text = _systemPrompt;
@@ -101,6 +113,40 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         const SnackBar(content: Text('Generation settings saved')),
       );
     }
+  }
+
+  /// Load the persisted HuggingFace token from secure storage.
+  Future<void> _loadHfToken() async {
+    final token = await HfTokenStore.load();
+    if (mounted) {
+      setState(() {
+        _hfTokenController.text = token;
+      });
+    }
+  }
+
+  /// Persist the HuggingFace token and apply it to the SDK after editing.
+  Future<void> _saveHfToken(String value, {bool showFeedback = false}) async {
+    final token = value.trim();
+    await HfTokenStore.save(token);
+    RunAnywhere.setHfToken(token);
+    await ModelCatalogBootstrap.refreshNpuCatalog();
+    if (showFeedback && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            token.isEmpty
+                ? 'Hugging Face token cleared'
+                : 'Hugging Face token saved',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _clearHfToken() async {
+    _hfTokenController.clear();
+    await _saveHfToken('', showFeedback: true);
   }
 
   /// Load API configuration from keychain
@@ -365,6 +411,11 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
           // Logging Configuration Section
           _buildSectionHeader('Logging Configuration'),
           _buildLoggingCard(),
+          const SizedBox(height: AppSpacing.large),
+
+          // Downloads Section (mirrors Android SettingsScreen "Downloads")
+          _buildSectionHeader('Downloads'),
+          _buildDownloadsCard(),
           const SizedBox(height: AppSpacing.large),
 
           // Performance Section (mirrors iOS CombinedSettingsView.swift:179-183)
@@ -675,6 +726,61 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
               ),
               value: _analyticsLogToLocal,
               onChanged: _toggleAnalyticsLogging,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDownloadsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'HuggingFace token',
+              style: AppTypography.subheadline(context),
+            ),
+            const SizedBox(height: AppSpacing.xSmall),
+            TextField(
+              controller: _hfTokenController,
+              decoration: const InputDecoration(
+                hintText: 'hf_…',
+                border: OutlineInputBorder(),
+              ),
+              autocorrect: false,
+              obscureText: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (value) => unawaited(_saveHfToken(value)),
+            ),
+            const SizedBox(height: AppSpacing.xSmall),
+            Wrap(
+              spacing: AppSpacing.small,
+              runSpacing: AppSpacing.xSmall,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => unawaited(
+                    _saveHfToken(_hfTokenController.text, showFeedback: true),
+                  ),
+                  icon: const Icon(Icons.check, size: 18),
+                  label: const Text('Save token'),
+                ),
+                TextButton.icon(
+                  onPressed: () => unawaited(_clearHfToken()),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Clear'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xSmall),
+            Text(
+              'Used to download private Hugging Face model repos, including HNPU/QHexRT NPU bundles',
+              style: AppTypography.caption2(
+                context,
+              ).copyWith(color: AppColors.textSecondary(context)),
             ),
           ],
         ),

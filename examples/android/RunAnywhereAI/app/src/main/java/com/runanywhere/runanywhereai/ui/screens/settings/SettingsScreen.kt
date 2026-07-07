@@ -10,10 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -25,16 +26,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.BuildConfig
 import com.runanywhere.runanywhereai.ui.screens.models.formatModelSize
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
-import com.runanywhere.runanywhereai.util.readableWidth
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
-import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
-import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.runanywhereai.util.readableWidth
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -52,7 +53,19 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Section("Generation") {
+        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            Text(
+                text = "Personalize the assistant, manage local models, and keep downloads private.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Section("Assistant") {
             SliderRow(
                 label = "Temperature",
                 valueText = String.format(Locale.US, "%.1f", settings.temperature),
@@ -86,6 +99,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 checked = settings.streaming,
                 onCheckedChange = viewModel::setStreaming,
             )
+            ToggleRow(
+                label = "Show reasoning when available",
+                description = "Thinking models can show a collapsible reasoning trace before the answer.",
+                checked = !settings.disableThinking,
+                onCheckedChange = { viewModel.setDisableThinking(!it) },
+            )
         }
 
         Section("Storage") {
@@ -94,27 +113,64 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 style = RACTextStyles.Metric,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (storage.downloaded.isEmpty() && !storage.isLoading) {
-                Text(
-                    "No downloaded models",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                storage.downloaded.forEach { model ->
-                    DownloadedModelRow(
-                        model = model,
-                        busy = storage.busyId == model.id,
-                        onDelete = { viewModel.deleteModel(model) },
-                    )
-                }
-            }
+            Text(
+                "Downloaded models are managed from the Models sheet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
                 TextButton(onClick = viewModel::clearCache) { Text("Clear cache") }
                 TextButton(onClick = viewModel::cleanTempFiles) { Text("Clean temp files") }
             }
             storage.message?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+
+        Section("Private Downloads") {
+            Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+                Text("Hugging Face token", style = MaterialTheme.typography.bodyLarge)
+                OutlinedTextField(
+                    value = settings.hfToken,
+                    onValueChange = viewModel::setHfToken,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("hf_…") },
+                    supportingText = {
+                        Text("Used to download private Hugging Face model repos, including HNPU/QHexRT NPU bundles")
+                    },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { viewModel.commitHfToken() }),
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = viewModel::commitHfToken, enabled = !storage.hfTokenBusy) {
+                        Text("Save token")
+                    }
+                    TextButton(onClick = viewModel::clearHfToken, enabled = !storage.hfTokenBusy) {
+                        Text("Clear")
+                    }
+                    if (storage.hfTokenBusy) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(dimens.iconSm),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                }
+                storage.hfTokenMessage?.let { message ->
+                    Text(
+                        message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (storage.hfTokenMessageIsError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                    )
+                }
             }
         }
 
@@ -129,6 +185,15 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { uriHandler.openUri("https://docs.runanywhere.ai") }
+                    .padding(vertical = dimens.spacingXs),
+            )
+            Text(
+                text = "Follow on X",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { uriHandler.openUri("https://x.com/RunanywhereAI") }
                     .padding(vertical = dimens.spacingXs),
             )
         }
@@ -183,55 +248,20 @@ private fun SliderRow(
 @Composable
 private fun ToggleRow(label: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-@Composable
-private fun DownloadedModelRow(model: RAModelInfo, busy: Boolean, onDelete: () -> Unit) {
-    val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(dimens.radiusMd),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(start = dimens.spacingMd, top = dimens.spacingSm, bottom = dimens.spacingSm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(model.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    formatModelSize(model.download_size_bytes),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (busy) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .padding(horizontal = dimens.spacingMd)
-                        .size(dimens.iconSm),
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = RACIcons.Outline.Trash,
-                        contentDescription = "Delete ${model.name}",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(dimens.iconSm),
-                    )
-                }
-            }
-        }
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

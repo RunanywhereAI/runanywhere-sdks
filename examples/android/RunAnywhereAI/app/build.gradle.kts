@@ -51,14 +51,33 @@ android {
 
         buildConfigField("String", "RUNANYWHERE_BASE_URL", "\"$runanywhereBaseUrl\"")
         buildConfigField("String", "RUNANYWHERE_API_KEY", "\"$runanywhereApiKey\"")
+
+        // Release/device builds ship arm64-v8a: the Qualcomm Hexagon NPU (QHexRT, Hexagon v75+)
+        // is arm64-only hardware, and target devices (Snapdragon 8 Gen 3+) are all
+        // arm64. Constraining to one ABI keeps a single consistent native slice (no
+        // stale armv7 commons), guarantees the QAIRT skels travel with
+        // it, and roughly halves the APK size.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     buildTypes {
+        debug {
+            // Keep emulator development available for the shared example app.
+            // QHexRT remains unavailable on x86_64; the SDK falls back to CPU backends.
+            ndk {
+                abiFilters += "x86_64"
+            }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfigs.findByName("release")?.let { signingConfig = it }
+            // Prefer an env-provided release keystore (CI / store builds); fall back to
+            // the debug keystore so a release-type APK is still installable locally.
+            // Replace with a real upload keystore before publishing to a store.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -73,6 +92,8 @@ android {
         jniLibs {
             // SDK + backend AARs each bundle the NDK C++ runtime; keep one copy per ABI.
             pickFirsts += "**/libc++_shared.so"
+            pickFirsts += "**/libomp.so"
+            pickFirsts += "**/librac_commons.so"
             useLegacyPackaging = true
         }
     }
@@ -82,8 +103,15 @@ dependencies {
     implementation(files("../libs/runanywhere-sdk.aar"))
     implementation(files("../libs/runanywhere-llamacpp.aar"))
     implementation(files("../libs/runanywhere-onnx.aar"))
+    implementation(files("../libs/runanywhere-qhexrt.aar"))
     implementation(libs.okhttp)
     implementation(libs.pdfbox.android)
+
+    // CameraX — Vision screen Live mode
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.security.crypto)

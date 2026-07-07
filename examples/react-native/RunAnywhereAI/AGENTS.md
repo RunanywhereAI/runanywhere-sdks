@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-React Native 0.83.1 demo app showcasing the RunAnywhere on-device AI SDK. Demonstrates 8 AI capabilities (LLM chat, STT, TTS, voice assistant, RAG, VLM camera vision, YAML pipeline solutions, settings/model management) across a tab-based UI. Lives inside a Yarn workspace monorepo — consumes local workspace packages (`@runanywhere/core`, `@runanywhere/llamacpp`, `@runanywhere/onnx`, `@runanywhere/proto-ts`) plus the published `@runanywhere/genie` (Android/Snapdragon NPU only).
+React Native 0.83.1 demo app showcasing the RunAnywhere on-device AI SDK. Demonstrates 8 AI capabilities (LLM chat, STT, TTS, voice assistant, RAG, VLM camera vision, YAML pipeline solutions, settings/model management) across a tab-based UI. Lives inside a Yarn workspace monorepo — consumes local workspace packages (`@runanywhere/core`, `@runanywhere/llamacpp`, `@runanywhere/onnx`, `@runanywhere/qhexrt`, `@runanywhere/proto-ts`).
 
 ## Common Commands
 
@@ -55,7 +55,7 @@ UI Screens (this app)
   └─> @runanywhere/core        (TypeScript API + NitroModules C++ bridge)
       ├─> @runanywhere/llamacpp (llama.cpp LLM/VLM backend)
       ├─> @runanywhere/onnx     (ONNX Runtime: STT/TTS/embeddings via Sherpa)
-      └─> @runanywhere/genie    (Qualcomm Snapdragon NPU, Android-only)
+      └─> @runanywhere/qhexrt   (Qualcomm Hexagon NPU, Android-only)
           └─> runanywhere-commons (C++ core, delivered as xcframeworks + .so libs)
 ```
 
@@ -85,10 +85,10 @@ Three-state machine: `loading → ready | error`.
 
 1. Reads stored API key + base URL from AsyncStorage (set in Settings screen)
 2. `RunAnywhere.initialize()` with config (dev or prod based on stored credentials)
-3. `registerModulesAndModels()` — registers backends (LlamaCPP, Genie, ONNX) and all model URLs
+3. `registerModulesAndModels()` — registers backends (LlamaCPP, QHexRT, ONNX) and all model URLs
 4. Renders `<NavigationContainer><TabNavigator /></NavigationContainer>`
 
-Backend registration uses dynamic `require()` with try/catch — `LlamaCPP` and `Genie` are optional.
+Backend registration uses dynamic `require()` with try/catch — `LlamaCPP` and `QHexRT` are optional.
 
 ### Navigation (8 Tabs)
 
@@ -143,7 +143,7 @@ Mirrors iOS Swift app design tokens exactly:
 - **`syncSdkNativeLibs` Gradle task**: copies `.so` files from `sdk/runanywhere-react-native/` into `node_modules/@runanywhere/*/android/` before each build (runs before `preBuild`)
 - **16KB page alignment**: enabled for Android 15+ compatibility (`useLegacyPackaging=false`, `ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON`)
 - **`packagingOptions.pickFirsts`**: resolves 12+ duplicate `.so` conflicts across SDK packages
-- Qualcomm Genie: `libcdsprpc.so` declared as optional native library in AndroidManifest
+- QHexRT/QNN: `libcdsprpc.so` declared as optional native library in AndroidManifest
 
 ### Monorepo / Metro
 
@@ -192,7 +192,7 @@ From `@runanywhere/llamacpp`: `LlamaCPP.register()` for optional backend registr
 
 From `@runanywhere/onnx`: `ONNX.register()`
 
-From `@runanywhere/genie`: `Genie.register()` (optional, Android/Snapdragon only)
+From `@runanywhere/qhexrt`: `QHexRT.register()` (optional, Android/Snapdragon only)
 
 From `@runanywhere/proto-ts`: `AudioFormat`, `PipelineState`, `VADStreamEventKind`, `VoiceEvent`
 
@@ -204,7 +204,7 @@ From `@runanywhere/proto-ts`: `AudioFormat`, `PipelineState`, `VADStreamEventKin
 - **Android STT recording**: native/example audio recorder plus `RunAnywhere.transcribe()`
 - **iOS streaming generation**: Manual async iteration of `RunAnywhere.generateStream()`
 - **Android streaming generation**: Falls back to non-streaming `RunAnywhere.generate()` in ChatScreen
-- **Genie NPU backend**: Android-only (no iOS Podfile entry); models filtered per Qualcomm chip ID (`8elite`, `8elite-gen5`)
+- **QHexRT NPU backend**: Android-only; model registration uses SDK QNN-context metadata and native arch resolution
 
 ## After Modifying the SDK
 

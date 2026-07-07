@@ -166,12 +166,10 @@ runanywhere::v1::InferenceFramework inference_framework_to_proto(rac_inference_f
             return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
         case RAC_FRAMEWORK_COREML:
             return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
-        case RAC_FRAMEWORK_METALRT:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_METALRT;
-        case RAC_FRAMEWORK_GENIE:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
         case RAC_FRAMEWORK_SHERPA:
             return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;
+        case RAC_FRAMEWORK_QHEXRT:
+            return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
         default:
             return runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN;
     }
@@ -197,12 +195,10 @@ rac_inference_framework_t inference_framework_from_proto(runanywhere::v1::Infere
             return RAC_FRAMEWORK_MLX;
         case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
             return RAC_FRAMEWORK_COREML;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_METALRT:
-            return RAC_FRAMEWORK_METALRT;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_GENIE:
-            return RAC_FRAMEWORK_GENIE;
         case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:
             return RAC_FRAMEWORK_SHERPA;
+        case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
+            return RAC_FRAMEWORK_QHEXRT;
         default:
             return RAC_FRAMEWORK_UNKNOWN;
     }

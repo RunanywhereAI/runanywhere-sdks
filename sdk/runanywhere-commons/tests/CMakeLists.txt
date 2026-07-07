@@ -144,6 +144,28 @@ rac_link_archive_deps(test_device_identity)
 target_compile_features(test_device_identity PRIVATE cxx_std_17)
 add_test(NAME device_identity_tests COMMAND test_device_identity --run-all)
 
+# --- Model path layout tests ----------------------------------------
+add_executable(test_model_paths test_model_paths.cpp)
+target_include_directories(test_model_paths PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_paths PRIVATE rac_commons)
+rac_link_archive_deps(test_model_paths)
+target_compile_features(test_model_paths PRIVATE cxx_std_17)
+add_test(NAME model_paths_tests COMMAND test_model_paths)
+
+# --- VLM default generation options ---------------------------------
+add_executable(test_vlm_options_defaults test_vlm_options_defaults.cpp)
+target_include_directories(test_vlm_options_defaults PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_vlm_options_defaults PRIVATE rac_commons)
+rac_link_archive_deps(test_vlm_options_defaults)
+target_compile_features(test_vlm_options_defaults PRIVATE cxx_std_17)
+add_test(NAME vlm_options_defaults_tests COMMAND test_vlm_options_defaults)
+
 # --- MemoryPool<T> tests ------------------------------
 # Header-only template; verifies acquire/release, blocking, cancel, and a
 # concurrent stress test.
@@ -1077,28 +1099,10 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     add_test(NAME plugin_entry_onnx_tests COMMAND test_plugin_entry_onnx)
 endif()
 
-if(RAC_BACKEND_GENIE AND TARGET rac_backend_genie)
-    add_executable(test_plugin_entry_genie test_plugin_entry_genie.cpp)
-    target_include_directories(test_plugin_entry_genie PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/engines/genie
-    )
-    target_link_libraries(test_plugin_entry_genie PRIVATE rac_commons rac_backend_genie)
-    rac_link_archive_deps(test_plugin_entry_genie)
-    target_compile_features(test_plugin_entry_genie PRIVATE cxx_std_17)
-    add_test(NAME plugin_entry_genie_tests COMMAND test_plugin_entry_genie)
-endif()
-
 # Note: sherpa plugin-entry test is wired in the root CMakeLists.txt (alongside
-# the genie test) because rac_backend_sherpa is built by engines/ which is
+# other engine tests) because rac_backend_sherpa is built by engines/ which is
 # configured after sdk/runanywhere-commons/, so the target does not exist yet
 # when this file runs in a root-level build.
-
-# Note: metalrt plugin-entry test is wired in the root
-# CMakeLists.txt for the same reason as sherpa — rac_backend_metalrt is built
-# by engines/ (Apple-only OBJECT library folded into rac_commons) and is not
-# yet configured at this point.
 
 if(APPLE AND RAC_BACKEND_COREML AND TARGET rac_backend_coreml)
     add_executable(test_diffusion_coreml_generate test_diffusion_coreml_generate.cpp)
@@ -1260,7 +1264,7 @@ add_test(NAME download_orchestrator_tests COMMAND test_download_orchestrator --r
 # (which owns the speech ops) and depend on rac_backend_onnx only for the
 # ONNX-named typedefs used in their config defaults. The engines/sherpa/
 # include path exposes the public sherpa function declarations.
-if(RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA)
+if(RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA AND RAC_SHERPA_ONNX_AVAILABLE)
     # VAD test
     add_executable(test_vad test_vad.cpp)
     target_include_directories(test_vad PRIVATE
@@ -1312,7 +1316,7 @@ if(RAC_BACKEND_LLAMACPP)
 endif()
 
 # --- Voice Agent real-inference test: Requires LlamaCPP + Sherpa/ONNX backends ---
-if(RAC_BACKEND_LLAMACPP AND RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA)
+if(RAC_BACKEND_LLAMACPP AND RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA AND RAC_SHERPA_ONNX_AVAILABLE)
     add_executable(test_voice_agent test_voice_agent.cpp)
     target_include_directories(test_voice_agent PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -1374,6 +1378,49 @@ if(WIN32 AND DEFINED onnxruntime_SOURCE_DIR AND NOT "${onnxruntime_SOURCE_DIR}" 
         endif()
     endforeach()
 endif()
+
+# =============================================================================
+# --- Hugging Face folder-bundle resolver (offline) ---------------------
+# Pure-core resolution of HF tree-API responses into folder bundles, with
+# the manifest heuristic injected as a predicate (in production it comes
+# from an engine's registered bundle policy).
+add_executable(test_hf_resolver_folder test_hf_resolver_folder.cpp)
+target_include_directories(test_hf_resolver_folder PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+)
+target_link_libraries(test_hf_resolver_folder PRIVATE rac_commons)
+rac_link_archive_deps(test_hf_resolver_folder)
+target_compile_features(test_hf_resolver_folder PRIVATE cxx_std_20)
+add_test(NAME hf_resolver_folder_tests COMMAND test_hf_resolver_folder)
+
+# --- Bundle-policy registry + the QHexRT policy (offline) --------------
+# Registry semantics plus the real QHexRT manifest predicate, included
+# header-only from engines/qhexrt (public-repo source; no prebuilt engine
+# needed) and driven through the generic folder resolver.
+add_executable(test_bundle_policy test_bundle_policy.cpp)
+target_include_directories(test_bundle_policy PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/engines/qhexrt
+)
+target_link_libraries(test_bundle_policy PRIVATE rac_commons)
+rac_link_archive_deps(test_bundle_policy)
+target_compile_features(test_bundle_policy PRIVATE cxx_std_20)
+add_test(NAME bundle_policy_tests COMMAND test_bundle_policy)
+
+# --- Hugging Face bearer auth (offline) --------------------------------
+# Host matching + bearer composition for rac_http_hf_token_set; ports the
+# retired per-platform (OkHttp) HF auth tests into commons.
+add_executable(test_hf_auth test_hf_auth.cpp)
+target_include_directories(test_hf_auth PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+)
+target_link_libraries(test_hf_auth PRIVATE rac_commons)
+rac_link_archive_deps(test_hf_auth)
+target_compile_features(test_hf_auth PRIVATE cxx_std_20)
+add_test(NAME hf_auth_tests COMMAND test_hf_auth)
 
 # =============================================================================
 # RAG Pipeline Tests (GoogleTest)

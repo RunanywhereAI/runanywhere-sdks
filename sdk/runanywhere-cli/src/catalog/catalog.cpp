@@ -52,6 +52,337 @@ constexpr CatalogFile kMiniLmFiles[] = {
      "vocab.txt", true},
 };
 
+constexpr CatalogFile kMlxQwen3_06BFiles[] = {
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "added_tokens.json",
+     "added_tokens.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "merges.txt",
+     "merges.txt", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
+constexpr CatalogFile kMlxLlama32_1BFiles[] = {
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/"
+     "main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/"
+     "main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/"
+     "main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/"
+     "main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/"
+     "main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/"
+     "main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+constexpr CatalogFile kMlxQwen2Vl2BFiles[] = {
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/"
+     "main/"
+     "added_tokens.json",
+     "added_tokens.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/"
+     "main/"
+     "chat_template.json",
+     "chat_template.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/"
+     "main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/"
+     "main/"
+     "merges.txt",
+     "merges.txt", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/"
+     "main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/"
+     "main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/"
+     "main/"
+     "preprocessor_config.json",
+     "preprocessor_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/"
+     "main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/"
+     "main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/"
+     "main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit/resolve/"
+     "main/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
+constexpr CatalogFile kMlxFastVlm05BFiles[] = {
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "added_tokens.json",
+     "added_tokens.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "llava_qwen.py",
+     "llava_qwen.py", false},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "merges.txt",
+     "merges.txt", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "preprocessor_config.json",
+     "preprocessor_config.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "processing_fastvlm.py",
+     "processing_fastvlm.py", false},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "processor_config.json",
+     "processor_config.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/FastVLM-0.5B-bf16/resolve/main/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
+constexpr CatalogFile kMlxQwen3Embedding06BFiles[] = {
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
+     "resolve/main/"
+     "added_tokens.json",
+     "added_tokens.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
+     "resolve/main/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
+     "resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
+     "resolve/main/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
+     "resolve/main/"
+     "merges.txt",
+     "merges.txt", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
+     "resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
+     "resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
+     "resolve/main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
+     "resolve/main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
+     "resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ/"
+     "resolve/main/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
+constexpr CatalogFile kMlxQwen3Asr06BFiles[] = {
+    {"https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/"
+     "chat_template.json",
+     "chat_template.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/"
+     "merges.txt",
+     "merges.txt", true},
+    {"https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/"
+     "preprocessor_config.json",
+     "preprocessor_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
+constexpr CatalogFile kMlxGlmAsrNano2512Files[] = {
+    {"https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/"
+     "configuration_glmasr.py",
+     "configuration_glmasr.py", false},
+    {"https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/"
+     "inference.py",
+     "inference.py", false},
+    {"https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/"
+     "modeling_audio.py",
+     "modeling_audio.py", false},
+    {"https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/"
+     "modeling_glmasr.py",
+     "modeling_glmasr.py", false},
+    {"https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/GLM-ASR-Nano-2512-4bit/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+constexpr CatalogFile kMlxQwen3Tts06BBaseFiles[] = {
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "merges.txt",
+     "merges.txt", true},
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "preprocessor_config.json",
+     "preprocessor_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "speech_tokenizer/config.json",
+     "speech_tokenizer/config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "speech_tokenizer/configuration.json",
+     "speech_tokenizer/configuration.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "speech_tokenizer/model.safetensors",
+     "speech_tokenizer/model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "speech_tokenizer/preprocessor_config.json",
+     "speech_tokenizer/preprocessor_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
+     "resolve/main/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
+constexpr CatalogFile kMlxSoprano1180M5BitFiles[] = {
+    {"https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/"
+     "generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/"
+     "special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/Soprano-1.1-80M-5bit/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
 constexpr int64_t MB = 1024LL * 1024LL;
 
 // ids/URLs verbatim from: examples/ios ModelCatalogBootstrap.swift, Android
@@ -141,6 +472,45 @@ constexpr CatalogEntry kCatalog[] = {
     {"all-minilm-l6-v2", "minilm", "All-MiniLM-L6-v2 (Embeddings)",
      v1::MODEL_CATEGORY_EMBEDDING, v1::INFERENCE_FRAMEWORK_ONNX,
      v1::MODEL_FORMAT_ONNX, nullptr, kMiniLmFiles, 2, 90 * MB, 0, false},
+
+    // --- MLX (Apple Silicon / Apple GPU via mlx-swift-lm) ---
+    {"mlx-qwen3-0.6b-4bit", "mlx-qwen3", "Qwen3 0.6B 4-bit (MLX)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxQwen3_06BFiles, 9, 351383618,
+     4096, true},
+    {"mlx-llama-3.2-1b-instruct-4bit", "mlx-llama3.2",
+     "Llama 3.2 1B Instruct 4-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxLlama32_1BFiles, 6, 712575975, 0, false},
+    {"mlx-qwen2-vl-2b-instruct-4bit", "mlx-qwen2-vl",
+     "Qwen2-VL 2B Instruct 4-bit (MLX)", v1::MODEL_CATEGORY_MULTIMODAL,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxQwen2Vl2BFiles, 11, 1261853827, 2048, false},
+    {"mlx-fastvlm-0.5b-bf16", "mlx-fastvlm", "FastVLM 0.5B bf16 (MLX)",
+     v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxFastVlm05BFiles, 14,
+     1256926974, 2048, false},
+    {"mlx-qwen3-embedding-0.6b-4bit-dwq", "mlx-qwen3-embed",
+     "Qwen3 Embedding 0.6B 4-bit DWQ (MLX)", v1::MODEL_CATEGORY_EMBEDDING,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxQwen3Embedding06BFiles, 11, 351230811, 0, false},
+    {"mlx-qwen3-asr-0.6b-8bit", "mlx-qwen3-asr", "Qwen3-ASR 0.6B 8-bit (MLX)",
+     v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxQwen3Asr06BFiles, 9, 1010773761,
+     0, false},
+    {"mlx-glm-asr-nano-2512-4bit", "mlx-glm-asr",
+     "GLM-ASR Nano 2512 4-bit (MLX)", v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxGlmAsrNano2512Files, 9, 1288437789, 0, false},
+    {"mlx-qwen3-tts-12hz-0.6b-base-8bit", "mlx-qwen3-tts",
+     "Qwen3-TTS 12Hz 0.6B Base 8-bit (MLX)",
+     v1::MODEL_CATEGORY_SPEECH_SYNTHESIS, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxQwen3Tts06BBaseFiles, 12,
+     1991299138, 0, false},
+    {"mlx-soprano-1.1-80m-5bit", "mlx-soprano", "Soprano 1.1 80M 5-bit (MLX)",
+     v1::MODEL_CATEGORY_SPEECH_SYNTHESIS, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxSoprano1180M5BitFiles, 7,
+     82220814, 0, false},
 };
 
 constexpr size_t kCatalogCount = sizeof(kCatalog) / sizeof(kCatalog[0]);

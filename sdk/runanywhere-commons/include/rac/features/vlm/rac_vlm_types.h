@@ -269,7 +269,7 @@ typedef struct rac_vlm_options {
      .image_marker_override = RAC_NULL,         \
      .top_k = 0,                                \
      .seed = 0,                                 \
-     .repetition_penalty = 1.0f,                \
+     .repetition_penalty = 1.1f,                \
      .min_p = 0.0f,                             \
      .emit_image_embeddings = RAC_FALSE}
 

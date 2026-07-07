@@ -27,6 +27,16 @@
 namespace runanywhere {
 namespace bridges {
 
+inline const char* defaultNativePlatform() {
+#if defined(__APPLE__)
+    return "ios";
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return "android";
+#else
+    return "unknown";
+#endif
+}
+
 /**
  * @brief Platform callbacks provided by React Native/JavaScript layer
  *

@@ -39,15 +39,17 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/onnx/CMakeLists.txt")
     add_subdirectory(onnx)
 endif()
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metalrt/CMakeLists.txt")
-    add_subdirectory(metalrt)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/mlx/CMakeLists.txt")
+    add_subdirectory(mlx)
 endif()
 
-# Qualcomm Genie / NPU LLM engine. OFF by default — requires the
-# Genie SDK headers which are not in-tree. Compiles a shell plugin that
-# surfaces RAC_ERROR_BACKEND_UNAVAILABLE when the SDK isn't linked in.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/genie/CMakeLists.txt")
-    add_subdirectory(genie)
+# QHexRT — RunAnywhere's PRIVATE Qualcomm Hexagon NPU runtime. OFF by default —
+# consumed as a prebuilt static archive under QHEXRT_ROOT (gitignored); compiles
+# a not-routable shell when the archive is absent (public repo builds clean),
+# and a routable LLM (GENERATE_TEXT) engine when -DRAC_BACKEND_QHEXRT=ON and the
+# archive is present on an Android build.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/qhexrt/CMakeLists.txt")
+    add_subdirectory(qhexrt)
 endif()
 
 # coreml engine — Apple-only engine that runs ON Apple CoreML (serves the

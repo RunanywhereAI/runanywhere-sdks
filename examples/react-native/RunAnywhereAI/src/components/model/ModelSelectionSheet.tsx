@@ -18,7 +18,9 @@ import { BottomSheet, BottomSheetScrollView } from '../ui/BottomSheet';
 import { Icon, useTheme } from '../../theme/system';
 import {
   DEFAULT_INFERENCE_FRAMEWORK,
+  getFrameworkColor,
   getFrameworkDisplayName,
+  getFrameworkSystemIcon,
   getModelDownloadSizeBytes,
   getModelFormatLabel,
   getModelFrameworks,
@@ -290,6 +292,8 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const renderRow = (model: SDKModelInfo, ready: boolean) => {
     const progress = downloading[model.id];
     const isDownloading = progress !== undefined;
+    const framework = getPrimaryFramework(model, DEFAULT_INFERENCE_FRAMEWORK);
+    const frameworkColor = getFrameworkColor(framework);
     return (
       <TouchableOpacity
         key={model.id}
@@ -300,8 +304,12 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           ready ? handleSelect(model) : !isDownloading && handleDownload(model)
         }
       >
-        <View style={[styles.tile, { backgroundColor: colors.surfaceVariant }]}>
-          <Icon name="cpu" size={20} color={colors.onSurfaceVariant} />
+        <View style={[styles.tile, { backgroundColor: `${frameworkColor}18` }]}>
+          <Icon
+            name={getFrameworkSystemIcon(framework)}
+            size={20}
+            color={frameworkColor}
+          />
         </View>
         <View style={styles.rowText}>
           <View style={styles.nameRow}>

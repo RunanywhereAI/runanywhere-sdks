@@ -87,6 +87,14 @@ struct MtmdBitmapDelete {
 };
 using MtmdBitmapPtr = std::unique_ptr<mtmd_bitmap, MtmdBitmapDelete>;
 
+struct MtmdVideoDelete {
+    void operator()(mtmd_helper_video* v) const {
+        if (v)
+            mtmd_helper_video_free(v);
+    }
+};
+using MtmdVideoPtr = std::unique_ptr<mtmd_helper_video, MtmdVideoDelete>;
+
 struct MtmdChunksDelete {
     void operator()(mtmd_input_chunks* c) const {
         if (c)
@@ -743,11 +751,15 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
     }
 
     MtmdBitmapPtr bitmap;
+    MtmdVideoPtr video;
 
     if (image && backend->mtmd_ctx) {
         if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
             RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading image from file path");
-            bitmap.reset(mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path));
+            auto wrapper =
+                mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path, false);
+            bitmap.reset(wrapper.bitmap);
+            video.reset(wrapper.video_ctx);
         } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
             RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading raw RGB bitmap");
             bitmap.reset(mtmd_bitmap_init(image->width, image->height, image->pixel_data));

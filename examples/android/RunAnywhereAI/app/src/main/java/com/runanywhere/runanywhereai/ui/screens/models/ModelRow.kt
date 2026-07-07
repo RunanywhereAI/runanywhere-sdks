@@ -2,6 +2,8 @@ package com.runanywhere.runanywhereai.ui.screens.models
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,8 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -20,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -35,6 +40,7 @@ fun ModelRow(
     progressPercent: Int?,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
+    onDelete: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
@@ -60,12 +66,24 @@ fun ModelRow(
             )
             Spacer(Modifier.width(dimens.spacingMd))
 
-            androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+            ) {
                 Text(
                     model.name,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                BackendBadge(framework = model.framework)
+                Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+                    Pill(model.quantizationLabel(), MaterialTheme.colorScheme.onSurfaceVariant)
+                    model.capabilityLabels().take(3).forEach { label ->
+                        Pill(label, MaterialTheme.colorScheme.primary)
+                    }
+                }
                 if (isBusy && progressPercent != null) {
                     Text(
                         "Downloading… $progressPercent%",
@@ -76,13 +94,19 @@ fun ModelRow(
             }
 
             Spacer(Modifier.width(dimens.spacingSm))
-            Pill(model.framework.shortLabel(), MaterialTheme.colorScheme.primary)
-            if (model.supports_lora) {
-                Spacer(Modifier.width(dimens.spacingXs))
-                Pill("LoRA", MaterialTheme.colorScheme.tertiary)
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+                TrailingAction(isCurrent, isReady, isBusy, model, onDownload)
+                if (onDelete != null && isReady) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = RACIcons.Outline.Trash,
+                            contentDescription = "Delete ${model.name}",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(dimens.iconSm),
+                        )
+                    }
+                }
             }
-            Spacer(Modifier.width(dimens.spacingSm))
-            TrailingAction(isCurrent, isReady, isBusy, model, onDownload)
         }
     }
 }
@@ -103,13 +127,30 @@ private fun TrailingAction(
             color = MaterialTheme.colorScheme.primary,
         )
         isReady -> Pill("Use", primaryGreen)
-        else -> Pill(
-            text = formatModelSize(model.download_size_bytes),
-            color = MaterialTheme.colorScheme.primary,
-            icon = RACIcons.Outline.Download,
-            onClick = onDownload,
-        )
+        else -> DownloadChip(model = model, onDownload = onDownload)
     }
+}
+
+@Composable
+private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
+    val dimens = LocalDimens.current
+    AssistChip(
+        onClick = onDownload,
+        label = {
+            Text(
+                text = formatModelSize(model.download_size_bytes),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = RACIcons.Outline.Download,
+                contentDescription = null,
+                modifier = Modifier.size(dimens.iconSm),
+            )
+        },
+    )
 }
 
 @Composable

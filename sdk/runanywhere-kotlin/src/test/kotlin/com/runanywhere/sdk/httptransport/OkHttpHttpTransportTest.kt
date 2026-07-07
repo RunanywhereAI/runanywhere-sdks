@@ -167,6 +167,10 @@ class OkHttpHttpTransportTest {
 
     private fun urlFor(s: StubServer): String = "http://127.0.0.1:${s.port}/probe"
 
+    /** Empty 200 response used by the header-only assertions below. */
+    private fun okResponse(): StubResponse =
+        StubResponse(statusLine = "HTTP/1.1 200 OK", headers = emptyList(), body = ByteArray(0))
+
     @Test
     fun executeRequest_get_returnsStatusHeadersAndBody() {
         val payload = "hello-from-stub".toByteArray(StandardCharsets.UTF_8)

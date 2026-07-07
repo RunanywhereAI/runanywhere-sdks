@@ -40,8 +40,8 @@ class ModelStatusBanner extends StatelessWidget {
       child: isLoading
           ? _buildLoadingState(context)
           : (framework != null && modelName != null)
-          ? _buildLoadedState(context)
-          : _buildNoModelState(context),
+              ? _buildLoadedState(context)
+              : _buildNoModelState(context),
     );
   }
 
@@ -71,8 +71,8 @@ class ModelStatusBanner extends StatelessWidget {
     return Row(
       children: [
         Icon(
-          _frameworkIcon(framework!),
-          color: _frameworkColor(framework!),
+          framework!.backendIcon,
+          color: framework!.backendColor,
           size: AppSpacing.iconRegular,
         ),
         const SizedBox(width: AppSpacing.smallMedium),
@@ -140,40 +140,6 @@ class ModelStatusBanner extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  IconData _frameworkIcon(LLMFramework framework) {
-    switch (framework) {
-      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-        return Icons.memory;
-      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
-        return Icons.graphic_eq;
-      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
-        return Icons.developer_board;
-      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return Icons.apple;
-      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
-        return Icons.volume_up;
-      default:
-        return Icons.view_in_ar;
-    }
-  }
-
-  Color _frameworkColor(LLMFramework framework) {
-    switch (framework) {
-      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-        return AppColors.primaryBlue;
-      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
-        return AppColors.primaryGreen;
-      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
-        return AppColors.primaryPurple;
-      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return Colors.black;
-      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
-        return AppColors.primaryOrange;
-      default:
-        return AppColors.statusGray;
-    }
   }
 }
 
@@ -534,7 +500,7 @@ class CompactModelIndicator extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: framework != null
-              ? AppColors.primaryBlue.withValues(alpha: 0.1)
+              ? framework!.backendColor.withValues(alpha: 0.1)
               : AppColors.statusOrange.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
         ),
@@ -555,16 +521,18 @@ class CompactModelIndicator extends StatelessWidget {
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: _frameworkColor(framework!),
+                  color: framework!.backendColor,
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: AppSpacing.xSmall),
               Text(
-                modelName ?? framework!.displayName,
+                modelName == null
+                    ? framework!.displayName
+                    : '${framework!.backendShortLabel} · $modelName',
                 style: AppTypography.caption(
                   context,
-                ).copyWith(color: AppColors.primaryBlue),
+                ).copyWith(color: framework!.backendColor),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -586,21 +554,6 @@ class CompactModelIndicator extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Color _frameworkColor(LLMFramework framework) {
-    switch (framework) {
-      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-        return AppColors.primaryBlue;
-      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
-        return AppColors.statusGreen;
-      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
-        return AppColors.primaryPurple;
-      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return Colors.black;
-      default:
-        return AppColors.statusGray;
-    }
   }
 }
 
@@ -823,19 +776,20 @@ class ModelSetupCard extends StatelessWidget {
                       ),
                     )
                   : isLoaded
-                  ? const Icon(
-                      Icons.check_circle,
-                      size: 20,
-                      color: Colors.white,
-                    )
-                  : isConfigured
-                  ? const Icon(Icons.check, size: 16, color: Colors.white)
-                  : Text(
-                      '$step',
-                      style: AppTypography.subheadlineSemibold(
-                        context,
-                      ).copyWith(color: AppColors.statusGray),
-                    ),
+                      ? const Icon(
+                          Icons.check_circle,
+                          size: 20,
+                          color: Colors.white,
+                        )
+                      : isConfigured
+                          ? const Icon(Icons.check,
+                              size: 16, color: Colors.white)
+                          : Text(
+                              '$step',
+                              style: AppTypography.subheadlineSemibold(
+                                context,
+                              ).copyWith(color: AppColors.statusGray),
+                            ),
             ),
             const SizedBox(width: AppSpacing.large),
 
@@ -858,6 +812,12 @@ class ModelSetupCard extends StatelessWidget {
                   if (isConfigured)
                     Row(
                       children: [
+                        Icon(
+                          selectedFramework!.backendIcon,
+                          size: 12,
+                          color: selectedFramework!.backendColor,
+                        ),
+                        const SizedBox(width: AppSpacing.xSmall),
                         Expanded(
                           child: Text(
                             '${selectedFramework!.displayName} • $selectedModel',

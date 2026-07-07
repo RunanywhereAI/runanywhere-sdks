@@ -10,12 +10,12 @@
 #   Ubuntu 22.04+ (apt + user-local pip/npm)
 #
 # Tools installed (all pins sourced from sdk/runanywhere-commons/VERSIONS):
-#   protoc                 34.x     (shared, all languages)        — PROTOC_VERSION_MAJOR
+#   protoc                 35.x     (shared, all languages)        — PROTOC_VERSION_MAJOR
 #   protoc-gen-swift       1.38.x   (swift-protobuf)                — SWIFT_PROTOBUF_VERSION
 #   wire-compiler          5.5.x    (Kotlin via Square Wire)        — WIRE_VERSION
 #   protoc_plugin          25.0.0   (Dart — emits *.pb.dart)        — PROTOC_GEN_DART_VERSION
 #   ts-proto               2.11.x   (TypeScript message types)      — TS_PROTO_VERSION
-#   google-protobuf Python 4.25.x   (Python message types)
+#   google-protobuf Python 6.33.x   (descriptor parsing)            — PYTHON_PROTOBUF_VERSION
 #
 # Streaming services (server-streaming gRPC client stubs):
 #   protoc-gen-grpc-swift  1.21.x   (Swift AsyncStream client wrappers)
@@ -58,12 +58,12 @@ if [ -f "${VERSIONS_FILE}" ]; then
     set +a
 fi
 
-PROTOC_EXPECTED_MAJOR="${PROTOC_VERSION_MAJOR:-34}"
+PROTOC_EXPECTED_MAJOR="${PROTOC_VERSION_MAJOR:-35}"
 SWIFT_PROTOBUF_EXPECTED="${SWIFT_PROTOBUF_VERSION:-1.38.0}"
 WIRE_EXPECTED="${WIRE_VERSION:-5.5.1}"
 PROTOC_PLUGIN_DART_EXPECTED="${PROTOC_GEN_DART_VERSION:-25.0.0}"
 TS_PROTO_EXPECTED="${TS_PROTO_VERSION:-2.11.8}"
-PYTHON_PROTOBUF_EXPECTED="4.25"
+PYTHON_PROTOBUF_EXPECTED="${PYTHON_PROTOBUF_VERSION:-6.33}"
 # Streaming additions:
 GRPC_SWIFT_EXPECTED="1.21"
 GRPCIO_TOOLS_EXPECTED="1.65"
@@ -161,7 +161,7 @@ install_ts_proto() {
 install_python_protobuf() {
     if have python3; then
         python3 -m pip install --user --upgrade \
-            "protobuf>=${PYTHON_PROTOBUF_EXPECTED},<5" \
+            "protobuf>=${PYTHON_PROTOBUF_EXPECTED},<7" \
             "grpcio-tools>=${GRPCIO_TOOLS_EXPECTED}"   # AsyncIterator client stubs
     else
         echo "warning: python3 not on PATH — skipping pip install." >&2
@@ -264,9 +264,9 @@ check_versions() {
     if have python3 && python3 -c "import google.protobuf" >/dev/null 2>&1; then
         local py_pb_ver
         py_pb_ver="$(python3 -c "import google.protobuf; print(google.protobuf.__version__)" 2>/dev/null || true)"
-        echo "python-protobuf:   ${py_pb_ver:-present} (expected >=${PYTHON_PROTOBUF_EXPECTED},<5)"
+        echo "python-protobuf:   ${py_pb_ver:-present} (expected >=${PYTHON_PROTOBUF_EXPECTED},<7)"
         if [ -n "${py_pb_ver}" ] && ! version_ok "${py_pb_ver}" "${PYTHON_PROTOBUF_EXPECTED}"; then
-            echo "  ✗ version mismatch — got ${py_pb_ver}, want >=${PYTHON_PROTOBUF_EXPECTED},<5" >&2
+            echo "  ✗ version mismatch — got ${py_pb_ver}, want >=${PYTHON_PROTOBUF_EXPECTED},<7" >&2
             rc=1
         fi
     else

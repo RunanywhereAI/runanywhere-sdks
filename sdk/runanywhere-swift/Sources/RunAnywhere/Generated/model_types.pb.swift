@@ -136,7 +136,7 @@ public nonisolated enum RAModelFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
   case tflite // = 9
   case safetensors // = 10
 
-  /// Qualcomm Genie
+  /// Qualcomm Hexagon NPU context
   case qnnContext // = 11
 
   /// Archive wrapping one of the above
@@ -222,10 +222,8 @@ public nonisolated enum RAModelFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// Inference framework / runtime. Same name used across all SDKs (RN names it
 /// LLMFramework; we canonicalize on InferenceFramework).
 /// Sources pre-IDL:
-///   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML,
-///                                       metalrt)
-///   Kotlin ComponentTypes.kt:122      (9 cases incl. GENIE; no coreml / mlx / whisperKit /
-///                                       metalrt)
+///   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML)
+///   Kotlin ComponentTypes.kt:122      (9 cases; no coreml / mlx / whisperKit)
 ///   Dart   model_types.dart:106       (9 cases, matches Kotlin)
 ///   RN     enums.ts:30 (LLMFramework) (16 cases)
 ///   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
@@ -246,12 +244,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
 
   /// Apple Silicon
   case mlx // = 7
-
-  /// Apple
-  case metalrt // = 9
-
-  /// Qualcomm
-  case genie // = 10
   case tflite // = 11
   case executorch // = 12
   case mediapipe // = 13
@@ -267,6 +259,9 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
 
   /// Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
   case sherpa // = 23
+
+  /// Qualcomm Hexagon NPU (QHexRT runtime)
+  case qhexrt // = 24
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -283,8 +278,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     case 5: self = .fluidAudio
     case 6: self = .coreml
     case 7: self = .mlx
-    case 9: self = .metalrt
-    case 10: self = .genie
     case 11: self = .tflite
     case 12: self = .executorch
     case 13: self = .mediapipe
@@ -296,6 +289,7 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     case 21: self = .none
     case 22: self = .unknown
     case 23: self = .sherpa
+    case 24: self = .qhexrt
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -310,8 +304,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     case .fluidAudio: return 5
     case .coreml: return 6
     case .mlx: return 7
-    case .metalrt: return 9
-    case .genie: return 10
     case .tflite: return 11
     case .executorch: return 12
     case .mediapipe: return 13
@@ -323,6 +315,7 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     case .none: return 21
     case .unknown: return 22
     case .sherpa: return 23
+    case .qhexrt: return 24
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -337,8 +330,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     .fluidAudio,
     .coreml,
     .mlx,
-    .metalrt,
-    .genie,
     .tflite,
     .executorch,
     .mediapipe,
@@ -350,6 +341,7 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     .none,
     .unknown,
     .sherpa,
+    .qhexrt,
   ]
 
 }
@@ -2918,7 +2910,7 @@ nonisolated extension RAModelFormat: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension RAInferenceFramework: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0INFERENCE_FRAMEWORK_UNSPECIFIED\0\u{1}INFERENCE_FRAMEWORK_ONNX\0\u{1}INFERENCE_FRAMEWORK_LLAMA_CPP\0\u{1}INFERENCE_FRAMEWORK_FOUNDATION_MODELS\0\u{1}INFERENCE_FRAMEWORK_SYSTEM_TTS\0\u{1}INFERENCE_FRAMEWORK_FLUID_AUDIO\0\u{1}INFERENCE_FRAMEWORK_COREML\0\u{1}INFERENCE_FRAMEWORK_MLX\0\u{2}\u{2}INFERENCE_FRAMEWORK_METALRT\0\u{1}INFERENCE_FRAMEWORK_GENIE\0\u{1}INFERENCE_FRAMEWORK_TFLITE\0\u{1}INFERENCE_FRAMEWORK_EXECUTORCH\0\u{1}INFERENCE_FRAMEWORK_MEDIAPIPE\0\u{1}INFERENCE_FRAMEWORK_MLC\0\u{1}INFERENCE_FRAMEWORK_PICO_LLM\0\u{1}INFERENCE_FRAMEWORK_PIPER_TTS\0\u{2}\u{3}INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS\0\u{1}INFERENCE_FRAMEWORK_BUILT_IN\0\u{1}INFERENCE_FRAMEWORK_NONE\0\u{1}INFERENCE_FRAMEWORK_UNKNOWN\0\u{1}INFERENCE_FRAMEWORK_SHERPA\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0INFERENCE_FRAMEWORK_UNSPECIFIED\0\u{1}INFERENCE_FRAMEWORK_ONNX\0\u{1}INFERENCE_FRAMEWORK_LLAMA_CPP\0\u{1}INFERENCE_FRAMEWORK_FOUNDATION_MODELS\0\u{1}INFERENCE_FRAMEWORK_SYSTEM_TTS\0\u{1}INFERENCE_FRAMEWORK_FLUID_AUDIO\0\u{1}INFERENCE_FRAMEWORK_COREML\0\u{1}INFERENCE_FRAMEWORK_MLX\0\u{2}\u{4}INFERENCE_FRAMEWORK_TFLITE\0\u{1}INFERENCE_FRAMEWORK_EXECUTORCH\0\u{1}INFERENCE_FRAMEWORK_MEDIAPIPE\0\u{1}INFERENCE_FRAMEWORK_MLC\0\u{1}INFERENCE_FRAMEWORK_PICO_LLM\0\u{1}INFERENCE_FRAMEWORK_PIPER_TTS\0\u{2}\u{3}INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS\0\u{1}INFERENCE_FRAMEWORK_BUILT_IN\0\u{1}INFERENCE_FRAMEWORK_NONE\0\u{1}INFERENCE_FRAMEWORK_UNKNOWN\0\u{1}INFERENCE_FRAMEWORK_SHERPA\0\u{1}INFERENCE_FRAMEWORK_QHEXRT\0")
 }
 
 nonisolated extension RAModelCategory: SwiftProtobuf._ProtoNameProviding {

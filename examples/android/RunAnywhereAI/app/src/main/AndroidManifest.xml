@@ -5,6 +5,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Vision screen Live mode (in-app CameraX preview). NOTE: because CAMERA is
+         declared, the system-camera intent (TakePicturePreview) also requires the
+         runtime grant — VisionScreen requests it before either capture path. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
         android:name=".RunAnywhereApplication"
@@ -19,6 +25,17 @@
         android:theme="@style/Theme.RunAnywhereAI"
         android:usesCleartextTraffic="false"
         tools:targetApi="35">
+
+        <!-- QHexRT (QNN HTP) talks to the Hexagon NPU through the fastRPC client
+             libcdsprpc.so, a vendor public library. Without this declaration the
+             QNN stub (libQnnHtpV81Stub.so) cannot dlopen it from the app's linker
+             namespace, so QnnDevice_create fails and no model can load on the NPU. -->
+        <uses-native-library
+            android:name="libcdsprpc.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libadsprpc.so"
+            android:required="false" />
 
         <activity
             android:name=".MainActivity"

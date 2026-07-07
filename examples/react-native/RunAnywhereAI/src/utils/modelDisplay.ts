@@ -1,5 +1,6 @@
 import { Colors } from '../theme/colors';
 import { RunAnywhere } from '@runanywhere/core';
+import type { IconName } from '../theme/system/icons';
 import {
   InferenceFramework,
   ModelFormat,
@@ -33,8 +34,8 @@ export const getFrameworkColor = (
       return Colors.frameworkSystemTTS;
     case InferenceFramework.INFERENCE_FRAMEWORK_TFLITE:
       return Colors.frameworkTFLite;
-    case InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
     case InferenceFramework.INFERENCE_FRAMEWORK_MLX:
+    case InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
       return Colors.primaryPurple;
     case InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH:
     case InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE:
@@ -63,7 +64,7 @@ export const getFrameworkIcon = (
     case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
       return 'sparkles-outline';
     case InferenceFramework.INFERENCE_FRAMEWORK_COREML:
-    case InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
+    case InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
       return 'hardware-chip-outline';
     case InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
       return 'cube-outline';
@@ -85,6 +86,34 @@ export const getFrameworkIcon = (
       return 'videocam-outline';
     default:
       return 'extension-puzzle-outline';
+  }
+};
+
+export const getFrameworkSystemIcon = (
+  framework?: InferenceFramework | null
+): IconName => {
+  switch (framework) {
+    case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
+      return 'storageDevice';
+    case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
+    case InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
+      return 'transcribe';
+    case InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:
+    case InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
+      return 'speak';
+    case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
+      return 'sparkles';
+    case InferenceFramework.INFERENCE_FRAMEWORK_COREML:
+    case InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
+      return 'cpu';
+    case InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
+    case InferenceFramework.INFERENCE_FRAMEWORK_TFLITE:
+    case InferenceFramework.INFERENCE_FRAMEWORK_MLC:
+      return 'solutions';
+    case InferenceFramework.INFERENCE_FRAMEWORK_MLX:
+      return 'bolt';
+    default:
+      return 'tool';
   }
 };
 

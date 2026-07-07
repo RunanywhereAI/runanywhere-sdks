@@ -37,6 +37,11 @@ class JsonWriter {
     JsonWriter& field(const std::string& key, int64_t value);
     JsonWriter& field(const std::string& key, double value);
     JsonWriter& field(const std::string& key, bool value);
+    JsonWriter& value(const std::string& value);
+    JsonWriter& value(const char* value);
+    JsonWriter& value(int64_t value);
+    JsonWriter& value(double value);
+    JsonWriter& value(bool value);
     /** Object element inside an array. */
     JsonWriter& begin_array_object();
 

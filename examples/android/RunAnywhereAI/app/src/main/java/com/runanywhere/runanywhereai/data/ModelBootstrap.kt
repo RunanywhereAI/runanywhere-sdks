@@ -34,7 +34,7 @@ object ModelBootstrap {
     private suspend fun seedCatalog() {
         var ok = 0
         var fail = 0
-        for (model in ModelCatalog.models) {
+        for (model in ModelCatalog.models + ModelCatalog.npuModels()) {
             try {
                 model.register()
                 ok++
@@ -46,6 +46,32 @@ object ModelBootstrap {
             }
         }
         RACLog.i("catalog seeded: ok=$ok failed=$fail")
+    }
+
+    suspend fun refreshNpuCatalog() {
+        var ok = 0
+        var fail = 0
+        for (model in ModelCatalog.npuModels()) {
+            try {
+                model.register()
+                ok++
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                fail++
+                RACLog.e("npu catalog: ${model.id} failed", e)
+            }
+        }
+        val registryRefreshed = try {
+            RunAnywhere.refreshModelRegistry()
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            RACLog.e("npu catalog registry refresh failed", e)
+            false
+        }
+        RACLog.i("npu catalog refreshed: ok=$ok failed=$fail registryRefreshed=$registryRefreshed")
     }
 
     private suspend fun seedLora() {

@@ -16,10 +16,11 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'chat.pb.dart' as $1;
 import 'llm_options.pb.dart' as $0;
 import 'llm_service.pbenum.dart';
-import 'tool_calling.pb.dart' as $1;
-import 'voice_events.pbenum.dart' as $2;
+import 'tool_calling.pb.dart' as $2;
+import 'voice_events.pbenum.dart' as $3;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
@@ -70,6 +71,7 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
     @$core.Deprecated('This field is deprecated.') $core.int? nThreads,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
     $0.LLMGenerationOptions? options,
+    $core.Iterable<$1.ChatMessage>? history,
   }) {
     final result = create();
     if (prompt != null) result.prompt = prompt;
@@ -99,6 +101,7 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
     if (nThreads != null) result.nThreads = nThreads;
     if (metadata != null) result.metadata.addEntries(metadata);
     if (options != null) result.options = options;
+    if (history != null) result.history.addAll(history);
     return result;
   }
 
@@ -149,6 +152,8 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
         packageName: const $pb.PackageName('runanywhere.v1'))
     ..aOM<$0.LLMGenerationOptions>(26, _omitFieldNames ? '' : 'options',
         subBuilder: $0.LLMGenerationOptions.create)
+    ..pPM<$1.ChatMessage>(27, _omitFieldNames ? '' : 'history',
+        subBuilder: $1.ChatMessage.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -486,6 +491,14 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   void clearOptions() => $_clearField(26);
   @$pb.TagNumber(26)
   $0.LLMGenerationOptions ensureOptions() => $_ensure(25);
+
+  /// idl-chat: PRIOR conversation turns (excludes the current `prompt`, which
+  /// stays the live user turn, and `system_prompt`, which stays separate).
+  /// Alternating user/assistant ChatMessages in chronological order. An engine
+  /// that owns its chat template renders {system_prompt, history, prompt} from
+  /// its model's markers; engines that don't simply ignore this field.
+  @$pb.TagNumber(27)
+  $pb.PbList<$1.ChatMessage> get history => $_getList(26);
 }
 
 /// Aggregate result carried on the terminal LLMStreamEvent. This intentionally
@@ -507,8 +520,8 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
     $core.String? errorMessage,
     $fixnum.Int64? promptEvalTimeMs,
     $fixnum.Int64? decodeTimeMs,
-    $core.Iterable<$1.ToolCall>? toolCalls,
-    $core.Iterable<$1.ToolResult>? toolResults,
+    $core.Iterable<$2.ToolCall>? toolCalls,
+    $core.Iterable<$2.ToolResult>? toolResults,
   }) {
     final result = create();
     if (text != null) result.text = text;
@@ -557,10 +570,10 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
     ..aOS(11, _omitFieldNames ? '' : 'errorMessage')
     ..aInt64(12, _omitFieldNames ? '' : 'promptEvalTimeMs')
     ..aInt64(13, _omitFieldNames ? '' : 'decodeTimeMs')
-    ..pPM<$1.ToolCall>(14, _omitFieldNames ? '' : 'toolCalls',
-        subBuilder: $1.ToolCall.create)
-    ..pPM<$1.ToolResult>(15, _omitFieldNames ? '' : 'toolResults',
-        subBuilder: $1.ToolResult.create)
+    ..pPM<$2.ToolCall>(14, _omitFieldNames ? '' : 'toolCalls',
+        subBuilder: $2.ToolCall.create)
+    ..pPM<$2.ToolResult>(15, _omitFieldNames ? '' : 'toolResults',
+        subBuilder: $2.ToolResult.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -704,10 +717,10 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
   /// llm_options.proto). Populated only on terminal events when the
   /// backend completed at least one tool call.
   @$pb.TagNumber(14)
-  $pb.PbList<$1.ToolCall> get toolCalls => $_getList(13);
+  $pb.PbList<$2.ToolCall> get toolCalls => $_getList(13);
 
   @$pb.TagNumber(15)
-  $pb.PbList<$1.ToolResult> get toolResults => $_getList(14);
+  $pb.PbList<$2.ToolResult> get toolResults => $_getList(14);
 }
 
 /// Unified per-token streaming event. Replaces
@@ -721,7 +734,7 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     $fixnum.Int64? timestampUs,
     $core.String? token,
     $core.bool? isFinal,
-    $2.TokenKind? kind,
+    $3.TokenKind? kind,
     $core.int? tokenId,
     $core.double? logprob,
     $core.String? finishReason,
@@ -734,7 +747,7 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     $core.int? promptTokensProcessed,
     $core.int? completionTokensGenerated,
     $fixnum.Int64? elapsedMs,
-    $1.ToolCall? toolCall,
+    $2.ToolCall? toolCall,
   }) {
     final result$ = create();
     if (seq != null) result$.seq = seq;
@@ -778,8 +791,8 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
     ..aOS(3, _omitFieldNames ? '' : 'token')
     ..aOB(4, _omitFieldNames ? '' : 'isFinal')
-    ..aE<$2.TokenKind>(5, _omitFieldNames ? '' : 'kind',
-        enumValues: $2.TokenKind.values)
+    ..aE<$3.TokenKind>(5, _omitFieldNames ? '' : 'kind',
+        enumValues: $3.TokenKind.values)
     ..aI(6, _omitFieldNames ? '' : 'tokenId', fieldType: $pb.PbFieldType.OU3)
     ..aD(7, _omitFieldNames ? '' : 'logprob', fieldType: $pb.PbFieldType.OF)
     ..aOS(8, _omitFieldNames ? '' : 'finishReason')
@@ -794,8 +807,8 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     ..aI(15, _omitFieldNames ? '' : 'promptTokensProcessed')
     ..aI(16, _omitFieldNames ? '' : 'completionTokensGenerated')
     ..aInt64(17, _omitFieldNames ? '' : 'elapsedMs')
-    ..aOM<$1.ToolCall>(18, _omitFieldNames ? '' : 'toolCall',
-        subBuilder: $1.ToolCall.create)
+    ..aOM<$2.ToolCall>(18, _omitFieldNames ? '' : 'toolCall',
+        subBuilder: $2.ToolCall.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -863,9 +876,9 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   /// Token semantic category (answer / thought / tool-call).
   /// Canonical TokenKind from voice_events.proto.
   @$pb.TagNumber(5)
-  $2.TokenKind get kind => $_getN(4);
+  $3.TokenKind get kind => $_getN(4);
   @$pb.TagNumber(5)
-  set kind($2.TokenKind value) => $_setField(5, value);
+  set kind($3.TokenKind value) => $_setField(5, value);
   @$pb.TagNumber(5)
   $core.bool hasKind() => $_has(4);
   @$pb.TagNumber(5)
@@ -1000,15 +1013,15 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   /// field the tool-call event kind carries no proto-typed payload and
   /// SDK consumers must fall back to JSON-parsing the raw `token` text.
   @$pb.TagNumber(18)
-  $1.ToolCall get toolCall => $_getN(17);
+  $2.ToolCall get toolCall => $_getN(17);
   @$pb.TagNumber(18)
-  set toolCall($1.ToolCall value) => $_setField(18, value);
+  set toolCall($2.ToolCall value) => $_setField(18, value);
   @$pb.TagNumber(18)
   $core.bool hasToolCall() => $_has(17);
   @$pb.TagNumber(18)
   void clearToolCall() => $_clearField(18);
   @$pb.TagNumber(18)
-  $1.ToolCall ensureToolCall() => $_ensure(17);
+  $2.ToolCall ensureToolCall() => $_ensure(17);
 }
 
 class LLMApi {

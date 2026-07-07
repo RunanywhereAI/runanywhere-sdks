@@ -52,21 +52,73 @@ data object Benchmarks
 @Serializable
 data class BenchmarkDetail(val runId: String)
 
-// Destinations shown in the bottom bar. selectedIcon defaults to icon when there's no filled variant.
-enum class TopLevelDestination(
-    val route: Any,
-    val label: String,
-    val icon: ImageVector,
-    val selectedIcon: ImageVector = icon,
-) {
-    CHAT(Chat, "Chat", RACIcons.Outline.MessageCircle, RACIcons.Filled.MessageCircle),
-    VOICE(Voice, "Voice", RACIcons.Outline.Microphone),
-    MORE(More, "More", RACIcons.Outline.Menu),
+enum class ConsumerNavGroup(val title: String) {
+    ASSISTANT("Assistant"),
+    LIBRARY("Library"),
+    ADVANCED("Advanced"),
 }
 
-// Shared by the bottom bar and the nav rail so their nav behaviour stays identical.
+enum class ConsumerDestination(
+    val route: Any,
+    val label: String,
+    val description: String,
+    val icon: ImageVector,
+    val selectedIcon: ImageVector = icon,
+    val group: ConsumerNavGroup,
+) {
+    CHAT(
+        Chat,
+        "Ask",
+        "Private chat assistant",
+        RACIcons.Outline.MessageCircle,
+        RACIcons.Filled.MessageCircle,
+        ConsumerNavGroup.ASSISTANT,
+    ),
+    TALK(
+        Voice,
+        "Talk",
+        "Hands-free voice assistant",
+        RACIcons.Outline.Microphone,
+        RACIcons.Filled.Microphone,
+        ConsumerNavGroup.ASSISTANT,
+    ),
+    LIVE(
+        Vision,
+        "Images & live",
+        "Ask about photos or camera",
+        RACIcons.Outline.Eye,
+        group = ConsumerNavGroup.ASSISTANT,
+    ),
+    DOCUMENTS(
+        Documents,
+        "Documents",
+        "Ask questions with sources",
+        RACIcons.Outline.FileText,
+        group = ConsumerNavGroup.ASSISTANT,
+    ),
+    SETTINGS(
+        Settings,
+        "Settings",
+        "Personalization and downloads",
+        RACIcons.Outline.Settings,
+        RACIcons.Filled.Settings,
+        ConsumerNavGroup.LIBRARY,
+    ),
+    ADVANCED(
+        More,
+        "Advanced",
+        "SDK tools and diagnostics",
+        RACIcons.Outline.Stack,
+        group = ConsumerNavGroup.ADVANCED,
+    ),
+}
+
+// Shared by drawer and programmatic top-level jumps so back stack behavior stays identical.
 fun NavDestination?.isSelected(route: Any): Boolean =
     this?.hierarchy?.any { it.hasRoute(route::class) } == true
+
+fun NavDestination?.isConsumerTopLevel(): Boolean =
+    ConsumerDestination.entries.any { isSelected(it.route) }
 
 fun NavHostController.navigateTopLevel(route: Any) {
     navigate(route) {

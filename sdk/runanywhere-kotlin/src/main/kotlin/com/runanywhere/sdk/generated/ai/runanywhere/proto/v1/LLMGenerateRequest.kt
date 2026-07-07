@@ -17,6 +17,7 @@ import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.immutableCopyOf
+import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -281,6 +282,7 @@ public class LLMGenerateRequest(
     schemaIndex = 25,
   )
   public val options: LLMGenerationOptions? = null,
+  history: List<ChatMessage> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerateRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(message = "stop_sequences is deprecated")
@@ -300,6 +302,21 @@ public class LLMGenerateRequest(
     schemaIndex = 24,
   )
   public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
+
+  /**
+   * idl-chat: PRIOR conversation turns (excludes the current `prompt`, which
+   * stays the live user turn, and `system_prompt`, which stays separate).
+   * Alternating user/assistant ChatMessages in chronological order. An engine
+   * that owns its chat template renders {system_prompt, history, prompt} from
+   * its model's markers; engines that don't simply ignore this field.
+   */
+  @field:WireField(
+    tag = 27,
+    adapter = "ai.runanywhere.proto.v1.ChatMessage#ADAPTER",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 26,
+  )
+  public val history: List<ChatMessage> = immutableCopyOf("history", history)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -337,6 +354,7 @@ public class LLMGenerateRequest(
     if (n_threads != other.n_threads) return false
     if (metadata != other.metadata) return false
     if (options != other.options) return false
+    if (history != other.history) return false
     return true
   }
 
@@ -370,6 +388,7 @@ public class LLMGenerateRequest(
       result = result * 37 + n_threads.hashCode()
       result = result * 37 + metadata.hashCode()
       result = result * 37 + (options?.hashCode() ?: 0)
+      result = result * 37 + history.hashCode()
       super.hashCode = result
     }
     return result
@@ -403,6 +422,7 @@ public class LLMGenerateRequest(
     result += """n_threads=$n_threads"""
     if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     if (options != null) result += """options=$options"""
+    if (history.isNotEmpty()) result += """history=$history"""
     return result.joinToString(prefix = "LLMGenerateRequest{", separator = ", ", postfix = "}")
   }
 
@@ -433,8 +453,9 @@ public class LLMGenerateRequest(
     n_threads: Int = this.n_threads,
     metadata: Map<String, String> = this.metadata,
     options: LLMGenerationOptions? = this.options,
+    history: List<ChatMessage> = this.history,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMGenerateRequest = LLMGenerateRequest(prompt, max_tokens, temperature, top_p, top_k, system_prompt, emit_thoughts, repetition_penalty, stop_sequences, streaming_enabled, preferred_framework, json_schema, execution_target, request_id, model_id, conversation_id, seed, frequency_penalty, presence_penalty, min_p, grammar, response_format, echo_prompt, n_threads, metadata, options, unknownFields)
+  ): LLMGenerateRequest = LLMGenerateRequest(prompt, max_tokens, temperature, top_p, top_k, system_prompt, emit_thoughts, repetition_penalty, stop_sequences, streaming_enabled, preferred_framework, json_schema, execution_target, request_id, model_id, conversation_id, seed, frequency_penalty, presence_penalty, min_p, grammar, response_format, echo_prompt, n_threads, metadata, options, history, unknownFields)
 
   public companion object {
     @JvmField
@@ -524,6 +545,7 @@ public class LLMGenerateRequest(
         }
         size += metadataAdapter.encodedSizeWithTag(25, value.metadata)
         size += LLMGenerationOptions.ADAPTER.encodedSizeWithTag(26, value.options)
+        size += ChatMessage.ADAPTER.asRepeated().encodedSizeWithTag(27, value.history)
         return size
       }
 
@@ -600,11 +622,13 @@ public class LLMGenerateRequest(
         }
         metadataAdapter.encodeWithTag(writer, 25, value.metadata)
         LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 26, value.options)
+        ChatMessage.ADAPTER.asRepeated().encodeWithTag(writer, 27, value.history)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerateRequest) {
         writer.writeBytes(value.unknownFields)
+        ChatMessage.ADAPTER.asRepeated().encodeWithTag(writer, 27, value.history)
         LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 26, value.options)
         metadataAdapter.encodeWithTag(writer, 25, value.metadata)
         if (value.n_threads != 0) {
@@ -706,6 +730,7 @@ public class LLMGenerateRequest(
         var n_threads: Int = 0
         val metadata = mutableMapOf<String, String>()
         var options: LLMGenerationOptions? = null
+        val history = mutableListOf<ChatMessage>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -734,6 +759,7 @@ public class LLMGenerateRequest(
             24 -> n_threads = ProtoAdapter.INT32.decode(reader)
             25 -> metadata.putAll(metadataAdapter.decode(reader))
             26 -> options = LLMGenerationOptions.ADAPTER.decode(reader)
+            27 -> history.add(ChatMessage.ADAPTER.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -764,12 +790,14 @@ public class LLMGenerateRequest(
           n_threads = n_threads,
           metadata = metadata,
           options = options,
+          history = history,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LLMGenerateRequest): LLMGenerateRequest = value.copy(
         options = value.options?.let(LLMGenerationOptions.ADAPTER::redact),
+        history = value.history.redactElements(ChatMessage.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

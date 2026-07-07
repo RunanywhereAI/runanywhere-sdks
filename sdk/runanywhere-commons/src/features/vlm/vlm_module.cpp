@@ -437,7 +437,7 @@ extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
         }
     }
 
-    // 3. For directory-based models (MetalRT), pass the directory directly.
+    // 3. For directory-based models, pass the directory directly.
     //    For GGUF-based models (llama.cpp), resolve .gguf + mmproj files.
     const char* name = model_info->name ? model_info->name : model_id;
 

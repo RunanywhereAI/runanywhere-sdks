@@ -8,6 +8,7 @@
 // scope for this dep-bump pass — see AGENTS.md "no source edits" rule.
 // Re-attempt once the Swift 6 strict-concurrency migration lands.
 import PackageDescription
+import Foundation
 
 // =============================================================================
 // RunAnywhere Swift SDK — LOCAL development Package.swift
@@ -25,6 +26,17 @@ import PackageDescription
 //
 // Min platforms: iOS 17.5 / macOS 14.5 (matches the root package).
 // =============================================================================
+
+// mlx-audio-swift currently requires a Swift 6.2+ toolchain and has not cut a
+// tag compatible with mlx-swift-lm 3.x. Pin current main so MLX STT/TTS are
+// first-class in the Apple MLX runtime while upstream release tags catch up.
+let mlxAudioPackageDependencies: [Package.Dependency] = [
+    .package(url: "https://github.com/Blaizzy/mlx-audio-swift.git", revision: "580e952adda0cd6bdc5c04f402822adbb61525c8"),
+]
+let mlxAudioRuntimeDependencies: [Target.Dependency] = [
+    .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
+    .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+]
 
 let package = Package(
     name: "RunAnywhere",
@@ -54,6 +66,7 @@ let package = Package(
         // want to link a subset of the runtimes).
         .library(name: "RunAnywhereLlamaCPP", targets: ["LlamaCPPRuntime"]),
         .library(name: "RunAnywhereONNX", targets: ["ONNXRuntime"]),
+        .library(name: "RunAnywhereMLX", targets: ["MLXRuntime"]),
     ],
     dependencies: [
         // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
@@ -76,7 +89,11 @@ let package = Package(
         // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
         // the dep-version policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
-    ],
+        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.6")),
+        .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
+        // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS.
+        .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
+    ] + mlxAudioPackageDependencies,
     targets: [
         // -------------------------------------------------------------------
         // C Bridge Module — Core Commons
@@ -85,7 +102,10 @@ let package = Package(
             name: "CRACommons",
             dependencies: ["RACommonsBinary"],
             path: "Sources/RunAnywhere/CRACommons",
-            publicHeadersPath: "include"
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("../../../Binaries/RACommons.xcframework/macos-arm64/Headers"),
+            ]
         ),
 
         // -------------------------------------------------------------------
@@ -122,6 +142,22 @@ let package = Package(
             ],
             path: "Sources/ONNXRuntime/include",
             publicHeadersPath: "."
+        ),
+
+        // -------------------------------------------------------------------
+        // C Bridge Module — MLX Backend Headers
+        // -------------------------------------------------------------------
+        .target(
+            name: "MLXBackend",
+            dependencies: [
+                "CRACommons",
+                "RABackendMLXBinary",
+            ],
+            path: "Sources/MLXRuntime/include",
+            publicHeadersPath: ".",
+            cSettings: [
+                .headerSearchPath("../../../Binaries/RACommons.xcframework/macos-arm64/Headers"),
+            ]
         ),
 
         // -------------------------------------------------------------------
@@ -226,6 +262,34 @@ let package = Package(
         ),
 
         // -------------------------------------------------------------------
+        // MLX Runtime Backend
+        // -------------------------------------------------------------------
+        .target(
+            name: "MLXRuntime",
+            dependencies: [
+                "MLXBackend",
+                "RABackendMLXBinary",
+                .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "MLXVLM", package: "mlx-swift-lm"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
+            ] + mlxAudioRuntimeDependencies,
+            path: "Sources/MLXRuntime",
+            exclude: [
+                "include",
+            ],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("CoreImage"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+            ]
+        ),
+
+        // -------------------------------------------------------------------
         // Unit tests: HandleStreamAdapter lifecycle, proto helpers
         // (LoRA / model-import / lifecycle / structured-output / tool-calling),
         // error mapping.
@@ -262,6 +326,10 @@ let package = Package(
         .binaryTarget(
             name: "RABackendSherpaBinary",
             path: "Binaries/RABackendSherpa.xcframework"
+        ),
+        .binaryTarget(
+            name: "RABackendMLXBinary",
+            path: "Binaries/RABackendMLX.xcframework"
         ),
     ]
 )

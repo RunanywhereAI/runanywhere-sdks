@@ -20,8 +20,29 @@ data class StoredMessage(
     val text: String,
     val isUser: Boolean,
     val thinking: String? = null,
+    val attachment: StoredAttachment? = null,
+    val sources: List<StoredSource> = emptyList(),
     val tool: StoredTool? = null,
     val stats: StoredStats? = null,
+)
+
+@Serializable
+data class StoredAttachment(
+    val kind: StoredAttachmentKind,
+    val name: String,
+    val detail: String? = null,
+    val localPath: String? = null,
+    val previewText: String? = null,
+)
+
+@Serializable
+enum class StoredAttachmentKind { IMAGE, DOCUMENT }
+
+@Serializable
+data class StoredSource(
+    val text: String,
+    val score: Float,
+    val document: String,
 )
 
 @Serializable

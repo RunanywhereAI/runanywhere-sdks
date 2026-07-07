@@ -72,5 +72,51 @@ class AccelerationPreference extends $pb.ProtobufEnum {
   const AccelerationPreference._(super.value, super.name);
 }
 
+/// Logical hardware service contract. Mirrors the C ABI in
+/// sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
+///   - rac_hardware_profile_get → GetProfile
+///   - rac_hardware_get_accelerators → GetAccelerators
+///   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
+///
+/// Native device probes (chip detection, neural engine queries, GPU
+/// discovery, memory/cores) remain platform-adapter owned. C++ caches and
+/// serves the normalized HardwareProfile/AcceleratorInfo messages.
+/// Pre-flight Qualcomm Hexagon NPU probe. Mirrors the C ABI struct
+/// rac_npu_info_t (rac/infrastructure/device/rac_npu_capability.h); served
+/// over the proto-buffer ABI by rac_npu_probe_proto(). Enum values equal the
+/// Hexagon HTP version number to stay in lock-step with rac_hexagon_arch_t.
+class HexagonArch extends $pb.ProtobufEnum {
+  static const HexagonArch HEXAGON_ARCH_UNKNOWN =
+      HexagonArch._(0, _omitEnumNames ? '' : 'HEXAGON_ARCH_UNKNOWN');
+  static const HexagonArch HEXAGON_ARCH_V68 =
+      HexagonArch._(68, _omitEnumNames ? '' : 'HEXAGON_ARCH_V68');
+  static const HexagonArch HEXAGON_ARCH_V69 =
+      HexagonArch._(69, _omitEnumNames ? '' : 'HEXAGON_ARCH_V69');
+  static const HexagonArch HEXAGON_ARCH_V73 =
+      HexagonArch._(73, _omitEnumNames ? '' : 'HEXAGON_ARCH_V73');
+  static const HexagonArch HEXAGON_ARCH_V75 =
+      HexagonArch._(75, _omitEnumNames ? '' : 'HEXAGON_ARCH_V75');
+  static const HexagonArch HEXAGON_ARCH_V79 =
+      HexagonArch._(79, _omitEnumNames ? '' : 'HEXAGON_ARCH_V79');
+  static const HexagonArch HEXAGON_ARCH_V81 =
+      HexagonArch._(81, _omitEnumNames ? '' : 'HEXAGON_ARCH_V81');
+
+  static const $core.List<HexagonArch> values = <HexagonArch>[
+    HEXAGON_ARCH_UNKNOWN,
+    HEXAGON_ARCH_V68,
+    HEXAGON_ARCH_V69,
+    HEXAGON_ARCH_V73,
+    HEXAGON_ARCH_V75,
+    HEXAGON_ARCH_V79,
+    HEXAGON_ARCH_V81,
+  ];
+
+  static final $core.Map<$core.int, HexagonArch> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static HexagonArch? valueOf($core.int value) => _byValue[value];
+
+  const HexagonArch._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

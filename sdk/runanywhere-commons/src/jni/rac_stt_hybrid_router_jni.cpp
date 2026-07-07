@@ -102,6 +102,11 @@ const char* framework_to_plugin_hint(rac_inference_framework_t fw) {
             return "sherpa";
         case RAC_FRAMEWORK_ONNX:
             return "onnx";
+        // Matches model_lifecycle's engine pinning (engine_name_for_framework):
+        // without this, a QHexRT STT model routed through the hybrid router
+        // would fall to raw priority selection instead of its own engine.
+        case RAC_FRAMEWORK_QHEXRT:
+            return "qhexrt";
         // RAC_FRAMEWORK_WHISPERKIT_COREML (retired enum value 9) intentionally
         // dropped: the whisperkit_coreml engine was removed, so no plugin hint
         // can resolve to it. Unmapped frameworks fall through to the default

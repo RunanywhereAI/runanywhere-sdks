@@ -68,7 +68,7 @@ class LoraViewModel : ViewModel() {
         }
     }
 
-    fun apply(entry: LoraAdapterCatalogEntry) {
+    fun apply(entry: LoraAdapterCatalogEntry, scale: Float = entry.default_scale.takeIf { it > 0f } ?: 1f) {
         val path = adapterLocalPath(entry)
         if (path.isNullOrBlank()) {
             state = state.copy(error = "Adapter not downloaded yet")
@@ -82,7 +82,7 @@ class LoraViewModel : ViewModel() {
                         adapters = listOf(
                             RALoRAAdapterConfig(
                                 adapter_path = path,
-                                scale = entry.default_scale.takeIf { it > 0f } ?: 1f,
+                                scale = scale,
                                 adapter_id = entry.id,
                             ),
                         ),

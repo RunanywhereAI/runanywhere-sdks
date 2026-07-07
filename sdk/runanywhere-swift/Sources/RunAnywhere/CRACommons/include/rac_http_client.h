@@ -249,6 +249,18 @@ RAC_API rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_k
                                               size_t* out_count);
 
 // =============================================================================
+// HUGGING FACE AUTH
+// =============================================================================
+
+/**
+ * @brief Override the optional Hugging Face bearer token used by commons.
+ *
+ * Pass NULL to return to RAC_HF_TOKEN / HF_TOKEN environment lookup. Pass an
+ * empty string to clear the in-memory override and disable env fallback.
+ */
+RAC_API void rac_http_hf_token_set(const char* token);
+
+// =============================================================================
 // RESULT CODES
 // =============================================================================
 // Consumers only need to check against RAC_SUCCESS; the other

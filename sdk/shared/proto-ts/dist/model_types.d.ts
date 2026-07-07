@@ -57,7 +57,7 @@ export declare enum ModelFormat {
     MODEL_FORMAT_MLPACKAGE = 8,
     MODEL_FORMAT_TFLITE = 9,
     MODEL_FORMAT_SAFETENSORS = 10,
-    /** MODEL_FORMAT_QNN_CONTEXT - Qualcomm Genie */
+    /** MODEL_FORMAT_QNN_CONTEXT - Qualcomm Hexagon NPU context */
     MODEL_FORMAT_QNN_CONTEXT = 11,
     /** MODEL_FORMAT_ZIP - Archive wrapping one of the above */
     MODEL_FORMAT_ZIP = 12,
@@ -74,10 +74,8 @@ export declare function modelFormatToJSON(object: ModelFormat): string;
  * Inference framework / runtime. Same name used across all SDKs (RN names it
  * LLMFramework; we canonicalize on InferenceFramework).
  * Sources pre-IDL:
- *   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML,
- *                                       metalrt)
- *   Kotlin ComponentTypes.kt:122      (9 cases incl. GENIE; no coreml / mlx / whisperKit /
- *                                       metalrt)
+ *   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML)
+ *   Kotlin ComponentTypes.kt:122      (9 cases; no coreml / mlx / whisperKit)
  *   Dart   model_types.dart:106       (9 cases, matches Kotlin)
  *   RN     enums.ts:30 (LLMFramework) (16 cases)
  *   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
@@ -95,10 +93,6 @@ export declare enum InferenceFramework {
     INFERENCE_FRAMEWORK_COREML = 6,
     /** INFERENCE_FRAMEWORK_MLX - Apple Silicon */
     INFERENCE_FRAMEWORK_MLX = 7,
-    /** INFERENCE_FRAMEWORK_METALRT - Apple */
-    INFERENCE_FRAMEWORK_METALRT = 9,
-    /** INFERENCE_FRAMEWORK_GENIE - Qualcomm */
-    INFERENCE_FRAMEWORK_GENIE = 10,
     INFERENCE_FRAMEWORK_TFLITE = 11,
     INFERENCE_FRAMEWORK_EXECUTORCH = 12,
     INFERENCE_FRAMEWORK_MEDIAPIPE = 13,
@@ -112,6 +106,8 @@ export declare enum InferenceFramework {
     INFERENCE_FRAMEWORK_UNKNOWN = 22,
     /** INFERENCE_FRAMEWORK_SHERPA - Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
     INFERENCE_FRAMEWORK_SHERPA = 23,
+    /** INFERENCE_FRAMEWORK_QHEXRT - Qualcomm Hexagon NPU (QHexRT runtime) */
+    INFERENCE_FRAMEWORK_QHEXRT = 24,
     UNRECOGNIZED = -1
 }
 export declare function inferenceFrameworkFromJSON(object: any): InferenceFramework;

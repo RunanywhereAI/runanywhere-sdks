@@ -36,10 +36,16 @@ bool looks_like_hf_ref(const std::string &ref) {
 // the saved id. Durable persistence is commons-owned: once the model
 // downloads, the model-folder manifest sidecar restores the entry on the next
 // launch (no CLI-side registry needed).
-rac_result_t register_url(const std::string &url, std::string *out_id,
-                          std::string *error) {
+rac_result_t register_url(const std::string &url, const ResolveOptions *options,
+                          std::string *out_id, std::string *error) {
   runanywhere::v1::RegisterModelFromUrlRequest request;
   request.set_url(url);
+  if (options && options->has_framework) {
+    request.set_framework(options->framework);
+  }
+  if (options && options->has_category) {
+    request.set_category(options->category);
+  }
 
   const std::string bytes = proto::serialize(request);
   rac_proto_buffer_t out;
@@ -70,8 +76,8 @@ rac_result_t register_url(const std::string &url, std::string *out_id,
 
 } // namespace
 
-rac_result_t resolve(const std::string &ref, Resolved *out,
-                     std::string *error) {
+rac_result_t resolve(const std::string &ref, Resolved *out, std::string *error,
+                     const ResolveOptions *options) {
   if (ref.empty()) {
     if (error) {
       *error = "empty model reference";
@@ -103,7 +109,7 @@ rac_result_t resolve(const std::string &ref, Resolved *out,
 
   if (is_http_url(ref) || looks_like_hf_ref(ref)) {
     out->from_catalog = false;
-    return register_url(ref, &out->model_id, error);
+    return register_url(ref, options, &out->model_id, error);
   }
 
   if (error) {

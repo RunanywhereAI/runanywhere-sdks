@@ -15,6 +15,7 @@ import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.hybrid.AndroidDeviceStateProvider
 import com.runanywhere.sdk.hybrid.HybridDeviceState
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
+import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.setDebugMode
 import kotlinx.coroutines.CoroutineScope
@@ -66,25 +67,40 @@ class RunAnywhereApplication : Application() {
 
         //Starting Setup Work
         AndroidPlatformContext.initialize(this@RunAnywhereApplication)
+        // Note: ADSP_LIBRARY_PATH (Hexagon DSP skel discovery for QHexRT/QNN) is set
+        // automatically by the engine before its first runtime create — no app glue needed.
         // Register backends with the C++ registry BEFORE initialize(): once initialize() runs,
         // a concurrent caller can hit loadModel() while only the platform backend is registered
         // and fail with -422 "No provider could handle the request" (same ordering as iOS).
         LlamaCPP.register()
         ONNX.register()
+        // QHexRT (Qualcomm Hexagon NPU). Registration is rejected internally on
+        // unsupported parts, so this is a safe no-op on parts older than v75.
+        QHexRT.register()
+        val hasBackendConfig =
+            BuildConfig.RUNANYWHERE_API_KEY.isNotBlank() &&
+                BuildConfig.RUNANYWHERE_BASE_URL.isNotBlank()
+        val environment =
+            if (hasBackendConfig) {
+                SDKEnvironment.SDK_ENVIRONMENT_STAGING
+            } else {
+                SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+            }
         RunAnywhere.initialize(
             apiKey = BuildConfig.RUNANYWHERE_API_KEY,
             baseURL = BuildConfig.RUNANYWHERE_BASE_URL,
-            // STAGING (not PRODUCTION) so the railway *development* backend in
-            // local.properties is honored and telemetry lands — matches the
-            // Flutter example. PRODUCTION expects a production backend/auth and
-            // also disables console logging.
-            environment = SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+            // Use staging only when local.properties provides a real backend
+            // config. Empty debug defaults boot in development/offline mode.
+            environment = environment,
         )
         // Production env disables SDK console logging entirely; without this
         // debug builds emit zero SDK logs to logcat, which makes on-device
         // issues (voice/STT/VLM) undiagnosable.
         if (BuildConfig.DEBUG) RunAnywhere.setDebugMode(true)
         HybridDeviceState.setProvider(AndroidDeviceStateProvider(applicationContext))
+        // Re-apply the persisted HuggingFace token (Settings screen) so private
+        // model repos (e.g. gated NPU bundles) download across app restarts.
+        SettingsRepository.settings.hfToken.takeIf { it.isNotBlank() }?.let { RunAnywhere.setHfToken(it) }
         ModelBootstrap.setupModels()
         CloudProviderRepository.registerAll()
         BuiltInTools.register(applicationContext)

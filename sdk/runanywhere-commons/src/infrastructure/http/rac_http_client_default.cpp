@@ -26,6 +26,7 @@
  * both TUs were pulled in.
  */
 
+#include "rac_http_hf_auth.h"
 #include "rac_http_transport_ref.h"
 #include "rac_http_upsert_mode.h"
 
@@ -92,34 +93,55 @@ struct PreparedRequest {
     std::vector<rac_http_header_kv_t> header_storage;  // valid only when transformed
     std::string url_storage;                           // backing for transformed url
     std::string prefer_value_storage;                  // backing for "Prefer" header
+    std::string auth_value_storage;                    // backing for "Authorization" header
     bool transformed = false;
 };
 
+bool has_authorization_header(const rac_http_request_t* req) {
+    for (size_t i = 0; i < req->header_count; ++i) {
+        const char* name = req->headers[i].name;
+        if (name != nullptr && strcasecmp(name, "Authorization") == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /// Builds the descriptor passed to the platform transport. When upsert
-/// mode is engaged we rewrite the URL and append a `Prefer` header;
-/// otherwise we pass `*req` through unchanged.
+/// mode is engaged we rewrite the URL and append a `Prefer` header; when a
+/// Hugging Face token is configured and the URL is an HF host we append the
+/// bearer Authorization header; otherwise we pass `*req` through unchanged.
 PreparedRequest prepare_request(const rac_http_request_t* req) {
     PreparedRequest prepared;
     auto transform = rac::http::consume_upsert_transform(req);
-    if (!transform.engaged) {
+    std::string hf_bearer =
+        rac::http::hf_bearer_for_url(req->url, has_authorization_header(req));
+    if (!transform.engaged && hf_bearer.empty()) {
         prepared.effective_request = *req;
         return prepared;
     }
 
     prepared.transformed = true;
-    prepared.url_storage = std::move(transform.transformed_url);
-    prepared.prefer_value_storage = std::move(transform.prefer_header_value);
+    prepared.effective_request = *req;
 
-    // Copy existing headers and append the upsert "Prefer" header.
-    prepared.header_storage.reserve(req->header_count + 1);
+    // Copy existing headers, then append the armed extras.
+    prepared.header_storage.reserve(req->header_count + 2);
     for (size_t i = 0; i < req->header_count; ++i) {
         prepared.header_storage.push_back(req->headers[i]);
     }
-    prepared.header_storage.push_back(
-        rac_http_header_kv_t{"Prefer", prepared.prefer_value_storage.c_str()});
+    if (transform.engaged) {
+        prepared.url_storage = std::move(transform.transformed_url);
+        prepared.prefer_value_storage = std::move(transform.prefer_header_value);
+        prepared.header_storage.push_back(
+            rac_http_header_kv_t{"Prefer", prepared.prefer_value_storage.c_str()});
+        prepared.effective_request.url = prepared.url_storage.c_str();
+    }
+    if (!hf_bearer.empty()) {
+        prepared.auth_value_storage = std::move(hf_bearer);
+        prepared.header_storage.push_back(
+            rac_http_header_kv_t{"Authorization", prepared.auth_value_storage.c_str()});
+    }
 
-    prepared.effective_request = *req;
-    prepared.effective_request.url = prepared.url_storage.c_str();
     prepared.effective_request.headers = prepared.header_storage.data();
     prepared.effective_request.header_count = prepared.header_storage.size();
     return prepared;

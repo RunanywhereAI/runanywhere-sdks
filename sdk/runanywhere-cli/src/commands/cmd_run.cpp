@@ -36,6 +36,7 @@
 #include "vlm_options.pb.h"
 
 #include "catalog/model_ref.h"
+#include "commands/engine_options.h"
 #include "config/cli_paths.h"
 #include "io/output.h"
 #include "io/proto.h"
@@ -54,6 +55,7 @@ namespace v1 = runanywhere::v1;
 // ---------------------------------------------------------------------------
 struct RunParams {
     std::string system_prompt;
+    std::string engine;
     float temperature = 0.0f;  // 0 = engine default
     int32_t max_tokens = 1024;
     bool no_think = false;
@@ -225,13 +227,20 @@ int generate_once(const GlobalOptions& options, const std::string& model_id,
     return exit_code;
 }
 
-bool load_model(const GlobalOptions& options, const std::string& model_id) {
+bool load_model(const GlobalOptions& options, const std::string& model_id,
+                v1::InferenceFramework framework, bool is_vlm) {
     // Auto-pull (validate_availability) + resolve + engine load, one call.
     progress::DownloadProgressScope progress_scope(model_id,
                                                    !options.no_progress && !options.json);
     v1::ModelLoadRequest request;
     request.set_model_id(model_id);
     request.set_validate_availability(true);
+    if (framework != v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
+        request.set_framework(framework);
+    }
+    if (is_vlm) {
+        request.set_category(v1::MODEL_CATEGORY_MULTIMODAL);
+    }
     const std::string bytes = proto::serialize(request);
 
     rac_proto_buffer_t out_buffer;
@@ -386,14 +395,28 @@ int run_run(const GlobalOptions& options, const std::string& ref, const std::str
         return 1;
     }
 
+    EngineHintResolution engine_hint;
+    std::string engine_error;
+    if (!resolve_engine_hint(params.engine, &engine_hint, &engine_error)) {
+        out::error_line(engine_error);
+        return 2;
+    }
+
+    if (!image_path.empty()) {
+        engine_hint.resolve_options.has_category = true;
+        engine_hint.resolve_options.category = v1::MODEL_CATEGORY_MULTIMODAL;
+    }
+
     model_ref::Resolved resolved;
     std::string error;
-    if (model_ref::resolve(ref, &resolved, &error) != RAC_SUCCESS) {
+    if (model_ref::resolve(ref, &resolved, &error, &engine_hint.resolve_options) != RAC_SUCCESS) {
         out::error_line(error);
         return 1;
     }
 
-    if (!load_model(options, resolved.model_id)) {
+    const v1::InferenceFramework load_framework =
+        resolved.from_catalog ? v1::INFERENCE_FRAMEWORK_UNSPECIFIED : engine_hint.framework;
+    if (!load_model(options, resolved.model_id, load_framework, !image_path.empty())) {
         return 1;
     }
 
@@ -437,6 +460,8 @@ void register_run(CLI::App& app, GlobalOptions& options) {
     cmd->add_option("--image", *image, "Image file for VLM models")
         ->check(CLI::ExistingFile);
     cmd->add_option("--system", params->system_prompt, "System prompt");
+    cmd->add_option("--engine", params->engine,
+                    "Engine/framework hint for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
     cmd->add_option("--temp,--temperature", params->temperature, "Sampling temperature");
     cmd->add_option("--max-tokens", params->max_tokens, "Max tokens to generate (default 1024)");
     cmd->add_flag("--no-think", params->no_think, "Disable the model's thinking phase");

@@ -18,6 +18,7 @@ if(NOT RAC_DESKTOP_ADAPTER)
 endif()
 
 set(RCLI_SOURCES
+    src/app.cpp
     src/bootstrap.cpp
     src/catalog/catalog.cpp
     src/catalog/model_ref.cpp
@@ -32,9 +33,11 @@ set(RCLI_SOURCES
     src/commands/cmd_serve.cpp
     src/commands/cmd_show.cpp
     src/commands/cmd_stt.cpp
+    src/commands/cmd_embed.cpp
     src/commands/cmd_tts.cpp
     src/commands/cmd_vad.cpp
     src/commands/cmd_voice.cpp
+    src/commands/engine_options.cpp
     src/commands/model_setup.cpp
     src/config/cli_paths.cpp
     src/io/wav_io.cpp
@@ -52,6 +55,7 @@ set(RCLI_THIRD_PARTY_SOURCES
 add_library(rcli_core OBJECT ${RCLI_SOURCES} ${RCLI_THIRD_PARTY_SOURCES})
 
 target_include_directories(rcli_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/CLI11
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/linenoise
@@ -93,7 +97,7 @@ endif()
 
 # Per-backend availability defines, mirroring tools/CMakeLists.txt's
 # if(TARGET ...) pattern so the CLI builds with any backend subset.
-foreach(_rcli_backend llamacpp onnx sherpa)
+foreach(_rcli_backend llamacpp onnx sherpa mlx)
     if(TARGET rac_backend_${_rcli_backend})
         string(TOUPPER ${_rcli_backend} _rcli_backend_upper)
         target_compile_definitions(rcli_core PUBLIC RCLI_HAS_${_rcli_backend_upper}=1)

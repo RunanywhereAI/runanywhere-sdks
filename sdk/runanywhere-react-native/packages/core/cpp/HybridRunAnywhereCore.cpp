@@ -83,7 +83,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         std::string deviceId = extractStringValue(configJson, "deviceId");
         std::string envStr = extractStringValue(configJson, "environment", "production");
         std::string sdkVersionFromConfig = extractStringValue(configJson, "sdkVersion", "0.2.0");
-        std::string platformFromConfig = extractStringValue(configJson, "platform", "react_native");
+        std::string platformFromConfig = extractStringValue(configJson, "platform", defaultNativePlatform());
         std::string buildToken = extractStringValue(configJson, "buildToken", "");
         bool forceRefreshAssignments = extractBoolValue(configJson, "forceRefreshAssignments", false);
         bool flushTelemetry = extractBoolValue(configJson, "flushTelemetry", true);
@@ -206,6 +206,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
                     persistentDeviceId,
                     deviceModel,
                     osVersion,
+                    platformFromConfig,
                     sdkVersionFromConfig  // Use version from config
                 );
 
@@ -359,6 +360,22 @@ HybridRunAnywhereCore::resultToProtoErrorProto(double code) {
         std::free(out.data);
         std::free(out.error_message);
         return buffer;
+    });
+}
+
+// Process-wide Hugging Face token → commons rac_http_hf_token_set. Auth is
+// applied in the C++ dispatch layer (https HF hosts only, caller
+// Authorization wins), shared by every SDK. Empty string clears the token
+// and disables the HF_TOKEN env fallback.
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::setHfToken(const std::string& token) {
+    return Promise<void>::async([token]() {
+        using SetHfTokenFn = void (*)(const char*);
+        auto fn = reinterpret_cast<SetHfTokenFn>(dlsym(RTLD_DEFAULT, "rac_http_hf_token_set"));
+        if (!fn) {
+            LOGW("setHfToken: rac_http_hf_token_set unavailable");
+            return;
+        }
+        fn(token.c_str());
     });
 }
 

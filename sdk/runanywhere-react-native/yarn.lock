@@ -2098,6 +2098,19 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@runanywhere/mlx@workspace:packages/mlx":
+  version: 0.0.0-use.local
+  resolution: "@runanywhere/mlx@workspace:packages/mlx"
+  dependencies:
+    typescript: ^5.9.3
+  peerDependencies:
+    "@runanywhere/core": ">=0.19.13"
+    react: ">=19.0.0"
+    react-native: ">=0.83.1"
+    react-native-nitro-modules: ^0.33.9
+  languageName: unknown
+  linkType: soft
+
 "@runanywhere/onnx@workspace:packages/onnx":
   version: 0.0.0-use.local
   resolution: "@runanywhere/onnx@workspace:packages/onnx"
@@ -2120,6 +2133,22 @@ __metadata:
   dependencies:
     "@bufbuild/protobuf": ^2.12.0
     typescript: ^5.9.3
+  languageName: unknown
+  linkType: soft
+
+"@runanywhere/qhexrt@workspace:packages/qhexrt":
+  version: 0.0.0-use.local
+  resolution: "@runanywhere/qhexrt@workspace:packages/qhexrt"
+  dependencies:
+    "@runanywhere/proto-ts": "workspace:*"
+    nitrogen: ^0.34.1
+    react-native-nitro-modules: ^0.33.9
+    typescript: ^5.9.3
+  peerDependencies:
+    "@runanywhere/core": ">=0.19.13"
+    react: ">=19.0.0"
+    react-native: ">=0.83.1"
+    react-native-nitro-modules: ^0.33.9
   languageName: unknown
   linkType: soft
 
@@ -8612,10 +8641,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react@npm:19.2.7":
-  version: 19.2.7
-  resolution: "react@npm:19.2.7"
-  checksum: be94ec2f1779b27cac328ddae18e52933c2977a2425b67039229ead45c62d0363b66e894076236616c8d98821a9a760fcbab8a9da8ae9c4b2849dfd12cc32a46
+"react@npm:19.2.3":
+  version: 19.2.3
+  resolution: "react@npm:19.2.3"
+  checksum: 506e369ae13cb46b7f303c0201aadf856642f482cdf5b1c3730c3a6d1762fd5a3ae1dd31196a4686bfbbe56456dcd0c48a4656c75cbcb45620e3028c54789ae9
   languageName: node
   linkType: hard
 
@@ -8916,7 +8945,7 @@ __metadata:
     eslint-plugin-prettier: ^5.5.5
     lerna: ^8.2.4
     prettier: ^3.8.3
-    react: 19.2.7
+    react: 19.2.3
     react-native: 0.85.3
     typescript: ^5.9.3
   languageName: unknown

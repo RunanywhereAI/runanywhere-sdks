@@ -53,11 +53,10 @@ class ModelListViewModel extends ChangeNotifier {
 
       _availableModels = sdkModels;
 
-      debugPrint(
-          'Loaded ${_availableModels.length} models from SDK registry');
+      debugPrint('Loaded ${_availableModels.length} models from SDK registry');
       for (final model in _availableModels) {
         debugPrint(
-            '  - ${model.name} (${model.category.displayName}) [${model.preferredFramework.displayName}] ready: ${model.isReadyOnDevice}');
+            '  - ${model.name} (${model.category.displayName}) [${model.backendFramework.displayName}] ready: ${model.isReadyOnDevice}');
       }
     } catch (e) {
       debugPrint('Failed to load models from SDK: $e');
@@ -76,7 +75,7 @@ class ModelListViewModel extends ChangeNotifier {
       // Extract unique frameworks from available models
       final frameworks = <LLMFramework>{};
       for (final model in _availableModels) {
-        frameworks.add(model.preferredFramework);
+        frameworks.add(model.backendFramework);
         frameworks.addAll(model.compatibleFrameworks);
       }
       _availableFrameworks = frameworks.toList();

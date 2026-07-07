@@ -50,10 +50,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     // built-in cases are handled explicitly below (see
     // ExampleModelInfoView.isReadyOnDevice in model_types.dart).
     int priorityFor(ModelInfo m) {
-      if (m.preferredFramework ==
+      if (m.backendFramework ==
               LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
-          m.preferredFramework ==
-              LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS) {
+          m.backendFramework == LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS) {
         return 0;
       }
       return m.localPath.isNotEmpty ? 1 : 2;
@@ -512,42 +511,17 @@ class _FlatModelRowContent extends StatelessWidget {
   });
 
   Color get _frameworkColor {
-    final framework = model.preferredFramework;
-    switch (framework) {
-      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-        return AppColors.primaryBlue;
-      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
-        return Colors.purple;
-      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return Colors.grey;
-      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
+    return model.backendFramework.backendColor;
   }
 
   String get _frameworkName {
-    final framework = model.preferredFramework;
-    switch (framework) {
-      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-        return 'Fast';
-      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
-        return 'ONNX';
-      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return 'Apple';
-      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
-        return 'Whisper';
-      default:
-        return framework.displayName;
-    }
+    return model.backendFramework.displayName;
   }
 
   bool get _isBuiltIn =>
-      model.preferredFramework ==
+      model.backendFramework ==
           LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
-      model.preferredFramework ==
-          LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
+      model.backendFramework == LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
 
   IconData get _statusIcon {
     if (_isBuiltIn || model.localPath.isNotEmpty) {
@@ -611,12 +585,23 @@ class _FlatModelRowContent extends StatelessWidget {
                           borderRadius: BorderRadius.circular(
                               AppSpacing.cornerRadiusSmall),
                         ),
-                        child: Text(
-                          _frameworkName,
-                          style: AppTypography.caption2(context).copyWith(
-                            fontWeight: FontWeight.w500,
-                            color: _frameworkColor,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              model.backendFramework.backendIcon,
+                              size: 10,
+                              color: _frameworkColor,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              _frameworkName,
+                              style: AppTypography.caption2(context).copyWith(
+                                fontWeight: FontWeight.w500,
+                                color: _frameworkColor,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -649,9 +634,8 @@ class _FlatModelRowContent extends StatelessWidget {
                           height: 12,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            value: downloadProgress > 0
-                                ? downloadProgress
-                                : null,
+                            value:
+                                downloadProgress > 0 ? downloadProgress : null,
                           ),
                         ),
                         const SizedBox(width: AppSpacing.xSmall),

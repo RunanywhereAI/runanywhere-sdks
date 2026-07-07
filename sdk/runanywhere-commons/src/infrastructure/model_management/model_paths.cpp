@@ -240,6 +240,17 @@ static bool matches_model_format(const fs::path& path, rac_model_format_t format
     }
 }
 
+static bool is_common_non_model_root_file(const fs::path& path) {
+    const std::string name = to_lower(filename_of(path));
+    if (name_equals_any(name, {"readme", "readme.txt", "readme.md", "license", "license.txt",
+                               "license.md", "notice", "notice.txt", "notice.md", "changelog",
+                               "changelog.txt", "changelog.md"})) {
+        return true;
+    }
+    return has_extension(path, "md") || has_extension(path, "txt") || has_extension(path, "sha256") ||
+           has_extension(path, "sha256sum") || has_extension(path, "jsonl");
+}
+
 static rac_resolved_model_file_role_t infer_file_role(const fs::path& path,
                                                       rac_model_format_t format) {
     std::string name = to_lower(filename_of(path));
@@ -321,8 +332,14 @@ rac_result_t rac_infer_model_file_role(const char* filename, int32_t modality_pr
     }
     if (name_equals_any(name, {"config.json", "generation_config.json", "preprocessor_config.json",
                                "processor_config.json", "image_processor_config.json",
-                               "model_config.json"})) {
+                               "model_config.json", "configuration.json", "chat_template.json",
+                               "chat_template.jinja", "model.safetensors.index.json"})) {
         *out_role_proto = RAC_MODEL_FILE_ROLE_CONFIG;
+        return RAC_SUCCESS;
+    }
+    if (has_extension(fs::path(name), "py") || name_equals_any(name, {"readme.md", "license.md",
+                                                                      "trainer_state.json"})) {
+        *out_role_proto = RAC_MODEL_FILE_ROLE_COMPANION;
         return RAC_SUCCESS;
     }
 
@@ -464,6 +481,7 @@ static fs::path effective_model_root(const fs::path& root, rac_model_format_t fo
     }
 
     bool has_direct_model_file = false;
+    bool has_regular_file = false;
     std::vector<fs::path> child_dirs;
     for (fs::directory_iterator it(root, fs::directory_options::skip_permission_denied, ec), end;
          !ec && it != end; it.increment(ec)) {
@@ -471,13 +489,24 @@ static fs::path effective_model_root(const fs::path& root, rac_model_format_t fo
         if (should_skip_model_entry(child)) {
             continue;
         }
-        if (it->is_regular_file(ec) && matches_model_format(child, format)) {
-            has_direct_model_file = true;
+        if (it->is_regular_file(ec)) {
+            if (matches_model_format(child, format)) {
+                has_regular_file = true;
+                has_direct_model_file = true;
+            } else if (!is_common_non_model_root_file(child)) {
+                has_regular_file = true;
+            }
         } else if (it->is_directory(ec)) {
             child_dirs.push_back(child);
         }
     }
-    if (!has_direct_model_file && child_dirs.size() == 1) {
+    // Descend into a lone wrapper subdirectory only when the root holds no
+    // files of its own — the classic "archive extracted to root/<subdir>/..."
+    // layout. When the root already carries regular files (e.g. a QHexRT
+    // bundle: a <name>.json manifest + weights alongside a companion subfolder
+    // such as vlm/), the root *is* the model directory; descending would
+    // strand the manifest under the wrong root and break model load.
+    if (!has_direct_model_file && !has_regular_file && child_dirs.size() == 1) {
         return child_dirs.front();
     }
     return root;
@@ -828,16 +857,16 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
             return "LlamaCpp";
         case RAC_FRAMEWORK_COREML:
             return "CoreML";
+        case RAC_FRAMEWORK_MLX:
+            return "MLX";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return "FoundationModels";
         case RAC_FRAMEWORK_SYSTEM_TTS:
             return "SystemTTS";
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return "FluidAudio";
-        case RAC_FRAMEWORK_METALRT:
-            return "MetalRT";
-        case RAC_FRAMEWORK_GENIE:
-            return "Genie";
+        case RAC_FRAMEWORK_QHEXRT:
+            return "QHexRT";
         case RAC_FRAMEWORK_BUILTIN:
             return "BuiltIn";
         case RAC_FRAMEWORK_NONE:
@@ -1333,9 +1362,9 @@ rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_
     // under {Models}/{framework}/{id}/ will be parsed as direct
     // {Models}/{id}/ entries and model-id extraction will collapse to the
     // framework name (observed previously for Sherpa which was missing here).
-    const char* frameworks[] = {"ONNX",      "Sherpa",     "LlamaCpp", "FoundationModels",
-                                "SystemTTS", "FluidAudio", "BuiltIn",  "CoreML",
-                                "MetalRT",   "Genie",      "None",     "Unknown"};
+    const char* frameworks[] = {"ONNX",      "Sherpa",     "LlamaCpp", "MLX",
+                                "FoundationModels", "SystemTTS", "FluidAudio", "BuiltIn",
+                                "CoreML",    "QHexRT",     "None",     "Unknown"};
     for (const char* fw : frameworks) {
         if (nextComponent == fw) {
             isFramework = true;
@@ -1397,6 +1426,9 @@ rac_result_t rac_model_paths_extract_framework(const char* path,
     } else if (nextComponent == "LlamaCpp") {
         *out_framework = RAC_FRAMEWORK_LLAMACPP;
         return RAC_SUCCESS;
+    } else if (nextComponent == "MLX") {
+        *out_framework = RAC_FRAMEWORK_MLX;
+        return RAC_SUCCESS;
     } else if (nextComponent == "CoreML") {
         *out_framework = RAC_FRAMEWORK_COREML;
         return RAC_SUCCESS;
@@ -1409,17 +1441,14 @@ rac_result_t rac_model_paths_extract_framework(const char* path,
     } else if (nextComponent == "FluidAudio") {
         *out_framework = RAC_FRAMEWORK_FLUID_AUDIO;
         return RAC_SUCCESS;
-    } else if (nextComponent == "MetalRT") {
-        *out_framework = RAC_FRAMEWORK_METALRT;
-        return RAC_SUCCESS;
     } else if (nextComponent == "BuiltIn") {
         *out_framework = RAC_FRAMEWORK_BUILTIN;
         return RAC_SUCCESS;
     } else if (nextComponent == "None") {
         *out_framework = RAC_FRAMEWORK_NONE;
         return RAC_SUCCESS;
-    } else if (nextComponent == "Genie") {
-        *out_framework = RAC_FRAMEWORK_GENIE;
+    } else if (nextComponent == "QHexRT") {
+        *out_framework = RAC_FRAMEWORK_QHEXRT;
         return RAC_SUCCESS;
     }
 

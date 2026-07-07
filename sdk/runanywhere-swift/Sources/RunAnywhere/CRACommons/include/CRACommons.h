@@ -16,6 +16,7 @@
 // =============================================================================
 
 #include "rac_audio_utils.h"
+#include "rac_benchmark.h"
 #include "rac_component_types.h"
 #include "rac_core.h"
 #include "rac_error.h"
@@ -117,6 +118,7 @@
 // Model management
 #include "rac_lora_registry.h"
 #include "rac_model_assignment.h"
+#include "rac_model_format_ids.h"
 #include "rac_model_paths.h"
 #include "rac_model_registry.h"
 #include "rac_model_types.h"
@@ -145,6 +147,7 @@
 
 #include "rac_api_types.h"
 #include "rac_auth_manager.h"
+#include "rac_client_info.h"
 #include "rac_dev_config.h"
 #include "rac_endpoints.h"
 #include "rac_environment.h"

@@ -105,7 +105,19 @@ export interface RegisterModelInput {
 export interface RegisterMultiFileModelInput {
   id: string;
   name: string;
-  files: Array<{ url: string; filename: string; isRequired: boolean }>;
+  /**
+   * Bundle files. `role` is optional: when omitted commons infers it from the
+   * filename (`rac_infer_model_file_role`), which is correct for GGUF/ONNX
+   * sidecars. Supply it explicitly when the filename heuristic can't pick the
+   * entry point — e.g. QHexRT bundles whose primary is a `.json` manifest that
+   * inference would otherwise treat like any other config sidecar.
+   */
+  files: Array<{
+    url: string;
+    filename: string;
+    isRequired: boolean;
+    role?: ModelFileRole;
+  }>;
   framework: InferenceFramework;
   modality?: ModelCategory;
   memoryRequirement?: number;
@@ -325,7 +337,9 @@ export async function registerMultiFileModel(
   // Canonical commons factory: rac_register_multi_file_model_proto builds
   // the MultiFileArtifact ModelInfo and persists it with merge-on-reseed
   // semantics. Role inference stays commons-owned (rac_infer_model_file_role)
-  // so tokenizer/config/vocab/mmproj sidecars resolve identically everywhere.
+  // so tokenizer/config/vocab/mmproj sidecars resolve identically everywhere —
+  // unless the caller pins a role explicitly (e.g. a QHexRT `.json` manifest
+  // the filename heuristic can't distinguish from a config sidecar).
   const message = RegisterMultiFileModelRequest.fromPartial({
     id: input.id,
     name: input.name,
@@ -339,7 +353,9 @@ export async function registerMultiFileModel(
         }
       : {}),
     files: input.files.map((file) => ({
-      role: native.inferModelFileRole(file.filename, category) as ModelFileRole,
+      role:
+        file.role ??
+        (native.inferModelFileRole(file.filename, category) as ModelFileRole),
       url: file.url,
       filename: file.filename,
       isRequired: file.isRequired,

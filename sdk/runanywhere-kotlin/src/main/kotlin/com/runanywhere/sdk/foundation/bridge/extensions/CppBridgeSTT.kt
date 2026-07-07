@@ -333,9 +333,8 @@ object CppBridgeSTT {
             InferenceFramework.INFERENCE_FRAMEWORK_NONE -> CppBridgeModelRegistry.Framework.NONE
             InferenceFramework.INFERENCE_FRAMEWORK_MLX -> CppBridgeModelRegistry.Framework.MLX
             InferenceFramework.INFERENCE_FRAMEWORK_COREML -> CppBridgeModelRegistry.Framework.COREML
-            InferenceFramework.INFERENCE_FRAMEWORK_METALRT -> CppBridgeModelRegistry.Framework.METALRT
-            InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> CppBridgeModelRegistry.Framework.GENIE
             InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> CppBridgeModelRegistry.Framework.SHERPA
+            InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> CppBridgeModelRegistry.Framework.QHEXRT
             else -> CppBridgeModelRegistry.Framework.UNKNOWN
         }
 }

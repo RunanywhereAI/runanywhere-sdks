@@ -25,10 +25,11 @@ extension RAVLMGenerationOptions {
     public static func defaults(prompt: String = "") -> RAVLMGenerationOptions {
         var options = RAVLMGenerationOptions()
         options.prompt = prompt
-        options.maxTokens = 256
+        options.maxTokens = 128
         options.temperature = 0.7
         options.topP = 0.9
         options.topK = 40
+        options.repetitionPenalty = 1.1
         return options
     }
 }

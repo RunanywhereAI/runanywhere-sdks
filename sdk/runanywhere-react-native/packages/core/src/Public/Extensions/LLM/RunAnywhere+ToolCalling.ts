@@ -259,7 +259,10 @@ export interface GenerateWithToolsOptions {
    * (maxTokens 100, temperature 0.8, topP 1.0).
    */
   llmOptions?: Partial<
-    Pick<LLMGenerationOptions, 'maxTokens' | 'temperature' | 'topP' | 'systemPrompt'>
+    Pick<
+      LLMGenerationOptions,
+      'maxTokens' | 'temperature' | 'topP' | 'systemPrompt' | 'disableThinking'
+    >
   >;
   /**
    * Swift parity: when omitted the proto field stays UNSET so commons applies
@@ -344,7 +347,8 @@ export async function generateWithTools(
     toolChoice: options?.toolChoice,
     forcedToolName: options?.forcedToolName,
     // Suppress thinking when requested (commons prepends the no-think directive).
-    disableThinking: options?.disableThinking ?? false,
+    disableThinking:
+      (options?.disableThinking ?? false) || (llm?.disableThinking ?? false),
   });
 
   logger.debug(

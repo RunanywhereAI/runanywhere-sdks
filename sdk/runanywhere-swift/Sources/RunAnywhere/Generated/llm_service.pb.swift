@@ -276,6 +276,16 @@ public nonisolated struct RALLMGenerateRequest: @unchecked Sendable {
   /// Clears the value of `options`. Subsequent reads from it will return its default value.
   public mutating func clearOptions() {_uniqueStorage()._options = nil}
 
+  /// idl-chat: PRIOR conversation turns (excludes the current `prompt`, which
+  /// stays the live user turn, and `system_prompt`, which stays separate).
+  /// Alternating user/assistant ChatMessages in chronological order. An engine
+  /// that owns its chat template renders {system_prompt, history, prompt} from
+  /// its model's markers; engines that don't simply ignore this field.
+  public var history: [RAChatMessage] {
+    get {_storage._history}
+    set {_uniqueStorage()._history = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -492,7 +502,7 @@ nonisolated extension RALLMStreamEventKind: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerateRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}system_prompt\0\u{3}emit_thoughts\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}json_schema\0\u{3}execution_target\0\u{3}request_id\0\u{3}model_id\0\u{3}conversation_id\0\u{1}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}min_p\0\u{1}grammar\0\u{3}response_format\0\u{3}echo_prompt\0\u{3}n_threads\0\u{1}metadata\0\u{1}options\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}system_prompt\0\u{3}emit_thoughts\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}json_schema\0\u{3}execution_target\0\u{3}request_id\0\u{3}model_id\0\u{3}conversation_id\0\u{1}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}min_p\0\u{1}grammar\0\u{3}response_format\0\u{3}echo_prompt\0\u{3}n_threads\0\u{1}metadata\0\u{1}options\0\u{1}history\0")
 
   fileprivate class _StorageClass {
     var _prompt: String = String()
@@ -521,6 +531,7 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
     var _nThreads: Int32 = 0
     var _metadata: Dictionary<String,String> = [:]
     var _options: RALLMGenerationOptions? = nil
+    var _history: [RAChatMessage] = []
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -557,6 +568,7 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
       _nThreads = source._nThreads
       _metadata = source._metadata
       _options = source._options
+      _history = source._history
     }
   }
 
@@ -601,6 +613,7 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
         case 24: try { try decoder.decodeSingularInt32Field(value: &_storage._nThreads) }()
         case 25: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._metadata) }()
         case 26: try { try decoder.decodeSingularMessageField(value: &_storage._options) }()
+        case 27: try { try decoder.decodeRepeatedMessageField(value: &_storage._history) }()
         default: break
         }
       }
@@ -691,6 +704,9 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
       try { if let v = _storage._options {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 26)
       } }()
+      if !_storage._history.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._history, fieldNumber: 27)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -726,6 +742,7 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
         if _storage._nThreads != rhs_storage._nThreads {return false}
         if _storage._metadata != rhs_storage._metadata {return false}
         if _storage._options != rhs_storage._options {return false}
+        if _storage._history != rhs_storage._history {return false}
         return true
       }
       if !storagesAreEqual {return false}

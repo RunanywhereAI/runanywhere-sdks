@@ -54,7 +54,8 @@ export const VoiceAssistantScreen: React.FC = () => {
   const micDriverRef = useRef<VoiceAgentMicDriver | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
-  const allModelsLoaded = sttModel && llmModel && ttsModel && vadModel;
+  // VAD is optional: the voice agent auto-ensures Silero VAD when none is picked.
+  const allModelsLoaded = sttModel && llmModel && ttsModel;
 
   const cleanupVoiceSession = useCallback(async () => {
     if (micDriverRef.current) {

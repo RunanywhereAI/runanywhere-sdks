@@ -7,6 +7,7 @@ import { Icon, useTheme } from '../theme/system';
 import type { IconName } from '../theme/system/icons';
 import { ROUTES } from '../navigation/routes';
 import type { RootStackParamList } from '../navigation/navigation.types';
+import HexagonNpuCard from '../components/HexagonNpuCard';
 
 type MoreEntry = {
   label: string;
@@ -93,6 +94,7 @@ export const MoreScreen: React.FC = () => {
       ]}
       showsVerticalScrollIndicator={false}
     >
+      <HexagonNpuCard />
       {ENTRIES.map((entry) => {
         const enabled = entry.route !== null;
         const labelColor = enabled

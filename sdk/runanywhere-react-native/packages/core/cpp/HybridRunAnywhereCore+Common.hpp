@@ -275,13 +275,14 @@ bool extractBoolValue(const std::string& json, const std::string& key, bool defa
 rac_inference_framework_t frameworkFromString(const std::string& framework) {
     if (framework == "LlamaCpp" || framework == "llamacpp") return RAC_FRAMEWORK_LLAMACPP;
     if (framework == "ONNX" || framework == "onnx") return RAC_FRAMEWORK_ONNX;
+    if (framework == "MLX" || framework == "mlx") return RAC_FRAMEWORK_MLX;
 #ifdef __APPLE__
     if (framework == "CoreML" || framework == "coreml") return RAC_FRAMEWORK_COREML;
 #endif
     if (framework == "FoundationModels") return RAC_FRAMEWORK_FOUNDATION_MODELS;
     if (framework == "SystemTTS") return RAC_FRAMEWORK_SYSTEM_TTS;
-    if (framework == "Genie" || framework == "genie") return (rac_inference_framework_t)11; // RAC_FRAMEWORK_GENIE
     if (framework == "Sherpa" || framework == "sherpa") return (rac_inference_framework_t)12; // RAC_FRAMEWORK_SHERPA (B-RN-Sherpa-001)
+    if (framework == "QHexRT" || framework == "qhexrt" || framework == "qnn") return (rac_inference_framework_t)13; // RAC_FRAMEWORK_QHEXRT
     return RAC_FRAMEWORK_UNKNOWN;
 }
 

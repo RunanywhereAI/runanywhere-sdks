@@ -52,7 +52,7 @@ public enum class ModelFormat(
   MODEL_FORMAT_TFLITE(9),
   MODEL_FORMAT_SAFETENSORS(10),
   /**
-   * Qualcomm Genie
+   * Qualcomm Hexagon NPU context
    */
   MODEL_FORMAT_QNN_CONTEXT(11),
   /**

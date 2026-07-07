@@ -84,6 +84,29 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   resultToProtoErrorProto(code: number): Promise<ArrayBuffer>;
 
+  /**
+   * Set (or clear) the process-wide Hugging Face token via commons'
+   * `rac_http_hf_token_set`. Auth lives in the C++ layer (attached only to
+   * https huggingface.co/hf.co requests, never overriding a caller
+   * Authorization header) so downloads, HEAD preflight, resumable transfers,
+   * and HF repo registration authenticate uniformly on every platform.
+   * Empty string clears the token and disables the HF_TOKEN env fallback.
+   * Kotlin parity: RunAnywhereBridge.racHttpHfTokenSet.
+   */
+  setHfToken(token: string): Promise<void>;
+
+  /**
+   * Apple MLX runtime bridge.
+   *
+   * These methods call the Swift MLX runtime C entrypoints when the host app
+   * links `RunAnywhereMLX`. They return false on platforms or builds where the
+   * Swift runtime is not present.
+   */
+  mlxRuntimeAvailable(): Promise<boolean>;
+  mlxRegisterBackend(priority: number): Promise<boolean>;
+  mlxUnregisterBackend(): Promise<boolean>;
+  mlxIsBackendRegistered(): Promise<boolean>;
+
   // ============================================================================
   // Plugin Loader
   // Matches Swift: RunAnywhere.pluginLoader backed by rac_registry_*.
@@ -901,9 +924,7 @@ export interface RunAnywhereCore extends HybridObject<{
    * `runanywhere.v1.VoiceAgentTranscribeProtoRequest`; the output is a
    * serialized `runanywhere.v1.STTOutput`.
    */
-  voiceAgentTranscribeProto(
-    audioBytes: ArrayBuffer
-  ): Promise<ArrayBuffer>;
+  voiceAgentTranscribeProto(audioBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
    * Synthesize speech using the voice-agent TTS component via the commons

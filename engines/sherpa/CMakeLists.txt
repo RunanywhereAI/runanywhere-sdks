@@ -341,6 +341,12 @@ elseif(EMSCRIPTEN)
     endif()
 endif()
 
+# Expose concrete runtime availability to later directories (notably the
+# commons test suite). RAC_BACKEND_SHERPA means the bridge/stub target exists;
+# this flag means the real Sherpa-ONNX C API artifact was found.
+set(RAC_SHERPA_ONNX_AVAILABLE "${SHERPA_ONNX_AVAILABLE}" CACHE INTERNAL
+    "Whether the Sherpa-ONNX runtime artifact is available for this build" FORCE)
+
 # =============================================================================
 # Sherpa Plugin Library
 # =============================================================================

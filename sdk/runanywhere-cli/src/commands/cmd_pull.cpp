@@ -22,6 +22,7 @@
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
+#include "commands/engine_options.h"
 #include "catalog/model_ref.h"
 #include "io/output.h"
 #include "io/proto.h"
@@ -259,16 +260,25 @@ void register_pull(CLI::App &app, GlobalOptions &options) {
   CLI::App *cmd = app.add_subcommand(
       "pull", "Download a model (catalog id, hf.co/... or direct URL)");
   auto ref = std::make_shared<std::string>();
+  auto engine = std::make_shared<std::string>();
   cmd->add_option("model", *ref, "Model id, alias, hf.co/org/repo/file or URL")
       ->required();
-  cmd->callback([&options, ref]() {
+  cmd->add_option("--engine", *engine,
+                  "Engine/framework hint for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
+  cmd->callback([&options, ref, engine]() {
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {
       throw CLI::RuntimeError(1);
     }
+    EngineHintResolution engine_hint;
+    std::string engine_error;
+    if (!resolve_engine_hint(*engine, &engine_hint, &engine_error)) {
+      out::error_line(engine_error);
+      throw CLI::RuntimeError(2);
+    }
     model_ref::Resolved resolved;
     std::string error;
-    if (model_ref::resolve(*ref, &resolved, &error) != RAC_SUCCESS) {
+    if (model_ref::resolve(*ref, &resolved, &error, &engine_hint.resolve_options) != RAC_SUCCESS) {
       out::error_line(error);
       throw CLI::RuntimeError(1);
     }

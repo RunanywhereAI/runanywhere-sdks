@@ -11,6 +11,7 @@
 #ifndef RAC_TELEMETRY_TYPES_H
 #define RAC_TELEMETRY_TYPES_H
 
+#include "rac_client_info.h"
 #include "rac_types.h"
 #include "rac_environment.h"
 
@@ -214,6 +215,7 @@ typedef struct rac_device_registration_request {
     const char* sdk_version;
     const char* build_token;  // For development mode
     int64_t last_seen_at_ms;
+    rac_client_info_t client_info;
 } rac_device_registration_request_t;
 
 /**

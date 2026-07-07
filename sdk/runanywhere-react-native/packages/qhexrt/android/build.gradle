@@ -1,0 +1,217 @@
+// =============================================================================
+// @runanywhere/qhexrt - QHexRT (Qualcomm Hexagon NPU) backend, Android arm64.
+//
+// Unlike the public LlamaCPP/ONNX backends, the QHexRT native library
+// (librac_backend_qhexrt.so) is PRIVATE and bundled directly in this package's
+// src/main/jniLibs — there is no GitHub release download step. librac_commons.so
+// is supplied by the sibling @runanywhere/core package (the authoritative source)
+// and is intentionally excluded from this module's packaging.
+// =============================================================================
+
+// =============================================================================
+// Node Binary Detection for Android Studio Compatibility
+// Android Studio doesn't inherit terminal PATH, so we need to find node explicitly
+// =============================================================================
+def findNodeBinary() {
+    def localProperties = new Properties()
+    def localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.withInputStream { localProperties.load(it) }
+        def nodePath = localProperties.getProperty("node.path")
+        if (nodePath && new File(nodePath).exists()) {
+            return nodePath
+        }
+    }
+
+    def homeDir = System.getProperty("user.home")
+    def nodePaths = [
+        "/opt/homebrew/bin/node",
+        "/usr/local/bin/node",
+        "/usr/bin/node",
+        "${homeDir}/.nvm/current/bin/node",
+        "${homeDir}/.volta/bin/node",
+        "${homeDir}/.asdf/shims/node"
+    ]
+    for (path in nodePaths) {
+        if (new File(path).exists()) {
+            return path
+        }
+    }
+    return "node"
+}
+
+def getExtOrIntegerDefault(name) {
+    if (rootProject.ext.has(name)) {
+        return rootProject.ext.get(name)
+    } else if (project.properties.containsKey('RunAnywhereQHexRT_' + name)) {
+        return (project.properties['RunAnywhereQHexRT_' + name]).toInteger()
+    }
+    def defaults = [
+        'compileSdkVersion': 36,
+        'minSdkVersion': 24,
+        'targetSdkVersion': 36
+    ]
+    return defaults[name] ?: 36
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+apply from: '../nitrogen/generated/android/runanywhereqhexrt+autolinking.gradle'
+apply plugin: 'com.facebook.react'
+
+// Configure node path for Android Studio builds
+def nodeBinary = findNodeBinary()
+logger.lifecycle("[RunAnywhereQHexRT] Using node binary: ${nodeBinary}")
+
+afterEvaluate {
+    tasks.withType(com.facebook.react.tasks.GenerateCodegenSchemaTask).configureEach {
+        nodeExecutableAndArgs.set([nodeBinary])
+    }
+    tasks.withType(com.facebook.react.tasks.GenerateCodegenArtifactsTask).configureEach {
+        nodeExecutableAndArgs.set([nodeBinary])
+    }
+}
+
+// Native libraries directory (bundled - QHexRT is private, never downloaded)
+def jniLibsDir = file("src/main/jniLibs")
+
+def androidNdkHomeForRuntime() {
+    def explicitNdk = System.getenv("ANDROID_NDK_HOME") ?: System.getenv("NDK_HOME")
+    if (explicitNdk) {
+        return file(explicitNdk)
+    }
+    def androidSdk = System.getenv("ANDROID_HOME") ?:
+        System.getenv("ANDROID_SDK_ROOT") ?:
+        "${System.getProperty('user.home')}/Library/Android/sdk"
+    def ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.0.12077973"
+    return file("${androidSdk}/ndk/${ndkVersion}")
+}
+
+def androidNdkHostTag() {
+    def osName = System.getProperty("os.name").toLowerCase(Locale.ROOT)
+    if (osName.contains("mac")) return "darwin-x86_64"
+    if (osName.contains("linux")) return "linux-x86_64"
+    throw new GradleException("Unsupported host for Android NDK runtime lookup: ${System.getProperty('os.name')}")
+}
+
+def syncAndroidNdkRuntimeLibs(File outputDir) {
+    def ndkHome = androidNdkHomeForRuntime()
+    def prebuiltDir = new File(ndkHome, "toolchains/llvm/prebuilt/${androidNdkHostTag()}")
+    if (!prebuiltDir.isDirectory()) {
+        throw new GradleException("Android NDK prebuilt directory not found: ${prebuiltDir}")
+    }
+    // QHexRT ships arm64-v8a only.
+    def abiDir = new File(outputDir, "arm64-v8a")
+    def hasNativeLibs = abiDir.isDirectory() && abiDir.listFiles()?.any { it.name.endsWith(".so") }
+    if (!hasNativeLibs) return
+    def libcxx = new File(prebuiltDir, "sysroot/usr/lib/aarch64-linux-android/libc++_shared.so")
+    if (!libcxx.isFile()) throw new GradleException("libc++_shared.so not found at ${libcxx}")
+    copy { from libcxx; into abiDir }
+}
+
+android {
+    namespace "com.margelo.nitro.runanywhere.qhexrt"
+
+    compileSdkVersion getExtOrIntegerDefault('compileSdkVersion')
+
+    defaultConfig {
+        minSdkVersion getExtOrIntegerDefault('minSdkVersion')
+        targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
+
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+
+        externalNativeBuild {
+            cmake {
+                cppFlags "-frtti -fexceptions -Wall -fstack-protector-all"
+                arguments "-DANDROID_STL=c++_shared",
+                          "-DREACT_NATIVE_NITRO_BUILD_DIR=${rootProject.buildDir}"
+                abiFilters 'arm64-v8a'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+            version "3.30.5"
+        }
+    }
+
+    packagingOptions {
+        excludes = [
+            "META-INF",
+            "META-INF/**",
+            // librac_commons.so is owned by @runanywhere/core (single authoritative
+            // source). Packaging it here risks a stale copy winning the native merge.
+            "**/librac_commons.so"
+        ]
+        pickFirsts = [
+            "**/libc++_shared.so",
+            "**/libjsi.so",
+            "**/libfbjni.so",
+            "**/libfolly_runtime.so"
+        ]
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+        prefab true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    lint {
+        disable 'GradleCompatible'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs += [
+                "generated/java",
+                "generated/jni"
+            ]
+            jniLibs.srcDirs = [jniLibsDir]
+        }
+    }
+}
+
+// Stage the 16 KB-aligned NDK libc++ next to the bundled QHexRT .so.
+task syncAndroidRuntimeLibs {
+    description = "Stages 16 KB-aligned Android NDK libc++ for QHexRT"
+    group = "build setup"
+    doLast {
+        syncAndroidNdkRuntimeLibs(jniLibsDir)
+        logger.lifecycle("[RunAnywhereQHexRT] Synced 16 KB-aligned Android NDK libc++ into ${jniLibsDir}")
+    }
+}
+
+preBuild.dependsOn syncAndroidRuntimeLibs
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+dependencies {
+    implementation "com.facebook.react:react-android"
+    implementation project(":react-native-nitro-modules")
+    implementation project(":runanywhere_core")
+}

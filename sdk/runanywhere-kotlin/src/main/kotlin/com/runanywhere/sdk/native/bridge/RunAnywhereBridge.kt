@@ -154,6 +154,15 @@ object RunAnywhereBridge {
     external fun racModelPathsGetBaseDir(): String?
 
     /**
+     * Set (or clear) the process-wide Hugging Face token used by the C++
+     * download/registration paths (`rac_http_hf_token_set`). Empty string
+     * clears the token and disables the HF_TOKEN env fallback; null restores
+     * the default env-fallback state.
+     */
+    @JvmStatic
+    external fun racHttpHfTokenSet(token: String?)
+
+    /**
      * Get the model folder path under the canonical schema:
      * `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/`
      *
@@ -958,6 +967,21 @@ object RunAnywhereBridge {
         apiKey: String?,
         baseUrl: String?,
     ): Int
+
+    /**
+     * Set SDK binding + host application metadata used by device registration
+     * and telemetry-adjacent backend APIs.
+     */
+    @JvmStatic
+    external fun racSdkSetClientInfo(
+        sdkBinding: String?,
+        appIdentifier: String?,
+        appName: String?,
+        appVersion: String?,
+        appBuild: String?,
+        locale: String?,
+        timezone: String?,
+    )
 
     // TOOL CALLING API (rac_tool_calling.h)
     // Mirrors Swift SDK's CppBridge+ToolCalling.swift

@@ -38,6 +38,7 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "infrastructure/rac_path_safety_internal.h"
 
 #ifdef RAC_HAVE_PROTOBUF
 
@@ -307,6 +308,9 @@ static bool restore_manifest_folder(rac_model_registry_handle_t handle, const st
 bool try_restore_model_manifest_by_id(rac_model_registry_handle_t handle,
                                       const std::string& model_id) {
     if (!handle || model_id.empty()) {
+        return false;
+    }
+    if (!rac::path::is_safe_path_segment(model_id)) {
         return false;
     }
     char models_dir_buffer[4096];

@@ -3,7 +3,7 @@
  * @brief Verifies the Sherpa-ONNX plugin entry point owns STT / TTS / VAD only.
  *
  * Mirrors the parallel
- * test_plugin_entry_{llamacpp,onnx,genie}.cpp smoke tests so any future edit
+ * test_plugin_entry_{llamacpp,onnx}.cpp smoke tests so any future edit
  * to rac_plugin_entry_sherpa.cpp (e.g. dropping a primitive, flipping
  * availability, missing ops-slot population) is caught at ctest time rather
  * than at runtime in an iOS/Android voice-agent example app.
@@ -95,7 +95,7 @@ int main() {
 
     // Routable branch: speech ops are populated; LLM / VLM / embedding /
     // diffusion ops must remain NULL — those primitives live in sibling
-    // engines (llamacpp / onnx / metalrt) and the router relies on the
+    // engines (llamacpp / onnx) and the router relies on the
     // disjoint-slot invariant to score routing candidates.
     if (vt->stt_ops == nullptr || vt->tts_ops == nullptr || vt->vad_ops == nullptr) {
         std::fprintf(stderr, "speech ops slot is NULL (stt=%p tts=%p vad=%p)\n",

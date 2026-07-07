@@ -98,7 +98,11 @@ extension LLMViewModel {
             role: currentMessage.role,
             content: content,
             thinkingContent: currentMessage.thinkingContent,
-            timestamp: currentMessage.timestamp
+            timestamp: currentMessage.timestamp,
+            analytics: currentMessage.analytics,
+            modelInfo: currentMessage.modelInfo,
+            toolCallInfo: currentMessage.toolCallInfo,
+            attachment: currentMessage.attachment
         )
         self.updateMessage(at: index, with: updatedMessage)
     }
@@ -139,7 +143,9 @@ extension LLMViewModel {
             thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
             timestamp: currentMessage.timestamp,
             analytics: analytics,
-            modelInfo: modelInfo
+            modelInfo: modelInfo,
+            toolCallInfo: currentMessage.toolCallInfo,
+            attachment: currentMessage.attachment
         )
         self.updateMessage(at: index, with: updatedMessage)
         self.updateConversationAnalytics()
@@ -163,7 +169,12 @@ extension LLMViewModel {
                 id: currentMessage.id,
                 role: currentMessage.role,
                 content: errorMessage,
-                timestamp: currentMessage.timestamp
+                thinkingContent: currentMessage.thinkingContent,
+                timestamp: currentMessage.timestamp,
+                analytics: currentMessage.analytics,
+                modelInfo: currentMessage.modelInfo,
+                toolCallInfo: currentMessage.toolCallInfo,
+                attachment: currentMessage.attachment
             )
             self.updateMessage(at: index, with: updatedMessage)
         }

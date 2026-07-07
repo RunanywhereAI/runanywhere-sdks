@@ -1,7 +1,7 @@
 # =============================================================================
 # cmake/protobuf.cmake — Protobuf + absl detection
 #
-# Wraps `find_package(Protobuf)` (>= 5.0) and probes absl so proto-consuming
+# Wraps `find_package(Protobuf)` and probes absl so proto-consuming
 # C++ targets — chiefly rac_commons, which compiles the committed *.pb.cc under
 # sdk/runanywhere-commons/src/generated/proto/ — get consistent runtime + absl
 # link deps without each running its own skip-if-missing block.
@@ -20,23 +20,19 @@
 
 include_guard(GLOBAL)
 
-# Protobuf 5.x is required for runtime_version.h + absl::log linkage.
+# Protobuf must exactly match the checked-in generated C++ sources.
 #
 # Checked-in generated headers under sdk/runanywhere-commons/src/generated/proto
-# (Protobuf C++ Version 7.34.1) include `google/protobuf/runtime_version.h`,
-# which only exists from libprotobuf 4.x onward and is paired with the
-# renumbered absl-using runtime (source v22+). Anything older than 5.0 is
-# the legacy protobuf 3.x line and must be rejected — otherwise rac_commons
-# latches onto a system protobuf 3.x install
-# (Ubuntu 22.04/24.04 ship 3.12/3.21) and the build fails with either
-# "runtime_version.h: No such file or directory" or a missing absl::log
-# target. On Linux CI install protobuf 5.x + libabsl-dev; on macOS use
-# `brew install protobuf`. The commons CMakeLists provides a vendored
-# FetchContent fallback to v34.1 when no acceptable system package exists.
-set(RAC_PROTOBUF_MIN_VERSION "5.0" CACHE STRING
-    "Minimum acceptable Protobuf source version. Generated .pb.h files require >= 5.0.")
+# include an exact `PROTOBUF_VERSION` preprocessor guard. Newer patch releases
+# can satisfy a loose `find_package(Protobuf 5.0)` probe but still fail during
+# compilation. Keep this early, optional probe exact so it cannot pre-register
+# incompatible `protobuf::` imported targets before rac_commons vendors the
+# pinned runtime.
+include(LoadVersions OPTIONAL)
+set(RAC_PROTOBUF_EXACT_VERSION "${RAC_PROTOBUF_VERSION}" CACHE STRING
+    "Exact Protobuf source version matching checked-in generated C++ sources.")
 
-find_package(Protobuf ${RAC_PROTOBUF_MIN_VERSION} QUIET)
+find_package(Protobuf ${RAC_PROTOBUF_EXACT_VERSION} EXACT CONFIG QUIET)
 
 # SHARED-build consumers of proto-generated .pb.cc.o files
 # (rac_voice_event_abi.cpp, pipeline.pb.cc, etc.) need absl symbols at
@@ -68,9 +64,6 @@ if(Protobuf_FOUND)
     message(STATUS "Protobuf: found ${Protobuf_VERSION} (${Protobuf_LIBRARIES})")
 else()
     set(RAC_HAVE_PROTOBUF FALSE)
-    message(STATUS "Protobuf: no install >= ${RAC_PROTOBUF_MIN_VERSION} found via find_package — "
-                   "proto-consuming targets will be skipped. "
-                   "Install via 'brew install protobuf' (macOS) or "
-                   "'apt-get install libprotobuf-dev libabsl-dev protobuf-compiler' (Ubuntu, "
-                   "requires libprotobuf-dev >= 5.0).")
+    message(STATUS "Protobuf: no exact ${RAC_PROTOBUF_EXACT_VERSION} CONFIG package found — "
+                   "rac_commons may vendor the pinned runtime if protobuf is enabled.")
 endif()

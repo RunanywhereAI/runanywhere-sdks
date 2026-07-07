@@ -80,6 +80,19 @@ Notes:
 - If formatting tools disagree after a dependency refresh, use the existing workaround: run `yarn format:fix` from this sample and review the diff before committing.
 - `scripts/verify.sh` runs the reproducible build gates; set `RUN_IOS=1` to include the optional iOS build.
 
+### Private HNPU / QHexRT Downloads on Android
+
+The React Native example depends on `@runanywhere/qhexrt` and registers QHexRT on supported Snapdragon/Hexagon Android devices. Its Android Gradle project is included only when the private native backend is staged at `node_modules/@runanywhere/qhexrt/android/src/main/jniLibs/arm64-v8a/librac_backend_qhexrt.so`, so public checkouts stay clean.
+
+To test private `runanywhere/*_HNPU` bundles from the app:
+
+1. Open `Settings` -> `Downloads`.
+2. Paste a Hugging Face token into `HuggingFace token` and tap `Save token`.
+3. Download and load an HNPU model through the normal model UI. The app registers logical HNPU URLs; the SDK resolves the matching Hexagon arch natively.
+4. Tap `Clear` to return to public/no-auth downloads.
+
+The token is passed to the SDK through `RunAnywhere.setHfToken(...)`; it is not stored in catalogs, assets, logs, or source files.
+
 ### How It Works
 
 This sample app's `package.json` uses workspace dependencies to reference the local React Native SDK packages:

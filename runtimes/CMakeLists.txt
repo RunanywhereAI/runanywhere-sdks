@@ -1,12 +1,12 @@
 # =============================================================================
 # runtimes/ — top-level L1 runtime plugin directory
 #
-# A "runtime" is the compute target an engine executes on (CPU, Apple Metal,
+# A "runtime" is the compute target an engine executes on (CPU, ONNX Runtime,
 # Core ML, CUDA, Vulkan, QNN, …). Runtime plugins are separate from engine
 # plugins (engines/) and register via the `rac_runtime_register` surface
 # declared in include/rac/plugin/rac_runtime_registry.h.
 #
-# CPU is always built in. ORT/CoreML/Metal are adapter runtimes: they own
+# CPU is always built in. ORT/CoreML are adapter runtimes: they own
 # shared lifecycle helpers while engines continue to own primitive-specific
 # tensor marshaling.
 #
@@ -27,8 +27,4 @@ endif()
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/coreml/CMakeLists.txt")
     add_subdirectory(coreml)
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metal/CMakeLists.txt")
-    add_subdirectory(metal)
 endif()

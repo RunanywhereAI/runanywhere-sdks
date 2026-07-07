@@ -440,6 +440,15 @@ export interface EmscriptenRunanywhereModule {
     requestSize: number,
     outResult: number,
   ): number;
+  _rac_wasm_set_client_info?(
+    sdkBinding: number,
+    appIdentifier: number,
+    appName: number,
+    appVersion: number,
+    appBuild: number,
+    locale: number,
+    timezone: number,
+  ): void;
   _rac_auth_is_authenticated?(): number;
   _rac_auth_get_user_id?(): number;
   _rac_auth_get_organization_id?(): number;

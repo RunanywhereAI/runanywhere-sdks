@@ -30,7 +30,7 @@
     "vite": "^6.4.2",
     "@runanywhere/proto-ts": "^0.19.13",
     "react-native": "0.85.3",
-    "react": "19.2.7",
+    "react": "19.2.3",
     "@eslint/js": "^9.39.4",
     "tsd": "^0.33.0"
   }

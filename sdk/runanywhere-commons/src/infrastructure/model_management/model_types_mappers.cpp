@@ -31,9 +31,7 @@ constexpr int32_t kProtoIfwSystemTts = 4;
 constexpr int32_t kProtoIfwFluidAudio = 5;
 constexpr int32_t kProtoIfwCoreml = 6;
 constexpr int32_t kProtoIfwMlx = 7;
-// Proto value 8 (WHISPERKIT_COREML) retired — gap preserved.
-constexpr int32_t kProtoIfwMetalrt = 9;
-constexpr int32_t kProtoIfwGenie = 10;
+// Proto value 8 and values 9-10 retired — gaps preserved.
 constexpr int32_t kProtoIfwTflite = 11;
 constexpr int32_t kProtoIfwExecutorch = 12;
 constexpr int32_t kProtoIfwMediapipe = 13;
@@ -46,6 +44,7 @@ constexpr int32_t kProtoIfwBuiltIn = 20;
 constexpr int32_t kProtoIfwNone = 21;
 constexpr int32_t kProtoIfwUnknown = 22;
 constexpr int32_t kProtoIfwSherpa = 23;
+constexpr int32_t kProtoIfwQhexrt = 24;
 
 // ModelCategory
 constexpr int32_t kProtoMcUnspecified = 0;
@@ -122,12 +121,6 @@ rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
         case kProtoIfwMlx:
             *out = RAC_FRAMEWORK_MLX;
             return RAC_SUCCESS;
-        case kProtoIfwMetalrt:
-            *out = RAC_FRAMEWORK_METALRT;
-            return RAC_SUCCESS;
-        case kProtoIfwGenie:
-            *out = RAC_FRAMEWORK_GENIE;
-            return RAC_SUCCESS;
         case kProtoIfwBuiltIn:
             *out = RAC_FRAMEWORK_BUILTIN;
             return RAC_SUCCESS;
@@ -139,6 +132,9 @@ rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
             return RAC_SUCCESS;
         case kProtoIfwSherpa:
             *out = RAC_FRAMEWORK_SHERPA;
+            return RAC_SUCCESS;
+        case kProtoIfwQhexrt:
+            *out = RAC_FRAMEWORK_QHEXRT;
             return RAC_SUCCESS;
         // Proto values defined in idl/model_types.proto but without a
         // corresponding rac_inference_framework_t case: TFLITE, EXECUTORCH,
@@ -192,14 +188,11 @@ rac_result_t rac_inference_framework_to_proto(rac_inference_framework_t value, i
         case RAC_FRAMEWORK_COREML:
             *out = kProtoIfwCoreml;
             return RAC_SUCCESS;
-        case RAC_FRAMEWORK_METALRT:
-            *out = kProtoIfwMetalrt;
-            return RAC_SUCCESS;
-        case RAC_FRAMEWORK_GENIE:
-            *out = kProtoIfwGenie;
-            return RAC_SUCCESS;
         case RAC_FRAMEWORK_SHERPA:
             *out = kProtoIfwSherpa;
+            return RAC_SUCCESS;
+        case RAC_FRAMEWORK_QHEXRT:
+            *out = kProtoIfwQhexrt;
             return RAC_SUCCESS;
         case RAC_FRAMEWORK_UNKNOWN:
             *out = kProtoIfwUnknown;

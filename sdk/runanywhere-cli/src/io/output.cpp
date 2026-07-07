@@ -118,6 +118,38 @@ JsonWriter& JsonWriter::field(const std::string& key, bool value) {
     return *this;
 }
 
+JsonWriter& JsonWriter::value(const std::string& value) {
+    comma();
+    buffer_ += '"' + json_escape(value) + '"';
+    return *this;
+}
+
+JsonWriter& JsonWriter::value(const char* value) {
+    return this->value(std::string(value ? value : ""));
+}
+
+JsonWriter& JsonWriter::value(int64_t value) {
+    comma();
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%" PRId64, value);
+    buffer_ += buf;
+    return *this;
+}
+
+JsonWriter& JsonWriter::value(double value) {
+    comma();
+    char buf[48];
+    std::snprintf(buf, sizeof(buf), "%g", value);
+    buffer_ += buf;
+    return *this;
+}
+
+JsonWriter& JsonWriter::value(bool value) {
+    comma();
+    buffer_ += value ? "true" : "false";
+    return *this;
+}
+
 void result_line(const std::string& line) {
     std::fprintf(stdout, "%s\n", line.c_str());
     std::fflush(stdout);

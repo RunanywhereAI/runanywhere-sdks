@@ -169,8 +169,8 @@ const char* framework_proto_to_string(int32_t framework) {
             return "coreml";
         case runanywhere::v1::INFERENCE_FRAMEWORK_MLX:
             return "mlx";
-        case runanywhere::v1::INFERENCE_FRAMEWORK_GENIE:
-            return "genie";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT:
+            return "qhexrt";
         default:
             return "unknown";
     }

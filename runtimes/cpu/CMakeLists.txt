@@ -3,8 +3,8 @@
 #
 ##
 # The CPU runtime is always available on every host. We build it as an
-# OBJECT library and fold its objects into rac_commons (mirrors the
-# metalrt approach), so there is no separate librac_runtime_cpu.* to ship.
+# OBJECT library and fold its objects into rac_commons, so there is no
+# separate librac_runtime_cpu.* to ship.
 # CPU registration is bootstrapped explicitly by rac_runtime_registry.cpp.
 # The CPU TU intentionally does not emit a RAC_STATIC_RUNTIME_REGISTER marker;
 # that macro path is covered by the runtime loader fixture tests.

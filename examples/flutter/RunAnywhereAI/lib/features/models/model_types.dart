@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere/runanywhere.dart' show formatFramework;
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 
 typedef ModelInfo = sdk.ModelInfo;
 typedef ModelCategory = sdk.ModelCategory;
@@ -91,7 +93,7 @@ enum ModelSelectionContext {
   bool includes(ModelInfo model) {
     if (!relevantCategories.contains(model.category)) return false;
     final frameworks = allowedFrameworks;
-    if (frameworks != null && !frameworks.contains(model.framework)) {
+    if (frameworks != null && !frameworks.contains(model.backendFramework)) {
       return false;
     }
     if (this == ModelSelectionContext.ragEmbedding &&
@@ -131,6 +133,107 @@ extension ModelCategoryDisplay on ModelCategory {
 
 extension InferenceFrameworkDisplay on LLMFramework {
   String get displayName => formatFramework(this);
+
+  String get backendShortLabel {
+    switch (this) {
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
+        return 'llama.cpp';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
+        return 'ONNX';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
+        return 'Sherpa';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
+        return 'Apple';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
+        return 'System';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
+        return 'QHexRT';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_COREML:
+        return 'Core ML';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_MLX:
+        return 'MLX';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:
+        return 'Piper';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
+        return 'Fluid';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_TFLITE:
+        return 'TFLite';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH:
+        return 'ExecuTorch';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE:
+        return 'MediaPipe';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_MLC:
+        return 'MLC';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM:
+        return 'Pico';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS:
+        return 'Swift';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN:
+        return 'Built-in';
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_NONE:
+        return 'None';
+      default:
+        return displayName;
+    }
+  }
+
+  IconData get backendIcon {
+    switch (this) {
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
+        return Icons.storage;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
+        return Icons.developer_board;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
+        return Icons.graphic_eq;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
+        return Icons.apple;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:
+        return Icons.volume_up;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_COREML:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_MLX:
+        return Icons.memory;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
+        return Icons.graphic_eq;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_TFLITE:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_MLC:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS:
+        return Icons.view_in_ar;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN:
+        return Icons.check_circle;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_NONE:
+        return Icons.block;
+      default:
+        return Icons.info_outline;
+    }
+  }
+
+  Color get backendColor {
+    switch (this) {
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
+        return AppColors.primaryBlue;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_COREML:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_MLX:
+        return AppColors.primaryPurple;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
+        return AppColors.primaryOrange;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN:
+        return AppColors.primaryGreen;
+      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
+        return AppColors.statusGray;
+      default:
+        return AppColors.statusGray;
+    }
+  }
 }
 
 extension ModelFormatDisplay on ModelFormat {
@@ -173,12 +276,23 @@ extension ModelFormatDisplay on ModelFormat {
 extension ExampleModelInfoView on ModelInfo {
   int? get memoryRequired =>
       hasDownloadSizeBytes() && downloadSizeBytes.toInt() > 0
-      ? downloadSizeBytes.toInt()
-      : null;
+          ? downloadSizeBytes.toInt()
+          : null;
 
-  List<LLMFramework> get compatibleFrameworks => [framework];
+  LLMFramework get backendFramework {
+    final preferred = preferredFramework;
+    if (hasPreferredFramework() &&
+        preferred != sdk.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED &&
+        preferred != sdk.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN) {
+      return preferred;
+    }
+    if (framework != sdk.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+      return framework;
+    }
+    return sdk.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
+  }
 
-  LLMFramework get preferredFramework => framework;
+  List<LLMFramework> get compatibleFrameworks => [backendFramework];
 
   /// Readiness check for the example UI.
   ///
@@ -192,8 +306,9 @@ extension ExampleModelInfoView on ModelInfo {
   /// uses instead (mirrors Swift `isDownloaded` / Kotlin `isDownloadedOnDisk`).
   bool get isReadyOnDevice =>
       localPath.isNotEmpty ||
-      framework ==
+      backendFramework ==
           sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
-      framework == sdk.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS ||
+      backendFramework ==
+          sdk.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS ||
       builtIn;
 }

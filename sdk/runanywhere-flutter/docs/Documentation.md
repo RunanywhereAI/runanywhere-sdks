@@ -398,13 +398,14 @@ STT (Whisper / Zipformer / Paraformer), TTS (Piper / VITS), VAD (Silero) via She
 await Onnx.register();
 ```
 
-### `Genie` — `package:runanywhere_genie/runanywhere_genie.dart`
+### `QHexRT` — `package:runanywhere_qhexrt/runanywhere_qhexrt.dart`
 
-Qualcomm Genie NPU LLM is currently deferred. Do not treat missing Genie
-coverage as an active Flutter gap unless the deferred-backends policy changes.
+Private Qualcomm Hexagon NPU support is exposed through QHexRT on Android
+arm64 devices. It registers the native QHexRT backend and lets commons resolve
+QNN-context bundles through the standard SDK model APIs.
 
 ```dart
-// Deferred backend; registration is out of scope for the current Flutter pass.
+await QHexRT.register();
 ```
 
 ### `RAGModule`

@@ -19,11 +19,7 @@ extension LLMViewModel {
         // The SDK derives the tool-calling format from the loaded model and
         // orchestrates the tool call → execute → respond loop internally.
         let result = try await RunAnywhere.generateWithTools(prompt: prompt, options: options)
-
-        // Tool call metadata is embedded in the result text (the SDK orchestrates
-        // tool call → execute → respond internally). No separate toolCalls/toolResults
-        // fields exist on RALLMGenerationResult; ToolCallInfo is unavailable here.
-        let toolCallInfo: ToolCallInfo? = nil
+        let toolCallInfo = ToolCallInfo(from: result)
 
         // Update the message with the result
         await updateMessageWithToolResult(
@@ -62,7 +58,8 @@ extension LLMViewModel {
                 timestamp: currentMessage.timestamp,
                 analytics: nil, // Tool calling doesn't use standard analytics
                 modelInfo: modelInfo,
-                toolCallInfo: toolCallInfo
+                toolCallInfo: toolCallInfo,
+                attachment: currentMessage.attachment
             )
 
             self.updateMessage(at: index, with: updatedMessage)

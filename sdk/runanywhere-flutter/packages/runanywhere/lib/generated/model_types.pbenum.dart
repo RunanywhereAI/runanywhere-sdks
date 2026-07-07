@@ -141,10 +141,8 @@ class ModelFormat extends $pb.ProtobufEnum {
 /// Inference framework / runtime. Same name used across all SDKs (RN names it
 /// LLMFramework; we canonicalize on InferenceFramework).
 /// Sources pre-IDL:
-///   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML,
-///                                       metalrt)
-///   Kotlin ComponentTypes.kt:122      (9 cases incl. GENIE; no coreml / mlx / whisperKit /
-///                                       metalrt)
+///   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML)
+///   Kotlin ComponentTypes.kt:122      (9 cases; no coreml / mlx / whisperKit)
 ///   Dart   model_types.dart:106       (9 cases, matches Kotlin)
 ///   RN     enums.ts:30 (LLMFramework) (16 cases)
 ///   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
@@ -172,12 +170,6 @@ class InferenceFramework extends $pb.ProtobufEnum {
           6, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_COREML');
   static const InferenceFramework INFERENCE_FRAMEWORK_MLX =
       InferenceFramework._(7, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_MLX');
-  static const InferenceFramework INFERENCE_FRAMEWORK_METALRT =
-      InferenceFramework._(
-          9, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_METALRT');
-  static const InferenceFramework INFERENCE_FRAMEWORK_GENIE =
-      InferenceFramework._(
-          10, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_GENIE');
   static const InferenceFramework INFERENCE_FRAMEWORK_TFLITE =
       InferenceFramework._(
           11, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_TFLITE');
@@ -210,6 +202,9 @@ class InferenceFramework extends $pb.ProtobufEnum {
   static const InferenceFramework INFERENCE_FRAMEWORK_SHERPA =
       InferenceFramework._(
           23, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_SHERPA');
+  static const InferenceFramework INFERENCE_FRAMEWORK_QHEXRT =
+      InferenceFramework._(
+          24, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_QHEXRT');
 
   static const $core.List<InferenceFramework> values = <InferenceFramework>[
     INFERENCE_FRAMEWORK_UNSPECIFIED,
@@ -220,8 +215,6 @@ class InferenceFramework extends $pb.ProtobufEnum {
     INFERENCE_FRAMEWORK_FLUID_AUDIO,
     INFERENCE_FRAMEWORK_COREML,
     INFERENCE_FRAMEWORK_MLX,
-    INFERENCE_FRAMEWORK_METALRT,
-    INFERENCE_FRAMEWORK_GENIE,
     INFERENCE_FRAMEWORK_TFLITE,
     INFERENCE_FRAMEWORK_EXECUTORCH,
     INFERENCE_FRAMEWORK_MEDIAPIPE,
@@ -233,10 +226,11 @@ class InferenceFramework extends $pb.ProtobufEnum {
     INFERENCE_FRAMEWORK_NONE,
     INFERENCE_FRAMEWORK_UNKNOWN,
     INFERENCE_FRAMEWORK_SHERPA,
+    INFERENCE_FRAMEWORK_QHEXRT,
   ];
 
   static final $core.List<InferenceFramework?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 23);
+      $pb.ProtobufEnum.$_initByValueList(values, 24);
   static InferenceFramework? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

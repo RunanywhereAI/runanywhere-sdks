@@ -21,10 +21,8 @@ import kotlin.Suppress
  * Inference framework / runtime. Same name used across all SDKs (RN names it
  * LLMFramework; we canonicalize on InferenceFramework).
  * Sources pre-IDL:
- *   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML,
- *                                       metalrt)
- *   Kotlin ComponentTypes.kt:122      (9 cases incl. GENIE; no coreml / mlx / whisperKit /
- *                                       metalrt)
+ *   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML)
+ *   Kotlin ComponentTypes.kt:122      (9 cases; no coreml / mlx / whisperKit)
  *   Dart   model_types.dart:106       (9 cases, matches Kotlin)
  *   RN     enums.ts:30 (LLMFramework) (16 cases)
  *   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
@@ -50,14 +48,6 @@ public enum class InferenceFramework(
    * Apple Silicon
    */
   INFERENCE_FRAMEWORK_MLX(7),
-  /**
-   * Apple
-   */
-  INFERENCE_FRAMEWORK_METALRT(9),
-  /**
-   * Qualcomm
-   */
-  INFERENCE_FRAMEWORK_GENIE(10),
   INFERENCE_FRAMEWORK_TFLITE(11),
   INFERENCE_FRAMEWORK_EXECUTORCH(12),
   INFERENCE_FRAMEWORK_MEDIAPIPE(13),
@@ -75,6 +65,10 @@ public enum class InferenceFramework(
    * Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
    */
   INFERENCE_FRAMEWORK_SHERPA(23),
+  /**
+   * Qualcomm Hexagon NPU (QHexRT runtime)
+   */
+  INFERENCE_FRAMEWORK_QHEXRT(24),
   ;
 
   public companion object {
@@ -97,8 +91,6 @@ public enum class InferenceFramework(
       5 -> INFERENCE_FRAMEWORK_FLUID_AUDIO
       6 -> INFERENCE_FRAMEWORK_COREML
       7 -> INFERENCE_FRAMEWORK_MLX
-      9 -> INFERENCE_FRAMEWORK_METALRT
-      10 -> INFERENCE_FRAMEWORK_GENIE
       11 -> INFERENCE_FRAMEWORK_TFLITE
       12 -> INFERENCE_FRAMEWORK_EXECUTORCH
       13 -> INFERENCE_FRAMEWORK_MEDIAPIPE
@@ -110,6 +102,7 @@ public enum class InferenceFramework(
       21 -> INFERENCE_FRAMEWORK_NONE
       22 -> INFERENCE_FRAMEWORK_UNKNOWN
       23 -> INFERENCE_FRAMEWORK_SHERPA
+      24 -> INFERENCE_FRAMEWORK_QHEXRT
       else -> null
     }
   }

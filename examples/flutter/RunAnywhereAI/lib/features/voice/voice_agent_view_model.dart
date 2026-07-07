@@ -71,11 +71,11 @@ class VoiceAgentViewModel extends ChangeNotifier {
 
   // --- Computed properties (for the view) -------------------------------------------
 
+  // VAD is optional: the voice agent auto-ensures Silero VAD when none is picked.
   bool get allModelsLoaded =>
       sttModelState == UiModelLoadState.loaded &&
       llmModelState == UiModelLoadState.loaded &&
-      ttsModelState == UiModelLoadState.loaded &&
-      vadModelState == UiModelLoadState.loaded;
+      ttsModelState == UiModelLoadState.loaded;
 
   bool get isActive =>
       sessionState != UiVoiceSessionState.disconnected &&

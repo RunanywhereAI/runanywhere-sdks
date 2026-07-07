@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.data.settings.AppSettings
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.state.GlobalState
@@ -28,6 +29,9 @@ data class StorageUiState(
     val modelsBytes: Long = 0,
     val downloaded: List<RAModelInfo> = emptyList(),
     val isLoading: Boolean = true,
+    val hfTokenBusy: Boolean = false,
+    val hfTokenMessage: String? = null,
+    val hfTokenMessageIsError: Boolean = false,
     val busyId: String? = null,
     val message: String? = null,
 )
@@ -48,6 +52,51 @@ class SettingsViewModel : ViewModel() {
     fun setMaxTokens(value: Int) = SettingsRepository.setMaxTokens(value)
     fun setSystemPrompt(value: String) = SettingsRepository.setSystemPrompt(value)
     fun setStreaming(value: Boolean) = SettingsRepository.setStreaming(value)
+    fun setDisableThinking(value: Boolean) = SettingsRepository.setDisableThinking(value)
+
+    fun setHfToken(value: String) {
+        SettingsRepository.setHfToken(value)
+    }
+
+    fun commitHfToken() {
+        viewModelScope.launch {
+            val clearing = settings.hfToken.isBlank()
+            storage = storage.copy(hfTokenBusy = true, hfTokenMessage = null, hfTokenMessageIsError = false)
+            try {
+                // Empty clears the token (public no-auth behavior); never logged.
+                RunAnywhere.setHfToken(settings.hfToken.ifBlank { "" })
+                ModelBootstrap.refreshNpuCatalog()
+                storage = storage.copy(
+                    hfTokenBusy = false,
+                    hfTokenMessage = if (clearing) {
+                        "Hugging Face token cleared"
+                    } else {
+                        "Hugging Face token saved"
+                    },
+                    hfTokenMessageIsError = false,
+                )
+                refreshStorage()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RACLog.e("Hugging Face token update failed", e)
+                storage = storage.copy(
+                    hfTokenBusy = false,
+                    hfTokenMessage = if (clearing) {
+                        "Could not clear Hugging Face token"
+                    } else {
+                        "Could not save Hugging Face token"
+                    },
+                    hfTokenMessageIsError = true,
+                )
+            }
+        }
+    }
+
+    fun clearHfToken() {
+        SettingsRepository.setHfToken("")
+        commitHfToken()
+    }
 
     fun refreshStorage() {
         viewModelScope.launch {
@@ -106,6 +155,6 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun clearMessage() {
-        storage = storage.copy(message = null)
+        storage = storage.copy(message = null, hfTokenMessage = null, hfTokenMessageIsError = false)
     }
 }

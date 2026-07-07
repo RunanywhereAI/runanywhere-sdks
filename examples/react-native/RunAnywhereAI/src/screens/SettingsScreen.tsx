@@ -45,6 +45,7 @@ import {
   isModelLoadedForCategory,
   unloadModelsForCategory,
 } from '../utils/runAnywhereLifecycle';
+import { refreshNpuCatalog } from '../services/ModelCatalogBootstrap';
 
 const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
 const listModels = async (): Promise<ModelInfo[]> =>
@@ -81,6 +82,14 @@ export const getStoredBaseURL = async (): Promise<string | null> => {
       return trimmed;
     }
     return `https://${trimmed}`;
+  } catch {
+    return null;
+  }
+};
+
+export const getStoredHfToken = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem(STORAGE_KEYS.HF_TOKEN);
   } catch {
     return null;
   }
@@ -382,6 +391,7 @@ export const SettingsScreen: React.FC = () => {
 
   const [apiKey, setApiKey] = useState('');
   const [baseURL, setBaseURL] = useState('');
+  const [hfToken, setHfTokenInput] = useState('');
   const [isBaseURLConfigured, setIsBaseURLConfigured] = useState(false);
   const [showApiConfigModal, setShowApiConfigModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -412,6 +422,7 @@ export const SettingsScreen: React.FC = () => {
   useEffect(() => {
     loadData();
     loadApiConfiguration();
+    loadHfToken();
     loadGenerationSettings();
     loadToolCallingSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -438,6 +449,63 @@ export const SettingsScreen: React.FC = () => {
       console.error('[Settings] Failed to load API configuration:', error);
     }
   };
+
+  const loadHfToken = async () => {
+    try {
+      const storedHfToken = await AsyncStorage.getItem(STORAGE_KEYS.HF_TOKEN);
+      setHfTokenInput(storedHfToken || '');
+    } catch (error) {
+      console.error('[Settings] Failed to load HuggingFace token:', error);
+    }
+  };
+
+  const saveHfToken = useCallback(
+    async (value: string, options: { showFeedback?: boolean } = {}) => {
+      const trimmed = value.trim();
+      try {
+        await AsyncStorage.setItem(STORAGE_KEYS.HF_TOKEN, trimmed);
+        await RunAnywhere.setHfToken(trimmed);
+        await refreshNpuCatalog();
+        if (options.showFeedback) {
+          Alert.alert(
+            trimmed ? 'Saved' : 'Cleared',
+            trimmed
+              ? 'Hugging Face token saved for private model downloads.'
+              : 'Hugging Face token cleared. Private model downloads will require a token.'
+          );
+        }
+      } catch (error) {
+        console.error('[Settings] Failed to save HuggingFace token:', error);
+      }
+    },
+    []
+  );
+
+  const handleHfTokenChange = useCallback(
+    (value: string) => {
+      setHfTokenInput(value);
+    },
+    []
+  );
+
+  const handleHfTokenCommit = useCallback(
+    () => {
+      // eslint-disable-next-line no-void
+      void saveHfToken(hfToken);
+    },
+    [hfToken, saveHfToken]
+  );
+
+  const handleHfTokenSave = useCallback(() => {
+    // eslint-disable-next-line no-void
+    void saveHfToken(hfToken, { showFeedback: true });
+  }, [hfToken, saveHfToken]);
+
+  const handleHfTokenClear = useCallback(() => {
+    setHfTokenInput('');
+    // eslint-disable-next-line no-void
+    void saveHfToken('', { showFeedback: true });
+  }, [saveHfToken]);
 
   const loadGenerationSettings = async () => {
     try {
@@ -892,6 +960,66 @@ export const SettingsScreen: React.FC = () => {
             <TouchableOpacity onPress={handleClearAllData}>
               <Text style={[typography.labelLarge, { color: colors.error }]}>Clear all data</Text>
             </TouchableOpacity>
+          </View>
+        </Section>
+
+        {/* Downloads (matches Android SettingsScreen "Downloads") */}
+        <Section title="Downloads">
+          <View style={{ gap: dimens.spacing.xs }}>
+            <Text style={[typography.bodyLarge, { color: colors.onSurface }]}>
+              HuggingFace token
+            </Text>
+            <TextInput
+              style={[
+                styles.inputField,
+                typography.bodyMedium,
+                {
+                  color: colors.onSurface,
+                  backgroundColor: colors.surfaceContainerHighest,
+                  borderColor: colors.outline,
+                  borderRadius: dimens.radius.sm,
+                },
+              ]}
+              value={hfToken}
+              onChangeText={handleHfTokenChange}
+              onSubmitEditing={handleHfTokenCommit}
+              placeholder="hf_…"
+              placeholderTextColor={colors.onSurfaceVariant}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              secureTextEntry
+              textContentType="password"
+            />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: dimens.spacing.sm }}>
+              <TouchableOpacity
+                style={[
+                  styles.outlineBtn,
+                  styles.centerRow,
+                  { borderColor: colors.outline, borderRadius: dimens.radius.sm },
+                ]}
+                onPress={handleHfTokenSave}
+              >
+                <Icon name="check" size={dimens.icon.sm} color={colors.primary} />
+                <Text style={[typography.labelLarge, { color: colors.primary }]}>
+                  Save token
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.outlineBtn,
+                  styles.centerRow,
+                  { borderColor: colors.outline, borderRadius: dimens.radius.sm },
+                ]}
+                onPress={handleHfTokenClear}
+              >
+                <Icon name="trash" size={dimens.icon.sm} color={colors.error} />
+                <Text style={[typography.labelLarge, { color: colors.error }]}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
+              Used to download private Hugging Face model repos, including HNPU/QHexRT NPU bundles
+            </Text>
           </View>
         </Section>
 

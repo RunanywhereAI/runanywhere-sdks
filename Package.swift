@@ -59,6 +59,21 @@ let useLocalNatives = true // Toggle: false for release (default committed to ma
 // Updated automatically by CI/CD during releases.
 let sdkVersion = "0.19.13"
 
+let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
+    ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
+    ?? "/opt/homebrew"
+
+// mlx-audio-swift currently requires a Swift 6.2+ toolchain and has not cut a
+// tag compatible with mlx-swift-lm 3.x. Pin current main so MLX STT/TTS are
+// first-class in the Apple MLX runtime while upstream release tags catch up.
+let mlxAudioPackageDependencies: [Package.Dependency] = [
+    .package(url: "https://github.com/Blaizzy/mlx-audio-swift.git", revision: "580e952adda0cd6bdc5c04f402822adbb61525c8"),
+]
+let mlxAudioRuntimeDependencies: [Target.Dependency] = [
+    .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
+    .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+]
+
 let package = Package(
     name: "runanywhere-sdks",
     platforms: [
@@ -92,6 +107,23 @@ let package = Package(
             targets: ["LlamaCPPRuntime"]
         ),
 
+        // =================================================================
+        // MLX Backend - adds Apple MLX LLM/VLM/embedding/STT/TTS capabilities
+        // =================================================================
+        .library(
+            name: "RunAnywhereMLX",
+            targets: ["MLXRuntime"]
+        ),
+
+        // =================================================================
+        // macOS MLX CLI host - registers real mlx-swift callbacks, then
+        // delegates to the existing C++ rcli command stack in-process.
+        // =================================================================
+        .executable(
+            name: "RunAnywhereMLXCLI",
+            targets: ["RunAnywhereMLXCLI"]
+        ),
+
     ],
     dependencies: [
         // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
@@ -114,6 +146,10 @@ let package = Package(
         // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
         // the policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
+        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.6")),
+        .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
+        // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS.
+        .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
         //
         // grpc-swift intentionally NOT wired. The *.grpc.swift files under
         // Sources/RunAnywhere/Generated/ are excluded from the RunAnywhere
@@ -123,7 +159,7 @@ let package = Package(
         // callback (see sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/
         // VoiceAgentStreamAdapter.swift).
         //
-    ],
+    ] + mlxAudioPackageDependencies,
     targets: [
         // =================================================================
         // C Bridge Module - Core Commons
@@ -132,7 +168,10 @@ let package = Package(
             name: "CRACommons",
             dependencies: ["RACommonsBinary"],
             path: "sdk/runanywhere-swift/Sources/RunAnywhere/CRACommons",
-            publicHeadersPath: "include"
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("../../../../runanywhere-commons/include"),
+            ]
         ),
 
         // =================================================================
@@ -172,6 +211,22 @@ let package = Package(
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime/include",
             publicHeadersPath: "."
+        ),
+
+        // =================================================================
+        // C Bridge Module - MLX Backend Headers
+        // =================================================================
+        .target(
+            name: "MLXBackend",
+            dependencies: [
+                "CRACommons",
+                "RABackendMLXBinary",
+            ],
+            path: "sdk/runanywhere-swift/Sources/MLXRuntime/include",
+            publicHeadersPath: ".",
+            cSettings: [
+                .headerSearchPath("../../../../runanywhere-commons/include"),
+            ]
         ),
 
         // =================================================================
@@ -261,6 +316,149 @@ let package = Package(
         ),
 
         // =================================================================
+        // MLX Runtime Backend
+        // =================================================================
+        .target(
+            name: "MLXRuntime",
+            dependencies: [
+                "MLXBackend",
+                "RABackendMLXBinary",
+                .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "MLXVLM", package: "mlx-swift-lm"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
+            ] + mlxAudioRuntimeDependencies,
+            path: "sdk/runanywhere-swift/Sources/MLXRuntime",
+            exclude: ["include"],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("CoreImage"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+            ]
+        ),
+
+        // =================================================================
+        // rcli host bridge for the macOS MLX CLI executable.
+        //
+        // This intentionally links only RACommons + RABackendMLXBinary. The
+        // current local LlamaCPP/ONNX/Sherpa XCFrameworks are iOS-only, while
+        // the MLX host needs a macOS binary for real mlx-swift-lm smoke tests.
+        // Linux/Windows keep using the normal CMake-built pure C++ rcli.
+        // =================================================================
+        .target(
+            name: "RADesktopHostAdapter",
+            dependencies: [
+                "CRACommons",
+            ],
+            path: "sdk/runanywhere-commons/src/desktop",
+            sources: [
+                "desktop_adapter.cpp",
+                "desktop_secure_store.cpp",
+                "http_transport_curl.cpp",
+            ],
+            publicHeadersPath: ".",
+            cxxSettings: [
+                .headerSearchPath(".."),
+                .headerSearchPath("../../include"),
+            ],
+            linkerSettings: [
+                .linkedLibrary("curl"),
+                .linkedLibrary("z"),
+            ]
+        ),
+
+        .target(
+            name: "RCLIHost",
+            dependencies: [
+                "CRACommons",
+                "RADesktopHostAdapter",
+                "RABackendMLXBinary",
+            ],
+            path: "sdk/runanywhere-cli",
+            sources: [
+                "src/app.cpp",
+                "src/bootstrap.cpp",
+                "src/catalog/catalog.cpp",
+                "src/catalog/model_ref.cpp",
+                "src/commands/cmd_version.cpp",
+                "src/commands/cmd_info.cpp",
+                "src/commands/cmd_backends.cpp",
+                "src/commands/cmd_list.cpp",
+                "src/commands/cmd_lora.cpp",
+                "src/commands/cmd_pull.cpp",
+                "src/commands/cmd_rm.cpp",
+                "src/commands/cmd_run.cpp",
+                "src/commands/cmd_serve.cpp",
+                "src/commands/cmd_show.cpp",
+                "src/commands/cmd_stt.cpp",
+                "src/commands/cmd_embed.cpp",
+                "src/commands/cmd_tts.cpp",
+                "src/commands/cmd_vad.cpp",
+                "src/commands/cmd_voice.cpp",
+                "src/commands/engine_options.cpp",
+                "src/commands/model_setup.cpp",
+                "src/config/cli_paths.cpp",
+                "src/io/wav_io.cpp",
+                "src/io/output.cpp",
+                "src/progress/progress_bar.cpp",
+                "src/repl/repl.cpp",
+                "src/util/term.cpp",
+                "third_party/linenoise/linenoise.c",
+            ],
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .define("RAC_HAVE_PROTOBUF", to: "1"),
+                .define("RCLI_HAS_MLX", to: "1"),
+                .define("RCLI_VERSION", to: "\"\(sdkVersion)\""),
+                .headerSearchPath("include"),
+                .headerSearchPath("src"),
+                .headerSearchPath("third_party/CLI11"),
+                .headerSearchPath("third_party/linenoise"),
+                .headerSearchPath("../runanywhere-commons/include"),
+                .headerSearchPath("../runanywhere-commons/src"),
+                .headerSearchPath("../runanywhere-commons/src/generated"),
+                .headerSearchPath("../runanywhere-commons/src/generated/proto"),
+                .unsafeFlags([
+                    "-I\(homebrewPrefix)/opt/protobuf/include",
+                    "-I\(homebrewPrefix)/opt/abseil/include",
+                ]),
+            ],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedLibrary("protobuf"),
+                .linkedLibrary("absl_log_internal_message"),
+                .linkedLibrary("absl_log_internal_check_op"),
+                .linkedLibrary("curl"),
+                .linkedLibrary("archive"),
+                .linkedLibrary("bz2"),
+                .linkedLibrary("z"),
+                .linkedFramework("CoreFoundation"),
+                .linkedFramework("Security"),
+                .unsafeFlags([
+                    "-L\(homebrewPrefix)/opt/protobuf/lib",
+                    "-L\(homebrewPrefix)/opt/abseil/lib",
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "\(homebrewPrefix)/opt/protobuf/lib",
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "\(homebrewPrefix)/opt/abseil/lib",
+                ]),
+            ]
+        ),
+
+        .executableTarget(
+            name: "RunAnywhereMLXCLI",
+            dependencies: [
+                "MLXRuntime",
+                "RCLIHost",
+            ],
+            path: "sdk/runanywhere-swift/Sources/RunAnywhereMLXCLI"
+        ),
+
+        // =================================================================
         // RunAnywhere unit tests (e.g. AudioCaptureManager – Issue #198)
         // =================================================================
         .testTarget(
@@ -269,7 +467,8 @@ let package = Package(
             path: "sdk/runanywhere-swift/Tests/RunAnywhereTests"
         ),
 
-    ] + binaryTargets()
+    ] + binaryTargets(),
+    cxxLanguageStandard: .cxx20
 )
 
 // =============================================================================
@@ -308,6 +507,10 @@ func binaryTargets() -> [Target] {
                 name: "RABackendSherpaBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework"
             ),
+            .binaryTarget(
+                name: "RABackendMLXBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendMLX.xcframework"
+            ),
         ]
     } else {
         // =====================================================================
@@ -325,7 +528,7 @@ func binaryTargets() -> [Target] {
         //   1. Build XCFrameworks (CI native_ios job, or locally via
         //      `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh`).
         //   2. Run `sdk/runanywhere-swift/scripts/sync-checksums.sh <zip_dir>` against the directory
-        //      that holds the four `*-ios-v<version>.zip` artifacts. This
+        //      that holds the five `*-ios-v<version>.zip` artifacts. This
         //      overwrites each `checksum:` line below with the real SHA-256.
         //   3. The release workflow (`release.yml::publish`) runs the
         //      checksum sync automatically right before creating the draft
@@ -343,22 +546,27 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "1685832e2b3a40b04ae27ad8d600e8f483bc355480677395241e0ab4ecdbd6fe"
+                checksum: "b1fe74a812af389c6c42339dcd3f3019c1c47137837cfe0e4ea746b95b48613e"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "a551a2218e0fda0dab5aca8d803982db3ad7185021a0db16300b3d996ac1910d"
+                checksum: "071e062573e792daa521b31b314e21a318423b01e0e2d30371cb7da77690624f"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "cf2608b6f85622edf33ea23c73e5e6ddf9ef7f967050767c8b578428578d78c7"
+                checksum: "7a57fa3db9ed572a2b46d8d500549b1b9b06a78bc77927a0e2256a5ce01d1de1"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "771b6d4273a2b3b7b1f459aaa5d29b4f42f7f341eed9018a8031cd80143556bb"
+                checksum: "e7c23219b47edcfeb1492441027af2f1295905db03a25f1efc1987ddd32f6cd2"
+            ),
+            .binaryTarget(
+                name: "RABackendMLXBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMLX-ios-v\(sdkVersion).zip",
+                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
             ),
         ]
     }

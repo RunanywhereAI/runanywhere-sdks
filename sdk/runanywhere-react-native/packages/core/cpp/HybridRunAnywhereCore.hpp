@@ -71,6 +71,11 @@ public:
   completeServicesInitialization() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   resultToProtoErrorProto(double code) override;
+  std::shared_ptr<Promise<void>> setHfToken(const std::string &token) override;
+  std::shared_ptr<Promise<bool>> mlxRuntimeAvailable() override;
+  std::shared_ptr<Promise<bool>> mlxRegisterBackend(double priority) override;
+  std::shared_ptr<Promise<bool>> mlxUnregisterBackend() override;
+  std::shared_ptr<Promise<bool>> mlxIsBackendRegistered() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   retryHTTPSetupProto() override;
   std::shared_ptr<Promise<void>> destroy() override;
