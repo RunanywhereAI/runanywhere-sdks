@@ -355,9 +355,18 @@ rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle, 
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
+    // Same spoken-assistant persona + brevity cap as the full voice turn so
+    // this text→text helper doesn't fall back to the model's raw (rambly)
+    // default. One-shot: no conversation history here (the d7 session path owns
+    // multi-turn memory).
+    rac_llm_options_t llm_opts = {};
+    llm_opts.max_tokens = kVoiceAgentMaxTokens;
+    llm_opts.temperature = 0.7f;
+    llm_opts.system_prompt = kVoiceAgentSystemPrompt;
+
     rac_llm_result_t llm_result = {};
     rac_result_t result =
-        rac_llm_component_generate(handle->llm_handle, prompt, nullptr, &llm_result);
+        rac_llm_component_generate(handle->llm_handle, prompt, &llm_opts, &llm_result);
 
     if (result != RAC_SUCCESS) {
         return result;
