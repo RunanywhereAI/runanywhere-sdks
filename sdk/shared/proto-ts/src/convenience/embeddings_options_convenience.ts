@@ -37,13 +37,13 @@ export const validateEmbeddingsConfiguration = (m: EmbeddingsConfiguration): voi
   if (m.embeddingDimension < 1) {
     throw new ValidationError({
       fieldPath: 'EmbeddingsConfiguration.embedding_dimension',
-      message: `embedding_dimension must be in >= 1 (got ${m.embeddingDimension})`,
+      message: `embedding_dimension must be >= 1 (got ${m.embeddingDimension})`,
     });
   }
   if (m.maxSequenceLength < 1) {
     throw new ValidationError({
       fieldPath: 'EmbeddingsConfiguration.max_sequence_length',
-      message: `max_sequence_length must be in >= 1 (got ${m.maxSequenceLength})`,
+      message: `max_sequence_length must be >= 1 (got ${m.maxSequenceLength})`,
     });
   }
 };

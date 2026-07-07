@@ -83,7 +83,9 @@ class RAGViewModel extends ChangeNotifier {
   // resets the session (re-add the document), matching a model change.
   Future<void> setRerankEnabled(bool value) async {
     if (_rerankEnabled == value) return;
+    final previous = _rerankEnabled;
     _rerankEnabled = value;
+    _error = null;
     try {
       if (_isDocumentLoaded) {
         await RunAnywhere.rag.destroyPipeline();
@@ -92,6 +94,7 @@ class RAGViewModel extends ChangeNotifier {
         _messages = [];
       }
     } catch (e) {
+      _rerankEnabled = previous;
       _error = e.toString();
     } finally {
       notifyListeners();

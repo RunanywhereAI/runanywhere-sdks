@@ -232,11 +232,23 @@ export const RAGScreen: React.FC = () => {
   // Rerank is a pipeline-level setting, so changing it rebuilds the pipeline.
   // The current corpus is dropped (re-add documents), matching a model change.
   const handleRerankChange = useCallback(async (value: boolean) => {
-    setRerankEnabled(value);
-    if (documents.length > 0) {
-      await handleClearAll();
+    try {
+      if (documents.length > 0) {
+        await RunAnywhere.ragDestroyPipeline();
+        setDocuments([]);
+        setMessages([]);
+        setCurrentQuestion('');
+        setSetupExpanded(true);
+      }
+      setError(null);
+      setRerankEnabled(value);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Failed to update rerank setting';
+      setError(msg);
+      console.error('[RAGScreen] Rerank toggle failed:', err);
     }
-  }, [documents.length, handleClearAll]);
+  }, [documents.length]);
 
   // MARK: - Q&A
 

@@ -104,12 +104,14 @@ void apply_extended_sampling_options(const rac_llm_options_t* options,
     // `messages` over the raw `prompt` when messages is non-empty.
     if (options->history != nullptr && options->n_history > 0) {
         request->messages.reserve(static_cast<size_t>(options->n_history) + 1);
+        int32_t accepted_history_entries = 0;
         for (int32_t i = 0; i < options->n_history; ++i) {
             if (options->history[i] == nullptr) {
                 continue;
             }
-            const char* role = (i % 2 == 0) ? "user" : "assistant";
+            const char* role = (accepted_history_entries % 2 == 0) ? "user" : "assistant";
             request->messages.emplace_back(role, options->history[i]);
+            ++accepted_history_entries;
         }
         if (!request->prompt.empty()) {
             request->messages.emplace_back("user", request->prompt);

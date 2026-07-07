@@ -61,6 +61,7 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
 
     private var pipelineKey: Pair<String, String>? = null
     private var job: Job? = null
+    private var isRerankRebuildInFlight = false
 
     // The currently loaded document, cached so a pipeline recreate (rerank toggle)
     // can re-ingest it — without persistence the recreated index starts empty.
@@ -105,25 +106,35 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
     // the pipeline. The recreated index starts empty, so re-ingest the loaded
     // document to keep it queryable after the change.
     fun updateRerank(value: Boolean) {
-        if (rerankEnabled == value) return
+        if (rerankEnabled == value || isRerankRebuildInFlight) return
         val previous = rerankEnabled
+        val key = pipelineKey
+        if (key == null) {
+            rerankEnabled = value
+            return
+        }
         rerankEnabled = value
-        val key = pipelineKey ?: return
+        isRerankRebuildInFlight = true
         viewModelScope.launch {
-            runCatching {
+            try {
                 RunAnywhere.ragDestroyPipeline()
                 RunAnywhere.ragCreatePipeline(buildConfig(key.first, key.second))
                 loadedDoc?.let { RunAnywhere.ragIngest(it.text, it.metadataJSON) }
                 chunkCount = RunAnywhere.ragGetStatistics().indexed_chunks.toInt()
-            }.onFailure {
-                RACLog.e("rag rerank toggle failed", it)
+            } catch (e: CancellationException) {
+                rerankEnabled = previous
+                throw e
+            } catch (e: Exception) {
+                RACLog.e("rag rerank toggle failed", e)
                 // The old pipeline is already torn down; roll the toggle back and
                 // drop the (now gone) corpus so the UI reflects the real state.
                 rerankEnabled = previous
                 documents.clear()
                 loadedDoc = null
                 chunkCount = 0
-                error = it.message ?: "Could not apply the rerank change."
+                error = e.message ?: "Could not apply the rerank change."
+            } finally {
+                isRerankRebuildInFlight = false
             }
         }
     }

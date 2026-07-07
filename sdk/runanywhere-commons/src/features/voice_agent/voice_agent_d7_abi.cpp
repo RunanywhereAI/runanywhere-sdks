@@ -434,11 +434,15 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
     // and context-aware — instead of feeding the raw transcript with no guidance
     // (which is why responses were rambly/useless).
     std::vector<const char*> history_ptrs;
-    history_ptrs.reserve(handle->conversation_history.size());
-    for (const auto& entry : handle->conversation_history) {
-        history_ptrs.push_back(entry.c_str());
+    history_ptrs.reserve(handle->conversation_history.size() * 2);
+    for (const auto& turn : handle->conversation_history) {
+        if (turn.user_text.empty()) {
+            continue;
+        }
+        history_ptrs.push_back(turn.user_text.c_str());
+        history_ptrs.push_back(turn.assistant_text.c_str());
     }
-    rac_llm_options_t llm_opts = {};
+    rac_llm_options_t llm_opts = RAC_LLM_OPTIONS_DEFAULT;
     llm_opts.max_tokens = kVoiceAgentMaxTokens;
     llm_opts.temperature = 0.7f;
     llm_opts.system_prompt = kVoiceAgentSystemPrompt;
@@ -475,19 +479,19 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
     }
     turn_metrics.response_chars = llm.text ? static_cast<int32_t>(std::strlen(llm.text)) : 0;
 
-    // Remember this turn so the next one has context. Order matters:
-    // rac_llm_options_t.history is alternating user,assistant — append the user
-    // transcript first, then the assistant reply. Bound to the most recent
-    // turns so the prompt stays within the context window.
+    // Remember this turn so the next one has context. The typed turn is
+    // flattened into rac_llm_options_t.history as alternating user,assistant.
+    // Bound to the same flattened-entry budget so the prompt stays within the
+    // context window.
     if (stt.text != nullptr && stt.text[0] != '\0') {
-        handle->conversation_history.emplace_back(stt.text);
-        handle->conversation_history.emplace_back(llm.text ? llm.text : "");
-        if (handle->conversation_history.size() > kVoiceAgentMaxHistoryEntries) {
-            const size_t excess =
-                handle->conversation_history.size() - kVoiceAgentMaxHistoryEntries;
-            handle->conversation_history.erase(
-                handle->conversation_history.begin(),
-                handle->conversation_history.begin() + static_cast<std::ptrdiff_t>(excess));
+        handle->conversation_history.push_back(VoiceConversationTurn{
+            .user_text = stt.text, .assistant_text = llm.text ? llm.text : ""});
+        const size_t max_turns = kVoiceAgentMaxHistoryEntries / 2;
+        if (handle->conversation_history.size() > max_turns) {
+            const size_t excess = handle->conversation_history.size() - max_turns;
+            handle->conversation_history.erase(handle->conversation_history.begin(),
+                                               handle->conversation_history.begin() +
+                                                   static_cast<std::ptrdiff_t>(excess));
         }
     }
 

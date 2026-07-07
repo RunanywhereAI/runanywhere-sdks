@@ -30,8 +30,14 @@ inline constexpr const char* kVoiceAgentSystemPrompt =
     "information, say so briefly instead of guessing.";
 /// Spoken replies should be short — cap generation length.
 inline constexpr int32_t kVoiceAgentMaxTokens = 200;
-/// Retained history entries (user+assistant), i.e. the most recent N/2 turns.
+/// Retained flattened history entries (user+assistant), i.e. the most recent
+/// N/2 turns.
 inline constexpr size_t kVoiceAgentMaxHistoryEntries = 20;
+
+struct VoiceConversationTurn {
+    std::string user_text;
+    std::string assistant_text;
+};
 
 /// Energy-VAD utterance segmenter state for the streaming
 /// `rac_voice_agent_feed_audio_proto` ingress path. The SDK feeds raw mic
@@ -84,11 +90,12 @@ struct rac_voice_agent {
     /// Streaming-ingress segmenter state (rac_voice_agent_feed_audio_proto).
     rac_voice_agent_feed_state feed;
 
-    /// Multi-turn conversation history for the LLM: alternating user/assistant
-    /// strings in chronological order (excludes the system prompt + current
-    /// turn). Fed to rac_llm_options_t.history so the agent remembers context
-    /// across turns. Bounded to kVoiceAgentMaxHistoryEntries. Guarded by `mutex`.
-    std::vector<std::string> conversation_history;
+    /// Multi-turn conversation history for the LLM in chronological order
+    /// (excludes the system prompt + current turn). Flattened into
+    /// rac_llm_options_t.history as alternating user/assistant strings so the
+    /// agent remembers context across turns. Bounded to the last
+    /// kVoiceAgentMaxHistoryEntries flattened entries. Guarded by `mutex`.
+    std::vector<VoiceConversationTurn> conversation_history;
 };
 
 #endif  // RAC_FEATURES_VOICE_AGENT_VOICE_AGENT_INTERNAL_H

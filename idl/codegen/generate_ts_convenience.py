@@ -548,7 +548,8 @@ def _emit_message_validate(
                 range_desc = f">= {min_int}"
             else:
                 range_desc = f"<= {max_int}"
-            msg_literal = f"`{field.name} must be in {range_desc} (got ${{m.{ts_field}}})`"
+            range_phrase = f"be in {range_desc}" if "..." in range_desc else f"be {range_desc}"
+            msg_literal = f"`{field.name} must {range_phrase} (got ${{m.{ts_field}}})`"
             checks.append(f"  if ({cond}) {{")
             checks.extend(_throw(field.name, msg_literal))
             checks.append("  }")
@@ -568,7 +569,8 @@ def _emit_message_validate(
                 range_desc = f">= {min_f}"
             else:
                 range_desc = f"<= {max_f}"
-            msg_literal = f"`{field.name} must be in {range_desc} (got ${{m.{ts_field}}})`"
+            range_phrase = f"be in {range_desc}" if "..." in range_desc else f"be {range_desc}"
+            msg_literal = f"`{field.name} must {range_phrase} (got ${{m.{ts_field}}})`"
             checks.append(f"  if ({cond}) {{")
             checks.extend(_throw(field.name, msg_literal))
             checks.append("  }")

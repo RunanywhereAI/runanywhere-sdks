@@ -292,6 +292,7 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
     // VAD uses stop + reset instead of cleanup
     rac_vad_component_stop(handle->vad_handle);
     rac_vad_component_reset(handle->vad_handle);
+    handle->conversation_history.clear();
 
     handle->is_configured.store(false, std::memory_order_release);
 
@@ -359,7 +360,7 @@ rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle, 
     // this text→text helper doesn't fall back to the model's raw (rambly)
     // default. One-shot: no conversation history here (the d7 session path owns
     // multi-turn memory).
-    rac_llm_options_t llm_opts = {};
+    rac_llm_options_t llm_opts = RAC_LLM_OPTIONS_DEFAULT;
     llm_opts.max_tokens = kVoiceAgentMaxTokens;
     llm_opts.temperature = 0.7f;
     llm_opts.system_prompt = kVoiceAgentSystemPrompt;
