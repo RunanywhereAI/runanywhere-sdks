@@ -173,10 +173,12 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   /// score are discarded before being passed to the LLM as context.
   /// Optional so callers can distinguish "unset" from explicit 0.0
   /// (accept-everything) without losing the canonical default.
-  /// Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
-  /// cosine similarities that rarely exceed ~0.5 even for relevant chunks,
-  /// so a 0.7 floor filters out every match and retrieval returns nothing
-  /// (validated by generated SDK helpers and commons session creation).
+  /// Default is 0.0 (accept-everything): MiniLM-class sentence embeddings
+  /// produce cosine similarities that rarely exceed ~0.5 even for relevant
+  /// chunks, and chunking a document lowers each chunk's similarity further, so
+  /// any positive floor filters out real matches — a multi-chunk document then
+  /// retrieves nothing and the answer model reports "no information". top_k
+  /// bounds the result count instead of a similarity floor.
   @$pb.TagNumber(5)
   $core.double get similarityThreshold => $_getN(4);
   @$pb.TagNumber(5)
