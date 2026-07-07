@@ -77,16 +77,10 @@
 }
 
 .consumer-brand__mark {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-regular);
-  background: var(--color-primary);
-  color: var(--text-white);
-  font-size: 11px;
-  font-weight: var(--font-weight-bold);
+  width: 30px;
+  height: 30px;
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .consumer-brand__name {

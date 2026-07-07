@@ -228,7 +228,7 @@ export function buildAppShell(): void {
         ${icon(ICONS.menu)}
       </button>
       <div class="consumer-brand" aria-label="RunAnywhere">
-        <span class="consumer-brand__mark">RA</span>
+        <img class="consumer-brand__mark" src="/runanywhere-logo.svg" alt="" />
         <span class="consumer-brand__name">RunAnywhere</span>
       </div>
     </div>
