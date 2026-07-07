@@ -61,6 +61,11 @@ jobs:
             echo "::error::Run scripts/release/sync-versions.sh $V before tagging."
             exit 1
           fi
+          if ! grep -Eq '^let useLocalNatives = false\b' Package.swift; then
+            echo "::error::Package.swift must set useLocalNatives = false before tagging a SwiftPM release."
+            echo "::error::External SPM consumers cannot resolve local binaryTarget paths from a Git tag."
+            exit 1
+          fi
 
   # ---------------------------------------------------------------------------
   # Native artifact builds — full matrix.
@@ -801,11 +806,11 @@ jobs:
             exit 1
           fi
           echo "All required client-SDK families present in release manifest."
-      - name: Sync Package.swift checksums from freshly-built XCFrameworks
-        # Updates the SHA-256 checksum lines in Package.swift so SPM consumers
-        # who pin to v${VERSION} can resolve the binary targets against the
-        # zips we're attaching to this Release. The iOS zips are suffixed
-        # `-ios-` since v0.19.0.
+      - name: Verify Package.swift checksums match freshly-built XCFrameworks
+        # Verifies the SHA-256 checksum lines in the tagged Package.swift match
+        # the binary zips we are about to attach to this Release. SPM reads the
+        # manifest from the immutable tag, not from release assets, so a
+        # post-build Package.swift patch cannot fix external consumers.
         #
         # This step is HARD-FAIL: a missing iOS zip (e.g. a rename regression
         # in native_ios) combined with the all-zero placeholder checksums in
@@ -820,18 +825,19 @@ jobs:
             ls -la release-flat/ || true
             exit 1
           fi
+          cp Package.swift Package.swift.tagged
           ./sdk/runanywhere-swift/scripts/sync-checksums.sh release-flat
           if ! git diff --quiet Package.swift; then
-            echo "Package.swift checksums updated:"
-            git diff Package.swift | head -40
-            # Attach the updated Package.swift as a release asset so
-            # consumers can see the correct checksums for this tag; also
-            # attach it locally so the next step can open a PR that folds
-            # these checksums back into main.
-            cp Package.swift release-flat/Package.swift.updated
+            echo "::error::Tagged Package.swift checksums do not match the freshly-built Swift binary zips."
+            echo "::error::SPM resolves Package.swift from the tag, so publishing this release would create an unresolvable Swift package."
+            echo "::error::Run sdk/runanywhere-swift/scripts/sync-checksums.sh against the release-candidate iOS zips, commit Package.swift, then retag."
+            git diff -- Package.swift | head -80
+            mv Package.swift.tagged Package.swift
+            exit 1
           else
             echo "Package.swift checksums already match (no changes)"
           fi
+          rm Package.swift.tagged
           # Refuse to publish if any binaryTarget.checksum still equals the
           # all-zero sentinel — that means sync-checksums.sh didn't see a
           # matching zip for that target, which is the exact failure mode

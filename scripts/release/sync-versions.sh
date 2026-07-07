@@ -15,7 +15,7 @@
 # What it touches:
 #   sdk/runanywhere-commons/VERSION                        (single line)
 #   sdk/runanywhere-commons/VERSIONS                       (PROJECT_VERSION line)
-#   Package.swift                                          (sdkVersion line)
+#   Package.swift                                          (sdkVersion line + useLocalNatives=false)
 #   sdk/runanywhere-swift/.../Generated/Versions.swift     (RAVersions.sdkVersion)
 #   sdk/runanywhere-kotlin/gradle.properties               (runanywhere.nativeLibVersion + SDK_VERSION)
 #   sdk/runanywhere-kotlin/src/main/.../SDKConstants.kt    (Kotlin VERSION constant)
@@ -36,7 +36,10 @@
 #     reads `rac_sdk_get_version()` from commons at runtime (single source of
 #     truth = sdk/runanywhere-commons/VERSION above), so it has no literal to
 #     bump. See commons-130.
-#   - SwiftPM XCFramework checksums — use sync-checksums.sh after release zips exist.
+#   - SwiftPM XCFramework checksums — use sync-checksums.sh after release
+#     candidate zips exist, then commit Package.swift before tagging. The
+#     release workflow rejects post-tag checksum drift because SPM reads the
+#     immutable tagged manifest, not any Package.swift asset attached later.
 #   - sdk/runanywhere-commons/VERSIONS dep-pin lines (ONNX/Sherpa/llama.cpp) —
 #     those track UPSTREAM library versions, not OUR release version.
 #   - sdk/runanywhere-flutter/.fvm/fvm_config.json — Flutter TOOLCHAIN pin
@@ -162,6 +165,9 @@ echo ""
 echo ">> Swift SDK:"
 bump_line "${REPO_ROOT}/Package.swift" \
     'let sdkVersion = "[^"]+"' "let sdkVersion = \"${NEW_VERSION}\""
+bump_line "${REPO_ROOT}/Package.swift" \
+    '^let useLocalNatives = .+' \
+    "let useLocalNatives = false // Release mode: external SPM consumers download XCFrameworks from GitHub Releases."
 # Swift SDK VERSION file (read by release tooling)
 SWIFT_VERSION_FILE="${REPO_ROOT}/sdk/runanywhere-swift/VERSION"
 if [ -f "$SWIFT_VERSION_FILE" ]; then
