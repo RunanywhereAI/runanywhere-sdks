@@ -55,6 +55,7 @@ set(RCLI_THIRD_PARTY_SOURCES
 add_library(rcli_core OBJECT ${RCLI_SOURCES} ${RCLI_THIRD_PARTY_SOURCES})
 
 target_include_directories(rcli_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/CLI11
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/linenoise

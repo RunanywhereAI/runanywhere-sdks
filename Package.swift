@@ -59,6 +59,10 @@ let useLocalNatives = true // Toggle: false for release (default committed to ma
 // Updated automatically by CI/CD during releases.
 let sdkVersion = "0.19.13"
 
+let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
+    ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
+    ?? "/opt/homebrew"
+
 // mlx-audio-swift currently requires a Swift 6.2+ toolchain and has not cut a
 // tag compatible with mlx-swift-lm 3.x. Pin current main so MLX STT/TTS are
 // first-class in the Apple MLX runtime while upstream release tags catch up.
@@ -109,6 +113,15 @@ let package = Package(
         .library(
             name: "RunAnywhereMLX",
             targets: ["MLXRuntime"]
+        ),
+
+        // =================================================================
+        // macOS MLX CLI host - registers real mlx-swift callbacks, then
+        // delegates to the existing C++ rcli command stack in-process.
+        // =================================================================
+        .executable(
+            name: "RunAnywhereMLXCLI",
+            targets: ["RunAnywhereMLXCLI"]
         ),
 
     ],
@@ -329,6 +342,123 @@ let package = Package(
         ),
 
         // =================================================================
+        // rcli host bridge for the macOS MLX CLI executable.
+        //
+        // This intentionally links only RACommons + RABackendMLXBinary. The
+        // current local LlamaCPP/ONNX/Sherpa XCFrameworks are iOS-only, while
+        // the MLX host needs a macOS binary for real mlx-swift-lm smoke tests.
+        // Linux/Windows keep using the normal CMake-built pure C++ rcli.
+        // =================================================================
+        .target(
+            name: "RADesktopHostAdapter",
+            dependencies: [
+                "CRACommons",
+            ],
+            path: "sdk/runanywhere-commons/src/desktop",
+            sources: [
+                "desktop_adapter.cpp",
+                "desktop_secure_store.cpp",
+                "http_transport_curl.cpp",
+            ],
+            publicHeadersPath: ".",
+            cxxSettings: [
+                .headerSearchPath(".."),
+                .headerSearchPath("../../include"),
+            ],
+            linkerSettings: [
+                .linkedLibrary("curl"),
+                .linkedLibrary("z"),
+            ]
+        ),
+
+        .target(
+            name: "RCLIHost",
+            dependencies: [
+                "CRACommons",
+                "RADesktopHostAdapter",
+                "RABackendMLXBinary",
+            ],
+            path: "sdk/runanywhere-cli",
+            sources: [
+                "src/app.cpp",
+                "src/bootstrap.cpp",
+                "src/catalog/catalog.cpp",
+                "src/catalog/model_ref.cpp",
+                "src/commands/cmd_version.cpp",
+                "src/commands/cmd_info.cpp",
+                "src/commands/cmd_backends.cpp",
+                "src/commands/cmd_list.cpp",
+                "src/commands/cmd_lora.cpp",
+                "src/commands/cmd_pull.cpp",
+                "src/commands/cmd_rm.cpp",
+                "src/commands/cmd_run.cpp",
+                "src/commands/cmd_serve.cpp",
+                "src/commands/cmd_show.cpp",
+                "src/commands/cmd_stt.cpp",
+                "src/commands/cmd_embed.cpp",
+                "src/commands/cmd_tts.cpp",
+                "src/commands/cmd_vad.cpp",
+                "src/commands/cmd_voice.cpp",
+                "src/commands/engine_options.cpp",
+                "src/commands/model_setup.cpp",
+                "src/config/cli_paths.cpp",
+                "src/io/wav_io.cpp",
+                "src/io/output.cpp",
+                "src/progress/progress_bar.cpp",
+                "src/repl/repl.cpp",
+                "src/util/term.cpp",
+                "third_party/linenoise/linenoise.c",
+            ],
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .define("RAC_HAVE_PROTOBUF", to: "1"),
+                .define("RCLI_HAS_MLX", to: "1"),
+                .define("RCLI_VERSION", to: "\"\(sdkVersion)\""),
+                .headerSearchPath("include"),
+                .headerSearchPath("src"),
+                .headerSearchPath("third_party/CLI11"),
+                .headerSearchPath("third_party/linenoise"),
+                .headerSearchPath("../runanywhere-commons/include"),
+                .headerSearchPath("../runanywhere-commons/src"),
+                .headerSearchPath("../runanywhere-commons/src/generated"),
+                .headerSearchPath("../runanywhere-commons/src/generated/proto"),
+                .unsafeFlags([
+                    "-I\(homebrewPrefix)/opt/protobuf/include",
+                    "-I\(homebrewPrefix)/opt/abseil/include",
+                ]),
+            ],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedLibrary("protobuf"),
+                .linkedLibrary("absl_log_internal_message"),
+                .linkedLibrary("absl_log_internal_check_op"),
+                .linkedLibrary("curl"),
+                .linkedLibrary("archive"),
+                .linkedLibrary("bz2"),
+                .linkedLibrary("z"),
+                .linkedFramework("CoreFoundation"),
+                .linkedFramework("Security"),
+                .unsafeFlags([
+                    "-L\(homebrewPrefix)/opt/protobuf/lib",
+                    "-L\(homebrewPrefix)/opt/abseil/lib",
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "\(homebrewPrefix)/opt/protobuf/lib",
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "\(homebrewPrefix)/opt/abseil/lib",
+                ]),
+            ]
+        ),
+
+        .executableTarget(
+            name: "RunAnywhereMLXCLI",
+            dependencies: [
+                "MLXRuntime",
+                "RCLIHost",
+            ],
+            path: "sdk/runanywhere-swift/Sources/RunAnywhereMLXCLI"
+        ),
+
+        // =================================================================
         // RunAnywhere unit tests (e.g. AudioCaptureManager – Issue #198)
         // =================================================================
         .testTarget(
@@ -337,7 +467,8 @@ let package = Package(
             path: "sdk/runanywhere-swift/Tests/RunAnywhereTests"
         ),
 
-    ] + binaryTargets()
+    ] + binaryTargets(),
+    cxxLanguageStandard: .cxx20
 )
 
 // =============================================================================

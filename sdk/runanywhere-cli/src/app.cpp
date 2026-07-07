@@ -1,8 +1,13 @@
 #include "app.h"
 
+#include <exception>
 #include <string>
 
+#include <CLI11.hpp>
+
+#include "bootstrap.h"
 #include "commands/commands.h"
+#include "io/output.h"
 
 #ifndef RCLI_VERSION
 #define RCLI_VERSION "0.0.0-dev"
@@ -40,4 +45,39 @@ void configure_app(CLI::App& app, GlobalOptions& options) {
     commands::register_serve(app, options);
 }
 
+int run(int argc, char** argv) {
+    GlobalOptions options;
+
+    CLI::App app{"RunAnywhere on-device AI CLI — run, manage and serve local models"};
+    configure_app(app, options);
+
+    int exit_code = 0;
+    try {
+        app.parse(argc, argv);
+        if (app.get_subcommands().empty()) {
+            // Bare `rcli` prints help like `ollama` does.
+            out::status_line(app.help());
+        }
+    } catch (const CLI::CallForHelp& e) {
+        exit_code = app.exit(e);
+    } catch (const CLI::CallForVersion& e) {
+        exit_code = app.exit(e);
+    } catch (const CLI::RuntimeError& e) {
+        exit_code = (e.get_exit_code() != 0) ? e.get_exit_code() : 1;
+    } catch (const CLI::ParseError& e) {
+        app.exit(e);  // prints the usage message to stderr
+        exit_code = 2;
+    } catch (const std::exception& e) {
+        out::error_line(e.what());
+        exit_code = 1;
+    }
+
+    shutdown();
+    return exit_code;
+}
+
 }  // namespace rcli
+
+extern "C" int rcli_run_main(int argc, char** argv) {
+    return rcli::run(argc, argv);
+}

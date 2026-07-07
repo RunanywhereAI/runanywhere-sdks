@@ -13,6 +13,7 @@
 namespace rcli {
 
 void configure_app(CLI::App& app, GlobalOptions& options);
+int run(int argc, char** argv);
 
 }  // namespace rcli
 
