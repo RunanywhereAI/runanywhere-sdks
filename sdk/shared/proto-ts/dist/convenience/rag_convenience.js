@@ -30,7 +30,7 @@ const validateRAGConfiguration = (m) => {
     if (m.topK !== undefined && (m.topK < 1)) {
         throw new _errors_1.ValidationError({
             fieldPath: 'RAGConfiguration.top_k',
-            message: `top_k must be in >= 1 (got ${m.topK})`,
+            message: `top_k must be >= 1 (got ${m.topK})`,
         });
     }
     if (m.similarityThreshold !== undefined && (m.similarityThreshold < 0.0 || m.similarityThreshold > 1.0)) {
@@ -42,13 +42,13 @@ const validateRAGConfiguration = (m) => {
     if (m.chunkSize !== undefined && (m.chunkSize < 1)) {
         throw new _errors_1.ValidationError({
             fieldPath: 'RAGConfiguration.chunk_size',
-            message: `chunk_size must be in >= 1 (got ${m.chunkSize})`,
+            message: `chunk_size must be >= 1 (got ${m.chunkSize})`,
         });
     }
     if (m.chunkOverlap !== undefined && (m.chunkOverlap < 0)) {
         throw new _errors_1.ValidationError({
             fieldPath: 'RAGConfiguration.chunk_overlap',
-            message: `chunk_overlap must be in >= 0 (got ${m.chunkOverlap})`,
+            message: `chunk_overlap must be >= 0 (got ${m.chunkOverlap})`,
         });
     }
 };
@@ -70,7 +70,7 @@ const validateRAGQueryOptions = (m) => {
     if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1)) {
         throw new _errors_1.ValidationError({
             fieldPath: 'RAGQueryOptions.multi_query_count',
-            message: `multi_query_count must be in >= 1 (got ${m.multiQueryCount})`,
+            message: `multi_query_count must be >= 1 (got ${m.multiQueryCount})`,
         });
     }
 };
