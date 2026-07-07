@@ -19,7 +19,7 @@ class VLMViewModel extends ChangeNotifier {
   String _currentDescription = '';
   String? _error;
   String? _selectedImagePath;
-  String _prompt = 'Describe this image in detail.';
+  String prompt = 'Describe this image in detail.';
 
   // Getters
   bool get isModelLoaded => _isModelLoaded;
@@ -28,12 +28,6 @@ class VLMViewModel extends ChangeNotifier {
   String get currentDescription => _currentDescription;
   String? get error => _error;
   String? get selectedImagePath => _selectedImagePath;
-  String get prompt => _prompt;
-
-  set prompt(String value) {
-    _prompt = value;
-  }
-
   // MARK: - Model Management
 
   /// Check if a VLM model is loaded.
@@ -90,8 +84,9 @@ class VLMViewModel extends ChangeNotifier {
     if (path == null || _isProcessing) {
       return;
     }
-    final prompt =
-        _prompt.trim().isEmpty ? 'Describe this image in detail.' : _prompt.trim();
+    final trimmedPrompt = prompt.trim();
+    final promptText =
+        trimmedPrompt.isEmpty ? 'Describe this image in detail.' : trimmedPrompt;
 
     _isProcessing = true;
     _error = null;
@@ -103,7 +98,7 @@ class VLMViewModel extends ChangeNotifier {
 
       final events = sdk.RunAnywhere.vlm.processImageStream(
         image,
-        prompt: prompt,
+        prompt: promptText,
         options: sdk.VLMGenerationOptions(maxTokens: 300),
       );
 

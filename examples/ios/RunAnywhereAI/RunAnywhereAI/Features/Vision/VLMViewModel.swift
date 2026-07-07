@@ -37,9 +37,9 @@ final class VLMViewModel: NSObject {
     // Auto-streaming mode
     var isAutoStreamingEnabled = false
     static let autoStreamInterval: TimeInterval = 2.5 // seconds between auto-captures
-    private static let liveFrameMaxTokens = 96
-    private static let selectedImageMaxTokens = 128
-    private static let autoStreamMaxTokens = 64
+    private static let liveFrameMaxTokens: Int32 = 96
+    private static let selectedImageMaxTokens: Int32 = 128
+    private static let autoStreamMaxTokens: Int32 = 64
 
     // Camera
     private(set) var captureSession: AVCaptureSession?
