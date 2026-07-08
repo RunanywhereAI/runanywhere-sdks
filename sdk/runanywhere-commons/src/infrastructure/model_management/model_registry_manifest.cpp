@@ -61,6 +61,38 @@ bool read_file_bytes(const std::string& path, std::string* out) {
     return true;
 }
 
+bool ends_with_ci(const std::string& value, const char* suffix) {
+    if (suffix == nullptr) {
+        return false;
+    }
+    const size_t suffix_len = std::strlen(suffix);
+    if (value.size() < suffix_len) {
+        return false;
+    }
+    for (size_t i = 0; i < suffix_len; ++i) {
+        char a = value[value.size() - suffix_len + i];
+        char b = suffix[i];
+        if (a >= 'A' && a <= 'Z') a = static_cast<char>(a + ('a' - 'A'));
+        if (b >= 'A' && b <= 'Z') b = static_cast<char>(b + ('a' - 'A'));
+        if (a != b) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool should_skip_exact_size_check(const rac_model_info_t* model,
+                                  const rac_model_file_descriptor_t& descriptor,
+                                  const char* name) {
+    if (model == nullptr || model->framework != RAC_FRAMEWORK_QHEXRT || name == nullptr) {
+        return false;
+    }
+    if (!ends_with_ci(name, ".json")) {
+        return false;
+    }
+    return true;
+}
+
 // Strip volatile absolute paths so the sidecar is location-independent
 // (absolute paths change across iOS container UUIDs / RUNANYWHERE_HOME moves;
 // restore re-derives them from the folder the sidecar lives in). The
@@ -141,6 +173,9 @@ bool model_folder_is_complete_struct(const rac_model_info_t* model, const std::s
             const fs::path on_disk = fs::path(folder) / name;
             if (!fs::exists(on_disk, ec)) {
                 continue;  // absence is the resolver's call (required vs optional)
+            }
+            if (should_skip_exact_size_check(model, descriptor, name)) {
+                continue;
             }
             const auto actual = fs::file_size(on_disk, ec);
             if (!ec && static_cast<int64_t>(actual) != descriptor.size_bytes) {

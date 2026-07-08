@@ -29,6 +29,7 @@ KOTLIN_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/jniLibs"
 KOTLIN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/src/main/jniLibs"
 KOTLIN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/main/jniLibs"
 KOTLIN_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs"
+KOTLIN_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-qhexrt/src/main/assets/runanywhere/qhexrt/skels"
 RN_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/android/src/main/jniLibs"
 RN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/android/src/main/jniLibs"
 RN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/src/main/jniLibs"
@@ -119,6 +120,7 @@ mkdir -p \
     "${KOTLIN_LLAMA_JNI_DEST}" \
     "${KOTLIN_ONNX_JNI_DEST}" \
     "${KOTLIN_QHEXRT_JNI_DEST}" \
+    "${KOTLIN_QHEXRT_SKEL_ASSET_DEST}" \
     "${RN_CORE_JNI_DEST}" \
     "${RN_LLAMA_JNI_DEST}" \
     "${RN_ONNX_JNI_DEST}" \
@@ -193,7 +195,7 @@ stage_qhexrt_qnn_runtime_libs() {
     fi
 
     local host_dir="${qairt_root}/lib/aarch64-android"
-    local qnn_libs=(
+    local qnn_host_libs=(
         "${host_dir}/libQnnHtp.so"
         "${host_dir}/libQnnHtpNetRunExtensions.so"
         "${host_dir}/libQnnHtpPrepare.so"
@@ -204,13 +206,15 @@ stage_qhexrt_qnn_runtime_libs() {
         "${host_dir}/libQnnHtpV79Stub.so"
         "${host_dir}/libQnnHtpV81CalculatorStub.so"
         "${host_dir}/libQnnHtpV81Stub.so"
+    )
+    local qnn_skel_libs=(
         "${qairt_root}/lib/hexagon-v75/unsigned/libQnnHtpV75Skel.so"
         "${qairt_root}/lib/hexagon-v79/unsigned/libQnnHtpV79Skel.so"
         "${qairt_root}/lib/hexagon-v81/unsigned/libQnnHtpV81Skel.so"
     )
 
     local src
-    for src in "${qnn_libs[@]}"; do
+    for src in "${qnn_host_libs[@]}" "${qnn_skel_libs[@]}"; do
         if [ ! -f "${src}" ]; then
             echo "error: required QHexRT QAIRT runtime lib is missing: ${src}" >&2
             exit 1
@@ -218,8 +222,14 @@ stage_qhexrt_qnn_runtime_libs() {
     done
 
     echo "  Staging QHexRT QAIRT runtime libs from ${qairt_root}"
-    for src in "${qnn_libs[@]}"; do
+    for src in "${qnn_host_libs[@]}"; do
         copy_if_exists "${src}" "$@"
+    done
+    local kotlin_skel_dest="${KOTLIN_QHEXRT_SKEL_ASSET_DEST}/${abi}"
+    mkdir -p "${kotlin_skel_dest}"
+    rm -f "${kotlin_skel_dest}"/*.so
+    for src in "${qnn_skel_libs[@]}"; do
+        copy_if_exists "${src}" "${kotlin_skel_dest}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"
     done
 }
 
@@ -301,6 +311,7 @@ for ABI in "${ABIS[@]}"; do
     KOTLIN_LLAMA_DEST="${KOTLIN_LLAMA_JNI_DEST}/${ABI}"
     KOTLIN_ONNX_DEST="${KOTLIN_ONNX_JNI_DEST}/${ABI}"
     KOTLIN_QHEXRT_DEST="${KOTLIN_QHEXRT_JNI_DEST}/${ABI}"
+    KOTLIN_QHEXRT_SKEL_DEST="${KOTLIN_QHEXRT_SKEL_ASSET_DEST}/${ABI}"
     RN_CORE_DEST="${RN_CORE_JNI_DEST}/${ABI}"
     RN_LLAMA_DEST="${RN_LLAMA_JNI_DEST}/${ABI}"
     RN_ONNX_DEST="${RN_ONNX_JNI_DEST}/${ABI}"
@@ -326,6 +337,7 @@ for ABI in "${ABIS[@]}"; do
         "${RN_CORE_DEST}"/*.so "${RN_LLAMA_DEST}"/*.so "${RN_ONNX_DEST}"/*.so "${RN_QHEXRT_DEST}"/*.so \
         "${FLUTTER_CORE_DEST}"/*.so "${FLUTTER_LLAMA_DEST}"/*.so \
         "${FLUTTER_ONNX_DEST}"/*.so "${FLUTTER_QHEXRT_DEST}"/*.so
+    rm -f "${KOTLIN_QHEXRT_SKEL_DEST}"/*.so
 
     # -------------------------------------------------------------------------
     # Locate artifacts produced by the CMake build.

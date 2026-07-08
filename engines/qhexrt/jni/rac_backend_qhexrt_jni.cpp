@@ -31,6 +31,9 @@ RAC_DEFINE_ENGINE_JNI_LOG_TAG("JNI.QHexRT");
 
 extern "C" rac_result_t rac_backend_qhexrt_register(void);
 extern "C" rac_result_t rac_backend_qhexrt_unregister(void);
+#if defined(__ANDROID__)
+extern "C" void rac_qhexrt_set_skel_directory(const char* path);
+#endif
 
 extern "C" {
 
@@ -70,6 +73,27 @@ Java_com_runanywhere_sdk_npu_qhexrt_QHexRTBridge_nativeProbeNpuProto(JNIEnv* env
     }
     rac_proto_buffer_free(&buf);
     return out;
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_npu_qhexrt_QHexRTBridge_nativeSetSkelDirectory(JNIEnv* env, jclass clazz,
+                                                                        jstring path) {
+    (void)clazz;
+#if defined(__ANDROID__)
+    if (path == nullptr) {
+        rac_qhexrt_set_skel_directory(nullptr);
+        return;
+    }
+    const char* chars = env->GetStringUTFChars(path, nullptr);
+    if (chars == nullptr) {
+        return;
+    }
+    rac_qhexrt_set_skel_directory(chars);
+    env->ReleaseStringUTFChars(path, chars);
+#else
+    (void)env;
+    (void)path;
+#endif
 }
 
 }  // extern "C"

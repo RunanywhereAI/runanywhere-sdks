@@ -127,10 +127,12 @@ private val logger = SDKLogger("QHexRT")
 
 internal fun QHexRT.registerNative(): Int {
     RunAnywhereBridge.ensureNativeLibraryLoaded()
+    val skelDirectory = QHexRTSkelInstaller.installIfAvailable()
     if (!QHexRTBridge.ensureNativeLibraryLoaded()) {
         logger.info("QHexRT native library unavailable; skipping backend registration")
         return RAC_ERROR_BACKEND_UNAVAILABLE
     }
+    QHexRTBridge.nativeSetSkelDirectory(skelDirectory)
     return QHexRTBridge.nativeRegister()
 }
 

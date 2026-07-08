@@ -1041,8 +1041,7 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
         return RAC_SUCCESS;
     }
 
-    // Log the text that couldn't be parsed
-    RAC_LOG_ERROR("StructuredOutput", saw_candidate ? "JSON candidate failed to parse"
+    RAC_LOG_DEBUG("StructuredOutput", saw_candidate ? "JSON candidate failed to parse"
                                                     : "No valid JSON found in the response");
     return RAC_ERROR_INVALID_FORMAT;
 }

@@ -23,6 +23,8 @@ private const val HF_AUTH_TAG = "requires-hf-auth"
 
 internal sealed interface CatalogModel {
     val id: String
+    val requiresHfAuth: Boolean
+        get() = false
     fun toModelInfo(): ModelInfo
     suspend fun register()
 }
@@ -39,7 +41,7 @@ internal data class SingleFileModel(
     val supportsLora: Boolean = false,
     val supportsThinking: Boolean = false,
 ) : CatalogModel {
-    private val requiresHfAuth: Boolean
+    override val requiresHfAuth: Boolean
         get() = framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
             url.contains("_HNPU", ignoreCase = true)
 

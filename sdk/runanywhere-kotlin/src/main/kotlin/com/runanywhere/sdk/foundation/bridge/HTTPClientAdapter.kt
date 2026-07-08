@@ -272,9 +272,12 @@ public object HTTPClientAdapter {
         }
         if (result.statusCode in 200..299) return result.body
 
-        logger.error(
-            "HTTP ${result.statusCode}: $method $url — ${result.body.decodeToString().take(1000)}",
-        )
+        val message = "HTTP ${result.statusCode}: $method $url — ${result.body.decodeToString().take(1000)}"
+        if (result.statusCode == 404 && url.contains(TELEMETRY_ENDPOINT_MARKER)) {
+            logger.warn(message)
+        } else {
+            logger.error(message)
+        }
         throw mapAPIError(
             statusCode = result.statusCode,
             body = result.body,
@@ -416,6 +419,8 @@ public object HTTPClientAdapter {
     /** Minimum credential length matching commons'
      *  `RAC_MIN_CREDENTIAL_LEN` policy (8 bytes for an API key prefix). */
     private const val MIN_CREDENTIAL_LENGTH: Int = 8
+
+    private const val TELEMETRY_ENDPOINT_MARKER: String = "/telemetry/"
 }
 
 internal suspend fun platformExecuteHttp(

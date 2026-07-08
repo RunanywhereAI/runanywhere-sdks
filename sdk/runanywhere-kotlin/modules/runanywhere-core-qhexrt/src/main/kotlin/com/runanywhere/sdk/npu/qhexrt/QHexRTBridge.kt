@@ -88,4 +88,8 @@ internal object QHexRTBridge {
     /** QHexRT module version string (RAC_QHEXRT_VERSION baked into the JNI lib). */
     @JvmStatic
     external fun nativeGetVersion(): String
+
+    /** App-private directory containing extracted QNN DSP skel libraries. */
+    @JvmStatic
+    external fun nativeSetSkelDirectory(path: String?)
 }

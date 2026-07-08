@@ -42,34 +42,116 @@ qhx_runtime* g_rt = nullptr;
 std::size_t g_rt_refs = 0;
 
 #if defined(__ANDROID__)
+const char* kAdspLibraryPathEnv = "ADSP_LIBRARY_PATH";
+const char* kQhexrtSkelDirEnv = "RUNANYWHERE_QHEXRT_SKEL_DIR";
+
+bool contains_zip_separator(const std::string& path) { return path.find("!/") != std::string::npos; }
+
+bool directory_contains_qnn_skel(const std::string& path) {
+    if (path.empty() || contains_zip_separator(path)) {
+        return false;
+    }
+    std::error_code ec;
+    if (!fs::is_directory(path, ec)) {
+        return false;
+    }
+    static const char* kSkels[] = {
+        "libQnnHtpV75Skel.so",
+        "libQnnHtpV79Skel.so",
+        "libQnnHtpV81Skel.so",
+    };
+    for (const char* skel : kSkels) {
+        if (fs::is_regular_file(fs::path(path) / skel, ec)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool append_path(std::vector<std::string>& paths, const std::string& path, bool require_skel) {
+    if (path.empty() || contains_zip_separator(path)) {
+        return false;
+    }
+    if (require_skel && !directory_contains_qnn_skel(path)) {
+        return false;
+    }
+    for (const std::string& existing : paths) {
+        if (existing == path) {
+            return true;
+        }
+    }
+    paths.push_back(path);
+    return true;
+}
+
+void append_existing_adsp_paths(std::vector<std::string>& paths, const char* existing) {
+    if (existing == nullptr || existing[0] == '\0') {
+        return;
+    }
+    std::string value(existing);
+    size_t start = 0;
+    while (start <= value.size()) {
+        const size_t end = value.find(';', start);
+        const std::string segment =
+            value.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        append_path(paths, segment, false);
+        if (end == std::string::npos) {
+            break;
+        }
+        start = end + 1;
+    }
+}
+
 // QNN's HTP stub dlopens libcdsprpc.so and the per-arch DSP skel
 // (for example, libQnnHtpV75/V79/V81Skel.so) via ADSP_LIBRARY_PATH; this must be set before
-// the first qhx_runtime_create in every host (Kotlin/Flutter/RN) — engine-owned
-// so platform glue never re-implements it. The skels ship next to this engine
-// .so in the app's nativeLibraryDir, which dladdr on one of our own symbols
-// yields. Composition order mirrors the retired Kotlin example-app helper:
-// native lib dir first, then any existing value, then the two vendor fallbacks
-// (blank segments skipped).
+// the first qhx_runtime_create in every host (Kotlin/Flutter/RN). Modern Android
+// packaging can load JNI libraries from base.apk!/..., which is valid for the
+// app linker but not for FastRPC's DSP file loader. Prefer a real skel directory
+// supplied by the SDK and only fall back to dladdr() when it points at a real
+// extracted native library directory.
 void configure_adsp_library_path() {
+    std::vector<std::string> paths;
+    const char* skel_dir = std::getenv(kQhexrtSkelDirEnv);
+    if (skel_dir != nullptr && skel_dir[0] != '\0' &&
+        !append_path(paths, skel_dir, true)) {
+        RAC_LOG_WARNING(LOG_CAT, "Ignoring invalid QHexRT skel directory: %s", skel_dir);
+    }
+
     Dl_info info{};
-    if (dladdr(reinterpret_cast<void*>(&configure_adsp_library_path), &info) == 0 ||
-        info.dli_fname == nullptr) {
+    if (dladdr(reinterpret_cast<void*>(&configure_adsp_library_path), &info) != 0 &&
+        info.dli_fname != nullptr) {
+        std::string lib_path(info.dli_fname);
+        auto slash = lib_path.find_last_of('/');
+        if (slash != std::string::npos) {
+            append_path(paths, lib_path.substr(0, slash), true);
+        }
+    }
+
+    append_existing_adsp_paths(paths, std::getenv(kAdspLibraryPathEnv));
+    append_path(paths, "/vendor/dsp/cdsp", false);
+    append_path(paths, "/vendor/lib/rfsa/adsp", false);
+
+    std::string path;
+    for (const std::string& segment : paths) {
+        if (!path.empty()) {
+            path += ";";
+        }
+        path += segment;
+    }
+    if (path.empty()) {
         return;
     }
-    std::string lib_path(info.dli_fname);
-    auto slash = lib_path.find_last_of('/');
-    if (slash == std::string::npos) {
-        return;
-    }
-    std::string path = lib_path.substr(0, slash);
-    const char* existing = std::getenv("ADSP_LIBRARY_PATH");
-    if (existing != nullptr && existing[0] != '\0') {
-        path += ";";
-        path += existing;
-    }
-    path += ";/vendor/dsp/cdsp;/vendor/lib/rfsa/adsp";
     setenv("ADSP_LIBRARY_PATH", path.c_str(), 1);
     RAC_LOG_INFO(LOG_CAT, "ADSP_LIBRARY_PATH set to %s", path.c_str());
+}
+
+extern "C" __attribute__((visibility("default"))) void rac_qhexrt_set_skel_directory(
+    const char* path) {
+    if (path == nullptr || path[0] == '\0') {
+        unsetenv(kQhexrtSkelDirEnv);
+        return;
+    }
+    setenv(kQhexrtSkelDirEnv, path, 1);
 }
 #endif
 

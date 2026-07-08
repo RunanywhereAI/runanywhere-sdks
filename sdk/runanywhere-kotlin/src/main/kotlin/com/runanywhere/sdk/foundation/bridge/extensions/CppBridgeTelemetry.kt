@@ -48,6 +48,8 @@ object CppBridgeTelemetry {
 
     @Volatile private var _apiKey: String? = null
 
+    @Volatile private var telemetryHttpDisabled: Boolean = false
+
     /**
      * Current SDK environment. Mirrors Swift's
      * `Telemetry.activeEnvironment: OSAllocatedUnfairLock<SDKEnvironment?>`.
@@ -217,6 +219,10 @@ object CppBridgeTelemetry {
      * preflight.
      */
     private suspend fun performTelemetryHttp(path: String, json: String, requiresAuth: Boolean) {
+        if (telemetryHttpDisabled) {
+            log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Skipping telemetry $path: endpoint disabled")
+            return
+        }
         val env = currentEnvironment
         if ((env == null || env == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) &&
             !CppBridgeDevConfig.hasUsableSupabaseConfig
@@ -237,11 +243,30 @@ object CppBridgeTelemetry {
             HTTPClientAdapter.post(path, json, requiresAuth = requiresAuth)
             log(CppBridgePlatformAdapter.LogLevel.INFO, "Telemetry sent to $path")
         } catch (e: Exception) {
-            log(CppBridgePlatformAdapter.LogLevel.ERROR, "Telemetry HTTP failed for $path: ${e.message}")
+            if (isInvalidTelemetryEndpoint(path, e.message)) {
+                telemetryHttpDisabled = true
+                log(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    "Disabling telemetry HTTP for this session; endpoint rejected $path: ${e.message}",
+                )
+                return
+            }
+            log(CppBridgePlatformAdapter.LogLevel.WARN, "Telemetry HTTP failed for $path: ${e.message}")
         }
     }
+
+    private fun isInvalidTelemetryEndpoint(path: String, message: String?): Boolean =
+        path.contains(TELEMETRY_ENDPOINT_MARKER) &&
+            (
+                message.orEmpty().contains(INVALID_ENDPOINT_MESSAGE, ignoreCase = true) ||
+                    message.orEmpty().contains(HTTP_NOT_FOUND_MESSAGE, ignoreCase = true)
+            )
 
     private fun log(level: Int, message: String) {
         CppBridgePlatformAdapter.logCallback(level, TAG, message)
     }
+
+    private const val TELEMETRY_ENDPOINT_MARKER: String = "/telemetry/"
+    private const val INVALID_ENDPOINT_MESSAGE: String = "requested path is invalid"
+    private const val HTTP_NOT_FOUND_MESSAGE: String = "HTTP error 404"
 }
