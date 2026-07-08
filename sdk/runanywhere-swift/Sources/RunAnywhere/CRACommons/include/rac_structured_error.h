@@ -440,7 +440,7 @@ RAC_API rac_result_t rac_set_error(rac_result_t code, rac_error_category_t categ
  * 1. Creates a structured error with source location
  * 2. Captures stack trace (if available)
  * 3. Logs the error via the logging system
- * 4. Sends to error tracking (Sentry) via platform adapter
+ * 4. Sends to platform error tracking via the adapter, when configured
  * 5. Sets as last error for retrieval
  *
  * @param code Error code

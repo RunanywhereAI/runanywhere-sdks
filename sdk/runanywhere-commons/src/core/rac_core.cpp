@@ -311,8 +311,8 @@ rac_result_t rac_configure_logging(rac_environment_t environment) {
 
         case RAC_ENV_PRODUCTION:
         default:
-            // Production: NO C++ stderr, only send to Swift bridge
-            // Swift handles local console and Sentry routing
+            // Production: NO C++ stderr, only send to the platform bridge.
+            // The SDK handles local console and custom destination routing.
             rac_logger_set_stderr_always(RAC_FALSE);
             rac_logger_set_min_level(RAC_LOG_WARNING);
             // Note: This log will only go to Swift, not stderr

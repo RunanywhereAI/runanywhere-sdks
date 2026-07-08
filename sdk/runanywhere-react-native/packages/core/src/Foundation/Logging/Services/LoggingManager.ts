@@ -2,7 +2,7 @@
  * LoggingManager.ts
  *
  * Central logging service: routes log entries to registered destinations
- * (console, Sentry, custom) based on the current `LoggingConfiguration`.
+ * based on the current `LoggingConfiguration`.
  *
  * Mirrors the `Logging` class in
  * `sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Logging/SDKLogger.swift`.
@@ -14,7 +14,6 @@ import {
   getConfigurationForEnvironment,
 } from '../Models/LoggingConfiguration';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
-import { SentryDestination } from '../Destinations/SentryDestination';
 
 export interface LogEntry {
   level: LogLevel;
@@ -98,11 +97,6 @@ export class LoggingManager {
     } else if (!this.destinations.has(this.consoleDestination.identifier)) {
       this.addDestination(this.consoleDestination);
     }
-    if (!this.config.enableSentryLogging) {
-      this.removeDestinationByIdentifier(SentryDestination.DESTINATION_ID);
-    } else if (!this.destinations.has(SentryDestination.DESTINATION_ID)) {
-      this.addDestination(new SentryDestination());
-    }
   }
 
   public applyEnvironmentConfiguration(environment: SDKEnvironment): void {
@@ -120,19 +114,6 @@ export class LoggingManager {
 
   public setMinLogLevel(level: LogLevel): void {
     this.config.minLogLevel = level;
-  }
-
-  public setSentryLoggingEnabled(enabled: boolean): void {
-    this.config.enableSentryLogging = enabled;
-    if (!enabled) {
-      this.removeDestinationByIdentifier(SentryDestination.DESTINATION_ID);
-    } else if (!this.destinations.has(SentryDestination.DESTINATION_ID)) {
-      // Swift parity: setupSentryLogging() adds the destination on enable
-      // (SDKLogger.swift:104-106, 221-225). The app supplies the Sentry
-      // instance later via `SentryDestination.initialize(...)` /
-      // `addDestination`; until then the destination reports unavailable.
-      this.addDestination(new SentryDestination());
-    }
   }
 
   public addDestination(destination: LogDestination): void {
@@ -154,10 +135,9 @@ export class LoggingManager {
     metadata?: Record<string, unknown>
   ): void {
     if (level < this.config.minLogLevel) return;
-    // Note: no global enableLocalLogging/enableSentryLogging early-return —
-    // those flags govern the console/Sentry destinations' presence in the
-    // map; app-registered custom destinations keep receiving entries
-    // (Swift parity: SDKLogger.swift routes to `destinations` directly).
+    // Note: no global enableLocalLogging early-return; that flag governs the
+    // console destination's presence in the map. App-registered custom
+    // destinations keep receiving entries after severity filtering.
 
     const entry: LogEntry = {
       level,

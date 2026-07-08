@@ -56,7 +56,7 @@ _rac_get_current_time_ms
 # Error Handling — internal struct/error-helper surface; SDK-facing errors
 # cross as runanywhere.v1.SDKError bytes inside SDKEvent envelopes.
 
-# Analytics Events — internal in-process telemetry sink (Sentry/HTTP
+# Analytics Events — internal in-process telemetry sink (HTTP
 # exporter, used by SDK telemetry shims still pending the proto-bytes
 # migration). SDK-facing events go through
 # rac_sdk_event_* below.
@@ -487,7 +487,7 @@ _rac_validate_base_url
 _rac_validate_config
 _rac_validation_error_message
 
-# Dev-only config (Sentry DSN, Supabase URL/key, build token) — reached
+# Dev-only config (Supabase URL/key, build token) — reached
 # through CppBridge+Environment.swift.
 _rac_dev_config_get_build_token
 _rac_dev_config_get_supabase_key
@@ -669,7 +669,7 @@ _rac_solution_feed
 _rac_solution_start
 _rac_solution_stop
 
-# Telemetry manager — flush + HTTP callback bridge for Sentry/analytics.
+# Telemetry manager — flush + HTTP callback bridge for analytics.
 _rac_telemetry_manager_create
 _rac_telemetry_manager_destroy
 _rac_telemetry_manager_flush

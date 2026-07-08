@@ -773,16 +773,15 @@ The file adds two things: a convenience computed property on the proto-generated
 
 ##### §5.4.4.2 RunAnywhere+Logging.swift
 
-**Path:** `Public/Extensions/RunAnywhere+Logging.swift` (LOC: 57)
+**Path:** `Public/Extensions/RunAnywhere+Logging.swift`
 
-All seven methods are `public static` on `RunAnywhere`. None call the C ABI directly; every call routes to `Logging.shared` (§9.4).
+All six methods are `public static` on `RunAnywhere`. None call the C ABI directly; every call routes to `Logging.shared` (§9.4).
 
 | Method | Parameters | Calls |
 |---|---|---|
 | `configureLogging(_:)` | `LoggingConfiguration` | `Logging.shared.configure(config)` |
 | `setLocalLoggingEnabled(_:)` | `Bool` | `Logging.shared.setLocalLoggingEnabled(enabled)` |
 | `setLogLevel(_:)` | `LogLevel` | `Logging.shared.setMinLogLevel(level)` |
-| `setSentryLoggingEnabled(_:)` | `Bool` | `Logging.shared.setSentryLoggingEnabled(enabled)` |
 | `addLogDestination(_:)` | `LogDestination` | `Logging.shared.addDestination(destination)` |
 | `setDebugMode(_:)` | `Bool` | Composes `setLogLevel(.debug/.info)` + `setLocalLoggingEnabled` |
 | `flushLogs()` | — | `Logging.shared.flush()` |
@@ -1325,7 +1324,7 @@ Shared streaming scaffolding:
 | `adapter.secure_delete` | `platformSecureDeleteCallback` | 327 | `SecItemDelete`; `errSecItemNotFound` treated as success |
 | `adapter.now_ms` | `platformNowMsCallback` | 350 | `Int64(Date().timeIntervalSince1970 * 1000)` |
 | `adapter.get_memory_info` | `platformGetMemoryInfoCallback` | 403 | `task_info(mach_task_self_, TASK_VM_INFO, ...)` |
-| `adapter.track_error` | `platformTrackErrorCallback` | 439 | JSON-parses C++ structured error, routes to `Logging.shared` + `SentryManager.shared.captureError` |
+| `adapter.track_error` | `platformTrackErrorCallback` | 439 | JSON-parses C++ structured error and routes to `Logging.shared` |
 | `adapter.http_download` | `platformHttpDownloadCallback` | 629 | Dispatches async on `platformHttpDownloadQueue`; calls `rac_http_download_execute` |
 | `adapter.http_download_cancel` | `platformHttpDownloadCancelCallback` | 719 | Sets `cancelFlag.cancel()` |
 | `adapter.extract_archive` | `nil` | 76 | Explicitly nil |
@@ -1860,31 +1859,11 @@ Metadata sanitization: `sanitizeMetadata(_:)` calls `rac_log_metadata_should_red
 
 Pre-instantiated: `SDKLogger.shared` ("RunAnywhere"), `.llm`, `.stt`, `.tts`, `.download`, `.models`.
 
-Environment presets: `.development` → minLevel `.debug`, Sentry on; `.staging` → `.info`, Sentry off; `.production` → `.warning`, Sentry off.
+Environment presets: `.development` → minLevel `.debug`; `.staging` → `.info`; `.production` → `.warning`.
 
-#### §9.4.2 SentryDestination
+#### §9.4.2 Custom Log Destinations
 
-**File:** `Sources/RunAnywhere/Infrastructure/Logging/SentryDestination.swift`
-
-`public final class SentryDestination: LogDestination, @unchecked Sendable`. `write(_:)`:
-1. Guards `entry.level >= .warning`.
-2. Calls `addBreadcrumb(for:)`.
-3. If `>= .error`, calls `captureEvent(for:)` and `SentrySDK.capture(event:)`.
-
-Level mapping: `.debug` → `.debug`, `.info` → `.info`, `.warning` → `.warning`, `.error` → `.error`, `.fault` → `.fatal`.
-
-#### §9.4.3 SentryManager
-
-**File:** `Sources/RunAnywhere/Infrastructure/Logging/SentryManager.swift`
-
-`public final class SentryManager: @unchecked Sendable` singleton.
-
-`initialize(dsn:environment:)`:
-1. Guards `!isInitialized`.
-2. Resolves DSN from param or `CppBridge.DevConfig.sentryDSN`.
-3. If DSN nil/empty/placeholder, silently returns.
-4. Calls `SentrySDK.start { options in ... }`.
-5. `beforeSend` hook appends `"sdk_name"` and `"sdk_version"`.
+`LogDestination` remains the extension point for additional sinks. Built-in logging now routes to the OS log/console path plus any app-registered custom destinations.
 
 Additional: `captureError(_:context:)`, `setUser(...)`, `clearUser()`, `flush(timeout:)`, `close()`.
 
@@ -2231,7 +2210,7 @@ Swift manages this in `NativeProtoABI`:
 | `file_delete` | Delete file |
 | `secure_get` / `secure_set` / `secure_delete` | Keychain/Secure storage CRUD |
 | `log` | Structured log delivery |
-| `track_error` | Error JSON to Sentry (optional, can be NULL) |
+| `track_error` | Error JSON to platform error tracking (optional, can be NULL) |
 | `now_ms` | Millisecond clock |
 | `get_memory_info` | RAM usage query |
 | `http_download` / `http_download_cancel` | Platform-managed HTTP download |
@@ -2385,7 +2364,7 @@ public struct SDKException: Error, LocalizedError, Sendable, CustomStringConvert
 
 **`os_log` backing.** `Logging` prints to console via `print(output)` when `config.enableLocalLogging` is true.
 
-**Sentry destination registered conditionally.** `Logging.setSentryLoggingEnabled(_:)` toggles `SentryDestination` registration.
+**Custom destinations registered explicitly.** `RunAnywhere.addLogDestination(_:)` appends a destination after deduplicating by identifier.
 
 **`rac_log_metadata_should_redact` for sensitive metadata.** `Logging.shouldRedact(_:)` calls the C ABI to check redaction; the substring policy (keys like `key`, `secret`, `password`, `token`, `auth`, `credential`) lives in C++.
 
@@ -2415,7 +2394,6 @@ The file at `sdk/runanywhere-swift/Package.swift` is the **local development man
 - `swift-crypto` ≥ 3.0.0
 - `Files` (JohnSundell) ≥ 4.3.0
 - `DeviceKit` ≥ 5.6.0
-- `sentry-cocoa` ≥ 8.40.0
 - `swift-protobuf` ≥ 1.27.0
 
 **Targets** (`Package.swift:58-234`):
@@ -2425,7 +2403,7 @@ The file at `sdk/runanywhere-swift/Package.swift` is the **local development man
 | `CRACommons` | regular | `Sources/RunAnywhere/CRACommons` | `RACommonsBinary` |
 | `LlamaCPPBackend` | regular | `Sources/LlamaCPPRuntime/include` | `CRACommons`, `RABackendLlamaCPPBinary` |
 | `ONNXBackend` | regular | `Sources/ONNXRuntime/include` | `CRACommons`, `RABackendONNXBinary`, `RABackendSherpaBinary` |
-| `RunAnywhere` | regular | `Sources/RunAnywhere` | Crypto, Files, DeviceKit, Sentry, SwiftProtobuf, CRACommons, RACommonsBinary |
+| `RunAnywhere` | regular | `Sources/RunAnywhere` | Crypto, Files, DeviceKit, SwiftProtobuf, CRACommons, RACommonsBinary |
 | `LlamaCPPRuntime` | regular | `Sources/LlamaCPPRuntime` | RunAnywhere, LlamaCPPBackend, RABackendLlamaCPPBinary |
 | `ONNXRuntime` | regular | `Sources/ONNXRuntime` | RunAnywhere, ONNXBackend, RABackendONNXBinary, RABackendSherpaBinary |
 | `RunAnywhereTests` | test | `Tests/RunAnywhereTests` | RunAnywhere |
@@ -2552,14 +2530,12 @@ Tests require the `Binaries/` XCFrameworks (built locally via `sdk/runanywhere-s
 | Foundation/Bridge/Extensions/CppBridge+SdkInit.swift | 135 |
 | Foundation/Bridge/Extensions/CppBridge+ModelLifecycle.swift | 133 |
 | Foundation/Bridge/Extensions/RALLMTypes+CppBridge.swift | 117 |
-| Infrastructure/Logging/SentryManager.swift | 113 |
 | Foundation/Bridge/Extensions/CppBridge+STT.swift | 112 |
 | Foundation/Bridge/Extensions/CppBridge+VLM.swift | 102 |
 | Public/Extensions/LLM/StructuredOutputProto+Helpers.swift | 98 |
 | Foundation/Errors/RASDKError+Helpers.swift | 97 |
 | Foundation/Bridge/Extensions/RASTTTypes+CppBridge.swift | 97 |
 | Features/LLM/System/SystemFoundationModelsModule.swift | 97 |
-| Infrastructure/Logging/SentryDestination.swift | 95 |
 | Public/Extensions/LLM/RunAnywhere+StructuredOutput.swift | 94 |
 | Public/Events/EventBus.swift | 90 |
 | Foundation/Bridge/Extensions/CppBridge+VoiceAgent.swift | 90 |

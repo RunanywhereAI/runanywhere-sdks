@@ -848,7 +848,7 @@ export const ToolCalling = {
           // pass3-syn-152: if the synchronous callback observed at least one
           // proto-decode failure since the last drain, surface that as the
           // root cause — the "stalled" symptom is downstream of the dropped
-          // event. Without this, telemetry/Sentry would chase the C++
+          // event. Without this, telemetry would chase the C++
           // session state machine for what is actually a JS-side decode
           // break (e.g. a backwards-incompatible proto rev in a custom
           // build, or an addFunction wiring bug).

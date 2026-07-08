@@ -203,7 +203,6 @@ Configured in `.periphery.yml`. Scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRun
 | swift-crypto | Cryptographic operations |
 | Files (JohnSundell) | Filesystem abstractions |
 | DeviceKit | Device model identification |
-| sentry-cocoa | Error reporting (optional) |
 | ml-stable-diffusion | CoreML image generation |
 | swift-protobuf | Proto-generated type support |
 

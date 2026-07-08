@@ -511,7 +511,6 @@ export const RunAnywhere = {
   configureLogging: Logging.configureLogging,
   setLocalLoggingEnabled: Logging.setLocalLoggingEnabled,
   setLogLevel: Logging.setLogLevel,
-  setSentryLoggingEnabled: Logging.setSentryLoggingEnabled,
   addLogDestination: Logging.addLogDestination,
   setDebugMode: Logging.setDebugMode,
   flushLogs: Logging.flushLogs,

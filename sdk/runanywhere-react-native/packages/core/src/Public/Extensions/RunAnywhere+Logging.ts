@@ -41,14 +41,6 @@ export function setLogLevel(level: LogLevel): void {
 }
 
 /**
- * Enable or disable Sentry error tracking
- * Matches iOS: static func setSentryLoggingEnabled(_ enabled: Bool)
- */
-export function setSentryLoggingEnabled(enabled: boolean): void {
-  LoggingManager.shared.setSentryLoggingEnabled(enabled);
-}
-
-/**
  * Add a custom log destination
  * Matches iOS: static func addLogDestination(_ destination: LogDestination)
  */

@@ -63,7 +63,5 @@
 # Optional deps referenced by libraries we use but don't bundle:
 #  - JPEG2000 decoder for pdfbox-android (we don't decode JP2)
 #  - errorprone annotations from Tink (androidx.security.crypto), compile-only
-#  - the SDK's optional Sentry crash-reporting integration (Sentry not included)
 -dontwarn com.gemalto.jp2.**
 -dontwarn com.google.errorprone.annotations.**
--dontwarn io.sentry.**

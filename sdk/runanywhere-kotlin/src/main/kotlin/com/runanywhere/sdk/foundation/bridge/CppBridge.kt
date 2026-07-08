@@ -29,8 +29,6 @@ import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.httptransport.OkHttpHttpTransport
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
-import com.runanywhere.sdk.infrastructure.logging.SentryDestination
-import com.runanywhere.sdk.infrastructure.logging.SentryManager
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.cEnvironment
@@ -151,8 +149,6 @@ object CppBridge {
             if (CppBridgeState.nativeLibraryLoaded) {
                 RunAnywhereBridge.racConfigureLogging(environment.cEnvironment)
             }
-
-            setupSentryHooks(environment)
 
             // CRITICAL: Set environment early so CppBridgeDevice.isDeviceRegisteredCallback()
             // can determine correct behavior for production/staging modes
@@ -463,13 +459,6 @@ object CppBridge {
 
             CppBridgePlatformAdapter.unregister()
 
-            // Teardown Sentry logging
-            teardownSentryLogging()
-
-            // Clear Sentry hooks
-            Logging.sentrySetupHook = null
-            Logging.sentryTeardownHook = null
-
             CppBridgeState.reset()
         }
     }
@@ -484,58 +473,4 @@ object CppBridge {
         return RunAnywhereBridge.racIsInitialized()
     }
 
-    /**
-     * Setup Sentry hooks so Logging can trigger Sentry setup/teardown dynamically.
-     *
-     * This allows runtime enabling/disabling of Sentry logging via Logging.setSentryLoggingEnabled()
-     */
-    private fun setupSentryHooks(environment: SDKEnvironment) {
-        Logging.sentrySetupHook = {
-            setupSentryLogging(environment)
-        }
-
-        Logging.sentryTeardownHook = {
-            teardownSentryLogging()
-        }
-    }
-
-    /**
-     * Initialize Sentry logging for error tracking.
-     *
-     * Matches iOS SDK's setupSentryLogging() in Logging class.
-     *
-     * @param environment SDK environment for tagging Sentry events
-     */
-    private fun setupSentryLogging(environment: SDKEnvironment) {
-        try {
-            SentryManager.initialize(environment = environment)
-
-            if (SentryManager.isInitialized) {
-                Logging.addDestinationSync(SentryDestination())
-                logger.info("Sentry logging initialized")
-            }
-        } catch (e: Exception) {
-            logger.error("Failed to setup Sentry logging: ${e.message}")
-        }
-    }
-
-    /**
-     * Teardown Sentry logging.
-     */
-    private fun teardownSentryLogging() {
-        try {
-            val sentryDestination =
-                Logging.destinations.find {
-                    it.identifier == SentryDestination.DESTINATION_ID
-                }
-            if (sentryDestination != null) {
-                Logging.removeDestinationSync(sentryDestination)
-            }
-
-            SentryManager.close()
-            logger.info("Sentry logging disabled")
-        } catch (e: Exception) {
-            logger.error("Failed to teardown Sentry logging: ${e.message}")
-        }
-    }
 }

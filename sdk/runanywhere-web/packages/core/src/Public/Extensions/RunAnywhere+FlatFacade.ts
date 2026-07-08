@@ -439,8 +439,7 @@ export const flatFacade = {
   // -------------------------------------------------------------------------
   // Logging — pure delegates. Exactly Swift RunAnywhere+Logging.swift's flat
   // statics (`RunAnywhere.configureLogging` / `setLocalLoggingEnabled` /
-  // `setLogLevel` / `setSentryLoggingEnabled` / `addLogDestination` /
-  // `setDebugMode` / `flushLogs`).
+  // `setLogLevel` / `addLogDestination` / `setDebugMode` / `flushLogs`).
   // -------------------------------------------------------------------------
 
   configureLogging(
@@ -459,12 +458,6 @@ export const flatFacade = {
     ...args: Parameters<typeof LoggingCapability.setLogLevel>
   ): ReturnType<typeof LoggingCapability.setLogLevel> {
     return LoggingCapability.setLogLevel(...args);
-  },
-
-  setSentryLoggingEnabled(
-    ...args: Parameters<typeof LoggingCapability.setSentryLoggingEnabled>
-  ): ReturnType<typeof LoggingCapability.setSentryLoggingEnabled> {
-    return LoggingCapability.setSentryLoggingEnabled(...args);
   },
 
   addLogDestination(

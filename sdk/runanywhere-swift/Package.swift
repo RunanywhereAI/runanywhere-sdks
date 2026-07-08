@@ -79,8 +79,6 @@ let package = Package(
         .package(url: "https://github.com/JohnSundell/Files.git", .upToNextMinor(from: "4.3.0")),
         // Floor bumped 5.6.0 → 5.8.0 (latest stable at bump time).
         .package(url: "https://github.com/devicekit/DeviceKit.git", .upToNextMinor(from: "5.8.0")),
-        // Floor bumped 8.40.0 → 8.58.2 (latest stable 8.x at bump time).
-        .package(url: "https://github.com/getsentry/sentry-cocoa", .upToNextMinor(from: "8.58.2")),
         // swift-protobuf is consumed by the pb.swift files generated from
         // idl/*.proto in Sources/RunAnywhere/Generated/.
         // Floor bumped 1.27.0 → 1.38.0 (latest stable). The earlier
@@ -169,7 +167,6 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Files", package: "Files"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
-                .product(name: "Sentry", package: "sentry-cocoa"),
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 "CRACommons",
                 "RACommonsBinary",

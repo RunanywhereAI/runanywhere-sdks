@@ -35,38 +35,33 @@ export 'package:runanywhere/generated/logging.pbenum.dart' show LogLevel;
 class LoggingConfigurations {
   LoggingConfigurations._();
 
-  /// Default configuration: local logging on, INFO floor, device metadata on,
-  /// Sentry off. Replaces the old `const LoggingConfiguration()` default.
+  /// Default configuration: local logging on, INFO floor, device metadata on.
   static LoggingConfiguration get defaults => LoggingConfiguration(
         enableLocalLogging: true,
         minLogLevel: LogLevel.LOG_LEVEL_INFO,
         includeDeviceMetadata: true,
-        enableSentryLogging: false,
       );
 
-  /// Development preset — verbose logging, Sentry on (matches Swift).
+  /// Development preset — verbose logging (matches Swift).
   static LoggingConfiguration get development => LoggingConfiguration(
         enableLocalLogging: true,
         minLogLevel: LogLevel.LOG_LEVEL_DEBUG,
         includeDeviceMetadata: false,
-        enableSentryLogging: true,
       );
 
-  /// Staging preset — info-level logging, Sentry off (matches Swift).
+  /// Staging preset — info-level logging (matches Swift).
   static LoggingConfiguration get staging => LoggingConfiguration(
         enableLocalLogging: true,
         minLogLevel: LogLevel.LOG_LEVEL_INFO,
         includeDeviceMetadata: true,
-        enableSentryLogging: false,
       );
 
-  /// Production preset — warnings + errors only, local logging off,
-  /// Sentry off (matches Swift).
+  /// Production preset — warnings + errors only, local logging off
+  /// (matches Swift).
   static LoggingConfiguration get production => LoggingConfiguration(
         enableLocalLogging: false,
         minLogLevel: LogLevel.LOG_LEVEL_WARNING,
         includeDeviceMetadata: true,
-        enableSentryLogging: false,
       );
 
   /// Preset for an SDK environment. Mirrors Swift
@@ -90,8 +85,8 @@ class LoggingConfigurations {
 /// protocol. This is a host-side interface (carries no wire payload) and so
 /// stays hand-written rather than moving to the proto contract.
 abstract class LogDestination {
-  /// Stable identifier for this destination (e.g. `"console"`,
-  /// `"sentry"`, `"file"`). Used to deduplicate registrations.
+  /// Stable identifier for this destination (e.g. `"console"`, `"file"`).
+  /// Used to deduplicate registrations.
   String get identifier;
 
   /// Whether this destination is currently available (e.g. network
@@ -180,10 +175,6 @@ class SDKLoggerConfig {
 
   void setLocalLoggingEnabled(bool enabled) {
     _configuration = _configuration.deepCopy()..enableLocalLogging = enabled;
-  }
-
-  void setSentryLoggingEnabled(bool enabled) {
-    _configuration = _configuration.deepCopy()..enableSentryLogging = enabled;
   }
 
   void addDestination(LogDestination destination) {

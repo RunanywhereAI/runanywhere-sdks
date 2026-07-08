@@ -17,7 +17,3 @@ export {
   type LogDestination,
   type LogEntry,
 } from './Services/LoggingManager';
-export {
-  SentryDestination,
-  type SentryInterface,
-} from './Destinations/SentryDestination';

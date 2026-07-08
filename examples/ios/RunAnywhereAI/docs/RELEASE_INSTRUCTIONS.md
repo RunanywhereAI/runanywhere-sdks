@@ -207,11 +207,9 @@ Invalid MinimumOSVersion. Apps that only support 64-bit devices must specify a d
 Upload Symbols Failed - The archive did not include a dSYM for the framework
 ```
 
-**Cause:** Third-party frameworks (Sentry, onnxruntime) don't include dSYM files in their binary distributions.
+**Cause:** Some third-party frameworks, such as onnxruntime, don't include dSYM files in their binary distributions.
 
-**Solution:** These warnings can be safely ignored. The frameworks either:
-- Have their own symbol upload mechanisms (Sentry)
-- Don't provide dSYMs in their binary distributions (onnxruntime)
+**Solution:** These warnings can be safely ignored when they come from frameworks that don't provide dSYMs in their binary distributions.
 
 ### Build Fails After SPM Clean
 

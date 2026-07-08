@@ -24,7 +24,7 @@ extension RALogLevel: @retroactive Comparable {
 
 // MARK: - LogDestination Protocol
 
-/// Protocol for log output destinations (Console, Sentry, etc.)
+/// Protocol for log output destinations (console, files, remote services, etc.)
 public protocol LogDestination: AnyObject, Sendable { // swiftlint:disable:this avoid_any_object
     var identifier: String { get }
     var isAvailable: Bool { get }
@@ -43,7 +43,6 @@ extension RALoggingConfiguration {
         config.enableLocalLogging = true
         config.minLogLevel = .debug
         config.includeDeviceMetadata = false
-        config.enableSentryLogging = true
         return config
     }
 
@@ -52,7 +51,6 @@ extension RALoggingConfiguration {
         config.enableLocalLogging = true
         config.minLogLevel = .info
         config.includeDeviceMetadata = true
-        config.enableSentryLogging = false
         return config
     }
 
@@ -61,7 +59,6 @@ extension RALoggingConfiguration {
         config.enableLocalLogging = false
         config.minLogLevel = .warning
         config.includeDeviceMetadata = true
-        config.enableSentryLogging = false
         return config
     }
 }
@@ -101,28 +98,16 @@ public final class Logging: @unchecked Sendable {
     private init() {
         let config = lock.withLock { $0.configuration }
         syncOSLogDestination(for: config)
-        if config.enableSentryLogging {
-            setupSentryLogging()
-        }
     }
 
     // MARK: - Configuration
 
     public func configure(_ config: RALoggingConfiguration) {
-        let oldConfig = lock.withLock { state -> RALoggingConfiguration in
-            let old = state.configuration
+        lock.withLock { state in
             state.configuration = config
-            return old
         }
 
         syncOSLogDestination(for: config)
-
-        // Handle Sentry state changes
-        if config.enableSentryLogging && !oldConfig.enableSentryLogging {
-            setupSentryLogging()
-        } else if !config.enableSentryLogging && oldConfig.enableSentryLogging {
-            removeSentryDestination()
-        }
     }
 
     public func setLocalLoggingEnabled(_ enabled: Bool) {
@@ -135,12 +120,6 @@ public final class Logging: @unchecked Sendable {
 
     public func setIncludeDeviceMetadata(_ include: Bool) {
         lock.withLock { $0.configuration.includeDeviceMetadata = include }
-    }
-
-    public func setSentryLoggingEnabled(_ enabled: Bool) {
-        var config = configuration
-        config.enableSentryLogging = enabled
-        configure(config)
     }
 
     // MARK: - Core Logging
@@ -215,18 +194,6 @@ public final class Logging: @unchecked Sendable {
         }
         if !hasOSLog {
             addDestination(OSLogDestination())
-        }
-    }
-
-    private func setupSentryLogging() {
-        let environment = RunAnywhere.currentEnvironment ?? .development
-        SentryManager.shared.initialize(environment: environment)
-        addDestination(SentryDestination())
-    }
-
-    private func removeSentryDestination() {
-        lock.withLock { state in
-            state.destinations.removeAll { $0.identifier == SentryDestination.destinationID }
         }
     }
 

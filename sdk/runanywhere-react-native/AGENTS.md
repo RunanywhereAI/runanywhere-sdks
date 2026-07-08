@@ -161,7 +161,7 @@ Each AI capability is a standalone module in `Public/Extensions/` (e.g., `LLM/Ru
 
 ### Logging
 
-`SDKLogger` (`Foundation/Logging/Logger/SDKLogger.ts`) delegates to `LoggingManager.shared`, which fans logs out to its registered `LogDestination`s. Default destination is the console; opt-in destinations (e.g. `SentryDestination`) are registered with `RunAnywhere.addLogDestination(...)`. Verbosity / Sentry fan-out is controlled via `RunAnywhere.configureLogging(...)`, `setLogLevel(...)`, `setLocalLoggingEnabled(...)`, and `setSentryLoggingEnabled(...)`. Pre-built category instances live in `SDKLogger`: `.shared`, `.llm`, `.stt`, `.tts`, `.download`, `.models`, `.core`, `.vad`, `.network`, `.events`, `.archive`.
+`SDKLogger` (`Foundation/Logging/Logger/SDKLogger.ts`) delegates to `LoggingManager.shared`, which fans logs out to its registered `LogDestination`s. Default destination is the console; opt-in custom destinations are registered with `RunAnywhere.addLogDestination(...)`. Verbosity is controlled via `RunAnywhere.configureLogging(...)`, `setLogLevel(...)`, and `setLocalLoggingEnabled(...)`. Pre-built category instances live in `SDKLogger`: `.shared`, `.llm`, `.stt`, `.tts`, `.download`, `.models`, `.core`, `.vad`, `.network`, `.events`, `.archive`.
 
 On iOS, Swift `SDKLogger` uses `OSLog` with subsystem `com.runanywhere.reactnative`. The ObjC `RNSDKLoggerBridge` lets C code route logs through Swift. SwiftLint rules (`.swiftlint.yml`) enforce that all logging goes through `SDKLogger` — `print()`, `NSLog()`, `os_log()` are banned at error severity.
 

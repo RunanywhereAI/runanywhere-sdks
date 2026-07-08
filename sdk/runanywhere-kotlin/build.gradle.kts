@@ -201,7 +201,6 @@ dependencies {
     implementation(libs.whisper.jni)
     implementation(libs.gson)
     implementation(libs.commons.io)
-    implementation(libs.sentry)
     implementation(libs.json)
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)

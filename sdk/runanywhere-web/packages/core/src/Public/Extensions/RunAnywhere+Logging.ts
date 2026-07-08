@@ -42,14 +42,6 @@ export const Logging = {
   },
 
   /**
-   * Enable or disable Sentry error tracking.
-   * Matches iOS: static func setSentryLoggingEnabled(_ enabled: Bool)
-   */
-  setSentryLoggingEnabled(enabled: boolean): void {
-    SDKLogger.setSentryLoggingEnabled(enabled);
-  },
-
-  /**
    * Add a custom log destination.
    * Matches iOS: static func addLogDestination(_ destination: LogDestination)
    */
