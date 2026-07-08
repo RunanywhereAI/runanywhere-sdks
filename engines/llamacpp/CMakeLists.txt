@@ -25,8 +25,9 @@ add_compile_definitions(RAC_LLAMACPP_VERSION="${RAC_LLAMACPP_VERSION}")
 # Issue #480: Apply Metal residency set guard patch for A12/A13 devices (iOS only).
 # A12 Bionic (iPhone XS Max) and A13 do not support MTLResidencySet, but the
 # upstream @available(iOS 18.0) guard passes on those devices, causing a SIGABRT
-# in newResidencySetWithDescriptor:. The patch adds a [device supportsResidencySets]
-# check before enabling residency sets.
+# in newResidencySetWithDescriptor:. The patch adds a
+# [device supportsFamily:MTLGPUFamilyApple7] check before enabling residency sets
+# (there is no `-[MTLDevice supportsResidencySets]` API).
 if(RAC_PLATFORM_IOS)
     set(LLAMACPP_PATCH_COMMAND git apply --ignore-whitespace "${CMAKE_CURRENT_SOURCE_DIR}/patches/001-metal-residency-set-guard.patch")
 else()
