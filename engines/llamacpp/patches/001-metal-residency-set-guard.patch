@@ -1,0 +1,42 @@
+From: RunAnywhere SDK <dev@runanywhere.ai>
+Date: Tue, 8 Jul 2026 10:30:00 +0530
+Subject: [PATCH] ggml-metal: guard residency set with supportsResidencySets
+
+The @available(iOS 18.0, ...) check passes on A12/A13 devices (iPhone XS
+Max, iPhone 11) because these devices run iOS 18, but their GPU does not
+support MTLResidencySet. Calling newResidencySetWithDescriptor: on these
+devices triggers a Metal debug assertion failure:
+
+  -[MTLDebugDevice newResidencySetWithDescriptor:error:]:2785:
+  failed assertion 'device does not support residency sets.'
+
+Fix: also check [device supportsResidencySets] when initializing the
+use_residency_sets flag in the device properties, so the entire residency
+set code path is skipped on unsupported GPUs.
+
+Residency sets require Apple GPU family 7+ (A14+).
+
+Fixes: https://github.com/RunanywhereAI/runanywhere-sdks/issues/480
+---
+ ggml/src/ggml-metal/ggml-metal-device.m | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/ggml/src/ggml-metal/ggml-metal-device.m b/ggml/src/ggml-metal/ggml-metal-device.m
+index 0000000..0000001 100644
+--- a/ggml/src/ggml-metal/ggml-metal-device.m
++++ b/ggml/src/ggml-metal/ggml-metal-device.m
+@@ -824,9 +824,12 @@ static void ggml_metal_device_init(ggml_metal_device_t dev) {
+                 }
+             }
+ 
+-            dev->props.use_residency_sets = true;
++            dev->props.use_residency_sets = false;
+ #if defined(GGML_METAL_HAS_RESIDENCY_SETS)
+-            dev->props.use_residency_sets = getenv("GGML_METAL_NO_RESIDENCY") == nil;
++            if ([dev->mtl_device supportsResidencySets]) {
++                dev->props.use_residency_sets = getenv("GGML_METAL_NO_RESIDENCY") == nil;
++            }
++            // else: device GPU does not support residency sets (A12/A13), leave as false
+ #endif
+ 
+             dev->props.use_shared_buffers = dev->props.has_unified_memory;
