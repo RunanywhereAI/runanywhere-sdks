@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.data.ModelCatalog
+import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
@@ -78,6 +79,12 @@ class ModelSelectionViewModel(
 
     fun download(model: RAModelInfo) {
         viewModelScope.launch {
+            if (model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()) {
+                state = state.copy(
+                    error = "Add a Hugging Face token in Settings to download private HNPU/QHexRT models.",
+                )
+                return@launch
+            }
             state = state.copy(busyModelId = model.id, progressPercent = 0, error = null)
             try {
                 RunAnywhere.downloadModelStream(model).collect { p ->

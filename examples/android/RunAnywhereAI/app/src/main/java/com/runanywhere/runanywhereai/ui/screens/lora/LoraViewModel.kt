@@ -10,8 +10,6 @@ import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.lora
-import com.runanywhere.sdk.public.types.RALoRAAdapterConfig
-import com.runanywhere.sdk.public.types.RALoRAApplyRequest
 import com.runanywhere.sdk.public.types.RALoRARemoveRequest
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
@@ -78,16 +76,10 @@ class LoraViewModel : ViewModel() {
             state = state.copy(busyId = entry.id, error = null)
             try {
                 val result = RunAnywhere.lora.apply(
-                    RALoRAApplyRequest(
-                        adapters = listOf(
-                            RALoRAAdapterConfig(
-                                adapter_path = path,
-                                scale = scale,
-                                adapter_id = entry.id,
-                            ),
-                        ),
-                        replace_existing = true,
-                    ),
+                    entry = entry,
+                    localPath = path,
+                    scale = scale,
+                    replaceExisting = true,
                 )
                 if (result.success) {
                     GlobalState.lora.set(entry.id)

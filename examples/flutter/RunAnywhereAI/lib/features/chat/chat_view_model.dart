@@ -148,16 +148,13 @@ class ChatViewModel extends ChangeNotifier {
     _lifecycleSubscription =
         sdk.RunAnywhere.events.modelLifecycle.listen((change) {
       // iOS parity (LLMViewModel.handleModelLifecycle): only react to LLM
-      // component changes. The lifecycle echo published by currentModel()
-      // when nothing is loaded carries an unspecified component, so this
-      // also drops it.
+      // component changes and ignore lifecycle events for other modalities.
       if (change.component != sdk.SDKComponent.SDK_COMPONENT_LLM &&
           change.event.category != sdk.EventCategory.EVENT_CATEGORY_LLM) {
         return;
       }
-      // syncModelState() calls currentModel(), which itself re-publishes a
-      // lifecycle event. Re-sync only on an actual transition so that echo
-      // cannot feed back into an infinite query -> publish loop.
+      // Re-sync only on an actual transition; duplicate loaded/unloaded
+      // events carry no new snapshot state.
       final loaded = change.kind == sdk.ModelLifecycleChangeKind.loaded;
       if (loaded && change.modelId == _loadedModelId) return;
       if (!loaded && _loadedModelId == null) return;
@@ -576,16 +573,10 @@ class ChatViewModel extends ChangeNotifier {
       final scale = adapter.hasDefaultScale() && adapter.defaultScale > 0
           ? adapter.defaultScale
           : 1.0;
-      final result = await sdk.RunAnywhere.lora.apply(
-        sdk.LoRAApplyRequest(
-          adapters: [
-            sdk.LoRAAdapterConfig(
-              adapterPath: localPath,
-              adapterId: adapter.id,
-              scale: scale,
-            ),
-          ],
-        ),
+      final result = await sdk.RunAnywhere.lora.applyCatalogAdapter(
+        adapter,
+        localPath: localPath,
+        scale: scale,
       );
       if (!result.success) {
         throw Exception(

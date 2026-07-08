@@ -35,6 +35,7 @@ import { formatError } from '../services/format-error';
 import {
   formatBytes,
   formatFramework,
+  modelDisplaySizeBytes,
   modalityEmoji,
 } from '../services/model-display';
 import { showToast } from './dialogs';
@@ -348,7 +349,7 @@ function renderModelRow(entry: ReturnType<typeof getCatalog>[number], state: Row
   const badges = [
     `<span class="model-framework-badge">${formatFramework(entry.framework)}</span>`,
     entry.supportsThinking ? '<span class="model-capability-badge model-capability-badge--thinking">Thinking</span>' : '',
-    `<span class="model-size">${formatBytes(entry.memoryRequiredBytes)}</span>`,
+    `<span class="model-size">${formatBytes(modelDisplaySizeBytes(entry))}</span>`,
   ].filter(Boolean).join('');
   return `
     <div class="model-row model-row--${state.status}" data-model-id="${entry.id}">

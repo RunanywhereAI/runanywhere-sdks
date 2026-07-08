@@ -35,6 +35,7 @@ import { formatError } from '../services/format-error';
 import {
   formatBytes,
   formatFramework,
+  modelDisplaySizeBytes,
   modalityEmoji,
 } from '../services/model-display';
 
@@ -284,7 +285,7 @@ function renderModelList(): void {
           <div class="model-name">${escapeHtml(entry.name)}</div>
           <div class="model-meta">
             <span class="model-framework-badge">${formatFramework(entry.framework)}</span>
-            <span class="model-size">${formatBytes(entry.memoryRequiredBytes)}</span>
+            <span class="model-size">${formatBytes(modelDisplaySizeBytes(entry))}</span>
             ${statusLabel}
           </div>
         </div>

@@ -11,6 +11,7 @@ struct LifecycleLlmRef {
     void* impl = nullptr;
     const char* model_id = nullptr;
     const char* framework_name = nullptr;
+    bool supports_lora = false;
     void* opaque = nullptr;
 };
 

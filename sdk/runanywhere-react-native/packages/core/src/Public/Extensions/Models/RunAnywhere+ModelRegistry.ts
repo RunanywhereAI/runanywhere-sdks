@@ -165,7 +165,7 @@ export async function registerModel(
     source: ModelSource.MODEL_SOURCE_REMOTE,
     ...(input.id !== undefined ? { id: input.id } : {}),
     ...(memoryHint !== undefined
-      ? { downloadSizeBytes: memoryHint, memoryRequiredBytes: memoryHint }
+      ? { memoryRequiredBytes: memoryHint }
       : {}),
     ...(input.supportsThinking ? { supportsThinking: true } : {}),
     ...(input.supportsLora ? { supportsLora: true } : {}),
@@ -302,7 +302,7 @@ export async function registerArchiveModel(
     supportsThinking: input.supportsThinking ?? false,
     supportsLora: input.supportsLora ?? false,
     ...(memoryHint !== undefined
-      ? { downloadSizeBytes: memoryHint, memoryRequiredBytes: memoryHint }
+      ? { memoryRequiredBytes: memoryHint }
       : {}),
     ...(input.supportsThinking
       ? { thinkingPattern: ThinkingTagPattern.fromPartial({}) }
@@ -349,7 +349,6 @@ export async function registerMultiFileModel(
     ...(input.memoryRequirement !== undefined && input.memoryRequirement > 0
       ? {
           memoryRequiredBytes: input.memoryRequirement,
-          downloadSizeBytes: input.memoryRequirement,
         }
       : {}),
     files: input.files.map((file) => ({

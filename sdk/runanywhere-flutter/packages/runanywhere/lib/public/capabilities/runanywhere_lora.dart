@@ -40,6 +40,44 @@ class RunAnywhereLoRACapability {
     return DartBridgeLora.shared.apply(request);
   }
 
+  /// Apply one registered catalog adapter to the current model.
+  ///
+  /// Preserves [entry.id] in the generated config so commons can validate
+  /// registered catalog adapters against the loaded base model.
+  Future<LoRAApplyResult> applyCatalogAdapter(
+    LoraAdapterCatalogEntry entry, {
+    String? localPath,
+    double? scale,
+    bool replaceExisting = false,
+  }) async {
+    final adapterPath =
+        localPath ?? (entry.localPath.isNotEmpty ? entry.localPath : '');
+    if (adapterPath.isEmpty) {
+      throw SDKException.make(
+        code: ErrorCode.ERROR_CODE_INVALID_ARGUMENT,
+        message: "LoRA catalog adapter '${entry.id}' has no local path",
+        category: ErrorCategory.ERROR_CATEGORY_INTERNAL,
+      );
+    }
+
+    final effectiveScale = scale ??
+        (entry.hasDefaultScale() && entry.defaultScale > 0
+            ? entry.defaultScale
+            : 1.0);
+    return apply(
+      LoRAApplyRequest(
+        adapters: [
+          LoRAAdapterConfig(
+            adapterPath: adapterPath,
+            adapterId: entry.id,
+            scale: effectiveScale,
+          ),
+        ],
+        replaceExisting: replaceExisting,
+      ),
+    );
+  }
+
   /// Remove one or more LoRA adapters, or clear all adapters.
   Future<LoRAState> remove(LoRARemoveRequest request) async {
     return DartBridgeLora.shared.remove(request);

@@ -204,6 +204,16 @@ private extension RunAnywhere {
         fallbackCategory: RAModelCategory,
         errorLabel: String
     ) async throws -> RAModelLoadResult {
+        guard !model.isLoRAAdapterArtifact else {
+            let message = "\(errorLabel) model '\(model.id)' is a LoRA adapter artifact. " +
+                "Select a compatible base LLM for RAG and apply the adapter through RunAnywhere.lora."
+            throw SDKException(
+                code: .invalidArgument,
+                message: message,
+                category: .validation
+            )
+        }
+
         var request = RAModelLoadRequest()
         request.modelID = model.id
         request.category = model.category == .unspecified ? fallbackCategory : model.category

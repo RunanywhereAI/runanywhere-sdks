@@ -14,16 +14,13 @@
 
 import Foundation
 
-private let loraArtifactModelIDPrefix = "lora-adapter:"
-private let loraArtifactTag = "lora-adapter"
-
 // MARK: - Catalog entry → model artifact
 
 public extension RALoraAdapterCatalogEntry {
 
     /// Stable model-registry id used for this adapter's download artifact.
     var loraArtifactModelID: String {
-        id.hasPrefix(loraArtifactModelIDPrefix) ? id : loraArtifactModelIDPrefix + id
+        id.hasPrefix(LoRAArtifactMetadata.modelIDPrefix) ? id : LoRAArtifactMetadata.modelIDPrefix + id
     }
 
     /// Convert this catalog entry into generated model-registry metadata used
@@ -70,6 +67,8 @@ public extension RALoraAdapterCatalogEntry {
             description: description_p,
             source: .remote
         )
+        model.category = .unspecified
+        model.framework = .unspecified
         if hasChecksumSha256, !checksumSha256.isEmpty {
             model.checksumSha256 = checksumSha256
         }
@@ -77,8 +76,10 @@ public extension RALoraAdapterCatalogEntry {
         model.metadata.description_p = description_p
         if hasAuthor { model.metadata.author = author }
         if hasLicense { model.metadata.license = license }
-        var metadataTags = [loraArtifactTag]
-        metadataTags.append(contentsOf: compatibleModels.map { "base-model:\($0)" })
+        var metadataTags = [LoRAArtifactMetadata.adapterTag]
+        metadataTags.append(contentsOf: compatibleModels.map {
+            "\(LoRAArtifactMetadata.baseModelTagPrefix)\($0)"
+        })
         metadataTags.append(contentsOf: tags)
         var seen = Set<String>()
         model.metadata.tags = metadataTags.filter { seen.insert($0).inserted }

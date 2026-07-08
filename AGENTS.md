@@ -3,12 +3,12 @@
 This file provides guidance to AI coding assistants (Claude Code, Cursor, etc.) when working with code in this repository.
 - Focus on SIMPLICITY, and following Clean SOLID principles when writing code. Reusability, Clean architecture(not strictly) style, clear separation of concerns.
 
-### ⚠️ Resource discipline — bounded parallelism (do NOT crash the machine)
-Unbounded parallel builds and process/agent storms have crashed dev laptops. ALWAYS cap parallelism:
-- **Builds: never use bare `-j`.** Cap native builds at **`-j 2`** (`cmake --build <dir> -j 2`, `make -j2`, `ninja -j 2`). Bare `-j` spawns one heavy compiler per core (protobuf/libarchive use ~1–2 GB each) → OOM/swap → crash. Gradle: `--max-workers=2`; Xcode: `-jobs 2`.
-- **One heavy build at a time.** Never run two native/SDK builds at once. Build the 5 SDKs and sample apps **sequentially**, not in parallel.
-- **No process/agent storms.** Don't launch many parallel agents or repo-wide `grep`/`find` loops at once; prefer a single bounded pass and fan out at most 2–3 agents.
-- **Check `uptime` before a heavy step**; if the 1-min load is already high, wait.
+### ⚠️ Resource discipline — use available capacity responsibly
+Use the machine's available capacity for local builds and verification instead of defaulting to low worker caps:
+- **Builds should use full local capacity by default.** Prefer explicit worker counts based on the host CPU count for reproducibility, e.g. `cmake --build <dir> -j "$(sysctl -n hw.logicalcpu)"`, `make -j"$(sysctl -n hw.logicalcpu)"`, `ninja -j "$(sysctl -n hw.logicalcpu)"`, Gradle `--max-workers="$(sysctl -n hw.logicalcpu)"`, and Xcode `-jobs "$(sysctl -n hw.logicalcpu)"`.
+- **Use lower caps only when there is real pressure.** Scale down if the machine is memory constrained, swapping, thermally throttling, or a build is failing because of resource exhaustion; do not wait solely because load average is above an arbitrary threshold.
+- **Parallelize with intent.** Running independent light checks or agents in parallel is fine. Avoid uncontrolled process storms, repeated repo-wide scans, or multiple native rebuilds that compete for the same memory-heavy toolchain without a clear benefit.
+- **Check `uptime` before a heavy step** as situational awareness, then proceed with the worker count that fits the current machine state and user urgency.
 
 ### Before starting work.
 - Do NOT write ANY MOCK IMPLEMENTATION unless specified otherwise.

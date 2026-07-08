@@ -124,15 +124,12 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
         }
         switch (change.kind) {
           case sdk.ModelLifecycleChangeKind.loaded:
-            // Resolve from the event payload, never re-query the SDK here:
-            // `modelLifecycle.current()` itself publishes a loaded lifecycle
-            // event, so calling it from inside this handler feeds back into an
-            // infinite loaded -> current() -> loaded loop that ANRs the app.
-            // The change carries the model id; resolve the rest from the
-            // catalog and apply through `applyLoadedModel` so the subclass
+            // Resolve from the event payload rather than doing extra snapshot
+            // work inside the lifecycle handler. The change carries the model
+            // id; resolve the rest from the catalog and apply through
+            // `applyLoadedModel` so the subclass
             // overrides (STT live-mode, TTS system-voice) still run.
             applyLoadedModel(resolveLoadedModel(change.modelId));
-            debugPrint('Voice component model loaded: ${change.modelId}');
           case sdk.ModelLifecycleChangeKind.unloaded:
             clearLoadedModel();
             debugPrint('Voice component model unloaded');
@@ -151,9 +148,8 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
   /// Resolve the current model for this modality via the SDK snapshot and
   /// apply it to published state. Used ONLY at cold start
   /// ([checkInitialModelState]); a one-shot `current()` outside an event
-  /// handler is safe. The lifecycle-loaded listener must NOT call this:
-  /// `modelLifecycle.current()` re-publishes a loaded event, which from inside
-  /// the handler loops forever — it resolves from the event payload instead.
+  /// handler is safe. The lifecycle-loaded listener resolves from the event
+  /// payload instead so it does not perform redundant SDK snapshot work.
   @protected
   Future<void> applyCurrentModelSnapshot(String reason) async {
     final result = await sdk.RunAnywhere.modelLifecycle.current(

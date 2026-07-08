@@ -39,11 +39,19 @@ export function modalityEmoji(category: ModelCategory): string {
 /**
  * Decimal byte formatter ("GB" / "MB" / "KB"). Aligns with how model
  * catalogs advertise file sizes (1 GB = 10^9 bytes) and with the eviction
- * dialog's storage gauge, both of which run against the same registry
- * memoryRequiredBytes / sizeBytes inputs.
+ * dialog's storage gauge, both of which run against model catalog byte inputs.
  */
 export function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
   if (bytes >= 1_000_000) return `${Math.round(bytes / 1_000_000)} MB`;
   return `${Math.round(bytes / 1_000)} KB`;
+}
+
+export function modelDisplaySizeBytes(model: {
+  downloadSizeBytes?: number;
+  memoryRequiredBytes?: number;
+}): number {
+  return model.downloadSizeBytes && model.downloadSizeBytes > 0
+    ? model.downloadSizeBytes
+    : model.memoryRequiredBytes ?? 0;
 }

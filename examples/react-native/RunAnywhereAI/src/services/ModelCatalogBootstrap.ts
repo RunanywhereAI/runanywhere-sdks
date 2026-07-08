@@ -53,8 +53,7 @@ export async function registerAll(
         name: 'Llama 2 7B Chat Q4_K_M',
         url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        // memoryRequirement doubles as downloadSizeBytes for the post-finalize
-        // size guard — set to the exact artifact Content-Length.
+        // Exact artifact Content-Length for catalog display/storage planning.
         memoryRequirement: 4_081_004_224,
       }),
       registerModel({
@@ -79,8 +78,8 @@ export async function registerAll(
         name: 'Qwen 2.5 1.5B Instruct Q4_K_M',
         url: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        // Q4_K_M artifact is ~1.1 GB; the prior 2.5 GB estimate tripped the
-        // 80% download size guard (actual was only 45% of declared).
+        // Q4_K_M artifact is ~1.1 GB; keep the catalog estimate close to the
+        // real transfer size for UI/storage planning.
         memoryRequirement: 1_117_320_736,
       }),
       registerModel({
@@ -88,10 +87,7 @@ export async function registerAll(
         name: 'Qwen3 0.6B Q4_K_M',
         url: 'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        // Actual Qwen3-0.6B-Q4_K_M.gguf artifact size (verified Content-Length).
-        // memoryRequirement doubles as downloadSizeBytes, which feeds the
-        // post-finalize download size guard. The prior 500 MB estimate tripped
-        // the 80% guard on the valid ~378 MB download.
+        // Actual Qwen3-0.6B-Q4_K_M.gguf Content-Length for catalog display.
         memoryRequirement: 396_705_472,
         supportsThinking: true,
       }),
@@ -276,10 +272,8 @@ export async function registerAll(
       url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
       modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-      // Actual silero_vad.onnx artifact size (verified Content-Length).
-      // memoryRequirement doubles as downloadSizeBytes, which feeds the
-      // post-finalize download size guard. An over-stated 5 MB
-      // tripped the guard on a valid ~2.3 MB download.
+      // Actual silero_vad.onnx Content-Length for catalog display/storage
+      // planning; the SDK keeps downloadSizeBytes separate.
       memoryRequirement: 2_327_524,
     }),
     // Embedding model for RAG (multi-file: model.onnx + vocab.txt co-located)
@@ -568,6 +562,7 @@ type NpuBundle = {
   name: string;
   url: string;
   modality: ModelCategory;
+  estimatedSizeBytes: number;
 };
 
 const NPU_BUNDLES: NpuBundle[] = [
@@ -576,240 +571,280 @@ const NPU_BUNDLES: NpuBundle[] = [
     name: 'LFM2.5 230M (HNPU)',
     url: 'https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 886_089_241,
   },
   {
     id: 'lfm2_5_350m',
     name: 'LFM2.5 350M (HNPU)',
     url: 'https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 1_441_493_515,
   },
   {
     id: 'qwen3_5_0_8b',
     name: 'Qwen3.5 0.8B (HNPU)',
     url: 'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 2_046_527_848,
   },
   {
     id: 'qwen3_5_2b',
     name: 'Qwen3.5 2B (HNPU)',
     url: 'https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 4_817_344_861,
   },
   {
     id: 'qwen3_5_4b',
     name: 'Qwen3.5 4B (HNPU)',
     url: 'https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 6_177_585_629,
   },
   {
     id: 'qwen3_0_6b',
     name: 'Qwen3 0.6B (HNPU)',
     url: 'https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 1_823_248_798,
   },
   {
     id: 'llama3_2_1b',
     name: 'Llama 3.2 1B (HNPU)',
     url: 'https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 3_023_821_212,
   },
   {
     id: 'ternary_bonsai_1_7b',
     name: 'Ternary Bonsai 1.7B (HNPU)',
     url: 'https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 2_367_579_370,
   },
   {
     id: 'phi_tiny_moe',
     name: 'Phi Tiny MoE (HNPU)',
     url: 'https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 6_100_212_369,
   },
   {
     id: 'gemma3n_e4b',
     name: 'Gemma 3n E4B (HNPU)',
     url: 'https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 10_929_816_419,
   },
   {
     id: 'gemma4_e2b',
     name: 'Gemma 4 E2B (HNPU)',
     url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 10_532_159_450,
   },
   {
     id: 'gemma4_e4b',
     name: 'Gemma 4 E4B (HNPU)',
     url: 'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 13_435_056_195,
   },
   {
     id: 'deepseek_r1_distill_qwen_1_5b',
     name: 'DeepSeek R1 Distill Qwen 1.5B (HNPU)',
     url: 'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 6_211_227_068,
   },
   {
     id: 'deepseek_r1_distill_qwen_7b',
     name: 'DeepSeek R1 Distill Qwen 7B (HNPU)',
     url: 'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 8_210_665_301,
   },
   {
     id: 'nemotron_nano_8b',
     name: 'Llama 3.1 Nemotron Nano 8B (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 8_609_694_487,
   },
   {
     id: 'nemoguard_content_8b',
     name: 'NemoGuard 8B Content Safety (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 8_610_354_023,
   },
   {
     id: 'nemoguard_topic_8b',
     name: 'NemoGuard 8B Topic Control (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 8_609_694_527,
   },
   {
     id: 'qwen3_vl_2b_text',
     name: 'Qwen3-VL 2B Text (HNPU)',
     url: 'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 3_220_397_297,
   },
   {
     id: 'qwen3_vl',
     name: 'Qwen3-VL 2B (HNPU)',
     url: 'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    estimatedSizeBytes: 3_220_397_297,
   },
   {
     id: 'internvl3_5_1b',
     name: 'InternVL3.5 1B (HNPU)',
     url: 'https://huggingface.co/runanywhere/internvl3_5_1b_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    estimatedSizeBytes: 3_067_933_894,
   },
   {
     id: 'gemma4_e2b_vlm',
     name: 'Gemma 4 E2B Image (HNPU)',
     url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    estimatedSizeBytes: 10_532_159_450,
   },
   {
     id: 'nemotron_nano_vl_8b',
     name: 'Llama 3.1 Nemotron Nano VL 8B (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    estimatedSizeBytes: 10_057_258_051,
   },
   {
     id: 'whisper_base',
     name: 'Whisper Base (HNPU)',
     url: 'https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    estimatedSizeBytes: 221_522_616,
   },
   {
     id: 'whisper_small',
     name: 'Whisper Small (HNPU)',
     url: 'https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    estimatedSizeBytes: 676_713_240,
   },
   {
     id: 'moonshine_tiny',
     name: 'Moonshine Tiny (HNPU)',
     url: 'https://huggingface.co/runanywhere/moonshine_tiny_HNPU/moonshine-tiny.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    estimatedSizeBytes: 84_569_427,
   },
   {
     id: 'moonshine_base',
     name: 'Moonshine Base (HNPU)',
     url: 'https://huggingface.co/runanywhere/moonshine_base_HNPU/moonshine-base.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    estimatedSizeBytes: 167_310_675,
   },
   {
     id: 'parakeet_tdt_0_6b_v2',
     name: 'Parakeet TDT 0.6B v2 (HNPU)',
     url: 'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    estimatedSizeBytes: 1_280_063_837,
   },
   {
     id: 'parakeet_tdt_0_6b_v3',
     name: 'Parakeet TDT 0.6B v3 (HNPU)',
     url: 'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    estimatedSizeBytes: 1_317_902_802,
   },
   {
     id: 'parakeet_rnnt_1_1b',
     name: 'Parakeet RNNT 1.1B (HNPU)',
     url: 'https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    estimatedSizeBytes: 2_211_659_923,
   },
   {
     id: 'canary_qwen_2_5b',
     name: 'Canary Qwen 2.5B (HNPU)',
     url: 'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    estimatedSizeBytes: 5_491_333_979,
   },
   {
     id: 'canary_1b_flash',
     name: 'Canary-1B-flash (HNPU)',
     url: 'https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    estimatedSizeBytes: 1_835_592_227,
   },
   {
     id: 'nemotron_asr_streaming',
     name: 'Nemotron ASR Streaming 0.6B (HNPU)',
     url: 'https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    estimatedSizeBytes: 1_361_283_432,
   },
   {
     id: 'melotts_en',
     name: 'MeloTTS EN (HNPU)',
     url: 'https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    estimatedSizeBytes: 120_439_053,
   },
   {
     id: 'kokoro_en',
     name: 'Kokoro-82M EN (HNPU)',
     url: 'https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    estimatedSizeBytes: 470_739_484,
   },
   {
     id: 'kitten_nano_0_8',
     name: 'Kitten-nano-0.8-fp32 (HNPU)',
     url: 'https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    estimatedSizeBytes: 95_842_227,
   },
   {
     id: 'kitten_mini_0_1',
     name: 'Kitten-mini-0.1 (HNPU)',
     url: 'https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    estimatedSizeBytes: 449_672_060,
   },
   {
     id: 'kitten_mini_0_8',
     name: 'Kitten-mini-0.8 (HNPU)',
     url: 'https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    estimatedSizeBytes: 778_828_575,
   },
   {
     id: 'kitten_micro_0_8',
     name: 'Kitten-micro-0.8 (HNPU)',
     url: 'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    estimatedSizeBytes: 338_682_302,
   },
   {
     id: 'kitten_nano_0_2',
     name: 'Kitten-nano-0.2 (HNPU)',
     url: 'https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    estimatedSizeBytes: 105_235_740,
   },
   {
     id: 'kitten_nano_0_1',
     name: 'Kitten-nano-0.1 (HNPU)',
     url: 'https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    estimatedSizeBytes: 104_733_291,
   },
 ];
 
@@ -827,6 +862,7 @@ async function registerNpuBundles(): Promise<void> {
         url: bundle.url,
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         modality: bundle.modality,
+        memoryRequirement: bundle.estimatedSizeBytes,
       }).catch((error: unknown) =>
         logDiagnostic(
           `[App] Failed to register NPU bundle ${bundle.id}: ${String(error)}`

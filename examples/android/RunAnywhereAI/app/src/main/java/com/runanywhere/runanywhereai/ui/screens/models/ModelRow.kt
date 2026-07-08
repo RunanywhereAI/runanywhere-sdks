@@ -156,10 +156,9 @@ private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
     val needsHfToken = model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()
     AssistChip(
         onClick = onDownload,
-        enabled = !needsHfToken,
         label = {
             Text(
-                text = if (needsHfToken) "HF token" else model.sizeLabel(),
+                text = if (needsHfToken) "Set token" else model.sizeLabel(),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -175,7 +174,11 @@ private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
 }
 
 private fun RAModelInfo.sizeLabel(): String {
-    val bytes = maxOf(download_size_bytes, memory_required_bytes ?: 0L)
+    val bytes = when {
+        download_size_bytes > 0L -> download_size_bytes
+        (memory_required_bytes ?: 0L) > 0L -> memory_required_bytes ?: 0L
+        else -> 0L
+    }
     if (bytes > 0) return formatModelSize(bytes)
     return if (requiresHfAuth()) "Size varies" else "Size unknown"
 }

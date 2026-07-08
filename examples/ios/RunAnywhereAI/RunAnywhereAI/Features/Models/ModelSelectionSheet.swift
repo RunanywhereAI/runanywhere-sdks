@@ -98,6 +98,7 @@ struct ModelSelectionSheet: View {
     private var candidateModels: [RAModelInfo] {
         viewModel.availableModels
             .filter { model in
+                guard !model.isLoRAAdapterArtifact else { return false }
                 guard context.relevantCategories.contains(model.category) else { return false }
                 if let allowed = context.allowedFrameworks {
                     guard allowed.contains(model.framework) else { return false }

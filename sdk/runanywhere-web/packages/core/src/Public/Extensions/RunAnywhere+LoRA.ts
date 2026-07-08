@@ -124,6 +124,42 @@ export async function applyLoraAdapters(
   );
 }
 
+/**
+ * Apply one registered catalog adapter to the current LLM session.
+ *
+ * Preserves the catalog entry id in the generated config so commons can
+ * validate registered catalog adapters against the loaded base model.
+ */
+export async function applyLoraCatalogAdapter(
+  entry: LoraAdapterCatalogEntry,
+  options: {
+    localPath?: string;
+    scale?: number;
+    replaceExisting?: boolean;
+  } = {},
+): Promise<LoRAApplyResult> {
+  const adapterPath = options.localPath || entry.localPath || '';
+  if (!adapterPath) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT,
+      `LoRA catalog adapter '${entry.id}' has no local path`,
+    );
+  }
+  return applyLoraAdapters({
+    requestId: '',
+    adapters: [
+      {
+        adapterPath,
+        adapterId: entry.id || undefined,
+        scale: options.scale ?? (entry.defaultScale > 0 ? entry.defaultScale : 1.0),
+        metadata: {},
+        targetModules: [],
+      },
+    ],
+    replaceExisting: options.replaceExisting ?? false,
+  });
+}
+
 export async function removeLoraAdapters(
   request: LoRARemoveRequest,
 ): Promise<LoRAState> {
@@ -485,6 +521,7 @@ export const LoRA = {
   supportsNativeCatalog: supportsNativeLoRACatalog,
   missingCatalogExports: missingLoRACatalogExports,
   apply: applyLoraAdapters,
+  applyCatalogAdapter: applyLoraCatalogAdapter,
   remove: removeLoraAdapters,
   list: listLoraAdapters,
   state: getLoraState,

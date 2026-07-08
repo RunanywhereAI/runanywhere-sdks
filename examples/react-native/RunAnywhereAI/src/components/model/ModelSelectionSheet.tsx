@@ -9,11 +9,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BottomSheet, BottomSheetScrollView } from '../ui/BottomSheet';
 import { Icon, useTheme } from '../../theme/system';
 import {
@@ -25,7 +27,9 @@ import {
   getModelFormatLabel,
   getModelFrameworks,
   getPrimaryFramework,
+  modelRequiresHfAuth,
 } from '../../utils/modelDisplay';
+import { APP_STORAGE_KEYS } from '../../types/settings';
 import { RunAnywhere } from '@runanywhere/core';
 import {
   InferenceFramework,
@@ -260,6 +264,17 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
   const handleDownload = useCallback(
     async (model: SDKModelInfo) => {
+      if (modelRequiresHfAuth(model)) {
+        const token = await AsyncStorage.getItem(APP_STORAGE_KEYS.HF_TOKEN);
+        if (!token?.trim()) {
+          Alert.alert(
+            'Hugging Face token required',
+            'Add a Hugging Face token in Settings to download private HNPU/QHexRT models.'
+          );
+          return;
+        }
+      }
+
       setDownloading((prev) => ({ ...prev, [model.id]: 0 }));
       try {
         const iter = downloadModelStreamHelper(model)[Symbol.asyncIterator]();

@@ -326,23 +326,50 @@ private enum MLXSessionCoordinator {
 }
 
 private struct RepetitionRunGuard {
-    private static let repeatedTokenLimit = 6
-    private var recentTokens: [String] = []
+    private static let repeatedTokenLimit = 3
+    private var previousToken: String?
+    private var runLength = 0
+    private var heldRepeatedTokens: [String] = []
 
-    mutating func shouldStop(after token: String) -> Bool {
+    mutating func consume(_ token: String) -> RepetitionRunDecision {
         let normalized = token
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
-        guard !normalized.isEmpty else { return false }
-
-        recentTokens.append(normalized)
-        if recentTokens.count > Self.repeatedTokenLimit {
-            recentTokens.removeFirst(recentTokens.count - Self.repeatedTokenLimit)
+        guard !normalized.isEmpty else {
+            previousToken = nil
+            runLength = 0
+            let tokensToEmit = heldRepeatedTokens + [token]
+            heldRepeatedTokens.removeAll()
+            return .emit(tokensToEmit)
         }
 
-        guard recentTokens.count == Self.repeatedTokenLimit else { return false }
-        return recentTokens.dropFirst().allSatisfy { $0 == recentTokens[0] }
+        if normalized == previousToken {
+            runLength += 1
+            heldRepeatedTokens.append(token)
+            if runLength >= Self.repeatedTokenLimit {
+                heldRepeatedTokens.removeAll()
+                return .stop
+            }
+            return .hold
+        }
+
+        previousToken = normalized
+        runLength = 1
+        let tokensToEmit = heldRepeatedTokens + [token]
+        heldRepeatedTokens.removeAll()
+        return .emit(tokensToEmit)
     }
+
+    mutating func flushHeldTokens() -> [String] {
+        defer { heldRepeatedTokens.removeAll() }
+        return heldRepeatedTokens
+    }
+}
+
+private enum RepetitionRunDecision {
+    case emit([String])
+    case hold
+    case stop
 }
 
 // swiftlint:disable:next type_body_length
@@ -350,6 +377,7 @@ private final class MLXSession: @unchecked Sendable {
     private struct State {
         var isCancelled = false
         var isLoaded = false
+        var modelPath: String?
         var embeddingDimension = 0
         var isSynthesizing = false
     }
@@ -440,6 +468,7 @@ private final class MLXSession: @unchecked Sendable {
         lock.withLock {
             $0.isLoaded = true
             $0.isCancelled = false
+            $0.modelPath = modelPath
         }
         #endif
     }
@@ -502,6 +531,10 @@ private final class MLXSession: @unchecked Sendable {
         lock.withLock { $0.isCancelled = true }
     }
 
+    private func beginInference() {
+        lock.withLock { $0.isCancelled = false }
+    }
+
     func cleanup() {
         modelLock.withLock { models in
             models.generationContainer = nil
@@ -517,9 +550,26 @@ private final class MLXSession: @unchecked Sendable {
         lock.withLock {
             $0.isLoaded = false
             $0.isCancelled = true
+            $0.modelPath = nil
             $0.embeddingDimension = 0
             $0.isSynthesizing = false
         }
+    }
+
+    private func ensureResidentModelLoaded() async throws {
+        guard isGenerationSession else { return }
+        let residentState = lock.withLock { state in
+            (isLoaded: state.isLoaded, modelPath: state.modelPath)
+        }
+        if residentState.isLoaded {
+            return
+        }
+        guard let reloadPath = residentState.modelPath else {
+            throw MLXRuntimeError.notLoaded(modelID)
+        }
+
+        mlxRuntimeLogger.debug("Restoring evicted MLX \(kindDescription) model '\(modelID)'")
+        try await load(modelPath: reloadPath)
     }
 
     private func collect(input: UserInput, parameters: GenerateParameters) async throws
@@ -551,6 +601,8 @@ private final class MLXSession: @unchecked Sendable {
         parameters: GenerateParameters,
         onToken: @escaping @Sendable (String) -> Bool
     ) async throws -> MLXGenerationMetrics {
+        try await ensureResidentModelLoaded()
+        beginInference()
         guard let container = modelLock.withLock({ $0.generationContainer }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
@@ -569,24 +621,30 @@ private final class MLXSession: @unchecked Sendable {
         let events = session.streamDetails(to: prompt, images: [image])
         var metrics = MLXGenerationMetrics()
         var repetitionGuard = RepetitionRunGuard()
-        var suppressRunawayTokens = false
+        var shouldFlushHeldTokens = true
         let started = Date()
 
         generationLoop: for try await event in events {
             if isCancelled {
+                shouldFlushHeldTokens = false
                 break
             }
             switch event {
             case .chunk(let token):
-                if suppressRunawayTokens {
+                switch repetitionGuard.consume(token) {
+                case .emit(let tokens):
+                    for outputToken in tokens where !outputToken.isEmpty {
+                        if !onToken(outputToken) {
+                            shouldFlushHeldTokens = false
+                            cancel()
+                            break generationLoop
+                        }
+                    }
+                case .hold:
                     continue
-                }
-                if repetitionGuard.shouldStop(after: token) {
-                    mlxRuntimeLogger.warning("Suppressing MLX VLM tokens after repeated token runaway")
-                    suppressRunawayTokens = true
-                    continue
-                }
-                if !onToken(token) {
+                case .stop:
+                    mlxRuntimeLogger.warning("Stopping MLX VLM generation after repeated token runaway")
+                    shouldFlushHeldTokens = false
                     cancel()
                     break generationLoop
                 }
@@ -597,6 +655,15 @@ private final class MLXSession: @unchecked Sendable {
                 metrics.totalTimeMs = Int64((info.promptTime + info.generateTime) * 1000)
             case .toolCall:
                 break
+            }
+        }
+
+        if shouldFlushHeldTokens {
+            for token in repetitionGuard.flushHeldTokens() where !token.isEmpty {
+                if !onToken(token) {
+                    cancel()
+                    break
+                }
             }
         }
 
@@ -611,6 +678,8 @@ private final class MLXSession: @unchecked Sendable {
         parameters: GenerateParameters,
         onToken: @escaping @Sendable (String) -> Bool
     ) async throws -> MLXGenerationMetrics {
+        try await ensureResidentModelLoaded()
+        beginInference()
         guard let container = modelLock.withLock({ $0.generationContainer }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
@@ -709,14 +778,15 @@ private final class MLXSession: @unchecked Sendable {
 
     func transcribe(
         audioData: Data,
-        options: UnsafePointer<rac_stt_options_t>?
-    ) throws -> MLXSTTOutput {
+        options: rac_stt_options_t?
+    ) async throws -> MLXSTTOutput {
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
+        try await ensureResidentModelLoaded()
         guard let model = modelLock.withLock({ $0.sttModel }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
-        let audio = try makeSTTAudioArray(audioData: audioData, options: options?.pointee)
-        let parameters = sttGenerateParameters(from: options?.pointee)
+        let audio = try makeSTTAudioArray(audioData: audioData, options: options)
+        let parameters = sttGenerateParameters(from: options)
         let output = model.generate(audio: audio, generationParameters: parameters)
         return MLXSTTOutput(
             text: output.text,
@@ -735,6 +805,7 @@ private final class MLXSession: @unchecked Sendable {
         userData: UnsafeMutableRawPointer?
     ) async throws {
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
+        try await ensureResidentModelLoaded()
         guard let model = modelLock.withLock({ $0.sttModel }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
@@ -771,7 +842,7 @@ private final class MLXSession: @unchecked Sendable {
     func sttInfo() -> rac_stt_info_t {
         let state = lock.withLock { $0 }
         var info = rac_stt_info_t()
-        info.is_ready = state.isLoaded ? RAC_TRUE : RAC_FALSE
+        info.is_ready = (state.isLoaded || state.modelPath != nil) ? RAC_TRUE : RAC_FALSE
         info.current_model = nil
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         info.supports_streaming = RAC_TRUE
@@ -786,6 +857,7 @@ private final class MLXSession: @unchecked Sendable {
         options: UnsafePointer<rac_tts_options_t>?
     ) async throws -> (samples: [Float], sampleRate: Int, processingTimeMs: Int64) {
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
+        try await ensureResidentModelLoaded()
         guard let model = modelLock.withLock({ $0.ttsModel }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
@@ -824,6 +896,7 @@ private final class MLXSession: @unchecked Sendable {
         userData: UnsafeMutableRawPointer?
     ) async throws {
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
+        try await ensureResidentModelLoaded()
         guard let model = modelLock.withLock({ $0.ttsModel }) else {
             throw MLXRuntimeError.notLoaded(modelID)
         }
@@ -867,7 +940,7 @@ private final class MLXSession: @unchecked Sendable {
     func ttsInfo() -> rac_tts_info_t {
         let state = lock.withLock { $0 }
         var info = rac_tts_info_t()
-        info.is_ready = state.isLoaded ? RAC_TRUE : RAC_FALSE
+        info.is_ready = (state.isLoaded || state.modelPath != nil) ? RAC_TRUE : RAC_FALSE
         info.is_synthesizing = state.isSynthesizing ? RAC_TRUE : RAC_FALSE
         info.available_voices = nil
         info.num_voices = 0
@@ -956,7 +1029,9 @@ private enum MLXRuntimeError: LocalizedError {
         case .unsupportedAudioFormat:
             return "MLX speech inference currently accepts 16-bit mono PCM audio."
         case .unsupportedSTTModel(let hints):
-            return "Unsupported MLX STT model. Supported local loaders: Qwen3-ASR and GLM-ASR. Hints: \(hints.joined(separator: ", "))"
+            let loaders = "Qwen3-ASR, GLM-ASR, Parakeet, Whisper, and Moonshine"
+            return "Unsupported MLX STT model. Supported local loaders: \(loaders). " +
+                "Hints: \(hints.joined(separator: ", "))"
         case .mlxAudioUnavailable:
             return "MLX audio requires mlx-audio-swift, which currently needs Swift tools 6.2. This build was compiled without that optional bridge."
         case .allocationFailed:
@@ -1097,6 +1172,19 @@ private func loadSpeechRecognitionModel(from directory: URL, modelID: String) as
 
     if joinedHints.contains("glm") && joinedHints.contains("asr") {
         return try await GLMASRModel.fromModelDirectory(directory)
+    }
+
+    if joinedHints.contains("parakeet") ||
+        joinedHints.contains("nemo.collections.asr.models") {
+        return try ParakeetModel.fromDirectory(directory)
+    }
+
+    if joinedHints.contains("whisper") {
+        return try await WhisperModel.fromDirectory(directory)
+    }
+
+    if joinedHints.contains("moonshine") {
+        return try await MoonshineModel.fromModelDirectory(directory)
     }
 
     throw MLXRuntimeError.unsupportedSTTModel(hints)
@@ -1433,9 +1521,10 @@ private let mlxSTTTranscribe: rac_mlx_stt_transcribe_fn = { handle, audioData, a
         return RAC_ERROR_INVALID_PARAMETER
     }
     let input = Data(bytes: audioData, count: Int(audioSize))
+    let optionsSnapshot = options?.pointee
     let started = Date()
-    do {
-        let output = try session.transcribe(audioData: input, options: options)
+    switch syncWait({ try await session.transcribe(audioData: input, options: optionsSnapshot) }) {
+    case .success(let output):
         outResult.pointee = rac_stt_result_t()
         outResult.pointee.text = strdup(output.text)
         if outResult.pointee.text == nil {
@@ -1454,7 +1543,7 @@ private let mlxSTTTranscribe: rac_mlx_stt_transcribe_fn = { handle, audioData, a
             ? outputTimeMs
             : Int64(Date().timeIntervalSince(started) * 1000)
         return RAC_SUCCESS
-    } catch {
+    case .failure(let error):
         recordMLXFailure("MLX speech transcription", error: error)
         return RAC_ERROR_INFERENCE_FAILED
     }

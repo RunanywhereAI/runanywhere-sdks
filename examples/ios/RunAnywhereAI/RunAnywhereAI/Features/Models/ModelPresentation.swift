@@ -333,11 +333,7 @@ extension RAModelInfo {
     }
 
     var isLoraAdapterModel: Bool {
-        let normalizedID = id.lowercased()
-        if normalizedID.hasPrefix("lora-adapter:") {
-            return true
-        }
-        return metadata.tags.contains(where: { $0.lowercased() == "lora-adapter" || $0.lowercased() == "lora" })
+        isLoRAAdapterArtifact
     }
 
     var requiresHfAuth: Bool {
@@ -349,7 +345,7 @@ extension RAModelInfo {
         if isBuiltIn {
             return "No download"
         }
-        let bytes = max(downloadSizeBytes, memoryRequiredBytes)
+        let bytes = downloadSizeBytes > 0 ? downloadSizeBytes : memoryRequiredBytes
         if bytes > 0 {
             return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory)
         }

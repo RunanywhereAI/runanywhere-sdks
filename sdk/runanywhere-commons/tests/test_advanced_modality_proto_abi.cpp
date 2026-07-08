@@ -837,6 +837,7 @@ runanywhere::v1::ModelInfo build_lora_test_model(const std::string& id, const st
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path("/tmp/" + id + ".gguf");
+    model.set_supports_lora(true);
     model.set_is_downloaded(true);
     model.set_is_available(true);
     return model;
@@ -900,6 +901,13 @@ int test_lora_register_compat_apply_remove_clear() {
     CHECK(registered.id() == "style.adapter", "LoRA register preserves id");
     rac_proto_buffer_free(&out);
     rac_lora_registry_destroy(lora_registry);
+
+    rac_proto_buffer_init(&out);
+    rc = rac_lora_register_proto(rac_get_lora_registry(), entry_bytes.data(), entry_bytes.size(),
+                                 &out);
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &registered),
+          "LoRA runtime catalog entry registers globally");
+    rac_proto_buffer_free(&out);
 
     rac_model_registry_handle_t model_registry = nullptr;
     CHECK(rac_model_registry_create(&model_registry) == RAC_SUCCESS && model_registry != nullptr,

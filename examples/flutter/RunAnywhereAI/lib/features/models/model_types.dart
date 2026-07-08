@@ -8,6 +8,14 @@ typedef ModelCategory = sdk.ModelCategory;
 typedef ModelFormat = sdk.ModelFormat;
 typedef LLMFramework = sdk.InferenceFramework;
 
+const Set<String> _privateHfTags = {
+  'private',
+  'requires-hf-auth',
+  'hf-auth',
+  'huggingface-auth',
+  'hugging-face-auth',
+};
+
 /// Model selection context is app UI state, not an SDK data contract.
 enum ModelSelectionContext {
   llm,
@@ -274,10 +282,25 @@ extension ModelFormatDisplay on ModelFormat {
 }
 
 extension ExampleModelInfoView on ModelInfo {
-  int? get memoryRequired =>
-      hasDownloadSizeBytes() && downloadSizeBytes.toInt() > 0
-          ? downloadSizeBytes.toInt()
-          : null;
+  bool get requiresHfAuth {
+    final tags = hasMetadata()
+        ? metadata.tags.map((tag) => tag.toLowerCase()).toSet()
+        : const <String>{};
+    return tags.any(_privateHfTags.contains) ||
+        backendFramework == sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
+            downloadUrl.toLowerCase().contains('_hnpu');
+  }
+
+  int? get memoryRequired {
+    final downloadBytes =
+        hasDownloadSizeBytes() && downloadSizeBytes.toInt() > 0
+        ? downloadSizeBytes.toInt()
+        : null;
+    if (downloadBytes != null) return downloadBytes;
+    return hasMemoryRequiredBytes() && memoryRequiredBytes.toInt() > 0
+        ? memoryRequiredBytes.toInt()
+        : null;
+  }
 
   LLMFramework get backendFramework {
     final preferred = preferredFramework;

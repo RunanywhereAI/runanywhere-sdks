@@ -31,6 +31,7 @@ import {
   getFrameworkDisplayName,
   getModelDownloadSizeBytes,
   getPrimaryFramework,
+  modelRequiresHfAuth,
 } from '../utils/modelDisplay';
 import { registerDemoTools as registerSharedDemoTools } from '../utils/chatSampleTools';
 import { Icon, useTheme } from '../theme/system';
@@ -769,6 +770,16 @@ export const SettingsScreen: React.FC = () => {
           console.error('Failed to cancel download:', err);
         }
         return;
+      }
+      if (modelRequiresHfAuth(model)) {
+        const token = await getStoredHfToken();
+        if (!token?.trim()) {
+          Alert.alert(
+            'Hugging Face token required',
+            'Add a Hugging Face token in Settings to download private HNPU/QHexRT models.'
+          );
+          return;
+        }
       }
       setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
       try {

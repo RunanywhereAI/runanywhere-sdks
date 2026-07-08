@@ -15,6 +15,7 @@
 #include <google/protobuf/descriptor.h>
 #include <ranges>
 
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -165,6 +166,7 @@ runanywhere::v1::ModelInfo build_lora_test_model(const std::string& id, const st
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path("/tmp/" + id + ".gguf");
+    model.set_supports_lora(true);
     model.set_is_downloaded(true);
     model.set_is_available(true);
     return model;
@@ -178,6 +180,16 @@ bool register_lora_test_model(rac_model_registry_handle_t registry,
         return false;
     return rac_model_registry_register_proto(registry, bytes.empty() ? nullptr : bytes.data(),
                                              bytes.size()) == RAC_SUCCESS;
+}
+
+bool register_lora_test_adapter(const std::string& adapter_id, const std::string& model_id) {
+    const char* compatible_models[] = {model_id.c_str()};
+    rac_lora_entry_t entry{};
+    entry.id = const_cast<char*>(adapter_id.c_str());
+    entry.name = const_cast<char*>(adapter_id.c_str());
+    entry.compatible_model_ids = const_cast<char**>(compatible_models);
+    entry.compatible_model_count = 1;
+    return rac_lora_registry_register(rac_get_lora_registry(), &entry) == RAC_SUCCESS;
 }
 
 bool load_lora_test_model(rac_model_registry_handle_t registry, const std::string& model_id) {
@@ -595,6 +607,9 @@ int test_generated_lora_apply_list_state_remove_and_clear(rac_model_registry_han
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "LoRA service test plugin registers");
     CHECK(register_lora_test_model(registry, build_lora_test_model("mock-llm", "Mock LLM")),
           "mock-llm registers for generated LoRA apply");
+    CHECK(register_lora_test_adapter("style", "mock-llm"),
+          "style adapter registers for mock-llm");
+    CHECK(register_lora_test_adapter("tone", "mock-llm"), "tone adapter registers for mock-llm");
     CHECK(load_lora_test_model(registry, "mock-llm"),
           "lifecycle loads mock model for generated LoRA apply");
 
@@ -717,6 +732,8 @@ int test_generated_lora_remove_unknown_id_is_typed_error(rac_model_registry_hand
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "LoRA unknown-id plugin registers");
     CHECK(register_lora_test_model(registry, build_lora_test_model("mock-llm", "Mock LLM")),
           "mock-llm registers for generated LoRA unknown-id test");
+    CHECK(register_lora_test_adapter("style", "mock-llm"),
+          "style adapter registers for mock-llm unknown-id test");
     CHECK(load_lora_test_model(registry, "mock-llm"),
           "lifecycle loads mock model for generated LoRA unknown-id test");
 
@@ -777,6 +794,10 @@ int test_generated_lora_state_is_scoped_per_lifecycle_load(rac_model_registry_ha
           "model-a registers for scoped LoRA state");
     CHECK(register_lora_test_model(registry, build_lora_test_model("model-b", "Model B")),
           "model-b registers for scoped LoRA state");
+    CHECK(register_lora_test_adapter("first", "model-a"),
+          "first adapter registers for model-a");
+    CHECK(register_lora_test_adapter("second", "model-b"),
+          "second adapter registers for model-b");
 
     CHECK(load_lora_test_model(registry, "model-a"),
           "lifecycle loads model-a for scoped LoRA state");

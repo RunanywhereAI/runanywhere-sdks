@@ -149,8 +149,26 @@ export const isModelCompatibleWithFramework = (
   framework: InferenceFramework
 ): boolean => getModelFrameworks(model).includes(framework);
 
+const privateHfTags = new Set([
+  'private',
+  'requires-hf-auth',
+  'hf-auth',
+  'huggingface-auth',
+  'hugging-face-auth',
+]);
+
+export const modelRequiresHfAuth = (model: ModelInfo): boolean => {
+  const tags = model.metadata?.tags?.map((tag) => tag.toLowerCase()) ?? [];
+  return (
+    tags.some((tag) => privateHfTags.has(tag)) ||
+    (getPrimaryFramework(model) ===
+      InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
+      (model.downloadUrl ?? '').toLowerCase().includes('_hnpu'))
+  );
+};
+
 export const getModelDownloadSizeBytes = (model: ModelInfo): number =>
-  model.downloadSizeBytes || 0;
+  model.downloadSizeBytes || model.memoryRequiredBytes || 0;
 
 export const getModelFormatLabel = (format?: ModelFormat | null): string => {
   switch (format) {
