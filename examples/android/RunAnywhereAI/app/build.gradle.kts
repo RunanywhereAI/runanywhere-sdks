@@ -94,7 +94,11 @@ android {
             pickFirsts += "**/libc++_shared.so"
             pickFirsts += "**/libomp.so"
             pickFirsts += "**/librac_commons.so"
-            useLegacyPackaging = true
+            // AGP 9.x zipaligns uncompressed native libraries on 16 KB boundaries
+            // for Android 15+ page-size compatibility. Keep this false for Play
+            // release builds; the old compressed/extracted path is only needed for
+            // projects stuck below AGP 8.5.1.
+            useLegacyPackaging = false
         }
     }
 }
