@@ -391,9 +391,6 @@ struct SimplifiedModelsView: View {
     }
 
     private func unavailableReason(for model: RAModelInfo) -> String? {
-        if model.framework == .qhexrt {
-            return "Requires a Qualcomm Hexagon NPU Android device."
-        }
         guard model.framework == .foundationModels else { return nil }
         return SystemFoundationModels.unavailableReason
     }
@@ -488,7 +485,6 @@ private enum ModelBackendFilter: String, CaseIterable, Identifiable {
     case all
     case mlx
     case llamaCpp
-    case qhexrt
     case onnx
     case sherpa
     case apple
@@ -500,7 +496,6 @@ private enum ModelBackendFilter: String, CaseIterable, Identifiable {
         case .all: return "All"
         case .mlx: return "MLX"
         case .llamaCpp: return "Llama CPP"
-        case .qhexrt: return "QHexRT"
         case .onnx: return "ONNX"
         case .sherpa: return "Sherpa"
         case .apple: return "Apple"
@@ -515,8 +510,6 @@ private enum ModelBackendFilter: String, CaseIterable, Identifiable {
             return model.framework == .mlx
         case .llamaCpp:
             return model.framework == .llamaCpp
-        case .qhexrt:
-            return model.framework == .qhexrt
         case .onnx:
             return model.framework == .onnx
         case .sherpa:

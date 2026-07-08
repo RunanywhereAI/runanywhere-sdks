@@ -588,12 +588,8 @@ enum ModelCatalogBootstrap {
         )
         logger.info("Embedding models registered")
 
-        if SettingsViewModel.getStoredHfToken() != nil {
-            await registerPrivateHnpuModels()
-            logger.info("Private HNPU models registered")
-        } else {
-            logger.info("Private HNPU models available in catalog; registration waits for Hugging Face token")
-        }
+        // QHexRT/HNPU bundles are Qualcomm-Android-only and are intentionally
+        // not registered on Apple platforms.
 
         // --- LoRA adapters ------------------------------------------------------
         // Mirrors Android `ModelBootstrap.seedLora` / `ModelCatalog.loraAdapters`.
@@ -604,24 +600,6 @@ enum ModelCatalogBootstrap {
         // Swift v1. Their model catalog entries are intentionally omitted.
 
         logger.info("All modules and models registered")
-    }
-
-    static var privateHnpuModels: [RAModelInfo] {
-        privateHnpuSpecs.map(makePrivateHnpuModel)
-    }
-
-    static func registerPrivateHnpuModels() async {
-        for spec in privateHnpuSpecs {
-            await registerLLM(
-                id: spec.id,
-                name: spec.name,
-                url: spec.url,
-                framework: .qhexrt,
-                modality: spec.category,
-                memoryRequirement: 0,
-                supportsThinking: spec.supportsThinking
-            )
-        }
     }
 
     /// Seed the curated LoRA adapter catalog. `registerArtifact` registers the
@@ -659,106 +637,6 @@ enum ModelCatalogBootstrap {
             self.filename = filename
             self.isRequired = isRequired
         }
-    }
-
-    private struct PrivateHnpuSpec {
-        let id: String
-        let name: String
-        let repo: String
-        let category: ModelCategory
-        let supportsThinking: Bool
-
-        var url: String {
-            "https://huggingface.co/runanywhere/\(repo)"
-        }
-
-        init(
-            id: String,
-            name: String,
-            repo: String,
-            category: ModelCategory,
-            supportsThinking: Bool = false
-        ) {
-            self.id = id
-            self.name = name
-            self.repo = repo
-            self.category = category
-            self.supportsThinking = supportsThinking
-        }
-    }
-
-    private static let privateHnpuSpecs: [PrivateHnpuSpec] = [
-        .init(id: "canary_1b_flash", name: "Canary 1B Flash (HNPU)", repo: "canary_1b_flash_HNPU", category: .speechRecognition),
-        .init(id: "canary_qwen_2_5b", name: "Canary Qwen 2.5B (HNPU)", repo: "canary_qwen_2.5b_HNPU", category: .speechRecognition),
-        .init(id: "deepseek_r1_distill_qwen_1_5b", name: "DeepSeek R1 Distill Qwen 1.5B (HNPU)", repo: "deepseek_r1_distill_qwen_1_5b_HNPU", category: .language, supportsThinking: true),
-        .init(id: "deepseek_r1_distill_qwen_7b", name: "DeepSeek R1 Distill Qwen 7B (HNPU)", repo: "deepseek_r1_distill_qwen_7b_HNPU", category: .language, supportsThinking: true),
-        .init(id: "embeddinggemma_300m", name: "EmbeddingGemma 300M (HNPU)", repo: "embeddinggemma_300m_HNPU", category: .embedding),
-        .init(id: "gemma3n_e4b", name: "Gemma 3n E4B (HNPU)", repo: "gemma3n_e4b_HNPU", category: .language),
-        .init(id: "gemma4_e2b", name: "Gemma 4 E2B (HNPU)", repo: "gemma4_e2b_HNPU", category: .language),
-        .init(id: "gemma4_e4b", name: "Gemma 4 E4B (HNPU)", repo: "gemma4_e4b_HNPU", category: .language),
-        .init(id: "internvl3_5_1b", name: "InternVL3.5 1B (HNPU)", repo: "internvl3_5_1b_HNPU", category: .multimodal),
-        .init(id: "kitten_micro_0_8", name: "Kitten Micro 0.8 (HNPU)", repo: "kitten_micro_0_8_HNPU", category: .speechSynthesis),
-        .init(id: "kitten_mini_0_1", name: "Kitten Mini 0.1 (HNPU)", repo: "kitten_mini_0_1_HNPU", category: .speechSynthesis),
-        .init(id: "kitten_mini_0_8", name: "Kitten Mini 0.8 (HNPU)", repo: "kitten_mini_0_8_HNPU", category: .speechSynthesis),
-        .init(id: "kitten_nano_0_1", name: "Kitten Nano 0.1 (HNPU)", repo: "kitten_nano_0_1_HNPU", category: .speechSynthesis),
-        .init(id: "kitten_nano_0_2", name: "Kitten Nano 0.2 (HNPU)", repo: "kitten_nano_0_2_HNPU", category: .speechSynthesis),
-        .init(id: "kitten_nano_0_8", name: "Kitten Nano 0.8 (HNPU)", repo: "kitten_nano_0_8_HNPU", category: .speechSynthesis),
-        .init(id: "kokoro_en", name: "Kokoro EN (HNPU)", repo: "kokoro_en_HNPU", category: .speechSynthesis),
-        .init(id: "lama_dilated", name: "LaMa Dilated (HNPU)", repo: "lama_dilated_HNPU", category: .vision),
-        .init(id: "lfm2_5_230m", name: "LFM2.5 230M (HNPU)", repo: "lfm2_5_230m_HNPU", category: .language),
-        .init(id: "lfm2_5_350m", name: "LFM2.5 350M (HNPU)", repo: "lfm2_5_350m_HNPU", category: .language),
-        .init(id: "llama3_2_1b", name: "Llama 3.2 1B (HNPU)", repo: "llama3_2_1b_HNPU", category: .language),
-        .init(id: "llama_embed_nemotron_8b", name: "Llama Embed Nemotron 8B (HNPU)", repo: "llama_embed_nemotron_8b_HNPU", category: .embedding),
-        .init(id: "melotts_en", name: "MeloTTS EN (HNPU)", repo: "melotts_en_HNPU", category: .speechSynthesis),
-        .init(id: "moonshine_base", name: "Moonshine Base (HNPU)", repo: "moonshine_base_HNPU", category: .speechRecognition),
-        .init(id: "moonshine_tiny", name: "Moonshine Tiny (HNPU)", repo: "moonshine_tiny_HNPU", category: .speechRecognition),
-        .init(id: "nemoguard_8b_content_safety", name: "NemoGuard 8B Content Safety (HNPU)", repo: "nemoguard_8b_content_safety_HNPU", category: .language),
-        .init(id: "nemoguard_8b_topic_control", name: "NemoGuard 8B Topic Control (HNPU)", repo: "nemoguard_8b_topic_control_HNPU", category: .language),
-        .init(id: "nemotron_asr_streaming", name: "Nemotron ASR Streaming (HNPU)", repo: "nemotron_asr_streaming_HNPU", category: .speechRecognition),
-        .init(id: "nemotron_nano_8b", name: "Nemotron Nano 8B (HNPU)", repo: "nemotron_nano_8b_HNPU", category: .language),
-        .init(id: "nemotron_nano_vl_8b", name: "Nemotron Nano VL 8B (HNPU)", repo: "nemotron_nano_vl_8b_HNPU", category: .multimodal),
-        .init(id: "nemotron_ocr", name: "Nemotron OCR (HNPU)", repo: "nemotron_ocr_HNPU", category: .multimodal),
-        .init(id: "nemotron_ocr_v1", name: "Nemotron OCR v1 (HNPU)", repo: "nemotron_ocr_v1_HNPU", category: .multimodal),
-        .init(id: "nemotron_parse", name: "Nemotron Parse (HNPU)", repo: "nemotron_parse_HNPU", category: .multimodal),
-        .init(id: "nv_embedcode_7b", name: "NV-EmbedCode 7B (HNPU)", repo: "nv_embedcode_7b_HNPU", category: .embedding),
-        .init(id: "nv_embedqa_1b", name: "NV-EmbedQA 1B (HNPU)", repo: "nv_embedqa_1b_HNPU", category: .embedding),
-        .init(id: "nv_rerankqa_1b", name: "NV-RerankQA 1B (HNPU)", repo: "nv_rerankqa_1b_HNPU", category: .embedding),
-        .init(id: "parakeet_rnnt_1_1b", name: "Parakeet RNNT 1.1B (HNPU)", repo: "parakeet_rnnt_1.1b_HNPU", category: .speechRecognition),
-        .init(id: "parakeet_tdt_0_6b_v2", name: "Parakeet TDT 0.6B v2 (HNPU)", repo: "parakeet_tdt_0.6b_v2_HNPU", category: .speechRecognition),
-        .init(id: "parakeet_tdt_0_6b_v3", name: "Parakeet TDT 0.6B v3 (HNPU)", repo: "parakeet_tdt_0.6b_v3_HNPU", category: .speechRecognition),
-        .init(id: "phi_tiny_moe", name: "Phi Tiny MoE (HNPU)", repo: "phi_tiny_moe_HNPU", category: .language),
-        .init(id: "qwen3_0_6b", name: "Qwen3 0.6B (HNPU)", repo: "qwen3_0_6b_HNPU", category: .language, supportsThinking: true),
-        .init(id: "qwen3_5_0_8b", name: "Qwen3.5 0.8B (HNPU)", repo: "qwen3_5_0_8b_HNPU", category: .language, supportsThinking: true),
-        .init(id: "qwen3_5_2b", name: "Qwen3.5 2B (HNPU)", repo: "qwen3_5_2b_HNPU", category: .language, supportsThinking: true),
-        .init(id: "qwen3_5_4b", name: "Qwen3.5 4B (HNPU)", repo: "qwen3_5_4b_HNPU", category: .language, supportsThinking: true),
-        .init(id: "qwen3_vl", name: "Qwen3-VL (HNPU)", repo: "qwen3_vl_HNPU", category: .multimodal, supportsThinking: true),
-        .init(id: "siglip2_base", name: "SigLIP2 Base (HNPU)", repo: "siglip2_base_HNPU", category: .vision),
-        .init(id: "ternary_bonsai_1_7b", name: "Ternary Bonsai 1.7B (HNPU)", repo: "ternary_bonsai_1_7b_HNPU", category: .language),
-        .init(id: "whisper_base", name: "Whisper Base (HNPU)", repo: "whisper_base_HNPU", category: .speechRecognition),
-        .init(id: "whisper_small", name: "Whisper Small (HNPU)", repo: "whisper_small_HNPU", category: .speechRecognition)
-    ]
-
-    private static func makePrivateHnpuModel(_ spec: PrivateHnpuSpec) -> RAModelInfo {
-        var model = RAModelInfo()
-        model.id = spec.id
-        model.name = spec.name
-        model.category = spec.category
-        model.format = .qnnContext
-        model.framework = .qhexrt
-        model.downloadURL = spec.url
-        model.downloadSizeBytes = 0
-        model.memoryRequiredBytes = 0
-        model.supportsThinking = spec.supportsThinking
-        model.description_p = "Private HNPU bundle. Add a Hugging Face token in Settings before downloading."
-        model.source = .remote
-        model.singleFile = RASingleFileArtifact()
-
-        var metadata = RAModelInfoMetadata()
-        metadata.description_p = model.description_p
-        metadata.author = "RunAnywhere"
-        metadata.tags = ["private", "requires-hf-auth", "hnpu", "hugging-face", spec.repo]
-        model.metadata = metadata
-        return model
     }
 
     private static func registerLLM(

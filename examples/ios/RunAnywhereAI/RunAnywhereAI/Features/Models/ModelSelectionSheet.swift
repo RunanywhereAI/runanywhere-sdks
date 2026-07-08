@@ -153,9 +153,6 @@ struct ModelSelectionSheet: View {
     }
 
     private func unavailableReason(for model: RAModelInfo) -> String? {
-        if model.framework == .qhexrt {
-            return "Requires a Qualcomm Hexagon NPU Android device."
-        }
         guard model.framework == .foundationModels else { return nil }
         return SystemFoundationModels.unavailableReason
     }

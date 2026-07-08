@@ -428,7 +428,6 @@ class SettingsViewModel: ObservableObject {
             }
 
             Task {
-                await ModelCatalogBootstrap.registerPrivateHnpuModels()
                 await ModelListViewModel.shared.loadModels()
             }
         } catch {

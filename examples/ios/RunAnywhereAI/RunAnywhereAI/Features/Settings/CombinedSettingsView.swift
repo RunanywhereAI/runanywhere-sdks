@@ -222,7 +222,7 @@ private struct IOSSettingsContent: View {
             } footer: {
                 Text(
                     "Developer controls are kept here so the main app stays assistant-first. "
-                    + "Add a Hugging Face token to download private HNPU/QHexRT model bundles."
+                    + "Add a Hugging Face token to download models from private repos."
                 )
                 .font(AppTypography.caption)
             }
@@ -520,7 +520,7 @@ private struct PrivateDownloadsControls: View {
                 .textFieldStyle(.roundedBorder)
                 .disabled(viewModel.isSavingHfToken)
 
-            Text("Used only for private Hugging Face repos, including HNPU/QHexRT bundles.")
+            Text("Used only for downloading models from private Hugging Face repos.")
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.textSecondary)
 
