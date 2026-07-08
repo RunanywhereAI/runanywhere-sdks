@@ -58,22 +58,15 @@ class DeviceInfoService: ObservableObject {
     // MARK: - Private Helper Methods
 
     private func getDeviceModelName() async -> String {
-        // Use system info directly since SDK methods are private
-        var systemInfo = utsname()
-        uname(&systemInfo)
-        let machineMirror = Mirror(reflecting: systemInfo.machine)
-        let identifier = machineMirror.children.reduce("") { identifier, element in
-            guard let value = element.value as? Int8, value != 0 else { return identifier }
-            let unicodeScalar = UnicodeScalar(UInt8(value))
-            return identifier + String(unicodeScalar)
-        }
-
+        // Consumer-facing name only — never a raw machine identifier like
+        // "arm64" (simulator) or "iPhone17,3". UIDevice gives a friendly
+        // family name ("iPhone" / "iPad") on iOS; macOS maps hw.model.
         #if os(iOS) || os(tvOS)
-        return identifier.isEmpty ? UIDevice.current.model : identifier
+        return UIDevice.current.model
         #elseif os(macOS)
         return getMacModelName()
         #else
-        return identifier.isEmpty ? "Mac" : identifier
+        return "Mac"
         #endif
     }
 

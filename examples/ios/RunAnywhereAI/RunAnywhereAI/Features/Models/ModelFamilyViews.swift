@@ -3,8 +3,8 @@
 //  RunAnywhereAI
 //
 //  The family-first browsing experience: a clean row card per model family and
-//  a detail view that auto-selects the best variant for the device and hides
-//  technical backend/variant details behind an "Advanced" disclosure.
+//  a detail view that highlights the best variant for the device, with every
+//  variant showing its clean name, download size, and a subtle backend pill.
 //
 
 import SwiftUI
@@ -102,8 +102,95 @@ struct ComingSoonFamilyRow: View {
     }
 }
 
-/// Family detail: picks the best-fit variant for the device automatically and
-/// only reveals per-variant/backend choices under a subtle "Advanced" section.
+/// One variant of a model family: clean human name, download size, subtle
+/// backend pill, ≤2 consumer tags, and the feel descriptor as secondary text.
+/// The single row design shared by the family detail and the selection sheet.
+struct ModelVariantRow: View {
+    let variant: RAModelInfo
+    /// Feel descriptor ("Smaller · faster") shown as secondary text, never as
+    /// the only identifier. Nil hides the line.
+    var feelDescriptor: String?
+    var highlight: String?
+    let availabilityReason: String?
+    let isSelected: Bool
+    let isLoadingModel: Bool
+    let handlers: ModelActionHandlers
+
+    var body: some View {
+        HStack(alignment: .top, spacing: AppSpacing.mediumLarge) {
+            VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
+                if let highlight {
+                    Text(highlight.uppercased())
+                        .font(AppTypography.caption2Bold)
+                        .foregroundColor(AppColors.primaryAccent)
+                }
+
+                Text(variant.consumerDisplayName)
+                    .font(AppTypography.subheadlineSemibold)
+                    .foregroundColor(AppColors.textPrimary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: AppSpacing.smallMedium) {
+                    Text(variant.consumerSizeLabel)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                    BackendPill(framework: variant.framework)
+                    if let feelDescriptor {
+                        Text(feelDescriptor)
+                            .font(AppTypography.caption2)
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+
+                if !variant.consumerTags.isEmpty {
+                    HStack(spacing: AppSpacing.xSmall) {
+                        ForEach(variant.consumerTags) { badge in
+                            ConsumerBadge(badge: badge)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            actions
+        }
+        .padding(.vertical, AppSpacing.smallMedium)
+    }
+
+    @ViewBuilder private var actions: some View {
+        VStack(alignment: .trailing, spacing: AppSpacing.small) {
+            ModelPrimaryActionButton(
+                model: variant,
+                availabilityReason: availabilityReason,
+                isSelected: isSelected,
+                isLoadingModel: isLoadingModel,
+                onSelectModel: { handlers.onSelect(variant) },
+                onChanged: handlers.onChanged
+            )
+
+            if let onDelete = handlers.onDelete,
+               !variant.isBuiltIn,
+               variant.localPathURL != nil,
+               availabilityReason == nil {
+                Button {
+                    onDelete(variant)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .font(AppTypography.caption)
+                .buttonStyle(.bordered)
+                .tint(AppColors.primaryRed)
+                .controlSize(.small)
+                .accessibilityLabel("Delete \(variant.consumerDisplayName)")
+            }
+        }
+    }
+}
+
+/// Family detail: highlights the best-fit variant for the device up top, with
+/// every other option listed directly below — each with full name, size, and
+/// backend so variants are always distinguishable.
 struct ModelFamilyDetailView: View {
     let family: ModelFamily
     let tier: HardwareTier
@@ -128,7 +215,7 @@ struct ModelFamilyDetailView: View {
     var body: some View {
         List {
             Section {
-                variantRow(bestVariant, highlight: "Best for this device")
+                row(for: bestVariant, highlight: "Best for this device")
             } header: {
                 Text("Recommended")
             } footer: {
@@ -138,12 +225,11 @@ struct ModelFamilyDetailView: View {
 
             if !otherVariants.isEmpty {
                 Section {
-                    DisclosureGroup("Advanced options") {
-                        ForEach(otherVariants, id: \.id) { variant in
-                            variantRow(variant, highlight: nil)
-                        }
+                    ForEach(otherVariants, id: \.id) { variant in
+                        row(for: variant, highlight: nil)
                     }
-                    .font(AppTypography.subheadline)
+                } header: {
+                    Text("All Options")
                 } footer: {
                     Text("Larger options are smarter but use more memory and storage.")
                         .font(AppTypography.caption)
@@ -156,62 +242,18 @@ struct ModelFamilyDetailView: View {
         #endif
     }
 
-    @ViewBuilder
-    private func variantRow(_ variant: RAModelInfo, highlight: String?) -> some View {
+    private func row(for variant: RAModelInfo, highlight: String?) -> some View {
         let position = family.variants.firstIndex { $0.id == variant.id } ?? 0
-        VStack(alignment: .leading, spacing: AppSpacing.small) {
-            HStack(alignment: .top, spacing: AppSpacing.mediumLarge) {
-                VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                    if let highlight {
-                        Text(highlight.uppercased())
-                            .font(AppTypography.caption2Bold)
-                            .foregroundColor(AppColors.primaryAccent)
-                    }
-                    Text(variant.variantFeelLabel(position: position, count: family.variants.count))
-                        .font(AppTypography.subheadlineSemibold)
-                        .foregroundColor(AppColors.textPrimary)
-
-                    HStack(spacing: AppSpacing.xSmall) {
-                        ForEach(variant.consumerTags) { badge in
-                            ConsumerBadge(badge: badge)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                variantActions(variant)
-            }
-        }
-        .padding(.vertical, AppSpacing.xSmall)
-    }
-
-    @ViewBuilder
-    private func variantActions(_ variant: RAModelInfo) -> some View {
-        VStack(alignment: .trailing, spacing: AppSpacing.small) {
-            ModelPrimaryActionButton(
-                model: variant,
-                availabilityReason: availabilityReason(variant),
-                isSelected: selectedModelID == variant.id,
-                isLoadingModel: isLoadingModel,
-                onSelectModel: { handlers.onSelect(variant) },
-                onChanged: handlers.onChanged
-            )
-
-            if let onDelete = handlers.onDelete,
-               !variant.isBuiltIn,
-               variant.localPathURL != nil,
-               availabilityReason(variant) == nil {
-                Button {
-                    onDelete(variant)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .font(AppTypography.caption)
-                .buttonStyle(.bordered)
-                .tint(AppColors.primaryRed)
-                .controlSize(.small)
-                .accessibilityLabel("Delete \(variant.name)")
-            }
-        }
+        return ModelVariantRow(
+            variant: variant,
+            feelDescriptor: family.variants.count > 1
+                ? variant.variantFeelLabel(position: position, count: family.variants.count)
+                : nil,
+            highlight: highlight,
+            availabilityReason: availabilityReason(variant),
+            isSelected: selectedModelID == variant.id,
+            isLoadingModel: isLoadingModel,
+            handlers: handlers
+        )
     }
 }

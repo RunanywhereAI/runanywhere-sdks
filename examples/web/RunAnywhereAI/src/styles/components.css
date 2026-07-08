@@ -1797,9 +1797,10 @@
 .variant-row--best { background: var(--color-primary-light); }
 .variant-row--loaded { background: var(--badge-green); }
 .variant-row__info { flex: 1; min-width: 0; }
-.variant-row__feel {
+.variant-row__name {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-sm);
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-sm);
@@ -1817,32 +1818,30 @@
 .variant-row__meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-sm);
-  margin-top: 2px;
+  margin-top: 3px;
   color: var(--text-tertiary);
   font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
 }
-.variant-row__advanced {
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-gray6);
+.variant-row__size {
+  font-weight: var(--font-weight-medium);
   color: var(--text-secondary);
 }
+.variant-row__feel { color: var(--text-tertiary); }
 
-.family-advanced-toggle {
-  align-self: flex-start;
-  margin-top: var(--space-sm);
-  padding: var(--space-xs) var(--space-sm-md);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-family);
-  color: var(--text-tertiary);
-  font-size: var(--font-size-xs);
+/* Small neutral pill naming the inference backend. Shared by variant rows,
+ * recommended cards, companion rows, and the Voice AI setup card. */
+.backend-pill {
+  font-size: 10px;
   font-weight: var(--font-weight-medium);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  background: var(--badge-gray);
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
-.family-advanced-toggle:hover { color: var(--text-secondary); }
 
 /* =============================================================================
  * Consumer tag pills — minimal, colored by kind (feel / capability).
@@ -1954,7 +1953,6 @@
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
-.voice-slot__feel { color: var(--text-tertiary); }
 .voice-slot__progress {
   margin-top: var(--space-sm);
   max-width: 220px;

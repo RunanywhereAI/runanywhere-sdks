@@ -28,7 +28,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
+import com.runanywhere.runanywhereai.ui.screens.models.displayTitle
+import com.runanywhere.runanywhereai.ui.screens.models.sizeLabel
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
@@ -158,12 +161,25 @@ private fun ComponentRow(component: VoiceComponent, enabled: Boolean, onChange: 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = model?.name ?: if (component.optional) "Auto" else "Not available",
+                    text = model?.displayTitle() ?: if (component.optional) "Auto" else "Not available",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (model != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                    ) {
+                        Text(
+                            model.sizeLabel(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        BackendBadge(framework = model.framework, compact = true)
+                    }
+                }
             }
             StatusIndicator(ready = ready, busy = busy)
             if (enabled && model != null) {

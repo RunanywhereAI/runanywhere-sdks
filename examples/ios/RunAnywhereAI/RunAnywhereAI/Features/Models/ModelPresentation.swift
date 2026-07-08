@@ -613,6 +613,77 @@ extension RAModelInfo {
 
         return tags
     }
+
+    /// Clean, human display name: family + parameter size, with quantization
+    /// suffixes (Q4_K_M, Q8_0, 4bit, DWQ, …) and backend/vendor prefixes
+    /// stripped. "MLX Qwen3 0.6B 4bit" → "Qwen3 0.6B",
+    /// "LiquidAI LFM2 1.2B Tool Q4_K_M" → "LFM2 1.2B Tool".
+    var consumerDisplayName: String {
+        Self.cleanDisplayName(from: name)
+    }
+
+    /// Tokens never shown in a consumer display name (lowercased).
+    private static let strippedNameTokens: Set<String> = [
+        "mlx", "liquidai", "sherpa", "gguf",
+        "q4_k_m", "q4_k_s", "q5_k_m", "q6_k", "q8_0",
+        "4bit", "5bit", "6bit", "8bit", "f16", "fp16", "dwq"
+    ]
+
+    /// Parenthetical segments removed when their content is technical.
+    private static let strippedParentheticals: Set<String> = [
+        "onnx", "tool calling", "embedding"
+    ]
+
+    private static func cleanDisplayName(from rawName: String) -> String {
+        var text = rawName
+
+        // Drop technical parentheticals like "(ONNX)" / "(Tool Calling)".
+        for phrase in strippedParentheticals {
+            let pattern = "(?i)\\([^)]*\(phrase)[^)]*\\)"
+            text = text.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+        }
+
+        let cleaned = text
+            .split(separator: " ")
+            .filter { !strippedNameTokens.contains($0.lowercased()) }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
+
+        return cleaned.isEmpty ? rawName : cleaned
+    }
+}
+
+extension InferenceFramework {
+    /// Short, neutral backend label for the subtle backend pill
+    /// (MLX / Llama CPP / ONNX / Sherpa / Apple).
+    var consumerBackendBadgeLabel: String {
+        switch self {
+        case .llamaCpp: return "Llama CPP"
+        case .mlx: return "MLX"
+        case .onnx: return "ONNX"
+        case .sherpa: return "Sherpa"
+        case .foundationModels, .systemTts, .builtIn: return "Apple"
+        case .piperTts: return "Piper"
+        case .coreml: return "Core ML"
+        default: return consumerBackendShortLabel
+        }
+    }
+}
+
+/// Small, neutral backend pill (never the dominant element of a row).
+struct BackendPill: View {
+    let framework: InferenceFramework
+
+    var body: some View {
+        Text(framework.consumerBackendBadgeLabel)
+            .font(AppTypography.caption2)
+            .fontWeight(.medium)
+            .foregroundColor(AppColors.textSecondary)
+            .padding(.horizontal, AppSpacing.small)
+            .padding(.vertical, AppSpacing.xxSmall)
+            .background(AppColors.backgroundSecondary)
+            .cornerRadius(AppSpacing.cornerRadiusSmall)
+    }
 }
 
 struct ConsumerBadge: View {

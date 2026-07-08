@@ -163,7 +163,7 @@ private fun PickerBody(
                 SectionLabel("Recommended for your device")
                 PickerModelRow(
                     viewModel, state, scopedRecommended, onSelect, onDownload, onDelete,
-                    highlightLabel = if (hasNpu) "Best for this device" else "Recommended",
+                    highlightLabel = "Top pick",
                 )
                 Spacer(Modifier.height(dimens.spacingMd))
             }
@@ -226,7 +226,7 @@ private fun RecommendedSection(
     recommendation.defaultModel?.let { model ->
         PickerModelRow(
             viewModel, state, model, onSelect, onDownload, onDelete,
-            highlightLabel = if (device?.hasNpu == true) "Best for this device" else "Default",
+            highlightLabel = "Top pick",
         )
     }
     recommendation.recommendedLLMs.filter { it.id != defaultId }.forEach { model ->

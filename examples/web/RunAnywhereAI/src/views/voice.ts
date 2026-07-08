@@ -59,9 +59,11 @@ import {
   type VoicePipelineSelection,
 } from '../services/model-recommendation';
 import {
+  cleanModelName,
+  formatBytes,
+  formatFramework,
   modalityEmoji,
-  modelFamily,
-  variantSizeFeel,
+  modelDisplaySizeBytes,
 } from '../services/model-display';
 import {
   ensureModelReady,
@@ -113,7 +115,6 @@ let unsubscribeModelState: (() => void) | null = null;
 interface PipelineSlot {
   key: 'stt' | 'llm' | 'tts' | 'vad';
   label: string;
-  hint: string;
   category: ModelCategory;
   entry: CatalogEntry | null;
   /** VAD is optional — the SDK auto-loads it; we don't gate Start on it. */
@@ -123,10 +124,10 @@ interface PipelineSlot {
 function pipelineSlots(): PipelineSlot[] {
   const p = voicePipeline;
   return [
-    { key: 'stt', label: 'Speech-to-text', hint: 'Hears what you say', category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, entry: p?.stt ?? null, optional: false },
-    { key: 'llm', label: 'Chat model', hint: 'Thinks of a reply', category: ModelCategory.MODEL_CATEGORY_LANGUAGE, entry: p?.llm ?? null, optional: false },
-    { key: 'tts', label: 'Text-to-speech', hint: 'Speaks the reply', category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS, entry: p?.tts ?? null, optional: false },
-    { key: 'vad', label: 'Voice detection', hint: 'Knows when you pause', category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION, entry: p?.vad ?? null, optional: true },
+    { key: 'stt', label: 'Speech-to-text', category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, entry: p?.stt ?? null, optional: false },
+    { key: 'llm', label: 'Chat model', category: ModelCategory.MODEL_CATEGORY_LANGUAGE, entry: p?.llm ?? null, optional: false },
+    { key: 'tts', label: 'Text-to-speech', category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS, entry: p?.tts ?? null, optional: false },
+    { key: 'vad', label: 'Voice detection', category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION, entry: p?.vad ?? null, optional: true },
   ];
 }
 
@@ -351,7 +352,6 @@ function renderSlotRow(slot: PipelineSlot): string {
   }
 
   const status = getModelStatus(entry.id);
-  const family = modelFamily(entry).name;
   const stateHtml = renderSlotState(status);
   const changeBtn = `<button type="button" class="voice-slot__change" data-change="${slot.key}">Change</button>`;
 
@@ -360,7 +360,11 @@ function renderSlotRow(slot: PipelineSlot): string {
       <div class="voice-slot__icon">${modalityEmoji(slot.category)}</div>
       <div class="voice-slot__body">
         <div class="voice-slot__label">${escapeHtml(slot.label)}${slot.optional ? ' <span class="voice-slot__opt">optional</span>' : ''}</div>
-        <div class="voice-slot__hint">${escapeHtml(slot.hint)} · ${escapeHtml(family)} <span class="voice-slot__feel">${escapeHtml(variantSizeFeel(entry))}</span></div>
+        <div class="voice-slot__hint">
+          ${escapeHtml(cleanModelName(entry.name))}
+          · ${formatBytes(modelDisplaySizeBytes(entry))}
+          <span class="backend-pill">${escapeHtml(formatFramework(entry.framework))}</span>
+        </div>
         ${status.status === 'downloading'
           ? `<div class="progress-bar voice-slot__progress"><div class="progress-fill" style="width:${Math.round(status.progress * 100)}%"></div></div>`
           : ''}

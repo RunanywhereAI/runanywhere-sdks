@@ -37,6 +37,7 @@ import {
   formatFramework,
   modelDisplaySizeBytes,
   modalityEmoji,
+  cleanModelName,
   consumerTags,
   modelFamily,
   modelCapability,
@@ -104,8 +105,6 @@ let searchQuery = '';
 // Which family cards are expanded to reveal their variants (keyed by family
 // key). Reset whenever the sheet is opened so it always starts collapsed.
 const expandedFamilies = new Set<string>();
-// Which families have their "Advanced" backend detail revealed.
-const advancedFamilies = new Set<string>();
 
 // ---------------------------------------------------------------------------
 // Public API — wiring into the chat view
@@ -315,7 +314,6 @@ function renderSheet(): void {
   const title = escapeHtml(activeSheetOptions.title ?? 'Select Model');
   searchQuery = '';
   expandedFamilies.clear();
-  advancedFamilies.clear();
   modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
   modalEl.innerHTML = `
@@ -466,22 +464,13 @@ function bindRowActions(host: HTMLElement): void {
   });
 }
 
-/** Wire family-card expand toggles and per-family "Advanced" disclosures. */
+/** Wire family-card expand toggles. */
 function bindFamilyInteractions(host: HTMLElement): void {
   host.querySelectorAll('[data-family-toggle]').forEach((el) => {
     el.addEventListener('click', () => {
       const key = (el as HTMLElement).dataset.familyToggle!;
       if (expandedFamilies.has(key)) expandedFamilies.delete(key);
       else expandedFamilies.add(key);
-      renderRows();
-    });
-  });
-  host.querySelectorAll('[data-family-advanced]').forEach((el) => {
-    el.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const key = (el as HTMLElement).dataset.familyAdvanced!;
-      if (advancedFamilies.has(key)) advancedFamilies.delete(key);
-      else advancedFamilies.add(key);
       renderRows();
     });
   });
@@ -696,31 +685,18 @@ function renderFamilyCard(family: FamilyGroup): string {
 
 /**
  * Render a family's variants once expanded. The best-for-device variant is
- * auto-flagged, variants are labelled by friendly size feel (not quant), and
- * the inference backend is hidden behind a per-family "Advanced" disclosure.
+ * auto-flagged; each row shows the clean model name, download size, a subtle
+ * backend pill, and the friendly size feel — never quant strings.
  */
 function renderFamilyVariants(family: FamilyGroup): string {
   const best = bestVariantForDevice(family.entries);
-  const showAdvanced = advancedFamilies.has(family.key);
-  const multiBackend = new Set(family.entries.map((entry) => entry.framework)).size > 1;
-
-  const rows = family.entries
-    .map((entry) => renderVariantRow(entry, entry.id === best?.id, showAdvanced))
+  return family.entries
+    .map((entry) => renderVariantRow(entry, entry.id === best?.id))
     .join('');
-
-  // Only offer the Advanced disclosure when it would actually reveal something
-  // new — i.e. when the family spans more than one backend.
-  const advancedToggle = multiBackend
-    ? `<button type="button" class="family-advanced-toggle" data-family-advanced="${escapeHtml(family.key)}">
-         ${showAdvanced ? 'Hide advanced' : 'Advanced'}
-       </button>`
-    : '';
-
-  return `${rows}${advancedToggle}`;
 }
 
 /** A single variant row inside an expanded family. */
-function renderVariantRow(entry: CatalogEntry, isBest: boolean, showAdvanced: boolean): string {
+function renderVariantRow(entry: CatalogEntry, isBest: boolean): string {
   const state = stateOf(entry.id);
   const progressBar = state.status === 'downloading'
     ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
@@ -731,17 +707,20 @@ function renderVariantRow(entry: CatalogEntry, isBest: boolean, showAdvanced: bo
   const bestBadge = isBest
     ? '<span class="variant-row__best">Best for this device</span>'
     : '';
-  const advanced = showAdvanced
-    ? `<span class="variant-row__advanced">${escapeHtml(formatFramework(entry.framework))}</span>`
+  const capability = modelCapability(entry);
+  const capabilityPill = capability
+    ? `<span class="tag-pill tag-pill--capability">${escapeHtml(capability)}</span>`
     : '';
 
   return `
     <div class="variant-row variant-row--${state.status}${isBest ? ' variant-row--best' : ''}" data-model-id="${entry.id}">
       <div class="variant-row__info">
-        <div class="variant-row__feel">${escapeHtml(variantSizeFeel(entry))}${bestBadge}</div>
+        <div class="variant-row__name">${escapeHtml(cleanModelName(entry.name))}${bestBadge}</div>
         <div class="variant-row__meta">
           <span class="variant-row__size">${formatBytes(modelDisplaySizeBytes(entry))}</span>
-          ${advanced}
+          ${renderBackendPill(entry)}
+          <span class="variant-row__feel">${escapeHtml(variantSizeFeel(entry))}</span>
+          ${capabilityPill}
         </div>
         ${progressBar}
         ${errorBar}
@@ -749,6 +728,11 @@ function renderVariantRow(entry: CatalogEntry, isBest: boolean, showAdvanced: bo
       ${actionButton(entry.id, state)}
     </div>
   `;
+}
+
+/** Small neutral pill naming the inference backend (llama.cpp / ONNX / Sherpa). */
+function renderBackendPill(entry: CatalogEntry): string {
+  return `<span class="backend-pill">${escapeHtml(formatFramework(entry.framework))}</span>`;
 }
 
 /** Choose the card's representative entry (the best-for-device variant). */
@@ -816,7 +800,8 @@ function renderRecommendedCard(entry: CatalogEntry, state: RowState, isDefault: 
       <div class="reco-card__head">
         <div class="model-logo reco-card__logo">${modalityEmoji(entry.category)}</div>
         <div class="reco-card__title-wrap">
-          <div class="reco-card__name">${escapeHtml(modelFamily(entry).name)}${bestBadge}</div>
+          <div class="reco-card__name">${escapeHtml(cleanModelName(entry.name))}${bestBadge}</div>
+          <div class="reco-card__size">${formatBytes(modelDisplaySizeBytes(entry))} ${renderBackendPill(entry)}</div>
           <div class="reco-card__tags">${tags}</div>
         </div>
         ${actionButton(entry.id, state)}
@@ -831,7 +816,7 @@ function renderTagPill(tag: ConsumerTag): string {
   return `<span class="tag-pill tag-pill--${tag.kind}">${escapeHtml(tag.label)}</span>`;
 }
 
-/** Compact companion row (ASR/TTS/VLM/embedding) with one clean capability tag. */
+/** Compact companion row (ASR/TTS/VLM/embedding): name, size + backend, tag. */
 function renderModelRow(entry: CatalogEntry, state: RowState): string {
   const progressBar = state.status === 'downloading'
     ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
@@ -847,8 +832,12 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
     <div class="model-row model-row--${state.status}" data-model-id="${entry.id}">
       <div class="model-logo">${modalityEmoji(entry.category)}</div>
       <div class="model-info">
-        <div class="model-name">${escapeHtml(modelFamily(entry).name)}</div>
-        <div class="model-meta">${capabilityPill}</div>
+        <div class="model-name">${escapeHtml(cleanModelName(entry.name))}</div>
+        <div class="model-meta">
+          <span class="model-size">${formatBytes(modelDisplaySizeBytes(entry))}</span>
+          ${renderBackendPill(entry)}
+          ${capabilityPill}
+        </div>
         ${progressBar}
         ${errorBar}
       </div>

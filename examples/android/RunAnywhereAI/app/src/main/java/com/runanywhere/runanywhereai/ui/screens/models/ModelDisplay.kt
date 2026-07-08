@@ -62,7 +62,7 @@ fun RAModelInfo.brand(): Brand {
 }
 
 fun InferenceFramework.shortLabel(): String = when (this) {
-    InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "Local"
+    InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "Llama CPP"
     InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> "ONNX"
     InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "Apple"
     InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> "System"
@@ -334,4 +334,28 @@ fun formatModelSize(bytes: Long): String {
     if (bytes <= 0) return "—"
     val gb = bytes / 1_073_741_824.0
     return if (gb >= 1.0) "%.2f GB".format(gb) else "%.0f MB".format(bytes / 1_048_576.0)
+}
+
+// Quant / precision tokens stripped from display titles. Word-bounded so parameter
+// counts like "0.5B" or family names like "LFM2" are never touched.
+private val quantTokenRegex = Regex("""(?i)\b(Q\d(_K(_[MS])?|_0)?|FP16|F16|[458]BIT|DWQ)\b""")
+
+// Vendor / marker noise removed from display titles; the brand icon and backend badge
+// carry that information instead. "Instruct" is implied for consumer chat models.
+private val titleNoise = listOf("(HNPU)", "(ONNX)", "LiquidAI", "Instruct")
+
+// Clean, consumer-facing row title: family + parameter size (e.g. "LFM2 1.2B Tool",
+// "Qwen3 4B") with quant suffixes and vendor prefixes stripped from the raw name.
+fun RAModelInfo.displayTitle(): String {
+    var title = name
+    titleNoise.forEach { title = title.replace(it, "", ignoreCase = true) }
+    title = quantTokenRegex.replace(title, "")
+    return title.replace(Regex("""\s+"""), " ").trim().trimEnd('-', '·', ',').trim()
+}
+
+// Download-size label shown on every model row — the user always sees the cost.
+fun RAModelInfo.sizeLabel(): String {
+    val bytes = effectiveBytes()
+    if (bytes > 0) return formatModelSize(bytes)
+    return if (requiresHfAuth()) "Size varies" else "Size unknown"
 }

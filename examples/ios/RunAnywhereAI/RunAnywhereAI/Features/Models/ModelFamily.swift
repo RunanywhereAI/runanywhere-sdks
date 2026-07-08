@@ -81,9 +81,12 @@ enum ModelFamilyCatalog {
         FamilyRule(key: "qwen2", displayName: "Qwen2.5",
                    tagline: "Reliable general-purpose chat",
                    patterns: ["qwen2.5", "qwen2"]),
-        FamilyRule(key: "llama", displayName: "Llama 3.2",
+        FamilyRule(key: "llama-3.2", displayName: "Llama 3.2",
                    tagline: "Meta's versatile assistants",
-                   patterns: ["llama-3.2", "llama-2"]),
+                   patterns: ["llama-3.2"]),
+        FamilyRule(key: "llama-2", displayName: "Llama 2",
+                   tagline: "Meta's classic chat models",
+                   patterns: ["llama-2"]),
         FamilyRule(key: "lfm2-vl", displayName: "LFM2 Vision",
                    tagline: "Compact models that can see",
                    patterns: ["lfm2-vl"]),
@@ -126,6 +129,9 @@ enum ModelFamilyCatalog {
         FamilyRule(key: "minilm", displayName: "MiniLM",
                    tagline: "Understands documents for search & Q&A",
                    patterns: ["minilm"]),
+        FamilyRule(key: "diffusion", displayName: "Image Generation",
+                   tagline: "Apple on-device image generation",
+                   patterns: ["diffusion"]),
         FamilyRule(key: "apple-foundation", displayName: "Apple Intelligence",
                    tagline: "Built into this device — no download",
                    patterns: ["foundation"])
@@ -138,7 +144,9 @@ enum ModelFamilyCatalog {
         var buckets: [String: [RAModelInfo]] = [:]
         var order: [String] = []
 
-        for model in models {
+        // LoRA adapters customize a loaded base model; they are not standalone
+        // downloads and would only surface as raw one-off families here.
+        for model in models where !model.isLoRAAdapterArtifact {
             let rule = rule(for: model)
             let key = rule?.key ?? fallbackKey(for: model)
             if buckets[key] == nil {
@@ -154,8 +162,8 @@ enum ModelFamilyCatalog {
             let rule = rules.first { $0.key == key }
             return ModelFamily(
                 id: key,
-                displayName: rule?.displayName ?? sorted[0].name,
-                tagline: rule?.tagline ?? sorted[0].framework.consumerBackendDescription,
+                displayName: rule?.displayName ?? sorted[0].consumerDisplayName,
+                tagline: rule?.tagline ?? sorted[0].category.consumerCapabilityLabel,
                 variants: sorted
             )
         }

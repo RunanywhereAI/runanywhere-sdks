@@ -2,7 +2,9 @@
 //  ModelSelectionSheet.swift
 //  RunAnywhereAI
 //
-//  Reusable model selection sheet that can be used across the app
+//  Reusable model selection sheet, scoped by modality context. Uses the same
+//  family-first components as the Models tab: the recommended pick highlighted
+//  up top, then one clean row per family with variants in a family detail.
 //
 
 import SwiftUI
@@ -77,8 +79,6 @@ struct ModelSelectionSheet: View {
     var dismiss
 
     @State private var selectedModel: RAModelInfo?
-    @State private var expandedFramework: InferenceFramework?
-    @State private var availableFrameworks: [InferenceFramework] = []
     @State private var isLoadingModel = false
     @State private var loadingProgress: String = ""
     @State private var loadErrorMessage: String?
@@ -98,12 +98,49 @@ struct ModelSelectionSheet: View {
         self.onModelSelected = onModelSelected
     }
 
+    // MARK: - Data
+
+    private var hardwareTier: HardwareTier {
+        tierResolver.resolve(from: deviceInfo.deviceInfo)
+    }
+
+    private var candidateModels: [RAModelInfo] {
+        viewModel.availableModels
+            .filter { model in
+                guard !model.isLoRAAdapterArtifact else { return false }
+                guard context.relevantCategories.contains(model.category) else { return false }
+                if let allowed = context.allowedFrameworks {
+                    guard allowed.contains(model.framework) else { return false }
+                }
+                // For RAG embedding context, exclude supporting files (vocab,
+                // tokenizer) that are not selectable as standalone models.
+                if context == .ragEmbedding {
+                    guard !model.id.hasSuffix("-vocab") && !model.id.hasSuffix("-tokenizer") else {
+                        return false
+                    }
+                }
+                return true
+            }
+    }
+
+    /// Candidates matching the friendly search (clean name / ability only).
+    private var filteredModels: [RAModelInfo] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return candidateModels }
+        return candidateModels.filter { model in
+            let tagText = model.consumerTags.map(\.label).joined(separator: " ")
+            return [model.consumerDisplayName, model.category.consumerCapabilityLabel, tagText]
+                .joined(separator: " ")
+                .lowercased()
+                .contains(query)
+        }
+    }
+
     /// The single best-for-device model for this scoped context, highlighted at
-    /// the top of the picker. Pure recommendation over the live catalog.
+    /// the top of the picker.
     private var recommendedModel: RAModelInfo? {
-        let tier = tierResolver.resolve(from: deviceInfo.deviceInfo)
         let selection = recommendationEngine.recommend(
-            tier: tier,
+            tier: hardwareTier,
             appleFoundationAvailable: tierResolver.appleFoundationAvailable,
             from: viewModel.availableModels
         )
@@ -122,81 +159,32 @@ struct ModelSelectionSheet: View {
         case .vad:
             pick = nil
         }
-        // Only surface it if it actually belongs to this scoped candidate set.
         guard let pick, candidateModels.contains(where: { $0.id == pick.id }) else { return nil }
         return pick
     }
 
-    private var candidateModels: [RAModelInfo] {
-        viewModel.availableModels
-            .filter { model in
-                guard !model.isLoRAAdapterArtifact else { return false }
-                guard context.relevantCategories.contains(model.category) else { return false }
-                if let allowed = context.allowedFrameworks {
-                    guard allowed.contains(model.framework) else { return false }
-                }
-                // For RAG embedding context, exclude supporting files (vocab, tokenizer)
-                // that are not selectable as standalone embedding models.
-                // Supporting files have ids ending in "-vocab" or "-tokenizer".
-                if context == .ragEmbedding {
-                    guard !model.id.hasSuffix("-vocab") && !model.id.hasSuffix("-tokenizer") else {
-                        return false
-                    }
-                }
-                return true
-            }
-            .sorted {
-                let lhsPriority = modelPriority($0)
-                let rhsPriority = modelPriority($1)
-                return lhsPriority != rhsPriority ? lhsPriority < rhsPriority : $0.name < $1.name
-            }
+    /// Families over all scoped candidates. The recommended pick stays in its
+    /// family too, so every family detail shows its complete variant list.
+    private var browseFamilies: [ModelFamily] {
+        ModelFamilyCatalog.families(from: filteredModels)
     }
 
-    private var availableModels: [RAModelInfo] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return candidateModels }
-        return candidateModels.filter { model in
-            [
-                model.name,
-                model.id,
-                model.framework.consumerBackendLabel,
-                model.framework.consumerBackendDescription,
-                model.consumerModelGroup.title,
-                model.requiresHfAuth ? "private hf auth hugging face" : ""
-            ]
-            .joined(separator: " ")
-            .lowercased()
-            .contains(query)
-        }
+    private var handlers: ModelActionHandlers {
+        ModelActionHandlers(
+            onSelect: { model in Task { await selectAndLoadModel(model) } },
+            onChanged: { Task { await viewModel.loadModels() } }
+        )
     }
 
-    private var groupedModels: [ConsumerModelGroup: [RAModelInfo]] {
-        Dictionary(grouping: availableModels, by: \.consumerModelGroup)
-    }
-
-    private var visibleModelGroups: [ConsumerModelGroup] {
-        ConsumerModelGroup.allCases.filter { !(groupedModels[$0] ?? []).isEmpty }
-    }
-
-    private func modelPriority(_ model: RAModelInfo) -> Int {
-        if unavailableReason(for: model) != nil { return 4 }
-        if model.framework == .foundationModels { return 0 }
-        if model.localPathURL != nil { return 1 }
-        return model.framework == .mlx ? 2 : 3
-    }
-
-    private func unavailableReason(for model: RAModelInfo) -> String? {
-        guard model.framework == .foundationModels else { return nil }
-        return SystemFoundationModels.unavailableReason
-    }
+    // MARK: - Body
 
     var body: some View {
         NavigationStack {
             ZStack {
                 List {
-                    modelSearchSection
-                    deviceStatusSection
-                    modelsListSection
+                    searchSection
+                    recommendedSection
+                    familiesSection
                 }
                 if isLoadingModel {
                     LoadingModelOverlay(loadingProgress: loadingProgress)
@@ -209,7 +197,7 @@ struct ModelSelectionSheet: View {
             .toolbar { toolbarContent }
         }
         .adaptiveSheetFrame()
-        .task { await loadInitialData() }
+        .task { await viewModel.loadModels() }
         .alert(
             "Unable to Load Model",
             isPresented: Binding(
@@ -237,39 +225,14 @@ struct ModelSelectionSheet: View {
         #endif
     }
 
-    private func loadInitialData() async {
-        await viewModel.loadModels()
-        await loadAvailableFrameworks()
-    }
+    // MARK: - Sections
 
-    private func loadAvailableFrameworks() async {
-        let allFrameworks = await RunAnywhere.getRegisteredFrameworks()
-        var filtered = allFrameworks.filter { shouldShowFramework($0) }
-        if context == .tts && !filtered.contains(.systemTts) {
-            filtered.insert(.systemTts, at: 0)
-        }
-        await MainActor.run { self.availableFrameworks = filtered }
-    }
-
-    private func shouldShowFramework(_ framework: InferenceFramework) -> Bool {
-        if let allowed = context.allowedFrameworks, !allowed.contains(framework) {
-            return false
-        }
-        return viewModel.availableModels
-            .filter { $0.framework == framework }
-            .contains { context.relevantCategories.contains($0.category) }
-    }
-}
-
-// MARK: - Search Section
-
-extension ModelSelectionSheet {
-    private var modelSearchSection: some View {
+    private var searchSection: some View {
         Section {
             HStack(spacing: AppSpacing.smallMedium) {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(AppColors.textSecondary)
-                TextField("Search models, backends, private access", text: $searchText)
+                TextField("Search models by name or ability", text: $searchText)
                     .disableAutocorrection(true)
                 if !searchText.isEmpty {
                     Button {
@@ -286,57 +249,59 @@ extension ModelSelectionSheet {
             .padding(.vertical, AppSpacing.smallMedium)
             .background(AppColors.backgroundSecondary)
             .cornerRadius(AppSpacing.cornerRadiusRegular)
-        } footer: {
-            Text("\(availableModels.count) of \(candidateModels.count) models shown")
-                .font(AppTypography.caption)
         }
     }
-}
 
-// MARK: - Device Status Section
-
-extension ModelSelectionSheet {
-    private var deviceStatusSection: some View {
-        Section("Device Status") {
-            if let device = deviceInfo.deviceInfo {
-                DeviceInfoRow(label: "Model", systemImage: "iphone", value: device.modelName)
-                DeviceInfoRow(label: "Chip", systemImage: "cpu", value: device.chipName)
-                DeviceInfoRow(
-                    label: "Memory",
-                    systemImage: "memorychip",
-                    value: ByteCountFormatter.string(
-                        fromByteCount: device.totalMemory,
-                        countStyle: .memory
-                    )
+    @ViewBuilder private var recommendedSection: some View {
+        if let recommended = recommendedModel, searchText.isEmpty {
+            Section {
+                ModelVariantRow(
+                    variant: recommended,
+                    highlight: "Recommended for your device",
+                    availabilityReason: unavailableReason(for: recommended),
+                    isSelected: selectedModel?.id == recommended.id,
+                    isLoadingModel: isLoadingModel,
+                    handlers: handlers
                 )
-                if device.neuralEngineAvailable {
-                    NeuralEngineRow()
-                }
-            } else {
-                LoadingDeviceRow()
-            }
-        }
-    }
-}
-
-// MARK: - Models List Section
-
-extension ModelSelectionSheet {
-    private var modelsListSection: some View {
-        Group {
-            if availableModels.isEmpty {
-                Section {
-                    loadingModelsView
-                } header: {
-                    Text("Choose a Model")
-                }
-            } else {
-                modelsContent
+            } header: {
+                Label("Recommended", systemImage: "sparkles")
             }
         }
     }
 
-    private var loadingModelsView: some View {
+    @ViewBuilder private var familiesSection: some View {
+        if browseFamilies.isEmpty {
+            Section {
+                emptyStateView
+            } header: {
+                Text("Browse Models")
+            }
+        } else {
+            Section {
+                ForEach(browseFamilies) { family in
+                    NavigationLink {
+                        ModelFamilyDetailView(
+                            family: family,
+                            tier: hardwareTier,
+                            selectedModelID: selectedModel?.id,
+                            isLoadingModel: isLoadingModel,
+                            availabilityReason: unavailableReason(for:),
+                            handlers: handlers
+                        )
+                    } label: {
+                        ModelFamilyRow(family: family)
+                    }
+                }
+            } header: {
+                Text("Browse Models")
+            } footer: {
+                Text("Pick a family, then choose the size that fits. Tap Use to switch models.")
+                    .font(AppTypography.caption)
+            }
+        }
+    }
+
+    private var emptyStateView: some View {
         VStack(alignment: .center, spacing: AppSpacing.mediumLarge) {
             if candidateModels.isEmpty {
                 ProgressView()
@@ -353,46 +318,9 @@ extension ModelSelectionSheet {
         .padding(.vertical, AppSpacing.xLarge)
     }
 
-    @ViewBuilder private var modelsContent: some View {
-        if let recommended = recommendedModel, searchText.isEmpty {
-            Section {
-                FlatModelRow(
-                    model: recommended,
-                    availabilityReason: unavailableReason(for: recommended),
-                    isSelected: selectedModel?.id == recommended.id,
-                    isLoading: isLoadingModel,
-                    onDownloadCompleted: { Task { await viewModel.loadModels() } },
-                    onSelectModel: { Task { await selectAndLoadModel(recommended) } },
-                    onModelUpdated: { Task { await viewModel.loadModels() } }
-                )
-            } header: {
-                Label("Recommended for your device", systemImage: "sparkles")
-            }
-        }
-
-        ForEach(visibleModelGroups) { group in
-            if let models = groupedModels[group] {
-                Section {
-                    ForEach(models, id: \.id) { model in
-                        FlatModelRow(
-                            model: model,
-                            availabilityReason: unavailableReason(for: model),
-                            isSelected: selectedModel?.id == model.id,
-                            isLoading: isLoadingModel,
-                            onDownloadCompleted: { Task { await viewModel.loadModels() } },
-                            onSelectModel: { Task { await selectAndLoadModel(model) } },
-                            onModelUpdated: { Task { await viewModel.loadModels() } }
-                        )
-                    }
-                } header: {
-                    Text(group.title)
-                } footer: {
-                    Text(group.footer)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-            }
-        }
+    private func unavailableReason(for model: RAModelInfo) -> String? {
+        guard model.framework == .foundationModels else { return nil }
+        return SystemFoundationModels.unavailableReason
     }
 }
 
@@ -431,7 +359,7 @@ extension ModelSelectionSheet {
 
         await MainActor.run {
             isLoadingModel = true
-            loadingProgress = "Initializing \(model.name)..."
+            loadingProgress = "Initializing \(model.consumerDisplayName)..."
             selectedModel = model
         }
 
@@ -452,8 +380,8 @@ extension ModelSelectionSheet {
                 loadingProgress = ""
                 selectedModel = nil
                 loadErrorMessage = message.isEmpty
-                    ? "Failed to load \(model.name)."
-                    : "Failed to load \(model.name): \(message)"
+                    ? "Failed to load \(model.consumerDisplayName)."
+                    : "Failed to load \(model.consumerDisplayName): \(message)"
             }
         }
     }
@@ -495,11 +423,6 @@ extension ModelSelectionSheet {
         Logger(subsystem: "com.runanywhere", category: "Models").info(
             "Model load succeeded for \(resolvedID, privacy: .public)"
         )
-        if context == .stt {
-            Logger(subsystem: "com.runanywhere", category: "STT").info(
-                "STT model loaded successfully: \(resolvedID, privacy: .public)"
-            )
-        }
     }
 
     private func handleModelLoadSuccess(_ model: RAModelInfo) async {

@@ -91,18 +91,30 @@ fun ModelRow(
                     Pill(highlightLabel, MaterialTheme.colorScheme.primary, icon = RACIcons.Filled.Bolt)
                 }
                 Text(
-                    model.name,
+                    model.displayTitle(),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                // Size is always visible; backend rides along as a subtle badge.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                ) {
+                    Text(
+                        model.sizeLabel(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    BackendBadge(framework = model.framework, compact = true)
+                }
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
                     verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
                 ) {
-                    // At most two clean tags (feel + one capability). No size / backend / quant.
+                    // At most two clean tags (feel + one notable capability).
                     model.consumerTags().forEach { tag ->
                         Pill(tag.label, tag.kind.color())
                     }
@@ -174,8 +186,9 @@ private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
     AssistChip(
         onClick = onDownload,
         label = {
+            // The row already shows the size; the chip stays a simple verb.
             Text(
-                text = if (needsHfToken) "Set token" else model.sizeLabel(),
+                text = if (needsHfToken) "Set token" else "Get",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -188,16 +201,6 @@ private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
             )
         },
     )
-}
-
-private fun RAModelInfo.sizeLabel(): String {
-    val bytes = when {
-        download_size_bytes > 0L -> download_size_bytes
-        (memory_required_bytes ?: 0L) > 0L -> memory_required_bytes ?: 0L
-        else -> 0L
-    }
-    if (bytes > 0) return formatModelSize(bytes)
-    return if (requiresHfAuth()) "Size varies" else "Size unknown"
 }
 
 @Composable

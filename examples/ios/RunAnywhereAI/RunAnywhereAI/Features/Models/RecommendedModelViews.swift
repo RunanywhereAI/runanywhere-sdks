@@ -146,15 +146,18 @@ struct RecommendedModelCard: View {
                         .foregroundColor(AppColors.primaryAccent)
                 }
 
-                Text(model.name)
+                Text(model.consumerDisplayName)
                     .font(AppTypography.subheadlineSemibold)
                     .foregroundColor(AppColors.textPrimary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text(subtitle)
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textSecondary)
+                HStack(spacing: AppSpacing.smallMedium) {
+                    Text(subtitle)
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.textSecondary)
+                    BackendPill(framework: model.framework)
+                }
 
                 tagWrap
             }
@@ -207,12 +210,16 @@ struct CompanionModelChip: View {
                     .foregroundColor(AppColors.textSecondary)
             }
 
-            Text(model.name)
+            Text(model.consumerDisplayName)
                 .font(AppTypography.caption2)
                 .fontWeight(.semibold)
                 .foregroundColor(AppColors.textPrimary)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(model.consumerSizeLabel)
+                .font(AppTypography.caption2)
+                .foregroundColor(AppColors.textSecondary)
 
             Spacer(minLength: 0)
 
@@ -226,7 +233,7 @@ struct CompanionModelChip: View {
             )
         }
         .padding(AppSpacing.mediumLarge)
-        .frame(width: 180, height: 130, alignment: .leading)
+        .frame(width: 180, height: 148, alignment: .leading)
         .background(AppColors.backgroundSecondary)
         .cornerRadius(AppSpacing.cornerRadiusCard)
     }

@@ -185,7 +185,6 @@ private fun VariantRow(
     onDelete: (() -> Unit)?,
 ) {
     val dimens = LocalDimens.current
-    var advancedOpen by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -197,12 +196,27 @@ private fun VariantRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
         ) {
+            // Clean human name is the primary identifier of every variant.
             Text(
-                // Friendly, size-free variant description instead of a quant string.
-                variant.variantFeelLabel(),
+                variant.displayTitle(),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+            // Size always visible; backend as a subtle badge; feel as secondary text.
+            // FlowRow so the badge wraps below instead of truncating on narrow rows.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+            ) {
+                Text(
+                    "${variant.sizeLabel()} · ${variant.variantFeelLabel()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                BackendBadge(framework = variant.framework, compact = true)
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
                 if (isRecommended) TagPill("Recommended", primaryGreen)
                 variant.consumerTags()
@@ -220,7 +234,6 @@ private fun VariantRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            AdvancedDisclosure(open = advancedOpen, onToggle = { advancedOpen = !advancedOpen }, variant = variant)
         }
         Spacer(Modifier.width(dimens.spacingSm))
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
@@ -234,29 +247,6 @@ private fun VariantRow(
                         modifier = Modifier.size(dimens.iconSm),
                     )
                 }
-            }
-        }
-    }
-}
-
-// Subtle "Advanced" expander that reveals the technical backend — hidden by default.
-@Composable
-private fun AdvancedDisclosure(open: Boolean, onToggle: () -> Unit, variant: RAModelInfo) {
-    val dimens = LocalDimens.current
-    Column {
-        Text(
-            text = if (open) "Hide details" else "Advanced",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .clip(RoundedCornerShape(dimens.radiusSm))
-                .clickable(onClick = onToggle)
-                .padding(vertical = dimens.spacingXs),
-        )
-        AnimatedVisibility(visible = open) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                BackendBadge(framework = variant.framework, compact = true)
             }
         }
     }

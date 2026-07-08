@@ -173,8 +173,15 @@ struct SimplifiedModelsView: View {
         return recommendation.recommendedLLMs.filter { $0.id != defaultID }
     }
 
+    /// Friendly phrase for the section header — never a raw identifier.
     private var recommendedHeaderDeviceName: String {
-        deviceInfo.deviceInfo?.modelName ?? "your device"
+        guard let modelName = deviceInfo.deviceInfo?.modelName.lowercased() else {
+            return "your device"
+        }
+        if modelName.contains("iphone") { return "this iPhone" }
+        if modelName.contains("ipad") { return "this iPad" }
+        if modelName.contains("mac") { return "this Mac" }
+        return "your device"
     }
 
     private func defaultModelCard(_ model: RAModelInfo) -> some View {
@@ -259,9 +266,11 @@ struct SimplifiedModelsView: View {
     }
 
     /// Show the CoreML image-generation placeholder when its modality is in
-    /// view and the search query is empty or plausibly matches it.
+    /// view, no real image-generation family is registered yet, and the search
+    /// query is empty or plausibly matches it.
     private var showsImageGenPlaceholder: Bool {
         guard selectedModality.showsImageGenerationPlaceholder else { return false }
+        guard !browseFamilies.contains(where: { $0.category == .imageGeneration }) else { return false }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !query.isEmpty else { return true }
         return "image generation apple coreml photo art".contains(query)

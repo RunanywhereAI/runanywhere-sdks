@@ -64,7 +64,7 @@ struct VoicePipeline {
 struct ModelRecommendationEngine {
     /// Preferred LLM ids per tier, ordered light → smart. The engine keeps the
     /// first few that are both present in the catalog and fit the memory budget.
-    private struct TierPreferences {
+    fileprivate struct TierPreferences {
         let llmIDs: [String]
         let asrIDs: [String]
         let ttsIDs: [String]
