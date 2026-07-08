@@ -18,11 +18,76 @@ struct ModelCapabilityBadge: Identifiable {
     let color: Color
 }
 
+/// Internal-only size class derived from a model's byte footprint. Used for
+/// recommendation fit checks and variant ordering — never surfaced as a raw
+/// "Tiny/Small/…" pill in the consumer UI.
+enum ModelSizeClass: Int, Comparable {
+    case tiny
+    case small
+    case medium
+    case large
+
+    /// Thresholds are on the best-available size signal (download or memory).
+    init(bytes: Int64) {
+        switch bytes {
+        case ..<400_000_000: self = .tiny
+        case ..<1_200_000_000: self = .small
+        case ..<3_000_000_000: self = .medium
+        default: self = .large
+        }
+    }
+
+    static func < (lhs: ModelSizeClass, rhs: ModelSizeClass) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+}
+
+/// The single, friendly "feel" tag shown on a model — the only speed/intelligence
+/// signal surfaced to the consumer. Derived purely from size class.
+enum ModelFeel: Int {
+    case fast
+    case balanced
+    case smart
+
+    init(sizeClass: ModelSizeClass) {
+        switch sizeClass {
+        case .tiny: self = .fast
+        case .small: self = .balanced
+        case .medium, .large: self = .smart
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .fast: return "Fast"
+        case .balanced: return "Balanced"
+        case .smart: return "Smart"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .fast: return "bolt.fill"
+        case .balanced: return "scalemass"
+        case .smart: return "lightbulb"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .fast: return AppColors.statusGreen
+        case .balanced: return AppColors.statusBlue
+        case .smart: return AppColors.primaryPurple
+        }
+    }
+}
+
 enum ConsumerModelGroup: Int, CaseIterable, Identifiable {
     case chatModels
     case appleBuiltIn
     case voiceModels
     case visionModels
+    case imageGenerationModels
     case documentModels
     case modelAdapters
     case other
@@ -39,6 +104,8 @@ enum ConsumerModelGroup: Int, CaseIterable, Identifiable {
             return "Voice Models"
         case .visionModels:
             return "Vision Models"
+        case .imageGenerationModels:
+            return "Image Generation"
         case .documentModels:
             return "Document Models"
         case .modelAdapters:
@@ -58,6 +125,8 @@ enum ConsumerModelGroup: Int, CaseIterable, Identifiable {
             return "Speech, dictation, and read-aloud models."
         case .visionModels:
             return "Models for camera, photo, and multimodal understanding."
+        case .imageGenerationModels:
+            return "On-device image generation, powered by Apple CoreML."
         case .documentModels:
             return "Embedding and answer models used by document Q&A."
         case .modelAdapters:
@@ -365,8 +434,10 @@ extension RAModelInfo {
             return .chatModels
         case .speechRecognition, .speechSynthesis, .voiceActivityDetection, .audio:
             return .voiceModels
-        case .multimodal, .vision, .imageGeneration:
+        case .multimodal, .vision:
             return .visionModels
+        case .imageGeneration:
+            return .imageGenerationModels
         case .embedding:
             return .documentModels
         default:
@@ -447,30 +518,100 @@ extension RAModelInfo {
         return badges
     }
 
-    var quantizationLabel: String {
-        let haystack = [
-            id,
-            name,
-            downloadURL
-        ]
-        .joined(separator: " ")
-        .lowercased()
+    /// Best available size signal in bytes (download size preferred, else the
+    /// runtime memory requirement). Zero when unknown.
+    var consumerSizeBytes: Int64 {
+        downloadSizeBytes > 0 ? downloadSizeBytes : memoryRequiredBytes
+    }
 
-        let knownLabels = [
-            ("q4_k_m", "Q4_K_M"),
-            ("q4_k_s", "Q4_K_S"),
-            ("q5_k_m", "Q5_K_M"),
-            ("q6_k", "Q6_K"),
-            ("q8_0", "Q8_0"),
-            ("4bit", "4bit"),
-            ("5bit", "5bit"),
-            ("8bit", "8bit"),
-            ("f16", "F16"),
-            ("fp16", "FP16"),
-            ("dwq", "DWQ")
-        ]
+    /// Coarse size class used internally for recommendation fit checks and
+    /// variant ordering. Not surfaced as a raw pill.
+    var consumerSizeClass: ModelSizeClass {
+        ModelSizeClass(bytes: consumerSizeBytes)
+    }
 
-        return knownLabels.first { haystack.contains($0.0) }?.1 ?? "Default"
+    /// The single friendly feel tag (Fast / Balanced / Smart) surfaced to users.
+    var consumerFeel: ModelFeel {
+        ModelFeel(sizeClass: consumerSizeClass)
+    }
+
+    /// True when the model advertises tool / function-calling ability via its
+    /// id or name (e.g. LFM2 *-tool, Llama-3.2-3B tool-calling build).
+    var supportsToolCalling: Bool {
+        let haystack = "\(id) \(name)".lowercased()
+        return haystack.contains("tool") || haystack.contains("function")
+    }
+
+    /// The single most notable capability tag, or nil when nothing stands out.
+    /// Ordering reflects consumer relevance: tools → thinking → modality.
+    var notableCapabilityBadge: ModelCapabilityBadge? {
+        if category == .language {
+            if supportsToolCalling {
+                return ModelCapabilityBadge(
+                    id: "cap-tools",
+                    label: "Great for tools",
+                    systemImage: "wrench.and.screwdriver",
+                    color: AppColors.primaryOrange
+                )
+            }
+            if supportsThinking {
+                return ModelCapabilityBadge(
+                    id: "cap-thinks",
+                    label: "Thinks",
+                    systemImage: "brain",
+                    color: AppColors.primaryPurple
+                )
+            }
+            return nil
+        }
+
+        switch category {
+        case .multimodal, .vision, .imageGeneration:
+            return ModelCapabilityBadge(
+                id: "cap-vision", label: "Vision",
+                systemImage: "eye", color: AppColors.primaryBlue
+            )
+        case .speechRecognition, .voiceActivityDetection:
+            return ModelCapabilityBadge(
+                id: "cap-dictation", label: "Voice",
+                systemImage: "waveform", color: AppColors.primaryBlue
+            )
+        case .speechSynthesis, .audio:
+            return ModelCapabilityBadge(
+                id: "cap-voice", label: "Voice",
+                systemImage: "speaker.wave.2", color: AppColors.primaryBlue
+            )
+        case .embedding:
+            return ModelCapabilityBadge(
+                id: "cap-documents", label: "Documents",
+                systemImage: "doc.text.magnifyingglass", color: AppColors.primaryBlue
+            )
+        default:
+            return nil
+        }
+    }
+
+    /// AT MOST TWO clean consumer tags: a feel tag (Fast/Balanced/Smart) plus
+    /// one notable capability tag. No quant strings, no backend names, no size
+    /// pills. Built-in models show only their capability.
+    var consumerTags: [ModelCapabilityBadge] {
+        var tags: [ModelCapabilityBadge] = []
+
+        if !isBuiltIn, consumerSizeBytes > 0, category == .language {
+            let feel = consumerFeel
+            tags.append(ModelCapabilityBadge(
+                id: "feel-\(feel.rawValue)",
+                label: feel.label,
+                systemImage: feel.systemImage,
+                color: feel.color
+            ))
+        }
+
+        if let capability = notableCapabilityBadge {
+            tags.append(capability)
+        }
+
+        return tags
     }
 }
 

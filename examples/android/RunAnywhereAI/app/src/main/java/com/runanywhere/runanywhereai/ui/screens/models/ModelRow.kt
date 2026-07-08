@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -45,17 +46,28 @@ fun ModelRow(
     onSelect: () -> Unit,
     onDownload: () -> Unit,
     onDelete: (() -> Unit)? = null,
+    highlightLabel: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
     val brand = model.brand()
     val hasHfToken = SettingsRepository.settings.hfToken.isNotBlank()
+    val isHighlighted = highlightLabel != null
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .then(if (isReady) Modifier.clickable(onClick = onSelect) else Modifier),
         shape = RoundedCornerShape(dimens.radiusLg),
-        color = MaterialTheme.colorScheme.surface,
+        color = if (isHighlighted) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        border = if (isHighlighted) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+        } else {
+            null
+        },
     ) {
         Row(
             modifier = Modifier
@@ -75,6 +87,9 @@ fun ModelRow(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
             ) {
+                if (highlightLabel != null) {
+                    Pill(highlightLabel, MaterialTheme.colorScheme.primary, icon = RACIcons.Filled.Bolt)
+                }
                 Text(
                     model.name,
                     style = MaterialTheme.typography.bodyLarge,
@@ -82,25 +97,20 @@ fun ModelRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                BackendBadge(framework = model.framework)
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
                     verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
                 ) {
-                    Pill(model.sizeLabel(), MaterialTheme.colorScheme.onSurfaceVariant)
-                    val quantization = model.quantizationLabel()
-                    if (quantization != "Default") {
-                        Pill(quantization, MaterialTheme.colorScheme.onSurfaceVariant)
+                    // At most two clean tags (feel + one capability). No size / backend / quant.
+                    model.consumerTags().forEach { tag ->
+                        Pill(tag.label, tag.kind.color())
                     }
                     if (model.requiresHfAuth()) {
                         Pill(
                             "Private",
                             if (hasHfToken) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                         )
-                    }
-                    model.capabilityLabels().filterNot { it == "HF auth" }.take(2).forEach { label ->
-                        Pill(label, MaterialTheme.colorScheme.primary)
                     }
                 }
                 if (isBusy && progressPercent != null) {
@@ -128,6 +138,13 @@ fun ModelRow(
             }
         }
     }
+}
+
+// Palette mapping for consumer tag kinds — keeps pill colors consistent app-wide.
+@Composable
+private fun ConsumerTagKind.color(): Color = when (this) {
+    ConsumerTagKind.FEEL -> MaterialTheme.colorScheme.tertiary
+    ConsumerTagKind.CAPABILITY -> MaterialTheme.colorScheme.primary
 }
 
 @Composable

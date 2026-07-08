@@ -43,6 +43,10 @@ class ModelSelectionViewModel(
 
     val title: String get() = context.title
 
+    // Which modality this picker is scoped to — used to highlight the per-modality
+    // recommended model and to orchestrate the Voice AI pipeline.
+    val modality: ModelSelectionContext get() = context
+
     private val isLlm: Boolean get() = context == ModelSelectionContext.LLM
 
     init {
@@ -78,32 +82,48 @@ class ModelSelectionViewModel(
     }
 
     fun download(model: RAModelInfo) {
-        viewModelScope.launch {
-            if (model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()) {
-                state = state.copy(
-                    error = "Add a Hugging Face token in Settings to download private HNPU/QHexRT models.",
-                )
-                return@launch
-            }
-            state = state.copy(busyModelId = model.id, progressPercent = 0, error = null)
-            try {
-                RunAnywhere.downloadModelStream(model).collect { p ->
-                    val pct = if (p.total_bytes > 0) {
-                        (p.bytes_downloaded * 100 / p.total_bytes).toInt()
-                    } else {
-                        (p.stage_progress.coerceIn(0f, 1f) * 100).toInt()
-                    }
-                    state = state.copy(progressPercent = pct)
-                }
-                state = state.copy(busyModelId = null, progressPercent = null)
-                reload()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                RACLog.e("download failed: ${model.id}", e)
-                state = state.copy(busyModelId = null, progressPercent = null, error = e.message ?: "Download failed")
-            }
+        viewModelScope.launch { downloadInternal(model) }
+    }
+
+    // Downloads the model (respecting the HF-token gate) with progress on this VM's
+    // state. Returns true when the model is on disk afterwards. Shared by [download]
+    // and [prepare].
+    private suspend fun downloadInternal(model: RAModelInfo): Boolean {
+        if (isReady(model)) return true
+        if (model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()) {
+            state = state.copy(
+                error = "Add a Hugging Face token in Settings to download private HNPU/QHexRT models.",
+            )
+            return false
         }
+        state = state.copy(busyModelId = model.id, progressPercent = 0, error = null)
+        return try {
+            RunAnywhere.downloadModelStream(model).collect { p ->
+                val pct = if (p.total_bytes > 0) {
+                    (p.bytes_downloaded * 100 / p.total_bytes).toInt()
+                } else {
+                    (p.stage_progress.coerceIn(0f, 1f) * 100).toInt()
+                }
+                state = state.copy(progressPercent = pct)
+            }
+            state = state.copy(busyModelId = null, progressPercent = null)
+            reload()
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            RACLog.e("download failed: ${model.id}", e)
+            state = state.copy(busyModelId = null, progressPercent = null, error = e.message ?: "Download failed")
+            false
+        }
+    }
+
+    // One-shot "make this model usable": download if needed, then load + mark current.
+    // Used by the Voice AI card to stage a whole pipeline component with one call.
+    suspend fun prepare(model: RAModelInfo): Boolean {
+        if (!downloadInternal(model)) return false
+        val onDisk = state.models.firstOrNull { it.id == model.id } ?: model
+        return select(onDisk)
     }
 
     fun delete(model: RAModelInfo) {

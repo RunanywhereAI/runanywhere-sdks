@@ -153,6 +153,75 @@ private fun RAModelInfo.isLoraAdapterEntry(): Boolean =
                 tag.equals("lora", ignoreCase = true)
         }
 
+// A consumer-facing "family" — a group of related model variants (e.g. Qwen3, LFM2,
+// Whisper). The picker shows one card per family; tapping expands its variants.
+data class ModelFamily(val key: String, val title: String, val tagline: String)
+
+// Ordered family matchers. First match wins; each entry maps id/name substrings to a
+// friendly family. Kept as a pure list so families are easy to extend without touching
+// UI. HNPU (on-device accelerated) families are distinguished from their GGUF cousins
+// by the "_HNPU"/"(HNPU)" marker so the two never collapse into one card.
+private data class FamilyMatcher(
+    val key: String,
+    val title: String,
+    val tagline: String,
+    val matches: (String) -> Boolean,
+)
+
+private fun containsAll(vararg needles: String): (String) -> Boolean =
+    { h -> needles.all { it in h } }
+
+private fun containsAny(vararg needles: String): (String) -> Boolean =
+    { h -> needles.any { it in h } }
+
+private val familyMatchers: List<FamilyMatcher> = listOf(
+    // On-device accelerated (HNPU) families first — the marker keeps them separate.
+    FamilyMatcher("qwen3-npu", "Qwen3 (On-device)", "Accelerated Qwen chat", containsAll("qwen3", "hnpu")),
+    FamilyMatcher("lfm2-npu", "LFM2 (On-device)", "Accelerated Liquid chat", containsAll("lfm2", "hnpu")),
+    FamilyMatcher("llama-npu", "Llama (On-device)", "Accelerated Meta chat", containsAll("llama", "hnpu")),
+    FamilyMatcher("gemma-npu", "Gemma (On-device)", "Accelerated Google chat", containsAll("gemma", "hnpu")),
+    FamilyMatcher("deepseek-npu", "DeepSeek (On-device)", "Accelerated reasoning", containsAll("deepseek", "hnpu")),
+    FamilyMatcher("nemotron-npu", "Nemotron (On-device)", "Accelerated NVIDIA models", containsAll("nemotron", "hnpu")),
+    FamilyMatcher("qwenvl-npu", "Qwen-VL (On-device)", "Accelerated vision chat", containsAll("qwen3_vl", "hnpu")),
+    FamilyMatcher("whisper-npu", "Whisper (On-device)", "Accelerated speech-to-text", containsAll("whisper", "hnpu")),
+    FamilyMatcher("kokoro-npu", "Kokoro (On-device)", "Accelerated read-aloud", containsAll("kokoro", "hnpu")),
+    FamilyMatcher("kitten-npu", "Kitten (On-device)", "Accelerated read-aloud", containsAll("kitten", "hnpu")),
+    FamilyMatcher("embed-npu", "On-device Embeddings", "Accelerated document search", containsAll("embed", "hnpu")),
+
+    // Standard on-device families.
+    FamilyMatcher("qwen3", "Qwen3", "Fast, capable chat", containsAny("qwen3", "qwen 3")),
+    FamilyMatcher("qwen25", "Qwen2.5", "Reliable everyday chat", containsAny("qwen2.5", "qwen 2.5")),
+    FamilyMatcher("qwen2vl", "Qwen2-VL", "Chat about photos", containsAny("qwen2-vl", "qwen2.5-vl")),
+    FamilyMatcher("lfm2", "LFM2", "Efficient Liquid chat", containsAny("lfm2")),
+    FamilyMatcher("smol", "SmolLM / SmolVLM", "Tiny, quick assistants", containsAny("smol")),
+    FamilyMatcher("llama", "Llama", "Meta's open chat", containsAny("llama")),
+    FamilyMatcher("mistral", "Mistral", "Balanced open chat", containsAny("mistral")),
+    FamilyMatcher("gemma", "Gemma", "Google's open chat", containsAny("gemma")),
+    FamilyMatcher("whisper", "Whisper", "Speech-to-text", containsAny("whisper")),
+    FamilyMatcher("piper", "Piper", "Natural read-aloud", containsAny("piper")),
+    FamilyMatcher("minilm", "MiniLM", "Document search", containsAny("minilm")),
+    FamilyMatcher("silero", "Silero", "Detects speech", containsAny("silero")),
+)
+
+// Pure family derivation from id + name. Falls back to a category-based family so every
+// model lands somewhere sensible.
+fun RAModelInfo.family(): ModelFamily {
+    val haystack = "$id $name".lowercase()
+    familyMatchers.firstOrNull { it.matches(haystack) }?.let {
+        return ModelFamily(it.key, it.title, it.tagline)
+    }
+    return when (consumerGroup()) {
+        ConsumerModelGroup.VISION_MODELS -> ModelFamily("other-vision", "Vision Models", "Chat about photos")
+        ConsumerModelGroup.VOICE_MODELS -> ModelFamily("other-voice", "Voice Models", "Speech and read-aloud")
+        ConsumerModelGroup.DOCUMENT_MODELS -> ModelFamily("other-docs", "Document Models", "Search your documents")
+        ConsumerModelGroup.LORA_ADAPTERS -> ModelFamily("other-lora", "Adapters", "Fine-tune a chat model")
+        ConsumerModelGroup.CHAT_MODELS,
+        ConsumerModelGroup.APPLE_BUILT_IN -> ModelFamily("other-chat", "Other Chat Models", "More assistants")
+        ConsumerModelGroup.OTHER -> ModelFamily("other", "Other Models", "Additional models")
+    }
+}
+
+
 fun RAModelInfo.requiresHfAuth(): Boolean {
     val tags = metadata?.tags.orEmpty().map { it.lowercase() }
     return tags.any { it in privateHfTags } ||
@@ -160,76 +229,105 @@ fun RAModelInfo.requiresHfAuth(): Boolean {
         download_url.contains("_HNPU", ignoreCase = true)
 }
 
-fun RAModelInfo.capabilityLabels(): List<String> = buildList {
+// Effective on-disk / in-memory footprint used for sizing and consumer tags.
+fun RAModelInfo.effectiveBytes(): Long = when {
+    download_size_bytes > 0L -> download_size_bytes
+    (memory_required_bytes ?: 0L) > 0L -> memory_required_bytes ?: 0L
+    else -> 0L
+}
+
+// Rough "intelligence" hint derived from parameter count (parsed from the name)
+// with a byte-size fallback. Used INTERNALLY only (recommendation + variant order);
+// never shown as a raw label on cards.
+enum class ModelIntelligence { LITE, BALANCED, SMART, GENIUS }
+
+fun RAModelInfo.intelligence(): ModelIntelligence {
+    val params = estimatedParamsBillions()
+    if (params != null) {
+        return when {
+            params < 0.7 -> ModelIntelligence.LITE
+            params < 2.0 -> ModelIntelligence.BALANCED
+            params < 5.0 -> ModelIntelligence.SMART
+            else -> ModelIntelligence.GENIUS
+        }
+    }
+    // No parseable param count — fall back to footprint.
+    val mb = effectiveBytes() / 1_048_576.0
+    return when {
+        mb < 500 -> ModelIntelligence.LITE
+        mb < 2_000 -> ModelIntelligence.BALANCED
+        mb < 6_000 -> ModelIntelligence.SMART
+        else -> ModelIntelligence.GENIUS
+    }
+}
+
+// Parses a parameter count in billions from tokens like "0.6b", "1.5b", "350m", "7b".
+private fun RAModelInfo.estimatedParamsBillions(): Double? {
+    val haystack = "$id $name".lowercase()
+    Regex("""(\d+(?:\.\d+)?)\s*b\b""").find(haystack)?.let {
+        return it.groupValues[1].toDoubleOrNull()
+    }
+    Regex("""(\d+(?:\.\d+)?)\s*m\b""").find(haystack)?.let {
+        return it.groupValues[1].toDoubleOrNull()?.div(1000.0)
+    }
+    return null
+}
+
+// The single "feel" word shown on every card. Derived from intelligence but collapsed
+// to three consumer-friendly buckets — no Lite/Genius, no raw parameter counts.
+enum class ModelFeel(val label: String) { FAST("Fast"), BALANCED("Balanced"), SMART("Smart") }
+
+fun RAModelInfo.feel(): ModelFeel = when (intelligence()) {
+    ModelIntelligence.LITE -> ModelFeel.FAST
+    ModelIntelligence.BALANCED -> ModelFeel.BALANCED
+    ModelIntelligence.SMART, ModelIntelligence.GENIUS -> ModelFeel.SMART
+}
+
+// Semantic kind so the UI can color pills consistently across the picker.
+enum class ConsumerTagKind { FEEL, CAPABILITY }
+
+data class ConsumerTag(val label: String, val kind: ConsumerTagKind)
+
+// AT MOST two clean, consumer-facing tags per card: a feel tag, plus one notable
+// capability tag when applicable. No quantization, size, context length, or backend
+// terms ever appear here — those stay internal to recommendation / variant ordering.
+fun RAModelInfo.consumerTags(): List<ConsumerTag> = buildList {
+    add(ConsumerTag(feel().label, ConsumerTagKind.FEEL))
+    notableCapability()?.let { add(ConsumerTag(it, ConsumerTagKind.CAPABILITY)) }
+}
+
+// The single most notable capability, or null when nothing stands out. Capability
+// (vision/voice/documents) wins over behavioral hints (tools/thinking).
+private fun RAModelInfo.notableCapability(): String? {
     when (category) {
-        ModelCategory.MODEL_CATEGORY_LANGUAGE -> add("Chat")
         ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         ModelCategory.MODEL_CATEGORY_VISION,
-        -> add("Vision")
-        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> add("Dictation")
-        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> add("Read aloud")
-        ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> add("Voice")
-        ModelCategory.MODEL_CATEGORY_EMBEDDING -> add("Documents")
+        -> return "Vision"
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        ModelCategory.MODEL_CATEGORY_AUDIO,
+        -> return "Voice"
+        ModelCategory.MODEL_CATEGORY_EMBEDDING -> return "Documents"
         else -> Unit
     }
-    if (supports_thinking) add("Thinking")
-    if (supports_lora) add("LoRA-ready")
-    if (requiresHfAuth()) add("HF auth")
-}.distinct()
-
-fun RAModelInfo.quantizationLabel(): String {
-    val haystack = listOf(id, name, download_url).joinToString(" ").lowercase()
-    val known = listOf(
-        "q4_k_m" to "Q4_K_M",
-        "q4_k_s" to "Q4_K_S",
-        "q5_k_m" to "Q5_K_M",
-        "q6_k" to "Q6_K",
-        "q8_0" to "Q8_0",
-        "4bit" to "4bit",
-        "5bit" to "5bit",
-        "8bit" to "8bit",
-        "f16" to "F16",
-        "fp16" to "FP16",
-        "dwq" to "DWQ",
-    )
-    return known.firstOrNull { haystack.contains(it.first) }?.second ?: "Default"
+    if (isToolCallingModel()) return "Great for tools"
+    if (supports_thinking) return "Thinks"
+    return null
 }
 
-// Android-visible backends only — Apple-only frameworks (MLX, Foundation
-// Models, CoreML) never run here, so they get no filter chip.
-enum class ModelBackendFilter(val title: String) {
-    ALL("All"),
-    LLAMA_CPP("Llama CPP"),
-    QHEXRT("QHexRT"),
-    ONNX("ONNX"),
-    SHERPA("Sherpa"),
+// Tool-oriented chat models: LiquidAI "tool" builds and NVIDIA Nemotron families
+// are trained/tuned for function calling; also catch any id/name flagged "tool".
+private fun RAModelInfo.isToolCallingModel(): Boolean {
+    val haystack = "$id $name".lowercase()
+    return "tool" in haystack || "nemotron" in haystack
 }
 
-fun ModelBackendFilter.matches(model: RAModelInfo): Boolean = when (this) {
-    ModelBackendFilter.ALL -> true
-    ModelBackendFilter.LLAMA_CPP -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
-    ModelBackendFilter.QHEXRT -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
-    ModelBackendFilter.ONNX -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX
-    ModelBackendFilter.SHERPA -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
-}
-
-enum class ModelGroupFilter(val title: String) {
-    ALL("All"),
-    CHAT("Chat"),
-    VISION("Vision"),
-    VOICE("Voice"),
-    DOCUMENTS("Documents"),
-    ADAPTERS("Adapters"),
-}
-
-fun ModelGroupFilter.matches(model: RAModelInfo): Boolean = when (this) {
-    ModelGroupFilter.ALL -> true
-    ModelGroupFilter.CHAT -> model.consumerGroup() == ConsumerModelGroup.CHAT_MODELS ||
-        model.consumerGroup() == ConsumerModelGroup.APPLE_BUILT_IN
-    ModelGroupFilter.VISION -> model.consumerGroup() == ConsumerModelGroup.VISION_MODELS
-    ModelGroupFilter.VOICE -> model.consumerGroup() == ConsumerModelGroup.VOICE_MODELS
-    ModelGroupFilter.DOCUMENTS -> model.consumerGroup() == ConsumerModelGroup.DOCUMENT_MODELS
-    ModelGroupFilter.ADAPTERS -> model.consumerGroup() == ConsumerModelGroup.LORA_ADAPTERS
+// Friendly variant label used inside a family's variant list — "Smaller · faster" vs
+// "Larger · smarter" — instead of quant strings. Ordered by footprint upstream.
+fun RAModelInfo.variantFeelLabel(): String = when (feel()) {
+    ModelFeel.FAST -> "Smaller · faster"
+    ModelFeel.BALANCED -> "Balanced"
+    ModelFeel.SMART -> "Larger · smarter"
 }
 
 fun formatModelSize(bytes: Long): String {

@@ -70,12 +70,21 @@ extension VoiceAssistantView {
         VStack(spacing: 0) {
             macOSToolbar
             Divider()
-            if showModelInfo {
-                modelInfoSection
+            if !viewModel.allModelsLoaded {
+                VoiceAISetupCard(
+                    viewModel: viewModel,
+                    onChangeSTT: { showSTTModelSelection = true },
+                    onChangeLLM: { showLLMModelSelection = true },
+                    onChangeTTS: { showTTSModelSelection = true }
+                )
+            } else {
+                if showModelInfo {
+                    modelInfoSection
+                }
+                macOSConversationArea
+                Spacer()
+                controlArea
             }
-            macOSConversationArea
-            Spacer()
-            controlArea
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.windowBackgroundColor))
@@ -176,28 +185,11 @@ extension VoiceAssistantView {
     }
 
     private var setupView: some View {
-        VoicePipelineSetupView(
-            sttModel: Binding(
-                get: { viewModel.sttModel },
-                set: { viewModel.sttModel = $0 }
-            ),
-            llmModel: Binding(
-                get: { viewModel.llmModel },
-                set: { viewModel.llmModel = $0 }
-            ),
-            ttsModel: Binding(
-                get: { viewModel.ttsModel },
-                set: { viewModel.ttsModel = $0 }
-            ),
-            sttLoadState: viewModel.sttModelState,
-            llmLoadState: viewModel.llmModelState,
-            ttsLoadState: viewModel.ttsModelState,
-            onSelectSTT: { showSTTModelSelection = true },
-            onSelectLLM: { showLLMModelSelection = true },
-            onSelectTTS: { showTTSModelSelection = true },
-            onStartVoice: {
-                // All models loaded, nothing to do here
-            }
+        VoiceAISetupCard(
+            viewModel: viewModel,
+            onChangeSTT: { showSTTModelSelection = true },
+            onChangeLLM: { showLLMModelSelection = true },
+            onChangeTTS: { showTTSModelSelection = true }
         )
     }
 
@@ -450,42 +442,25 @@ extension VoiceAssistantView {
 extension VoiceAssistantView {
     private var modelSelectionSheet: some View {
         NavigationView {
-            VoicePipelineSetupView(
-                sttModel: Binding(
-                    get: { viewModel.sttModel },
-                    set: { viewModel.sttModel = $0 }
-                ),
-                llmModel: Binding(
-                    get: { viewModel.llmModel },
-                    set: { viewModel.llmModel = $0 }
-                ),
-                ttsModel: Binding(
-                    get: { viewModel.ttsModel },
-                    set: { viewModel.ttsModel = $0 }
-                ),
-                sttLoadState: viewModel.sttModelState,
-                llmLoadState: viewModel.llmModelState,
-                ttsLoadState: viewModel.ttsModelState,
-                onSelectSTT: {
+            VoiceAISetupCard(
+                viewModel: viewModel,
+                onChangeSTT: {
                     showModelSelection = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         showSTTModelSelection = true
                     }
                 },
-                onSelectLLM: {
+                onChangeLLM: {
                     showModelSelection = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         showLLMModelSelection = true
                     }
                 },
-                onSelectTTS: {
+                onChangeTTS: {
                     showModelSelection = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         showTTSModelSelection = true
                     }
-                },
-                onStartVoice: {
-                    showModelSelection = false
                 }
             )
             .navigationTitle("Voice Models")

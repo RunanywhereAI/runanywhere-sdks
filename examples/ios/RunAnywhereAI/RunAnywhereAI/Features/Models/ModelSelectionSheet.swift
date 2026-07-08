@@ -87,12 +87,44 @@ struct ModelSelectionSheet: View {
     let context: ModelSelectionContext
     let onModelSelected: (RAModelInfo) async -> Void
 
+    private let recommendationEngine = ModelRecommendationEngine()
+    private let tierResolver = HardwareTierResolver()
+
     init(
         context: ModelSelectionContext = .llm,
         onModelSelected: @escaping (RAModelInfo) async -> Void
     ) {
         self.context = context
         self.onModelSelected = onModelSelected
+    }
+
+    /// The single best-for-device model for this scoped context, highlighted at
+    /// the top of the picker. Pure recommendation over the live catalog.
+    private var recommendedModel: RAModelInfo? {
+        let tier = tierResolver.resolve(from: deviceInfo.deviceInfo)
+        let selection = recommendationEngine.recommend(
+            tier: tier,
+            appleFoundationAvailable: tierResolver.appleFoundationAvailable,
+            from: viewModel.availableModels
+        )
+        let pick: RAModelInfo?
+        switch context {
+        case .llm, .voice, .ragLLM:
+            pick = selection.defaultChatModel
+        case .stt:
+            pick = selection.recommendedASR
+        case .tts:
+            pick = selection.recommendedTTS
+        case .vlm:
+            pick = selection.recommendedVLM
+        case .ragEmbedding:
+            pick = selection.recommendedEmbedding
+        case .vad:
+            pick = nil
+        }
+        // Only surface it if it actually belongs to this scoped candidate set.
+        guard let pick, candidateModels.contains(where: { $0.id == pick.id }) else { return nil }
+        return pick
     }
 
     private var candidateModels: [RAModelInfo] {
@@ -322,6 +354,22 @@ extension ModelSelectionSheet {
     }
 
     @ViewBuilder private var modelsContent: some View {
+        if let recommended = recommendedModel, searchText.isEmpty {
+            Section {
+                FlatModelRow(
+                    model: recommended,
+                    availabilityReason: unavailableReason(for: recommended),
+                    isSelected: selectedModel?.id == recommended.id,
+                    isLoading: isLoadingModel,
+                    onDownloadCompleted: { Task { await viewModel.loadModels() } },
+                    onSelectModel: { Task { await selectAndLoadModel(recommended) } },
+                    onModelUpdated: { Task { await viewModel.loadModels() } }
+                )
+            } header: {
+                Label("Recommended for your device", systemImage: "sparkles")
+            }
+        }
+
         ForEach(visibleModelGroups) { group in
             if let models = groupedModels[group] {
                 Section {

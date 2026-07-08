@@ -29,7 +29,7 @@ import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import {
   DownloadState,
 } from '@runanywhere/proto-ts/download_service';
-import { getCatalog } from '../services/model-catalog';
+import { getCatalog, type CatalogEntry } from '../services/model-catalog';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import {
@@ -37,7 +37,21 @@ import {
   formatFramework,
   modelDisplaySizeBytes,
   modalityEmoji,
+  consumerTags,
+  modelFamily,
+  modelCapability,
+  variantSizeFeel,
+  type ConsumerTag,
 } from '../services/model-display';
+import {
+  detectDeviceCapabilities,
+  describeCapabilities,
+  type DeviceCapabilities,
+} from '../services/device-capabilities';
+import {
+  recommendModels,
+  type RecommendedSelection,
+} from '../services/model-recommendation';
 import { showToast } from './dialogs';
 
 // ---------------------------------------------------------------------------
@@ -80,6 +94,18 @@ export interface OpenSheetOptions {
 }
 
 let activeSheetOptions: OpenSheetOptions = {};
+
+// Hardware detection is async and stable for a session, so we probe once and
+// cache. The recommendation set is derived purely from the tier + catalog.
+let capabilitiesCache: DeviceCapabilities | null = null;
+let recommendationCache: RecommendedSelection | null = null;
+let searchQuery = '';
+
+// Which family cards are expanded to reveal their variants (keyed by family
+// key). Reset whenever the sheet is opened so it always starts collapsed.
+const expandedFamilies = new Set<string>();
+// Which families have their "Advanced" backend detail revealed.
+const advancedFamilies = new Set<string>();
 
 // ---------------------------------------------------------------------------
 // Public API — wiring into the chat view
@@ -238,11 +264,58 @@ export function openSheet(options: OpenSheetOptions = {}): void {
 }
 
 // ---------------------------------------------------------------------------
+// Programmatic model orchestration — used by multi-model experiences (Voice AI)
+// that need to download + load a set of models without opening the picker. All
+// SDK verbs stay centralized here; consumers only pass model ids + a progress
+// callback and observe the shared row state via `getModelStatus`.
+// ---------------------------------------------------------------------------
+
+/** Public snapshot of a model's lifecycle for external consumers. */
+export interface ModelStatusSnapshot {
+  status: RowStatus;
+  progress: number;   // 0..1
+  error?: string;
+}
+
+/** Read the current lifecycle status for a model id. */
+export function getModelStatus(modelId: string): ModelStatusSnapshot {
+  const state = rowStates.get(modelId) ?? { status: 'registered' as RowStatus };
+  return { status: state.status, progress: state.progress ?? 0, error: state.error };
+}
+
+/** True once a model is downloaded and successfully loaded. */
+export function isModelLoaded(modelId: string): boolean {
+  return getModelStatus(modelId).status === 'loaded';
+}
+
+/**
+ * Ensure a model is downloaded and loaded, reusing the picker's download/load
+ * pipeline (progress + toolbar sync included). No-ops when already loaded.
+ * Resolves `true` on success, `false` on any failure (the error surfaces via
+ * the shared row state + a toast, matching the picker's behavior).
+ */
+export async function ensureModelReady(modelId: string): Promise<boolean> {
+  const status = getModelStatus(modelId).status;
+  if (status === 'loaded') return true;
+
+  if (status !== 'downloaded') {
+    await startDownload(modelId);
+    if (getModelStatus(modelId).status !== 'downloaded') return false;
+  }
+
+  await loadModel(modelId);
+  return getModelStatus(modelId).status === 'loaded';
+}
+
+// ---------------------------------------------------------------------------
 // Rendering — bottom sheet
 // ---------------------------------------------------------------------------
 
 function renderSheet(): void {
   const title = escapeHtml(activeSheetOptions.title ?? 'Select Model');
+  searchQuery = '';
+  expandedFamilies.clear();
+  advancedFamilies.clear();
   modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
   modalEl.innerHTML = `
@@ -258,6 +331,15 @@ function renderSheet(): void {
         </button>
       </div>
       <div class="modal-body">
+        <div id="model-sheet-banner"></div>
+        <div class="model-search">
+          <svg class="model-search__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input id="model-sheet-search" class="model-search__input" type="search"
+            placeholder="Search models, capabilities…" autocomplete="off" spellcheck="false" />
+        </div>
         <div id="model-sheet-list"></div>
       </div>
     </div>
@@ -270,7 +352,64 @@ function renderSheet(): void {
     if (event.target === modalEl) closeSheet();
   });
 
+  const searchInput = modalEl.querySelector('#model-sheet-search') as HTMLInputElement;
+  searchInput.addEventListener('input', () => {
+    searchQuery = searchInput.value;
+    renderRows();
+  });
+
+  // Probe hardware once, then re-render the banner + recommended section. The
+  // list renders immediately (state-grouped) so the sheet is never blank while
+  // the async capability probe resolves.
+  void ensureCapabilities().then(() => {
+    if (modalEl) {
+      renderBanner();
+      renderRows();
+    }
+  });
+
+  renderBanner();
   renderRows();
+}
+
+/** Detect + cache hardware capabilities and the derived recommendation set. */
+async function ensureCapabilities(): Promise<void> {
+  if (capabilitiesCache) return;
+  try {
+    capabilitiesCache = await detectDeviceCapabilities();
+    recommendationCache = recommendModels(
+      capabilitiesCache.tier,
+      capabilitiesCache.memoryBudgetBytes,
+      getCatalog(),
+    );
+  } catch (err) {
+    console.warn('[model-selection] capability probe failed', err);
+  }
+}
+
+function renderBanner(): void {
+  const host = modalEl?.querySelector('#model-sheet-banner') as HTMLElement | null;
+  if (!host) return;
+  const caps = capabilitiesCache;
+  if (!caps) {
+    host.innerHTML = '';
+    return;
+  }
+  host.innerHTML = `
+    <div class="device-banner device-banner--${caps.tier}">
+      <div class="device-banner__glyph">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="3"/>
+          <rect x="9" y="9" width="6" height="6" rx="1"/>
+          <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>
+        </svg>
+      </div>
+      <div class="device-banner__text">
+        <div class="device-banner__title">Recommended for your device</div>
+        <div class="device-banner__meta">${escapeHtml(describeCapabilities(caps))}</div>
+      </div>
+    </div>
+  `;
 }
 
 function closeSheet(): void {
@@ -278,6 +417,7 @@ function closeSheet(): void {
   modalEl.remove();
   modalEl = null;
   activeSheetOptions = {};
+  searchQuery = '';
 }
 
 function renderRows(): void {
@@ -285,49 +425,36 @@ function renderRows(): void {
   if (!host) return;
 
   const allEntries = getCatalog();
-  // Filter by category when the caller scoped the picker to a modality
-  // (e.g. Vision shows only VLM, Transcribe shows only STT). Without
-  // filtering, a user opening the picker from Vision could load an LLM
-  // and the modality call would then fail (BackendNotAvailable from the
-  // VLM provider).
   const filterCats = activeSheetOptions.filterCategories;
-  const entries = filterCats && filterCats.length > 0
+  const scoped = filterCats && filterCats.length > 0
     ? allEntries.filter((entry) => filterCats.includes(entry.category))
     : allEntries;
-  if (!entries.length) {
+  if (!scoped.length) {
     host.innerHTML = '<p class="text-secondary">No models registered.</p>';
+    bindRowActions(host);
     return;
   }
 
-  // Consumer catalog sections by state: what's running, what's on the
-  // device, what can be downloaded — matches the iOS picker grouping.
-  const stateOf = (id: string): RowState => rowStates.get(id) ?? { status: 'registered' as RowStatus };
-  const sections: Array<{ title: string; hint?: string; rows: typeof entries }> = [
-    {
-      title: 'Active',
-      rows: entries.filter((entry) => ['loaded', 'loading'].includes(stateOf(entry.id).status)),
-    },
-    {
-      title: 'On this device',
-      hint: 'Ready to use — no download needed',
-      rows: entries.filter((entry) => stateOf(entry.id).status === 'downloaded'),
-    },
-    {
-      title: 'Available to download',
-      hint: 'Stored in your browser, runs fully offline',
-      rows: entries.filter((entry) => ['registered', 'downloading', 'error'].includes(stateOf(entry.id).status)),
-    },
-  ];
+  const query = searchQuery.trim().toLowerCase();
+  const matches = (entry: CatalogEntry): boolean => matchesSearch(entry, query);
 
-  host.innerHTML = sections
-    .filter((section) => section.rows.length > 0)
-    .map((section) => `
-      <div class="model-section">
-        <div class="model-section__title">${section.title}${section.hint ? `<small>${section.hint}</small>` : ''}</div>
-        ${section.rows.map((entry) => renderModelRow(entry, stateOf(entry.id))).join('')}
-      </div>
-    `).join('');
+  const recommendedIds = recommendedIdSet();
+  const recommendedHtml = renderRecommendedSection(scoped, recommendedIds, matches);
 
+  // Everything not surfaced as a recommendation is grouped into family cards,
+  // filtered by the search query. Recommended entries stay only in the block
+  // above so the family list reads as "browse the rest".
+  const rest = scoped.filter((entry) => !recommendedIds.has(entry.id) && matches(entry));
+  const familiesHtml = renderFamilySection(rest, recommendedHtml.length > 0);
+
+  const body = recommendedHtml + familiesHtml;
+  host.innerHTML = body || '<p class="model-empty text-secondary">No models match your search.</p>';
+
+  bindRowActions(host);
+  bindFamilyInteractions(host);
+}
+
+function bindRowActions(host: HTMLElement): void {
   host.querySelectorAll('[data-action]').forEach((el) => {
     const btn = el as HTMLButtonElement;
     const action = btn.dataset.action as 'download' | 'load' | 'unload';
@@ -339,25 +466,389 @@ function renderRows(): void {
   });
 }
 
-function renderModelRow(entry: ReturnType<typeof getCatalog>[number], state: RowState): string {
+/** Wire family-card expand toggles and per-family "Advanced" disclosures. */
+function bindFamilyInteractions(host: HTMLElement): void {
+  host.querySelectorAll('[data-family-toggle]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const key = (el as HTMLElement).dataset.familyToggle!;
+      if (expandedFamilies.has(key)) expandedFamilies.delete(key);
+      else expandedFamilies.add(key);
+      renderRows();
+    });
+  });
+  host.querySelectorAll('[data-family-advanced]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const key = (el as HTMLElement).dataset.familyAdvanced!;
+      if (advancedFamilies.has(key)) advancedFamilies.delete(key);
+      else advancedFamilies.add(key);
+      renderRows();
+    });
+  });
+}
+
+/** Ids surfaced in the recommended block (excluded from the family list). */
+function recommendedIdSet(): Set<string> {
+  const ids = new Set<string>();
+  const rec = recommendationCache;
+  if (!rec) return ids;
+
+  const filterCats = activeSheetOptions.filterCategories;
+  // Modality-scoped pickers (Vision/Transcribe/Speak/Documents) still get a
+  // recommended highlight — just the one entry relevant to that modality —
+  // so every single-modality tab opens on its best-for-device default.
+  if (filterCats && filterCats.length > 0) {
+    for (const category of filterCats) {
+      const entry = recommendedForCategory(rec, category);
+      if (entry) ids.add(entry.id);
+    }
+    return ids;
+  }
+
+  for (const llm of rec.recommendedLLMs) ids.add(llm.id);
+  const { asr, tts, vlm, embedding } = rec.companions;
+  for (const companion of [asr, tts, vlm, embedding]) {
+    if (companion) ids.add(companion.id);
+  }
+  return ids;
+}
+
+/** The single recommended entry for a modality category, when one exists. */
+function recommendedForCategory(
+  rec: RecommendedSelection,
+  category: ModelCategory,
+): CatalogEntry | null {
+  switch (category) {
+    case ModelCategory.MODEL_CATEGORY_LANGUAGE:
+      return rec.defaultModel;
+    case ModelCategory.MODEL_CATEGORY_MULTIMODAL:
+      return rec.companions.vlm;
+    case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
+      return rec.companions.asr;
+    case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
+      return rec.companions.tts;
+    case ModelCategory.MODEL_CATEGORY_EMBEDDING:
+      return rec.companions.embedding;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Render the "Recommended for your device" block. For the full (Chat) picker
+ * this is the default LLM highlighted + the other recommended LLMs, followed by
+ * a compact "Also recommended" companion row. For a modality-scoped picker it's
+ * simply the single best-for-device model for that modality, highlighted.
+ * Returns '' when nothing is recommended in scope.
+ */
+function renderRecommendedSection(
+  scoped: readonly CatalogEntry[],
+  recommendedIds: Set<string>,
+  matches: (entry: CatalogEntry) => boolean,
+): string {
+  const rec = recommendationCache;
+  if (!rec || recommendedIds.size === 0) return '';
+
+  const scopedById = new Map(scoped.map((entry) => [entry.id, entry]));
+  const inScope = (entry: CatalogEntry | null | undefined): entry is CatalogEntry =>
+    entry != null && scopedById.has(entry.id) && matches(entry);
+
+  const isScoped = (activeSheetOptions.filterCategories?.length ?? 0) > 0;
+  const defaultId = rec.defaultModel?.id;
+
+  if (isScoped) {
+    // One highlighted card per recommended-in-scope entry (usually exactly one).
+    const cards = [...recommendedIds]
+      .map((id) => scopedById.get(id))
+      .filter(inScope)
+      .map((entry) => renderRecommendedCard(entry, stateOf(entry.id), true))
+      .join('');
+    if (!cards) return '';
+    return recommendedShell(`<div class="reco-grid">${cards}</div>`, '');
+  }
+
+  const llms = rec.recommendedLLMs.filter(inScope);
+  const companions = [rec.companions.vlm, rec.companions.asr, rec.companions.tts, rec.companions.embedding]
+    .filter(inScope);
+  if (llms.length === 0 && companions.length === 0) return '';
+
+  const llmCards = llms
+    .map((entry) => renderRecommendedCard(entry, stateOf(entry.id), entry.id === defaultId))
+    .join('');
+  const companionRows = companions.length > 0
+    ? `
+      <div class="model-subsection__title">Also recommended</div>
+      ${companions.map((entry) => renderModelRow(entry, stateOf(entry.id))).join('')}
+    `
+    : '';
+
+  return recommendedShell(`<div class="reco-grid">${llmCards}</div>`, companionRows);
+}
+
+/** Wrap recommended content in the titled section shell. */
+function recommendedShell(cardsHtml: string, companionRows: string): string {
+  return `
+    <div class="model-section model-section--recommended">
+      <div class="model-section__title model-section__title--reco">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+          <path d="M12 3l1.9 5.4L19 10l-5.1 1.6L12 17l-1.9-5.4L5 10l5.1-1.6L12 3z"/>
+        </svg>
+        Recommended
+      </div>
+      ${cardsHtml}
+      ${companionRows}
+    </div>
+  `;
+}
+
+/** Group the remaining catalog into consumer-facing family cards. */
+function renderFamilySection(entries: readonly CatalogEntry[], hasRecommended: boolean): string {
+  if (entries.length === 0) return '';
+
+  const families = groupByFamily(entries);
+  if (families.length === 0) return '';
+
+  const heading = hasRecommended ? 'Browse all models' : 'All models';
+  const cards = families.map((family) => renderFamilyCard(family)).join('');
+
+  return `
+    <div class="model-section">
+      <div class="model-section__title">${escapeHtml(heading)}</div>
+      <div class="family-list">${cards}</div>
+    </div>
+  `;
+}
+
+interface FamilyGroup {
+  key: string;
+  name: string;
+  tagline: string;
+  entries: CatalogEntry[];
+}
+
+/** Bucket entries by family, preserving catalog order within each family. */
+function groupByFamily(entries: readonly CatalogEntry[]): FamilyGroup[] {
+  const groups = new Map<string, FamilyGroup>();
+  for (const entry of entries) {
+    const family = modelFamily(entry);
+    const existing = groups.get(family.key);
+    if (existing) {
+      existing.entries.push(entry);
+    } else {
+      groups.set(family.key, {
+        key: family.key,
+        name: family.name,
+        tagline: family.tagline,
+        entries: [entry],
+      });
+    }
+  }
+  return [...groups.values()];
+}
+
+/**
+ * A rounded family card: name, one-liner, the family's cleanest tag, and the
+ * option count. Tapping toggles an expanded list of variants. When a variant is
+ * loaded/downloaded the card reflects that with a subtle status dot.
+ */
+function renderFamilyCard(family: FamilyGroup): string {
+  const expanded = expandedFamilies.has(family.key);
+  const options = family.entries.length;
+  const representative = pickRepresentative(family.entries);
+  const tag = consumerTags(representative)[0];
+  const activeEntry = family.entries.find((entry) => stateOf(entry.id).status === 'loaded');
+  const onDevice = family.entries.some((entry) =>
+    ['downloaded', 'loaded'].includes(stateOf(entry.id).status));
+
+  const statusPill = activeEntry
+    ? '<span class="family-card__status family-card__status--active">Active</span>'
+    : onDevice
+      ? '<span class="family-card__status">On device</span>'
+      : '';
+
+  const variants = expanded
+    ? `<div class="family-variants">${renderFamilyVariants(family)}</div>`
+    : '';
+
+  return `
+    <div class="family-card${expanded ? ' family-card--expanded' : ''}" data-family-key="${escapeHtml(family.key)}">
+      <button type="button" class="family-card__head" data-family-toggle="${escapeHtml(family.key)}" aria-expanded="${expanded}">
+        <div class="model-logo family-card__logo">${modalityEmoji(representative.category)}</div>
+        <div class="family-card__body">
+          <div class="family-card__name-row">
+            <span class="family-card__name">${escapeHtml(family.name)}</span>
+            ${tag ? renderTagPill(tag) : ''}
+            ${statusPill}
+          </div>
+          <div class="family-card__tagline">${escapeHtml(family.tagline)}</div>
+        </div>
+        <div class="family-card__aside">
+          <span class="family-card__count">${options} ${options === 1 ? 'option' : 'options'}</span>
+          <svg class="family-card__chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+      </button>
+      ${variants}
+    </div>
+  `;
+}
+
+/**
+ * Render a family's variants once expanded. The best-for-device variant is
+ * auto-flagged, variants are labelled by friendly size feel (not quant), and
+ * the inference backend is hidden behind a per-family "Advanced" disclosure.
+ */
+function renderFamilyVariants(family: FamilyGroup): string {
+  const best = bestVariantForDevice(family.entries);
+  const showAdvanced = advancedFamilies.has(family.key);
+  const multiBackend = new Set(family.entries.map((entry) => entry.framework)).size > 1;
+
+  const rows = family.entries
+    .map((entry) => renderVariantRow(entry, entry.id === best?.id, showAdvanced))
+    .join('');
+
+  // Only offer the Advanced disclosure when it would actually reveal something
+  // new — i.e. when the family spans more than one backend.
+  const advancedToggle = multiBackend
+    ? `<button type="button" class="family-advanced-toggle" data-family-advanced="${escapeHtml(family.key)}">
+         ${showAdvanced ? 'Hide advanced' : 'Advanced'}
+       </button>`
+    : '';
+
+  return `${rows}${advancedToggle}`;
+}
+
+/** A single variant row inside an expanded family. */
+function renderVariantRow(entry: CatalogEntry, isBest: boolean, showAdvanced: boolean): string {
+  const state = stateOf(entry.id);
   const progressBar = state.status === 'downloading'
     ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
     : '';
   const errorBar = state.error
     ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
     : '';
-  const badges = [
-    `<span class="model-framework-badge">${formatFramework(entry.framework)}</span>`,
-    entry.supportsThinking ? '<span class="model-capability-badge model-capability-badge--thinking">Thinking</span>' : '',
-    `<span class="model-size">${formatBytes(modelDisplaySizeBytes(entry))}</span>`,
-  ].filter(Boolean).join('');
+  const bestBadge = isBest
+    ? '<span class="variant-row__best">Best for this device</span>'
+    : '';
+  const advanced = showAdvanced
+    ? `<span class="variant-row__advanced">${escapeHtml(formatFramework(entry.framework))}</span>`
+    : '';
+
+  return `
+    <div class="variant-row variant-row--${state.status}${isBest ? ' variant-row--best' : ''}" data-model-id="${entry.id}">
+      <div class="variant-row__info">
+        <div class="variant-row__feel">${escapeHtml(variantSizeFeel(entry))}${bestBadge}</div>
+        <div class="variant-row__meta">
+          <span class="variant-row__size">${formatBytes(modelDisplaySizeBytes(entry))}</span>
+          ${advanced}
+        </div>
+        ${progressBar}
+        ${errorBar}
+      </div>
+      ${actionButton(entry.id, state)}
+    </div>
+  `;
+}
+
+/** Choose the card's representative entry (the best-for-device variant). */
+function pickRepresentative(entries: CatalogEntry[]): CatalogEntry {
+  return bestVariantForDevice(entries) ?? entries[0];
+}
+
+/**
+ * Auto-select the best variant for the device: the largest entry that still
+ * fits the tier memory budget (smarter is better when it fits), falling back to
+ * the smallest entry when none fit. Pure w.r.t. the cached capabilities.
+ */
+function bestVariantForDevice(entries: CatalogEntry[]): CatalogEntry | undefined {
+  if (entries.length === 0) return undefined;
+  const budget = capabilitiesCache?.memoryBudgetBytes ?? Number.POSITIVE_INFINITY;
+  const fitting = entries.filter((entry) => entry.memoryRequiredBytes <= budget);
+  if (fitting.length > 0) {
+    // Largest that still fits — smarter is better when it comfortably fits.
+    return [...fitting].sort((a, b) => modelDisplaySizeBytes(b) - modelDisplaySizeBytes(a))[0];
+  }
+  // Nothing fits the budget: fall back to the smallest so it's at least usable.
+  return [...entries].sort((a, b) => modelDisplaySizeBytes(a) - modelDisplaySizeBytes(b))[0];
+}
+
+/** Read-through row state accessor with a sensible default. */
+function stateOf(id: string): RowState {
+  return rowStates.get(id) ?? { status: 'registered' as RowStatus };
+}
+
+/**
+ * Match against friendly, consumer-facing signals only — model name, family
+ * name/tagline, size feel, and consumer tags. Deliberately excludes quant
+ * strings and inference backend names.
+ */
+function matchesSearch(entry: CatalogEntry, query: string): boolean {
+  if (!query) return true;
+  const family = modelFamily(entry);
+  const haystack = [
+    entry.name,
+    entry.description,
+    family.name,
+    family.tagline,
+    variantSizeFeel(entry),
+    ...consumerTags(entry).map((tag) => tag.label),
+  ]
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(query);
+}
+
+/** Render a rich recommended card with a single clean tag row. */
+function renderRecommendedCard(entry: CatalogEntry, state: RowState, isDefault: boolean): string {
+  const tags = consumerTags(entry).map(renderTagPill).join('');
+  const progressBar = state.status === 'downloading'
+    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
+    : '';
+  const errorBar = state.error
+    ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
+    : '';
+  const bestBadge = isDefault
+    ? '<span class="reco-card__best">Best for this device</span>'
+    : '';
+  return `
+    <div class="reco-card${isDefault ? ' reco-card--default' : ''} reco-card--${state.status}" data-model-id="${entry.id}">
+      <div class="reco-card__head">
+        <div class="model-logo reco-card__logo">${modalityEmoji(entry.category)}</div>
+        <div class="reco-card__title-wrap">
+          <div class="reco-card__name">${escapeHtml(modelFamily(entry).name)}${bestBadge}</div>
+          <div class="reco-card__tags">${tags}</div>
+        </div>
+        ${actionButton(entry.id, state)}
+      </div>
+      ${progressBar}
+      ${errorBar}
+    </div>
+  `;
+}
+
+function renderTagPill(tag: ConsumerTag): string {
+  return `<span class="tag-pill tag-pill--${tag.kind}">${escapeHtml(tag.label)}</span>`;
+}
+
+/** Compact companion row (ASR/TTS/VLM/embedding) with one clean capability tag. */
+function renderModelRow(entry: CatalogEntry, state: RowState): string {
+  const progressBar = state.status === 'downloading'
+    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
+    : '';
+  const errorBar = state.error
+    ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
+    : '';
+  const capability = modelCapability(entry);
+  const capabilityPill = capability
+    ? `<span class="tag-pill tag-pill--capability">${escapeHtml(capability)}</span>`
+    : '';
   return `
     <div class="model-row model-row--${state.status}" data-model-id="${entry.id}">
       <div class="model-logo">${modalityEmoji(entry.category)}</div>
       <div class="model-info">
-        <div class="model-name">${escapeHtml(entry.name)}</div>
-        <div class="model-description">${escapeHtml(entry.description)}</div>
-        <div class="model-meta">${badges}</div>
+        <div class="model-name">${escapeHtml(modelFamily(entry).name)}</div>
+        <div class="model-meta">${capabilityPill}</div>
         ${progressBar}
         ${errorBar}
       </div>
