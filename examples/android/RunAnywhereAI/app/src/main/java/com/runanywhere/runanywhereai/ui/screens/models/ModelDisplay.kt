@@ -195,25 +195,22 @@ fun RAModelInfo.quantizationLabel(): String {
     return known.firstOrNull { haystack.contains(it.first) }?.second ?: "Default"
 }
 
+// Android-visible backends only — Apple-only frameworks (MLX, Foundation
+// Models, CoreML) never run here, so they get no filter chip.
 enum class ModelBackendFilter(val title: String) {
     ALL("All"),
-    MLX("MLX"),
     LLAMA_CPP("Llama CPP"),
     QHEXRT("QHexRT"),
     ONNX("ONNX"),
     SHERPA("Sherpa"),
-    APPLE("Apple"),
 }
 
 fun ModelBackendFilter.matches(model: RAModelInfo): Boolean = when (this) {
     ModelBackendFilter.ALL -> true
-    ModelBackendFilter.MLX -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_MLX
     ModelBackendFilter.LLAMA_CPP -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
     ModelBackendFilter.QHEXRT -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
     ModelBackendFilter.ONNX -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX
     ModelBackendFilter.SHERPA -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
-    ModelBackendFilter.APPLE -> model.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
-        model.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
 }
 
 enum class ModelGroupFilter(val title: String) {

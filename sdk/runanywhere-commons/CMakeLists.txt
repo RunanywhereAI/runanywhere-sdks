@@ -768,6 +768,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_assignment.cpp
     src/infrastructure/model_management/model_compatibility.cpp
     src/infrastructure/model_management/model_compatibility_proto.cpp
+    src/infrastructure/model_management/platform_capabilities.cpp
     src/infrastructure/model_management/model_registry_fetch_assignments_proto.cpp
     src/infrastructure/model_management/model_format_infer_proto.cpp
     src/infrastructure/model_management/model_info_make_proto.cpp

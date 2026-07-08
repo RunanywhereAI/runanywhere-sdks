@@ -464,6 +464,11 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_inference_framework_from_proto"
     "_rac_framework_raw_value"
 
+    # Platform capability boundary — lets the TS layer probe which inference
+    # frameworks can ever run on this platform (matches the registry-side
+    # list filtering in commons).
+    "_rac_framework_supported_on_platform"
+
     # Model paths — base-dir configuration. Web has no native filesystem root,
     # but the C++ download orchestrator rejects an empty base via
     # `rac_model_paths_get_model_folder`. The TypeScript bridge installs a
