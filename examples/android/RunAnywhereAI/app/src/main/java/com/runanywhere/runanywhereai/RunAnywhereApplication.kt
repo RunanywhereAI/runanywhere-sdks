@@ -82,14 +82,14 @@ class RunAnywhereApplication : Application() {
                 BuildConfig.RUNANYWHERE_BASE_URL.isNotBlank()
         val environment =
             if (hasBackendConfig) {
-                SDKEnvironment.SDK_ENVIRONMENT_STAGING
+                SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
             } else {
                 SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
             }
         RunAnywhere.initialize(
             apiKey = BuildConfig.RUNANYWHERE_API_KEY,
             baseURL = BuildConfig.RUNANYWHERE_BASE_URL,
-            // Use staging only when local.properties provides a real backend
+            // Use production when local.properties provides a real backend
             // config. Empty debug defaults boot in development/offline mode.
             environment = environment,
         )

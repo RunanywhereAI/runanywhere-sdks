@@ -124,18 +124,10 @@ struct RunAnywhereAIApp: App {
     /// Initializes the SDK with either custom credentials (from Settings) or
     /// build-configuration-driven defaults. Release builds without credentials fail loud.
     private func runSDKInitialize() throws {
-        let customApiKey = SettingsViewModel.getStoredApiKey()
-        let customBaseURL = SettingsViewModel.getStoredBaseURL()
-
-        if let apiKey = customApiKey,
-           let baseURL = customBaseURL,
-           !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-           !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-           !looksLikePlaceholder(apiKey),
-           isUsableHTTPURL(baseURL) {
+        if let credentials = storedCredentials() ?? bundledCredentials() {
             try RunAnywhere.initialize(
-                apiKey: apiKey,
-                baseURL: baseURL,
+                apiKey: credentials.apiKey,
+                baseURL: credentials.baseURL,
                 environment: .production
             )
         } else {
@@ -150,9 +142,56 @@ struct RunAnywhereAIApp: App {
         }
     }
 
+    private func storedCredentials() -> (apiKey: String, baseURL: String)? {
+        credentials(
+            apiKey: SettingsViewModel.getStoredApiKey(),
+            baseURL: SettingsViewModel.getStoredBaseURL()
+        )
+    }
+
+    private func bundledCredentials() -> (apiKey: String, baseURL: String)? {
+        if let localSecrets = localSecretsPlist(),
+           let credentials = credentials(
+               apiKey: localSecrets["apiKey"],
+               baseURL: localSecrets["baseURL"]
+           ) {
+            return credentials
+        }
+
+        return credentials(
+            apiKey: Bundle.main.object(forInfoDictionaryKey: "RUNANYWHERE_API_KEY") as? String,
+            baseURL: Bundle.main.object(forInfoDictionaryKey: "RUNANYWHERE_BASE_URL") as? String
+        )
+    }
+
+    private func localSecretsPlist() -> [String: String]? {
+        guard let url = Bundle.main.url(forResource: "RunAnywhereLocalSecrets", withExtension: "plist"),
+              let data = try? Data(contentsOf: url),
+              let object = try? PropertyListSerialization.propertyList(from: data, format: nil),
+              let dictionary = object as? [String: String] else {
+            return nil
+        }
+        return dictionary
+    }
+
+    private func credentials(apiKey: String?, baseURL: String?) -> (apiKey: String, baseURL: String)? {
+        guard let apiKey = sanitizedConfigValue(apiKey),
+              let baseURL = sanitizedConfigValue(baseURL),
+              isUsableHTTPURL(baseURL) else {
+            return nil
+        }
+        return (apiKey, baseURL)
+    }
+
+    private func sanitizedConfigValue(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !trimmed.isEmpty, !looksLikePlaceholder(trimmed) else { return nil }
+        return trimmed
+    }
+
     private func looksLikePlaceholder(_ value: String) -> Bool {
         value.range(
-            of: "YOUR_|<your|REPLACE_ME|PLACEHOLDER",
+            of: "YOUR_|<your|REPLACE_ME|PLACEHOLDER|\\$\\(",
             options: [.regularExpression, .caseInsensitive]
         ) != nil
     }
