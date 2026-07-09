@@ -31,6 +31,7 @@
 #endif
 
 #if RAC_QHEXRT_ROUTABLE
+#include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
@@ -81,6 +82,7 @@ extern const rac_llm_service_ops_t g_qhexrt_llm_ops;
 extern const rac_vlm_service_ops_t g_qhexrt_vlm_ops;
 extern const rac_stt_service_ops_t g_qhexrt_stt_ops;
 extern const rac_tts_service_ops_t g_qhexrt_tts_ops;
+extern const rac_embeddings_service_ops_t g_qhexrt_embeddings_ops;
 
 // Advisory routing metadata (validated at register, NOT used for selection —
 // selection is plain priority order via rac_plugin_find).
@@ -96,6 +98,7 @@ static const rac_primitive_t k_qhexrt_primitives[] = {
     RAC_PRIMITIVE_VLM,
     RAC_PRIMITIVE_TRANSCRIBE,
     RAC_PRIMITIVE_SYNTHESIZE,
+    RAC_PRIMITIVE_EMBED,
 };
 
 static const rac_engine_manifest_t k_qhexrt_manifest = {
@@ -128,7 +131,7 @@ static const rac_engine_vtable_t g_qhexrt_engine_vtable = {
     /* stt_ops          */ &g_qhexrt_stt_ops,
     /* tts_ops          */ &g_qhexrt_tts_ops,
     /* vad_ops          */ nullptr,
-    /* embedding_ops    */ nullptr,
+    /* embedding_ops    */ &g_qhexrt_embeddings_ops,
     /* vlm_ops          */ &g_qhexrt_vlm_ops,
     /* diffusion_ops    */ nullptr,
 
