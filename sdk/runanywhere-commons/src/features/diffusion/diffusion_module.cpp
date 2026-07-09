@@ -773,7 +773,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
                         int32_t negative_prompt_length = 0, int32_t image_width = 0,
                         int32_t image_height = 0, int32_t num_inference_steps = 0,
                         double guidance_scale = 0.0, int64_t seed = 0,
-                        int64_t output_size_bytes = 0) {
+                        int64_t output_size_bytes = 0,
+                        runanywhere::v1::EventDestination destination =
+                            runanywhere::v1::EVENT_DESTINATION_ALL) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -781,7 +783,7 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     event.set_severity(error && error[0] != '\0' ? runanywhere::v1::ERROR_SEVERITY_ERROR
                                                  : runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
-    event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    event.set_destination(destination);
     event.set_source("cpp");
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
@@ -877,8 +879,11 @@ rac_bool_t progress_trampoline(const rac_diffusion_progress_t* progress, void* u
         return RAC_FALSE;
     }
 
+    // Progress is UI-only: at default steps a single generation would otherwise
+    // land ~28 telemetry rows. Started/completed carry the backend record.
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS,
-                       "diffusion.generate", progress->progress, nullptr);
+                       "diffusion.generate", progress->progress, nullptr, 0.0, nullptr, 0, 0, 0, 0,
+                       0, 0.0, 0, 0, runanywhere::v1::EVENT_DESTINATION_PUBLIC);
 
     if (!ctx || !ctx->callback)
         return RAC_TRUE;

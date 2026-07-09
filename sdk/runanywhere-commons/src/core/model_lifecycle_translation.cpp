@@ -23,6 +23,7 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 namespace rac::core::model_lifecycle::detail {
@@ -217,12 +218,12 @@ void populate_event_envelope(runanywhere::v1::SDKEvent* event,
 }
 
 rac_result_t publish_event(const runanywhere::v1::SDKEvent& event) {
-    const size_t size = event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return RAC_ERROR_ENCODING_ERROR;
-    }
-    return rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
+    // Route through the destination router instead of the PUBLIC-only
+    // rac_sdk_event_publish_proto so the envelope's LOG/TELEMETRY bits are
+    // honored. Component-lifecycle/registry arms are still filtered out of
+    // backend telemetry by the extractor (module-level kModel events already
+    // carry load/unload; mapping these too would double-count).
+    return rac::events::publish_prebuilt(event);
 }
 
 std::string json_escape(const std::string& value) {

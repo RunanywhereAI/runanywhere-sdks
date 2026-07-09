@@ -69,6 +69,9 @@ struct rac_telemetry_manager {
     static constexpr size_t BATCH_SIZE_PRODUCTION = 10;  // Flush after 10 events in production
     static constexpr int64_t BATCH_TIMEOUT_MS = 5000;    // Flush after 5 seconds in production
     static constexpr size_t MAX_QUEUE_SIZE = 256;  // Cap while flushes defer (e.g. pre-auth)
+    // Cap the poll-path HTTP queue (drop-oldest) — it was unbounded, so a
+    // platform that never drains (Flutter isolate gone) grew it without limit.
+    static constexpr size_t MAX_HTTP_QUEUE_SIZE = 64;
     int64_t last_flush_time_ms = 0;                // Track last flush time for timeout
 };
 
@@ -665,6 +668,43 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
         }
         case SDKEvent::kFailure:
             return "sdk.error";
+        case SDKEvent::kCancellation: {
+            // Cancel-operation lifecycle (the terminal generation.cancelled row
+            // comes via kGeneration); previously fell to "unknown" and was
+            // silently dropped, making all cancel telemetry invisible.
+            switch (ev.cancellation().kind()) {
+                case runanywhere::v1::CANCELLATION_EVENT_KIND_REQUESTED:
+                    return "cancellation.requested";
+                case runanywhere::v1::CANCELLATION_EVENT_KIND_ACKNOWLEDGED:
+                    return "cancellation.acknowledged";
+                case runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED:
+                    return "cancellation.completed";
+                case runanywhere::v1::CANCELLATION_EVENT_KIND_FAILED:
+                    return "cancellation.failed";
+                default:
+                    return "unknown";
+            }
+        }
+        case SDKEvent::kAuth: {
+            switch (ev.auth().kind()) {
+                case runanywhere::v1::AUTH_EVENT_KIND_REQUESTED:
+                    return "auth.requested";
+                case runanywhere::v1::AUTH_EVENT_KIND_SUCCEEDED:
+                    return "auth.succeeded";
+                case runanywhere::v1::AUTH_EVENT_KIND_FAILED:
+                    return "auth.failed";
+                case runanywhere::v1::AUTH_EVENT_KIND_TOKEN_REFRESHED:
+                    return "auth.token_refreshed";
+                case runanywhere::v1::AUTH_EVENT_KIND_TOKEN_EXPIRED:
+                    return "auth.token_expired";
+                case runanywhere::v1::AUTH_EVENT_KIND_DEVICE_REGISTERED:
+                    return "auth.device_registered";
+                case runanywhere::v1::AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED:
+                    return "auth.device_registration_failed";
+                default:
+                    return "unknown";
+            }
+        }
         default:
             return "unknown";
     }
@@ -757,9 +797,12 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
     payload.event_type = event_type.c_str();
 
     // Oneof arms the translator has no name for (component lifecycle state
-    // transitions, cancellation envelopes, …) must not reach the backend as
-    // literal "unknown" rows — they are public/log events, not analytics.
+    // transitions, …) must not reach the backend as literal "unknown" rows.
+    // Log the drop: a silent return here previously hid whole event classes
+    // (cancellation, auth) for months.
     if (event_type == "unknown") {
+        RAC_LOG_DEBUG("Telemetry", "Dropping telemetry event with unmapped oneof arm (case=%d)",
+                      static_cast<int>(ev.event_case()));
         return RAC_SUCCESS;
     }
 
@@ -1407,6 +1450,13 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
             // by Flutter, whose Dart FFI data callbacks are isolate-bound.
             {
                 std::lock_guard<std::mutex> lock(manager->http_queue_mutex);
+                while (manager->http_queue.size() >=
+                       rac_telemetry_manager::MAX_HTTP_QUEUE_SIZE) {
+                    RAC_LOG_WARNING("Telemetry",
+                                    "HTTP queue full (%zu) — dropping oldest pending batch",
+                                    manager->http_queue.size());
+                    manager->http_queue.pop_front();
+                }
                 manager->http_queue.push_back({endpoint, std::string(json, json_len), true});
             }
             manager->http_wakeup(manager->http_wakeup_user_data);
