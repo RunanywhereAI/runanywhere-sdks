@@ -390,15 +390,37 @@ class NpuModelE2ETest {
     // similar than an unrelated pair, and by a clear margin. Proves the QHexRT embedding op produces
     // a meaningful sentence vector on the NPU end-to-end via RunAnywhere.embeddings.embed.
     private suspend fun runEmbedding(report: RunReport, model: SingleFileModel) {
-        val anchor = "The capital of France is Paris."
-        val paraphrase = "Paris is the capital city of France."
-        val unrelated = "A cat slept quietly on the warm windowsill all afternoon."
         suspend fun vec(t: String): FloatArray {
             val start = System.currentTimeMillis()
             val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.embeddings.embed(t, model.id) }
             report.put("last_embed_ms", System.currentTimeMillis() - start)
             return (r.vectors.firstOrNull()?.values ?: emptyList()).toFloatArray()
         }
+        // SigLIP2 / CLIP-style DUAL-TOWER embedder: zero-shot IMAGE classification through the SAME
+        // embedding API. embed(<image file path>) runs the image tower (the native adapter detects a
+        // readable *.jpg/*.png path), embed(<label text>) the text tower. The image (two cats) must be
+        // MORE similar to its true label than to a distractor — real vision inference, not text-only.
+        if (model.id.contains("siglip")) {
+            val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+            val img = File(ctx.cacheDir, "siglip_img.jpg").apply { writeBytes(testAsset("test.jpg")) }
+            val label = "a photo of two cats"; val distractor = "a photo of a red car"
+            val iv = vec(img.absolutePath); val rel = vec(label); val irr = vec(distractor)
+            val dimOk = iv.isNotEmpty() && rel.size == iv.size && irr.size == iv.size
+            val simRel = if (dimOk) cosine(iv, rel) else 0.0
+            val simIrr = if (dimOk) cosine(iv, irr) else 0.0
+            val ok = dimOk && simRel > simIrr && (simRel - simIrr) >= 0.03
+            report.addSample(JSONObject().put("idx", 0).put("kind", "zeroshot_classify")
+                .put("image", "test.jpg").put("label", label).put("distractor", distractor)
+                .put("dim", iv.size).put("sim_label", round3(simRel)).put("sim_distractor", round3(simIrr))
+                .put("metric", "clip_margin").put("score", round3(simRel - simIrr)).put("pass", ok))
+            report.gate("embed_dim_ok", dimOk)
+            report.gate("clip_zeroshot", ok)
+            report.put("embedding_dim", iv.size)
+            return
+        }
+        val anchor = "The capital of France is Paris."
+        val paraphrase = "Paris is the capital city of France."
+        val unrelated = "A cat slept quietly on the warm windowsill all afternoon."
         val a = vec(anchor)
         val dim = a.size
         // A reranker (e.g. nv_rerankqa) emits a single relevance SCORE (dim<=1), not a sentence vector, so the
