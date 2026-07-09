@@ -220,10 +220,13 @@ rac_result_t rac_streaming_metrics_get_result(rac_streaming_metrics_handle_t han
             output_tokens = 1;
     }
 
-    // Tokens per second
+    // Tokens/sec over decode time only — subtracting TTFT keeps the figure a
+    // generation-speed metric instead of a prefill-diluted average.
     double tokens_per_second = 0.0;
-    if (latency_ms > 0) {
-        tokens_per_second = static_cast<double>(output_tokens) / (latency_ms / 1000.0);
+    const double decode_ms =
+        (ttft_ms > 0.0 && ttft_ms < latency_ms) ? latency_ms - ttft_ms : latency_ms;
+    if (decode_ms > 0) {
+        tokens_per_second = static_cast<double>(output_tokens) / (decode_ms / 1000.0);
     }
 
     // Populate result

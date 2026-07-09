@@ -21,6 +21,8 @@
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
+#include "infrastructure/events/sdk_event_publish.h"
+
 namespace rac::storage {
 namespace {
 
@@ -95,11 +97,11 @@ runanywhere::v1::ErrorSeverity storage_event_severity(rac_result_t error_code, i
 }
 
 void publish_storage_sdk_event(const runanywhere::v1::SDKEvent& event) {
-    std::string bytes;
-    if (!event.SerializeToString(&bytes)) {
-        return;
-    }
-    (void)rac_sdk_event_publish_proto(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+    // Route through the destination router instead of the PUBLIC-only
+    // rac_sdk_event_publish_proto so LOG/TELEMETRY destination bits are
+    // honored (storage-lifecycle arms stay excluded from backend telemetry
+    // by the extractor — they'd be noise rows).
+    (void)rac::events::publish_prebuilt(event);
 }
 
 }  // namespace
