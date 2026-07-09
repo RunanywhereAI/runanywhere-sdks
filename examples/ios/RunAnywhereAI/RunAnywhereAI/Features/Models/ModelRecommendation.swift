@@ -196,11 +196,11 @@ private extension ModelRecommendationEngine.TierPreferences {
             "qwen3-0.6b-q4_k_m"
         ],
         asrIDs: [
-            "mlx-whisper-tiny-en-asr-4bit",
-            "sherpa-onnx-whisper-tiny.en"
+            "sherpa-onnx-whisper-tiny.en",
+            "mlx-qwen3-asr-0.6b-8bit"
         ],
         ttsIDs: [
-            "mlx-kitten-tts-nano-0.8-5bit",
+            "mlx-soprano-1.1-80m-5bit",
             "vits-piper-en_US-lessac-medium"
         ],
         vlmIDs: [
@@ -223,11 +223,10 @@ private extension ModelRecommendationEngine.TierPreferences {
             "qwen3-1.7b-q4_k_m"
         ],
         asrIDs: [
-            "mlx-whisper-tiny-en-asr-4bit",
+            "mlx-qwen3-asr-0.6b-8bit",
             "sherpa-onnx-whisper-tiny.en"
         ],
         ttsIDs: [
-            "mlx-kitten-tts-nano-0.8-5bit",
             "mlx-soprano-1.1-80m-5bit",
             "vits-piper-en_US-lessac-medium"
         ],
@@ -252,11 +251,10 @@ private extension ModelRecommendationEngine.TierPreferences {
             "mlx-qwen3-4b-4bit"
         ],
         asrIDs: [
-            "mlx-whisper-tiny-en-asr-4bit",
+            "mlx-qwen3-asr-0.6b-8bit",
             "sherpa-onnx-whisper-tiny.en"
         ],
         ttsIDs: [
-            "mlx-kitten-tts-nano-0.8-5bit",
             "mlx-soprano-1.1-80m-5bit",
             "vits-piper-en_US-lessac-medium"
         ],

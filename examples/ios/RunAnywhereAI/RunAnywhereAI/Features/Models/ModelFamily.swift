@@ -22,13 +22,12 @@ struct ModelFamily: Identifiable {
     /// Category used for section grouping and iconography (from the primary variant).
     var category: RAModelCategory { variants.first?.category ?? .unspecified }
 
-    /// The cleanest single tag to show on the family row (feel for chat models,
-    /// else the capability), taken from the primary variant.
+    /// The cleanest single tag to show on the family row (capability only —
+    /// feel is implied by the tagline and variant count). Skipped when a
+    /// variant is already installed to avoid crowding the row.
     var headlineTag: ModelCapabilityBadge? {
-        guard let primary = variants.first else { return nil }
-        return primary.category == .language
-            ? primary.consumerTags.first
-            : primary.notableCapabilityBadge
+        guard !hasReadyVariant, let primary = variants.first else { return nil }
+        return primary.consumerCapabilityTags.first ?? primary.notableCapabilityBadge
     }
 
     /// Number of downloadable/usable options in this family.

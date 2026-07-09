@@ -50,9 +50,6 @@ struct ModelFamilyRow: View {
                 Text("\(family.optionCount) option\(family.optionCount == 1 ? "" : "s")")
                     .font(AppTypography.caption2)
                     .foregroundColor(AppColors.textSecondary)
-                Image(systemName: "chevron.right")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary.opacity(0.6))
             }
         }
         .padding(.vertical, AppSpacing.smallMedium)
@@ -116,6 +113,13 @@ struct ModelVariantRow: View {
     let isLoadingModel: Bool
     let handlers: ModelActionHandlers
 
+    /// Tags shown below the metadata row. When a relative feel descriptor is
+    /// present ("Balanced", "Smaller · faster"), skip the feel badge so the
+    /// same signal is not shown twice.
+    private var displayTags: [ModelCapabilityBadge] {
+        feelDescriptor != nil ? variant.consumerCapabilityTags : variant.consumerTags
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: AppSpacing.mediumLarge) {
             VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
@@ -143,9 +147,9 @@ struct ModelVariantRow: View {
                     }
                 }
 
-                if !variant.consumerTags.isEmpty {
+                if !displayTags.isEmpty {
                     HStack(spacing: AppSpacing.xSmall) {
-                        ForEach(variant.consumerTags) { badge in
+                        ForEach(displayTags) { badge in
                             ConsumerBadge(badge: badge)
                         }
                     }

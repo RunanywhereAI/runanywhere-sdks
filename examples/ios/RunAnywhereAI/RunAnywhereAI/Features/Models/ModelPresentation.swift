@@ -614,6 +614,12 @@ extension RAModelInfo {
         return tags
     }
 
+    /// Capability-only tags (excludes the feel badge). Use when the feel is
+    /// already conveyed by a relative descriptor such as "Smaller · faster".
+    var consumerCapabilityTags: [ModelCapabilityBadge] {
+        consumerTags.filter { !$0.id.hasPrefix("feel-") }
+    }
+
     /// Clean, human display name: family + parameter size, with quantization
     /// suffixes (Q4_K_M, Q8_0, 4bit, DWQ, …) and backend/vendor prefixes
     /// stripped. "MLX Qwen3 0.6B 4bit" → "Qwen3 0.6B",

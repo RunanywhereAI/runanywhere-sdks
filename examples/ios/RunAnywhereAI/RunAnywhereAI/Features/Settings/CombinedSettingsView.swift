@@ -1066,10 +1066,6 @@ private struct BenchmarksCard: View {
                             .foregroundColor(AppColors.primaryAccent)
                         Text("Benchmarks")
                         Spacer()
-                        #if !os(macOS)
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(AppColors.textSecondary)
-                        #endif
                     }
                 }
                 .buttonStyle(.plain)

@@ -335,38 +335,11 @@ enum ModelCatalogBootstrap {
         )
 
         // --- STT models (MLX, Apple Metal) -----------------------------------
-        await registerLLM(
-            id: "mlx-whisper-tiny-en-asr-4bit",
-            name: "MLX Whisper Tiny.en ASR 4bit",
-            url: "https://huggingface.co/mlx-community/whisper-tiny.en-asr-4bit",
-            framework: .mlx,
-            modality: .speechRecognition,
-            memoryRequirement: 25_991_239
-        )
-        await registerLLM(
-            id: "mlx-whisper-tiny-asr-4bit",
-            name: "MLX Whisper Tiny ASR 4bit",
-            url: "https://huggingface.co/mlx-community/whisper-tiny-asr-4bit",
-            framework: .mlx,
-            modality: .speechRecognition,
-            memoryRequirement: 26_426_403
-        )
-        await registerLLM(
-            id: "mlx-whisper-base-asr-4bit",
-            name: "MLX Whisper Base ASR 4bit",
-            url: "https://huggingface.co/mlx-community/whisper-base-asr-4bit",
-            framework: .mlx,
-            modality: .speechRecognition,
-            memoryRequirement: 46_622_312
-        )
-        await registerLLM(
-            id: "mlx-whisper-small-asr-5bit",
-            name: "MLX Whisper Small ASR 5bit",
-            url: "https://huggingface.co/mlx-community/whisper-small-asr-5bit",
-            framework: .mlx,
-            modality: .speechRecognition,
-            memoryRequirement: 173_297_821
-        )
+        // Keep the iOS example on the same MLX speech bundles that are proven
+        // to load in the local DevTools CLI. Several repo-style Whisper
+        // bundles previously registered here fail against the current
+        // MLXAudioSTT loader at runtime, so we intentionally do not surface
+        // them in the example catalog.
         await registerMultiFile(
             id: "mlx-qwen3-asr-0.6b-8bit",
             name: "MLX Qwen3-ASR 0.6B 8bit",
@@ -461,30 +434,6 @@ enum ModelCatalogBootstrap {
             modality: .speechRecognition,
             memoryRequirement: 1_288_437_789
         )
-        await registerLLM(
-            id: "mlx-parakeet-ctc-0.6b",
-            name: "MLX Parakeet CTC 0.6B (NVIDIA)",
-            url: "https://huggingface.co/mlx-community/parakeet-ctc-0.6b",
-            framework: .mlx,
-            modality: .speechRecognition,
-            memoryRequirement: 2_435_805_367
-        )
-        await registerLLM(
-            id: "mlx-parakeet-rnnt-0.6b",
-            name: "MLX Parakeet RNNT 0.6B (NVIDIA)",
-            url: "https://huggingface.co/mlx-community/parakeet-rnnt-0.6b",
-            framework: .mlx,
-            modality: .speechRecognition,
-            memoryRequirement: 2_467_370_930
-        )
-        await registerLLM(
-            id: "mlx-parakeet-tdt-0.6b-v3",
-            name: "MLX Parakeet TDT 0.6B v3 (NVIDIA)",
-            url: "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3",
-            framework: .mlx,
-            modality: .speechRecognition,
-            memoryRequirement: 2_509_044_141
-        )
 
         // --- TTS models (Sherpa-ONNX Piper VITS) ------------------------------
         await registerArchive(
@@ -509,22 +458,10 @@ enum ModelCatalogBootstrap {
         )
 
         // --- TTS models (MLX, Apple Metal) -----------------------------------
-        await registerLLM(
-            id: "mlx-kitten-tts-nano-0.8-5bit",
-            name: "MLX Kitten TTS Nano 0.8 5bit",
-            url: "https://huggingface.co/mlx-community/kitten-tts-nano-0.8-5bit",
-            framework: .mlx,
-            modality: .speechSynthesis,
-            memoryRequirement: 34_637_568
-        )
-        await registerLLM(
-            id: "mlx-soprano-80m-4bit",
-            name: "MLX Soprano 80M 4bit",
-            url: "https://huggingface.co/mlx-community/Soprano-80M-4bit",
-            framework: .mlx,
-            modality: .speechSynthesis,
-            memoryRequirement: 60_131_869
-        )
+        // Match the MLX TTS bundles exercised by the local CLI. Repo-style
+        // Kitten/Soprano bundles previously surfaced here are intentionally
+        // omitted because they are not reliable with the current MLXAudioTTS
+        // runtime in this release branch.
         await registerMultiFile(
             id: "mlx-soprano-1.1-80m-5bit",
             name: "MLX Soprano 1.1 80M 5bit",
