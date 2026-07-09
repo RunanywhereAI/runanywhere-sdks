@@ -440,6 +440,9 @@ validate_tool_call(const ToolCallingSession& session, const runanywhere::v1::Too
 }
 
 void run_generate_loop(ToolCallingSession& session) {
+    // One telemetry row per step invocation; inner iterations are PUBLIC-only.
+    rac::llm::tool_calling::ToolLoopTelemetryScope loop_telemetry;
+
     while (session.iteration < session.max_iterations) {
         session.iteration++;
         RAC_LOG_DEBUG(kTag, "iteration %u/%u", session.iteration, session.max_iterations);
@@ -449,7 +452,8 @@ void run_generate_loop(ToolCallingSession& session) {
         rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
             &session.active_ref_mu, &session.active_ref, &session.cancel_requested};
         if (!rac::llm::tool_calling::run_generate_once(
-                session.generation, cancel_binding, session.current_prompt, &response, &rc)) {
+                session.generation, cancel_binding, session.current_prompt, &response, &rc,
+                &loop_telemetry.agg)) {
             // Distinguish cancel from other generate failures.
             // A cancel that landed before or during generate makes the session
             // terminal — emit a cancel error and mark state kCancelled so the

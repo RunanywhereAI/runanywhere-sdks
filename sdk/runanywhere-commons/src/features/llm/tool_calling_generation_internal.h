@@ -88,11 +88,20 @@ inline void set_display_text_and_thinking(runanywhere::v1::ToolCallingResult* re
 }
 #endif
 
-inline void publish_generation_completed_event(const LifecycleLlmRef& ref,
-                                               const rac_llm_result_t& raw) {
+inline void publish_generation_completed_event(
+    const LifecycleLlmRef& ref, const rac_llm_result_t& raw,
+#if defined(RAC_HAVE_PROTOBUF)
+    runanywhere::v1::EventDestination destination = runanywhere::v1::EVENT_DESTINATION_UNSPECIFIED
+#else
+    int destination = 0
+#endif
+) {
 #if defined(RAC_HAVE_PROTOBUF)
     // Tool-calling generate calls still need the canonical LLM telemetry path.
     runanywhere::v1::SDKEvent llm_event;
+    if (destination != runanywhere::v1::EVENT_DESTINATION_UNSPECIFIED) {
+        llm_event.set_destination(destination);
+    }
     auto* gen = llm_event.mutable_generation();
     gen->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED);
     if (ref.model_id != nullptr && ref.model_id[0] != '\0') {
@@ -116,13 +125,70 @@ inline void publish_generation_completed_event(const LifecycleLlmRef& ref,
 #else
     (void)ref;
     (void)raw;
+    (void)destination;
 #endif
 }
+
+// Aggregates the tool-calling loop's inner generations into ONE telemetry row
+// per logical request. Per-iteration completed events go PUBLIC-only (UI parity);
+// without this a single tool-calling request landed N unpaired "completed"
+// telemetry rows — one per loop iteration.
+struct GenerationTelemetryAgg {
+    int64_t input_tokens{0};
+    int64_t output_tokens{0};
+    double tokens_per_second{0.0};
+    int64_t time_to_first_token_ms{0};
+    uint32_t generations{0};
+    std::string model_id;
+};
+
+inline void publish_tool_loop_telemetry(const GenerationTelemetryAgg& agg) {
+#if defined(RAC_HAVE_PROTOBUF)
+    if (agg.generations == 0) {
+        return;
+    }
+    runanywhere::v1::SDKEvent event;
+    // Telemetry-only: the per-iteration PUBLIC events already served consumers.
+    event.set_destination(runanywhere::v1::EVENT_DESTINATION_TELEMETRY);
+    (*event.mutable_properties())["iterations"] = std::to_string(agg.generations);
+    auto* gen = event.mutable_generation();
+    gen->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED);
+    if (!agg.model_id.empty()) {
+        gen->set_model_id(agg.model_id);
+    }
+    if (agg.output_tokens > 0) {
+        gen->set_tokens_count(static_cast<int32_t>(agg.output_tokens));
+        gen->set_tokens_used(static_cast<int32_t>(agg.output_tokens));
+    }
+    if (agg.input_tokens > 0) {
+        gen->set_input_tokens(static_cast<int32_t>(agg.input_tokens));
+    }
+    if (agg.tokens_per_second > 0.0) {
+        gen->set_tokens_per_second(agg.tokens_per_second);
+    }
+    if (agg.time_to_first_token_ms > 0) {
+        gen->set_time_to_first_token_ms(agg.time_to_first_token_ms);
+    }
+    (void)rac::events::publish(event, runanywhere::v1::SDK_COMPONENT_LLM,
+                               runanywhere::v1::EVENT_CATEGORY_LLM);
+#else
+    (void)agg;
+#endif
+}
+
+// Emits the aggregate on every loop exit path (success, tool failure, cancel).
+struct ToolLoopTelemetryScope {
+    GenerationTelemetryAgg agg;
+    ToolLoopTelemetryScope() = default;
+    ToolLoopTelemetryScope(const ToolLoopTelemetryScope&) = delete;
+    ToolLoopTelemetryScope& operator=(const ToolLoopTelemetryScope&) = delete;
+    ~ToolLoopTelemetryScope() { publish_tool_loop_telemetry(agg); }
+};
 
 inline bool run_generate_once(GenerationState& generation,
                               const GenerationCancelBinding& cancel_binding,
                               const std::string& prompt, std::string* out_response,
-                              rac_result_t* out_rc) {
+                              rac_result_t* out_rc, GenerationTelemetryAgg* agg = nullptr) {
     LifecycleLlmRef ref;
     rac_result_t rc = acquire_lifecycle_llm(&ref);
     if (rc != RAC_SUCCESS) {
@@ -194,7 +260,27 @@ inline bool run_generate_once(GenerationState& generation,
     if (out_response) {
         *out_response = raw.text ? raw.text : "";
     }
-    publish_generation_completed_event(ref, raw);
+    if (agg) {
+        agg->generations++;
+        agg->input_tokens += raw.prompt_tokens;
+        agg->output_tokens += raw.completion_tokens;
+        if (agg->generations == 1) {
+            agg->time_to_first_token_ms = raw.time_to_first_token_ms;
+        }
+        if (raw.tokens_per_second > 0.0f) {
+            agg->tokens_per_second = raw.tokens_per_second;
+        }
+        if (agg->model_id.empty() && ref.model_id != nullptr) {
+            agg->model_id = ref.model_id;
+        }
+#if defined(RAC_HAVE_PROTOBUF)
+        publish_generation_completed_event(ref, raw, runanywhere::v1::EVENT_DESTINATION_PUBLIC);
+#else
+        publish_generation_completed_event(ref, raw);
+#endif
+    } else {
+        publish_generation_completed_event(ref, raw);
+    }
 
     rac_llm_result_free(&raw);
     release_lifecycle_llm(&ref);

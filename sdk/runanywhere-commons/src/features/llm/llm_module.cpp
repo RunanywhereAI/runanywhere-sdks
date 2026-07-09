@@ -689,12 +689,12 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     RAC_LOG_INFO("LLM.Component", "Generation completed");
 
     // Emit generation completed event
-    // Use estimated input_tokens for telemetry consistency across platforms
-    // (some backends return actual tokenized count including chat template,
-    // others return 0 - estimation ensures consistent user-facing metrics)
+    // Report the backend's real token counts — out_result falls back to a
+    // chars/4 estimate only when the backend returned 0; an estimate must
+    // never override a real count.
 #if defined(RAC_HAVE_PROTOBUF)
     emit_llm_generation_completed(
-        generation_id.c_str(), model_id, model_name, estimate_tokens(prompt),
+        generation_id.c_str(), model_id, model_name, out_result->prompt_tokens,
         out_result->completion_tokens, static_cast<double>(total_time_ms), tokens_per_second,
         /*is_streaming=*/false, /*time_to_first_token_ms=*/0, component->actual_framework,
         effective_options->temperature, effective_options->max_tokens, context_length);
@@ -1002,11 +1002,15 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         ttft_ms = static_cast<double>(ttft_duration.count());
     }
 
-    // Calculate tokens per second
+    // Tokens/sec over decode time only — including prefill (TTFT) in the
+    // denominator systematically understates generation speed.
     double tokens_per_second = 0.0;
-    if (final_result.total_time_ms > 0) {
-        tokens_per_second = static_cast<double>(final_result.completion_tokens) /
-                            (static_cast<double>(final_result.total_time_ms) / 1000.0);
+    const double decode_ms = (ttft_ms > 0.0 && ttft_ms < static_cast<double>(total_time_ms))
+                                 ? static_cast<double>(total_time_ms) - ttft_ms
+                                 : static_cast<double>(total_time_ms);
+    if (decode_ms > 0.0) {
+        tokens_per_second =
+            static_cast<double>(final_result.completion_tokens) / (decode_ms / 1000.0);
         final_result.tokens_per_second = static_cast<float>(tokens_per_second);
     }
 
@@ -1959,12 +1963,17 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     final_result.set_total_tokens(ctx->prompt_tokens + ctx->token_count);
     const int64_t total_time_ms = now_ms() - ctx->started_ms;
     final_result.set_total_time_ms(total_time_ms);
+    int64_t ttft_ms = 0;
     if (ctx->first_token_ms > 0) {
-        final_result.set_time_to_first_token_ms(ctx->first_token_ms - ctx->started_ms);
+        ttft_ms = ctx->first_token_ms - ctx->started_ms;
+        final_result.set_time_to_first_token_ms(ttft_ms);
     }
-    if (total_time_ms > 0 && ctx->token_count > 0) {
+    // Tokens/sec over decode time only, not prefill-inclusive wall time.
+    const int64_t decode_ms =
+        (ttft_ms > 0 && ttft_ms < total_time_ms) ? total_time_ms - ttft_ms : total_time_ms;
+    if (decode_ms > 0 && ctx->token_count > 0) {
         final_result.set_tokens_per_second(static_cast<float>(
-            static_cast<double>(ctx->token_count) / (static_cast<double>(total_time_ms) / 1000.0)));
+            static_cast<double>(ctx->token_count) / (static_cast<double>(decode_ms) / 1000.0)));
     }
     final_result.set_finish_reason(
         (finish_reason != nullptr) && finish_reason[0] != '\0' ? finish_reason : "stop");
@@ -2213,17 +2222,21 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
             (options.max_tokens > 0 && ctx.token_count >= options.max_tokens) ? "length" : "stop";
         dispatch_terminal_once(&ctx, finish_reason, nullptr);
         const int64_t stream_elapsed = now_ms() - ctx.started_ms;
+        // Tokens/sec over decode time only, not prefill-inclusive wall time.
+        const int64_t stream_ttft =
+            ctx.first_token_ms > ctx.started_ms ? ctx.first_token_ms - ctx.started_ms : 0;
+        const int64_t stream_decode = (stream_ttft > 0 && stream_ttft < stream_elapsed)
+                                          ? stream_elapsed - stream_ttft
+                                          : stream_elapsed;
         publish_generation_event(
             runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED, request.prompt().c_str(),
             nullptr, ctx.response_text.c_str(), nullptr, ref.model_id, ctx.token_count,
             stream_elapsed, ctx.prompt_tokens, ref.framework_name,
-            (ctx.token_count > 0 && stream_elapsed > 0)
-                ? ctx.token_count * 1000.0 / static_cast<double>(stream_elapsed)
+            (ctx.token_count > 0 && stream_decode > 0)
+                ? ctx.token_count * 1000.0 / static_cast<double>(stream_decode)
                 : 0.0,
-            ctx.first_token_ms > ctx.started_ms
-                ? static_cast<double>(ctx.first_token_ms - ctx.started_ms)
-                : 0.0,
-            options.temperature, options.max_tokens, lifecycle_context_length(ref),
+            static_cast<double>(stream_ttft), options.temperature, options.max_tokens,
+            lifecycle_context_length(ref),
             /*is_streaming=*/true);
     }
 

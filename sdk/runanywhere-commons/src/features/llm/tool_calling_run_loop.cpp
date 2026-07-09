@@ -393,6 +393,9 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
     bool is_complete = false;
     std::string final_text;
 
+    // One telemetry row per tool-calling request; inner iterations are PUBLIC-only.
+    rac::llm::tool_calling::ToolLoopTelemetryScope loop_telemetry;
+
     while (iteration < ctx.max_iterations) {
         iteration++;
         RAC_LOG_DEBUG(kTag, "iteration %u/%u", iteration, ctx.max_iterations);
@@ -403,7 +406,8 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
             &cancel_state->active_ref_mu, &cancel_state->active_ref,
             &cancel_state->cancel_requested};
         if (!rac::llm::tool_calling::run_generate_once(
-                ctx.generation, cancel_binding, current_prompt, &response, &rc)) {
+                ctx.generation, cancel_binding, current_prompt, &response, &rc,
+                &loop_telemetry.agg)) {
             // distinguish cancel from other generate
             // failures, mirroring run_generate_loop in tool_calling_session.cpp.
             // A cancel that latched before/during generate surfaces as

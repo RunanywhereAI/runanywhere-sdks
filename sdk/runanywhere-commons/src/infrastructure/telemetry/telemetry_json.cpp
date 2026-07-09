@@ -520,7 +520,11 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         json.add_string_always("device_name", info->device_name);
         json.add_string_always("platform", info->platform);
         json.add_string_always("os_version", info->os_version);
-        json.add_string_always("form_factor", info->form_factor ? info->form_factor : "phone");
+        // Unset stays null — the old fabricated defaults ("phone"/"unknown")
+        // made every desktop and web device register as a phone. Requires the
+        // backend DeviceInfo schema to accept nullable form_factor/gpu_family
+        // (deploy the backend schema change before shipping this).
+        json.add_string_or_null("form_factor", info->form_factor);
         json.add_string_always("architecture", info->architecture);
         json.add_string_always("chip_name", info->chip_name);
 
@@ -532,8 +536,7 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         json.add_bool_always("has_neural_engine", info->has_neural_engine != RAC_FALSE);
         json.add_int_always("neural_engine_cores", info->neural_engine_cores);
 
-        // GPU family with default
-        json.add_string_always("gpu_family", info->gpu_family ? info->gpu_family : "unknown");
+        json.add_string_or_null("gpu_family", info->gpu_family);
 
         // Battery info (may be unavailable - use nullable methods)
         // battery_level is a double (0.0-1.0), negative if unavailable

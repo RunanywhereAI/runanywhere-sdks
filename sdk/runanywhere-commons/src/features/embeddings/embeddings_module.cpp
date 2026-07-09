@@ -600,8 +600,8 @@ rac_result_t rac_embeddings_create_proto(const uint8_t* request_proto_bytes,
         create_result.set_max_tokens(static_cast<int32_t>(info.max_tokens));
     }
 
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED,
-                       "embeddings.create", 1.0f, 0, 0, nullptr);
+    // No event on create: service creation is not an embed request; the
+    // unpaired STARTED here counted as a phantom embedding per create.
     return copy_proto(create_result, out_result);
 #endif
 }
