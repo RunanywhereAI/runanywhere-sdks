@@ -16,6 +16,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.aggregateStream
 import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.downloadModel
+import com.runanywhere.sdk.public.extensions.embeddings
 import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.loadModel
@@ -195,6 +196,7 @@ class NpuModelE2ETest {
                     ModelCategory.MODEL_CATEGORY_MULTIMODAL -> runVlm(report, maxNew, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> runStt(report, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> runTts(report, model, outDir, suite)
+                    ModelCategory.MODEL_CATEGORY_EMBEDDING -> runEmbedding(report, model)
                     else -> throw AssertionError("unsupported NPU modality: ${model.category}")
                 }
 
@@ -383,6 +385,59 @@ class NpuModelE2ETest {
         if (n > 0) report.put("rtf", round2(rtfSum / n)).put("wer", round3(worstWer))
     }
 
+    // ------------------------------------------------------------- EMBEDDING ----
+    // Self-consistent cosine gate (needs no external gold vector): a paraphrase pair must be MORE
+    // similar than an unrelated pair, and by a clear margin. Proves the QHexRT embedding op produces
+    // a meaningful sentence vector on the NPU end-to-end via RunAnywhere.embeddings.embed.
+    private suspend fun runEmbedding(report: RunReport, model: SingleFileModel) {
+        val anchor = "The capital of France is Paris."
+        val paraphrase = "Paris is the capital city of France."
+        val unrelated = "A cat slept quietly on the warm windowsill all afternoon."
+        suspend fun vec(t: String): FloatArray {
+            val start = System.currentTimeMillis()
+            val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.embeddings.embed(t, model.id) }
+            report.put("last_embed_ms", System.currentTimeMillis() - start)
+            return (r.vectors.firstOrNull()?.values ?: emptyList()).toFloatArray()
+        }
+        val a = vec(anchor)
+        val dim = a.size
+        // A reranker (e.g. nv_rerankqa) emits a single relevance SCORE (dim<=1), not a sentence vector, so the
+        // cosine gate does not apply — and the SDK's rerank primitive is retired. Report it ran (produced a
+        // finite scalar on the NPU) instead of a misleading semantic FAIL.
+        if (dim <= 1) {
+            val score = a.firstOrNull()?.toDouble() ?: Double.NaN
+            val ran = a.isNotEmpty() && score.isFinite()
+            report.addSample(JSONObject().put("idx", 0).put("kind", "reranker")
+                .put("anchor", anchor).put("dim", dim).put("rerank_score", round3(score))
+                .put("metric", "reranker_scalar").put("note", "reranker score output; cosine gate N/A (rerank primitive retired)")
+                .put("pass", ran))
+            report.gate("embed_dim_ok", ran)
+            report.gate("reranker_ran", ran)
+            report.put("embedding_dim", dim).put("is_reranker", true)
+            return
+        }
+        val p = vec(paraphrase); val u = vec(unrelated)
+        val dimOk = p.size == dim && u.size == dim
+        val simPara = if (dimOk) cosine(a, p) else 0.0
+        val simUnrel = if (dimOk) cosine(a, u) else 0.0
+        val semanticOk = dimOk && simPara > simUnrel && (simPara - simUnrel) >= NpuRubric.EMBED_MARGIN
+        report.addSample(JSONObject().put("idx", 0)
+            .put("anchor", anchor).put("paraphrase", paraphrase).put("unrelated", unrelated)
+            .put("dim", dim).put("sim_paraphrase", round3(simPara)).put("sim_unrelated", round3(simUnrel))
+            .put("metric", "cosine_margin").put("score", round3(simPara - simUnrel)).put("pass", semanticOk))
+        report.gate("embed_dim_ok", dimOk)
+        report.gate("embed_semantic", semanticOk)
+        report.put("embedding_dim", dim).put("sim_paraphrase", round3(simPara)).put("sim_unrelated", round3(simUnrel))
+    }
+
+    private fun cosine(a: FloatArray, b: FloatArray): Double {
+        var dot = 0.0; var na = 0.0; var nb = 0.0
+        val n = minOf(a.size, b.size)
+        for (i in 0 until n) { dot += a[i] * b[i]; na += (a[i] * a[i]).toDouble(); nb += (b[i] * b[i]).toDouble() }
+        val denom = kotlin.math.sqrt(na) * kotlin.math.sqrt(nb)
+        return if (denom > 0.0) dot / denom else 0.0
+    }
+
     // ---------------------------------------------------------------- TTS ----
     private suspend fun runTts(report: RunReport, model: SingleFileModel, outDir: File?, suite: NpuSuite?) {
         val texts = suite?.cases?.mapNotNull { it.text }?.takeIf { it.isNotEmpty() } ?: ttsTexts
@@ -440,6 +495,7 @@ class NpuModelE2ETest {
             "vlm" -> ModelCategory.MODEL_CATEGORY_MULTIMODAL
             "stt", "asr" -> ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
             "tts" -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+            "embed", "embedding" -> ModelCategory.MODEL_CATEGORY_EMBEDDING
             else -> return null
         }
         // Only the manifest is named; commons + the engine bundle policy resolve the rest of the
@@ -462,6 +518,7 @@ class NpuModelE2ETest {
         ModelCategory.MODEL_CATEGORY_MULTIMODAL -> "vlm"
         ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> "stt"
         ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> "tts"
+        ModelCategory.MODEL_CATEGORY_EMBEDDING -> "embedding"
         else -> category.name.lowercase()
     }
 

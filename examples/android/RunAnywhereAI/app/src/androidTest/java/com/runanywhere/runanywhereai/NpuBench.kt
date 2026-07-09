@@ -21,6 +21,7 @@ object NpuRubric {
     const val TTS_RMS_MIN = 0.005      // TTS output must not be silence
     const val TTS_MIN_SECONDS = 0.30   // TTS must produce real audio
     val TTS_RATES = setOf(16000, 22050, 24000, 44100, 48000)
+    const val EMBED_MARGIN = 0.05      // embedding: cos(paraphrase) must beat cos(unrelated) by this much
 
     /** Exact output sample rates baked into the published bundles (QHexRT TTS docs). */
     fun expectedTtsRate(modelId: String): Int? = when {
