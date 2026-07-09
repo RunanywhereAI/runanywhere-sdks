@@ -32,6 +32,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -130,10 +131,24 @@ class NpuModelE2ETest {
 
         val report = RunReport(model.id, hfRepoOf(model), modalityName(model.category), requestedArch ?: "native-auto")
         report.put("device_model", "${Build.MANUFACTURER} ${Build.MODEL}")
+            .put("request", JSONObject()
+                .put("selection", if (args.getString("modelId").isNullOrBlank()) "ad_hoc" else "catalog")
+                .put("model_id", args.getString("modelId") ?: JSONObject.NULL)
+                .put("hf_repo", args.getString("hfRepo") ?: JSONObject.NULL)
+                .put("manifest", args.getString("manifest") ?: args.getString("files") ?: JSONObject.NULL)
+                .put("arch", requestedArch ?: "native-auto")
+                .put("max_new", maxNew))
+            .put("sdk_source", JSONObject()
+                .put("git_revision", args.getString("sdkGitRevision") ?: JSONObject.NULL)
+                .put("git_dirty", args.getString("sdkGitDirty")?.toBooleanStrictOrNull() ?: JSONObject.NULL)
+                .put("app_version", BuildConfig.VERSION_NAME)
+                .put("app_version_code", BuildConfig.VERSION_CODE))
 
         var phase = "init"
         var line = ""
-        var passed = false
+        var finalStatus = "FAIL"
+        var finalPhase = phase
+        var finalDetail = "run did not complete"
         runBlocking {
             try {
                 awaitSdkReady(180_000)
@@ -191,6 +206,9 @@ class NpuModelE2ETest {
                 phase = "infer"
                 val suite = loadSuite(model.id, expectedArch)
                 report.put("suite", if (suite != null) "npu_suite/v1:${suite.metric}:${suite.cases.size}cases" else "heuristic")
+                    .put("suite_id", suite?.suiteId)
+                    .put("suite_sha256", suite?.sha256)
+                    .gate("canonical_suite", suite != null)
                 when (model.category) {
                     ModelCategory.MODEL_CATEGORY_LANGUAGE -> runLlm(report, suite, maxNew)
                     ModelCategory.MODEL_CATEGORY_MULTIMODAL -> runVlm(report, maxNew, suite)
@@ -204,22 +222,81 @@ class NpuModelE2ETest {
                     .put("peak_pss_mb", round2(NpuMetrics.totalPssKb() / 1024.0))
 
                 phase = "done"
-                passed = report.allGatesPass()
-                line = report.finish(if (passed) "PASS" else "FAIL", phase,
-                    if (passed) "ok" else "gate(s) failed", outDir)
+                finalStatus = if (report.allGatesPass()) "PASS" else "FAIL"
+                finalPhase = phase
+                finalDetail = if (finalStatus == "PASS") "ok" else "gate(s) failed"
             } catch (e: TimeoutCancellationException) {
-                line = report.finish("FAIL", phase, "timeout in $phase", outDir)
+                finalPhase = phase
+                finalDetail = "timeout in $phase"
             } catch (e: AssertionError) {
-                line = report.finish("FAIL", phase, e.message ?: "assertion", outDir)
+                finalPhase = phase
+                finalDetail = e.message ?: "assertion"
             } catch (e: Exception) {
-                line = report.finish("FAIL", phase, "${e.javaClass.simpleName}: ${e.message}", outDir)
+                finalPhase = phase
+                finalDetail = "${e.javaClass.simpleName}: ${e.message}"
             } finally {
-                if (args.getString("keepModel") != "true") runCatching { RunAnywhere.deleteModel(model.id) }   // keep only one bundle on device
+                val keepModel = args.getString("keepModel") == "true"
+                if (keepModel) {
+                    report.put("delete", JSONObject()
+                        .put("requested", false)
+                        .put("success", false)
+                        .put("reason", "keepModel=true"))
+                        .gate("delete_model", false)
+                    finalStatus = "FAIL"
+                    finalPhase = "delete"
+                    finalDetail = appendDetail(finalDetail, "model deletion skipped because keepModel=true")
+                } else {
+                    val deleteStart = System.currentTimeMillis()
+                    try {
+                        val result = RunAnywhere.deleteModel(model.id)
+                        val modelIdDeleted = model.id in result.deleted_model_ids
+                        val deleteOk = result.success && modelIdDeleted && result.failed_model_ids.isEmpty() &&
+                            result.skipped_model_ids.isEmpty() && result.files_deleted &&
+                            result.registry_updated && !result.dry_run
+                        report.put("delete", JSONObject()
+                            .put("requested", true)
+                            .put("success", result.success)
+                            .put("duration_ms", System.currentTimeMillis() - deleteStart)
+                            .put("deleted_bytes", result.deleted_bytes)
+                            .put("deleted_model_ids", JSONArray(result.deleted_model_ids))
+                            .put("failed_model_ids", JSONArray(result.failed_model_ids))
+                            .put("skipped_model_ids", JSONArray(result.skipped_model_ids))
+                            .put("warnings", JSONArray(result.warnings))
+                            .put("files_deleted", result.files_deleted)
+                            .put("registry_updated", result.registry_updated)
+                            .put("dry_run", result.dry_run)
+                            .put("error_message", result.error_message))
+                            .gate("delete_model", deleteOk)
+                        if (!deleteOk) {
+                            finalStatus = "FAIL"
+                            finalPhase = "delete"
+                            val reason = result.error_message.ifBlank {
+                                "delete result did not confirm files + registry cleanup for ${model.id}"
+                            }
+                            finalDetail = appendDetail(finalDetail, reason)
+                        }
+                    } catch (e: Exception) {
+                        report.put("delete", JSONObject()
+                            .put("requested", true)
+                            .put("success", false)
+                            .put("duration_ms", System.currentTimeMillis() - deleteStart)
+                            .put("error_message", "${e.javaClass.simpleName}: ${e.message}"))
+                            .gate("delete_model", false)
+                        finalStatus = "FAIL"
+                        finalPhase = "delete"
+                        finalDetail = appendDetail(finalDetail, "model deletion failed: ${e.javaClass.simpleName}: ${e.message}")
+                    }
+                }
+                if (!report.allGatesPass()) finalStatus = "FAIL"
+                line = report.finish(finalStatus, finalPhase, finalDetail, outDir)
             }
         }
         Log.i(tag, line)
         assertTrue("NPU_E2E FAIL — see the NPU_E2E line / report json ($line)", line.contains("status=PASS"))
     }
+
+    private fun appendDetail(current: String, extra: String): String =
+        if (current == "ok" || current.isBlank()) extra else "$current; $extra"
 
     // ---------------------------------------------------------------- LLM ----
     private suspend fun runLlm(report: RunReport, suite: NpuSuite?, maxNew: Int) {

@@ -5,8 +5,8 @@
 # baseline gate -> delete (the instrumentation test deletes each bundle in a
 # finally block, so only one lives on the device at a time). For each model it
 # captures the compact `NPU_E2E …` logcat line, pulls the rich per-run JSON report
-# (and any TTS wavs), then aggregates everything into a shareable report via
-# scripts/npu_e2e_report.py (which also does the offline-whisper TTS round-trip).
+# (and any TTS wavs), records sanitized source/artifact inputs in `run_inputs.json`,
+# then aggregates via scripts/npu_e2e_report.py (which also does the offline-whisper TTS round-trip).
 #
 # Prereqs (see the QHexRT `android_npu_e2e` skill / BUILD.md): the QHexRT static
 # libs are built + staged, the SDK plugin .so are built + staged into jniLibs,
@@ -27,6 +27,16 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SDK_GIT_REVISION="$(git -C "$APP_ROOT" rev-parse HEAD 2>/dev/null || true)"
+SDK_GIT_DIRTY="unknown"
+if [ -n "$SDK_GIT_REVISION" ]; then
+  if git -C "$APP_ROOT" diff --quiet --ignore-submodules HEAD -- &&
+     [ -z "$(git -C "$APP_ROOT" ls-files --others --exclude-standard)" ]; then
+    SDK_GIT_DIRTY="false"
+  else
+    SDK_GIT_DIRTY="true"
+  fi
+fi
 
 SERIAL="${SERIAL:-}"
 APP_PKG="${APP_PKG:-com.runanywhere.runanywhereai}"
@@ -86,6 +96,96 @@ if [ $BUILD -eq 1 ]; then
   "${ADB[@]}" install -r -g "$TAPK"
 fi
 
+installed_apk_sha256() {
+  local package_name="$1" apk_path
+  apk_path="$("${ADB[@]}" shell pm path "$package_name" 2>/dev/null | tr -d '\r' | sed -n '1s/^package://p')"
+  [ -n "$apk_path" ] || return 0
+  "${ADB[@]}" shell sha256sum "$apk_path" 2>/dev/null | tr -d '\r' | awk '{print $1}'
+}
+INSTALLED_APP_SHA256="$(installed_apk_sha256 "$APP_PKG")"
+INSTALLED_TEST_SHA256="$(installed_apk_sha256 "$TEST_PKG")"
+
+# Sanitized, host-side inputs for provenance. The token itself is never recorded.
+python3 - "$OUT/run_inputs.json" "$APP_ROOT" "$SDK_GIT_REVISION" "$SDK_GIT_DIRTY" \
+  "$ARCH" "$BUILD" "$REPO" "$MODALITY" "$FILES" "$MAX_NEW" \
+  "$([ -n "$HF_TOKEN" ] && printf true || printf false)" "$APP_PKG" "$TEST_PKG" \
+  "$INSTALLED_APP_SHA256" "$INSTALLED_TEST_SHA256" "${MODELS[@]}" <<'PY'
+import hashlib
+import json
+import sys
+import time
+from pathlib import Path
+
+(
+    out, app_root, revision, dirty, arch, build, repo, modality, files, max_new, auth,
+    app_package, test_package, installed_app_sha, installed_test_sha, *models,
+) = sys.argv[1:]
+root = Path(app_root)
+
+
+def sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+artifacts = []
+for relative in (
+    "app/build/outputs/apk/debug/app-debug.apk",
+    "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
+    "libs/runanywhere-sdk.aar",
+    "libs/runanywhere-qhexrt.aar",
+    "scripts/run_npu_e2e.sh",
+    "scripts/npu_e2e_report.py",
+):
+    path = root / relative
+    if path.is_file():
+        artifacts.append({
+            "path": relative,
+            "bytes": path.stat().st_size,
+            "sha256": sha256(path),
+        })
+artifact_hashes = {item["path"]: item["sha256"] for item in artifacts}
+installed_packages = [
+    {
+        "package": app_package,
+        "sha256": installed_app_sha or None,
+        "local_artifact": "app/build/outputs/apk/debug/app-debug.apk",
+        "matches_local": installed_app_sha == artifact_hashes.get("app/build/outputs/apk/debug/app-debug.apk")
+        if installed_app_sha else None,
+    },
+    {
+        "package": test_package,
+        "sha256": installed_test_sha or None,
+        "local_artifact": "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
+        "matches_local": installed_test_sha == artifact_hashes.get(
+            "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+        ) if installed_test_sha else None,
+    },
+]
+payload = {
+    "schema": "npu_e2e_inputs/v1",
+    "generated_unix_ms": int(time.time() * 1000),
+    "sdk_git": {"revision": revision or None, "dirty": None if dirty == "unknown" else dirty == "true"},
+    "request": {
+        "arch": arch,
+        "build_requested": build == "1",
+        "selection": "ad_hoc" if repo else "catalog",
+        "model_ids": models,
+        "hf_repo": repo or None,
+        "modality": modality or None,
+        "manifest_or_files": files or None,
+        "max_new": int(max_new) if max_new else None,
+        "hf_auth_enabled": auth == "true",
+    },
+    "artifacts": artifacts,
+    "installed_packages": installed_packages,
+}
+Path(out).write_text(json.dumps(payload, indent=2) + "\n")
+PY
+
 run_one() { # $1=model-id  $2..=extra `-e k v` pairs
   local id="$1"; shift
   echo "=== $id ==="
@@ -93,6 +193,8 @@ run_one() { # $1=model-id  $2..=extra `-e k v` pairs
   local extra=(-e class "$TEST_CLASS")
   [ -n "$HF_TOKEN" ] && extra+=(-e hfToken "$HF_TOKEN")
   [ -n "$MAX_NEW" ] && extra+=(-e maxNew "$MAX_NEW")
+  [ -n "$SDK_GIT_REVISION" ] && extra+=(-e sdkGitRevision "$SDK_GIT_REVISION")
+  [ "$SDK_GIT_DIRTY" != "unknown" ] && extra+=(-e sdkGitDirty "$SDK_GIT_DIRTY")
   # -w blocks until the test finishes; the NPU_E2E result lands in logcat.
   "${ADB[@]}" shell am instrument -w -r "$@" "${extra[@]}" "$TEST_PKG/$RUNNER" 2>&1 \
     | sed 's/^/  [instr] /' || true
@@ -134,6 +236,6 @@ else
 fi
 
 echo "=== aggregating -> $OUT/summary.md ==="
-python3 "$SCRIPT_DIR/npu_e2e_report.py" "$OUT" || echo "(aggregation skipped: $?)"
+python3 "$SCRIPT_DIR/npu_e2e_report.py" "$OUT"
 echo
-echo "shareable report: $OUT/summary.md  (+ summary.json, per-model npu_e2e_*.json)"
+echo "shareable report: $OUT/summary.md  (+ summary.json, run_inputs.json, per-model npu_e2e_*.json)"

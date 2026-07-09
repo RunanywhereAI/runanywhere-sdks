@@ -4,6 +4,7 @@ import android.os.Debug
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.security.MessageDigest
 import kotlin.math.sqrt
 
 /**
@@ -221,7 +222,11 @@ class SuiteCase(private val o: JSONObject) {
  * audio) so "device-validated" means the same thing on both planes. Absent → the harness falls back to its
  * built-in heuristic cases.
  */
-class NpuSuite(private val o: JSONObject) {
+class NpuSuite(
+    private val o: JSONObject,
+    val suiteId: String,
+    val sha256: String,
+) {
     val modality: String get() = o.optString("modality")
     private val gate: JSONObject get() = o.optJSONObject("gate") ?: JSONObject()
     val metric: String get() = gate.optString("metric")
@@ -235,9 +240,13 @@ class NpuSuite(private val o: JSONObject) {
     companion object {
         /** Load `assets/npu_suites/<modelId>.json` from the TEST apk; null if none shipped for this model. */
         fun load(assets: android.content.res.AssetManager, modelId: String): NpuSuite? = try {
-            assets.open("npu_suites/$modelId.json").use {
-                NpuSuite(JSONObject(String(it.readBytes(), Charsets.UTF_8)))
-            }
+            val raw = assets.open("npu_suites/$modelId.json").use { it.readBytes() }
+            NpuSuite(
+                o = JSONObject(String(raw, Charsets.UTF_8)),
+                suiteId = modelId,
+                sha256 = MessageDigest.getInstance("SHA-256").digest(raw)
+                    .joinToString("") { "%02x".format(it.toInt() and 0xff) },
+            )
         } catch (e: Exception) { null }
     }
 }
