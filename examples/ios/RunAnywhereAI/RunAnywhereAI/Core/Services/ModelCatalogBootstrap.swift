@@ -458,10 +458,9 @@ enum ModelCatalogBootstrap {
         )
 
         // --- TTS models (MLX, Apple Metal) -----------------------------------
-        // Match the MLX TTS bundles exercised by the local CLI. Repo-style
-        // Kitten/Soprano bundles previously surfaced here are intentionally
-        // omitted because they are not reliable with the current MLXAudioTTS
-        // runtime in this release branch.
+        // Match the MLX TTS bundles we verified locally through the DevTools
+        // CLI on macOS. Keep only models that completed a real load/synthesis
+        // pass with the current MLXAudioTTS runtime.
         await registerMultiFile(
             id: "mlx-soprano-1.1-80m-5bit",
             name: "MLX Soprano 1.1 80M 5bit",
@@ -500,20 +499,98 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 82_220_814
         )
         await registerLLM(
-            id: "mlx-pocket-tts-4bit",
-            name: "MLX Pocket TTS 4bit",
-            url: "https://huggingface.co/mlx-community/pocket-tts-4bit",
-            framework: .mlx,
-            modality: .speechSynthesis,
-            memoryRequirement: 89_316_161
-        )
-        await registerLLM(
             id: "mlx-kokoro-82m-6bit",
             name: "MLX Kokoro 82M 6bit",
             url: "https://huggingface.co/mlx-community/Kokoro-82M-6bit",
             framework: .mlx,
             modality: .speechSynthesis,
             memoryRequirement: 309_640_166
+        )
+        await registerMultiFile(
+            id: "mlx-pocket-tts",
+            name: "MLX Pocket TTS",
+            files: [
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/config.json",
+                    filename: "config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/model.safetensors",
+                    filename: "model.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/special_tokens_map.json",
+                    filename: "special_tokens_map.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/tokenizer.json",
+                    filename: "tokenizer.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/tokenizer_config.json",
+                    filename: "tokenizer_config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/alba.safetensors",
+                    filename: "embeddings/alba.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/azelma.safetensors",
+                    filename: "embeddings/azelma.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/cosette.safetensors",
+                    filename: "embeddings/cosette.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/eponine.safetensors",
+                    filename: "embeddings/eponine.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/fantine.safetensors",
+                    filename: "embeddings/fantine.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/javert.safetensors",
+                    filename: "embeddings/javert.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/jean.safetensors",
+                    filename: "embeddings/jean.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/marius.safetensors",
+                    filename: "embeddings/marius.safetensors"
+                )
+            ],
+            framework: .mlx,
+            modality: .speechSynthesis,
+            memoryRequirement: 420_000_000
+        )
+        await registerMultiFile(
+            id: "mlx-kitten-tts-nano-0.8-5bit",
+            name: "MLX Kitten TTS Nano 0.8 5bit",
+            files: [
+                .init(
+                    url: "https://huggingface.co/mlx-community/kitten-tts-nano-0.8-5bit/resolve/main/config.json",
+                    filename: "config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/kitten-tts-nano-0.8-5bit/resolve/main/model.safetensors",
+                    filename: "model.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/kitten-tts-nano-0.8-5bit/resolve/main/model.safetensors.index.json",
+                    filename: "model.safetensors.index.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/kitten-tts-nano-0.8/resolve/1a06939883365626208c9cd832133f36fbc6fe82/voices.safetensors",
+                    filename: "voices.safetensors"
+                )
+            ],
+            framework: .mlx,
+            modality: .speechSynthesis,
+            memoryRequirement: 120_000_000
         )
         await registerLLM(
             id: "mlx-qwen3-tts-12hz-0.6b-base-4bit",
