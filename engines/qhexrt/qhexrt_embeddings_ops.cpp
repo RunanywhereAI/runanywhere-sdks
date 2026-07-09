@@ -17,6 +17,10 @@
 
 #include "qhexrt_session.h"
 
+#include <cstring>
+#include <strings.h>
+#include <unistd.h>
+
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
@@ -46,8 +50,22 @@ rac_result_t embed_one(Session* c, const char* text, rac_embedding_vector_t* out
     qhx_session_reset(c->sess);  // each public embed() call is an independent request
     c->cancel.store(false, std::memory_order_relaxed);
     qhx_inputs in{};
-    in.text = (text != nullptr) ? text : "";
-    in.no_template = 1;  // embedding inputs are raw text, never chat-templated
+    // Multimodal embedders (siglip2): a CLIP-style bundle has BOTH an image tower and a text tower and
+    // returns an L2-normalized vector for either. If the input string is a readable image file path,
+    // embed the IMAGE tower (in.image_path); otherwise embed the TEXT tower. This lets the SAME public
+    // embed()/embed_batch() API do zero-shot image classification: embed(image) vs embed(labels), argmax
+    // cosine — all through the one embedding modality, no new SDK surface. Text embedders are unaffected
+    // (their inputs never end in an image extension / are not real files).
+    const char* t = (text != nullptr) ? text : "";
+    const size_t tl = std::strlen(t);
+    const bool looks_img = (tl > 4 && (strcasecmp(t + tl - 4, ".jpg") == 0 || strcasecmp(t + tl - 4, ".png") == 0)) ||
+                           (tl > 5 && strcasecmp(t + tl - 5, ".jpeg") == 0);
+    if (looks_img && access(t, R_OK) == 0) {
+        in.image_path = t;             // image tower
+    } else {
+        in.text = t;                   // text tower
+        in.no_template = 1;            // embedding inputs are raw text, never chat-templated
+    }
     qhx_gen_cfg cfg;
     qhx_gen_cfg_default(&cfg);
     qhx_output out{};
