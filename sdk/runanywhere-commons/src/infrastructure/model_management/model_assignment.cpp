@@ -1475,9 +1475,17 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
                 // Preserve artifact_info if existing has more specific type
                 if (existing->artifact_info.kind != RAC_ARTIFACT_KIND_SINGLE_FILE &&
                     model->artifact_info.kind == RAC_ARTIFACT_KIND_SINGLE_FILE) {
+                    // Transfer ownership of the heap members to `model` and null
+                    // them on `existing`: `model` outlives this block (copied into
+                    // the cache, freed at the end of the fetch), so a shallow
+                    // alias here + rac_model_info_free(existing) below left
+                    // dangling pointers that were re-freed later — use-after-free
+                    // crash (bionic tagged-pointer SIGABRT) on second launch.
                     model->artifact_info = existing->artifact_info;
-                    // Note: This is a shallow copy — existing must stay alive until
-                    // after rac_model_registry_save deep-copies the data.
+                    existing->artifact_info.expected_files = nullptr;
+                    existing->artifact_info.file_descriptors = nullptr;
+                    existing->artifact_info.file_descriptor_count = 0;
+                    existing->artifact_info.strategy_id = nullptr;
                 }
                 rac_model_registry_save(registry, model);
                 rac_model_info_free(existing);
