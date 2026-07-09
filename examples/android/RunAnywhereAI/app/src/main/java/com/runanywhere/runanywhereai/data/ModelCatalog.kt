@@ -72,7 +72,10 @@ internal object ModelCatalog {
         SingleFileModel("nemotron_ocr", "Nemotron OCR (HNPU)", "https://huggingface.co/runanywhere/nemotron_ocr_HNPU", QHEXRT, MULTIMODAL, 121_193_004L),
         SingleFileModel("nemotron_ocr_v1", "Nemotron OCR v1 (HNPU)", "https://huggingface.co/runanywhere/nemotron_ocr_v1_HNPU", QHEXRT, MULTIMODAL, 121_406_323L),
         SingleFileModel("nemotron_parse", "Nemotron Parse (HNPU)", "https://huggingface.co/runanywhere/nemotron_parse_HNPU", QHEXRT, MULTIMODAL, 1_995_206_253L),
-        SingleFileModel("siglip2_base", "SigLIP2 Base (HNPU)", "https://huggingface.co/runanywhere/siglip2_base_HNPU", QHEXRT, VISION, 789_101_244L),
+        // SigLIP2 is a CLIP-style dual-tower embedder — routed as EMBEDDING so the app exercises it via the
+        // real embeddings.embed() API: embed(image path) uses the vision tower, embed(label) the text tower,
+        // and the harness does zero-shot classification (image closer to its true label than a distractor).
+        SingleFileModel("siglip2_base", "SigLIP2 Base (HNPU)", "https://huggingface.co/runanywhere/siglip2_base_HNPU", QHEXRT, EMBEDDING, 789_101_244L),
         SingleFileModel("whisper_base", "Whisper Base (HNPU)", "https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json", QHEXRT, STT, 221_522_616L),
         SingleFileModel("whisper_small", "Whisper Small (HNPU)", "https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json", QHEXRT, STT, 676_713_240L),
         SingleFileModel("moonshine_tiny", "Moonshine Tiny (HNPU)", "https://huggingface.co/runanywhere/moonshine_tiny_HNPU/moonshine-tiny.json", QHEXRT, STT, 84_569_427L),
