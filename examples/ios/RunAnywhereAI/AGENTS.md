@@ -42,7 +42,141 @@ idevicesyslog | grep "com.runanywhere"
 ```
 
 ### App Store Release
-See `docs/RELEASE_INSTRUCTIONS.md`. Key step: after building, run `./scripts/patch-framework-plist.sh` to fix `MinimumOSVersion` in ONNX Runtime / RACommons XCFrameworks before archiving.
+See `docs/RELEASE_INSTRUCTIONS.md` for the full App Store flow. Key step:
+after building, run `./scripts/patch-framework-plist.sh` to fix
+`MinimumOSVersion` in ONNX Runtime / RACommons XCFrameworks before archiving.
+
+#### Required Native Symbol Release Gate
+
+Before uploading any iOS archive to TestFlight/App Store Connect, verify the
+archive still exports every Swift-facing native ABI symbol. This protects
+against Release stripping or stale XCFrameworks causing runtime startup errors
+such as:
+
+```text
+Native proto ABI is not exported by the linked RACommons binary: rac_sdk_init_phase1_proto
+```
+
+Release archives must preserve the RunAnywhere native ABI export surface:
+
+- `RunAnywhereExportedSymbols.txt` must contain `_rac_*` and `_ra_mlx_*`.
+- The Release app target must link with `-all_load`.
+- The Release app target must pass
+  `-Wl,-exported_symbols_list,$(SRCROOT)/RunAnywhereExportedSymbols.txt`.
+- The Release app target must use `STRIP_STYLE = non-global` so `dlsym` can
+  still find the required symbols after archive post-processing.
+- `RunAnywhereExportedSymbols.txt` must not be bundled into the app resources.
+
+From `examples/ios/RunAnywhereAI/`, use this release flow:
+
+```bash
+# 1. Build once so DerivedData and SPM binary artifacts are populated.
+xcodebuild \
+  -project RunAnywhereAI.xcodeproj \
+  -scheme RunAnywhereAI \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -skipPackagePluginValidation \
+  -jobs "$(sysctl -n hw.logicalcpu)" \
+  build
+
+# 2. Patch framework plists before archiving. Do not clean after this step.
+./scripts/patch-framework-plist.sh
+
+# 3. Archive directly into Xcode Organizer's archive folder.
+ARCHIVE_DIR="$HOME/Library/Developer/Xcode/Archives/$(date +%Y-%m-%d)"
+ARCHIVE="$ARCHIVE_DIR/RunAnywhereAI-$(date +%Y%m%d-%H%M%S).xcarchive"
+mkdir -p "$ARCHIVE_DIR"
+xcodebuild \
+  -project RunAnywhereAI.xcodeproj \
+  -scheme RunAnywhereAI \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -archivePath "$ARCHIVE" \
+  -allowProvisioningUpdates \
+  -skipPackagePluginValidation \
+  -jobs "$(sysctl -n hw.logicalcpu)" \
+  archive
+
+# 4. Open the archive in Xcode Organizer.
+open -a Xcode "$ARCHIVE"
+```
+
+After archiving, run the native symbol audit against the archived app binary:
+
+```bash
+APP="$ARCHIVE/Products/Applications/RunAnywhereAI.app"
+BIN="$APP/RunAnywhereAI"
+
+nm -gjU "$BIN" 2>/dev/null \
+  | rg '^_(rac|ra_mlx)_' \
+  | sed 's/^_//' \
+  | sort -u > /tmp/runanywhere_archive_exported_symbols.txt
+
+SRC_DIRS=(
+  ../../../sdk/runanywhere-swift/Sources/RunAnywhere
+  ../../../sdk/runanywhere-swift/Sources/LlamaCPPRuntime
+  ../../../sdk/runanywhere-swift/Sources/ONNXRuntime
+  ../../../sdk/runanywhere-swift/Sources/MLXRuntime
+)
+
+rg -No '"(rac|ra_mlx)_[A-Za-z0-9_]+"' "${SRC_DIRS[@]}" --glob '*.swift' \
+  | perl -ne 'while (/"((?:rac|ra_mlx)_[A-Za-z0-9_]+)"/g) { print "$1\n" }' \
+  | sort -u > /tmp/runanywhere_expected_swift_native_symbols.from_strings
+
+{
+  cat /tmp/runanywhere_expected_swift_native_symbols.from_strings
+  printf '%s\n' \
+    rac_proto_buffer_free \
+    rac_backend_llamacpp_register \
+    rac_backend_llamacpp_unregister \
+    rac_backend_onnx_register \
+    rac_backend_onnx_unregister \
+    rac_plugin_entry_sherpa \
+    rac_plugin_register \
+    rac_plugin_unregister \
+    rac_backend_mlx_register \
+    rac_backend_mlx_unregister \
+    rac_mlx_set_callbacks \
+    ra_mlx_register_runtime \
+    ra_mlx_runtime_is_available \
+    ra_mlx_runtime_is_registered \
+    ra_mlx_unregister_runtime
+} | sort -u > /tmp/runanywhere_expected_swift_native_symbols.txt
+
+comm -23 \
+  /tmp/runanywhere_expected_swift_native_symbols.txt \
+  /tmp/runanywhere_archive_exported_symbols.txt \
+  > /tmp/runanywhere_missing_swift_native_symbols.txt
+
+test ! -s /tmp/runanywhere_missing_swift_native_symbols.txt
+```
+
+The final `test` command must pass. If it fails, inspect
+`/tmp/runanywhere_missing_swift_native_symbols.txt`, rebuild the native
+XCFrameworks, fix the Release linker/strip settings, and archive again before
+uploading.
+
+Also verify release configuration and secrets presence without printing secret
+values:
+
+```bash
+test -f "$APP/RunAnywhereLocalSecrets.plist"
+test -f "$APP/RunAnywhereConfig-Release.plist"
+test ! -e "$APP/RunAnywhereExportedSymbols.txt"
+```
+
+Upload from Xcode Organizer via **Validate App** then **Distribute App > App
+Store Connect > Upload**. If exporting from the command line, use the
+repository's App Store Connect export options plist when present:
+
+```bash
+xcodebuild -exportArchive \
+  -archivePath "$ARCHIVE" \
+  -exportPath "../../../build/archives/$(basename "$ARCHIVE" .xcarchive)-export" \
+  -exportOptionsPlist "../../../build/archives/ExportOptions-app-store-connect.plist" \
+  -allowProvisioningUpdates
+```
 
 ---
 
