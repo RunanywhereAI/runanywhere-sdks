@@ -86,7 +86,8 @@ if(RAC_PLATFORM_ANDROID AND EXISTS "${QHEXRT_CORE_LIB}" AND EXISTS "${QHEXRT_HOS
         qhexrt_llm_ops.cpp
         qhexrt_vlm_ops.cpp
         qhexrt_stt_ops.cpp
-        qhexrt_tts_ops.cpp)
+        qhexrt_tts_ops.cpp
+        qhexrt_embeddings_ops.cpp)
     list(APPEND QHEXRT_INCLUDE_DIRS "${QHEXRT_ROOT}/include")
     list(APPEND QHEXRT_COMPILE_DEFS RAC_QHEXRT_ENGINE_AVAILABLE=1)
 
