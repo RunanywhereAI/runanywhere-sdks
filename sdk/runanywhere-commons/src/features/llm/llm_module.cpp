@@ -2456,7 +2456,13 @@ rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_by
     const char* thinking = nullptr;
     size_t thinking_len = 0;
     const char* raw_text = raw.text ? raw.text : "";
-    (void)rac_llm_extract_thinking(raw_text, &response, &response_len, &thinking, &thinking_len);
+    std::string thinking_open_tag;
+    std::string thinking_close_tag;
+    thinking_tags_from_request_or_model(request, ref, &thinking_open_tag, &thinking_close_tag);
+    (void)rac_llm_extract_thinking_with_tags(
+        raw_text, thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
+        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
+        &response_len, &thinking, &thinking_len);
 
     int32_t thinking_tokens = 0;
     int32_t response_tokens = raw.completion_tokens;
