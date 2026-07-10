@@ -367,7 +367,7 @@ class NpuModelE2ETest {
                     ModelCategory.MODEL_CATEGORY_MULTIMODAL -> runVlm(report, maxNew, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> runStt(report, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> runTts(report, model, outDir, suite)
-                    ModelCategory.MODEL_CATEGORY_EMBEDDING -> runEmbedding(report, model)
+                    ModelCategory.MODEL_CATEGORY_EMBEDDING -> runEmbedding(report, model, suite)
                     ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION -> runInpaint(report, model, suite, outDir)
                     else -> throw AssertionError("unsupported NPU modality: ${model.category}")
                 }
@@ -786,12 +786,104 @@ class NpuModelE2ETest {
     // Self-consistent cosine gate (needs no external gold vector): a paraphrase pair must be MORE
     // similar than an unrelated pair, and by a clear margin. Proves the QHexRT embedding op produces
     // a meaningful sentence vector on the NPU end-to-end via RunAnywhere.embeddings.embed.
-    private suspend fun runEmbedding(report: RunReport, model: SingleFileModel) {
+    private suspend fun runEmbedding(report: RunReport, model: SingleFileModel, suite: NpuSuite?) {
+        var embedCalls = 0
+        var embedMsTotal = 0L
         suspend fun vec(t: String): FloatArray {
             val start = System.currentTimeMillis()
             val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.embeddings.embed(t, model.id) }
-            report.put("last_embed_ms", System.currentTimeMillis() - start)
+            val elapsed = System.currentTimeMillis() - start
+            embedCalls++
+            embedMsTotal += elapsed
+            report.put("last_embed_ms", elapsed)
             return (r.vectors.firstOrNull()?.values ?: emptyList()).toFloatArray()
+        }
+        val retrievalCases = suite?.cases?.filter {
+            it.query != null && it.positive != null && it.negative != null
+        }.orEmpty()
+        if (retrievalCases.isNotEmpty()) {
+            require(suite != null && suite.metric == "embedding_retrieval_ranking") {
+                "embedding retrieval cases require metric=embedding_retrieval_ranking"
+            }
+            val allInputs = retrievalCases.flatMap {
+                listOf(requireNotNull(it.query), requireNotNull(it.positive), requireNotNull(it.negative))
+            }
+            val distinctInputCount = allInputs.distinct().size
+            val queryPrefixOk = suite.queryPrefix.isNotBlank() && retrievalCases.all {
+                requireNotNull(it.query).startsWith(suite.queryPrefix)
+            }
+            val documentPrefixOk = suite.documentPrefix.isNotBlank() && retrievalCases.all {
+                requireNotNull(it.positive).startsWith(suite.documentPrefix) &&
+                    requireNotNull(it.negative).startsWith(suite.documentPrefix)
+            }
+            report.gate("embed_min_inputs", distinctInputCount >= suite.minInputs)
+                .gate("embed_min_triples", retrievalCases.size >= suite.minTriples)
+                .gate("embed_query_prefix_exact", queryPrefixOk)
+                .gate("embed_document_prefix_exact", documentPrefixOk)
+
+            var expectedDim = suite.expectedDimension
+            var dimensionOk = true
+            var normalized = true
+            var passed = 0
+            var minimumMargin = Double.POSITIVE_INFINITY
+            for ((index, case) in retrievalCases.withIndex()) {
+                val query = requireNotNull(case.query)
+                val positive = requireNotNull(case.positive)
+                val negative = requireNotNull(case.negative)
+                val q = vec(query)
+                val p = vec(positive)
+                val n = vec(negative)
+                if (expectedDim <= 0) expectedDim = q.size
+                val caseDimensionOk =
+                    q.size == expectedDim && p.size == expectedDim && n.size == expectedDim
+                dimensionOk = dimensionOk && caseDimensionOk
+                fun norm(v: FloatArray): Double = kotlin.math.sqrt(v.sumOf { it.toDouble() * it })
+                val qNorm = norm(q)
+                val pNorm = norm(p)
+                val nNorm = norm(n)
+                val caseNormalized =
+                    qNorm in suite.l2NormMin..suite.l2NormMax &&
+                        pNorm in suite.l2NormMin..suite.l2NormMax &&
+                        nNorm in suite.l2NormMin..suite.l2NormMax
+                normalized = normalized && caseNormalized
+                val positiveCosine = if (caseDimensionOk) cosine(q, p) else 0.0
+                val negativeCosine = if (caseDimensionOk) cosine(q, n) else 0.0
+                val margin = positiveCosine - negativeCosine
+                minimumMargin = minOf(minimumMargin, margin)
+                val casePass = caseDimensionOk && margin > suite.minimumPairwiseMargin
+                if (casePass) passed++
+                report.addSample(
+                    JSONObject()
+                        .put("idx", index)
+                        .put("id", case.id)
+                        .put("kind", "retrieval_triple")
+                        .put("query", query)
+                        .put("positive", positive)
+                        .put("negative", negative)
+                        .put("dim", q.size)
+                        .put("query_l2", round6(qNorm))
+                        .put("positive_l2", round6(pNorm))
+                        .put("negative_l2", round6(nNorm))
+                        .put("positive_cosine", round6(positiveCosine))
+                        .put("negative_cosine", round6(negativeCosine))
+                        .put("margin", round6(margin))
+                        .put("metric", "positive_greater_than_negative")
+                        .put("pass", casePass),
+                )
+            }
+            val passFraction = passed.toDouble() / retrievalCases.size
+            report.gate("embed_dim_ok", dimensionOk)
+                .gate("embed_l2_normalized", normalized)
+                .gate("embed_retrieval_ranking", passFraction >= suite.passFrac - 1e-9)
+                .put("embedding_dim", expectedDim)
+                .put("embed_inputs", distinctInputCount)
+                .put("embed_triples", retrievalCases.size)
+                .put("embed_triples_passed", passed)
+                .put("suite_pass_frac", round6(passFraction))
+                .put("retrieval_min_margin", round6(minimumMargin))
+                .put("embed_ms_total", embedMsTotal)
+                .put("embed_ms_avg", round2(embedMsTotal.toDouble() / maxOf(embedCalls, 1)))
+            return
         }
         // SigLIP2 / CLIP-style DUAL-TOWER embedder: zero-shot IMAGE classification through the SAME
         // embedding API. embed(<image file path>) runs the image tower (the native adapter detects a
@@ -950,8 +1042,17 @@ class NpuModelE2ETest {
         require(expectedSuite.manifestSha256.matches(Regex("[0-9a-f]{64}"))) {
             "suite does not pin a manifest SHA-256"
         }
-        require(expectedSuite.contextSha256.matches(Regex("[0-9a-f]{64}"))) {
-            "suite does not pin a context SHA-256"
+        val expectedContexts = expectedSuite.contextSha256s
+        require(expectedContexts.isNotEmpty() && expectedContexts.all { it.matches(Regex("[0-9a-f]{64}")) }) {
+            "suite does not pin valid context SHA-256 values"
+        }
+        val expectedArtifacts = expectedSuite.artifactSha256s
+        require(expectedArtifacts.all { (path, digest) ->
+            path.isNotBlank() && !path.startsWith('/') &&
+                path.split('/').none { it.isBlank() || it == "." || it == ".." } &&
+                digest.matches(Regex("[0-9a-f]{64}"))
+        }) {
+            "suite contains invalid artifact SHA-256 metadata"
         }
 
         val root = rawRoot?.let { File(it).canonicalFile }
@@ -992,7 +1093,10 @@ class NpuModelE2ETest {
             )
         require(computedTree == expectedTree) { "local bundle tree SHA-256 mismatch" }
         val exactManifest = files.any { it.sha256 == expectedSuite.manifestSha256 }
-        val exactContext = files.any { it.sha256 == expectedSuite.contextSha256 }
+        val exactContexts = expectedContexts.all { digest -> files.any { it.sha256 == digest } }
+        val exactArtifacts = expectedArtifacts.all { (path, digest) ->
+            files.any { it.relativePath == path && it.sha256 == digest }
+        }
         val mode = if (root != null) "local_adb_import" else "local_loopback_download"
         if (root != null) require(verifyBundleFiles(root, files) == computedTree) {
             "local bundle files do not match the index"
@@ -1009,6 +1113,11 @@ class NpuModelE2ETest {
                 .put("tree_sha256", computedTree)
                 .put("manifest_sha256", expectedSuite.manifestSha256)
                 .put("context_sha256", expectedSuite.contextSha256)
+                .put("context_sha256s", JSONArray(expectedContexts))
+                .put(
+                    "artifact_sha256s",
+                    JSONObject().also { expectedArtifacts.forEach { (path, digest) -> it.put(path, digest) } },
+                )
                 .put("policy_sha256", expectedSuite.policySha256)
                 .put(
                     "files",
@@ -1024,10 +1133,13 @@ class NpuModelE2ETest {
                     },
                 ),
         ).gate("local_bundle_manifest_exact", exactManifest)
-            .gate("local_bundle_context_exact", exactContext)
+            .gate("local_bundle_context_exact", exactContexts)
+            .gate("local_bundle_contexts_exact", exactContexts)
+            .gate("local_bundle_artifacts_exact", exactArtifacts)
             .gate("local_bundle_tree_exact", true)
         require(exactManifest) { "local bundle does not contain the suite-pinned manifest" }
-        require(exactContext) { "local bundle does not contain the suite-pinned context" }
+        require(exactContexts) { "local bundle does not contain every suite-pinned context" }
+        require(exactArtifacts) { "local bundle does not match every suite-pinned artifact" }
         return LocalBundle(mode, root, rawBaseUrl, computedTree, files)
     }
 

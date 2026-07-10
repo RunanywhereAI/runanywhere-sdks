@@ -400,7 +400,8 @@ class RunReport(
         for (k in listOf("framework", "soc_model", "download_s", "load_ms",
                 "decode_toks", "ttft_ms", "tokens_per_s", "rtf", "wer",
                 "sample_rate", "peak_rss_mb", "vision_ms", "inpaint_ms",
-                "full_psnr_db", "hole_psnr_db", "seam_psnr_db")) {
+                "full_psnr_db", "hole_psnr_db", "seam_psnr_db", "embed_inputs",
+                "embed_ms_avg", "embedding_dim", "retrieval_min_margin")) {
             if (root.has(k)) sb.append(" $k=${root.get(k)}")
         }
         sb.append(" gates=$gates detail=\"${detail.replace('\n', ' ').take(160)}\"")
@@ -413,6 +414,9 @@ class SuiteCase(private val o: JSONObject) {
     private val input = o.optJSONObject("input") ?: JSONObject()
     val id: String get() = o.optString("id")
     val text: String? get() = input.optString("text").ifBlank { null }
+    val query: String? get() = input.optString("query").ifBlank { null }
+    val positive: String? get() = input.optString("positive").ifBlank { null }
+    val negative: String? get() = input.optString("negative").ifBlank { null }
     val wavAsset: String? get() = input.optString("wav_asset").ifBlank { null }
     val imageAsset: String? get() = input.optString("image_asset").ifBlank { null }
     val maskAsset: String? get() = input.optString("mask_asset").ifBlank { null }
@@ -449,11 +453,34 @@ class NpuSuite(
     val policySha256: String get() = selectedProfile.optString("policy_sha256")
     val manifestSha256: String get() = selectedProfile.optString("manifest_sha256")
     val contextSha256: String get() = selectedProfile.optString("context_sha256")
+    val contextSha256s: List<String>
+        get() = selectedProfile.optJSONArray("context_sha256s")
+            ?.let { a -> (0 until a.length()).map { a.getString(it) } }
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOfNotNull(contextSha256.takeIf { it.isNotBlank() })
+    val artifactSha256s: Map<String, String>
+        get() {
+            val values = selectedProfile.optJSONObject("artifact_sha256s") ?: return emptyMap()
+            val result = linkedMapOf<String, String>()
+            val keys = values.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                result[key] = values.getString(key)
+            }
+            return result
+        }
     val metric: String get() = gate.optString("metric")
     val editTol: Double get() = gate.optDouble("edit_tol", NpuRubric.EDIT_TOL)
     val werMax: Double get() = gate.optDouble("wer_max", NpuRubric.WER_MAX)
     val passFrac: Double get() = gate.optDouble("suite_pass_frac", 0.60)
     val minInputs: Int get() = gate.optInt("min_inputs", 1)
+    val minTriples: Int get() = gate.optInt("min_triples", 1)
+    val expectedDimension: Int get() = gate.optInt("expected_dimension", 0)
+    val minimumPairwiseMargin: Double get() = gate.optDouble("minimum_pairwise_margin", 0.0)
+    val l2NormMin: Double get() = gate.optDouble("l2_norm_min", 0.99)
+    val l2NormMax: Double get() = gate.optDouble("l2_norm_max", 1.01)
+    val queryPrefix: String get() = gate.optString("query_prefix")
+    val documentPrefix: String get() = gate.optString("document_prefix")
     val maxNew: Int get() = gate.optInt("max_new", 0)
     val fullCosineMin: Double get() = gate.optDouble(
         "minimum_full_cosine",
