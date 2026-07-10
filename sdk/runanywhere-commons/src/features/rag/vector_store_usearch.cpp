@@ -163,7 +163,11 @@ class VectorStoreUSearch::Impl {
         RAC_LOG_INFO(LOG_TAG, "USearch returned %zu matches from %zu total vectors", matches.size(),
                      index_.size());
 
-        float effective_threshold = threshold;
+        // Only apply an absolute cosine floor when the caller explicitly asks
+        // for a positive one. threshold <= 0 = accept-all, ranked by score:
+        // all-MiniLM scores are low/near-zero even for relevant chunks, so a
+        // positive floor silently drops real matches.
+        const bool apply_floor = threshold > 0.0f;
         if (threshold > 0.5f) {
             LOGW(
                 "Similarity threshold %.2f is high — dense embeddings (e.g. all-MiniLM) rarely "
@@ -182,7 +186,7 @@ class VectorStoreUSearch::Impl {
             // USearch cosine distance is 1 - cosine_similarity
             float similarity = 1.0f - distance;
 
-            if (similarity < effective_threshold) {
+            if (apply_floor && similarity < threshold) {
                 continue;
             }
 

@@ -203,6 +203,8 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->category = RAC_MODEL_CATEGORY_AUDIO;
         else if (category == "multimodal")
             model->category = RAC_MODEL_CATEGORY_MULTIMODAL;
+        else if (category == "embedding" || category == "embeddings")
+            model->category = RAC_MODEL_CATEGORY_EMBEDDING;
         else
             model->category = RAC_MODEL_CATEGORY_LANGUAGE;
 
@@ -1468,18 +1470,39 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
                     model->format = existing->format;
                     RAC_LOG_DEBUG(LOG_CAT, "Preserved local format for model: %s", model->id);
                 }
+                // Preserve a specialized local category over the assignment's
+                // LANGUAGE fallback. The backend payload has no embedding category
+                // and defaults unknown categories to LANGUAGE, which would drop a
+                // locally-seeded embedding model from the embedding picker.
+                if (existing->category == RAC_MODEL_CATEGORY_EMBEDDING &&
+                    model->category == RAC_MODEL_CATEGORY_LANGUAGE) {
+                    model->category = existing->category;
+                    RAC_LOG_DEBUG(LOG_CAT, "Preserved local embedding category for model: %s",
+                                  model->id);
+                }
                 // Preserve local_path if existing has one and new doesn't
                 if (existing->local_path && !model->local_path) {
                     model->local_path = strdup(existing->local_path);
                 }
-                // Preserve artifact_info if existing has more specific type
+                // Preserve artifact_info if existing has more specific type.
+                // Borrow existing's richer artifact_info ONLY across the save
+                // (which deep-copies into the registry), then restore model's own
+                // pointers. Assigning existing's struct is a shallow copy that
+                // shares heap pointers; if left in place, freeing `existing`
+                // below would leave `model` with dangling artifact_info that gets
+                // copied into the cache (use-after-free) and freed again later
+                // (double-free) -> SIGABRT.
+                rac_model_artifact_info_t model_own_artifact = model->artifact_info;
+                bool borrowed_artifact = false;
                 if (existing->artifact_info.kind != RAC_ARTIFACT_KIND_SINGLE_FILE &&
                     model->artifact_info.kind == RAC_ARTIFACT_KIND_SINGLE_FILE) {
                     model->artifact_info = existing->artifact_info;
-                    // Note: This is a shallow copy — existing must stay alive until
-                    // after rac_model_registry_save deep-copies the data.
+                    borrowed_artifact = true;
                 }
                 rac_model_registry_save(registry, model);
+                if (borrowed_artifact) {
+                    model->artifact_info = model_own_artifact;
+                }
                 rac_model_info_free(existing);
             } else {
                 rac_model_registry_save(registry, model);

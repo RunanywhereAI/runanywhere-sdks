@@ -205,7 +205,6 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
     const BM25Index* bm25 = inputs.bm25_index;
     const size_t embed_dim = inputs.embedding_dimension;
     const size_t top_k = inputs.top_k;
-    const float sim_thresh = inputs.similarity_threshold;
     const size_t max_ctx_tokens = inputs.max_context_tokens;
     const std::string prompt_tmpl = inputs.prompt_template;
     rac_llm_options_t llm_options = inputs.llm_options;
@@ -238,7 +237,12 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
 
     std::vector<SearchResult> results;
     try {
-        auto dense_results = vstore->search(query_embedding, top_k, sim_thresh);
+        // Candidate gathering must not apply an absolute cosine floor: all-MiniLM
+        // scores are low/near-zero even for relevant chunks, so any floor drops
+        // real matches (a multi-chunk doc then retrieves nothing -> "no info").
+        // Gather top_k and let fusion/rerank select; the configured
+        // similarity_threshold is intentionally ignored for gathering.
+        auto dense_results = vstore->search(query_embedding, top_k, 0.0f);
         std::vector<std::pair<std::string, float>> bm25_results;
         if (bm25) {
             bm25_results = bm25->search(question, top_k);
