@@ -11,14 +11,12 @@
 #include "rac/infrastructure/network/rac_endpoints.h"
 
 const char* rac_endpoint_device_registration(rac_environment_t env) {
-    switch (env) {
-        case RAC_ENV_DEVELOPMENT:
-            return RAC_ENDPOINT_DEV_DEVICE_REGISTER;
-        case RAC_ENV_STAGING:
-        case RAC_ENV_PRODUCTION:
-        default:
-            return RAC_ENDPOINT_DEVICE_REGISTER;
-    }
+    // Development used to target a Supabase PostgREST path (/rest/v1/sdk_devices)
+    // that doesn't exist on the FastAPI backend — every dev registration 404'd
+    // silently, leaving "Unknown" placeholder devices and registration.failed
+    // telemetry with no error code. All environments use the real endpoint now.
+    (void)env;
+    return RAC_ENDPOINT_DEVICE_REGISTER;
 }
 
 const char* rac_endpoint_model_assignments(void) {
