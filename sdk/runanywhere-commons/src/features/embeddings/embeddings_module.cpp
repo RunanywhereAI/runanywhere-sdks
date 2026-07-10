@@ -378,7 +378,7 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
                         float progress, int64_t input_count, int64_t output_count,
                         const char* error, double duration_ms = 0.0,
                         int64_t embedding_dimension = 0, const char* model_id = nullptr,
-                        const char* framework = nullptr) {
+                        const char* framework = nullptr, int64_t total_tokens = 0) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -418,6 +418,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     if (embedding_dimension > 0) {
         (*event.mutable_properties())["embedding_dimension"] =
             std::to_string(embedding_dimension);
+    }
+    if (total_tokens > 0) {
+        (*event.mutable_properties())["total_tokens"] = std::to_string(total_tokens);
     }
     publish_event(event);
 }
@@ -528,10 +531,16 @@ rac_result_t rac_embeddings_embed_batch_proto(rac_handle_t handle,
         proto.mutable_vectors(i)->set_text(texts[static_cast<size_t>(i)]);
     }
     rc = copy_proto(proto, out_result);
+    // total_tokens is a chars/4 estimate over the embedded texts.
+    int64_t batch_token_estimate = 0;
+    for (const auto& t : texts) {
+        batch_token_estimate += static_cast<int64_t>((t.size() + 3) / 4);
+    }
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED,
                        "embeddings.embedBatch", 1.0f, static_cast<int64_t>(texts.size()),
                        proto.vectors_size(), nullptr,
-                       static_cast<double>(result.processing_time_ms));
+                       static_cast<double>(result.processing_time_ms), 0, nullptr, nullptr,
+                       batch_token_estimate);
     rac_embeddings_result_free(&result);
     return rc;
 #endif
@@ -695,12 +704,18 @@ rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_p
     }
     result.set_model_id(ref.model_id ? ref.model_id : "");
     result.set_request_id(request.request_id());
+    // total_tokens is a chars/4 estimate over the embedded texts (no tokenizer
+    // on this path).
+    int64_t embed_token_estimate = 0;
+    for (const auto& t : texts) {
+        embed_token_estimate += static_cast<int64_t>((t.size() + 3) / 4);
+    }
     publish_capability(
         runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED, "embeddings.embed",
         1.0f, static_cast<int64_t>(texts.size()), static_cast<int64_t>(result.vectors_size()),
         nullptr, static_cast<double>(now_ms() - embed_start_ms),
         raw.num_embeddings > 0 ? static_cast<int64_t>(raw.embeddings[0].dimension) : 0, ref.model_id,
-        ref.framework_name);
+        ref.framework_name, embed_token_estimate);
     rc = copy_proto(result, out_result);
     rac_embeddings_result_free(&raw);
     rac::lifecycle::release_lifecycle_embeddings(&ref);

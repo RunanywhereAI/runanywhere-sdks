@@ -93,7 +93,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
                         float progress, int64_t input_count, int64_t output_count,
                         const char* error, double duration_ms = 0.0,
                         const char* model_id = nullptr, int64_t top_k = 0,
-                        double retrieval_time_ms = 0.0, const char* embedding_model = nullptr) {
+                        double retrieval_time_ms = 0.0, const char* embedding_model = nullptr,
+                        int32_t query_token_count = 0, int32_t context_tokens = 0,
+                        int reranker_used = -1) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -132,6 +134,16 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     if (embedding_model != nullptr && embedding_model[0] != '\0') {
         (*event.mutable_properties())["embedding_model"] = embedding_model;
     }
+    if (query_token_count > 0) {
+        (*event.mutable_properties())["query_token_count"] = std::to_string(query_token_count);
+    }
+    if (context_tokens > 0) {
+        (*event.mutable_properties())["context_tokens"] = std::to_string(context_tokens);
+    }
+    // -1 = unknown (omitted); 0/1 = explicit.
+    if (reranker_used >= 0) {
+        (*event.mutable_properties())["reranker_used"] = reranker_used ? "true" : "false";
+    }
     publish_event(event);
 }
 
@@ -139,6 +151,12 @@ void publish_failure(rac_result_t code, const char* operation, const char* messa
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED, operation, 0.0f,
                        0, 0, message && message[0] ? message : rac_error_message(code));
     (void)rac_sdk_event_publish_failure(code, message, "rag", operation, RAC_TRUE);
+}
+
+// ~4 chars per token, mirroring the LLM module's estimator. 0 stays 0 so
+// unknown/empty inputs are omitted rather than reported as 1 token.
+int32_t estimate_tokens_from_chars(size_t chars) {
+    return chars == 0 ? 0 : static_cast<int32_t>((chars + 3) / 4);
 }
 
 // ---------------------------------------------------------------------------
@@ -688,11 +706,23 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     proto.set_total_time_ms(static_cast<int64_t>(total_ms));
 
     rac_result_t rc = copy_proto(proto, out_result);
+    // Estimated token counts (chars/4): the retrieval path has no tokenizer.
+    // Context prefers the actual prompt context string; falls back to the sum
+    // of retrieved chunk texts. reranker_used=0: no reranker is wired into
+    // run_rag_query yet — false is the honest value, not unknown.
+    size_t context_chars = proto.context_used().size();
+    if (context_chars == 0) {
+        for (const auto& chunk : proto.retrieved_chunks()) {
+            context_chars += chunk.text().size();
+        }
+    }
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED,
                        "rag.query", 1.0f, 1, proto.retrieved_chunks_size(), nullptr, total_ms,
                        s->llm_model_id.empty() ? s->embedding_model_id.c_str()
                                                : s->llm_model_id.c_str(),
-                       query_proto.top_k(), retrieval_ms, s->embedding_model_id.c_str());
+                       query_proto.top_k(), retrieval_ms, s->embedding_model_id.c_str(),
+                       estimate_tokens_from_chars(question.size()),
+                       estimate_tokens_from_chars(context_chars), /*reranker_used=*/0);
     rac_llm_result_free(&llm_result);
     return rc;
 #endif
