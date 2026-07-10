@@ -1180,6 +1180,21 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     if (em_it != ev.properties().end() && !em_it->second.empty()) {
                         payload.embedding_model = em_it->second.c_str();
                     }
+                    auto qt_it = ev.properties().find("query_token_count");
+                    if (qt_it != ev.properties().end()) {
+                        payload.query_token_count =
+                            static_cast<int32_t>(std::atoi(qt_it->second.c_str()));
+                    }
+                    auto ct_it = ev.properties().find("context_tokens");
+                    if (ct_it != ev.properties().end()) {
+                        payload.context_tokens =
+                            static_cast<int32_t>(std::atoi(ct_it->second.c_str()));
+                    }
+                    auto rr_it = ev.properties().find("reranker_used");
+                    if (rr_it != ev.properties().end()) {
+                        payload.reranker_used = rr_it->second == "true" ? RAC_TRUE : RAC_FALSE;
+                        payload.has_reranker_used = RAC_TRUE;
+                    }
                     break;
                 }
                 case runanywhere::v1::SDK_COMPONENT_EMBEDDINGS: {
@@ -1192,6 +1207,12 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     if (dim_it != ev.properties().end()) {
                         payload.embedding_dimension =
                             static_cast<int32_t>(std::atoi(dim_it->second.c_str()));
+                    }
+                    // total embedded tokens (chars/4 estimate from the module).
+                    auto tt_it = ev.properties().find("total_tokens");
+                    if (tt_it != ev.properties().end()) {
+                        payload.total_tokens =
+                            static_cast<int32_t>(std::atoi(tt_it->second.c_str()));
                     }
                     break;
                 }

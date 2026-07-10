@@ -123,6 +123,10 @@ typedef struct rac_telemetry_payload {
     int32_t top_k;
     double retrieval_time_ms;
     const char* embedding_model;  // RAG embedding model (string → dup'd/freed)
+    int32_t query_token_count;    // estimated tokens in the query (via carrier)
+    int32_t context_tokens;       // estimated tokens in the retrieved context (via carrier)
+    rac_bool_t reranker_used;     // via carrier; gated on has_reranker_used
+    rac_bool_t has_reranker_used;
 
     // LoRA-specific fields. Strings → must be dup'd/freed in track + payload_free.
     const char* adapter_id;
