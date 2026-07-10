@@ -10,14 +10,14 @@ devices triggers a Metal debug assertion failure:
   -[MTLDebugDevice newResidencySetWithDescriptor:error:]:2785:
   failed assertion 'device does not support residency sets.'
 
-Fix: also check [device supportsFamily:MTLGPUFamilyApple7] when
+Fix: also check [device supportsFamily:MTLGPUFamilyApple6] when
 initializing the use_residency_sets flag in the device properties, so
 the entire residency set code path is skipped on unsupported GPUs.
 (There is no `-[MTLDevice supportsResidencySets]` API; supportsFamily:
 is the real, documented way to query GPU-family-gated capabilities and
-is already used a few lines below for supports_gpu_family_apple7.)
+is the real runtime capability check for this GPU-family-gated feature.)
 
-Residency sets require Apple GPU family 7+ (A14+).
+Residency sets require Apple GPU family 6+ (A13+).
 
 Fixes: https://github.com/RunanywhereAI/runanywhere-sdks/issues/480
 ---
@@ -36,10 +36,10 @@ index 0000000..0000001 100644
 +            dev->props.use_residency_sets = false;
  #if defined(GGML_METAL_HAS_RESIDENCY_SETS)
 -            dev->props.use_residency_sets = getenv("GGML_METAL_NO_RESIDENCY") == nil;
-+            if ([dev->mtl_device supportsFamily:MTLGPUFamilyApple7]) {
++            if ([dev->mtl_device supportsFamily:MTLGPUFamilyApple6]) {
 +                dev->props.use_residency_sets = getenv("GGML_METAL_NO_RESIDENCY") == nil;
 +            }
-+            // else: device GPU does not support residency sets (A12/A13), leave as false
++            // else: device GPU does not support residency sets (A12 and older), leave as false
  #endif
  
              dev->props.use_shared_buffers = dev->props.has_unified_memory;
