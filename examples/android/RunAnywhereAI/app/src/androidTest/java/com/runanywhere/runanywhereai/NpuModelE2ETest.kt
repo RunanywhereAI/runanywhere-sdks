@@ -2,7 +2,13 @@ package com.runanywhere.runanywhereai
 
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelFileDescriptor
+import ai.runanywhere.proto.v1.ModelImportRequest
+import ai.runanywhere.proto.v1.ModelSource
+import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.ThinkingTagPattern
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -19,13 +25,17 @@ import com.runanywhere.sdk.public.extensions.downloadModel
 import com.runanywhere.sdk.public.extensions.embeddings
 import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.extensions.generateStream
+import com.runanywhere.sdk.public.extensions.inpaint
+import com.runanywhere.sdk.public.extensions.importModel
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.extensions.registerModel
 import com.runanywhere.sdk.public.extensions.synthesize
 import com.runanywhere.sdk.public.extensions.transcribe
+import com.runanywhere.sdk.public.extensions.unloadModel
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RAModelLoadResult
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.TimeoutCancellationException
@@ -39,6 +49,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.security.MessageDigest
 
 /**
  * On-device end-to-end **benchmark + parity gate** for one NPU (QHexRT) model,
@@ -48,7 +59,7 @@ import java.io.File
  *     anything the SDK does not surface (load ms, peak RSS/PSS, RTF, tok/s);
  *  2. compares the output to a baseline with the same rubric forge holds every model
  *     to (ASR WER<=0.05, LLM answer+coherence, TTS exact sample-rate + non-silence,
- *     VLM keyword) — see [NpuBench.kt];
+ *     VLM keyword, inpaint PSNR + unmasked preservation) — see [NpuBench.kt];
  *  3. asserts the NPU actually served it (loaded framework == QHEXRT, arch match).
  *
  * A rich JSON report lands in the app external-files dir (adb-pullable) plus a compact
@@ -57,7 +68,7 @@ import java.io.File
  *
  * Selection (instrumentation args, `-e key value`):
      *   -e modelId <catalog-id>                          a row from ModelCatalog.npuCatalog
- *   OR -e hfRepo <org/repo> -e arch <v81> -e modality <llm|vlm|stt|tts> -e manifest <m.json>
+     *   OR -e hfRepo <org/repo> -e arch <v81> -e modality <llm|vlm|stt|tts|inpaint> -e manifest <m.json>
  *      (legacy: -e files "m.json,..." — only the first name, the manifest, is used)
  *   -e hfToken <hf_...>   download private runanywhere/<name>_HNPU repos (never committed/logged)
  *   -e maxNew <n>         override LLM/VLM max new tokens (default 48)
@@ -111,6 +122,20 @@ class NpuModelE2ETest {
         VlmCase("test.jpg", "Describe this image.", listOf("cat", "cats", "kitten")),
     )
 
+    private data class LocalBundleFile(
+        val relativePath: String,
+        val bytes: Long,
+        val sha256: String,
+    )
+
+    private data class LocalBundle(
+        val mode: String,
+        val root: File?,
+        val baseUrl: String?,
+        val treeSha256: String,
+        val files: List<LocalBundleFile>,
+    )
+
     @Test
     fun runOne() {
         val args = InstrumentationRegistry.getArguments()
@@ -126,13 +151,24 @@ class NpuModelE2ETest {
         val (model, requestedArch) = selection
         val maxNew = args.getString("maxNew")?.toIntOrNull() ?: 48
         val hfToken = args.getString("hfToken")?.takeIf { it.isNotBlank() }
+        val localBundleRequested =
+            !args.getString("localBundlePath").isNullOrBlank() ||
+                !args.getString("localDownloadBaseUrl").isNullOrBlank()
         val outDir = InstrumentationRegistry.getInstrumentation().targetContext
             .getExternalFilesDir(null)?.let { File(it, "npu_e2e") }
 
         val report = RunReport(model.id, hfRepoOf(model), modalityName(model.category), requestedArch ?: "native-auto")
         report.put("device_model", "${Build.MANUFACTURER} ${Build.MODEL}")
             .put("request", JSONObject()
-                .put("selection", if (args.getString("modelId").isNullOrBlank()) "ad_hoc" else "catalog")
+                .put(
+                    "selection",
+                    when {
+                        !args.getString("localDownloadBaseUrl").isNullOrBlank() -> "local_loopback_download"
+                        localBundleRequested -> "local_adb_import"
+                        args.getString("modelId").isNullOrBlank() -> "ad_hoc"
+                        else -> "catalog"
+                    },
+                )
                 .put("model_id", args.getString("modelId") ?: JSONObject.NULL)
                 .put("hf_repo", args.getString("hfRepo") ?: JSONObject.NULL)
                 .put("manifest", args.getString("manifest") ?: args.getString("files") ?: JSONObject.NULL)
@@ -168,37 +204,154 @@ class NpuModelE2ETest {
                     throw AssertionError("arch mismatch: requested=$expectedArch device=${npu.arch_name} (context binaries are arch-pinned)")
                 }
 
+                if (localBundleRequested && hfToken != null) {
+                    throw AssertionError("local bundle mode must not receive an HF token")
+                }
                 if (hfToken != null) RunAnywhere.setHfToken(hfToken)   // private repos; never logged/committed
 
+                val acquisitionSuite = loadSuite(model.id, expectedArch)
+                val localBundle = validateLocalBundle(args, acquisitionSuite, report)
+
                 phase = "register"
-                val registered = register(model)
+                val registered =
+                    if (localBundle != null) {
+                        RunAnywhere.registerModel(
+                            multiFile = localBundle.files.map { it.toDescriptor(model.id, localBundle) },
+                            id = model.id,
+                            name = model.name,
+                            framework = model.framework,
+                            modality = model.category,
+                            source =
+                                if (localBundle.mode == "local_adb_import") {
+                                    ModelSource.MODEL_SOURCE_LOCAL
+                                } else {
+                                    ModelSource.MODEL_SOURCE_REMOTE
+                                },
+                        )
+                    } else {
+                        register(model)
+                    }
 
-                // ---- download (unbounded on time; size drives it) + real transfer metrics ----
-                phase = "download"
-                val dlStart = System.currentTimeMillis()
-                var lastLog = 0
-                var seen = 0L
-                var bps = 0f
-                val dl = RunAnywhere.downloadModel(registered) { p ->
-                    seen = maxOf(seen, p.bytes_downloaded)
-                    if (p.overall_speed_bps > 0f) bps = p.overall_speed_bps
-                    val pct = ((if (p.overall_progress > 0f) p.overall_progress else p.stage_progress) * 100).toInt()
-                    if (pct >= lastLog + 20) { lastLog = pct; Log.i(tag, "${model.id} download $pct%") }
+                if (localBundle?.mode == "local_adb_import") {
+                    val localRoot = requireNotNull(localBundle.root)
+                    phase = "local_import"
+                    val importStart = System.currentTimeMillis()
+                    val imported =
+                        RunAnywhere.importModel(
+                            ModelImportRequest(
+                                model = registered.copy(source = ModelSource.MODEL_SOURCE_LOCAL),
+                                source_path = localRoot.absolutePath,
+                                overwrite_existing = true,
+                                files = localBundle.files.map { it.toDescriptor(model.id, localBundle, true) },
+                            ),
+                        )
+                    val importOk =
+                        imported.success && imported.registered &&
+                            imported.local_path == localRoot.absolutePath
+                    report.put("acquisition_ms", System.currentTimeMillis() - importStart)
+                        .put("local_bundle_mb", round2(localBundle.files.sumOf { it.bytes } / 1e6))
+                        .put("hf_download_exercised", false)
+                        .put(
+                            "local_import",
+                            JSONObject()
+                                .put("success", imported.success)
+                                .put("registered", imported.registered)
+                                .put("copied_into_managed_storage", imported.copied_into_managed_storage)
+                                .put("imported_bytes", imported.imported_bytes)
+                                .put("warnings", JSONArray(imported.warnings))
+                                .put("error_message", imported.error_message),
+                        )
+                        .gate("local_import_registered", importOk)
+                    if (!importOk) {
+                        throw AssertionError(imported.error_message.ifBlank { "local model import failed" })
+                    }
+                } else {
+                    // ---- download (unbounded on time; size drives it) + real transfer metrics ----
+                    phase = "download"
+                    val dlStart = System.currentTimeMillis()
+                    var lastLog = 0
+                    var seen = 0L
+                    var bps = 0f
+                    val dl = RunAnywhere.downloadModel(registered) { p ->
+                        seen = maxOf(seen, p.bytes_downloaded)
+                        if (p.overall_speed_bps > 0f) bps = p.overall_speed_bps
+                        val pct = ((if (p.overall_progress > 0f) p.overall_progress else p.stage_progress) * 100).toInt()
+                        if (pct >= lastLog + 20) { lastLog = pct; Log.i(tag, "${model.id} download $pct%") }
+                    }
+                    val dlMs = System.currentTimeMillis() - dlStart
+                    val totBytes = maxOf(dl.total_bytes, dl.bytes_downloaded, seen)
+                    report.put("download_s", dlMs / 1000).put("download_ms", dlMs)
+                        .put("download_mb", round2(totBytes / 1e6))
+                        .put("download_mbps", round2((if (dl.overall_speed_bps > 0f) dl.overall_speed_bps else bps) / 1e6))
+                        .put("public_download_model_exercised", true)
+                        .put("hf_download_exercised", localBundle == null)
+                    if (localBundle?.mode == "local_loopback_download") {
+                        val downloadedRoot = File(dl.local_path).canonicalFile
+                        val downloadedTree = verifyBundleFiles(downloadedRoot, localBundle)
+                        val downloadOk =
+                            dl.local_path.isNotBlank() && downloadedTree == localBundle.treeSha256 &&
+                                totBytes >= localBundle.files.sumOf { it.bytes }
+                        report.put("downloaded_bundle_tree_sha256", downloadedTree)
+                            .put("download_local_path", dl.local_path)
+                            .gate("local_download_completed", downloadOk)
+                        require(downloadOk) { "loopback download did not produce the exact managed bundle" }
+                    }
                 }
-                val dlMs = System.currentTimeMillis() - dlStart
-                val totBytes = maxOf(dl.total_bytes, dl.bytes_downloaded, seen)
-                report.put("download_s", dlMs / 1000).put("download_ms", dlMs)
-                    .put("download_mb", round2(totBytes / 1e6))
-                    .put("download_mbps", round2((if (dl.overall_speed_bps > 0f) dl.overall_speed_bps else bps) / 1e6))
 
-                // ---- load (SDK returns a timestamp, not a duration -> we time it) ----
-                phase = "load"
-                val loadStart = System.currentTimeMillis()
-                val load = withTimeout(LOAD_TIMEOUT_MS) { RunAnywhere.loadModel(RAModelLoadRequest(model_id = model.id)) }
-                report.put("load_ms", System.currentTimeMillis() - loadStart)
-                if (!load.success) throw AssertionError(load.error_message.ifBlank { "load success=false" })
-                report.put("framework", load.framework.name)
-                    .gate("framework_qhexrt", load.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT)
+                // ---- repeated load/unload stability; leave the final cycle loaded for inference ----
+                val lifecycleCycles = args.getString("lifecycleCycles")?.toIntOrNull() ?: 1
+                require(lifecycleCycles in 1..3) { "lifecycleCycles must be between 1 and 3" }
+                val cycleReport = JSONArray()
+                var load: RAModelLoadResult? = null
+                var lifecycleStable = true
+                repeat(lifecycleCycles) { cycle ->
+                    phase = "load_${cycle + 1}"
+                    val loadStart = System.currentTimeMillis()
+                    val candidate =
+                        withTimeout(LOAD_TIMEOUT_MS) {
+                            RunAnywhere.loadModel(RAModelLoadRequest(model_id = model.id))
+                        }
+                    val loadMs = System.currentTimeMillis() - loadStart
+                    val row =
+                        JSONObject()
+                            .put("cycle", cycle + 1)
+                            .put("load_ms", loadMs)
+                            .put("load_success", candidate.success)
+                            .put("framework", candidate.framework.name)
+                    lifecycleStable =
+                        lifecycleStable && candidate.success &&
+                            candidate.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
+                    if (!candidate.success) {
+                        throw AssertionError(candidate.error_message.ifBlank { "load cycle ${cycle + 1} failed" })
+                    }
+                    load = candidate
+                    if (cycle + 1 < lifecycleCycles) {
+                        phase = "unload_${cycle + 1}"
+                        val unload =
+                            RunAnywhere.unloadModel(
+                                ModelUnloadRequest(
+                                    model_id = model.id,
+                                    category = model.category,
+                                    framework = model.framework,
+                                ),
+                            )
+                        val unloadOk = unload.success && model.id in unload.unloaded_model_ids
+                        row.put("unload_success", unload.success)
+                            .put("unloaded_model_ids", JSONArray(unload.unloaded_model_ids))
+                            .put("unload_error", unload.error_message)
+                        lifecycleStable = lifecycleStable && unloadOk
+                        require(unloadOk) {
+                            unload.error_message.ifBlank { "unload cycle ${cycle + 1} failed" }
+                        }
+                    }
+                    cycleReport.put(row)
+                }
+                val loaded = requireNotNull(load)
+                report.put("load_ms", cycleReport.getJSONObject(cycleReport.length() - 1).getLong("load_ms"))
+                    .put("load_cycles", cycleReport)
+                    .gate("repeated_load_stability", lifecycleStable)
+                report.put("framework", loaded.framework.name)
+                    .gate("framework_qhexrt", loaded.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT)
 
                 // ---- inference suite (multiple inputs) + full benchmark + parity ----
                 // Prefer the canonical npu_suite/v1 (the SAME cases + gold forge/goal_npu uses, synced into
@@ -215,6 +368,7 @@ class NpuModelE2ETest {
                     ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> runStt(report, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> runTts(report, model, outDir, suite)
                     ModelCategory.MODEL_CATEGORY_EMBEDDING -> runEmbedding(report, model)
+                    ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION -> runInpaint(report, model, suite, outDir)
                     else -> throw AssertionError("unsupported NPU modality: ${model.category}")
                 }
 
@@ -433,6 +587,172 @@ class NpuModelE2ETest {
         }
     }
 
+    // ------------------------------------------------------------ INPAINT ----
+    private suspend fun runInpaint(
+        report: RunReport,
+        model: SingleFileModel,
+        suite: NpuSuite?,
+        outDir: File?,
+    ) {
+        requireNotNull(suite) { "inpaint requires a canonical npu_suite/v1 baseline" }
+        val cases =
+            suite.cases.filter {
+                it.imageAsset != null && it.maskAsset != null && it.referenceImageAsset != null
+            }
+        require(cases.isNotEmpty()) { "inpaint suite has no image+mask+reference cases" }
+        require(cases.size >= suite.minInputs) {
+            "inpaint suite has ${cases.size} cases, requires at least ${suite.minInputs}"
+        }
+        report.gate("inpaint_min_inputs", cases.size >= suite.minInputs)
+        report.put("parity_metric", "inpaint_forge_parity+passthrough_detection")
+
+        var passed = 0
+        var totalLatencyMs = 0.0
+        var minimumFullCosine = Double.POSITIVE_INFINITY
+        var minimumHoleCosine = Double.POSITIVE_INFINITY
+        var maximumHoleRelativeL2 = 0.0
+        var minimumFullPsnr = Double.POSITIVE_INFINITY
+        var minimumHolePsnr = Double.POSITIVE_INFINITY
+        var minimumSeamPsnr = Double.POSITIVE_INFINITY
+        var maximumUnmaskedMae = 0.0
+        var maximumUnmaskedP99 = 0.0
+        var minimumUnmaskedWithinOne = Double.POSITIVE_INFINITY
+        var minimumHoleChanged = Double.POSITIVE_INFINITY
+        var measuredCases = 0
+        for ((index, case) in cases.withIndex()) {
+            val expectedWidth = case.expectedWidth.takeIf { it > 0 } ?: 512
+            val expectedHeight = case.expectedHeight.takeIf { it > 0 } ?: 512
+            val imageBytes = testAsset(case.imageAsset!!)
+            val maskBytes = testAsset(case.maskAsset!!)
+            val referenceBytes = testAsset(case.referenceImageAsset!!)
+            val started = System.currentTimeMillis()
+            val result =
+                withTimeout(INFER_TIMEOUT_MS) {
+                    RunAnywhere.inpaint(
+                        inputImage = imageBytes,
+                        maskImage = maskBytes,
+                        prompt = case.text ?: "Remove the masked region.",
+                        width = expectedWidth,
+                        height = expectedHeight,
+                    )
+                }
+            val wallMs = (System.currentTimeMillis() - started).toDouble()
+            val latencyMs = result.total_time_ms.takeIf { it > 0 }?.toDouble() ?: wallMs
+            totalLatencyMs += latencyMs
+            val rgba = result.image_data.toByteArray()
+            val shapeOk =
+                result.width == expectedWidth && result.height == expectedHeight &&
+                    rgba.size == expectedWidth * expectedHeight * 4
+            val mediaOk = result.image_media_type == "image/raw-rgba"
+            if (!shapeOk || !mediaOk) {
+                report.addSample(
+                    JSONObject()
+                        .put("idx", index)
+                        .put("id", case.id)
+                        .put("output", "${result.width}x${result.height}:${rgba.size}bytes")
+                        .put("image_media_type", result.image_media_type ?: JSONObject.NULL)
+                        .put("latency_ms", round2(latencyMs))
+                        .put("metric", "inpaint_output_contract")
+                        .put("pass", false),
+                )
+                report.gate("inpaint_case_$index", false)
+                continue
+            }
+
+            val metricImageBytes = case.metricImageAsset?.let(::testAsset) ?: imageBytes
+            val metricMaskBytes = case.metricMaskAsset?.let(::testAsset) ?: maskBytes
+            val inputRgb = decodeRgb(metricImageBytes, expectedWidth, expectedHeight)
+            val mask = decodeMask(metricMaskBytes, expectedWidth, expectedHeight)
+            val referenceRgb = decodeRgb(referenceBytes, expectedWidth, expectedHeight)
+            val candidateRgb = rgbaToRgb(rgba)
+            val metric =
+                NpuMetrics.inpaintMetrics(
+                    inputRgb = inputRgb,
+                    mask = mask,
+                    referenceRgb = referenceRgb,
+                    candidateRgb = candidateRgb,
+                    width = expectedWidth,
+                    height = expectedHeight,
+                )
+            measuredCases++
+            val pass =
+                metric.fullCosine >= suite.fullCosineMin &&
+                    metric.holeCosine >= suite.holeCosineMin &&
+                    metric.holeRelativeL2 <= suite.holeRelativeL2Max &&
+                    metric.fullPsnrDb >= suite.fullPsnrMin &&
+                    metric.holePsnrDb >= suite.holePsnrMin &&
+                    metric.seamPsnrDb >= suite.seamPsnrMin &&
+                    metric.unmaskedMeanAbsoluteError <= suite.unmaskedMaeMax &&
+                    metric.unmaskedP99AbsoluteError <= suite.unmaskedP99Max &&
+                    metric.unmaskedWithinOneLsbFraction >= suite.unmaskedWithinOneMin &&
+                    metric.holeChangedFraction >= suite.holeChangedMin
+            if (pass) passed++
+            minimumFullCosine = minOf(minimumFullCosine, metric.fullCosine)
+            minimumHoleCosine = minOf(minimumHoleCosine, metric.holeCosine)
+            maximumHoleRelativeL2 = maxOf(maximumHoleRelativeL2, metric.holeRelativeL2)
+            minimumFullPsnr = minOf(minimumFullPsnr, metric.fullPsnrDb)
+            minimumHolePsnr = minOf(minimumHolePsnr, metric.holePsnrDb)
+            minimumSeamPsnr = minOf(minimumSeamPsnr, metric.seamPsnrDb)
+            maximumUnmaskedMae = maxOf(maximumUnmaskedMae, metric.unmaskedMeanAbsoluteError)
+            maximumUnmaskedP99 = maxOf(maximumUnmaskedP99, metric.unmaskedP99AbsoluteError)
+            minimumUnmaskedWithinOne =
+                minOf(minimumUnmaskedWithinOne, metric.unmaskedWithinOneLsbFraction)
+            minimumHoleChanged = minOf(minimumHoleChanged, metric.holeChangedFraction)
+            outDir?.let {
+                writeRgbaPng(
+                    File(it.apply { mkdirs() }, "inpaint_${model.id}_${index}_${case.id}.png"),
+                    rgba,
+                    expectedWidth,
+                    expectedHeight,
+                )
+            }
+            report.addSample(
+                JSONObject()
+                    .put("idx", index)
+                    .put("id", case.id)
+                    .put("input", case.imageAsset)
+                    .put("mask", case.maskAsset)
+                    .put("metric_input", case.metricImageAsset ?: case.imageAsset)
+                    .put("metric_mask", case.metricMaskAsset ?: case.maskAsset)
+                    .put("reference", case.referenceImageAsset)
+                    .put("output", "rgba:${rgba.size}bytes@${expectedWidth}x$expectedHeight")
+                    .put("latency_ms", round2(latencyMs))
+                    .put("full_cosine", round6(metric.fullCosine))
+                    .put("hole_cosine", round6(metric.holeCosine))
+                    .put("hole_relative_l2", round6(metric.holeRelativeL2))
+                    .put("full_psnr_db", round3(metric.fullPsnrDb))
+                    .put("hole_psnr_db", round3(metric.holePsnrDb))
+                    .put("seam_psnr_db", round3(metric.seamPsnrDb))
+                    .put("unmasked_mae_rgb8", round3(metric.unmaskedMeanAbsoluteError))
+                    .put("unmasked_p99_rgb8", round3(metric.unmaskedP99AbsoluteError))
+                    .put("unmasked_within_one_lsb", round3(metric.unmaskedWithinOneLsbFraction))
+                    .put("hole_changed_fraction", round3(metric.holeChangedFraction))
+                    .put("hole_pixels", metric.holePixels)
+                    .put("seam_pixels", metric.seamPixels)
+                    .put("metric", "inpaint_forge_parity+passthrough_detection")
+                    .put("pass", pass),
+            )
+            report.gate("inpaint_case_$index", pass)
+        }
+        val passFraction = passed.toDouble() / cases.size
+        report.put("suite_pass_frac", round2(passFraction))
+            .put("inpaint_ms", round2(totalLatencyMs / cases.size))
+            .put("inpaint_measured_cases", measuredCases)
+            .gate("inpaint_suite", passFraction >= suite.passFrac - 1e-9)
+        if (measuredCases > 0) {
+            report.put("full_cosine", round6(minimumFullCosine))
+                .put("hole_cosine", round6(minimumHoleCosine))
+                .put("hole_relative_l2", round6(maximumHoleRelativeL2))
+                .put("full_psnr_db", round3(minimumFullPsnr))
+                .put("hole_psnr_db", round3(minimumHolePsnr))
+                .put("seam_psnr_db", round3(minimumSeamPsnr))
+                .put("unmasked_mae_rgb8", round3(maximumUnmaskedMae))
+                .put("unmasked_p99_rgb8", round3(maximumUnmaskedP99))
+                .put("unmasked_within_one_lsb", round6(minimumUnmaskedWithinOne))
+                .put("hole_changed_fraction", round6(minimumHoleChanged))
+        }
+    }
+
     // ---------------------------------------------------------------- STT ----
     private suspend fun runStt(report: RunReport, suite: NpuSuite?) {
         val cases = suite?.cases?.mapNotNull { c -> c.wavAsset?.let { it to c.goldText } }?.takeIf { it.isNotEmpty() }
@@ -579,6 +899,184 @@ class NpuModelE2ETest {
             modality = bundle.category,
         )
 
+    private fun LocalBundleFile.toDescriptor(
+        modelId: String,
+        bundle: LocalBundle,
+        includeLocalPath: Boolean = false,
+    ) =
+        ModelFileDescriptor(
+            url =
+                bundle.baseUrl?.trimEnd('/')?.let { "$it/$relativePath" }
+                    ?: "local://$modelId/$relativePath",
+            filename = File(relativePath).name,
+            is_required = true,
+            size_bytes = bytes,
+            relative_path = relativePath,
+            local_path =
+                if (includeLocalPath) {
+                    requireNotNull(bundle.root) { "local descriptor requires a bundle root" }
+                        .let { File(it, relativePath).absolutePath }
+                } else {
+                    null
+                },
+            checksum_sha256 = sha256,
+        )
+
+    private fun validateLocalBundle(
+        args: Bundle,
+        suite: NpuSuite?,
+        report: RunReport,
+    ): LocalBundle? {
+        val rawRoot = args.getString("localBundlePath")?.takeIf { it.isNotBlank() }
+        val rawBaseUrl = args.getString("localDownloadBaseUrl")?.takeIf { it.isNotBlank() }
+        if (rawRoot == null && rawBaseUrl == null) return null
+        require((rawRoot == null) xor (rawBaseUrl == null)) {
+            "exactly one of localBundlePath or localDownloadBaseUrl is allowed"
+        }
+        if (rawBaseUrl != null) {
+            require(rawBaseUrl.matches(Regex("http://127\\.0\\.0\\.1:[0-9]{1,5}"))) {
+                "localDownloadBaseUrl must be an adb-reversed IPv4 loopback URL"
+            }
+            val port = rawBaseUrl.substringAfterLast(':').toInt()
+            require(port in 1..65535) { "localDownloadBaseUrl port is outside 1..65535" }
+        }
+        val rawIndex =
+            args.getString("localBundleIndex")?.takeIf { it.isNotBlank() }
+                ?: throw AssertionError("localBundleIndex is required in local bundle mode")
+        val expectedTree =
+            args.getString("localBundleTreeSha256")?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
+                ?: throw AssertionError("valid localBundleTreeSha256 is required in local bundle mode")
+        val expectedSuite = requireNotNull(suite) { "local bundle mode requires a canonical suite" }
+        require(expectedSuite.manifestSha256.matches(Regex("[0-9a-f]{64}"))) {
+            "suite does not pin a manifest SHA-256"
+        }
+        require(expectedSuite.contextSha256.matches(Regex("[0-9a-f]{64}"))) {
+            "suite does not pin a context SHA-256"
+        }
+
+        val root = rawRoot?.let { File(it).canonicalFile }
+        if (root != null) require(root.isDirectory) { "local bundle root is not a directory: $rawRoot" }
+        val index = JSONObject(File(rawIndex).readText())
+        require(index.optString("schema") == "npu_local_bundle/v1") { "unsupported local bundle index schema" }
+        require(index.optString("tree_sha256") == expectedTree) { "runner/index tree SHA-256 mismatch" }
+        val rows = index.getJSONArray("files")
+        require(rows.length() > 0) { "local bundle index contains no files" }
+        val files =
+            (0 until rows.length()).map { position ->
+                val row = rows.getJSONObject(position)
+                val relative = row.getString("path")
+                require(
+                    relative.isNotBlank() && !relative.startsWith('/') &&
+                        relative.split('/').none { it.isBlank() || it == "." || it == ".." },
+                ) { "unsafe local bundle path: $relative" }
+                LocalBundleFile(
+                    relativePath = relative,
+                    bytes = row.getLong("bytes"),
+                    sha256 = row.getString("sha256"),
+                )
+            }.sortedBy { it.relativePath }
+        require(files.map { it.relativePath }.distinct().size == files.size) {
+            "local bundle index contains duplicate paths"
+        }
+
+        for (file in files) {
+            require(file.bytes >= 0 && file.sha256.matches(Regex("[0-9a-f]{64}"))) {
+                "invalid local bundle metadata for ${file.relativePath}"
+            }
+        }
+        val computedTree =
+            sha256(
+                files.joinToString(separator = "") {
+                    "${it.sha256} ${it.bytes} ${it.relativePath}\n"
+                }.toByteArray(),
+            )
+        require(computedTree == expectedTree) { "local bundle tree SHA-256 mismatch" }
+        val exactManifest = files.any { it.sha256 == expectedSuite.manifestSha256 }
+        val exactContext = files.any { it.sha256 == expectedSuite.contextSha256 }
+        val mode = if (root != null) "local_adb_import" else "local_loopback_download"
+        if (root != null) require(verifyBundleFiles(root, files) == computedTree) {
+            "local bundle files do not match the index"
+        }
+        report.put(
+            "bundle_provenance",
+            JSONObject()
+                .put("mode", mode)
+                .put("locally_staged", root != null)
+                .put("loopback_download", rawBaseUrl != null)
+                .put("public_download_model_exercised", rawBaseUrl != null)
+                .put("hf_download_exercised", false)
+                .put("source_label", index.optString("source_label"))
+                .put("tree_sha256", computedTree)
+                .put("manifest_sha256", expectedSuite.manifestSha256)
+                .put("context_sha256", expectedSuite.contextSha256)
+                .put("policy_sha256", expectedSuite.policySha256)
+                .put(
+                    "files",
+                    JSONArray().also { array ->
+                        files.forEach {
+                            array.put(
+                                JSONObject()
+                                    .put("path", it.relativePath)
+                                    .put("bytes", it.bytes)
+                                    .put("sha256", it.sha256),
+                            )
+                        }
+                    },
+                ),
+        ).gate("local_bundle_manifest_exact", exactManifest)
+            .gate("local_bundle_context_exact", exactContext)
+            .gate("local_bundle_tree_exact", true)
+        require(exactManifest) { "local bundle does not contain the suite-pinned manifest" }
+        require(exactContext) { "local bundle does not contain the suite-pinned context" }
+        return LocalBundle(mode, root, rawBaseUrl, computedTree, files)
+    }
+
+    private fun verifyBundleFiles(root: File, bundle: LocalBundle): String =
+        verifyBundleFiles(root, bundle.files)
+
+    private fun verifyBundleFiles(root: File, files: List<LocalBundleFile>): String {
+        require(root.isDirectory) { "managed bundle root is not a directory: $root" }
+        val rootPrefix = root.path + File.separator
+        for (file in files) {
+            val actual = File(root, file.relativePath).canonicalFile
+            require(actual.path.startsWith(rootPrefix) && actual.isFile) {
+                "bundle file is missing or escaped the root: ${file.relativePath}"
+            }
+            require(actual.length() == file.bytes) { "size mismatch for ${file.relativePath}" }
+            require(sha256(actual) == file.sha256) { "SHA-256 mismatch for ${file.relativePath}" }
+        }
+        val actualPaths =
+            root.walkTopDown()
+                .filter { it.isFile && it.name != ".rac-manifest.binpb" }
+                .map { it.relativeTo(root).invariantSeparatorsPath }
+                .sorted()
+                .toList()
+        require(actualPaths == files.map { it.relativePath }) {
+            "bundle files do not exactly match the index: actual=$actualPaths"
+        }
+        return sha256(
+            files.joinToString(separator = "") {
+                "${it.sha256} ${it.bytes} ${it.relativePath}\n"
+            }.toByteArray(),
+        )
+    }
+
+    private fun sha256(file: File): String =
+        file.inputStream().use { stream ->
+            val digest = MessageDigest.getInstance("SHA-256")
+            val buffer = ByteArray(1024 * 1024)
+            while (true) {
+                val count = stream.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+            digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        }
+
+    private fun sha256(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+
     /** Catalog id, or an ad-hoc bundle synthesized from -e hfRepo/arch/modality/manifest. */
     private fun resolveModel(args: Bundle): Pair<SingleFileModel, String?>? {
         args.getString("modelId")?.takeIf { it.isNotBlank() }?.let { rawId ->
@@ -595,6 +1093,7 @@ class NpuModelE2ETest {
             "stt", "asr" -> ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
             "tts" -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
             "embed", "embedding" -> ModelCategory.MODEL_CATEGORY_EMBEDDING
+            "inpaint", "diffusion", "image" -> ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION
             else -> return null
         }
         // Only the manifest is named; commons + the engine bundle policy resolve the rest of the
@@ -618,6 +1117,7 @@ class NpuModelE2ETest {
         ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> "stt"
         ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> "tts"
         ModelCategory.MODEL_CATEGORY_EMBEDDING -> "embedding"
+        ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION -> "inpaint"
         else -> category.name.lowercase()
     }
 
@@ -636,6 +1136,53 @@ class NpuModelE2ETest {
 
     private fun testAsset(name: String): ByteArray =
         InstrumentationRegistry.getInstrumentation().context.assets.open(name).use { it.readBytes() }
+
+    private fun decodeRgb(encoded: ByteArray, width: Int, height: Int): ByteArray {
+        val bitmap =
+            requireNotNull(BitmapFactory.decodeByteArray(encoded, 0, encoded.size)) {
+                "could not decode image asset"
+            }
+        require(bitmap.width == width && bitmap.height == height) {
+            "image asset is ${bitmap.width}x${bitmap.height}, expected ${width}x$height"
+        }
+        val argb = IntArray(width * height)
+        bitmap.getPixels(argb, 0, width, 0, 0, width, height)
+        bitmap.recycle()
+        return ByteArray(argb.size * 3).also { rgb ->
+            for (i in argb.indices) {
+                rgb[i * 3] = ((argb[i] shr 16) and 0xff).toByte()
+                rgb[i * 3 + 1] = ((argb[i] shr 8) and 0xff).toByte()
+                rgb[i * 3 + 2] = (argb[i] and 0xff).toByte()
+            }
+        }
+    }
+
+    private fun decodeMask(encoded: ByteArray, width: Int, height: Int): BooleanArray {
+        val rgb = decodeRgb(encoded, width, height)
+        return BooleanArray(width * height) { (rgb[it * 3].toInt() and 0xff) > 127 }
+    }
+
+    private fun rgbaToRgb(rgba: ByteArray): ByteArray =
+        ByteArray(rgba.size / 4 * 3).also { rgb ->
+            for (i in 0 until rgba.size / 4) {
+                rgb[i * 3] = rgba[i * 4]
+                rgb[i * 3 + 1] = rgba[i * 4 + 1]
+                rgb[i * 3 + 2] = rgba[i * 4 + 2]
+            }
+        }
+
+    private fun writeRgbaPng(file: File, rgba: ByteArray, width: Int, height: Int) {
+        val argb =
+            IntArray(width * height) { i ->
+                ((rgba[i * 4 + 3].toInt() and 0xff) shl 24) or
+                    ((rgba[i * 4].toInt() and 0xff) shl 16) or
+                    ((rgba[i * 4 + 1].toInt() and 0xff) shl 8) or
+                    (rgba[i * 4 + 2].toInt() and 0xff)
+            }
+        val bitmap = Bitmap.createBitmap(argb, width, height, Bitmap.Config.ARGB_8888)
+        runCatching { file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+        bitmap.recycle()
+    }
 
     /** Minimal 16-bit PCM WAV writer so the runner can transcribe the TTS output offline. */
     private fun writeWav(file: File, samples: FloatArray, sampleRate: Int) {
@@ -667,4 +1214,5 @@ class NpuModelE2ETest {
 
     private fun round2(v: Double) = Math.round(v * 100) / 100.0
     private fun round3(v: Double) = Math.round(v * 1000) / 1000.0
+    private fun round6(v: Double) = Math.round(v * 1_000_000) / 1_000_000.0
 }

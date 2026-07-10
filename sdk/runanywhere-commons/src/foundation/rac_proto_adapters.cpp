@@ -82,6 +82,15 @@ char* copy_string_required(const ::std::string& s) {
     return rac_strdup(s.c_str());
 }
 
+uint8_t* copy_bytes(const ::std::string& bytes) {
+    if (bytes.empty())
+        return nullptr;
+    auto* out = static_cast<uint8_t*>(rac_alloc(bytes.size()));
+    if (out)
+        std::memcpy(out, bytes.data(), bytes.size());
+    return out;
+}
+
 // ---- STT language enum mapping --------------------------------------------
 //
 // Drift reconciliation: C ABI uses BCP-47 strings ("en", "en-US", "es-MX"),
@@ -696,6 +705,17 @@ bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerati
     *out = RAC_DIFFUSION_OPTIONS_DEFAULT;
     out->prompt = copy_string(in.prompt());
     out->negative_prompt = copy_string(in.negative_prompt());
+    auto fail = [&]() {
+        rac_free(const_cast<char*>(out->prompt));
+        rac_free(const_cast<char*>(out->negative_prompt));
+        rac_free(const_cast<uint8_t*>(out->input_image_data));
+        rac_free(const_cast<uint8_t*>(out->mask_data));
+        *out = RAC_DIFFUSION_OPTIONS_DEFAULT;
+        return false;
+    };
+    if ((!in.prompt().empty() && !out->prompt) ||
+        (!in.negative_prompt().empty() && !out->negative_prompt))
+        return fail();
     if (in.width() > 0)
         out->width = in.width();
     if (in.height() > 0)
@@ -707,6 +727,25 @@ bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerati
     out->seed = in.seed();
     out->scheduler = diffusion_scheduler_from_proto(in.scheduler());
     out->mode = diffusion_mode_from_proto(in.mode());
+    if (!in.input_image().empty()) {
+        out->input_image_data = copy_bytes(in.input_image());
+        if (!out->input_image_data)
+            return fail();
+        out->input_image_size = in.input_image().size();
+    }
+    if (!in.mask_image().empty()) {
+        out->mask_data = copy_bytes(in.mask_image());
+        if (!out->mask_data)
+            return fail();
+        out->mask_size = in.mask_image().size();
+    }
+    out->input_image_width = in.input_image_width();
+    out->input_image_height = in.input_image_height();
+    if (in.denoise_strength() > 0.0f)
+        out->denoise_strength = in.denoise_strength();
+    out->report_intermediate_images = in.report_intermediate_images() ? RAC_TRUE : RAC_FALSE;
+    if (in.progress_stride() > 0)
+        out->progress_stride = in.progress_stride();
     return true;
 }
 

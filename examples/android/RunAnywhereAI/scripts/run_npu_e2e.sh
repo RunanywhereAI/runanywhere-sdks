@@ -23,6 +23,8 @@
 #     --arch <v81>       expected device arch for the default/ad-hoc sweep
 #     --max-new <n>      override LLM/VLM max new tokens
 #     --repo/--modality/--files  run ONE ad-hoc HF repo instead of a catalog id
+#     --local-bundle <dir>  stage ONE private bundle locally; use with one catalog model id
+#     --local-download <dir> serve ONE private bundle over adb-reversed loopback and download it
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -47,7 +49,7 @@ HF_TOKEN="${HF_TOKEN:-}"
 ARCH="${ARCH:-v81}"
 MAX_NEW="${MAX_NEW:-}"
 BUILD=0
-REPO="" ; MODALITY="" ; FILES=""
+REPO="" ; MODALITY="" ; FILES="" ; LOCAL_BUNDLE="" ; LOCAL_DOWNLOAD=""
 MODELS=()
 
 while [ $# -gt 0 ]; do
@@ -60,6 +62,8 @@ while [ $# -gt 0 ]; do
     --repo)   REPO="$2"; shift 2;;
     --modality) MODALITY="$2"; shift 2;;
     --files)  FILES="$2"; shift 2;;
+    --local-bundle) LOCAL_BUNDLE="$2"; shift 2;;
+    --local-download) LOCAL_DOWNLOAD="$2"; shift 2;;
     -h|--help) sed -n '2,30p' "$0"; exit 0;;
     *) MODELS+=("$1"); shift;;
   esac
@@ -69,7 +73,7 @@ ADB=(adb); [ -n "$SERIAL" ] && ADB=(adb -s "$SERIAL")
 
 # Default per-modality sweeps use logical catalog ids. --arch is still passed
 # into the test runner so it can assert the connected device matches the sweep.
-if [ ${#MODELS[@]} -eq 0 ] && [ -z "$REPO" ]; then
+if [ ${#MODELS[@]} -eq 0 ] && [ -z "$REPO" ] && [ -z "$LOCAL_BUNDLE" ] && [ -z "$LOCAL_DOWNLOAD" ]; then
   case "$ARCH" in
     v81) MODELS=(lfm2_5_230m moonshine_tiny melotts_en kokoro_en internvl3_5_1b);;  # kokoro is private → needs --token
     v79) MODELS=(lfm2_5_230m whisper_base melotts_en internvl3_5_1b);;
@@ -77,10 +81,67 @@ if [ ${#MODELS[@]} -eq 0 ] && [ -z "$REPO" ]; then
   esac
 fi
 
+if [ -n "$LOCAL_BUNDLE" ] && [ -n "$LOCAL_DOWNLOAD" ]; then
+  echo "--local-bundle and --local-download are mutually exclusive"
+  exit 2
+fi
+LOCAL_SOURCE="${LOCAL_BUNDLE:-$LOCAL_DOWNLOAD}"
+if [ -n "$LOCAL_SOURCE" ]; then
+  [ -d "$LOCAL_SOURCE" ] || { echo "local bundle source is not a directory: $LOCAL_SOURCE"; exit 2; }
+  [ -z "$REPO" ] || { echo "local bundle modes cannot be combined with --repo"; exit 2; }
+  [ ${#MODELS[@]} -eq 1 ] || { echo "local bundle modes require exactly one catalog model id"; exit 2; }
+  LOCAL_SOURCE="$(cd "$LOCAL_SOURCE" && pwd)"
+  if [ -n "$LOCAL_BUNDLE" ]; then LOCAL_BUNDLE="$LOCAL_SOURCE"; else LOCAL_DOWNLOAD="$LOCAL_SOURCE"; fi
+fi
+
 TS="$(date +%Y%m%d_%H%M%S)"
 OUT="$APP_ROOT/reports/npu_e2e/$TS"
 mkdir -p "$OUT"
 EXT="/sdcard/Android/data/$APP_PKG/files/npu_e2e"
+LOCAL_INDEX=""
+LOCAL_TREE_SHA256=""
+LOCAL_DEVICE_ROOT=""
+LOCAL_DEVICE_INDEX=""
+LOCAL_DOWNLOAD_BASE_URL=""
+LOCAL_SERVER_PID=""
+LOCAL_SERVER_LOG=""
+LOCAL_REVERSE_PORT=""
+
+if [ -n "$LOCAL_SOURCE" ]; then
+  LOCAL_INDEX="$OUT/local_bundle_index.json"
+  python3 - "$LOCAL_SOURCE" "$LOCAL_INDEX" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve()
+out = Path(sys.argv[2])
+rows = []
+for path in sorted(root.rglob("*")):
+    if path.is_symlink():
+        raise SystemExit(f"local bundle must not contain symlinks: {path}")
+    if not path.is_file():
+        continue
+    relative = path.relative_to(root).as_posix()
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    rows.append({"path": relative, "bytes": path.stat().st_size, "sha256": digest.hexdigest()})
+if not rows:
+    raise SystemExit("local bundle contains no files")
+tree_input = "".join(f"{row['sha256']} {row['bytes']} {row['path']}\n" for row in rows).encode()
+payload = {
+    "schema": "npu_local_bundle/v1",
+    "source_label": root.name,
+    "tree_sha256": hashlib.sha256(tree_input).hexdigest(),
+    "files": rows,
+}
+out.write_text(json.dumps(payload, indent=2) + "\n")
+PY
+  LOCAL_TREE_SHA256="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tree_sha256"])' "$LOCAL_INDEX")"
+fi
 
 echo "device : $("${ADB[@]}" shell getprop ro.soc.model | tr -d '\r') ($("${ADB[@]}" shell getprop ro.product.model | tr -d '\r'))"
 echo "arch   : $ARCH   report: $OUT"
@@ -96,6 +157,51 @@ if [ $BUILD -eq 1 ]; then
   "${ADB[@]}" install -r -g "$TAPK"
 fi
 
+cleanup_local_bundle() {
+  if [ -n "$LOCAL_DEVICE_ROOT" ]; then "${ADB[@]}" shell "rm -rf '$LOCAL_DEVICE_ROOT'" >/dev/null 2>&1 || true; fi
+  if [ -n "$LOCAL_DEVICE_INDEX" ]; then "${ADB[@]}" shell "rm -f '$LOCAL_DEVICE_INDEX'" >/dev/null 2>&1 || true; fi
+  if [ -n "$LOCAL_REVERSE_PORT" ]; then "${ADB[@]}" reverse --remove "tcp:$LOCAL_REVERSE_PORT" >/dev/null 2>&1 || true; fi
+  if [ -n "$LOCAL_SERVER_PID" ]; then kill "$LOCAL_SERVER_PID" >/dev/null 2>&1 || true; wait "$LOCAL_SERVER_PID" >/dev/null 2>&1 || true; fi
+}
+trap cleanup_local_bundle EXIT
+
+if [ -n "$LOCAL_SOURCE" ]; then
+  local_id="${MODELS[0]}"
+  LOCAL_DEVICE_INDEX="/sdcard/Android/data/$APP_PKG/files/npu_local_bundle_index_$local_id.json"
+  if [ -n "$LOCAL_BUNDLE" ]; then
+    LOCAL_DEVICE_ROOT="/sdcard/Android/data/$APP_PKG/files/npu_local_bundle/$local_id"
+  fi
+  cleanup_local_bundle
+  "${ADB[@]}" push "$LOCAL_INDEX" "$LOCAL_DEVICE_INDEX" >/dev/null
+  if [ -n "$LOCAL_BUNDLE" ]; then
+    "${ADB[@]}" shell "mkdir -p '$LOCAL_DEVICE_ROOT'"
+    "${ADB[@]}" push "$LOCAL_BUNDLE/." "$LOCAL_DEVICE_ROOT/" >/dev/null
+    echo "local  : staged $(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("{} files tree={}".format(len(d["files"]), d["tree_sha256"]))' "$LOCAL_INDEX")"
+  else
+    LOCAL_REVERSE_PORT="$(python3 - <<'PY'
+import socket
+with socket.socket() as sock:
+    sock.bind(("127.0.0.1", 0))
+    print(sock.getsockname()[1])
+PY
+)"
+    LOCAL_SERVER_LOG="$OUT/loopback_http_server.log"
+    python3 -m http.server "$LOCAL_REVERSE_PORT" --bind 127.0.0.1 --directory "$LOCAL_DOWNLOAD" >"$LOCAL_SERVER_LOG" 2>&1 &
+    LOCAL_SERVER_PID=$!
+    LOCAL_DOWNLOAD_BASE_URL="http://127.0.0.1:$LOCAL_REVERSE_PORT"
+    LOCAL_HTTP_READY=0
+    LOCAL_PROBE_PATH="$(python3 -c 'import json,sys; print(min(json.load(open(sys.argv[1]))["files"], key=lambda row: row["bytes"])["path"])' "$LOCAL_INDEX")"
+    for _ in $(seq 1 50); do
+      if curl -fsS "$LOCAL_DOWNLOAD_BASE_URL/$LOCAL_PROBE_PATH" >/dev/null 2>&1; then LOCAL_HTTP_READY=1; break; fi
+      sleep 0.1
+    done
+    kill -0 "$LOCAL_SERVER_PID" 2>/dev/null || { echo "loopback HTTP server failed; see $LOCAL_SERVER_LOG"; exit 1; }
+    [ "$LOCAL_HTTP_READY" = 1 ] || { echo "loopback HTTP server did not become ready; see $LOCAL_SERVER_LOG"; exit 1; }
+    "${ADB[@]}" reverse "tcp:$LOCAL_REVERSE_PORT" "tcp:$LOCAL_REVERSE_PORT" >/dev/null
+    echo "local  : serving $(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("{} files tree={}".format(len(d["files"]), d["tree_sha256"]))' "$LOCAL_INDEX") at adb-reversed loopback"
+  fi
+fi
+
 installed_apk_sha256() {
   local package_name="$1" apk_path
   apk_path="$("${ADB[@]}" shell pm path "$package_name" 2>/dev/null | tr -d '\r' | sed -n '1s/^package://p')"
@@ -104,11 +210,14 @@ installed_apk_sha256() {
 }
 INSTALLED_APP_SHA256="$(installed_apk_sha256 "$APP_PKG")"
 INSTALLED_TEST_SHA256="$(installed_apk_sha256 "$TEST_PKG")"
+ACQUISITION="hf_download"
+if [ -n "$LOCAL_BUNDLE" ]; then ACQUISITION="local_adb_import"; fi
+if [ -n "$LOCAL_DOWNLOAD" ]; then ACQUISITION="local_loopback_download"; fi
 
 # Sanitized, host-side inputs for provenance. The token itself is never recorded.
 python3 - "$OUT/run_inputs.json" "$APP_ROOT" "$SDK_GIT_REVISION" "$SDK_GIT_DIRTY" \
-  "$ARCH" "$BUILD" "$REPO" "$MODALITY" "$FILES" "$MAX_NEW" \
-  "$([ -n "$HF_TOKEN" ] && printf true || printf false)" "$APP_PKG" "$TEST_PKG" \
+  "$ARCH" "$BUILD" "$REPO" "$MODALITY" "$FILES" "$MAX_NEW" "$LOCAL_INDEX" "$LOCAL_TREE_SHA256" \
+  "$ACQUISITION" "$([ -n "$HF_TOKEN" ] && printf true || printf false)" "$APP_PKG" "$TEST_PKG" \
   "$INSTALLED_APP_SHA256" "$INSTALLED_TEST_SHA256" "${MODELS[@]}" <<'PY'
 import hashlib
 import json
@@ -117,7 +226,8 @@ import time
 from pathlib import Path
 
 (
-    out, app_root, revision, dirty, arch, build, repo, modality, files, max_new, auth,
+    out, app_root, revision, dirty, arch, build, repo, modality, files, max_new,
+    local_index, local_tree_sha256, acquisition, auth,
     app_package, test_package, installed_app_sha, installed_test_sha, *models,
 ) = sys.argv[1:]
 root = Path(app_root)
@@ -179,10 +289,16 @@ payload = {
         "manifest_or_files": files or None,
         "max_new": int(max_new) if max_new else None,
         "hf_auth_enabled": auth == "true",
+        "acquisition": acquisition,
+        "local_bundle_tree_sha256": local_tree_sha256 or None,
     },
     "artifacts": artifacts,
     "installed_packages": installed_packages,
 }
+if local_index:
+    index_path = Path(local_index)
+    payload["local_bundle"] = json.loads(index_path.read_text())
+    payload["local_bundle"]["index_sha256"] = sha256(index_path)
 Path(out).write_text(json.dumps(payload, indent=2) + "\n")
 PY
 
@@ -195,9 +311,26 @@ run_one() { # $1=model-id  $2..=extra `-e k v` pairs
   [ -n "$MAX_NEW" ] && extra+=(-e maxNew "$MAX_NEW")
   [ -n "$SDK_GIT_REVISION" ] && extra+=(-e sdkGitRevision "$SDK_GIT_REVISION")
   [ "$SDK_GIT_DIRTY" != "unknown" ] && extra+=(-e sdkGitDirty "$SDK_GIT_DIRTY")
+  if [ -n "$LOCAL_DEVICE_ROOT" ]; then
+    extra+=(-e localBundlePath "$LOCAL_DEVICE_ROOT")
+    extra+=(-e localBundleIndex "$LOCAL_DEVICE_INDEX")
+    extra+=(-e localBundleTreeSha256 "$LOCAL_TREE_SHA256")
+  fi
+  if [ -n "$LOCAL_DOWNLOAD_BASE_URL" ]; then
+    extra+=(-e localDownloadBaseUrl "$LOCAL_DOWNLOAD_BASE_URL")
+    extra+=(-e localBundleIndex "$LOCAL_DEVICE_INDEX")
+    extra+=(-e localBundleTreeSha256 "$LOCAL_TREE_SHA256")
+    extra+=(-e lifecycleCycles 3)
+  fi
   # -w blocks until the test finishes; the NPU_E2E result lands in logcat.
   "${ADB[@]}" shell am instrument -w -r "$@" "${extra[@]}" "$TEST_PKG/$RUNNER" 2>&1 \
     | sed 's/^/  [instr] /' || true
+  # Preserve the execution-plane evidence used to distinguish a QHexRT route
+  # from an HTP/CDSP graph execution. The runner cleared logcat immediately
+  # before this model, so the capture is scoped to this one-model invocation.
+  "${ADB[@]}" logcat -d -v threadtime 2>/dev/null \
+    | grep -E 'NPU_E2E|qhexrt|QnnHtp|QNN API|adsprpc|cdsprpc|CDSP|cdsp|fastrpc' \
+    > "$OUT/logcat_${id}.txt" || true
   local line report_id
   line="$("${ADB[@]}" logcat -d -s NPU_E2E:I 2>/dev/null | grep "NPU_E2E id=" | tail -1 || true)"
   [ -n "$line" ] && printf '%s\n' "$line" | tee -a "$OUT/lines.txt" || true
@@ -224,6 +357,10 @@ run_one() { # $1=model-id  $2..=extra `-e k v` pairs
   for w in $("${ADB[@]}" shell "ls $EXT/tts_${report_id}_*.wav $EXT/tts_${id}_*.wav 2>/dev/null" | tr -d '\r' | sort -u); do
     "${ADB[@]}" pull "$w" "$OUT/" 2>/dev/null || true
   done
+  # pull inpainting outputs for visual inspection and report provenance
+  for image in $("${ADB[@]}" shell "ls $EXT/inpaint_${report_id}_*.png $EXT/inpaint_${id}_*.png 2>/dev/null" | tr -d '\r' | sort -u); do
+    "${ADB[@]}" pull "$image" "$OUT/" 2>/dev/null || true
+  done
 }
 
 "${ADB[@]}" shell "rm -rf $EXT" >/dev/null 2>&1 || true
@@ -233,6 +370,54 @@ if [ -n "$REPO" ]; then
   run_one "$(basename "$REPO")_${ARCH}" -e hfRepo "$REPO" -e arch "$ARCH" -e modality "$MODALITY" -e files "$FILES"
 else
   for id in "${MODELS[@]}"; do run_one "$id" -e modelId "$id" -e arch "$ARCH"; done
+fi
+
+if [ -n "$LOCAL_SOURCE" ]; then
+  cleanup_local_bundle
+  local_id="${MODELS[0]}"
+  model_absent="$("${ADB[@]}" shell "run-as '$APP_PKG' sh -c 'test ! -e files/RunAnywhere/Models/QHexRT/$local_id && echo true || echo false'" | tr -d '\r')"
+  temp_files_absent="$("${ADB[@]}" shell "run-as '$APP_PKG' sh -c 'test -z \"\$(find files/RunAnywhere/Models/QHexRT/$local_id -type f -name \".qhexrt-*\" 2>/dev/null)\" && echo true || echo false'" | tr -d '\r')"
+  index_absent="$("${ADB[@]}" shell "test ! -e '$LOCAL_DEVICE_INDEX' && echo true || echo false" | tr -d '\r')"
+  local_stage_absent=true
+  if [ -n "$LOCAL_DEVICE_ROOT" ]; then
+    local_stage_absent="$("${ADB[@]}" shell "test ! -e '$LOCAL_DEVICE_ROOT' && echo true || echo false" | tr -d '\r')"
+  fi
+  reverse_absent=true
+  if [ -n "$LOCAL_REVERSE_PORT" ] && "${ADB[@]}" reverse --list | grep -q "tcp:$LOCAL_REVERSE_PORT"; then reverse_absent=false; fi
+  server_absent=true
+  if [ -n "$LOCAL_SERVER_PID" ] && kill -0 "$LOCAL_SERVER_PID" >/dev/null 2>&1; then server_absent=false; fi
+  python3 - "$OUT/post_run_cleanup.json" "$local_id" "$model_absent" "$temp_files_absent" \
+    "$index_absent" "$local_stage_absent" "$reverse_absent" "$server_absent" <<'PY'
+import json
+import sys
+import time
+
+out, model_id, model_absent, temp_absent, index_absent, stage_absent, reverse_absent, server_absent = sys.argv[1:]
+checks = {
+    "managed_model_folder_absent": model_absent == "true",
+    "temporary_qhexrt_files_absent": temp_absent == "true",
+    "runner_index_absent": index_absent == "true",
+    "local_stage_absent": stage_absent == "true",
+    "adb_reverse_absent": reverse_absent == "true",
+    "loopback_server_absent": server_absent == "true",
+}
+payload = {
+    "schema": "npu_e2e_cleanup/v1",
+    "generated_unix_ms": int(time.time() * 1000),
+    "model_id": model_id,
+    "checks": checks,
+    "passed": all(checks.values()),
+}
+with open(out, "w", encoding="utf-8") as stream:
+    json.dump(payload, stream, indent=2)
+    stream.write("\n")
+PY
+  python3 -c 'import json,sys; raise SystemExit(0 if json.load(open(sys.argv[1]))["passed"] else 1)' "$OUT/post_run_cleanup.json" \
+    || { echo "post-run cleanup verification failed: $OUT/post_run_cleanup.json"; exit 1; }
+  LOCAL_SERVER_PID=""
+  LOCAL_REVERSE_PORT=""
+  LOCAL_DEVICE_ROOT=""
+  LOCAL_DEVICE_INDEX=""
 fi
 
 echo "=== aggregating -> $OUT/summary.md ==="

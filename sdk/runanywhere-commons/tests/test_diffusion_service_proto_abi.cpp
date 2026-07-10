@@ -9,6 +9,8 @@
 #include "diffusion_options.pb.h"
 
 #include <google/protobuf/descriptor.h>
+
+#include "rac/features/diffusion/rac_diffusion_proto_adapters.h"
 #endif
 
 namespace {
@@ -104,6 +106,38 @@ int test_diffusion_generated_service_contract() {
     return 0;
 }
 
+int test_inpainting_payload_adapter() {
+    runanywhere::v1::DiffusionGenerationOptions options;
+    options.set_prompt("remove the masked object");
+    options.set_mode(runanywhere::v1::DIFFUSION_MODE_INPAINTING);
+    options.set_input_image(std::string("\x89PNG\r\n\x1a\nimage", 13));
+    options.set_mask_image(std::string("\x89PNG\r\n\x1a\nmask", 12));
+    options.set_input_image_width(512);
+    options.set_input_image_height(512);
+    options.set_denoise_strength(0.65f);
+    options.set_report_intermediate_images(true);
+    options.set_progress_stride(3);
+
+    rac_diffusion_options_t raw{};
+    CHECK(rac::foundation::rac_diffusion_options_from_proto(options, &raw),
+          "inpainting options adapt to the C diffusion ABI");
+    CHECK(raw.mode == RAC_DIFFUSION_MODE_INPAINTING, "inpainting mode survives proto adaptation");
+    CHECK(raw.input_image_data != nullptr && raw.input_image_size == 13,
+          "input image bytes survive proto adaptation");
+    CHECK(raw.mask_data != nullptr && raw.mask_size == 12, "mask bytes survive proto adaptation");
+    CHECK(raw.input_image_width == 512 && raw.input_image_height == 512,
+          "raw input dimensions survive proto adaptation");
+    CHECK(raw.denoise_strength == 0.65f, "denoise strength survives proto adaptation");
+    CHECK(raw.report_intermediate_images == RAC_TRUE && raw.progress_stride == 3,
+          "progress controls survive proto adaptation");
+
+    rac_free(const_cast<char*>(raw.prompt));
+    rac_free(const_cast<char*>(raw.negative_prompt));
+    rac_free(const_cast<uint8_t*>(raw.input_image_data));
+    rac_free(const_cast<uint8_t*>(raw.mask_data));
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -115,6 +149,7 @@ int main() {
     return 0;
 #else
     test_diffusion_generated_service_contract();
+    test_inpainting_payload_adapter();
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
     return fail_count == 0 ? 0 : 1;
 #endif

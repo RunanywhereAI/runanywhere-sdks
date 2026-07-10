@@ -751,6 +751,8 @@ void free_diffusion_options(rac_diffusion_options_t* options) {
         return;
     rac_free(const_cast<char*>(options->prompt));
     rac_free(const_cast<char*>(options->negative_prompt));
+    rac_free(const_cast<uint8_t*>(options->input_image_data));
+    rac_free(const_cast<uint8_t*>(options->mask_data));
     *options = RAC_DIFFUSION_OPTIONS_DEFAULT;
 }
 
@@ -767,15 +769,13 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
     (void)rac::events::publish_prebuilt(event);
 }
 
-void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
-                        float progress, const char* error, double duration_ms = 0.0,
-                        const char* model_id = nullptr, int32_t prompt_length = 0,
-                        int32_t negative_prompt_length = 0, int32_t image_width = 0,
-                        int32_t image_height = 0, int32_t num_inference_steps = 0,
-                        double guidance_scale = 0.0, int64_t seed = 0,
-                        int64_t output_size_bytes = 0,
-                        runanywhere::v1::EventDestination destination =
-                            runanywhere::v1::EVENT_DESTINATION_ALL) {
+void publish_capability(
+    runanywhere::v1::CapabilityOperationEventKind kind, const char* operation, float progress,
+    const char* error, double duration_ms = 0.0, const char* model_id = nullptr,
+    int32_t prompt_length = 0, int32_t negative_prompt_length = 0, int32_t image_width = 0,
+    int32_t image_height = 0, int32_t num_inference_steps = 0, double guidance_scale = 0.0,
+    int64_t seed = 0, int64_t output_size_bytes = 0,
+    runanywhere::v1::EventDestination destination = runanywhere::v1::EVENT_DESTINATION_ALL) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -839,6 +839,8 @@ void free_options(rac_diffusion_options_t* options) {
         return;
     rac_free(const_cast<char*>(options->prompt));
     rac_free(const_cast<char*>(options->negative_prompt));
+    rac_free(const_cast<uint8_t*>(options->input_image_data));
+    rac_free(const_cast<uint8_t*>(options->mask_data));
     *options = RAC_DIFFUSION_OPTIONS_DEFAULT;
 }
 
@@ -962,9 +964,8 @@ rac_result_t rac_diffusion_generate_proto(rac_handle_t handle, const uint8_t* op
             "diffusion.generate", 1.0f, nullptr, static_cast<double>(result.generation_time_ms),
             model_id, options.prompt ? static_cast<int32_t>(strlen(options.prompt)) : 0,
             options.negative_prompt ? static_cast<int32_t>(strlen(options.negative_prompt)) : 0,
-            result.width, result.height, options.steps,
-            static_cast<double>(options.guidance_scale), result.seed_used,
-            static_cast<int64_t>(result.image_size));
+            result.width, result.height, options.steps, static_cast<double>(options.guidance_scale),
+            result.seed_used, static_cast<int64_t>(result.image_size));
     } else {
         publish_failure(rc, "diffusion.generate", rac_error_message(rc));
     }
@@ -1030,9 +1031,8 @@ rac_result_t rac_diffusion_generate_with_progress_proto(
             "diffusion.generate", 1.0f, nullptr, static_cast<double>(result.generation_time_ms),
             model_id, options.prompt ? static_cast<int32_t>(strlen(options.prompt)) : 0,
             options.negative_prompt ? static_cast<int32_t>(strlen(options.negative_prompt)) : 0,
-            result.width, result.height, options.steps,
-            static_cast<double>(options.guidance_scale), result.seed_used,
-            static_cast<int64_t>(result.image_size));
+            result.width, result.height, options.steps, static_cast<double>(options.guidance_scale),
+            result.seed_used, static_cast<int64_t>(result.image_size));
     } else {
         publish_failure(rc, "diffusion.generate", rac_error_message(rc));
     }

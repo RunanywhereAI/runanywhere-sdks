@@ -2975,11 +2975,13 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     // while admitting the trusted planner's outputs.
     std::string containment_model_folder;
     std::string containment_downloads_dir;
+    std::string canonical_model_folder;
     if (task->framework != RAC_FRAMEWORK_UNKNOWN) {
         char model_folder_buf[4096];
         if (rac_model_paths_get_model_folder(model_id.c_str(), task->framework, model_folder_buf,
                                              sizeof(model_folder_buf)) == RAC_SUCCESS) {
             containment_model_folder = model_folder_buf;
+            canonical_model_folder = model_folder_buf;
         }
     }
     if (containment_model_folder.empty()) {
@@ -3026,26 +3028,16 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
             : (!request.plan().resume_token().empty() ? request.plan().resume_token()
                                                       : make_resume_token(task->task_id, model_id));
 
-    bool any_archive = false;
-    for (const auto& file : task->files) {
-        if (file.requires_extraction) {
-            any_archive = true;
-            break;
-        }
-    }
-
-    if (any_archive && task->framework != RAC_FRAMEWORK_UNKNOWN) {
-        char model_folder_buf[4096];
-        if (rac_model_paths_get_model_folder(model_id.c_str(), task->framework, model_folder_buf,
-                                             sizeof(model_folder_buf)) == RAC_SUCCESS) {
-            task->model_folder_path = model_folder_buf;
-        }
+    if (!canonical_model_folder.empty()) {
+        // Keep the canonical per-model root even when the first descriptor is
+        // nested (for example context/model.bin plus a root manifest). Using
+        // first_dest.parent_path() in that case publishes the nested directory
+        // as local_path and makes the root manifest invisible to loaders.
+        task->model_folder_path = canonical_model_folder;
     }
 
     if (task->model_folder_path.empty()) {
-        // Fallback (non-archive + anything we couldn't resolve above): use
-        // the first file's parent, matching the pre-fix behaviour so single-
-        // file and multi-file (VLM, MiniLM) flows are unchanged.
+        // Unregistered/bypass-planner fallback: use the first file's parent.
         fs::path first_dest(task->files.front().destination_path);
         if (first_dest.has_parent_path()) {
             task->model_folder_path = first_dest.parent_path().string();

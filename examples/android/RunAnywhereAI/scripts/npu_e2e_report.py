@@ -156,6 +156,8 @@ def _report_inputs(report_path, report_dir, model_id, run_inputs_sha256):
         inputs.append({"role": "run_inputs", "name": "run_inputs.json", "sha256": run_inputs_sha256})
     for wav in sorted(report_dir.glob(f"tts_{model_id}_*.wav")):
         inputs.append({"role": "tts_wav", "name": wav.name, "sha256": _sha256(wav)})
+    for image in sorted(report_dir.glob(f"inpaint_{model_id}_*.png")):
+        inputs.append({"role": "inpaint_output", "name": image.name, "sha256": _sha256(image)})
     return inputs
 
 
@@ -374,6 +376,10 @@ def main():
             "intel_wer": r.get("intelligibility_wer"),
             "sample_rate": r.get("sample_rate"),
             "vision_ms": r.get("vision_ms"),
+            "inpaint_ms": r.get("inpaint_ms"),
+            "full_psnr_db": r.get("full_psnr_db"),
+            "hole_psnr_db": r.get("hole_psnr_db"),
+            "seam_psnr_db": r.get("seam_psnr_db"),
             "download_mb": r.get("download_mb"),
             "load_ms": r.get("load_ms"),
             "peak_rss_mb": r.get("peak_rss_mb"),
@@ -401,7 +407,8 @@ def main():
     def cell(v):
         return "—" if v is None else (f"{v}")
     hdr = ["model", "modality", "status", "suite", "delete", "framework", "decode_toks", "tokens_per_s",
-           "ttft_ms", "rtf", "wer", "intel_wer", "sample_rate", "vision_ms",
+           "ttft_ms", "rtf", "wer", "intel_wer", "sample_rate", "vision_ms", "inpaint_ms",
+           "full_psnr_db", "hole_psnr_db", "seam_psnr_db",
            "download_mb", "load_ms", "peak_rss_mb", "gates"]
     source_revision = rows[0].get("sdk_git_revision")
     source_dirty = rows[0].get("sdk_git_dirty")
@@ -423,7 +430,9 @@ def main():
             "✅" if x["delete_model"] else "❌",
             cell(x["framework"]), cell(x["decode_toks"]), cell(x["tokens_per_s"]),
             cell(x["ttft_ms"]), cell(x["rtf"]), cell(x["wer"]), cell(x["intel_wer"]),
-            cell(x["sample_rate"]), cell(x["vision_ms"]), cell(x["download_mb"]),
+            cell(x["sample_rate"]), cell(x["vision_ms"]), cell(x["inpaint_ms"]),
+            cell(x["full_psnr_db"]), cell(x["hole_psnr_db"]), cell(x["seam_psnr_db"]),
+            cell(x["download_mb"]),
             cell(x["load_ms"]), cell(x["peak_rss_mb"]),
             f"{x['gates_pass']}/{x['gates_total']}",
         ]) + " |")

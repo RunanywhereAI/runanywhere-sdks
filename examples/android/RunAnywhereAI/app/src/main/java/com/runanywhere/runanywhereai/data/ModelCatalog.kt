@@ -18,6 +18,7 @@ internal object ModelCatalog {
     private val LANGUAGE = ModelCategory.MODEL_CATEGORY_LANGUAGE
     private val MULTIMODAL = ModelCategory.MODEL_CATEGORY_MULTIMODAL
     private val VISION = ModelCategory.MODEL_CATEGORY_VISION
+    private val IMAGE_GENERATION = ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION
     private val EMBEDDING = ModelCategory.MODEL_CATEGORY_EMBEDDING
     private val STT = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
     private val TTS = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
@@ -68,7 +69,7 @@ internal object ModelCatalog {
         SingleFileModel("internvl3_5_1b", "InternVL3.5 1B (HNPU)", "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU", QHEXRT, MULTIMODAL, 3_067_933_894L),
         SingleFileModel("gemma4_e2b_vlm", "Gemma 4 E2B Image (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json", QHEXRT, MULTIMODAL, 10_532_159_450L),
         SingleFileModel("nemotron_nano_vl_8b", "Llama 3.1 Nemotron Nano VL 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json", QHEXRT, MULTIMODAL, 10_057_258_051L),
-        SingleFileModel("lama_dilated", "LaMa Dilated (HNPU)", "https://huggingface.co/runanywhere/lama_dilated_HNPU", QHEXRT, VISION, 98_509_597L),
+        SingleFileModel("lama_dilated", "LaMa Dilated (HNPU)", "https://huggingface.co/runanywhere/lama_dilated_HNPU", QHEXRT, IMAGE_GENERATION, 98_509_597L),
         SingleFileModel("nemotron_ocr", "Nemotron OCR (HNPU)", "https://huggingface.co/runanywhere/nemotron_ocr_HNPU", QHEXRT, MULTIMODAL, 121_193_004L),
         SingleFileModel("nemotron_ocr_v1", "Nemotron OCR v1 (HNPU)", "https://huggingface.co/runanywhere/nemotron_ocr_v1_HNPU", QHEXRT, MULTIMODAL, 121_406_323L),
         SingleFileModel("nemotron_parse", "Nemotron Parse (HNPU)", "https://huggingface.co/runanywhere/nemotron_parse_HNPU", QHEXRT, MULTIMODAL, 1_995_206_253L),

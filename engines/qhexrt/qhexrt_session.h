@@ -13,6 +13,7 @@
 #define RUNANYWHERE_QHEXRT_SESSION_H
 
 #include <atomic>
+#include <string>
 
 #include "qhexrt/qhexrt_c.h"
 
@@ -24,6 +25,8 @@ struct Session {
     qhx_model* model = nullptr;
     qhx_session* sess = nullptr;
     std::atomic<bool> cancel{false};
+    std::string model_ref;
+    std::string scratch_dir;
 };
 
 // Acquire the process runtime, load `manifest_path`, create a session.

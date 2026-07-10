@@ -454,6 +454,12 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racVlmDestroy(handle: Long)
 
+    // DIFFUSION LIFECYCLE-PROTO ABI. The generated request carries encoded
+    // image and mask bytes and resolves the lifecycle-owned diffusion model.
+
+    @JvmStatic
+    external fun racDiffusionGenerateLifecycleProto(requestProto: ByteArray): ByteArray?
+
     // Backend registration
     // NOTE: Backend registration has been MOVED to their respective module JNI bridges:
     //

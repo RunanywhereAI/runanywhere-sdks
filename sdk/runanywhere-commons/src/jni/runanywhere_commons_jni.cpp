@@ -804,7 +804,8 @@ static bool jniClearPendingException(JNIEnv* env) {
     return false;
 }
 
-static bool decodeUtf8CodePoint(const char* source, size_t length, size_t& index, uint32_t& code_point) {
+static bool decodeUtf8CodePoint(const char* source, size_t length, size_t& index,
+                                uint32_t& code_point) {
     const auto first = static_cast<unsigned char>(source[index]);
     if (first < 0x80) {
         code_point = first;
@@ -875,8 +876,7 @@ static std::string jniSafeLogString(const char* value, const char* fallback) {
             continue;
         }
 
-        if (code_point == '\n' || code_point == '\r' || code_point == '\t' ||
-            code_point >= 0x20u) {
+        if (code_point == '\n' || code_point == '\r' || code_point == '\t' || code_point >= 0x20u) {
             const size_t byte_count = i - start;
             if (output.size() + byte_count > kMaxLogChars) {
                 break;
@@ -1751,10 +1751,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetBaseDir
     return value != nullptr ? env->NewStringUTF(value) : nullptr;
 }
 
-JNIEXPORT void JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpHfTokenSet(JNIEnv* env,
-                                                                           jclass clazz,
-                                                                           jstring token) {
+JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpHfTokenSet(
+    JNIEnv* env, jclass clazz, jstring token) {
     (void)clazz;
     std::string storage;
     rac_http_hf_token_set(getNullableCString(env, token, storage));
@@ -2549,9 +2547,9 @@ static void jni_device_get_info(rac_device_registration_info_t* out_info, void* 
 
             // Extract float field for battery
             auto battery_it = j.find("battery_level");
-            out_info->battery_level =
-                (battery_it != j.end() && battery_it->is_number()) ? battery_it->get<float>()
-                                                                   : 0.0f;
+            out_info->battery_level = (battery_it != j.end() && battery_it->is_number())
+                                          ? battery_it->get<float>()
+                                          : 0.0f;
         } catch (const nlohmann::json::exception& e) {
             LOGe("Failed to parse device info JSON: %s", e.what());
         }
@@ -3500,8 +3498,7 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     return static_cast<jint>(result);
 }
 
-JNIEXPORT void JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkSetClientInfo(
+JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkSetClientInfo(
     JNIEnv* env, jclass clazz, jstring sdkBinding, jstring appIdentifier, jstring appName,
     jstring appVersion, jstring appBuild, jstring locale, jstring timezone) {
     (void)clazz;
@@ -5462,6 +5459,19 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionGeneratePro
     rac_result_t rc = rac_diffusion_generate_proto(handleFromJLong(handle), options.u8(),
                                                    options.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racDiffusionGenerateProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionGenerateLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_diffusion_generate_lifecycle_proto(request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racDiffusionGenerateLifecycleProto");
 }
 
 JNIEXPORT jbyteArray JNICALL
@@ -7859,8 +7869,8 @@ void rac_jni_erase_vad_listeners(JNIEnv* env, uintptr_t handle_key) {
 // individually — otherwise the C++ compiler mangles the JNI export name and the
 // runtime fails with "No implementation found for ...racPlatformRegisterSystemTts".
 extern "C" JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformRegisterSystemTts(JNIEnv* env,
-                                                                                     jclass clazz) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformRegisterSystemTts(
+    JNIEnv* env, jclass clazz) {
     (void)env;
     (void)clazz;
 

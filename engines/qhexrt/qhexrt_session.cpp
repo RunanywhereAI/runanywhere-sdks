@@ -28,6 +28,7 @@
 #endif
 
 #include "qhexrt_bundle_policy.h"
+
 #include "rac/core/rac_logger.h"
 
 namespace fs = std::filesystem;
@@ -45,7 +46,9 @@ std::size_t g_rt_refs = 0;
 const char* kAdspLibraryPathEnv = "ADSP_LIBRARY_PATH";
 const char* kQhexrtSkelDirEnv = "RUNANYWHERE_QHEXRT_SKEL_DIR";
 
-bool contains_zip_separator(const std::string& path) { return path.find("!/") != std::string::npos; }
+bool contains_zip_separator(const std::string& path) {
+    return path.find("!/") != std::string::npos;
+}
 
 bool directory_contains_qnn_skel(const std::string& path) {
     if (path.empty() || contains_zip_separator(path)) {
@@ -112,8 +115,7 @@ void append_existing_adsp_paths(std::vector<std::string>& paths, const char* exi
 void configure_adsp_library_path() {
     std::vector<std::string> paths;
     const char* skel_dir = std::getenv(kQhexrtSkelDirEnv);
-    if (skel_dir != nullptr && skel_dir[0] != '\0' &&
-        !append_path(paths, skel_dir, true)) {
+    if (skel_dir != nullptr && skel_dir[0] != '\0' && !append_path(paths, skel_dir, true)) {
         RAC_LOG_WARNING(LOG_CAT, "Ignoring invalid QHexRT skel directory: %s", skel_dir);
     }
 
@@ -145,8 +147,8 @@ void configure_adsp_library_path() {
     RAC_LOG_INFO(LOG_CAT, "ADSP_LIBRARY_PATH set to %s", path.c_str());
 }
 
-extern "C" __attribute__((visibility("default"))) void rac_qhexrt_set_skel_directory(
-    const char* path) {
+extern "C" __attribute__((visibility("default"))) void
+rac_qhexrt_set_skel_directory(const char* path) {
     if (path == nullptr || path[0] == '\0') {
         unsetenv(kQhexrtSkelDirEnv);
         return;
@@ -193,7 +195,8 @@ bool ends_with_ci(const std::string& s, const char* suffix) {
     }
     for (size_t i = 0; i < n; ++i) {
         char a = s[s.size() - n + i];
-        if (a >= 'A' && a <= 'Z') a = static_cast<char>(a + ('a' - 'A'));
+        if (a >= 'A' && a <= 'Z')
+            a = static_cast<char>(a + ('a' - 'A'));
         if (a != suffix[i]) {
             return false;
         }
@@ -204,7 +207,9 @@ bool ends_with_ci(const std::string& s, const char* suffix) {
 // Aux JSON files that live next to a manifest but are not the manifest
 // itself. Single source of truth: qhexrt_bundle_policy.h, shared with the
 // commons-side bundle resolution so remote and on-disk selection agree.
-bool is_aux_json(const std::string& name) { return qhexrt_is_aux_json(name.c_str()) != 0; }
+bool is_aux_json(const std::string& name) {
+    return qhexrt_is_aux_json(name.c_str()) != 0;
+}
 
 // A QHexRT manifest carries a "plan"/"schema_version"/"dsp_arch" key. Sniff the
 // head of the file to disambiguate it from arbitrary JSON sidecars.
@@ -218,8 +223,7 @@ bool looks_like_manifest(const fs::path& file) {
     buf[in.gcount() > 0 ? static_cast<size_t>(in.gcount()) : 0] = '\0';
     std::string head(buf);
     return head.find("schema_version") != std::string::npos ||
-           head.find("\"plan\"") != std::string::npos ||
-           head.find("dsp_arch") != std::string::npos;
+           head.find("\"plan\"") != std::string::npos || head.find("dsp_arch") != std::string::npos;
 }
 
 // Returns the manifest .json inside `dir`, or empty. Prefers a file that sniffs
@@ -296,6 +300,8 @@ Session* session_open(const char* manifest_path) {
         runtime_release();
         return nullptr;
     }
+    s->model_ref = manifest_path;
+    s->scratch_dir = fs::path(manifest).parent_path().generic_string();
     // artifacts_dir = NULL -> manifest-relative paths resolve against its own dir.
     s->model = qhx_model_load(rt, manifest.c_str(), nullptr);
     if (s->model == nullptr) {

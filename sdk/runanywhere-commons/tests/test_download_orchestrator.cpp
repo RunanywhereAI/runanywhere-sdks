@@ -24,6 +24,7 @@
 #include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/core/rac_core.h"
 
 #ifdef RAC_HAVE_PROTOBUF
 #include "download_service.pb.h"
@@ -1085,6 +1086,82 @@ static TestResult test_proto_start_progress_callback_complete() {
     return r;
 }
 
+static TestResult test_proto_nested_multifile_reports_model_root() {
+    TestResult r;
+    r.test_name = "proto_nested_multifile_reports_model_root";
+
+    FakeTransport fake;
+    ScopedFakeTransport scoped(&fake);
+    std::string base_dir = create_temp_dir("proto_nested_multifile");
+    ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
+    rac_model_paths_set_base_dir(base_dir.c_str());
+
+    const std::string model_id = "proto-nested-multifile";
+    const std::string model_name = "Nested multifile";
+    const std::string model_url = "http://fake/success";
+    rac_model_info_t registered{};
+    registered.id = const_cast<char*>(model_id.c_str());
+    registered.name = const_cast<char*>(model_name.c_str());
+    registered.download_url = const_cast<char*>(model_url.c_str());
+    registered.category = RAC_MODEL_CATEGORY_IMAGE_GENERATION;
+    registered.framework = RAC_FRAMEWORK_QHEXRT;
+    registered.format = RAC_MODEL_FORMAT_QNN_CONTEXT;
+    ASSERT_TRUE(rac_register_model(&registered) == RAC_SUCCESS,
+                "Model must be registered so the start path resolves its framework root");
+
+    rav1::DownloadPlanRequest request;
+    request.set_model_id(model_id);
+    rav1::ModelInfo* model = request.mutable_model();
+    model->set_id(model_id);
+    model->set_name(model_name);
+    model->set_download_url(model_url);
+    model->set_framework(rav1::INFERENCE_FRAMEWORK_QHEXRT);
+    model->set_format(rav1::MODEL_FORMAT_QNN_CONTEXT);
+    for (const auto& relative : {std::string("context/model.bin"), std::string("manifest.json")}) {
+        auto* file = model->mutable_multi_file()->add_files();
+        file->set_url(model_url + "/" + relative);
+        file->set_filename(relative.substr(relative.find_last_of('/') + 1));
+        file->set_relative_path(relative);
+        file->set_is_required(true);
+        file->set_size_bytes(static_cast<int64_t>(fake.payload.size()));
+    }
+
+    std::string plan_bytes = serialize_msg(request);
+    rac_proto_buffer_t plan_buffer;
+    rac_proto_buffer_init(&plan_buffer);
+    ASSERT_TRUE(rac_download_plan_proto(reinterpret_cast<const uint8_t*>(plan_bytes.data()),
+                                        plan_bytes.size(), &plan_buffer) == RAC_SUCCESS,
+                "Nested multi-file plan should succeed");
+    rav1::DownloadPlanResult plan;
+    ASSERT_TRUE(parse_plan(plan_buffer, &plan), "Nested multi-file plan should parse");
+    rac_proto_buffer_free(&plan_buffer);
+    ASSERT_TRUE(plan.can_start() && plan.files_size() == 2,
+                "Nested multi-file plan should contain both files");
+
+    rav1::DownloadStartResult start;
+    ASSERT_TRUE(start_from_plan(plan, false, &start), "Nested multi-file start should parse");
+    ASSERT_TRUE(start.accepted(), "Nested multi-file start should be accepted");
+    rav1::DownloadProgress terminal;
+    ASSERT_TRUE(wait_for_terminal(start.task_id(), &terminal), "Nested multi-file download should finish");
+    ASSERT_TRUE(terminal.state() == rav1::DOWNLOAD_STATE_COMPLETED,
+                "Nested multi-file download should complete");
+
+    char model_folder[4096];
+    ASSERT_TRUE(rac_model_paths_get_model_folder(model_id.c_str(), RAC_FRAMEWORK_QHEXRT,
+                                                 model_folder, sizeof(model_folder)) == RAC_SUCCESS,
+                "Canonical model root should resolve");
+    ASSERT_TRUE(terminal.local_path() == std::string(model_folder),
+                "Completed multi-file local_path must be the model root, not the first nested parent");
+    ASSERT_TRUE(std::ifstream(std::string(model_folder) + "/context/model.bin").good(),
+                "Nested context should exist under the model root");
+    ASSERT_TRUE(std::ifstream(std::string(model_folder) + "/manifest.json").good(),
+                "Root manifest should exist beside the nested context directory");
+
+    remove_dir(base_dir);
+    r.passed = true;
+    return r;
+}
+
 static TestResult test_proto_cancel_resume() {
     TestResult r;
     r.test_name = "proto_cancel_resume";
@@ -1274,6 +1351,8 @@ int main(int argc, char** argv) {
         suite.add("proto_start_no_adapter", test_proto_start_no_adapter);
         suite.add("proto_start_progress_callback_complete",
                   test_proto_start_progress_callback_complete);
+        suite.add("proto_nested_multifile_reports_model_root",
+                  test_proto_nested_multifile_reports_model_root);
         suite.add("proto_cancel_resume", test_proto_cancel_resume);
         suite.add("proto_failed_transfer_no_stale_completion",
                   test_proto_failed_transfer_no_stale_completion);
