@@ -137,14 +137,11 @@ extension CppBridge {
 
         /// Convert a failed native adaptive-context status into an SDK error with backend detail.
         private static func throwIfFailed(_ status: rac_result_t, operation: String) throws {
-            guard status == RAC_SUCCESS else {
-                let nativeMessage = String(cString: rac_error_message(status))
-                throw SDKException(
-                    code: .processingFailed,
-                    message: "LLM adaptive context \(operation) failed: \(nativeMessage) (\(status))",
-                    category: .component
-                )
-            }
+            guard let exception = SDKException.from(rcResult: status) else { return }
+            let nativeMessage = String(cString: rac_error_message(status))
+            var proto = exception.proto
+            proto.message = "LLM adaptive context \(operation) failed: \(nativeMessage) (\(status))"
+            throw SDKException(proto: proto, underlying: exception.underlying)
         }
     }
 }
