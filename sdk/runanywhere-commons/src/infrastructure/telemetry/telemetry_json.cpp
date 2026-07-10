@@ -318,21 +318,22 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_double("vision_encode_time_ms", payload->vision_encode_time_ms);
         json.add_string("image_resolution", payload->image_resolution);
     } else if (strcmp(modality, "rag") == 0) {
-        // retrieved_docs_count / top_k / retrieval_time_ms / embedding_model have
-        // sources today (via the properties carrier). query_token_count /
-        // reranker_used / context_tokens still need carriers.
         json.add_int("retrieved_docs_count", payload->retrieved_docs_count);
         json.add_int("top_k", payload->top_k);
         json.add_double("retrieval_time_ms", payload->retrieval_time_ms);
         json.add_string("embedding_model", payload->embedding_model);
+        // Estimated (chars/4) — the retrieval path has no tokenizer.
+        json.add_int("query_token_count", payload->query_token_count);
+        json.add_int("context_tokens", payload->context_tokens);
+        json.add_bool("reranker_used", payload->reranker_used, payload->has_reranker_used);
     } else if (strcmp(modality, "embeddings") == 0) {
-        // input_count / vectors_produced / embedding_model / embedding_dimension
-        // have sources today (dimension via the properties carrier).
-        // total_tokens / batch_size still need a carrier.
         json.add_int("input_count", payload->input_count);
         json.add_int("vectors_produced", payload->vectors_produced);
         json.add_int("embedding_dimension", payload->embedding_dimension);
         json.add_string("embedding_model", payload->model_id);
+        // Estimated (chars/4) over the embedded texts. batch_size has no
+        // independent source (input_count already carries the batch length).
+        json.add_int("total_tokens", payload->total_tokens);
     } else if (strcmp(modality, "voice") == 0) {
         // Per-turn voice-agent pipeline summary (from MetricsEvent).
         json.add_double("stt_ms", payload->voice_stt_ms);
@@ -457,57 +458,12 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
     JsonBuilder json;
     json.start_object();
 
-    // For development mode (Supabase), flatten the structure to match Supabase schema
-    // For production/staging, use nested device_info structure
-    if (env == RAC_ENV_DEVELOPMENT) {
-        // Flattened structure for Supabase (matches Kotlin SDK DevDeviceRegistrationRequest)
-        const rac_device_registration_info_t* info = &request->device_info;
-
-        // Required fields (matching Supabase schema)
-        if (info->device_id) {
-            json.add_string("device_id", info->device_id);
-        }
-        if (info->platform) {
-            json.add_string("platform", info->platform);
-        }
-        if (info->os_version) {
-            json.add_string("os_version", info->os_version);
-        }
-        if (info->device_model) {
-            json.add_string("device_model", info->device_model);
-        }
-        if (request->sdk_version) {
-            json.add_string("sdk_version", request->sdk_version);
-        }
-        if (has_client_info(request->client_info)) {
-            add_client_info_fields(json, request->client_info);
-        }
-
-        // Optional fields
-        if (request->build_token) {
-            json.add_string("build_token", request->build_token);
-        }
-        if (info->total_memory > 0) {
-            json.add_int("total_memory", info->total_memory);
-        }
-        if (info->architecture) {
-            json.add_string("architecture", info->architecture);
-        }
-        if (info->chip_name) {
-            json.add_string("chip_name", info->chip_name);
-        }
-        if (info->form_factor) {
-            json.add_string("form_factor", info->form_factor);
-        }
-        // has_neural_engine is always set (rac_bool_t), so we can always include it
-        json.add_bool("has_neural_engine", info->has_neural_engine, RAC_TRUE);
-        // Add last_seen_at timestamp for UPSERT to update existing records
-        if (request->last_seen_at_ms > 0) {
-            json.add_timestamp("last_seen_at", request->last_seen_at_ms);
-        }
-    } else {
-        // Nested structure for production/staging
-        // Matches backend schemas/device.py DeviceInfo schema
+    // One payload shape for every environment. The old development branch
+    // emitted a flattened Supabase-era structure for an endpoint that no
+    // longer exists; dev now posts to /api/v1/devices/register like prod.
+    (void)env;
+    {
+        // Nested structure matching backend schemas/device.py DeviceInfo
         const rac_device_registration_info_t* info = &request->device_info;
 
         json.add_string("device_id", info->device_id);
