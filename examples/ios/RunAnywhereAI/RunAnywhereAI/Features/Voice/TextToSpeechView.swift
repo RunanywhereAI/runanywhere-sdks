@@ -6,7 +6,7 @@ import AppKit
 
 // MARK: - Sample Texts
 
-/// Collection of funny sample texts for TTS demo
+/// Collection of light sample texts for text-to-speech.
 private let funnyTTSSampleTexts: [String] = [
     "I'm not saying I'm Batman, but have you ever seen me and Batman in the same room?",
     "According to my calculations, I should have been a millionaire by now. My calculations were wrong.",
@@ -25,7 +25,7 @@ private let funnyTTSSampleTexts: [String] = [
     "We're a Y Combinator company now. Our moms are finally proud of us.",
     "On-device AI means your voice data stays on your phone. Unlike your ex, we respect privacy.",
     "RunAnywhere: Making cloud APIs jealous since 2024.",
-    "Our SDK is so fast, it finished processing before you finished reading this sentence.",
+    "RunAnywhere is so fast, it finished processing before you finished reading this sentence.",
     "Why pay per API call when you can run AI locally? Your wallet called, it says thank you.",
     "Voice AI that runs offline? That's not magic, that's just good engineering. Okay, maybe a little magic."
 ]

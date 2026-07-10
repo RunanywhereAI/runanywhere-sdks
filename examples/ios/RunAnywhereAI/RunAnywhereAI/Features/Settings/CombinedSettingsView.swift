@@ -48,7 +48,7 @@ struct CombinedSettingsView: View {
         } message: {
             Text(
                 "Please restart the app for the new API configuration to take effect. "
-                + "The SDK will be reinitialized with your custom settings."
+                + "RunAnywhere will use your custom connection after restarting."
             )
         }
     }
@@ -131,8 +131,8 @@ private struct IOSSettingsContent: View {
                 Text("Models")
             } footer: {
                 Text(
-                    "RunAnywhere supports multiple backends. "
-                    + "Model labels explain which engine powers each capability."
+                    "Each model is labeled with the technology it uses, "
+                    + "so you can choose what fits your device."
                 )
                 .font(AppTypography.caption)
             }
@@ -160,11 +160,12 @@ private struct IOSSettingsContent: View {
                     SettingsNavigationRow(
                         icon: "slider.horizontal.3",
                         color: AppColors.primaryPurple,
-                        title: "SDK Workbench",
-                        subtitle: "Voice utilities, benchmarks, and diagnostics"
+                        title: "AI Tools",
+                        subtitle: "Voice, performance, and model controls"
                     )
                 }
 
+                #if DEBUG
                 Button(
                     action: { viewModel.showApiKeySheet() },
                     label: {
@@ -211,6 +212,7 @@ private struct IOSSettingsContent: View {
                         }
                     )
                 }
+                #endif
 
                 DisclosureGroup {
                     PrivateDownloadsControls(viewModel: viewModel)
@@ -220,19 +222,24 @@ private struct IOSSettingsContent: View {
             } header: {
                 Text("Advanced")
             } footer: {
+                #if DEBUG
                 Text(
-                    "Developer controls are kept here so the main app stays assistant-first. "
+                    "Connection controls are kept here so the main app stays assistant-first. "
                     + "Add a Hugging Face token to download models from private repos."
                 )
                 .font(AppTypography.caption)
+                #else
+                Text("Add a Hugging Face token to download models from private repos.")
+                    .font(AppTypography.caption)
+                #endif
             }
 
             // About
             Section {
                 VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
-                    Label("RunAnywhere SDK", systemImage: "cube")
+                    Label("RunAnywhere", systemImage: "app")
                         .font(AppTypography.headline)
-                    Text("Version 0.1")
+                    Text(Bundle.main.displayVersion)
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.textSecondary)
                 }
@@ -301,7 +308,9 @@ private struct MacOSSettingsContent: View {
                 AssistantSettingsCard()
                 GenerationSettingsCard(viewModel: viewModel)
                 ToolSettingsCard(viewModel: toolViewModel)
+                #if DEBUG
                 APIConfigurationCard(viewModel: viewModel)
+                #endif
                 PrivateDownloadsCard(viewModel: viewModel)
                 LoggingConfigurationCard(viewModel: viewModel)
                 BenchmarksCard()
@@ -337,8 +346,8 @@ private struct AssistantSettingsCard: View {
                     SettingsNavigationRow(
                         icon: "slider.horizontal.3",
                         color: AppColors.primaryPurple,
-                        title: "SDK Workbench",
-                        subtitle: "Voice utilities, benchmarks, and diagnostics"
+                        title: "AI Tools",
+                        subtitle: "Voice, performance, and model controls"
                     )
                 }
                 .buttonStyle(.plain)
@@ -650,10 +659,10 @@ private struct LoggingConfigurationCard: View {
     @ObservedObject var viewModel: SettingsViewModel
 
     var body: some View {
-        SettingsCard(title: "Logging Configuration") {
+        SettingsCard(title: "Privacy") {
             VStack(alignment: .leading, spacing: AppSpacing.padding15) {
                 HStack {
-                    Text("Log Analytics Locally")
+                    Text("Save Performance History")
                         .frame(width: 150, alignment: .leading)
 
                     Toggle("", isOn: $viewModel.analyticsLogToLocal)
@@ -669,7 +678,7 @@ private struct LoggingConfigurationCard: View {
                         )
                 }
 
-                Text("When enabled, analytics events will be logged locally instead of being sent to the server.")
+                Text("When enabled, performance history is stored locally on this Mac.")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.textSecondary)
             }
@@ -682,12 +691,12 @@ private struct AboutCard: View {
         SettingsCard(title: "About") {
             VStack(alignment: .leading, spacing: AppSpacing.padding15) {
                 HStack {
-                    Image(systemName: "cube")
+                    Image(systemName: "app")
                         .foregroundColor(AppColors.primaryAccent)
                     VStack(alignment: .leading) {
-                        Text("RunAnywhere SDK")
+                        Text("RunAnywhere")
                             .font(AppTypography.headline)
-                        Text("Version 0.1")
+                        Text(Bundle.main.displayVersion)
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.textSecondary)
                     }
@@ -873,7 +882,7 @@ private struct ApiConfigurationSheet: View {
 
                         Text(
                             "After saving, you must restart the app for changes to take effect. "
-                            + "The SDK will reinitialize with your custom configuration."
+                            + "RunAnywhere will use your custom connection after restarting."
                         )
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.textSecondary)
@@ -1075,6 +1084,14 @@ private struct BenchmarksCard: View {
                     .foregroundColor(AppColors.textSecondary)
             }
         }
+    }
+}
+
+private extension Bundle {
+    var displayVersion: String {
+        let version = object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+        let build = object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        return build.isEmpty ? "Version \(version)" : "Version \(version) (\(build))"
     }
 }
 

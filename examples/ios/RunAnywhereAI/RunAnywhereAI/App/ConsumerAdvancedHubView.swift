@@ -2,7 +2,7 @@
 //  ConsumerAdvancedHubView.swift
 //  RunAnywhereAI
 //
-//  Secondary SDK demos and developer-oriented utilities moved out of the main face.
+//  Secondary voice, performance, and model utilities.
 //
 
 import SwiftUI

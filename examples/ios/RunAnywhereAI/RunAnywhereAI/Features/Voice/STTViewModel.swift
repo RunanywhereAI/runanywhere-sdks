@@ -30,7 +30,7 @@ class STTViewModel: VoiceComponentViewModelBase {
     @Published var isProcessing = false
     @Published var isTranscribing = false
     @Published var audioLevel: Float = 0.0
-    @Published var cloudProviderId = "ios-demo-cloud-stt"
+    @Published var cloudProviderId = "runanywhere-cloud-stt"
     @Published var cloudProvider = Cloud.defaultProvider
     @Published var cloudModel = "saarika:v2.5"
     @Published var cloudAPIKey = ""

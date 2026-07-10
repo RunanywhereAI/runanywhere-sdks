@@ -44,7 +44,7 @@ struct InitializationLoadingView: View {
                         .tint(AppColors.primaryAccent)
                         .frame(width: 240)
 
-                    Text("Initializing SDK...")
+                    Text("Getting things ready...")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -77,7 +77,7 @@ struct InitializationErrorView: View {
                 .font(AppTypography.system60)
                 .foregroundColor(AppColors.statusOrange)
 
-            Text("Initialization Failed")
+            Text("RunAnywhere Couldn't Start")
                 .font(.title2)
                 .fontWeight(.semibold)
 

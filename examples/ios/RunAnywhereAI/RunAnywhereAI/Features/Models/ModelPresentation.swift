@@ -132,7 +132,7 @@ enum ConsumerModelGroup: Int, CaseIterable, Identifiable {
         case .modelAdapters:
             return "Adapters customize a loaded base chat model. Choose a primary assistant first."
         case .other:
-            return "Additional SDK model entries available on this device."
+            return "Additional local model entries available on this device."
         }
     }
 }
@@ -257,7 +257,7 @@ extension InferenceFramework {
         case .none:
             return "No model runtime required"
         case .unknown:
-            return "Backend reported by the SDK"
+            return "Runtime details unavailable"
         case .tflite:
             return "Mobile-optimized model runtime"
         case .executorch:
@@ -269,7 +269,7 @@ extension InferenceFramework {
         case .picoLlm:
             return "Small local language models"
         default:
-            return "RunAnywhere backend"
+            return "RunAnywhere model runtime"
         }
     }
 
