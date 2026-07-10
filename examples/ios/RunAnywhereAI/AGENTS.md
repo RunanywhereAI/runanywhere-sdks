@@ -178,6 +178,64 @@ xcodebuild -exportArchive \
   -allowProvisioningUpdates
 ```
 
+#### Required macOS Release Gate
+
+The shared `RunAnywhereAI` target also ships as a native Mac app. Before every
+Mac App Store release:
+
+- Increment `CURRENT_PROJECT_VERSION`; do not reuse an uploaded build number.
+- Keep `MACOSX_DEPLOYMENT_TARGET = 14.5`, matching `Package.swift`.
+- Build and archive the Release configuration for
+  `generic/platform=macOS` with the host logical CPU count.
+- Require App Sandbox, the RunAnywhere app group, camera, microphone, outbound
+  network, and user-selected file entitlements.
+- Require Hardened Runtime in the macOS Release build.
+- Bundle `PrivacyInfo.xcprivacy`, `RunAnywhereLocalSecrets.plist`, and
+  `RunAnywhereConfig-Release.plist` without printing credential values.
+- Keep `RunAnywhereExportedSymbols.txt` out of the app resources and run the
+  platform-filtered Swift-facing native ABI audit against
+  `Contents/MacOS/RunAnywhereAI`. The current Mac target links `RunAnywhere`
+  and `MLXRuntime`; the llama.cpp, ONNX, and Sherpa products are iOS-only
+  because their local XCFrameworks do not contain macOS slices.
+- Verify `codesign`, `arm64`, the absence of quarantine metadata, and zero
+  missing `_rac_*` / `_ra_mlx_*` symbols before opening Organizer.
+
+Archive into Xcode Organizer's standard folder so it is visible immediately:
+
+```bash
+JOBS="$(sysctl -n hw.logicalcpu)"
+ARCHIVE_DIR="$HOME/Library/Developer/Xcode/Archives/$(date +%Y-%m-%d)"
+ARCHIVE="$ARCHIVE_DIR/RunAnywhereAI macOS $(date +%Y-%m-%d\ %H.%M.%S).xcarchive"
+mkdir -p "$ARCHIVE_DIR"
+
+xcodebuild \
+  -project RunAnywhereAI.xcodeproj \
+  -scheme RunAnywhereAI \
+  -configuration Release \
+  -destination 'generic/platform=macOS' \
+  -archivePath "$ARCHIVE" \
+  -allowProvisioningUpdates \
+  -skipPackagePluginValidation \
+  -jobs "$JOBS" \
+  archive
+
+open -a Xcode "$ARCHIVE"
+```
+
+For App Store media, review one to ten screenshots in their final upload order.
+Use `1320x2868` sRGB PNG/JPEG masters for the 6.9-inch iPhone family and
+`2880x1800` sRGB PNG/JPEG masters for macOS. The real app UI must remain the
+dominant content; branded framing and concise, factual feature copy are fine.
+For the current voice-first iPhone set, use authenticated simulator captures
+from llama.cpp LFM2 350M, Sherpa-ONNX Whisper Tiny, and Piper TTS. MLX may be
+listed as a supported runtime, but do not present it as tested evidence unless
+it was separately verified for that build. Until the llama.cpp XCFramework
+gains a macOS slice, Mac copy should describe the shared model catalog instead
+of claiming local llama.cpp execution.
+
+The complete iOS and macOS flow, archive checks, screenshot paths, and upload
+boundary are documented in `docs/RELEASE_INSTRUCTIONS.md`.
+
 ---
 
 ## Architecture Overview
