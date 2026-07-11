@@ -33,7 +33,9 @@ not publishable until every required item is checked and its evidence is retaine
   inventory. Resolve every external approval in
   [`THIRD_PARTY_NOTICES_AUDIT.md`](THIRD_PARTY_NOTICES_AUDIT.md).
 
-`bundleRelease` enforces the following environment variables:
+The Gradle `bundleRelease` gate enforces the backend and signing inputs below.
+The wrapper also requires `SDK_VERSION` and rejects a snapshot or any value that
+does not exactly match the app version in the produced AAB:
 
 ```text
 RUNANYWHERE_BASE_URL
@@ -45,12 +47,76 @@ KEYSTORE_PASSWORD
 KEY_ALIAS
 KEY_PASSWORD
 UPLOAD_CERT_SHA256
+SDK_VERSION
 ```
+
+Use the secret-safe release wrapper rather than invoking `bundleRelease`
+directly:
+
+```bash
+cd examples/android/RunAnywhereAI
+./scripts/build-play-aab.sh
+```
+
+The wrapper disables shell tracing, uses a private umask, fails before native
+or Gradle build work when an input is missing, and passes every value to Gradle
+through its environment rather than command-line arguments. Environment values
+win. On macOS, missing values are read from Keychain service
+`com.runanywhere.android.release`, with an account name exactly matching each
+variable above. Create or update an item without putting its value in the
+command line by leaving `-w` last and entering the value at the prompt, for
+example:
+
+```bash
+security add-generic-password -U \
+  -s com.runanywhere.android.release \
+  -a KEYSTORE_PASSWORD \
+  -w
+```
+
+Use `--no-keychain` for an environment-only CI run. The default workflow removes
+the ignored QHexRT and SDK Android native build directories, rebuilds the private
+QHexRT static libraries, stages them into the SDK, rebuilds the arm64 Android
+native layer, and rebuilds/stages every release AAR before the guarded AAB
+build. `--skip-native-rebuild` is only for a repeat signing/archive run after
+those native outputs have already been validated; it still validates the staged
+runtime set and rebuilds/stages the release AARs.
+
+Both SDK and QHexRT worktrees must be clean, including untracked files. The
+`--allow-dirty` override is only for traceable development validation; its
+archive is explicitly labeled not Play-ready. A default run also cleans the SDK
+and app Gradle outputs, runs app unit tests and release lint, and pins QAIRT
+2.47.0 build 260601114230 plus Android NDK 27.3.13750724.
+
+The wrapper uses only the checksum-pinned official bundletool jar cached under
+the ignored app `build/` directory. It verifies complete JAR-signature coverage,
+the actual upload certificate, exact arm64 native contents, every packaged ELF
+`LOAD` alignment, exact V75/V79/V81 DSP-skel placement, and
+`PAGE_ALIGNMENT_16K`. It then creates a private timestamped directory under
+`build/play-release/` containing:
+
+- the upload-signed AAB;
+- R8 `mapping.txt` and native debug symbols;
+- the release CycloneDX SBOM;
+- bundletool config and merged manifest dumps;
+- native ELF-alignment and QHexRT-skel-layout reports;
+- an arm64-only native-debug-symbol archive and its reviewed layout;
+- SDK/QHexRT Git provenance (including untracked-file dirtiness), pinned QAIRT
+  and NDK versions, AAB metadata, SHA-256 checksums, and the actual upload
+  certificate SHA-256.
+
+Both Gradle wrapper distributions have pinned SHA-256 checksums. Maven/Google
+dependency verification metadata and dependency lockfiles are not yet present,
+so a successful local wrapper run is not by itself byte-for-byte dependency
+reproducibility evidence; resolve that before calling the supply chain fully
+pinned.
 
 ## Engineering gates
 
 - [ ] Clean QHexRT static build and clean Android native SDK build use the pinned
   QAIRT version documented for this release.
+- [ ] Gradle dependency verification metadata and release dependency locks are
+  reviewed and committed; wrapper-distribution checksums alone are insufficient.
 - [ ] Clean release AARs are staged; unit tests and minified release build pass.
 - [ ] Release catalog exposes only architecture/runtime-compatible HNPU models.
 - [ ] No model download plan contains `.dex`, `.jar`, or executable `.so` files.

@@ -24,6 +24,7 @@ esac
 
 cd "${SDK_DIR}"
 ./gradlew \
+    --no-daemon \
     --max-workers=2 \
     -x buildLocalJniLibs \
     "${SDK_TASK}" \
