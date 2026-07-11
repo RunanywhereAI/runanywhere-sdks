@@ -120,7 +120,7 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
 }
 
-required_inputs=(
+release_inputs=(
     RUNANYWHERE_BASE_URL
     RUNANYWHERE_API_KEY
     RUNANYWHERE_PRIVACY_POLICY_URL
@@ -133,9 +133,23 @@ required_inputs=(
     SDK_VERSION
 )
 
+# A blank search URL deliberately selects the tested keyless public fallback.
+# Every other release input is mandatory.
+required_inputs=(
+    RUNANYWHERE_BASE_URL
+    RUNANYWHERE_API_KEY
+    RUNANYWHERE_PRIVACY_POLICY_URL
+    KEYSTORE_PATH
+    KEYSTORE_PASSWORD
+    KEY_ALIAS
+    KEY_PASSWORD
+    UPLOAD_CERT_SHA256
+    SDK_VERSION
+)
+
 run_release_gradle() (
     set +x
-    for name in "${required_inputs[@]}"; do
+    for name in "${release_inputs[@]}"; do
         export "${name}"
     done
     exec ./gradlew "$@" \
@@ -178,7 +192,7 @@ run_app_gradle() (
 # the value is never echoed or placed in a child process's argv.
 if [[ "${USE_KEYCHAIN}" -eq 1 ]]; then
     require_command security
-    for name in "${required_inputs[@]}"; do
+    for name in "${release_inputs[@]}"; do
         if [[ -z "${!name:-}" ]]; then
             keychain_value="$(security find-generic-password \
                 -s "${KEYCHAIN_SERVICE}" \
@@ -563,7 +577,7 @@ rm -f "${staged_aar_hashes_after}"
 
 # No post-build verifier needs backend or signing inputs. Drop them before
 # invoking bundletool, jarsigner, jq, or archival helpers.
-for name in "${required_inputs[@]}"; do
+for name in "${release_inputs[@]}"; do
     unset "${name}"
 done
 

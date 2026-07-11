@@ -32,7 +32,7 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-/** Proxy-backed web search with a developer-only DuckDuckGo fallback. */
+/** Web search through a configured proxy or the keyless DuckDuckGo fallback. */
 internal object WebSearchTool {
     private const val MAX_RESULTS = 5
     private const val MAX_RESPONSE_BYTES = 1_000_000
@@ -98,9 +98,8 @@ internal object WebSearchTool {
             }
         }
 
-        // Developer builds can run without backend credentials. This is not the
-        // Play release path: the release gate requires the configured proxy so a
-        // confidential provider key never has to be embedded in the APK.
+        // Builds without a configured proxy use a keyless public endpoint, so no
+        // confidential search-provider credential is embedded in the APK.
         val liteResults = runCatching {
             parseLiteResults(publicFetcher(buildLiteSearchUrl(trimmed))).take(MAX_RESULTS)
         }.getOrDefault(emptyList())

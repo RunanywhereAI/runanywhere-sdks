@@ -87,8 +87,8 @@ android {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
         targetSdk = 37
-        versionCode = 14
-        versionName = "0.1.5"
+        versionCode = 21
+        versionName = "0.1.12"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -203,7 +203,9 @@ val verifyPlayRelease = tasks.register("verifyPlayRelease") {
         }
         requireHttps("RUNANYWHERE_BASE_URL", runanywhereBaseUrl)
         requireHttps("RUNANYWHERE_PRIVACY_POLICY_URL", privacyPolicyUrl)
-        requireHttps("RUNANYWHERE_WEB_SEARCH_URL", webSearchUrl)
+        if (webSearchUrl.isNotBlank()) {
+            requireHttps("RUNANYWHERE_WEB_SEARCH_URL", webSearchUrl)
+        }
 
         val keystore = file(checkNotNull(releaseKeystorePath))
         check(keystore.isFile) { "KEYSTORE_PATH does not point to a readable upload keystore" }
@@ -230,7 +232,7 @@ val verifyPlayRelease = tasks.register("verifyPlayRelease") {
 val localSdkVersion = providers.environmentVariable("SDK_VERSION").orNull
     ?.removePrefix("v")
     ?.takeIf { it.isNotBlank() }
-    ?: "0.1.5-SNAPSHOT"
+    ?: "0.1.12-SNAPSHOT"
 val localSdkAars = fileTree("../libs") { include("*.aar") }
 
 val generateReleaseSbom = tasks.register("generateReleaseSbom") {

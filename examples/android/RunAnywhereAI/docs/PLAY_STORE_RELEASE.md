@@ -6,11 +6,10 @@ not publishable until every required item is checked and its evidence is retaine
 ## Required publisher inputs
 
 - [ ] Production HTTPS SDK base URL and a public, restricted mobile credential.
-- [ ] HTTPS web-search proxy with server-side Brave/HMAC credentials, an explicit
-  release-key allowlist, installation/organization/global limits, alerting,
-  retention terms, and a tested real-result response contract. A client-supplied
-  device UUID and extractable APK key do not replace Play Integrity or equivalent
-  attestation for a larger public rollout.
+- [ ] Web-search routing is selected and disclosed. A blank proxy URL uses the
+  tested keyless DuckDuckGo path. If the HTTPS Brave proxy is configured, require
+  its release-key allowlist, installation/organization/global limits, alerting,
+  retention terms, and a tested real-result response contract.
 - [ ] Final public HTTPS privacy-policy URL and completed policy placeholders. The
   page must describe the exact candidate; the currently deployed legacy page says
   no analytics or transmission and cannot be used for this build.
@@ -52,7 +51,7 @@ does not exactly match the app version in the produced AAB:
 RUNANYWHERE_BASE_URL
 RUNANYWHERE_API_KEY
 RUNANYWHERE_PRIVACY_POLICY_URL
-RUNANYWHERE_WEB_SEARCH_URL
+RUNANYWHERE_WEB_SEARCH_URL (optional; blank selects the keyless public fallback)
 KEYSTORE_PATH
 KEYSTORE_PASSWORD
 KEY_ALIAS
