@@ -330,24 +330,39 @@ export async function ensureModelReady(
     console.info(`[release-e2e] ${model.id}: load requested`);
     await load.click();
     const loadDeadline = Date.now() + loadTimeout;
-    const loadedAction = row.locator(
-      `[data-model-id="${model.id}"][data-action="select"], `
-      + `[data-model-id="${model.id}"][data-action="unload"]`,
-    );
-    while (!(await loadedAction.isVisible().catch(() => false))) {
-      const errorText = (
-        await row.locator('.model-row-error').textContent().catch(() => null)
-        ?? ''
-      ).trim();
-      if (errorText) {
-        throw new Error(`${model.id} load failed in the model picker: ${errorText}`);
+    while (true) {
+      // Read the picker atomically in-page. A successful load either renders
+      // a loaded action or immediately selects the model and removes the
+      // sheet; retaining a Locator rooted at the replaced row can otherwise
+      // wait on a detached element for the full test timeout.
+      const loadState = await page.evaluate((id) => {
+        const picker = document.querySelector<HTMLElement>('.modal-sheet');
+        if (!picker) return { completed: true, errorText: '' };
+        const actions = Array.from(
+          picker.querySelectorAll<HTMLElement>('[data-model-id][data-action]'),
+        );
+        const loaded = actions.some((action) => (
+          action.dataset.modelId === id
+          && (action.dataset.action === 'select' || action.dataset.action === 'unload')
+        ));
+        const modelRow = Array.from(
+          picker.querySelectorAll<HTMLElement>('[data-model-id]'),
+        ).find((candidate) => candidate.dataset.modelId === id);
+        const errorText = modelRow?.querySelector<HTMLElement>('.model-row-error')
+          ?.textContent?.trim() ?? '';
+        return { completed: loaded, errorText };
+      }, model.id);
+      if (loadState.completed) break;
+      if (loadState.errorText) {
+        throw new Error(`${model.id} load failed in the model picker: ${loadState.errorText}`);
       }
       if (Date.now() >= loadDeadline) {
         throw new Error(`${model.id} did not reach the visible loaded state before timeout`);
       }
       await page.waitForTimeout(1_000);
     }
-    if (!(await isModelLoaded(page, model.id))) {
+    const retainedByNative = await isModelLoaded(page, model.id);
+    if (!retainedByNative) {
       throw new Error(
         `${model.id} reached the visible loaded state but native lifecycle did not retain it`,
       );

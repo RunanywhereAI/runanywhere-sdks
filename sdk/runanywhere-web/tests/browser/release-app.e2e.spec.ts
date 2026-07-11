@@ -626,6 +626,11 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
   test('10 — downloads one canonical LLM and proves streamed chat inference', async ({ appPage }) => {
     await navigateTo(appPage, 'chat');
     await ensureModelReady(appPage, '#chat-toolbar-model', RELEASE_MODELS.llm);
+    // Regression: a successful load auto-selects the model and closes the
+    // picker. The release gate must accept that completion path instead of
+    // waiting for a loaded button that is now intentionally hidden.
+    await expect(appPage.locator('.modal-sheet')).toBeHidden();
+    await expect(appPage.locator('#chat-toolbar-model')).toContainText(/SmolLM2 360M/i);
 
     // Once chat is genuinely ready, prove that its visible composer routes to
     // both Live camera and Talk Mode through user-facing controls.
