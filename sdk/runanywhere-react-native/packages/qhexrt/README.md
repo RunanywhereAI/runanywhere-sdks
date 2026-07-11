@@ -3,7 +3,7 @@
 Android arm64 QHexRT backend for Qualcomm Hexagon V75, V79, and V81 NPUs.
 
 ```ts
-import { QHexRT, HexagonArch } from '@runanywhere/qhexrt';
+import { QHexRT } from '@runanywhere/qhexrt';
 import {
   InferenceFramework,
   RegisterModelFromUrlRequest,
@@ -14,17 +14,16 @@ if (capability.qhexrtSupported) await QHexRT.register();
 
 const model = await QHexRT.registerModelForDevice(
   RegisterModelFromUrlRequest.fromPartial({
-    id: 'my-hnpu-model',
-    name: 'My HNPU Model',
-    url: 'https://huggingface.co/your-org/your-model_HNPU/model.json',
+    id: 'qwen3_5_0_8b',
+    name: 'Qwen3.5 0.8B (HNPU)',
+    url: 'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
     framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-  }),
-  [HexagonArch.HEXAGON_ARCH_V79, HexagonArch.HEXAGON_ARCH_V81]
+  })
 );
 ```
 
 The app remains the source of URLs and presentation metadata. QHexRT owns
-architecture probing and model/device selection, then composes the shared C++
+stable product IDs, architecture/auth policy, and model/device selection, then composes the shared C++
 registry, Hugging Face resolver, download, extraction, validation, and
 local-path workflow. `null` is the normal result when a definition does not
 match the current device.

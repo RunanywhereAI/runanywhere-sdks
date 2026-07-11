@@ -2,21 +2,11 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:runanywhere/generated/hardware_profile.pbenum.dart';
+import 'package:runanywhere/generated/hardware_profile.pb.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere_qhexrt/native/qhexrt_bindings.dart';
 
 void main() {
-  test('generated V75 V79 V81 values cross FFI unchanged', () {
-    final values = QhexrtCatalogWire.archValues(const [
-      HexagonArch.HEXAGON_ARCH_V75,
-      HexagonArch.HEXAGON_ARCH_V79,
-      HexagonArch.HEXAGON_ARCH_V81,
-    ]);
-
-    expect(values, [75, 79, 81]);
-  });
-
   test('model definition crosses FFI as canonical proto bytes', () {
     final request = RegisterModelFromUrlRequest(
       id: 'catalog-contract-model',
@@ -44,6 +34,15 @@ void main() {
       final bindings = QhexrtBindings.fromDynamicLibrary(
         DynamicLibrary.open(hostLibrary!),
       );
+      expect(
+        bindings.modelSupportsArchitecture(
+          'qwen3_5_0_8b',
+          HexagonArch.HEXAGON_ARCH_V81,
+        ),
+        isTrue,
+      );
+      expect(bindings.modelRequiresHfAuth('qwen3_0_6b'), isTrue);
+      expect(bindings.modelRequiresHfAuth('qwen3_5_0_8b'), isFalse);
       final request = RegisterModelFromUrlRequest(
         id: 'flutter-qhexrt-native-contract',
         name: 'Flutter QHexRT Native Contract',
@@ -53,9 +52,7 @@ void main() {
         source: ModelSource.MODEL_SOURCE_REMOTE,
       );
 
-      final registered = bindings.registerModelForDevice(request, const [
-        HexagonArch.HEXAGON_ARCH_V81,
-      ]);
+      final registered = bindings.registerModelForDevice(request);
 
       // A host has no Qualcomm NPU. The important contract is that the Dart
       // wrapper called the real exported symbol and decoded its normal

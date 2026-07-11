@@ -254,14 +254,12 @@ const App: React.FC = () => {
       // Re-apply the persisted HuggingFace token (Settings screen) so private
       // HF model repos stay downloadable across app restarts.
       const storedHfToken = (await getStoredHfToken())?.trim();
+      await RunAnywhere.setHfToken(storedHfToken ?? '');
       if (storedHfToken) {
-        await RunAnywhere.setHfToken(storedHfToken);
         console.log('[App] Applied persisted HuggingFace token');
       }
 
-      await registerAll(backendState, {
-        skipHfAuthModels: !storedHfToken,
-      });
+      await registerAll(backendState);
       await RunAnywhere.refreshModelRegistry();
 
       const initTime = Date.now() - startTime;

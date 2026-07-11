@@ -1,4 +1,3 @@
-import { HexagonArch } from '@runanywhere/proto-ts/hardware_profile';
 import {
   InferenceFramework,
   ModelCategory,
@@ -9,16 +8,6 @@ import {
 import { QHexRTCatalogWire } from '../../src/QHexRTCatalogWire';
 
 describe('QHexRT catalog wire contract', () => {
-  it('passes generated V75 V79 V81 values to Nitro unchanged', () => {
-    expect(
-      QHexRTCatalogWire.archValues([
-        HexagonArch.HEXAGON_ARCH_V75,
-        HexagonArch.HEXAGON_ARCH_V79,
-        HexagonArch.HEXAGON_ARCH_V81,
-      ])
-    ).toEqual([75, 79, 81]);
-  });
-
   it('passes the model definition as canonical proto bytes', () => {
     const request = RegisterModelFromUrlRequest.fromPartial({
       id: 'catalog-contract-model',

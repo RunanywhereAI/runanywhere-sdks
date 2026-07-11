@@ -1,4 +1,3 @@
-import { HexagonArch } from '@runanywhere/proto-ts/hardware_profile';
 import {
   InferenceFramework,
   ModelCategory,
@@ -8,19 +7,6 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 
 const HNPU_DESCRIPTION = 'Qualcomm Hexagon NPU model bundle.';
-const PRIVATE_HNPU_DESCRIPTION =
-  'Private HNPU bundle. Add a Hugging Face token in Settings before downloading.';
-
-const V75 = HexagonArch.HEXAGON_ARCH_V75;
-const V79 = HexagonArch.HEXAGON_ARCH_V79;
-const V81 = HexagonArch.HEXAGON_ARCH_V81;
-
-const V75_V79_V81 = [V75, V79, V81] as const;
-const V79_V81 = [V79, V81] as const;
-const V75_V81 = [V75, V81] as const;
-const V81_ONLY = [V81] as const;
-const V75_ONLY = [V75] as const;
-const V75_V79 = [V75, V79] as const;
 
 export type NpuBundle = Readonly<{
   id: string;
@@ -28,16 +14,14 @@ export type NpuBundle = Readonly<{
   url: string;
   modality: ModelCategory;
   estimatedSizeBytes: number;
-  supportedArches: readonly HexagonArch[];
   contextLength?: number;
   supportsThinking?: boolean;
-  requiresHfAuth?: boolean;
 }>;
 
 /**
  * App-owned QHexRT catalog. Keep this in lockstep with the Kotlin Android
- * example: native QHexRT owns device probing and chip-folder selection, while
- * the example owns URLs, display metadata, and validated architecture sets.
+ * example: native QHexRT owns device probing, per-model architecture/auth
+ * policy, and chip-folder selection; the example owns URLs and presentation.
  */
 export const NPU_BUNDLES: readonly NpuBundle[] = [
   {
@@ -46,7 +30,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 886_089_241,
-    supportedArches: V75_V79_V81,
     contextLength: 512,
   },
   {
@@ -55,7 +38,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 1_441_493_515,
-    supportedArches: V75_V79_V81,
     contextLength: 2_048,
   },
   {
@@ -64,7 +46,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 2_046_527_848,
-    supportedArches: V75_V79_V81,
     contextLength: 1_024,
     supportsThinking: true,
   },
@@ -74,7 +55,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 4_817_344_861,
-    supportedArches: V75_V79_V81,
     contextLength: 1_024,
   },
   {
@@ -83,7 +63,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 6_177_585_629,
-    supportedArches: V79_V81,
     contextLength: 1_024,
   },
   {
@@ -92,7 +71,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 1_823_248_798,
-    supportedArches: V75_V79_V81,
     contextLength: 1_024,
   },
   {
@@ -101,7 +79,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 3_023_821_212,
-    supportedArches: V79_V81,
   },
   {
     id: 'ternary_bonsai_1_7b',
@@ -109,7 +86,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 2_367_579_370,
-    supportedArches: V75_V81,
     contextLength: 1_024,
   },
   {
@@ -118,7 +94,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 6_100_212_369,
-    supportedArches: V79_V81,
   },
   {
     id: 'embeddinggemma_300m',
@@ -126,16 +101,13 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/embeddinggemma_300m_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
     estimatedSizeBytes: 566_263_339,
-    supportedArches: V75_V79_V81,
   },
-  // The documented V79 bundle requires QAIRT 2.48; Android ships 2.47.
   {
     id: 'gemma3n_e4b',
     name: 'Gemma 3n E4B (HNPU)',
     url: 'https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 10_929_816_419,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'gemma4_e2b',
@@ -143,7 +115,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 10_532_159_450,
-    supportedArches: V79_V81,
   },
   {
     id: 'gemma4_e4b',
@@ -151,7 +122,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 13_435_056_195,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'llama_embed_nemotron_8b',
@@ -159,7 +129,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/llama_embed_nemotron_8b_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
     estimatedSizeBytes: 8_079_101_598,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'nv_embedcode_7b',
@@ -167,7 +136,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/nv_embedcode_7b_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
     estimatedSizeBytes: 7_276_868_122,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'nv_embedqa_1b',
@@ -175,7 +143,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/nv_embedqa_1b_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
     estimatedSizeBytes: 2_493_026_133,
-    supportedArches: V75_V79_V81,
   },
   {
     id: 'nv_rerankqa_1b',
@@ -183,7 +150,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/nv_rerankqa_1b_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
     estimatedSizeBytes: 2_494_254_905,
-    supportedArches: V75_V79_V81,
   },
   {
     id: 'deepseek_r1_distill_qwen_1_5b',
@@ -191,7 +157,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 6_211_227_068,
-    supportedArches: V79_V81,
     supportsThinking: true,
   },
   {
@@ -200,7 +165,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 8_210_665_301,
-    supportedArches: V81_ONLY,
     supportsThinking: true,
   },
   {
@@ -209,7 +173,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 8_609_694_487,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'nemoguard_content_8b',
@@ -217,7 +180,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 8_610_354_023,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'nemoguard_topic_8b',
@@ -225,7 +187,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 8_609_694_527,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'qwen3_vl_2b_text',
@@ -233,7 +194,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json',
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     estimatedSizeBytes: 3_220_397_297,
-    supportedArches: V81_ONLY,
     contextLength: 512,
   },
   {
@@ -242,7 +202,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     estimatedSizeBytes: 3_220_397_297,
-    supportedArches: V75_V79,
     contextLength: 512,
   },
   {
@@ -251,7 +210,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/internvl3_5_1b_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     estimatedSizeBytes: 3_067_933_894,
-    supportedArches: V75_V79_V81,
     contextLength: 512,
   },
   {
@@ -260,7 +218,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     estimatedSizeBytes: 10_532_159_450,
-    supportedArches: V79_V81,
   },
   {
     id: 'gemma4_e4b_vlm',
@@ -268,7 +225,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B-vlm.json',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     estimatedSizeBytes: 13_435_056_195,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'nemotron_nano_vl_8b',
@@ -276,7 +232,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     estimatedSizeBytes: 10_057_258_051,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'lama_dilated',
@@ -284,7 +239,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/lama_dilated_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION,
     estimatedSizeBytes: 98_509_597,
-    supportedArches: V79_V81,
   },
   {
     id: 'nemotron_ocr',
@@ -292,7 +246,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/nemotron_ocr_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     estimatedSizeBytes: 121_193_004,
-    supportedArches: V75_ONLY,
   },
   {
     id: 'nemotron_ocr_v1',
@@ -300,7 +253,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/nemotron_ocr_v1_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     estimatedSizeBytes: 121_406_323,
-    supportedArches: V75_ONLY,
   },
   {
     id: 'nemotron_parse',
@@ -308,7 +260,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/nemotron_parse_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     estimatedSizeBytes: 1_995_206_253,
-    supportedArches: V75_ONLY,
   },
   {
     id: 'siglip2_base',
@@ -316,7 +267,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/siglip2_base_HNPU',
     modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
     estimatedSizeBytes: 789_101_244,
-    supportedArches: V75_V79_V81,
   },
   {
     id: 'whisper_base',
@@ -324,7 +274,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     estimatedSizeBytes: 221_522_616,
-    supportedArches: V75_V79_V81,
   },
   {
     id: 'whisper_small',
@@ -332,7 +281,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     estimatedSizeBytes: 676_713_240,
-    supportedArches: V75_V79_V81,
   },
   {
     id: 'moonshine_tiny',
@@ -340,7 +288,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/moonshine_tiny_HNPU/moonshine-tiny.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     estimatedSizeBytes: 84_569_427,
-    supportedArches: V75_V79_V81,
   },
   {
     id: 'moonshine_base',
@@ -348,7 +295,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/moonshine_base_HNPU/moonshine-base.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     estimatedSizeBytes: 167_310_675,
-    supportedArches: V75_V79_V81,
   },
   {
     id: 'parakeet_tdt_0_6b_v2',
@@ -356,7 +302,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     estimatedSizeBytes: 1_280_063_837,
-    supportedArches: V75_V81,
   },
   {
     id: 'parakeet_tdt_0_6b_v3',
@@ -364,7 +309,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     estimatedSizeBytes: 1_317_902_802,
-    supportedArches: V75_V81,
   },
   {
     id: 'parakeet_rnnt_1_1b',
@@ -372,7 +316,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     estimatedSizeBytes: 2_211_659_923,
-    supportedArches: V75_V81,
   },
   {
     id: 'canary_qwen_2_5b',
@@ -380,7 +323,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     estimatedSizeBytes: 5_491_333_979,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'canary_1b_flash',
@@ -388,7 +330,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     estimatedSizeBytes: 1_835_592_227,
-    supportedArches: V75_V81,
   },
   {
     id: 'nemotron_asr_streaming',
@@ -396,7 +337,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     estimatedSizeBytes: 1_361_283_432,
-    supportedArches: V75_V81,
   },
   {
     id: 'melotts_en',
@@ -404,17 +344,13 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
     estimatedSizeBytes: 120_439_053,
-    supportedArches: V75_V79_V81,
   },
-  // V79 needs executable files from the HF bundle, which Play disallows.
   {
     id: 'kokoro_en',
     name: 'Kokoro-82M EN (HNPU)',
     url: 'https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
     estimatedSizeBytes: 470_739_484,
-    supportedArches: V75_V81,
-    requiresHfAuth: true,
   },
   {
     id: 'kitten_nano_0_8',
@@ -422,7 +358,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
     estimatedSizeBytes: 95_842_227,
-    supportedArches: V75_V81,
   },
   {
     id: 'kitten_mini_0_1',
@@ -430,7 +365,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
     estimatedSizeBytes: 449_672_060,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'kitten_mini_0_8',
@@ -438,7 +372,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
     estimatedSizeBytes: 778_828_575,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'kitten_micro_0_8',
@@ -446,7 +379,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
     estimatedSizeBytes: 338_682_302,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'kitten_nano_0_2',
@@ -454,7 +386,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
     estimatedSizeBytes: 105_235_740,
-    supportedArches: V81_ONLY,
   },
   {
     id: 'kitten_nano_0_1',
@@ -462,7 +393,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
     estimatedSizeBytes: 104_733_291,
-    supportedArches: V81_ONLY,
   },
 ];
 
@@ -481,9 +411,7 @@ export function toNpuRegistrationRequest(
     contextLength: bundle.contextLength,
     supportsThinking: bundle.supportsThinking ?? false,
     supportsLora: false,
-    description: bundle.requiresHfAuth
-      ? PRIVATE_HNPU_DESCRIPTION
-      : HNPU_DESCRIPTION,
+    description: HNPU_DESCRIPTION,
   });
 }
 

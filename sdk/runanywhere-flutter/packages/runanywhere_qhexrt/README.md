@@ -22,22 +22,19 @@ if (npu.qhexrtSupported) {          // generated runanywhere.v1.NpuCapability
 
 final model = await QHexRT.registerModelForDevice(
   request: RegisterModelFromUrlRequest(
-    id: 'my-hnpu-model',
-    name: 'My HNPU Model',
-    url: 'https://huggingface.co/your-org/your-model_HNPU/model.json',
+    id: 'qwen3_5_0_8b',
+    name: 'Qwen3.5 0.8B (HNPU)',
+    url: 'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
     framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
   ),
-  supportedArches: const [
-    HexagonArch.HEXAGON_ARCH_V79,
-    HexagonArch.HEXAGON_ARCH_V81,
-  ],
 );
 ```
 
 `probeNpu()` returns the generated `runanywhere.v1.NpuCapability` proto
 message (`socModel`, `socId`, `hexagonArch`, `qhexrtSupported`, `archName`),
 decoded from QHexRT's `rac_qhexrt_probe_proto()` — no hand-mirrored types.
-The app owns URLs and presentation metadata. QHexRT owns chip selection and
+The app owns URLs and presentation metadata. QHexRT owns stable product IDs,
+per-model architecture/auth policy, chip selection, and
 composes commons' registry, Hugging Face resolver, download, extraction,
 validation, and local-path workflow. A null model is a normal device mismatch.
 

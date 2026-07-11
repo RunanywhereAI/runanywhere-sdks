@@ -23,7 +23,7 @@
 #include "../nitrogen/generated/shared/c++/HybridRunAnywhereQHexRTSpec.hpp"
 #endif
 
-#include <vector>
+#include <string>
 
 namespace margelo::nitro::runanywhere::qhexrt {
 
@@ -54,12 +54,12 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   probeNpuProto() override;
   bool isArchitectureSupported(double arch) override;
-  bool modelSupportsArchitecture(const std::vector<double> &supportedArches,
+  bool modelSupportsArchitecture(const std::string &modelId,
                                  double arch) override;
+  bool modelRequiresHfAuth(const std::string &modelId) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
-  registerModelForDeviceProto(
-      const std::shared_ptr<ArrayBuffer> &requestBytes,
-      const std::vector<double> &supportedArches) override;
+  catalogRegisterModelProto(
+      const std::shared_ptr<ArrayBuffer> &requestBytes) override;
 
 private:
   bool isRegistered_ = false;

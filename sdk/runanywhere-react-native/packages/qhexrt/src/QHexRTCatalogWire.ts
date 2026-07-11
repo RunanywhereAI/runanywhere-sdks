@@ -4,7 +4,6 @@ import {
   type RegisterModelFromUrlRequest,
   RegisterModelFromUrlRequest as RegisterModelFromUrlRequestCodec,
 } from '@runanywhere/proto-ts/model_types';
-import type { HexagonArch } from '@runanywhere/proto-ts/hardware_profile';
 
 function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(
@@ -15,10 +14,6 @@ function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 
 /** Generated-enum/protobuf transport only; all QHexRT policy stays native. */
 export const QHexRTCatalogWire = {
-  archValues(arches: Iterable<HexagonArch>): number[] {
-    return Array.from(arches, (arch) => arch as number);
-  },
-
   encodeRequest(request: RegisterModelFromUrlRequest): ArrayBuffer {
     return bytesToArrayBuffer(
       RegisterModelFromUrlRequestCodec.encode(request).finish()

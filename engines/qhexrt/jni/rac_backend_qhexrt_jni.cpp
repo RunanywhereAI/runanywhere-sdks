@@ -48,23 +48,6 @@ void throw_java_exception(JNIEnv* env, const char* class_name, const std::string
     }
 }
 
-std::vector<rac_qhexrt_hexagon_arch_t> copy_arches(JNIEnv* env, jintArray arches) {
-    if (arches == nullptr) {
-        return {};
-    }
-    const jsize count = env->GetArrayLength(arches);
-    std::vector<jint> values(static_cast<size_t>(count));
-    if (count > 0) {
-        env->GetIntArrayRegion(arches, 0, count, values.data());
-    }
-    std::vector<rac_qhexrt_hexagon_arch_t> result;
-    result.reserve(values.size());
-    for (const jint value : values) {
-        result.push_back(static_cast<rac_qhexrt_hexagon_arch_t>(value));
-    }
-    return result;
-}
-
 bool is_input_error(rac_result_t result) {
     return result == RAC_ERROR_INVALID_PARAMETER || result == RAC_ERROR_VALIDATION_FAILED ||
            result == RAC_ERROR_INVALID_INPUT || result == RAC_ERROR_INVALID_ARGUMENT ||
@@ -122,26 +105,48 @@ JNIEXPORT jboolean JNICALL Java_com_runanywhere_sdk_npu_qhexrt_QHexRTBridge_nati
                : JNI_FALSE;
 }
 
-JNIEXPORT jboolean JNICALL Java_com_runanywhere_sdk_npu_qhexrt_QHexRTBridge_nativeModelSupportsArch(
-    JNIEnv* env, jclass clazz, jintArray supported_arches, jint arch) {
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_npu_qhexrt_QHexRTBridge_nativeCatalogModelSupportsArch(JNIEnv* env,
+                                                                                jclass clazz,
+                                                                                jstring model_id,
+                                                                                jint arch) {
     (void)clazz;
-    const std::vector<rac_qhexrt_hexagon_arch_t> arches = copy_arches(env, supported_arches);
-    if (env->ExceptionCheck()) {
+    if (model_id == nullptr) {
         return JNI_FALSE;
     }
-    return rac_qhexrt_model_supports_arch(arches.data(), arches.size(),
-                                          static_cast<rac_qhexrt_hexagon_arch_t>(arch)) == RAC_TRUE
-               ? JNI_TRUE
-               : JNI_FALSE;
+    const char* id = env->GetStringUTFChars(model_id, nullptr);
+    if (id == nullptr) {
+        return JNI_FALSE;
+    }
+    const rac_bool_t supported =
+        rac_qhexrt_catalog_model_supports_arch(id, static_cast<rac_qhexrt_hexagon_arch_t>(arch));
+    env->ReleaseStringUTFChars(model_id, id);
+    return supported == RAC_TRUE ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_npu_qhexrt_QHexRTBridge_nativeCatalogModelRequiresHfAuth(
+    JNIEnv* env, jclass clazz, jstring model_id) {
+    (void)clazz;
+    if (model_id == nullptr) {
+        return JNI_FALSE;
+    }
+    const char* id = env->GetStringUTFChars(model_id, nullptr);
+    if (id == nullptr) {
+        return JNI_FALSE;
+    }
+    const rac_bool_t requires_auth = rac_qhexrt_catalog_model_requires_hf_auth(id);
+    env->ReleaseStringUTFChars(model_id, id);
+    return requires_auth == RAC_TRUE ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jbyteArray JNICALL
-Java_com_runanywhere_sdk_npu_qhexrt_QHexRTBridge_nativeRegisterModelForDeviceProto(
-    JNIEnv* env, jclass clazz, jbyteArray request_bytes, jintArray supported_arches) {
+Java_com_runanywhere_sdk_npu_qhexrt_QHexRTBridge_nativeCatalogRegisterModelProto(
+    JNIEnv* env, jclass clazz, jbyteArray request_bytes) {
     (void)clazz;
-    if (request_bytes == nullptr || supported_arches == nullptr) {
+    if (request_bytes == nullptr) {
         throw_java_exception(env, "java/lang/IllegalArgumentException",
-                             "requestBytes and supportedArches must not be null");
+                             "requestBytes must not be null");
         return nullptr;
     }
 
@@ -151,23 +156,18 @@ Java_com_runanywhere_sdk_npu_qhexrt_QHexRTBridge_nativeRegisterModelForDevicePro
         env->GetByteArrayRegion(request_bytes, 0, request_size,
                                 reinterpret_cast<jbyte*>(request.data()));
     }
-    const std::vector<rac_qhexrt_hexagon_arch_t> arches = copy_arches(env, supported_arches);
-    if (env->ExceptionCheck()) {
-        return nullptr;
-    }
-
     rac_bool_t registered = RAC_FALSE;
     rac_proto_buffer_t model;
     rac_proto_buffer_init(&model);
-    const rac_result_t rc = rac_qhexrt_register_model_for_device_proto(
-        request.data(), request.size(), arches.data(), arches.size(), &registered, &model);
+    const rac_result_t rc = rac_qhexrt_catalog_register_model_proto(request.data(), request.size(),
+                                                                    &registered, &model);
     const rac_result_t status = rc != RAC_SUCCESS ? rc : model.status;
     if (status != RAC_SUCCESS) {
         const std::string detail = model.error_message != nullptr ? model.error_message : "";
         const std::string message =
             "QHexRT device-aware model registration failed (code=" + std::to_string(status) + ")" +
             (detail.empty() ? "" : ": " + detail);
-        LOGe("nativeRegisterModelForDeviceProto: %s", message.c_str());
+        LOGe("nativeCatalogRegisterModelProto: %s", message.c_str());
         rac_proto_buffer_free(&model);
         throw_java_exception(env,
                              is_input_error(status) ? "java/lang/IllegalArgumentException"

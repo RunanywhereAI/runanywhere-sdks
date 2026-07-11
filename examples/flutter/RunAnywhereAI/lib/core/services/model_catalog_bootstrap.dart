@@ -24,7 +24,7 @@ abstract final class ModelCatalogBootstrap {
     }
     debugPrint('Registering modules with their models...');
 
-    final hasHfToken = await _applyPersistedHfToken();
+    await _applyPersistedHfToken();
 
     // --- LLM models (LlamaCpp backend) ------------------------------------
     await _registerLLM(
@@ -288,7 +288,7 @@ abstract final class ModelCatalogBootstrap {
     // --- QHexRT (Hexagon NPU) bundles ---------------------------------------
     // Native QHexRT probes the device, chooses the exact Hexagon bundle, and
     // returns the registered architecture-specific model ID.
-    await _registerNpuBundles(hasHfToken: hasHfToken);
+    await _registerNpuBundles();
 
     debugPrint('All modules and models registered');
     _modulesRegistered = true;
@@ -516,30 +516,27 @@ abstract final class ModelCatalogBootstrap {
   /// Register logical HNPU rows. QHexRT's native bundle resolver chooses the
   /// current device arch; unsupported devices or missing HF child dirs fail
   /// registration and never appear as runnable models.
-  static Future<void> _registerNpuBundles({required bool hasHfToken}) async {
-    final result = await QHexRTModelCatalog.registerForCurrentDevice(
-      hasHfToken: hasHfToken,
-    );
+  static Future<void> _registerNpuBundles() async {
+    final result = await QHexRTModelCatalog.registerForCurrentDevice();
     debugPrint(
       'QHexRT catalog registered: ok=${result.registered} '
-      'failed=${result.failed} skippedHfAuth=${result.skippedHfAuth} '
-      'skippedNative=${result.skippedNative}',
+      'failed=${result.failed} skippedNative=${result.skippedNative}',
     );
   }
 
   static Future<void> refreshNpuCatalog() async {
-    final hasHfToken = await _applyPersistedHfToken();
-    await _registerNpuBundles(hasHfToken: hasHfToken);
+    await _applyPersistedHfToken();
+    await _registerNpuBundles();
     await RunAnywhere.refreshModelRegistry();
   }
 
-  static Future<bool> _applyPersistedHfToken() async {
+  static Future<void> _applyPersistedHfToken() async {
     final token = await HfTokenStore.load();
     if (token.isEmpty) {
-      return false;
+      RunAnywhere.setHfToken('');
+      return;
     }
     RunAnywhere.setHfToken(token);
-    return true;
   }
 
   /// Seed the curated LoRA adapter catalog. `registerArtifact` registers the

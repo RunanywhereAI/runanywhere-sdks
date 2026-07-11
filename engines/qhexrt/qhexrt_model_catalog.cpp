@@ -8,10 +8,12 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/model_management/rac_bundle_policy.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/qhexrt/rac_qhexrt.h"
@@ -20,25 +22,111 @@
 #include "model_types.pb.h"
 #endif
 
+#ifndef RAC_QHEXRT_ENGINE_AVAILABLE
+#define RAC_QHEXRT_ENGINE_AVAILABLE 0
+#endif
+
+extern "C" rac_bool_t rac_backend_qhexrt_is_registered(void);
+
 namespace {
+
+constexpr uint8_t kV75 = 1U << 0;
+constexpr uint8_t kV79 = 1U << 1;
+constexpr uint8_t kV81 = 1U << 2;
+constexpr uint8_t kV75V79 = kV75 | kV79;
+constexpr uint8_t kV75V81 = kV75 | kV81;
+constexpr uint8_t kV79V81 = kV79 | kV81;
+constexpr uint8_t kAllSupportedArches = kV75 | kV79 | kV81;
+
+struct ModelPolicy {
+    std::string_view id;
+    uint8_t arch_mask;
+    bool requires_hf_auth;
+};
+
+// Product URLs and presentation remain app-owned. Stable model identity,
+// device applicability, and remote access class are QHexRT runtime policy so
+// Kotlin, Flutter, and React Native cannot drift independently.
+constexpr ModelPolicy kModelPolicies[] = {
+    {"lfm2_5_230m", kAllSupportedArches, false},
+    {"lfm2_5_350m", kAllSupportedArches, false},
+    {"qwen3_5_0_8b", kAllSupportedArches, false},
+    {"qwen3_5_2b", kAllSupportedArches, false},
+    {"qwen3_5_4b", kV79V81, false},
+    {"qwen3_0_6b", kAllSupportedArches, true},
+    {"llama3_2_1b", kV79V81, false},
+    {"ternary_bonsai_1_7b", kV75V81, false},
+    {"phi_tiny_moe", kV79V81, false},
+    {"embeddinggemma_300m", kAllSupportedArches, false},
+    // The V79 bundle requires QAIRT 2.48; Android production currently ships 2.47.
+    {"gemma3n_e4b", kV81, false},
+    {"gemma4_e2b", kV79V81, false},
+    {"gemma4_e4b", kV81, false},
+    {"llama_embed_nemotron_8b", kV81, true},
+    {"nv_embedcode_7b", kV81, true},
+    {"nv_embedqa_1b", kAllSupportedArches, true},
+    {"nv_rerankqa_1b", kAllSupportedArches, true},
+    {"deepseek_r1_distill_qwen_1_5b", kV79V81, false},
+    {"deepseek_r1_distill_qwen_7b", kV81, false},
+    {"nemotron_nano_8b", kV81, true},
+    {"nemoguard_content_8b", kV81, true},
+    {"nemoguard_topic_8b", kV81, true},
+    {"qwen3_vl_2b_text", kV81, false},
+    {"qwen3_vl", kV75V79, false},
+    {"internvl3_5_1b", kAllSupportedArches, false},
+    {"gemma4_e2b_vlm", kV79V81, false},
+    {"gemma4_e4b_vlm", kV81, false},
+    {"nemotron_nano_vl_8b", kV81, true},
+    {"lama_dilated", kV79V81, false},
+    {"nemotron_ocr", kV75, true},
+    {"nemotron_ocr_v1", kV75, true},
+    {"nemotron_parse", kV75, true},
+    {"siglip2_base", kAllSupportedArches, false},
+    {"whisper_base", kAllSupportedArches, false},
+    {"whisper_small", kAllSupportedArches, false},
+    {"moonshine_tiny", kAllSupportedArches, false},
+    {"moonshine_base", kAllSupportedArches, false},
+    {"parakeet_tdt_0_6b_v2", kV75V81, true},
+    {"parakeet_tdt_0_6b_v3", kV75V81, true},
+    {"parakeet_rnnt_1_1b", kV75V81, true},
+    {"canary_qwen_2_5b", kV81, true},
+    {"canary_1b_flash", kV75V81, true},
+    {"nemotron_asr_streaming", kV75V81, true},
+    {"melotts_en", kAllSupportedArches, false},
+    // V79 requires model-downloaded executable .so files, which Play disallows.
+    {"kokoro_en", kV75V81, true},
+    {"kitten_nano_0_8", kV75V81, true},
+    {"kitten_mini_0_1", kV81, true},
+    {"kitten_mini_0_8", kV81, true},
+    {"kitten_micro_0_8", kV81, true},
+    {"kitten_nano_0_2", kV81, true},
+    {"kitten_nano_0_1", kV81, true},
+};
+
+const ModelPolicy* find_model_policy(std::string_view model_id) {
+    const auto it =
+        std::find_if(std::begin(kModelPolicies), std::end(kModelPolicies),
+                     [model_id](const ModelPolicy& policy) { return policy.id == model_id; });
+    return it == std::end(kModelPolicies) ? nullptr : &*it;
+}
+
+uint8_t arch_mask(rac_qhexrt_hexagon_arch_t arch) {
+    switch (arch) {
+        case RAC_QHEXRT_HEXAGON_ARCH_V75:
+            return kV75;
+        case RAC_QHEXRT_HEXAGON_ARCH_V79:
+            return kV79;
+        case RAC_QHEXRT_HEXAGON_ARCH_V81:
+            return kV81;
+        default:
+            return 0;
+    }
+}
 
 #if defined(RAC_QHEXRT_HAVE_PROTOBUF)
 
 rac_result_t definition_error(rac_proto_buffer_t* out_model, const char* message) {
     return rac_proto_buffer_set_error(out_model, RAC_ERROR_INVALID_ARGUMENT, message);
-}
-
-bool valid_supported_arches(const rac_qhexrt_hexagon_arch_t* supported_arches,
-                            size_t supported_arch_count) {
-    if (supported_arches == nullptr || supported_arch_count == 0) {
-        return false;
-    }
-    for (size_t index = 0; index < supported_arch_count; ++index) {
-        if (rac_qhexrt_arch_is_supported(supported_arches[index]) != RAC_TRUE) {
-            return false;
-        }
-    }
-    return true;
 }
 
 bool starts_with_case_insensitive(std::string_view value, std::string_view prefix) {
@@ -200,10 +288,9 @@ rac_result_t pin_hf_ref_to_arch(const std::string& input, rac_qhexrt_hexagon_arc
 namespace rac::qhexrt::catalog {
 
 rac_result_t register_for_arch_proto(const uint8_t* request_bytes, size_t request_size,
-                                     const rac_qhexrt_hexagon_arch_t* supported_arches,
-                                     size_t supported_arch_count,
                                      rac_qhexrt_hexagon_arch_t detected_arch,
-                                     rac_bool_t* out_registered, rac_proto_buffer_t* out_model) {
+                                     rac_bool_t engine_available, rac_bool_t* out_registered,
+                                     rac_proto_buffer_t* out_model) {
     if (out_registered == nullptr || out_model == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -212,9 +299,8 @@ rac_result_t register_for_arch_proto(const uint8_t* request_bytes, size_t reques
 #if !defined(RAC_QHEXRT_HAVE_PROTOBUF)
     (void)request_bytes;
     (void)request_size;
-    (void)supported_arches;
-    (void)supported_arch_count;
     (void)detected_arch;
+    (void)engine_available;
     return rac_proto_buffer_set_error(out_model, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "QHexRT catalog registration requires protobuf support");
 #else
@@ -223,12 +309,6 @@ rac_result_t register_for_arch_proto(const uint8_t* request_bytes, size_t reques
         return rac_proto_buffer_set_error(out_model, bytes_rc,
                                           "RegisterModelFromUrlRequest bytes are invalid");
     }
-    if (!valid_supported_arches(supported_arches, supported_arch_count)) {
-        return definition_error(out_model,
-                                "supported_arches must contain only QHexRT v75, v79, and/or "
-                                "v81 values");
-    }
-
     runanywhere::v1::RegisterModelFromUrlRequest request;
     if (!request.ParseFromArray(rac_proto_bytes_data_or_empty(request_bytes, request_size),
                                 static_cast<int>(request_size))) {
@@ -248,8 +328,17 @@ rac_result_t register_for_arch_proto(const uint8_t* request_bytes, size_t reques
         return definition_error(out_model, "QHexRT catalog definitions require a URL");
     }
 
-    if (rac_qhexrt_model_supports_arch(supported_arches, supported_arch_count, detected_arch) !=
-        RAC_TRUE) {
+    const ModelPolicy* policy = find_model_policy(request.id());
+    if (policy == nullptr) {
+        return definition_error(out_model, "unknown QHexRT native catalog model id");
+    }
+    if (engine_available != RAC_TRUE) {
+        return rac_proto_buffer_copy(nullptr, 0, out_model);
+    }
+    if ((policy->arch_mask & arch_mask(detected_arch)) == 0) {
+        return rac_proto_buffer_copy(nullptr, 0, out_model);
+    }
+    if (policy->requires_hf_auth && rac_http_hf_token_is_configured() != RAC_TRUE) {
         return rac_proto_buffer_copy(nullptr, 0, out_model);
     }
 
@@ -269,8 +358,8 @@ rac_result_t register_for_arch_proto(const uint8_t* request_bytes, size_t reques
     }
 
     // The policy is inert process-lifetime metadata and registration is
-    // idempotent. Installing it here makes the facade safe before backend
-    // registration while keeping all QHexRT knowledge in the engine.
+    // idempotent. Ensure it is installed before commons registration while
+    // keeping all QHexRT knowledge in the engine.
     const rac_result_t policy_rc = rac_bundle_policy_register(qhexrt_bundle_policy());
     if (policy_rc != RAC_SUCCESS) {
         return rac_proto_buffer_set_error(out_model, policy_rc,
@@ -291,28 +380,38 @@ rac_result_t register_for_arch_proto(const uint8_t* request_bytes, size_t reques
 
 extern "C" {
 
-rac_bool_t rac_qhexrt_model_supports_arch(const rac_qhexrt_hexagon_arch_t* supported_arches,
-                                          size_t supported_arch_count,
-                                          rac_qhexrt_hexagon_arch_t arch) {
-    if (supported_arches == nullptr || supported_arch_count == 0 ||
-        rac_qhexrt_arch_is_supported(arch) != RAC_TRUE) {
-        return RAC_FALSE;
-    }
-    for (size_t index = 0; index < supported_arch_count; ++index) {
-        if (supported_arches[index] == arch) {
-            return RAC_TRUE;
-        }
-    }
-    return RAC_FALSE;
+rac_bool_t rac_qhexrt_catalog_model_is_known(const char* model_id) {
+    return model_id != nullptr && find_model_policy(model_id) != nullptr ? RAC_TRUE : RAC_FALSE;
 }
 
-rac_result_t
-rac_qhexrt_register_model_for_device_proto(const uint8_t* request_bytes, size_t request_size,
-                                           const rac_qhexrt_hexagon_arch_t* supported_arches,
-                                           size_t supported_arch_count, rac_bool_t* out_registered,
-                                           rac_proto_buffer_t* out_model) {
+rac_bool_t rac_qhexrt_catalog_model_supports_arch(const char* model_id,
+                                                  rac_qhexrt_hexagon_arch_t arch) {
+    if (model_id == nullptr) {
+        return RAC_FALSE;
+    }
+    const ModelPolicy* policy = find_model_policy(model_id);
+    return policy != nullptr && (policy->arch_mask & arch_mask(arch)) != 0 ? RAC_TRUE : RAC_FALSE;
+}
+
+rac_bool_t rac_qhexrt_catalog_model_requires_hf_auth(const char* model_id) {
+    if (model_id == nullptr) {
+        return RAC_FALSE;
+    }
+    const ModelPolicy* policy = find_model_policy(model_id);
+    return policy != nullptr && policy->requires_hf_auth ? RAC_TRUE : RAC_FALSE;
+}
+
+rac_result_t rac_qhexrt_catalog_register_model_proto(const uint8_t* request_bytes,
+                                                     size_t request_size,
+                                                     rac_bool_t* out_registered,
+                                                     rac_proto_buffer_t* out_model) {
     if (out_registered == nullptr || out_model == nullptr) {
         return RAC_ERROR_NULL_POINTER;
+    }
+
+    *out_registered = RAC_FALSE;
+    if (!RAC_QHEXRT_ENGINE_AVAILABLE || rac_backend_qhexrt_is_registered() != RAC_TRUE) {
+        return rac_proto_buffer_copy(nullptr, 0, out_model);
     }
 
     rac_qhexrt_device_info_t capability{};
@@ -322,8 +421,7 @@ rac_qhexrt_register_model_for_device_proto(const uint8_t* request_bytes, size_t 
         return rac_proto_buffer_set_error(out_model, probe_rc, "QHexRT device probe failed");
     }
     return rac::qhexrt::catalog::register_for_arch_proto(
-        request_bytes, request_size, supported_arches, supported_arch_count,
-        capability.hexagon_arch, out_registered, out_model);
+        request_bytes, request_size, capability.hexagon_arch, RAC_TRUE, out_registered, out_model);
 }
 
 }  // extern "C"

@@ -33,10 +33,6 @@ export type BackendRegistrationState = {
   qhexrtRegistered: boolean;
 };
 
-export type CatalogRegistrationOptions = {
-  skipHfAuthModels?: boolean;
-};
-
 let qhexrtBackendRegistered = false;
 
 /**
@@ -44,8 +40,7 @@ let qhexrtBackendRegistered = false;
  * backend. Matches iOS `ModelCatalogBootstrap.registerAll()`.
  */
 export async function registerAll(
-  backendState: BackendRegistrationState,
-  options: CatalogRegistrationOptions = {}
+  backendState: BackendRegistrationState
 ): Promise<void> {
   const { llamaRegistered, onnxRegistered, mlxRegistered, qhexrtRegistered } =
     backendState;
@@ -316,7 +311,7 @@ export async function registerAll(
   // =========================================================================
   qhexrtBackendRegistered = qhexrtRegistered;
   if (await isNpuCatalogReady()) {
-    const result = await registerNpuBundles(options.skipHfAuthModels ?? false);
+    const result = await registerNpuBundles();
     publishNpuCatalogAcceptance(result.registeredIds);
   } else {
     publishNpuCatalogAcceptance([]);
@@ -579,7 +574,6 @@ type NpuSeedResult = Readonly<{
   registeredIds: ReadonlySet<string>;
   registered: number;
   failed: number;
-  skippedHfAuth: number;
   skippedNative: number;
 }>;
 
@@ -599,25 +593,16 @@ async function isNpuCatalogReady(): Promise<boolean> {
 }
 
 /** Register only the logical HNPU rows accepted by native QHexRT. */
-async function registerNpuBundles(
-  skipHfAuthModels: boolean
-): Promise<NpuSeedResult> {
+async function registerNpuBundles(): Promise<NpuSeedResult> {
   const registeredIds = new Set<string>();
   let registered = 0;
   let failed = 0;
-  let skippedHfAuth = 0;
   let skippedNative = 0;
 
   for (const bundle of NPU_BUNDLES) {
-    if (skipHfAuthModels && bundle.requiresHfAuth) {
-      skippedHfAuth += 1;
-      continue;
-    }
-
     try {
       const saved = await QHexRT.registerModelForDevice(
-        toNpuRegistrationRequest(bundle),
-        bundle.supportedArches
+        toNpuRegistrationRequest(bundle)
       );
       if (saved) {
         registered += 1;
@@ -635,13 +620,12 @@ async function registerNpuBundles(
 
   logDiagnostic(
     `[App] QHexRT catalog seeded: ok=${registered} failed=${failed} ` +
-      `skippedHfAuth=${skippedHfAuth} skippedNative=${skippedNative}`
+      `skippedNative=${skippedNative}`
   );
   return {
     registeredIds,
     registered,
     failed,
-    skippedHfAuth,
     skippedNative,
   };
 }
@@ -650,9 +634,7 @@ async function registerNpuBundles(
  * Re-seed QHexRT rows after token/config changes. A generic registry refresh is
  * only meaningful when native QHexRT is still registered on a supported device.
  */
-export async function refreshNpuCatalog(
-  options: CatalogRegistrationOptions = {}
-): Promise<boolean> {
+export async function refreshNpuCatalog(): Promise<boolean> {
   if (!(await isNpuCatalogReady())) {
     publishNpuCatalogAcceptance([]);
     logDiagnostic(
@@ -661,7 +643,7 @@ export async function refreshNpuCatalog(
     return false;
   }
 
-  const result = await registerNpuBundles(options.skipHfAuthModels ?? false);
+  const result = await registerNpuBundles();
   let registryRefreshed = false;
   try {
     await RunAnywhere.refreshModelRegistry();

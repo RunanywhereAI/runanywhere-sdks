@@ -45,11 +45,6 @@ void main() {
         kotlinModel.supportsThinking,
         reason: flutterModel.id,
       );
-      expect(
-        flutterModel.supportedArches,
-        kotlinModel.supportedArches,
-        reason: flutterModel.id,
-      );
     }
   });
 
@@ -78,7 +73,6 @@ void main() {
         );
         expect(request.supportsThinking, model.supportsThinking);
         expect(request.supportsLora, model.supportsLora);
-        expect(model.supportedArches, isNotEmpty);
         expect(model.url, startsWith('https://'));
       }
     },
@@ -87,12 +81,11 @@ void main() {
   test(
     'native accepted IDs replace logical and stale QHexRT picker rows',
     () async {
-      final seenArches = <String, Set<HexagonArch>>{};
+      final seenIds = <String>{};
       final result = await QHexRTModelCatalog.registerWith(
         deviceEligible: true,
-        hasHfToken: false,
-        registrar: (request, arches) async {
-          seenArches[request.id] = arches.toSet();
+        registrar: (request) async {
+          seenIds.add(request.id);
           if (request.id == 'qwen3_5_0_8b') {
             return ModelInfo(
               id: 'qwen3_5_0_8b_v81',
@@ -105,15 +98,10 @@ void main() {
 
       expect(result.registered, 1);
       expect(result.failed, 0);
-      expect(result.skippedHfAuth, 1);
-      expect(result.skippedNative, 49);
+      expect(result.skippedNative, 50);
       expect(result.registeredModelIds, {'qwen3_5_0_8b_v81'});
-      expect(seenArches, isNot(contains('kokoro_en')));
-      expect(seenArches['qwen3_5_0_8b'], {
-        HexagonArch.HEXAGON_ARCH_V75,
-        HexagonArch.HEXAGON_ARCH_V79,
-        HexagonArch.HEXAGON_ARCH_V81,
-      });
+      expect(seenIds, hasLength(51));
+      expect(seenIds, contains('kokoro_en'));
 
       final cpu = ModelInfo(
         id: 'cpu-model',
@@ -143,8 +131,7 @@ void main() {
   test('non-Android registration clears accepted QHexRT IDs', () async {
     await QHexRTModelCatalog.registerWith(
       deviceEligible: true,
-      hasHfToken: true,
-      registrar: (request, _) async => ModelInfo(
+      registrar: (request) async => ModelInfo(
         id: '${request.id}_native',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
       ),
@@ -153,8 +140,7 @@ void main() {
 
     final result = await QHexRTModelCatalog.registerWith(
       deviceEligible: false,
-      hasHfToken: true,
-      registrar: (_, _) async {
+      registrar: (_) async {
         registrarCalled = true;
         return null;
       },
@@ -195,28 +181,13 @@ void main() {
     expect(ModelSelectionContext.ragLLM.includes(qhexrtLlm), isTrue);
   });
 
-  test('only the explicitly private QHexRT row requires an HF token', () {
-    expect(privateQHexRTHfModelIds, {'kokoro_en'});
-    expect(
-      QHexRTModelCatalog.models
-          .where((model) => model.requiresHfAuth)
-          .map((model) => model.id),
-      ['kokoro_en'],
+  test('non-QHexRT IDs do not inherit native QHexRT auth policy', () {
+    final cpuModelWithSharedId = ModelInfo(
+      id: 'qwen3_0_6b',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
     );
-    expect(
-      (ModelInfo(
-        id: 'kokoro_en',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-      )).requiresHfAuth,
-      isTrue,
-    );
-    expect(
-      (ModelInfo(
-        id: 'whisper_base',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-      )).requiresHfAuth,
-      isFalse,
-    );
+
+    expect(cpuModelWithSharedId.requiresHfAuth, isFalse);
   });
 }
 
@@ -238,7 +209,7 @@ List<_KotlinCatalogModel> _parseKotlinCatalog() {
   final end = source.indexOf('// The Play build', start);
   final catalogSource = source.substring(start, end);
   final rowPattern = RegExp(
-    r'SingleFileModel\("([^"]+)", "([^"]+)", "([^"]+)", QHEXRT, ([A-Z_]+), ([0-9_]+)L([^)]*)\)\.supportedOn\(([^)]*)\)',
+    r'SingleFileModel\("([^"]+)", "([^"]+)", "([^"]+)", QHEXRT, ([A-Z_]+), ([0-9_]+)L([^)]*)\)',
   );
 
   return rowPattern
@@ -260,11 +231,6 @@ List<_KotlinCatalogModel> _parseKotlinCatalog() {
           supportsThinking: optionalArguments.contains(
             'supportsThinking = true',
           ),
-          supportedArches: match
-              .group(7)!
-              .split(',')
-              .map((arch) => _kotlinArch(arch.trim()))
-              .toSet(),
         );
       })
       .toList(growable: false);
@@ -280,13 +246,6 @@ ModelCategory _kotlinCategory(String category) => switch (category) {
   _ => throw StateError('Unknown Kotlin category: $category'),
 };
 
-HexagonArch _kotlinArch(String arch) => switch (arch) {
-  'V75' => HexagonArch.HEXAGON_ARCH_V75,
-  'V79' => HexagonArch.HEXAGON_ARCH_V79,
-  'V81' => HexagonArch.HEXAGON_ARCH_V81,
-  _ => throw StateError('Unknown Kotlin Hexagon arch: $arch'),
-};
-
 class _KotlinCatalogModel {
   const _KotlinCatalogModel({
     required this.id,
@@ -296,7 +255,6 @@ class _KotlinCatalogModel {
     required this.memoryBytes,
     required this.contextLength,
     required this.supportsThinking,
-    required this.supportedArches,
   });
 
   final String id;
@@ -306,5 +264,4 @@ class _KotlinCatalogModel {
   final int memoryBytes;
   final int? contextLength;
   final bool supportsThinking;
-  final Set<HexagonArch> supportedArches;
 }

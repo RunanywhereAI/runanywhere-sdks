@@ -1,27 +1,13 @@
 package com.runanywhere.sdk.npu.qhexrt
 
-import ai.runanywhere.proto.v1.HexagonArch
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.RegisterModelFromUrlRequest
 import org.junit.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 class QHexRTCatalogWireTest {
-    @Test
-    fun `generated V75 V79 V81 values cross JNI unchanged`() {
-        val arches =
-            listOf(
-                HexagonArch.HEXAGON_ARCH_V75,
-                HexagonArch.HEXAGON_ARCH_V79,
-                HexagonArch.HEXAGON_ARCH_V81,
-            )
-
-        assertContentEquals(intArrayOf(75, 79, 81), QHexRTCatalogWire.archValues(arches))
-    }
-
     @Test
     fun `model definition crosses JNI as canonical proto bytes`() {
         val request =

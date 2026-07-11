@@ -84,16 +84,6 @@ rac_qhexrt_hexagon_arch_t toNativeArch(double arch) {
   return static_cast<rac_qhexrt_hexagon_arch_t>(static_cast<int32_t>(arch));
 }
 
-std::vector<rac_qhexrt_hexagon_arch_t>
-toNativeArches(const std::vector<double> &arches) {
-  std::vector<rac_qhexrt_hexagon_arch_t> native;
-  native.reserve(arches.size());
-  for (const double arch : arches) {
-    native.push_back(toNativeArch(arch));
-  }
-  return native;
-}
-
 std::vector<uint8_t>
 copyArrayBuffer(const std::shared_ptr<ArrayBuffer> &buffer) {
   if (!buffer || buffer->size() == 0) {
@@ -226,35 +216,39 @@ bool HybridRunAnywhereQHexRT::isArchitectureSupported(double arch) {
 }
 
 bool HybridRunAnywhereQHexRT::modelSupportsArchitecture(
-    const std::vector<double> &supportedArches, double arch) {
+    const std::string &modelId, double arch) {
 #if !RAC_QHEXRT_BACKEND_AVAILABLE
-  (void)supportedArches;
+  (void)modelId;
   (void)arch;
   return false;
 #else
-  const auto nativeArches = toNativeArches(supportedArches);
-  return rac_qhexrt_model_supports_arch(nativeArches.data(),
-                                        nativeArches.size(),
-                                        toNativeArch(arch)) == RAC_TRUE;
+  return rac_qhexrt_catalog_model_supports_arch(modelId.c_str(),
+                                                toNativeArch(arch)) == RAC_TRUE;
+#endif
+}
+
+bool HybridRunAnywhereQHexRT::modelRequiresHfAuth(const std::string &modelId) {
+#if !RAC_QHEXRT_BACKEND_AVAILABLE
+  (void)modelId;
+  return false;
+#else
+  return rac_qhexrt_catalog_model_requires_hf_auth(modelId.c_str()) == RAC_TRUE;
 #endif
 }
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
-HybridRunAnywhereQHexRT::registerModelForDeviceProto(
-    const std::shared_ptr<ArrayBuffer> &requestBytes,
-    const std::vector<double> &supportedArches) {
+HybridRunAnywhereQHexRT::catalogRegisterModelProto(
+    const std::shared_ptr<ArrayBuffer> &requestBytes) {
   auto request = copyArrayBuffer(requestBytes);
-  auto arches = toNativeArches(supportedArches);
   return Promise<std::shared_ptr<ArrayBuffer>>::async(
-      [request = std::move(request), arches = std::move(arches)]() {
+      [request = std::move(request)]() {
 #if !RAC_QHEXRT_BACKEND_AVAILABLE
         return ArrayBuffer::allocate(0);
 #else
         rac_bool_t registered = RAC_FALSE;
         ScopedProtoBuffer out;
-        const rac_result_t rc = rac_qhexrt_register_model_for_device_proto(
-            request.data(), request.size(), arches.data(), arches.size(),
-            &registered, &out.value);
+        const rac_result_t rc = rac_qhexrt_catalog_register_model_proto(
+            request.data(), request.size(), &registered, &out.value);
         const rac_result_t status = rc != RAC_SUCCESS ? rc : out.value.status;
         if (status != RAC_SUCCESS) {
           const std::string detail =

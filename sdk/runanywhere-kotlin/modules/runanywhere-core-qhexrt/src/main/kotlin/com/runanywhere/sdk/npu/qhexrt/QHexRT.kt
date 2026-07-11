@@ -90,41 +90,38 @@ object QHexRT {
     }
 
     /**
-     * Match a model definition's declared [supportedArches] against [arch].
-     * Validation and the supported-device policy stay in the native QHexRT
-     * module; this method only transports generated enum values.
+     * Match native product catalog policy for [modelId] against [arch].
      */
     fun modelSupportsArchitecture(
-        supportedArches: Collection<HexagonArch>,
+        modelId: String,
         arch: HexagonArch,
     ): Boolean {
         RunAnywhereBridge.ensureNativeLibraryLoaded()
         if (!QHexRTBridge.ensureNativeLibraryLoaded()) return false
-        return QHexRTBridge.nativeModelSupportsArch(
-            QHexRTCatalogWire.archValues(supportedArches),
-            arch.value,
-        )
+        return QHexRTBridge.nativeCatalogModelSupportsArch(modelId, arch.value)
+    }
+
+    /** Whether native product policy marks [modelId] as HF-authenticated. */
+    fun modelRequiresHfAuth(modelId: String): Boolean {
+        RunAnywhereBridge.ensureNativeLibraryLoaded()
+        if (!QHexRTBridge.ensureNativeLibraryLoaded()) return false
+        return QHexRTBridge.nativeCatalogModelRequiresHfAuth(modelId)
     }
 
     /**
-     * Register [request] only when this device matches [supportedArches].
+     * Register [request] only when native product policy allows it here.
      *
      * The app remains the source of the model URL and presentation metadata.
      * QHexRT owns device probing and architecture selection, then composes the
      * shared C++ URL-registration/download pipeline. Returns `null` for the
      * normal "model is not eligible on this device" outcome.
      */
-    suspend fun registerModelForDevice(
-        request: RegisterModelFromUrlRequest,
-        supportedArches: Collection<HexagonArch>,
-    ): ModelInfo? {
+    suspend fun registerModelForDevice(request: RegisterModelFromUrlRequest): ModelInfo? {
         RunAnywhereBridge.ensureNativeLibraryLoaded()
         if (!QHexRTBridge.ensureNativeLibraryLoaded()) return null
         val bytes =
-            QHexRTBridge.nativeRegisterModelForDeviceProto(
-                QHexRTCatalogWire.encodeRequest(request),
-                QHexRTCatalogWire.archValues(supportedArches),
-            ) ?: return null
+            QHexRTBridge.nativeCatalogRegisterModelProto(QHexRTCatalogWire.encodeRequest(request))
+                ?: return null
         return QHexRTCatalogWire.decodeModel(bytes)
     }
 
@@ -183,9 +180,6 @@ object QHexRT {
 
 /** Byte/enum transport only; all QHexRT catalog policy stays native. */
 internal object QHexRTCatalogWire {
-    fun archValues(arches: Collection<HexagonArch>): IntArray =
-        arches.map(HexagonArch::value).toIntArray()
-
     fun encodeRequest(request: RegisterModelFromUrlRequest): ByteArray =
         RegisterModelFromUrlRequest.ADAPTER.encode(request)
 

@@ -2,7 +2,6 @@ package com.runanywhere.runanywhereai.data
 
 import ai.runanywhere.proto.v1.ArchiveStructure
 import ai.runanywhere.proto.v1.ArchiveType
-import ai.runanywhere.proto.v1.HexagonArch
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
@@ -16,16 +15,8 @@ import com.runanywhere.sdk.public.extensions.registerModel
 
 private val QHEXRT = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
 private const val HNPU_DESCRIPTION = "Qualcomm Hexagon NPU model bundle."
-private const val PRIVATE_HNPU_DESCRIPTION =
-    "Private HNPU bundle. Add a Hugging Face token in Settings before downloading."
-
-/** Catalog rows whose Hugging Face repository currently requires authentication. */
-internal val PRIVATE_HF_MODEL_IDS: Set<String> = setOf("kokoro_en")
-
 internal sealed interface CatalogModel {
     val id: String
-    val requiresHfAuth: Boolean
-        get() = id in PRIVATE_HF_MODEL_IDS
     suspend fun register(): ModelInfo?
 }
 
@@ -41,7 +32,6 @@ internal data class SingleFileModel(
     val contextLength: Int? = null,
     val supportsLora: Boolean = false,
     val supportsThinking: Boolean = false,
-    val supportedNpuArches: Set<HexagonArch> = emptySet(),
 ) : CatalogModel {
     internal fun toQHexRTRegistrationRequest(): RegisterModelFromUrlRequest {
         require(framework == QHEXRT) { "Only QHexRT catalog rows use device-aware registration" }
@@ -57,16 +47,13 @@ internal data class SingleFileModel(
             context_length = contextLength,
             supports_thinking = supportsThinking,
             supports_lora = supportsLora,
-            description = if (requiresHfAuth) PRIVATE_HNPU_DESCRIPTION else HNPU_DESCRIPTION,
+            description = HNPU_DESCRIPTION,
         )
     }
 
     override suspend fun register(): ModelInfo? {
         if (framework == QHEXRT) {
-            return QHexRT.registerModelForDevice(
-                request = toQHexRTRegistrationRequest(),
-                supportedArches = supportedNpuArches,
-            )
+            return QHexRT.registerModelForDevice(toQHexRTRegistrationRequest())
         }
         return RunAnywhere.registerModel(
             id = id,

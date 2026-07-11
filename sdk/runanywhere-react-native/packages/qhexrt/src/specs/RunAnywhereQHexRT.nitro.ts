@@ -25,10 +25,9 @@ import type { HybridObject } from 'react-native-nitro-modules';
  * QHexRT is Qualcomm-only (Snapdragon Hexagon NPU); the package ships
  * arm64-v8a Android binaries exclusively.
  */
-export interface RunAnywhereQHexRT
-  extends HybridObject<{
-    android: 'c++';
-  }> {
+export interface RunAnywhereQHexRT extends HybridObject<{
+  android: 'c++';
+}> {
   /**
    * Register the QHexRT backend with the C++ service registry.
    * Calls rac_backend_qhexrt_register(); the single call covers LLM, VLM,
@@ -62,16 +61,16 @@ export interface RunAnywhereQHexRT
   /** True when `arch` is in QHexRT's native device-validated support set. */
   isArchitectureSupported(arch: number): boolean;
 
-  /** Match one model definition's architecture values in native QHexRT. */
-  modelSupportsArchitecture(supportedArches: number[], arch: number): boolean;
+  /** Match native product policy for `modelId` against `arch`. */
+  modelSupportsArchitecture(modelId: string, arch: number): boolean;
+
+  /** Whether native product policy marks `modelId` HF-authenticated. */
+  modelRequiresHfAuth(modelId: string): boolean;
 
   /**
-   * Register a serialized `RegisterModelFromUrlRequest` only when the current
-   * device matches `supportedArches`. Returns serialized `ModelInfo`, or an
-   * empty buffer for the normal ineligible-device/model outcome.
+   * Register a serialized `RegisterModelFromUrlRequest` only when native
+   * product policy allows it on this device. Returns serialized `ModelInfo`,
+   * or an empty buffer for a normal ineligible/private-without-token outcome.
    */
-  registerModelForDeviceProto(
-    requestBytes: ArrayBuffer,
-    supportedArches: number[]
-  ): Promise<ArrayBuffer>;
+  catalogRegisterModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 }

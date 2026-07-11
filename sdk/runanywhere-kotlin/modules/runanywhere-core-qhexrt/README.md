@@ -39,19 +39,16 @@ if (npu.qhexrt_supported) {
 }
 
 val request = RegisterModelFromUrlRequest(
-    id = "my-hnpu-model",
-    name = "My HNPU Model",
-    url = "https://huggingface.co/your-org/your-model_HNPU/model.json",
+    id = "qwen3_5_0_8b",
+    name = "Qwen3.5 0.8B (HNPU)",
+    url = "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json",
     framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
 )
-val model = QHexRT.registerModelForDevice(
-    request,
-    setOf(HexagonArch.HEXAGON_ARCH_V79, HexagonArch.HEXAGON_ARCH_V81),
-)
+val model = QHexRT.registerModelForDevice(request)
 ```
 
-The app owns the request's URL and presentation metadata. QHexRT owns the
-architecture match and composes the shared native registry, Hugging Face
+The app owns the request's URL and presentation metadata. QHexRT owns stable
+product IDs, architecture/auth policy, and composes the shared native registry, Hugging Face
 resolver, download, extraction, validation, and local-path workflow. `null`
 means the definition is not eligible on the current device.
 

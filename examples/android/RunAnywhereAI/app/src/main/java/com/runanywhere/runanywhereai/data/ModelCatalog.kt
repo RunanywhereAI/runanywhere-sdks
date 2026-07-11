@@ -2,7 +2,6 @@ package com.runanywhere.runanywhereai.data
 
 import ai.runanywhere.proto.v1.ArchiveStructure
 import ai.runanywhere.proto.v1.ArchiveType
-import ai.runanywhere.proto.v1.HexagonArch
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.ModelCategory
@@ -15,10 +14,6 @@ internal object ModelCatalog {
     private val SHERPA = InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
     private val ONNX = InferenceFramework.INFERENCE_FRAMEWORK_ONNX
     private val QHEXRT = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
-
-    private val V75 = HexagonArch.HEXAGON_ARCH_V75
-    private val V79 = HexagonArch.HEXAGON_ARCH_V79
-    private val V81 = HexagonArch.HEXAGON_ARCH_V81
 
     private val LANGUAGE = ModelCategory.MODEL_CATEGORY_LANGUAGE
     private val MULTIMODAL = ModelCategory.MODEL_CATEGORY_MULTIMODAL
@@ -38,74 +33,69 @@ internal object ModelCatalog {
         }
     }
 
-    private fun SingleFileModel.supportedOn(vararg arches: HexagonArch): SingleFileModel =
-        copy(supportedNpuArches = arches.toSet())
-
     /**
      * Logical HNPU catalog. These app-owned URLs, display fields, and validated
-     * architecture sets are passed unfiltered to QHexRT; native code probes the
-     * device, selects the architecture folder, and decides which rows register.
+     * definitions are passed to QHexRT; native code owns the per-model
+     * architecture and HF-auth policy, selects the device folder, and decides
+     * which rows register.
      */
     val npuCatalog: List<SingleFileModel> = listOf(
-        SingleFileModel("lfm2_5_230m", "LFM2.5 230M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json", QHEXRT, LANGUAGE, 886_089_241L, contextLength = 512).supportedOn(V75, V79, V81),
-        SingleFileModel("lfm2_5_350m", "LFM2.5 350M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json", QHEXRT, LANGUAGE, 1_441_493_515L, contextLength = 2_048).supportedOn(V75, V79, V81),
-        SingleFileModel("qwen3_5_0_8b", "Qwen3.5 0.8B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json", QHEXRT, LANGUAGE, 2_046_527_848L, contextLength = 1_024, supportsThinking = true).supportedOn(V75, V79, V81),
-        SingleFileModel("qwen3_5_2b", "Qwen3.5 2B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json", QHEXRT, LANGUAGE, 4_817_344_861L, contextLength = 1_024).supportedOn(V75, V79, V81),
-        SingleFileModel("qwen3_5_4b", "Qwen3.5 4B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json", QHEXRT, LANGUAGE, 6_177_585_629L, contextLength = 1_024).supportedOn(V79, V81),
-        SingleFileModel("qwen3_0_6b", "Qwen3 0.6B (HNPU)", "https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json", QHEXRT, LANGUAGE, 1_823_248_798L, contextLength = 1_024).supportedOn(V75, V79, V81),
-        SingleFileModel("llama3_2_1b", "Llama 3.2 1B (HNPU)", "https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json", QHEXRT, LANGUAGE, 3_023_821_212L).supportedOn(V79, V81),
-        SingleFileModel("ternary_bonsai_1_7b", "Ternary Bonsai 1.7B (HNPU)", "https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json", QHEXRT, LANGUAGE, 2_367_579_370L, contextLength = 1_024).supportedOn(V75, V81),
-        SingleFileModel("phi_tiny_moe", "Phi Tiny MoE (HNPU)", "https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json", QHEXRT, LANGUAGE, 6_100_212_369L).supportedOn(V79, V81),
-        SingleFileModel("embeddinggemma_300m", "EmbeddingGemma 300M (HNPU)", "https://huggingface.co/runanywhere/embeddinggemma_300m_HNPU", QHEXRT, EMBEDDING, 566_263_339L).supportedOn(V75, V79, V81),
-        // The documented V79 bundle requires QAIRT 2.48; this app ships 2.47.
-        SingleFileModel("gemma3n_e4b", "Gemma 3n E4B (HNPU)", "https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json", QHEXRT, LANGUAGE, 10_929_816_419L).supportedOn(V81),
-        SingleFileModel("gemma4_e2b", "Gemma 4 E2B (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json", QHEXRT, LANGUAGE, 10_532_159_450L).supportedOn(V79, V81),
-        SingleFileModel("gemma4_e4b", "Gemma 4 E4B (HNPU)", "https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json", QHEXRT, LANGUAGE, 13_435_056_195L).supportedOn(V81),
-        SingleFileModel("llama_embed_nemotron_8b", "Llama Embed Nemotron 8B (HNPU)", "https://huggingface.co/runanywhere/llama_embed_nemotron_8b_HNPU", QHEXRT, EMBEDDING, 8_079_101_598L).supportedOn(V81),
-        SingleFileModel("nv_embedcode_7b", "NV-EmbedCode 7B (HNPU)", "https://huggingface.co/runanywhere/nv_embedcode_7b_HNPU", QHEXRT, EMBEDDING, 7_276_868_122L).supportedOn(V81),
-        SingleFileModel("nv_embedqa_1b", "NV-EmbedQA 1B (HNPU)", "https://huggingface.co/runanywhere/nv_embedqa_1b_HNPU", QHEXRT, EMBEDDING, 2_493_026_133L).supportedOn(V75, V79, V81),
-        SingleFileModel("nv_rerankqa_1b", "NV-RerankQA 1B (HNPU)", "https://huggingface.co/runanywhere/nv_rerankqa_1b_HNPU", QHEXRT, EMBEDDING, 2_494_254_905L).supportedOn(V75, V79, V81),
-        SingleFileModel("deepseek_r1_distill_qwen_1_5b", "DeepSeek R1 Distill Qwen 1.5B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json", QHEXRT, LANGUAGE, 6_211_227_068L, supportsThinking = true).supportedOn(V79, V81),
-        SingleFileModel("deepseek_r1_distill_qwen_7b", "DeepSeek R1 Distill Qwen 7B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json", QHEXRT, LANGUAGE, 8_210_665_301L, supportsThinking = true).supportedOn(V81),
-        SingleFileModel("nemotron_nano_8b", "Llama 3.1 Nemotron Nano 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json", QHEXRT, LANGUAGE, 8_609_694_487L).supportedOn(V81),
-        SingleFileModel("nemoguard_content_8b", "NemoGuard 8B Content Safety (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json", QHEXRT, LANGUAGE, 8_610_354_023L).supportedOn(V81),
-        SingleFileModel("nemoguard_topic_8b", "NemoGuard 8B Topic Control (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json", QHEXRT, LANGUAGE, 8_609_694_527L).supportedOn(V81),
-        SingleFileModel("qwen3_vl_2b_text", "Qwen3-VL 2B Text (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json", QHEXRT, LANGUAGE, 3_220_397_297L, contextLength = 512).supportedOn(V81),
-        SingleFileModel("qwen3_vl", "Qwen3-VL 2B (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json", QHEXRT, MULTIMODAL, 3_220_397_297L, contextLength = 512).supportedOn(V75, V79),
-        SingleFileModel("internvl3_5_1b", "InternVL3.5 1B (HNPU)", "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU", QHEXRT, MULTIMODAL, 3_067_933_894L, contextLength = 512).supportedOn(V75, V79, V81),
-        SingleFileModel("gemma4_e2b_vlm", "Gemma 4 E2B Image (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json", QHEXRT, MULTIMODAL, 10_532_159_450L).supportedOn(V79, V81),
-        SingleFileModel("gemma4_e4b_vlm", "Gemma 4 E4B Image (HNPU)", "https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B-vlm.json", QHEXRT, MULTIMODAL, 13_435_056_195L).supportedOn(V81),
-        SingleFileModel("nemotron_nano_vl_8b", "Llama 3.1 Nemotron Nano VL 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json", QHEXRT, MULTIMODAL, 10_057_258_051L).supportedOn(V81),
-        SingleFileModel("lama_dilated", "LaMa Dilated (HNPU)", "https://huggingface.co/runanywhere/lama_dilated_HNPU", QHEXRT, IMAGE_GENERATION, 98_509_597L).supportedOn(V79, V81),
-        SingleFileModel("nemotron_ocr", "Nemotron OCR (HNPU)", "https://huggingface.co/runanywhere/nemotron_ocr_HNPU", QHEXRT, MULTIMODAL, 121_193_004L).supportedOn(V75),
-        SingleFileModel("nemotron_ocr_v1", "Nemotron OCR v1 (HNPU)", "https://huggingface.co/runanywhere/nemotron_ocr_v1_HNPU", QHEXRT, MULTIMODAL, 121_406_323L).supportedOn(V75),
-        SingleFileModel("nemotron_parse", "Nemotron Parse (HNPU)", "https://huggingface.co/runanywhere/nemotron_parse_HNPU", QHEXRT, MULTIMODAL, 1_995_206_253L).supportedOn(V75),
+        SingleFileModel("lfm2_5_230m", "LFM2.5 230M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json", QHEXRT, LANGUAGE, 886_089_241L, contextLength = 512),
+        SingleFileModel("lfm2_5_350m", "LFM2.5 350M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json", QHEXRT, LANGUAGE, 1_441_493_515L, contextLength = 2_048),
+        SingleFileModel("qwen3_5_0_8b", "Qwen3.5 0.8B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json", QHEXRT, LANGUAGE, 2_046_527_848L, contextLength = 1_024, supportsThinking = true),
+        SingleFileModel("qwen3_5_2b", "Qwen3.5 2B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json", QHEXRT, LANGUAGE, 4_817_344_861L, contextLength = 1_024),
+        SingleFileModel("qwen3_5_4b", "Qwen3.5 4B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json", QHEXRT, LANGUAGE, 6_177_585_629L, contextLength = 1_024),
+        SingleFileModel("qwen3_0_6b", "Qwen3 0.6B (HNPU)", "https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json", QHEXRT, LANGUAGE, 1_823_248_798L, contextLength = 1_024),
+        SingleFileModel("llama3_2_1b", "Llama 3.2 1B (HNPU)", "https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json", QHEXRT, LANGUAGE, 3_023_821_212L),
+        SingleFileModel("ternary_bonsai_1_7b", "Ternary Bonsai 1.7B (HNPU)", "https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json", QHEXRT, LANGUAGE, 2_367_579_370L, contextLength = 1_024),
+        SingleFileModel("phi_tiny_moe", "Phi Tiny MoE (HNPU)", "https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json", QHEXRT, LANGUAGE, 6_100_212_369L),
+        SingleFileModel("embeddinggemma_300m", "EmbeddingGemma 300M (HNPU)", "https://huggingface.co/runanywhere/embeddinggemma_300m_HNPU", QHEXRT, EMBEDDING, 566_263_339L),
+        SingleFileModel("gemma3n_e4b", "Gemma 3n E4B (HNPU)", "https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json", QHEXRT, LANGUAGE, 10_929_816_419L),
+        SingleFileModel("gemma4_e2b", "Gemma 4 E2B (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json", QHEXRT, LANGUAGE, 10_532_159_450L),
+        SingleFileModel("gemma4_e4b", "Gemma 4 E4B (HNPU)", "https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json", QHEXRT, LANGUAGE, 13_435_056_195L),
+        SingleFileModel("llama_embed_nemotron_8b", "Llama Embed Nemotron 8B (HNPU)", "https://huggingface.co/runanywhere/llama_embed_nemotron_8b_HNPU", QHEXRT, EMBEDDING, 8_079_101_598L),
+        SingleFileModel("nv_embedcode_7b", "NV-EmbedCode 7B (HNPU)", "https://huggingface.co/runanywhere/nv_embedcode_7b_HNPU", QHEXRT, EMBEDDING, 7_276_868_122L),
+        SingleFileModel("nv_embedqa_1b", "NV-EmbedQA 1B (HNPU)", "https://huggingface.co/runanywhere/nv_embedqa_1b_HNPU", QHEXRT, EMBEDDING, 2_493_026_133L),
+        SingleFileModel("nv_rerankqa_1b", "NV-RerankQA 1B (HNPU)", "https://huggingface.co/runanywhere/nv_rerankqa_1b_HNPU", QHEXRT, EMBEDDING, 2_494_254_905L),
+        SingleFileModel("deepseek_r1_distill_qwen_1_5b", "DeepSeek R1 Distill Qwen 1.5B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json", QHEXRT, LANGUAGE, 6_211_227_068L, supportsThinking = true),
+        SingleFileModel("deepseek_r1_distill_qwen_7b", "DeepSeek R1 Distill Qwen 7B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json", QHEXRT, LANGUAGE, 8_210_665_301L, supportsThinking = true),
+        SingleFileModel("nemotron_nano_8b", "Llama 3.1 Nemotron Nano 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json", QHEXRT, LANGUAGE, 8_609_694_487L),
+        SingleFileModel("nemoguard_content_8b", "NemoGuard 8B Content Safety (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json", QHEXRT, LANGUAGE, 8_610_354_023L),
+        SingleFileModel("nemoguard_topic_8b", "NemoGuard 8B Topic Control (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json", QHEXRT, LANGUAGE, 8_609_694_527L),
+        SingleFileModel("qwen3_vl_2b_text", "Qwen3-VL 2B Text (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json", QHEXRT, LANGUAGE, 3_220_397_297L, contextLength = 512),
+        SingleFileModel("qwen3_vl", "Qwen3-VL 2B (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json", QHEXRT, MULTIMODAL, 3_220_397_297L, contextLength = 512),
+        SingleFileModel("internvl3_5_1b", "InternVL3.5 1B (HNPU)", "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU", QHEXRT, MULTIMODAL, 3_067_933_894L, contextLength = 512),
+        SingleFileModel("gemma4_e2b_vlm", "Gemma 4 E2B Image (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json", QHEXRT, MULTIMODAL, 10_532_159_450L),
+        SingleFileModel("gemma4_e4b_vlm", "Gemma 4 E4B Image (HNPU)", "https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B-vlm.json", QHEXRT, MULTIMODAL, 13_435_056_195L),
+        SingleFileModel("nemotron_nano_vl_8b", "Llama 3.1 Nemotron Nano VL 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json", QHEXRT, MULTIMODAL, 10_057_258_051L),
+        SingleFileModel("lama_dilated", "LaMa Dilated (HNPU)", "https://huggingface.co/runanywhere/lama_dilated_HNPU", QHEXRT, IMAGE_GENERATION, 98_509_597L),
+        SingleFileModel("nemotron_ocr", "Nemotron OCR (HNPU)", "https://huggingface.co/runanywhere/nemotron_ocr_HNPU", QHEXRT, MULTIMODAL, 121_193_004L),
+        SingleFileModel("nemotron_ocr_v1", "Nemotron OCR v1 (HNPU)", "https://huggingface.co/runanywhere/nemotron_ocr_v1_HNPU", QHEXRT, MULTIMODAL, 121_406_323L),
+        SingleFileModel("nemotron_parse", "Nemotron Parse (HNPU)", "https://huggingface.co/runanywhere/nemotron_parse_HNPU", QHEXRT, MULTIMODAL, 1_995_206_253L),
         // SigLIP2 is a CLIP-style dual-tower embedder — routed as EMBEDDING so the app exercises it via the
         // real embeddings.embed() API: embed(image path) uses the vision tower, embed(label) the text tower,
         // and the harness does zero-shot classification (image closer to its true label than a distractor).
-        SingleFileModel("siglip2_base", "SigLIP2 Base (HNPU)", "https://huggingface.co/runanywhere/siglip2_base_HNPU", QHEXRT, EMBEDDING, 789_101_244L).supportedOn(V75, V79, V81),
-        SingleFileModel("whisper_base", "Whisper Base (HNPU)", "https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json", QHEXRT, STT, 221_522_616L).supportedOn(V75, V79, V81),
-        SingleFileModel("whisper_small", "Whisper Small (HNPU)", "https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json", QHEXRT, STT, 676_713_240L).supportedOn(V75, V79, V81),
-        SingleFileModel("moonshine_tiny", "Moonshine Tiny (HNPU)", "https://huggingface.co/runanywhere/moonshine_tiny_HNPU/moonshine-tiny.json", QHEXRT, STT, 84_569_427L).supportedOn(V75, V79, V81),
-        SingleFileModel("moonshine_base", "Moonshine Base (HNPU)", "https://huggingface.co/runanywhere/moonshine_base_HNPU/moonshine-base.json", QHEXRT, STT, 167_310_675L).supportedOn(V75, V79, V81),
-        SingleFileModel("parakeet_tdt_0_6b_v2", "Parakeet TDT 0.6B v2 (HNPU)", "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json", QHEXRT, STT, 1_280_063_837L).supportedOn(V75, V81),
-        SingleFileModel("parakeet_tdt_0_6b_v3", "Parakeet TDT 0.6B v3 (HNPU)", "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json", QHEXRT, STT, 1_317_902_802L).supportedOn(V75, V81),
-        SingleFileModel("parakeet_rnnt_1_1b", "Parakeet RNNT 1.1B (HNPU)", "https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json", QHEXRT, STT, 2_211_659_923L).supportedOn(V75, V81),
+        SingleFileModel("siglip2_base", "SigLIP2 Base (HNPU)", "https://huggingface.co/runanywhere/siglip2_base_HNPU", QHEXRT, EMBEDDING, 789_101_244L),
+        SingleFileModel("whisper_base", "Whisper Base (HNPU)", "https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json", QHEXRT, STT, 221_522_616L),
+        SingleFileModel("whisper_small", "Whisper Small (HNPU)", "https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json", QHEXRT, STT, 676_713_240L),
+        SingleFileModel("moonshine_tiny", "Moonshine Tiny (HNPU)", "https://huggingface.co/runanywhere/moonshine_tiny_HNPU/moonshine-tiny.json", QHEXRT, STT, 84_569_427L),
+        SingleFileModel("moonshine_base", "Moonshine Base (HNPU)", "https://huggingface.co/runanywhere/moonshine_base_HNPU/moonshine-base.json", QHEXRT, STT, 167_310_675L),
+        SingleFileModel("parakeet_tdt_0_6b_v2", "Parakeet TDT 0.6B v2 (HNPU)", "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json", QHEXRT, STT, 1_280_063_837L),
+        SingleFileModel("parakeet_tdt_0_6b_v3", "Parakeet TDT 0.6B v3 (HNPU)", "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json", QHEXRT, STT, 1_317_902_802L),
+        SingleFileModel("parakeet_rnnt_1_1b", "Parakeet RNNT 1.1B (HNPU)", "https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json", QHEXRT, STT, 2_211_659_923L),
         // The V81 product bundle is the complete ASR pipeline. The similarly named
         // `-llm.json` manifest belonged to a separate V75 decoder-only experiment.
-        SingleFileModel("canary_qwen_2_5b", "Canary Qwen 2.5B (HNPU)", "https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json", QHEXRT, STT, 5_491_333_979L).supportedOn(V81),
-        SingleFileModel("canary_1b_flash", "Canary-1B-flash (HNPU)", "https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json", QHEXRT, STT, 1_835_592_227L).supportedOn(V75, V81),
-        SingleFileModel("nemotron_asr_streaming", "Nemotron ASR Streaming 0.6B (HNPU)", "https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json", QHEXRT, STT, 1_361_283_432L).supportedOn(V75, V81),
-        SingleFileModel("melotts_en", "MeloTTS EN (HNPU)", "https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json", QHEXRT, TTS, 120_439_053L).supportedOn(V75, V79, V81),
-        // V79 needs model-specific executable .so files from the HF bundle. Play
-        // forbids downloading executable code, while the V75/V81 bundles are data-only.
-        SingleFileModel("kokoro_en", "Kokoro-82M EN (HNPU)", "https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json", QHEXRT, TTS, 470_739_484L).supportedOn(V75, V81),
-        SingleFileModel("kitten_nano_0_8", "Kitten-nano-0.8-fp32 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json", QHEXRT, TTS, 95_842_227L).supportedOn(V75, V81),
-        SingleFileModel("kitten_mini_0_1", "Kitten-mini-0.1 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json", QHEXRT, TTS, 449_672_060L).supportedOn(V81),
-        SingleFileModel("kitten_mini_0_8", "Kitten-mini-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json", QHEXRT, TTS, 778_828_575L).supportedOn(V81),
-        SingleFileModel("kitten_micro_0_8", "Kitten-micro-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json", QHEXRT, TTS, 338_682_302L).supportedOn(V81),
-        SingleFileModel("kitten_nano_0_2", "Kitten-nano-0.2 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json", QHEXRT, TTS, 105_235_740L).supportedOn(V81),
-        SingleFileModel("kitten_nano_0_1", "Kitten-nano-0.1 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json", QHEXRT, TTS, 104_733_291L).supportedOn(V81),
+        SingleFileModel("canary_qwen_2_5b", "Canary Qwen 2.5B (HNPU)", "https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json", QHEXRT, STT, 5_491_333_979L),
+        SingleFileModel("canary_1b_flash", "Canary-1B-flash (HNPU)", "https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json", QHEXRT, STT, 1_835_592_227L),
+        SingleFileModel("nemotron_asr_streaming", "Nemotron ASR Streaming 0.6B (HNPU)", "https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json", QHEXRT, STT, 1_361_283_432L),
+        SingleFileModel("melotts_en", "MeloTTS EN (HNPU)", "https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json", QHEXRT, TTS, 120_439_053L),
+        SingleFileModel("kokoro_en", "Kokoro-82M EN (HNPU)", "https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json", QHEXRT, TTS, 470_739_484L),
+        SingleFileModel("kitten_nano_0_8", "Kitten-nano-0.8-fp32 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json", QHEXRT, TTS, 95_842_227L),
+        SingleFileModel("kitten_mini_0_1", "Kitten-mini-0.1 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json", QHEXRT, TTS, 449_672_060L),
+        SingleFileModel("kitten_mini_0_8", "Kitten-mini-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json", QHEXRT, TTS, 778_828_575L),
+        SingleFileModel("kitten_micro_0_8", "Kitten-micro-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json", QHEXRT, TTS, 338_682_302L),
+        SingleFileModel("kitten_nano_0_2", "Kitten-nano-0.2 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json", QHEXRT, TTS, 105_235_740L),
+        SingleFileModel("kitten_nano_0_1", "Kitten-nano-0.1 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json", QHEXRT, TTS, 104_733_291L),
     )
 
     // The Play build intentionally ships no refusal-removal or safety-bypass adapters.

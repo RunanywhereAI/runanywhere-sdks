@@ -34,6 +34,7 @@ RN_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/androi
 RN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/android/src/main/jniLibs"
 RN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/src/main/jniLibs"
 RN_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/android/src/main/jniLibs"
+RN_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/android/src/main/assets/runanywhere/qhexrt/skels"
 RN_CORE_INCLUDE_DEST="${RN_CORE_JNI_DEST}/include"
 RN_QHEXRT_INCLUDE_DEST="${RN_QHEXRT_JNI_DEST}/include"
 
@@ -42,6 +43,7 @@ FLUTTER_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere
 FLUTTER_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/src/main/jniLibs"
 FLUTTER_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/android/src/main/jniLibs"
 FLUTTER_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/jniLibs"
+FLUTTER_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/assets/runanywhere/qhexrt/skels"
 
 COMMONS_INCLUDE_SRC="${REPO_ROOT}/sdk/runanywhere-commons/include"
 QHEXRT_INCLUDE_SRC="${REPO_ROOT}/engines/qhexrt/include"
@@ -127,10 +129,12 @@ mkdir -p \
     "${RN_LLAMA_JNI_DEST}" \
     "${RN_ONNX_JNI_DEST}" \
     "${RN_QHEXRT_JNI_DEST}" \
+    "${RN_QHEXRT_SKEL_ASSET_DEST}" \
     "${FLUTTER_CORE_JNI_DEST}" \
     "${FLUTTER_LLAMA_JNI_DEST}" \
     "${FLUTTER_ONNX_JNI_DEST}" \
-    "${FLUTTER_QHEXRT_JNI_DEST}"
+    "${FLUTTER_QHEXRT_JNI_DEST}" \
+    "${FLUTTER_QHEXRT_SKEL_ASSET_DEST}"
 
 rm -rf "${RN_CORE_INCLUDE_DEST}"
 mkdir -p "${RN_CORE_INCLUDE_DEST}"
@@ -235,10 +239,12 @@ stage_qhexrt_qnn_runtime_libs() {
         copy_if_exists "${src}" "$@"
     done
     local kotlin_skel_dest="${KOTLIN_QHEXRT_SKEL_ASSET_DEST}/${abi}"
-    mkdir -p "${kotlin_skel_dest}"
-    rm -f "${kotlin_skel_dest}"/*.so
+    local rn_skel_dest="${RN_QHEXRT_SKEL_ASSET_DEST}/${abi}"
+    local flutter_skel_dest="${FLUTTER_QHEXRT_SKEL_ASSET_DEST}/${abi}"
+    mkdir -p "${kotlin_skel_dest}" "${rn_skel_dest}" "${flutter_skel_dest}"
+    rm -f "${kotlin_skel_dest}"/*.so "${rn_skel_dest}"/*.so "${flutter_skel_dest}"/*.so
     for src in "${qnn_skel_libs[@]}"; do
-        copy_if_exists "${src}" "${kotlin_skel_dest}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"
+        copy_if_exists "${src}" "${kotlin_skel_dest}" "${rn_skel_dest}" "${flutter_skel_dest}"
     done
 }
 
@@ -325,16 +331,19 @@ for ABI in "${ABIS[@]}"; do
     RN_LLAMA_DEST="${RN_LLAMA_JNI_DEST}/${ABI}"
     RN_ONNX_DEST="${RN_ONNX_JNI_DEST}/${ABI}"
     RN_QHEXRT_DEST="${RN_QHEXRT_JNI_DEST}/${ABI}"
+    RN_QHEXRT_SKEL_DEST="${RN_QHEXRT_SKEL_ASSET_DEST}/${ABI}"
     FLUTTER_CORE_DEST="${FLUTTER_CORE_JNI_DEST}/${ABI}"
     FLUTTER_LLAMA_DEST="${FLUTTER_LLAMA_JNI_DEST}/${ABI}"
     FLUTTER_ONNX_DEST="${FLUTTER_ONNX_JNI_DEST}/${ABI}"
     FLUTTER_QHEXRT_DEST="${FLUTTER_QHEXRT_JNI_DEST}/${ABI}"
+    FLUTTER_QHEXRT_SKEL_DEST="${FLUTTER_QHEXRT_SKEL_ASSET_DEST}/${ABI}"
 
     mkdir -p \
         "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" "${KOTLIN_QHEXRT_DEST}" \
         "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
         "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
-        "${FLUTTER_QHEXRT_DEST}"
+        "${FLUTTER_QHEXRT_DEST}" \
+        "${KOTLIN_QHEXRT_SKEL_DEST}" "${RN_QHEXRT_SKEL_DEST}" "${FLUTTER_QHEXRT_SKEL_DEST}"
 
     # Clean everything we manage before re-staging so stale artifacts from a
     # previous run (e.g. a dropped backend) don't linger.
@@ -346,7 +355,10 @@ for ABI in "${ABIS[@]}"; do
         "${RN_CORE_DEST}"/*.so "${RN_LLAMA_DEST}"/*.so "${RN_ONNX_DEST}"/*.so "${RN_QHEXRT_DEST}"/*.so \
         "${FLUTTER_CORE_DEST}"/*.so "${FLUTTER_LLAMA_DEST}"/*.so \
         "${FLUTTER_ONNX_DEST}"/*.so "${FLUTTER_QHEXRT_DEST}"/*.so
-    rm -f "${KOTLIN_QHEXRT_SKEL_DEST}"/*.so
+    rm -f \
+        "${KOTLIN_QHEXRT_SKEL_DEST}"/*.so \
+        "${RN_QHEXRT_SKEL_DEST}"/*.so \
+        "${FLUTTER_QHEXRT_SKEL_DEST}"/*.so
 
     # -------------------------------------------------------------------------
     # Locate artifacts produced by the CMake build.

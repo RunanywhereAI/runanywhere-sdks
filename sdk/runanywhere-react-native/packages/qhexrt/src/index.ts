@@ -12,7 +12,7 @@
  * ```typescript
  * import { RunAnywhere } from '@runanywhere/core';
  * import { InferenceFramework, RegisterModelFromUrlRequest } from '@runanywhere/proto-ts/model_types';
- * import { QHexRT, HexagonArch } from '@runanywhere/qhexrt';
+ * import { QHexRT } from '@runanywhere/qhexrt';
  *
  * await RunAnywhere.initialize({ apiKey: 'your-key' });
  *
@@ -28,12 +28,11 @@
  * // URLs and display metadata stay app-owned; QHexRT selects the chip folder.
  * await QHexRT.registerModelForDevice(
  *   RegisterModelFromUrlRequest.fromPartial({
- *     id: 'my-npu-llm',
- *     name: 'My NPU LLM',
- *     url: 'https://huggingface.co/your-org/your-model_HNPU/model.json',
+ *     id: 'qwen3_5_0_8b',
+ *     name: 'Qwen3.5 0.8B (HNPU)',
+ *     url: 'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
  *     framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
- *   }),
- *   [HexagonArch.HEXAGON_ARCH_V79, HexagonArch.HEXAGON_ARCH_V81]
+ *   })
  * );
  * ```
  *

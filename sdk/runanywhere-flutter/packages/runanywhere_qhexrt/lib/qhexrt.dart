@@ -60,33 +60,31 @@ class QHexRT {
     return (_bindings ??= QhexrtBindings()).isArchitectureSupported(arch);
   }
 
-  /// Match one model definition's generated architecture values in native
-  /// QHexRT code.
-  static bool modelSupportsArchitecture(
-    Iterable<HexagonArch> supportedArches,
-    HexagonArch arch,
-  ) {
+  /// Match QHexRT's native product policy for [modelId] against [arch].
+  static bool modelSupportsArchitecture(String modelId, HexagonArch arch) {
     if (!isAvailable) return false;
     return (_bindings ??= QhexrtBindings()).modelSupportsArchitecture(
-      supportedArches,
+      modelId,
       arch,
     );
   }
 
-  /// Register [request] only when the current device matches
-  /// [supportedArches]. URLs and presentation metadata stay in the app;
-  /// QHexRT owns probing/selection and composes commons' shared model
+  /// Whether QHexRT's native product policy marks [modelId] HF-authenticated.
+  static bool modelRequiresHfAuth(String modelId) {
+    if (!isAvailable) return false;
+    return (_bindings ??= QhexrtBindings()).modelRequiresHfAuth(modelId);
+  }
+
+  /// Register [request] only when native product policy allows it on this
+  /// device. URLs and presentation metadata stay in the app; QHexRT owns
+  /// probing/selection and composes commons' shared model
   /// registration and download pipeline. A null value is a normal ineligible
   /// model/device outcome.
   static Future<ModelInfo?> registerModelForDevice({
     required RegisterModelFromUrlRequest request,
-    required Iterable<HexagonArch> supportedArches,
   }) async {
     if (!isAvailable) return null;
-    return (_bindings ??= QhexrtBindings()).registerModelForDevice(
-      request,
-      supportedArches,
-    );
+    return (_bindings ??= QhexrtBindings()).registerModelForDevice(request);
   }
 
   /// Register the QHexRT backend with the C++ plugin registry. Safe to call

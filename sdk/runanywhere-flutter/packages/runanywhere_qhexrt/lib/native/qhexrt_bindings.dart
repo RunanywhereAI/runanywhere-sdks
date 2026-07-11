@@ -25,8 +25,8 @@ class QhexrtBindings {
   late final RacQhexrtProbeProtoDart? _probeProto;
   late final RacQhexrtArchIsSupportedDart? _archIsSupported;
   late final RacQhexrtModelSupportsArchDart? _modelSupportsArch;
-  late final RacQhexrtRegisterModelForDeviceProtoDart?
-  _registerModelForDeviceProto;
+  late final RacQhexrtModelRequiresHfAuthDart? _modelRequiresHfAuth;
+  late final RacQhexrtCatalogRegisterModelProtoDart? _catalogRegisterModelProto;
   late final RacQhexrtSetSkelDirectoryDart? _setSkelDirectory;
 
   QhexrtBindings() : this.fromDynamicLibrary(_loadBackend());
@@ -123,22 +123,36 @@ class QhexrtBindings {
           .lookupFunction<
             RacQhexrtModelSupportsArchNative,
             RacQhexrtModelSupportsArchDart
-          >('rac_qhexrt_model_supports_arch');
+          >('rac_qhexrt_catalog_model_supports_arch');
     } catch (e) {
-      _logger.warning('Failed to resolve rac_qhexrt_model_supports_arch: $e');
+      _logger.warning(
+        'Failed to resolve rac_qhexrt_catalog_model_supports_arch: $e',
+      );
       _modelSupportsArch = null;
     }
     try {
-      _registerModelForDeviceProto = _backend
+      _modelRequiresHfAuth = _backend
           .lookupFunction<
-            RacQhexrtRegisterModelForDeviceProtoNative,
-            RacQhexrtRegisterModelForDeviceProtoDart
-          >('rac_qhexrt_register_model_for_device_proto');
+            RacQhexrtModelRequiresHfAuthNative,
+            RacQhexrtModelRequiresHfAuthDart
+          >('rac_qhexrt_catalog_model_requires_hf_auth');
     } catch (e) {
       _logger.warning(
-        'Failed to resolve rac_qhexrt_register_model_for_device_proto: $e',
+        'Failed to resolve rac_qhexrt_catalog_model_requires_hf_auth: $e',
       );
-      _registerModelForDeviceProto = null;
+      _modelRequiresHfAuth = null;
+    }
+    try {
+      _catalogRegisterModelProto = _backend
+          .lookupFunction<
+            RacQhexrtCatalogRegisterModelProtoNative,
+            RacQhexrtCatalogRegisterModelProtoDart
+          >('rac_qhexrt_catalog_register_model_proto');
+    } catch (e) {
+      _logger.warning(
+        'Failed to resolve rac_qhexrt_catalog_register_model_proto: $e',
+      );
+      _catalogRegisterModelProto = null;
     }
     try {
       _setSkelDirectory = _backend
@@ -201,59 +215,48 @@ class QhexrtBindings {
   bool isArchitectureSupported(HexagonArch arch) =>
       _archIsSupported?.call(arch.value) == RAC_TRUE;
 
-  bool modelSupportsArchitecture(
-    Iterable<HexagonArch> supportedArches,
-    HexagonArch arch,
-  ) {
+  bool modelSupportsArchitecture(String modelId, HexagonArch arch) {
     final fn = _modelSupportsArch;
     if (fn == null) return false;
-    final values = QhexrtCatalogWire.archValues(supportedArches);
-    final ptr = calloc<Int32>(values.isEmpty ? 1 : values.length);
+    final id = modelId.toNativeUtf8();
     try {
-      for (var index = 0; index < values.length; index++) {
-        ptr[index] = values[index];
-      }
-      return fn(ptr, values.length, arch.value) == RAC_TRUE;
+      return fn(id, arch.value) == RAC_TRUE;
     } finally {
-      calloc.free(ptr);
+      calloc.free(id);
     }
   }
 
-  ModelInfo? registerModelForDevice(
-    RegisterModelFromUrlRequest request,
-    Iterable<HexagonArch> supportedArches,
-  ) {
-    final fn = _registerModelForDeviceProto;
+  bool modelRequiresHfAuth(String modelId) {
+    final fn = _modelRequiresHfAuth;
+    if (fn == null) return false;
+    final id = modelId.toNativeUtf8();
+    try {
+      return fn(id) == RAC_TRUE;
+    } finally {
+      calloc.free(id);
+    }
+  }
+
+  ModelInfo? registerModelForDevice(RegisterModelFromUrlRequest request) {
+    final fn = _catalogRegisterModelProto;
     if (fn == null) {
       throw StateError(
-        'rac_qhexrt_register_model_for_device_proto is unavailable',
+        'rac_qhexrt_catalog_register_model_proto is unavailable',
       );
     }
 
     final requestBytes = QhexrtCatalogWire.encodeRequest(request);
     final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
-    final archValues = QhexrtCatalogWire.archValues(supportedArches);
-    final archesPtr = calloc<Int32>(archValues.isEmpty ? 1 : archValues.length);
     final registered = calloc<Int32>();
     final out = calloc<RacProtoBuffer>();
 
     try {
-      for (var index = 0; index < archValues.length; index++) {
-        archesPtr[index] = archValues[index];
-      }
       RacNative.bindings.rac_proto_buffer_init(out);
-      final code = fn(
-        requestPtr,
-        requestBytes.length,
-        archesPtr,
-        archValues.length,
-        registered,
-        out,
-      );
+      final code = fn(requestPtr, requestBytes.length, registered, out);
       DartBridgeProtoUtils.ensureSuccess(
         out,
         code,
-        'rac_qhexrt_register_model_for_device_proto',
+        'rac_qhexrt_catalog_register_model_proto',
       );
       if (registered.value != RAC_TRUE) return null;
       if (out.ref.data == nullptr || out.ref.size == 0) {
@@ -268,7 +271,6 @@ class QhexrtBindings {
     } finally {
       RacNative.bindings.rac_proto_buffer_free(out);
       calloc.free(requestPtr);
-      calloc.free(archesPtr);
       calloc.free(registered);
       calloc.free(out);
     }
@@ -278,9 +280,6 @@ class QhexrtBindings {
 /// Generated-enum/protobuf transport only; QHexRT policy stays native.
 class QhexrtCatalogWire {
   QhexrtCatalogWire._();
-
-  static List<int> archValues(Iterable<HexagonArch> arches) =>
-      arches.map((arch) => arch.value).toList(growable: false);
 
   static List<int> encodeRequest(RegisterModelFromUrlRequest request) =>
       request.writeToBuffer();
@@ -294,26 +293,18 @@ typedef RacQhexrtProbeProtoNative = Int32 Function(Pointer<RacProtoBuffer>);
 typedef RacQhexrtProbeProtoDart = int Function(Pointer<RacProtoBuffer>);
 typedef RacQhexrtArchIsSupportedNative = Int32 Function(Int32);
 typedef RacQhexrtArchIsSupportedDart = int Function(int);
-typedef RacQhexrtModelSupportsArchNative =
-    Int32 Function(Pointer<Int32>, Size, Int32);
-typedef RacQhexrtModelSupportsArchDart = int Function(Pointer<Int32>, int, int);
-typedef RacQhexrtRegisterModelForDeviceProtoNative =
+typedef RacQhexrtModelSupportsArchNative = Int32 Function(Pointer<Utf8>, Int32);
+typedef RacQhexrtModelSupportsArchDart = int Function(Pointer<Utf8>, int);
+typedef RacQhexrtModelRequiresHfAuthNative = Int32 Function(Pointer<Utf8>);
+typedef RacQhexrtModelRequiresHfAuthDart = int Function(Pointer<Utf8>);
+typedef RacQhexrtCatalogRegisterModelProtoNative =
     Int32 Function(
       Pointer<Uint8>,
       Size,
       Pointer<Int32>,
-      Size,
-      Pointer<Int32>,
       Pointer<RacProtoBuffer>,
     );
-typedef RacQhexrtRegisterModelForDeviceProtoDart =
-    int Function(
-      Pointer<Uint8>,
-      int,
-      Pointer<Int32>,
-      int,
-      Pointer<Int32>,
-      Pointer<RacProtoBuffer>,
-    );
+typedef RacQhexrtCatalogRegisterModelProtoDart =
+    int Function(Pointer<Uint8>, int, Pointer<Int32>, Pointer<RacProtoBuffer>);
 typedef RacQhexrtSetSkelDirectoryNative = Void Function(Pointer<Utf8>);
 typedef RacQhexrtSetSkelDirectoryDart = void Function(Pointer<Utf8>);

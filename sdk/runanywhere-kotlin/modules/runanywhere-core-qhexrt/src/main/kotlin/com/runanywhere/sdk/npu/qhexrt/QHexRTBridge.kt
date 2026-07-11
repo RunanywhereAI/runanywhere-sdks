@@ -90,24 +90,24 @@ internal object QHexRTBridge {
     @JvmStatic
     external fun nativeArchIsSupported(arch: Int): Boolean
 
-    /** Match a model's declared architectures against [arch] in native code. */
+    /** Match the native product catalog policy for [modelId] against [arch]. */
     @JvmStatic
-    external fun nativeModelSupportsArch(
-        supportedArches: IntArray,
+    external fun nativeCatalogModelSupportsArch(
+        modelId: String,
         arch: Int,
     ): Boolean
 
+    /** Whether the native product catalog marks [modelId] as HF-authenticated. */
+    @JvmStatic
+    external fun nativeCatalogModelRequiresHfAuth(modelId: String): Boolean
+
     /**
      * Register one serialized `RegisterModelFromUrlRequest` only when the
-     * current device matches [supportedArches]. A null result is the normal
-     * native "not eligible on this device" outcome; native validation and
-     * registry errors are raised by JNI.
+     * native product catalog allows it on the current device. A null result is
+     * the normal ineligible/private-without-token outcome.
      */
     @JvmStatic
-    external fun nativeRegisterModelForDeviceProto(
-        requestBytes: ByteArray,
-        supportedArches: IntArray,
-    ): ByteArray?
+    external fun nativeCatalogRegisterModelProto(requestBytes: ByteArray): ByteArray?
 
     /** QHexRT module version string (RAC_QHEXRT_VERSION baked into the JNI lib). */
     @JvmStatic

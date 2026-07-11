@@ -86,4 +86,9 @@ rac_result_t rac_backend_qhexrt_unregister(void) {
     return RAC_SUCCESS;
 }
 
+rac_bool_t rac_backend_qhexrt_is_registered(void) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return g_registered ? RAC_TRUE : RAC_FALSE;
+}
+
 }  // extern "C"

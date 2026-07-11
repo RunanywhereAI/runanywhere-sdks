@@ -9,7 +9,8 @@ validation, and local-path primitives used after QHexRT selects a definition.
 
 | Concern | Owner |
 |---|---|
-| Model id, display metadata, remote URL, validated architecture list | Example app |
+| Display metadata and remote URL | Example app |
+| Stable model id, validated architecture set, HF access class | QHexRT engine |
 | Snapdragon/Hexagon probe and v75/v79/v81 support set | QHexRT engine |
 | Definition eligibility and logical URL -> device folder | QHexRT engine |
 | Bundle manifest predicate and QNN context format | QHexRT bundle policy |
@@ -22,23 +23,19 @@ reuses serialized `runanywhere.v1.RegisterModelFromUrlRequest` bytes; it does
 not introduce another schema or embed product URLs in native code.
 
 ```c
-const rac_qhexrt_hexagon_arch_t arches[] = {
-    RAC_QHEXRT_HEXAGON_ARCH_V75,
-    RAC_QHEXRT_HEXAGON_ARCH_V81,
-};
-
 rac_proto_buffer_t saved;
 rac_proto_buffer_init(&saved);
 rac_bool_t registered = RAC_FALSE;
-rac_result_t rc = rac_qhexrt_register_model_for_device_proto(
-    request_bytes, request_size, arches, 2, &registered, &saved);
+rac_result_t rc = rac_qhexrt_catalog_register_model_proto(
+    request_bytes, request_size, &registered, &saved);
 rac_proto_buffer_free(&saved);
 ```
 
-Malformed definitions fail closed. A definition requires a stable id, the
-QHEXRT framework, a URL, and a non-empty subset of v75/v79/v81. An unsupported
-or ineligible device is a normal skip: `RAC_SUCCESS`, `registered=false`, and
-an empty success buffer.
+Malformed definitions fail closed. A definition requires a stable id present
+in QHexRT's native product catalog, the QHEXRT framework, and a URL. An
+unregistered/stub backend, unsupported/ineligible device, or private row with
+no configured HF token is a zero-network normal skip: `RAC_SUCCESS`,
+`registered=false`, and an empty success buffer.
 
 For a logical HNPU ref, QHexRT inserts the detected architecture before calling
 commons:
@@ -56,28 +53,24 @@ resolution sequence.
 
 ## Binding migration checklist
 
-- [x] Kotlin QHexRT JNI/facade passes generated request bytes and generated
-  `HexagonArch` values to the engine API.
+- [x] Kotlin QHexRT JNI/facade passes only generated request bytes to native
+  product policy.
 - [x] Flutter QHexRT FFI/facade exposes the same catalog operation.
 - [x] React Native QHexRT Nitro facade exposes the same catalog operation.
 - [x] Stage this public header with QHexRT Android packages.
-- [x] Add Kotlin, Flutter, and React Native wire-contract tests for the shared
-  enum numbers and serialized registration request.
-- [ ] Kotlin example: retain rows/URLs only; call the QHexRT facade for NPU rows
-  and remove app-side probe/filter logic.
-- [ ] Flutter Android example: sync the authoritative model definitions and
-  validated generated `HexagonArch` sets, call `registerModelForDevice`, and
-  expose only rows the native facade registers.
-- [ ] React Native Android example: perform the same catalog sync and facade
-  migration; its current `NpuBundle` rows do not yet carry architecture sets.
+- [x] Add Kotlin, Flutter, and React Native wire-contract tests for serialized
+  registration requests.
+- [x] Kotlin, Flutter, and React Native examples retain URL/presentation rows
+  only and expose exactly the rows native policy registers.
 - [x] Add a hardware-free Flutter FFI integration smoke that crosses the SDK
   wrapper into the exported native registration symbol. Keep an Android-device
   smoke in the release workflow for packaged-library validation.
 
 Native evidence:
 
-- `test_qhexrt_model_catalog`: support matrix, intersection semantics,
-  ineligible no-mutation, app metadata round-trip, and logical V81 HF selection.
+- `test_qhexrt_model_catalog`: exact 51-row support matrix, exact 25-row HF-auth
+  class, stub/unregistered rejection, zero-request unauthenticated private skip,
+  app metadata round-trip, and logical V81 HF selection.
 - Flutter `qhexrt_catalog_wire_test`: real host dylib wrapper-to-C-ABI
   registration, including the normal unsupported-host skip mapping.
 - Commons `test_register_model_from_url` and `test_hf_resolver_folder`: normalized

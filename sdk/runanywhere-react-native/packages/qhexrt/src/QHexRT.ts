@@ -122,15 +122,14 @@ export const QHexRT = {
     return QHexRTProvider.isArchitectureSupported(arch);
   },
 
-  /** Match a model definition's generated architecture values in QHexRT. */
-  modelSupportsArchitecture(
-    supportedArches: Iterable<HexagonArch>,
-    arch: HexagonArch
-  ): boolean {
-    return QHexRTProvider.modelSupportsArchitecture(
-      QHexRTCatalogWire.archValues(supportedArches),
-      arch
-    );
+  /** Match QHexRT native product policy for a model against an architecture. */
+  modelSupportsArchitecture(modelId: string, arch: HexagonArch): boolean {
+    return QHexRTProvider.modelSupportsArchitecture(modelId, arch);
+  },
+
+  /** Whether QHexRT native product policy marks a model HF-authenticated. */
+  modelRequiresHfAuth(modelId: string): boolean {
+    return QHexRTProvider.modelRequiresHfAuth(modelId);
   },
 
   /**
@@ -140,12 +139,10 @@ export const QHexRT = {
    * normal ineligible model/device outcome.
    */
   async registerModelForDevice(
-    request: RegisterModelFromUrlRequest,
-    supportedArches: Iterable<HexagonArch>
+    request: RegisterModelFromUrlRequest
   ): Promise<ModelInfo | null> {
     const raw = await QHexRTProvider.registerModelForDeviceRaw(
-      QHexRTCatalogWire.encodeRequest(request),
-      QHexRTCatalogWire.archValues(supportedArches)
+      QHexRTCatalogWire.encodeRequest(request)
     );
     return raw ? QHexRTCatalogWire.decodeModel(raw) : null;
   },

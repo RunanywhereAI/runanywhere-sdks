@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai
 
-import ai.runanywhere.proto.v1.HexagonArch
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
@@ -68,7 +67,7 @@ import java.security.MessageDigest
  *
  * Selection (instrumentation args, `-e key value`):
      *   -e modelId <catalog-id>                          a row from ModelCatalog.npuCatalog
-     *   OR -e hfRepo <org/repo> -e arch <v81> -e modality <llm|vlm|stt|tts|inpaint> -e manifest <m.json>
+     *   OR -e hfRepo <catalog-org/repo> -e arch <v81> -e modality <llm|vlm|stt|tts|inpaint> -e manifest <m.json>
  *      (legacy: -e files "m.json,..." — only the first name, the manifest, is used)
  *   -e hfToken <hf_...>   download private runanywhere/<name>_HNPU repos (never committed/logged)
  *   -e maxNew <n>         override LLM/VLM max new tokens (default 48)
@@ -115,7 +114,7 @@ class NpuModelE2ETest {
             val requestedModelId = args.getString("modelId")?.takeIf { it.isNotBlank() }
             val message = requestedModelId?.let {
                 "unknown -e modelId '$it' (expected a ModelCatalog.npuCatalog id, optionally suffixed with _v75/_v79/_v81/_v83)"
-            } ?: "missing -e modelId <id> or -e hfRepo <repo> -e modality <m> -e manifest <m.json>"
+            } ?: "invalid selection: use -e modelId <id> or a catalog-backed -e hfRepo <repo> with modality and manifest"
             Log.i(tag, "NPU_E2E status=FAIL phase=lookup detail=\"$message\"")
             assertTrue(message, false)
             return
@@ -1168,7 +1167,7 @@ class NpuModelE2ETest {
         MessageDigest.getInstance("SHA-256").digest(bytes)
             .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
-    /** Catalog id, or an ad-hoc bundle synthesized from -e hfRepo/arch/modality/manifest. */
+    /** Catalog id, or a catalog-backed URL override from -e hfRepo/arch/modality/manifest. */
     private fun resolveModel(args: Bundle): Pair<SingleFileModel, String?>? {
         args.getString("modelId")?.takeIf { it.isNotBlank() }?.let { rawId ->
             val (logicalId, requestedArch) = logicalIdAndArch(rawId)
@@ -1177,8 +1176,9 @@ class NpuModelE2ETest {
             return model?.let { it to (requestedArch ?: args.getString("arch")?.takeIf { arch -> arch.isNotBlank() }) }
         }
         val repo = args.getString("hfRepo") ?: return null
+        val catalogModel = ModelCatalog.npuCatalog.firstOrNull { hfRepoOf(it) == repo } ?: return null
         val arch = args.getString("arch")?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: "v81"
-        val supportedArch = hexagonArch(arch) ?: return null
+        if (arch !in setOf("v75", "v79", "v81")) return null
         val category = when (args.getString("modality")?.lowercase()) {
             "llm" -> ModelCategory.MODEL_CATEGORY_LANGUAGE
             "vlm" -> ModelCategory.MODEL_CATEGORY_MULTIMODAL
@@ -1193,22 +1193,12 @@ class NpuModelE2ETest {
         val manifest = args.getString("manifest")?.trim()?.takeIf { it.isNotEmpty() }
             ?: args.getString("files")?.split(",")?.map { it.trim() }?.firstOrNull { it.isNotEmpty() }
             ?: return null
-        return SingleFileModel(
-            id = repo.substringAfterLast('/').removeSuffix("_HNPU"),
+        return catalogModel.copy(
             name = repo,
             url = "https://huggingface.co/$repo/$manifest",
-            framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
             category = category,
             memoryBytes = 0L,
-            supportedNpuArches = setOf(supportedArch),
         ) to arch
-    }
-
-    private fun hexagonArch(name: String): HexagonArch? = when (name.lowercase()) {
-        "v75" -> HexagonArch.HEXAGON_ARCH_V75
-        "v79" -> HexagonArch.HEXAGON_ARCH_V79
-        "v81" -> HexagonArch.HEXAGON_ARCH_V81
-        else -> null
     }
 
     private fun modalityName(category: ModelCategory): String = when (category) {

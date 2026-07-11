@@ -75,7 +75,7 @@ ADB=(adb); [ -n "$SERIAL" ] && ADB=(adb -s "$SERIAL")
 # into the test runner so it can assert the connected device matches the sweep.
 if [ ${#MODELS[@]} -eq 0 ] && [ -z "$REPO" ] && [ -z "$LOCAL_BUNDLE" ] && [ -z "$LOCAL_DOWNLOAD" ]; then
   case "$ARCH" in
-    v81) MODELS=(lfm2_5_230m moonshine_tiny melotts_en kokoro_en internvl3_5_1b);;  # kokoro is private → needs --token
+    v81) MODELS=(lfm2_5_230m moonshine_tiny melotts_en kokoro_en internvl3_5_1b);;  # includes auth-gated kokoro
     v79) MODELS=(lfm2_5_230m whisper_base melotts_en internvl3_5_1b);;
     *)   echo "no default model set for arch=$ARCH; pass model ids explicitly"; exit 2;;
   esac

@@ -62,34 +62,38 @@ RAC_API rac_result_t rac_qhexrt_probe(rac_qhexrt_device_info_t* out);
  */
 RAC_API rac_result_t rac_qhexrt_probe_proto(rac_proto_buffer_t* out_capability);
 
-/**
- * Return whether a model definition's borrowed architecture array contains
- * @p arch and the architecture is supported by QHexRT.
- */
-RAC_API rac_bool_t rac_qhexrt_model_supports_arch(const rac_qhexrt_hexagon_arch_t* supported_arches,
-                                                  size_t supported_arch_count,
-                                                  rac_qhexrt_hexagon_arch_t arch);
+/** Return whether @p model_id is in QHexRT's native product catalog. */
+RAC_API rac_bool_t rac_qhexrt_catalog_model_is_known(const char* model_id);
+
+/** Return whether QHexRT's native catalog allows @p model_id on @p arch. */
+RAC_API rac_bool_t rac_qhexrt_catalog_model_supports_arch(const char* model_id,
+                                                          rac_qhexrt_hexagon_arch_t arch);
+
+/** Return whether QHexRT's native catalog marks @p model_id as HF-authenticated. */
+RAC_API rac_bool_t rac_qhexrt_catalog_model_requires_hf_auth(const char* model_id);
 
 /**
  * Register a QHexRT catalog definition only when it is eligible on this
  * device. The request is an existing serialized
- * runanywhere.v1.RegisterModelFromUrlRequest; product ids, URLs, and metadata
- * therefore remain in example apps.
+ * runanywhere.v1.RegisterModelFromUrlRequest. It carries a stable native
+ * catalog id while URLs and presentation metadata remain in example apps.
  *
- * The request must carry an explicit id, the QHEXRT framework, and a non-empty
- * v75/v79/v81 architecture list. This facade probes the chip, selects the
- * matching HNPU folder, then delegates normalized registration and all later
- * model lifecycle work to backend-neutral commons primitives.
+ * The request must carry an explicit id present in QHexRT's native product
+ * catalog and the QHEXRT framework. The native policy owns per-model
+ * v75/v79/v81 applicability and HF-auth requirements. It skips private rows
+ * before network access when no token is configured, probes the chip, selects
+ * the matching HNPU folder, then delegates normalized registration and all
+ * later model lifecycle work to backend-neutral commons primitives.
  *
  * Inputs are borrowed for the call. The caller initializes @p out_model with
  * rac_proto_buffer_init() and frees it with rac_proto_buffer_free(). A normal
  * unsupported/ineligible outcome returns RAC_SUCCESS, sets
  * @p out_registered to RAC_FALSE, and writes an empty success buffer.
  */
-RAC_API rac_result_t rac_qhexrt_register_model_for_device_proto(
-    const uint8_t* request_bytes, size_t request_size,
-    const rac_qhexrt_hexagon_arch_t* supported_arches, size_t supported_arch_count,
-    rac_bool_t* out_registered, rac_proto_buffer_t* out_model);
+RAC_API rac_result_t rac_qhexrt_catalog_register_model_proto(const uint8_t* request_bytes,
+                                                             size_t request_size,
+                                                             rac_bool_t* out_registered,
+                                                             rac_proto_buffer_t* out_model);
 
 #ifdef __cplusplus
 }

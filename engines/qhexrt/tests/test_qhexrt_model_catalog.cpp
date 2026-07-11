@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <unordered_set>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -53,13 +54,129 @@ int test_supported_arch_policy() {
     return 0;
 }
 
-int test_multi_arch_intersection() {
-    const rac_qhexrt_hexagon_arch_t v75_v81[] = {RAC_QHEXRT_HEXAGON_ARCH_V75,
-                                                 RAC_QHEXRT_HEXAGON_ARCH_V81};
-    ASSERT_EQ(rac_qhexrt_model_supports_arch(v75_v81, 2, RAC_QHEXRT_HEXAGON_ARCH_V75), RAC_TRUE);
-    ASSERT_EQ(rac_qhexrt_model_supports_arch(v75_v81, 2, RAC_QHEXRT_HEXAGON_ARCH_V79), RAC_FALSE);
-    ASSERT_EQ(rac_qhexrt_model_supports_arch(v75_v81, 2, RAC_QHEXRT_HEXAGON_ARCH_V81), RAC_TRUE);
-    ASSERT_EQ(rac_qhexrt_model_supports_arch(nullptr, 0, RAC_QHEXRT_HEXAGON_ARCH_V81), RAC_FALSE);
+int test_native_catalog_owns_arch_and_auth_policy() {
+    const std::unordered_set<std::string> v75 = {
+        "lfm2_5_230m",          "lfm2_5_350m",         "qwen3_0_6b",      "qwen3_5_0_8b",
+        "qwen3_5_2b",           "ternary_bonsai_1_7b", "internvl3_5_1b",  "qwen3_vl",
+        "nemotron_ocr",         "nemotron_ocr_v1",     "nemotron_parse",  "whisper_base",
+        "whisper_small",        "moonshine_tiny",      "moonshine_base",  "parakeet_tdt_0_6b_v2",
+        "parakeet_tdt_0_6b_v3", "parakeet_rnnt_1_1b",  "canary_1b_flash", "nemotron_asr_streaming",
+        "melotts_en",           "kokoro_en",           "kitten_nano_0_8", "embeddinggemma_300m",
+        "nv_embedqa_1b",        "nv_rerankqa_1b",      "siglip2_base",
+    };
+    const std::unordered_set<std::string> v79 = {
+        "lfm2_5_230m",         "lfm2_5_350m",
+        "qwen3_0_6b",          "llama3_2_1b",
+        "gemma4_e2b",          "phi_tiny_moe",
+        "qwen3_5_0_8b",        "qwen3_5_2b",
+        "qwen3_5_4b",          "deepseek_r1_distill_qwen_1_5b",
+        "internvl3_5_1b",      "qwen3_vl",
+        "gemma4_e2b_vlm",      "whisper_base",
+        "whisper_small",       "moonshine_base",
+        "moonshine_tiny",      "melotts_en",
+        "nv_embedqa_1b",       "nv_rerankqa_1b",
+        "embeddinggemma_300m", "siglip2_base",
+        "lama_dilated",
+    };
+    const std::unordered_set<std::string> v81 = {
+        "qwen3_0_6b",
+        "llama3_2_1b",
+        "lfm2_5_230m",
+        "lfm2_5_350m",
+        "gemma4_e2b",
+        "gemma4_e4b",
+        "gemma3n_e4b",
+        "phi_tiny_moe",
+        "qwen3_5_0_8b",
+        "qwen3_5_2b",
+        "qwen3_5_4b",
+        "deepseek_r1_distill_qwen_1_5b",
+        "deepseek_r1_distill_qwen_7b",
+        "ternary_bonsai_1_7b",
+        "nemotron_nano_8b",
+        "nemoguard_content_8b",
+        "nemoguard_topic_8b",
+        "qwen3_vl_2b_text",
+        "internvl3_5_1b",
+        "gemma4_e2b_vlm",
+        "gemma4_e4b_vlm",
+        "nemotron_nano_vl_8b",
+        "whisper_base",
+        "whisper_small",
+        "moonshine_base",
+        "moonshine_tiny",
+        "parakeet_tdt_0_6b_v2",
+        "parakeet_tdt_0_6b_v3",
+        "parakeet_rnnt_1_1b",
+        "canary_qwen_2_5b",
+        "canary_1b_flash",
+        "nemotron_asr_streaming",
+        "kokoro_en",
+        "melotts_en",
+        "kitten_nano_0_8",
+        "kitten_mini_0_1",
+        "kitten_mini_0_8",
+        "kitten_micro_0_8",
+        "kitten_nano_0_2",
+        "kitten_nano_0_1",
+        "embeddinggemma_300m",
+        "nv_embedqa_1b",
+        "nv_rerankqa_1b",
+        "nv_embedcode_7b",
+        "llama_embed_nemotron_8b",
+        "siglip2_base",
+        "lama_dilated",
+    };
+    std::unordered_set<std::string> all = v75;
+    all.insert(v79.begin(), v79.end());
+    all.insert(v81.begin(), v81.end());
+    ASSERT_EQ(all.size(), static_cast<size_t>(51));
+    for (const std::string& id : all) {
+        ASSERT_EQ(rac_qhexrt_catalog_model_is_known(id.c_str()), RAC_TRUE);
+        ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch(id.c_str(), RAC_QHEXRT_HEXAGON_ARCH_V75),
+                  v75.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
+        ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch(id.c_str(), RAC_QHEXRT_HEXAGON_ARCH_V79),
+                  v79.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
+        ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch(id.c_str(), RAC_QHEXRT_HEXAGON_ARCH_V81),
+                  v81.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
+    }
+
+    const std::unordered_set<std::string> private_ids = {
+        "qwen3_0_6b",
+        "llama_embed_nemotron_8b",
+        "nv_embedcode_7b",
+        "nv_embedqa_1b",
+        "nv_rerankqa_1b",
+        "nemotron_nano_8b",
+        "nemoguard_content_8b",
+        "nemoguard_topic_8b",
+        "nemotron_nano_vl_8b",
+        "nemotron_ocr",
+        "nemotron_ocr_v1",
+        "nemotron_parse",
+        "parakeet_tdt_0_6b_v2",
+        "parakeet_tdt_0_6b_v3",
+        "parakeet_rnnt_1_1b",
+        "canary_qwen_2_5b",
+        "canary_1b_flash",
+        "nemotron_asr_streaming",
+        "kokoro_en",
+        "kitten_nano_0_8",
+        "kitten_mini_0_1",
+        "kitten_mini_0_8",
+        "kitten_micro_0_8",
+        "kitten_nano_0_2",
+        "kitten_nano_0_1",
+    };
+    ASSERT_EQ(private_ids.size(), static_cast<size_t>(25));
+    for (const std::string& id : all) {
+        ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth(id.c_str()),
+                  private_ids.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
+    }
+    ASSERT_EQ(rac_qhexrt_catalog_model_is_known("not-in-product-catalog"), RAC_FALSE);
+    ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth("not-in-product-catalog"), RAC_FALSE);
+    ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch("qwen3_5_0_8b", RAC_QHEXRT_HEXAGON_ARCH_V73),
+              RAC_FALSE);
     return 0;
 }
 
@@ -119,16 +236,14 @@ bool registry_contains(const std::string& id) {
 
 int test_ineligible_does_not_mutate_registry() {
     install_noop_adapter();
-    const std::string id = "qhexrt-catalog-ineligible-test";
+    const std::string id = "qwen3_vl";
     remove_model(id);
     const std::string bytes = serialize(make_request(id, "https://cdn.example.test/model.json"));
-    const rac_qhexrt_hexagon_arch_t arches[] = {RAC_QHEXRT_HEXAGON_ARCH_V75,
-                                                RAC_QHEXRT_HEXAGON_ARCH_V79};
     rac_proto_buffer_t out{};
     rac_bool_t registered = RAC_TRUE;
     const rac_result_t rc = rac::qhexrt::catalog::register_for_arch_proto(
-        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), arches, 2,
-        RAC_QHEXRT_HEXAGON_ARCH_V81, &registered, &out);
+        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), RAC_QHEXRT_HEXAGON_ARCH_V81,
+        RAC_TRUE, &registered, &out);
     ASSERT_EQ(rc, RAC_SUCCESS);
     ASSERT_EQ(out.status, RAC_SUCCESS);
     ASSERT_EQ(out.size, static_cast<size_t>(0));
@@ -140,17 +255,15 @@ int test_ineligible_does_not_mutate_registry() {
 
 int test_eligible_preserves_app_definition() {
     install_noop_adapter();
-    const std::string id = "qhexrt-catalog-eligible-test";
+    const std::string id = "qwen3_5_0_8b";
     remove_model(id);
     const auto request = make_request(id, "https://cdn.example.test/model.json");
     const std::string bytes = serialize(request);
-    const rac_qhexrt_hexagon_arch_t arches[] = {RAC_QHEXRT_HEXAGON_ARCH_V75,
-                                                RAC_QHEXRT_HEXAGON_ARCH_V81};
     rac_proto_buffer_t out{};
     rac_bool_t registered = RAC_FALSE;
     const rac_result_t rc = rac::qhexrt::catalog::register_for_arch_proto(
-        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), arches, 2,
-        RAC_QHEXRT_HEXAGON_ARCH_V81, &registered, &out);
+        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), RAC_QHEXRT_HEXAGON_ARCH_V81,
+        RAC_TRUE, &registered, &out);
     ASSERT_EQ(rc, RAC_SUCCESS);
     ASSERT_EQ(out.status, RAC_SUCCESS);
     ASSERT_EQ(registered, RAC_TRUE);
@@ -174,6 +287,41 @@ int test_eligible_preserves_app_definition() {
     return 0;
 }
 
+int test_unavailable_engine_does_not_accept_catalog_rows() {
+    install_noop_adapter();
+    const std::string id = "qwen3_5_0_8b";
+    remove_model(id);
+    const std::string bytes = serialize(make_request(id, "https://cdn.example.test/model.json"));
+    rac_proto_buffer_t out{};
+    rac_bool_t registered = RAC_TRUE;
+    ASSERT_EQ(rac::qhexrt::catalog::register_for_arch_proto(
+                  reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
+                  RAC_QHEXRT_HEXAGON_ARCH_V81, RAC_FALSE, &registered, &out),
+              RAC_SUCCESS);
+    ASSERT_EQ(registered, RAC_FALSE);
+    ASSERT_EQ(out.size, static_cast<size_t>(0));
+    ASSERT_TRUE(!registry_contains(id));
+    rac_proto_buffer_free(&out);
+    return 0;
+}
+
+int test_public_catalog_abi_skips_stub_or_unregistered_backend() {
+    install_noop_adapter();
+    const std::string id = "qwen3_5_0_8b";
+    remove_model(id);
+    const std::string bytes = serialize(make_request(id, "https://cdn.example.test/model.json"));
+    rac_proto_buffer_t out{};
+    rac_bool_t registered = RAC_TRUE;
+    ASSERT_EQ(rac_qhexrt_catalog_register_model_proto(
+                  reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &registered, &out),
+              RAC_SUCCESS);
+    ASSERT_EQ(registered, RAC_FALSE);
+    ASSERT_EQ(out.size, static_cast<size_t>(0));
+    ASSERT_TRUE(!registry_contains(id));
+    rac_proto_buffer_free(&out);
+    return 0;
+}
+
 const char* kHfTree = R"JSON([
   {"type":"file","path":"v75/test.json","size":11},
   {"type":"file","path":"v75/context.bin","size":12},
@@ -182,10 +330,13 @@ const char* kHfTree = R"JSON([
    "lfs":{"oid":"abc123","size":22}}
 ])JSON";
 
+int g_hf_request_count = 0;
+
 rac_result_t fake_hf_tree(void*, const rac_http_request_t* request, rac_http_response_t* response) {
     if (request == nullptr || request->url == nullptr || response == nullptr) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    ++g_hf_request_count;
     std::memset(response, 0, sizeof(*response));
     if (std::string(request->url)
             .find("/api/models/runanywhere/test_HNPU/tree/main?recursive=true") ==
@@ -211,16 +362,15 @@ const rac_http_transport_ops_t kFakeTransport = {
 int test_logical_hf_ref_selects_v81_before_commons_registration() {
     install_noop_adapter();
     ASSERT_EQ(rac_http_transport_register(&kFakeTransport, nullptr), RAC_SUCCESS);
-    const std::string id = "qhexrt-catalog-hf-v81-test";
+    const std::string id = "qwen3_5_0_8b";
     remove_model(id);
     const auto request = make_request(id, "https://huggingface.co/runanywhere/test_HNPU/test.json");
     const std::string bytes = serialize(request);
-    const rac_qhexrt_hexagon_arch_t arches[] = {RAC_QHEXRT_HEXAGON_ARCH_V81};
     rac_proto_buffer_t out{};
     rac_bool_t registered = RAC_FALSE;
     const rac_result_t rc = rac::qhexrt::catalog::register_for_arch_proto(
-        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), arches, 1,
-        RAC_QHEXRT_HEXAGON_ARCH_V81, &registered, &out);
+        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), RAC_QHEXRT_HEXAGON_ARCH_V81,
+        RAC_TRUE, &registered, &out);
     ASSERT_EQ(rc, RAC_SUCCESS);
     ASSERT_EQ(registered, RAC_TRUE);
 
@@ -240,28 +390,65 @@ int test_logical_hf_ref_selects_v81_before_commons_registration() {
     return 0;
 }
 
-int test_invalid_definitions_fail_closed() {
+int test_private_model_skips_network_without_token_and_registers_with_token() {
     install_noop_adapter();
-    auto request =
-        make_request("qhexrt-catalog-invalid-test", "https://cdn.example.test/model.json");
-    std::string bytes = serialize(request);
-    const rac_qhexrt_hexagon_arch_t invalid_arch[] = {RAC_QHEXRT_HEXAGON_ARCH_V73};
+    ASSERT_EQ(rac_http_transport_register(&kFakeTransport, nullptr), RAC_SUCCESS);
+    const std::string id = "qwen3_0_6b";
+    remove_model(id);
+    const std::string bytes =
+        serialize(make_request(id, "https://huggingface.co/runanywhere/test_HNPU/test.json"));
+    rac_http_hf_token_set("");
+    ASSERT_EQ(rac_http_hf_token_is_configured(), RAC_FALSE);
+    g_hf_request_count = 0;
     rac_proto_buffer_t out{};
     rac_bool_t registered = RAC_TRUE;
     ASSERT_EQ(rac::qhexrt::catalog::register_for_arch_proto(
-                  reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), invalid_arch, 1,
-                  RAC_QHEXRT_HEXAGON_ARCH_V81, &registered, &out),
+                  reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
+                  RAC_QHEXRT_HEXAGON_ARCH_V81, RAC_TRUE, &registered, &out),
+              RAC_SUCCESS);
+    ASSERT_EQ(registered, RAC_FALSE);
+    ASSERT_EQ(out.size, static_cast<size_t>(0));
+    ASSERT_EQ(g_hf_request_count, 0);
+    ASSERT_TRUE(!registry_contains(id));
+    rac_proto_buffer_free(&out);
+
+    rac_http_hf_token_set("test-token-never-logged");
+    ASSERT_EQ(rac_http_hf_token_is_configured(), RAC_TRUE);
+    registered = RAC_FALSE;
+    ASSERT_EQ(rac::qhexrt::catalog::register_for_arch_proto(
+                  reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
+                  RAC_QHEXRT_HEXAGON_ARCH_V81, RAC_TRUE, &registered, &out),
+              RAC_SUCCESS);
+    ASSERT_EQ(registered, RAC_TRUE);
+    ASSERT_EQ(g_hf_request_count, 1);
+    ASSERT_TRUE(registry_contains(id));
+    rac_proto_buffer_free(&out);
+
+    remove_model(id);
+    rac_http_hf_token_set(nullptr);
+    rac_http_transport_register(nullptr, nullptr);
+    return 0;
+}
+
+int test_invalid_definitions_fail_closed() {
+    install_noop_adapter();
+    auto request = make_request("not-in-product-catalog", "https://cdn.example.test/model.json");
+    std::string bytes = serialize(request);
+    rac_proto_buffer_t out{};
+    rac_bool_t registered = RAC_TRUE;
+    ASSERT_EQ(rac::qhexrt::catalog::register_for_arch_proto(
+                  reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
+                  RAC_QHEXRT_HEXAGON_ARCH_V81, RAC_TRUE, &registered, &out),
               RAC_ERROR_INVALID_ARGUMENT);
     ASSERT_EQ(registered, RAC_FALSE);
     rac_proto_buffer_free(&out);
 
     request.clear_id();
     bytes = serialize(request);
-    const rac_qhexrt_hexagon_arch_t v81[] = {RAC_QHEXRT_HEXAGON_ARCH_V81};
     registered = RAC_TRUE;
     ASSERT_EQ(rac::qhexrt::catalog::register_for_arch_proto(
-                  reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), v81, 1,
-                  RAC_QHEXRT_HEXAGON_ARCH_V81, &registered, &out),
+                  reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
+                  RAC_QHEXRT_HEXAGON_ARCH_V81, RAC_TRUE, &registered, &out),
               RAC_ERROR_INVALID_ARGUMENT);
     ASSERT_EQ(registered, RAC_FALSE);
     rac_proto_buffer_free(&out);
@@ -279,12 +466,18 @@ int main() {
     };
     static const TestCase tests[] = {
         {"supported_arch_policy", test_supported_arch_policy},
-        {"multi_arch_intersection", test_multi_arch_intersection},
+        {"native_catalog_owns_arch_and_auth_policy", test_native_catalog_owns_arch_and_auth_policy},
 #if defined(RAC_QHEXRT_HAVE_PROTOBUF)
         {"ineligible_does_not_mutate_registry", test_ineligible_does_not_mutate_registry},
         {"eligible_preserves_app_definition", test_eligible_preserves_app_definition},
+        {"unavailable_engine_does_not_accept_catalog_rows",
+         test_unavailable_engine_does_not_accept_catalog_rows},
+        {"public_catalog_abi_skips_stub_or_unregistered_backend",
+         test_public_catalog_abi_skips_stub_or_unregistered_backend},
         {"logical_hf_ref_selects_v81_before_commons_registration",
          test_logical_hf_ref_selects_v81_before_commons_registration},
+        {"private_model_skips_network_without_token_and_registers_with_token",
+         test_private_model_skips_network_without_token_and_registers_with_token},
         {"invalid_definitions_fail_closed", test_invalid_definitions_fail_closed},
 #endif
     };

@@ -466,7 +466,7 @@ export const SettingsScreen: React.FC = () => {
       try {
         await AsyncStorage.setItem(STORAGE_KEYS.HF_TOKEN, trimmed);
         await RunAnywhere.setHfToken(trimmed);
-        await refreshNpuCatalog({ skipHfAuthModels: !trimmed });
+        await refreshNpuCatalog();
         setAvailableModels(await listVisibleCatalogModels());
         if (options.showFeedback) {
           Alert.alert(

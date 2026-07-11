@@ -59,7 +59,9 @@ export class QHexRTProvider {
       const success = await native.registerBackend();
       if (success) {
         this.registered = true;
-        log.info('QHexRT backend registered successfully (covers LLM, VLM, STT, TTS)');
+        log.info(
+          'QHexRT backend registered successfully (covers LLM, VLM, STT, TTS)'
+        );
       }
       return success;
     } catch (error) {
@@ -92,7 +94,9 @@ export class QHexRTProvider {
       }
       return success;
     } catch (error) {
-      log.error(`QHexRT unregistration failed: ${error instanceof Error ? error.message : String(error)}`);
+      log.error(
+        `QHexRT unregistration failed: ${error instanceof Error ? error.message : String(error)}`
+      );
       return false;
     }
   }
@@ -131,7 +135,9 @@ export class QHexRTProvider {
       const native = getNativeQHexRTModule();
       return await native.probeNpuProto();
     } catch (error) {
-      log.warning(`QHexRT NPU probe failed: ${error instanceof Error ? error.message : String(error)}`);
+      log.warning(
+        `QHexRT NPU probe failed: ${error instanceof Error ? error.message : String(error)}`
+      );
       return null;
     }
   }
@@ -142,24 +148,22 @@ export class QHexRTProvider {
   }
 
   static modelSupportsArchitecture(
-    supportedArches: number[],
+    modelId: string,
     arch: HexagonArch
   ): boolean {
     if (!isNativeQHexRTModuleAvailable()) return false;
-    return getNativeQHexRTModule().modelSupportsArchitecture(
-      supportedArches,
-      arch
-    );
+    return getNativeQHexRTModule().modelSupportsArchitecture(modelId, arch);
+  }
+
+  static modelRequiresHfAuth(modelId: string): boolean {
+    if (!isNativeQHexRTModuleAvailable()) return false;
+    return getNativeQHexRTModule().modelRequiresHfAuth(modelId);
   }
 
   static async registerModelForDeviceRaw(
-    requestBytes: ArrayBuffer,
-    supportedArches: number[]
+    requestBytes: ArrayBuffer
   ): Promise<ArrayBuffer | null> {
     if (!isNativeQHexRTModuleAvailable()) return null;
-    return getNativeQHexRTModule().registerModelForDeviceProto(
-      requestBytes,
-      supportedArches
-    );
+    return getNativeQHexRTModule().catalogRegisterModelProto(requestBytes);
   }
 }
