@@ -45,8 +45,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // JitPack for transitive dependencies (android-vad, PRDownloader)
-        maven { url = uri("https://jitpack.io") }
     }
 }
 ```

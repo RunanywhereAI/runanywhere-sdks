@@ -3,11 +3,17 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.Properties
 import java.util.UUID
+import org.gradle.api.artifacts.dsl.LockMode
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+}
+
+dependencyLocking {
+    lockAllConfigurations()
+    lockMode.set(LockMode.STRICT)
 }
 
 // Backend config comes from CI-safe environment variables first, then the

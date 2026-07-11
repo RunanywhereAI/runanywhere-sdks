@@ -1,12 +1,21 @@
+import org.gradle.api.artifacts.dsl.LockMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.library)
+    // AGP's built-in Kotlin is older; this keeps SDK compilation aligned at 2.4.0.
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
     id("maven-publish")
     signing
+}
+
+allprojects {
+    dependencyLocking {
+        lockAllConfigurations()
+        lockMode.set(LockMode.STRICT)
+    }
 }
 
 detekt {
@@ -195,27 +204,12 @@ kotlin {
 dependencies {
     api(libs.wire.runtime)
     api(libs.okhttp)
+    api(libs.kotlinx.coroutines.core)
+    api(libs.okio)
 
-    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.kotlinx.datetime)
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.client.logging)
-    implementation(libs.ktor.serialization.kotlinx.json)
-    implementation(libs.okio)
-    implementation(libs.whisper.jni)
-    implementation(libs.gson)
-    implementation(libs.commons.io)
-    implementation(libs.json)
     implementation(libs.androidx.core.ktx)
-    implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.android.vad.webrtc)
-    implementation(libs.prdownloader)
-    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.security.crypto)
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.gson)
 
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.kotlinx.coroutines.test)

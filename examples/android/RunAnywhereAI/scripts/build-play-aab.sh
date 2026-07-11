@@ -141,6 +141,7 @@ run_release_gradle() (
     exec ./gradlew "$@" \
         --no-daemon \
         --max-workers=2 \
+        --dependency-verification strict \
         -Pkotlin.compiler.execution.strategy=in-process
 )
 
@@ -157,6 +158,8 @@ run_sdk_gradle() (
     exec ./gradlew "$@" \
         --no-daemon \
         --max-workers=2 \
+        --dependency-verification strict \
+        -Prunanywhere.useLocalNatives=true \
         -Pkotlin.compiler.execution.strategy=in-process
 )
 
@@ -166,6 +169,7 @@ run_app_gradle() (
     exec ./gradlew "$@" \
         --no-daemon \
         --max-workers=2 \
+        --dependency-verification strict \
         -Pkotlin.compiler.execution.strategy=in-process
 )
 
@@ -228,6 +232,21 @@ for command_name in awk chmod cmake cp date diff env find git grep java jq keyto
     require_command "${command_name}"
 done
 [[ -x ./gradlew ]] || fail "Gradle wrapper is missing or not executable"
+
+dependency_state_files=(
+    "${APP_ROOT}/gradle/verification-metadata.xml"
+    "${APP_ROOT}/app/gradle.lockfile"
+    "${REPO_ROOT}/sdk/runanywhere-kotlin/gradle/verification-metadata.xml"
+    "${REPO_ROOT}/sdk/runanywhere-kotlin/gradle.lockfile"
+    "${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/gradle.lockfile"
+    "${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/gradle.lockfile"
+    "${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-qhexrt/gradle.lockfile"
+)
+for dependency_state_file in "${dependency_state_files[@]}"; do
+    [[ -s "${dependency_state_file}" ]] || \
+        fail "required Gradle dependency state is missing: ${dependency_state_file}"
+done
+unset dependency_state_file
 
 # Run the existing Gradle gate before any native compilation. It validates the
 # HTTPS endpoints, upload keystore, and expected upload-certificate fingerprint.
@@ -471,6 +490,48 @@ fi
 echo "==> Building and staging release AARs"
 run_sdk_versioned "${APP_ROOT}/scripts/stage-sdk-aars.sh" release
 
+dependency_evidence_dir="${APP_ROOT}/build/release-dependency-evidence"
+cmake -E remove_directory "${dependency_evidence_dir}"
+mkdir -p "${dependency_evidence_dir}"
+
+write_staged_aar_hashes() {
+    local output="$1"
+    local aar_name
+    local aar_path
+    local aar_sha256
+    : > "${output}"
+    for aar_name in \
+        runanywhere-sdk.aar \
+        runanywhere-llamacpp.aar \
+        runanywhere-onnx.aar \
+        runanywhere-qhexrt.aar; do
+        aar_path="${APP_ROOT}/libs/${aar_name}"
+        [[ -s "${aar_path}" ]] || fail "staged SDK AAR is missing: ${aar_path}"
+        aar_sha256="$(shasum -a 256 "${aar_path}")"
+        aar_sha256="${aar_sha256%% *}"
+        printf '%s  %s\n' "${aar_sha256}" "${aar_name}" >> "${output}"
+    done
+}
+
+staged_aar_hashes_before="${dependency_evidence_dir}/staged-aar-sha256.txt"
+write_staged_aar_hashes "${staged_aar_hashes_before}"
+
+echo "==> Capturing strict release dependency graphs"
+run_sdk_gradle :dependencies --configuration releaseRuntimeClasspath > \
+    "${dependency_evidence_dir}/sdk-release-runtime-dependencies.txt"
+for sdk_module in \
+    runanywhere-core-llamacpp \
+    runanywhere-core-onnx \
+    runanywhere-core-qhexrt; do
+    run_sdk_gradle \
+        ":modules:${sdk_module}:dependencies" \
+        --configuration releaseRuntimeClasspath > \
+        "${dependency_evidence_dir}/${sdk_module}-release-runtime-dependencies.txt"
+done
+unset sdk_module
+run_app_gradle :app:dependencies --configuration releaseRuntimeClasspath > \
+    "${dependency_evidence_dir}/app-release-runtime-dependencies.txt"
+
 # packageReleaseBundle owns the native-symbol ZIP, but AGP can update an
 # existing archive without deleting entries from an older multi-ABI build.
 # Reuse mode keeps app/build, so invalidate both the extractor output and the
@@ -493,6 +554,12 @@ echo "==> Building guarded release APK and Play bundle"
 run_release_gradle \
     :app:assembleRelease \
     :app:bundleRelease
+
+staged_aar_hashes_after="${dependency_evidence_dir}/staged-aar-sha256-after-build.txt"
+write_staged_aar_hashes "${staged_aar_hashes_after}"
+diff -u "${staged_aar_hashes_before}" "${staged_aar_hashes_after}" >/dev/null || \
+    fail "staged SDK AAR bytes changed during the app build"
+rm -f "${staged_aar_hashes_after}"
 
 # No post-build verifier needs backend or signing inputs. Drop them before
 # invoking bundletool, jarsigner, jq, or archival helpers.
@@ -608,6 +675,28 @@ cp "${AAB}" "${ARCHIVE_PARTIAL}/${archive_aab}"
 cp "${MAPPING}" "${ARCHIVE_PARTIAL}/mapping.txt"
 cp "${NATIVE_SYMBOLS}" "${ARCHIVE_PARTIAL}/native-debug-symbols.zip"
 cp "${SBOM}" "${ARCHIVE_PARTIAL}/release-sbom.cdx.json"
+mkdir -p \
+    "${ARCHIVE_PARTIAL}/gradle-dependency-state/app" \
+    "${ARCHIVE_PARTIAL}/gradle-dependency-state/sdk/modules/runanywhere-core-llamacpp" \
+    "${ARCHIVE_PARTIAL}/gradle-dependency-state/sdk/modules/runanywhere-core-onnx" \
+    "${ARCHIVE_PARTIAL}/gradle-dependency-state/sdk/modules/runanywhere-core-qhexrt"
+cp "${APP_ROOT}/gradle/verification-metadata.xml" \
+    "${ARCHIVE_PARTIAL}/gradle-dependency-state/app/verification-metadata.xml"
+cp "${APP_ROOT}/app/gradle.lockfile" \
+    "${ARCHIVE_PARTIAL}/gradle-dependency-state/app/gradle.lockfile"
+cp "${REPO_ROOT}/sdk/runanywhere-kotlin/gradle/verification-metadata.xml" \
+    "${ARCHIVE_PARTIAL}/gradle-dependency-state/sdk/verification-metadata.xml"
+cp "${REPO_ROOT}/sdk/runanywhere-kotlin/gradle.lockfile" \
+    "${ARCHIVE_PARTIAL}/gradle-dependency-state/sdk/gradle.lockfile"
+for sdk_module in \
+    runanywhere-core-llamacpp \
+    runanywhere-core-onnx \
+    runanywhere-core-qhexrt; do
+    cp "${REPO_ROOT}/sdk/runanywhere-kotlin/modules/${sdk_module}/gradle.lockfile" \
+        "${ARCHIVE_PARTIAL}/gradle-dependency-state/sdk/modules/${sdk_module}/gradle.lockfile"
+done
+unset sdk_module
+cp -R "${dependency_evidence_dir}" "${ARCHIVE_PARTIAL}/dependency-evidence"
 "${BUNDLETOOL_COMMAND[@]}" dump config --bundle="${AAB}" > "${ARCHIVE_PARTIAL}/bundletool-config.json"
 "${BUNDLETOOL_COMMAND[@]}" dump manifest --bundle="${AAB}" > "${ARCHIVE_PARTIAL}/AndroidManifest.xml"
 

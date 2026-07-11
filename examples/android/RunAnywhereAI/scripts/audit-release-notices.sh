@@ -45,7 +45,8 @@ cd "$APP_ROOT"
 ./gradlew \
     :app:generateReleaseSbom \
     --no-daemon \
-    --max-workers=2
+    --max-workers=2 \
+    --dependency-verification strict
 
 SBOM="app/build/reports/release-sbom.cdx.json"
 INVENTORY="app/build/reports/release-notice-inventory.json"

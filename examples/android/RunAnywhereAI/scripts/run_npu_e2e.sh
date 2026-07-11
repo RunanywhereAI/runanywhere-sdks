@@ -9,9 +9,9 @@
 # then aggregates via scripts/npu_e2e_report.py (which also does the offline-whisper TTS round-trip).
 #
 # Prereqs (see the QHexRT `android_npu_e2e` skill / BUILD.md): the QHexRT static
-# libs are built + staged, the SDK plugin .so are built + staged into jniLibs,
-# and the Kotlin SDK is published to mavenLocal. `--build` (below) then stages the
-# AARs and builds+installs the app + androidTest APKs.
+# libs are built + staged, and the SDK plugin .so are built + staged into jniLibs.
+# `--build` (below) builds/stages the local AARs directly, then builds and installs
+# the app and androidTest APKs.
 #
 # Usage:
 #   scripts/run_npu_e2e.sh [flags] [modelId ...]
@@ -160,7 +160,7 @@ if [ $BUILD -eq 1 ]; then
     fi
   fi
   (cd "$APP_ROOT" && bash scripts/stage-sdk-aars.sh)
-  (cd "$APP_ROOT" && ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest)
+  (cd "$APP_ROOT" && ./gradlew --dependency-verification strict :app:assembleDebug :app:assembleDebugAndroidTest)
   APK="$APP_ROOT/app/build/outputs/apk/debug/app-debug.apk"
   TAPK="$APP_ROOT/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
   "${ADB[@]}" install -r -g "$APK"

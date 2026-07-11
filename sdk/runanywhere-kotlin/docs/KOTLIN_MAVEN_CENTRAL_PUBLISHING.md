@@ -261,7 +261,6 @@ No `pickFirsts` or workarounds needed. Each AAR bundles only its own native libs
 | Duplicate `.so` across AARs | Stale files in module `jniLibs/`. Delete and rebuild. Check `.gitignore` covers `src/main/jniLibs/`. |
 | Staging repo "No objects found" | Drop the stale repo and re-upload |
 | OSSRH staging never auto-closes | Manually close/release via staging API |
-| `Unresolved reference 'json'` (JVM) | `org.json:json:20240303` is in `jvmAndroidMain` dependencies |
 
 ---
 

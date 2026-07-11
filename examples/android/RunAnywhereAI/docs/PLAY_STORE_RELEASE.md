@@ -117,20 +117,29 @@ the actual upload certificate, exact arm64 native contents, every packaged ELF
 - an arm64-only native-debug-symbol archive and its reviewed layout;
 - SDK/QHexRT Git provenance (including untracked-file dirtiness), pinned QAIRT
   and NDK versions, AAB metadata, SHA-256 checksums, and the actual upload
-  certificate SHA-256.
+  certificate SHA-256;
+- the reviewed Gradle verification metadata and strict dependency locks used by
+  the app, SDK root, and all three Android backend modules; and
+- strict release-runtime dependency graphs plus SHA-256 hashes for the four
+  locally staged SDK AARs, with a post-build byte-stability check.
 
-Both Gradle wrapper distributions have pinned SHA-256 checksums. Maven/Google
-dependency verification metadata and dependency lockfiles are not yet present,
-so a successful local wrapper run is not by itself byte-for-byte dependency
-reproducibility evidence; resolve that before calling the supply chain fully
-pinned.
+Both Gradle wrapper distributions have pinned SHA-256 checksums. Every wrapper
+Gradle invocation uses strict dependency verification, and the release wrapper
+fails before Gradle starts unless all seven reviewed verification/lock files are
+present. The verification metadata covers the platform-specific AAPT2 artifacts
+used by the supported macOS and Linux/amd64 build hosts. A new or updated
+dependency must be deliberately reviewed and committed; never generate metadata
+or locks as an unreviewed side effect of a release build. This freezes the
+reviewed Gradle plugin and repository bytes; it does not independently attest
+publisher signatures or pin the host JDK and Android platform SDK, which remain
+controlled-builder prerequisites.
 
 ## Engineering gates
 
 - [ ] Clean QHexRT static build and clean Android native SDK build use the pinned
   QAIRT version documented for this release.
-- [ ] Gradle dependency verification metadata and release dependency locks are
-  reviewed and committed; wrapper-distribution checksums alone are insufficient.
+- [x] Gradle dependency verification metadata and strict dependency locks are
+  reviewed and committed for the app, SDK root, and each Android backend module.
 - [ ] Clean release AARs are staged; unit tests and minified release build pass.
 - [ ] Release catalog exposes only architecture/runtime-compatible HNPU models.
 - [ ] No model download plan contains `.dex`, `.jar`, or executable `.so` files.
