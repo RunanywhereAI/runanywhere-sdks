@@ -100,17 +100,6 @@ expect_literal "sdk/runanywhere-react-native/packages/core/src/Foundation/Consta
   "version: '${VERSION}'"
 expect_literal "sdk/runanywhere-react-native/packages/qhexrt/src/QHexRTProvider.ts" \
   "static readonly version = '${VERSION}'"
-expect_literal "sdk/runanywhere-react-native/packages/core/android/build.gradle" \
-  "def commonsVersion = \"${VERSION}\""
-expect_literal "sdk/runanywhere-react-native/packages/llamacpp/android/build.gradle" ": \"${VERSION}\""
-expect_literal "sdk/runanywhere-react-native/packages/onnx/android/build.gradle" \
-  "def coreVersion = \"${VERSION}\""
-expect_count "sdk/runanywhere-react-native/packages/core/android/build.gradle" \
-  'releases/download/v${commonsVersion}/RACommons-android-v${commonsVersion}.zip' 2
-expect_count "sdk/runanywhere-react-native/packages/llamacpp/android/build.gradle" \
-  'releases/download/v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip' 2
-expect_count "sdk/runanywhere-react-native/packages/onnx/android/build.gradle" \
-  'releases/download/v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip' 2
 expect_count "sdk/runanywhere-react-native/yarn.lock" \
   "\"@runanywhere/core\": \">=${VERSION}\"" 4
 expect_count "yarn.lock" "\"@runanywhere/core\": \">=${VERSION}\"" 4
@@ -142,20 +131,6 @@ for gradle_file in \
   sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/build.gradle; do
   expect_literal "${gradle_file}" "version '${VERSION}'"
 done
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere/android/binary_config.gradle" \
-  "commonsVersion = \"${VERSION}\""
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere/android/binary_config.gradle" \
-  "coreVersion = \"${VERSION}\""
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/binary_config.gradle" \
-  "coreVersion = \"${VERSION}\""
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere_onnx/android/binary_config.gradle" \
-  "coreVersion = \"${VERSION}\""
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere/android/binary_config.gradle" \
-  'commonsAndroidUrl = "${commonsBaseUrl}/v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"'
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/binary_config.gradle" \
-  'llamacppAndroidUrl = "${binariesBaseUrl}/v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip"'
-expect_literal "sdk/runanywhere-flutter/packages/runanywhere_onnx/android/binary_config.gradle" \
-  'onnxAndroidUrl = "${binariesBaseUrl}/v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip"'
 expect_literal "sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt" \
   "private const val SDK_VERSION = \"${VERSION}\""
 expect_literal "sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt" \

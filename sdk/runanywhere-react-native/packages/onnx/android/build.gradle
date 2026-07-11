@@ -85,7 +85,7 @@ def getExtOrIntegerDefault(name) {
 // Version Constants (MUST match Swift Package.swift and iOS Podspec)
 // RABackendONNX from runanywhere-sdks
 // =============================================================================
-def coreVersion = "0.19.15"
+def coreVersion = "0.19.13"
 
 // =============================================================================
 // Binary Source - RABackendONNX from runanywhere-sdks
@@ -290,7 +290,7 @@ task downloadNativeLibs {
                 logger.lifecycle("[RunAnywhereONNX] ⚠️ Bundled libs found for arm64-v8a but missing for: ${missingAbis.join(', ')}")
                 logger.lifecycle("[RunAnywhereONNX] Attempting to download missing ABIs from GitHub releases...")
                 try {
-                    def onnxUrl = "https://github.com/${githubOrg}/${coreRepo}/releases/download/v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip"
+                    def onnxUrl = "https://github.com/${githubOrg}/${coreRepo}/releases/download/core-v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip"
                     def tempZip = file("${downloadedLibsDir}/RABackendONNX-supplement.zip")
                     downloadedLibsDir.mkdirs()
                     new URL(onnxUrl).withInputStream { input ->
@@ -343,7 +343,7 @@ task downloadNativeLibs {
         // =============================================================================
         // Download RABackendONNX from runanywhere-sdks
         // =============================================================================
-        def onnxUrl = "https://github.com/${githubOrg}/${coreRepo}/releases/download/v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip"
+        def onnxUrl = "https://github.com/${githubOrg}/${coreRepo}/releases/download/core-v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip"
         def onnxZip = file("${downloadedLibsDir}/RABackendONNX.zip")
 
         logger.lifecycle("\n📦 Downloading RABackendONNX...")

@@ -12,7 +12,7 @@ ext {
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
-    coreVersion = "0.19.15"
+    coreVersion = "0.1.6"
 
     // =============================================================================
     // Remote binary URLs
@@ -23,7 +23,7 @@ ext {
     binariesBaseUrl = "https://github.com/${binariesGitHubOrg}/${binariesRepo}/releases/download"
 
     // Android native libraries package
-    onnxAndroidUrl = "${binariesBaseUrl}/v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip"
+    onnxAndroidUrl = "${binariesBaseUrl}/commons-v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip"
 
     // Helper method to check if local libs exist.
     // The engines CMake may emit either `librac_backend_onnx.so` (always)

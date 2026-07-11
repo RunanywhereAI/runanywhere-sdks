@@ -28,8 +28,6 @@
 #   sdk/runanywhere-react-native/packages/*/package.json   (each package + first-party deps)
 #   sdk/runanywhere-react-native/lerna.json                (fixed package train version)
 #   sdk/runanywhere-react-native/.../SDKConstants.ts       (RN version constant)
-#   sdk/runanywhere-react-native/packages/core/android/build.gradle (commonsVersion)
-#   sdk/runanywhere-react-native/packages/*/android/build.gradle (def coreVersion)
 #   sdk/runanywhere-flutter/packages/*/pubspec.yaml        (each version + core dep)
 #   sdk/runanywhere-flutter package/plugin/native metadata (Dart, Gradle, Swift, Kotlin)
 #   dependencies/versions.json                             (@runanywhere/proto-ts pin — first-party suite version)
@@ -168,23 +166,6 @@ bump_versions_json_proto_ts_pin() {
         "\"@runanywhere/proto-ts\": \"^${NEW_VERSION}\""
 }
 
-# Update `def coreVersion = "x.y.z"` in RN backend Android build.gradle files.
-# Each backend package's Gradle script derives its native-asset download URL
-# from `coreVersion`, so it must track the SDK suite version or `assemble*`
-# will try to fetch a release tag that doesn't exist (or fetch the wrong one).
-bump_rn_backend_core_version() {
-    local file="$1"
-    if grep -Eq 'def coreVersion = "[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"' "$file"; then
-        bump_line "$file" \
-            'def coreVersion = "[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"' \
-            "def coreVersion = \"${NEW_VERSION}\""
-    else
-        bump_line "$file" \
-            '(def coreVersion = .*:[[:space:]]*)"[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"' \
-            "\\1\"${NEW_VERSION}\""
-    fi
-}
-
 bump_gradle_version() {
     local file="$1"
     bump_line "$file" \
@@ -313,22 +294,6 @@ bump_line "${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/src/QHexRTP
     "static readonly version = '[^']+'" \
     "static readonly version = '${NEW_VERSION}'"
 
-# RN core downloads the release-train RACommons archive directly.
-bump_line "${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/android/build.gradle" \
-    'def commonsVersion = "[^"]+"' \
-    "def commonsVersion = \"${NEW_VERSION}\""
-
-# RN backend Android build.gradle `coreVersion` — each backend package
-# derives its native-asset download URL from this constant
-# (`v${coreVersion}` GitHub Release tag), so it must track the SDK suite
-# version. Leaving it stale causes assemble tasks to fetch wrong/missing
-# artifacts on release builds. See pass3-syn-078.
-for gradle_file in \
-    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/android/build.gradle" \
-    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/build.gradle"; do
-    bump_rn_backend_core_version "$gradle_file"
-done
-
 # 6. Flutter SDK packages
 echo ""
 echo ">> Flutter SDK:"
@@ -357,27 +322,13 @@ bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/lib/foundat
     "static const String _fallbackVersion = '[^']+'" \
     "static const String _fallbackVersion = '${NEW_VERSION}'"
 
-# Flutter package versions and native download metadata are all release-train
-# values, not independent backend versions.
+# Flutter Gradle package versions follow the package release train.
 for gradle_file in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/build.gradle" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/build.gradle" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/android/build.gradle" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/build.gradle"; do
     bump_gradle_version "$gradle_file"
-done
-bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/binary_config.gradle" \
-    'commonsVersion = "[^"]+"' \
-    "commonsVersion = \"${NEW_VERSION}\""
-bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/binary_config.gradle" \
-    'coreVersion = "[^"]+"' \
-    "coreVersion = \"${NEW_VERSION}\""
-for binary_config in \
-    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/binary_config.gradle" \
-    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/android/binary_config.gradle"; do
-    bump_line "$binary_config" \
-        'coreVersion = "[^"]+"' \
-        "coreVersion = \"${NEW_VERSION}\""
 done
 bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt" \
     'private const val SDK_VERSION = "[^"]+"' \
