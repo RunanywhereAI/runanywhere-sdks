@@ -56,19 +56,19 @@
  *    than per-call request/response.
  */
 
-import { ProtoErrorCode, SDKException } from '../Foundation/SDKException';
-import { SDKLogger } from '../Foundation/SDKLogger';
-import { Runtime, type StreamingMode } from '../Foundation/RuntimeConfig';
+import { ProtoErrorCode, SDKException } from '../Foundation/SDKException.js';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { Runtime, type StreamingMode } from '../Foundation/RuntimeConfig.js';
 import {
   getStreamWorkerFactory,
   type StreamWorkerFactory,
-} from './StreamWorkerFactoryRegistry';
-import type { ProtoCodec } from './ProtoWasm';
+} from './StreamWorkerFactoryRegistry.js';
+import type { ProtoCodec } from './ProtoWasm.js';
 import type {
   StreamRequestKind,
   WorkerRequest,
   WorkerResponse,
-} from './StreamWorker';
+} from './StreamWorker.js';
 
 const logger = new SDKLogger('OffscreenRuntimeBridge');
 

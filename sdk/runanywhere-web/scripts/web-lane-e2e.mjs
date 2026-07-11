@@ -235,7 +235,7 @@ function speechInfraLimitedReason(since = 0) {
   }
   if (/pthread_create failed/i.test(blob)
     && /SherpaONNXBridge|Sherpa\.(STT|TTS)/i.test(blob)) {
-    return 'Sherpa/ONNX pthread blocked in WASM (single-threaded ORT required)';
+    return 'Sherpa/ONNX pthread startup blocked (cross-origin isolation or worker pool unavailable)';
   }
   return '';
 }
@@ -683,8 +683,7 @@ async function runExecutor() {
     headless,
     args: [
       '--enable-unsafe-webgpu',
-      '--enable-features=SharedArrayBuffer,WebAssemblyJSPI,WebAssemblyStackSwitching,WebGPUDeveloperFeatures',
-      '--js-flags=--experimental-wasm-stack-switching',
+      '--enable-features=SharedArrayBuffer,WebGPUDeveloperFeatures',
       '--use-fake-ui-for-media-stream',
       '--use-fake-device-for-media-stream',
     ],

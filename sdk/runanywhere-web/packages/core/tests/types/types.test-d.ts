@@ -2,7 +2,7 @@
  * Type-level tests for @runanywhere/web public API.
  * Run with: npx tsd
  */
-import { expectType } from 'tsd';
+import { expectNotAssignable, expectType } from 'tsd';
 import {
   RunAnywhere,
   SDKEnvironment,
@@ -41,6 +41,9 @@ const opts: InitOptions = {
   environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 };
 expectType<Promise<void>>(RunAnywhere.initialize(opts));
+expectNotAssignable<InitOptions>({
+  webgpuWasmUrl: 'https://example.com/racommons-llamacpp-webgpu.js',
+});
 
 // LLM generation options can be supplied partially by public convenience calls.
 const genOpts: Partial<LLMGenerationOptions> = { temperature: 0.8 };
@@ -92,7 +95,6 @@ const prog: DownloadProgress = {
 };
 expectType<number>(prog.stageProgress);
 
-const loraHandle = 1;
 const loraConfig: LoRAAdapterConfig = {
   adapterPath: '/models/adapters/style.gguf',
   scale: 0.75,
@@ -150,12 +152,12 @@ expectType<boolean>(RunAnywhere.lora.supportsNative());
 expectType<string[]>(RunAnywhere.lora.missingExports());
 expectType<boolean>(RunAnywhere.lora.catalog.supportsNative());
 expectType<string[]>(RunAnywhere.lora.catalog.missingExports());
-expectType<Promise<LoRAApplyResult>>(RunAnywhere.lora.apply(loraHandle, loraApplyRequest));
-expectType<Promise<LoRAState>>(RunAnywhere.lora.remove(loraHandle, loraRemoveRequest));
-expectType<Promise<LoRAState>>(RunAnywhere.lora.list(loraHandle, loraStateRequest));
-expectType<Promise<LoRAState>>(RunAnywhere.lora.state(loraHandle, loraStateRequest));
+expectType<Promise<LoRAApplyResult>>(RunAnywhere.lora.apply(loraApplyRequest));
+expectType<Promise<LoRAState>>(RunAnywhere.lora.remove(loraRemoveRequest));
+expectType<Promise<LoRAState>>(RunAnywhere.lora.list(loraStateRequest));
+expectType<Promise<LoRAState>>(RunAnywhere.lora.state(loraStateRequest));
 expectType<Promise<LoraCompatibilityResult>>(
-  RunAnywhere.lora.checkCompatibility(loraHandle, loraConfig),
+  RunAnywhere.lora.checkCompatibility(loraConfig),
 );
 expectType<Promise<LoraAdapterCatalogEntry>>(
   RunAnywhere.lora.catalog.register(loraCatalogEntry),

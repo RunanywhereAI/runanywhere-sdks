@@ -23,22 +23,22 @@
  * point keep working unchanged.
  */
 
-import { DiffusionProtoAdapter } from './DiffusionProtoAdapter';
-import { EmbeddingsProtoAdapter } from './EmbeddingsProtoAdapter';
-import { LLMProtoAdapter } from './LLMProtoAdapter';
-import { LoRAProtoAdapter } from './LoRAProtoAdapter';
+import { DiffusionProtoAdapter } from './DiffusionProtoAdapter.js';
+import { EmbeddingsProtoAdapter } from './EmbeddingsProtoAdapter.js';
+import { LLMProtoAdapter } from './LLMProtoAdapter.js';
+import { LoRAProtoAdapter } from './LoRAProtoAdapter.js';
 import {
   adapterState,
   type ModalityCapabilityName,
   type ModalityProtoModule,
-} from './ProtoAdapterTypes';
-import { RAGProtoAdapter } from './RAGProtoAdapter';
-import { STTProtoAdapter } from './STTProtoAdapter';
-import { StructuredOutputProtoAdapter } from './StructuredOutputProtoAdapter';
-import { TTSProtoAdapter } from './TTSProtoAdapter';
-import { VADProtoAdapter } from './VADProtoAdapter';
-import { VLMProtoAdapter } from './VLMProtoAdapter';
-import { VoiceAgentProtoAdapter } from './VoiceAgentProtoAdapter';
+} from './ProtoAdapterTypes.js';
+import { RAGProtoAdapter } from './RAGProtoAdapter.js';
+import { STTProtoAdapter } from './STTProtoAdapter.js';
+import { StructuredOutputProtoAdapter } from './StructuredOutputProtoAdapter.js';
+import { TTSProtoAdapter } from './TTSProtoAdapter.js';
+import { VADProtoAdapter } from './VADProtoAdapter.js';
+import { VLMProtoAdapter } from './VLMProtoAdapter.js';
+import { VoiceAgentProtoAdapter } from './VoiceAgentProtoAdapter.js';
 
 /**
  * Subset of `WasmCapability` that maps to a ModalityProtoModule slot. The
@@ -61,21 +61,21 @@ const MODALITY_CAPABILITIES: ReadonlySet<string> = new Set<ModalityCapabilityNam
   'voice-agent',
 ]);
 
-export { DiffusionProtoAdapter } from './DiffusionProtoAdapter';
-export { EmbeddingsProtoAdapter } from './EmbeddingsProtoAdapter';
-export { LLMProtoAdapter } from './LLMProtoAdapter';
-export { LoRAProtoAdapter } from './LoRAProtoAdapter';
-export { RAGProtoAdapter } from './RAGProtoAdapter';
-export { STTProtoAdapter } from './STTProtoAdapter';
-export { StructuredOutputProtoAdapter } from './StructuredOutputProtoAdapter';
-export { TTSProtoAdapter } from './TTSProtoAdapter';
-export { VADProtoAdapter } from './VADProtoAdapter';
-export { VLMProtoAdapter } from './VLMProtoAdapter';
-export { VoiceAgentProtoAdapter } from './VoiceAgentProtoAdapter';
+export { DiffusionProtoAdapter } from './DiffusionProtoAdapter.js';
+export { EmbeddingsProtoAdapter } from './EmbeddingsProtoAdapter.js';
+export { LLMProtoAdapter } from './LLMProtoAdapter.js';
+export { LoRAProtoAdapter } from './LoRAProtoAdapter.js';
+export { RAGProtoAdapter } from './RAGProtoAdapter.js';
+export { STTProtoAdapter } from './STTProtoAdapter.js';
+export { StructuredOutputProtoAdapter } from './StructuredOutputProtoAdapter.js';
+export { TTSProtoAdapter } from './TTSProtoAdapter.js';
+export { VADProtoAdapter } from './VADProtoAdapter.js';
+export { VLMProtoAdapter } from './VLMProtoAdapter.js';
+export { VoiceAgentProtoAdapter } from './VoiceAgentProtoAdapter.js';
 export type {
   ModalityProtoModule,
   ProtoEventHandler,
-} from './ProtoAdapterTypes';
+} from './ProtoAdapterTypes.js';
 
 export class ModalityProtoAdapter {
   /**

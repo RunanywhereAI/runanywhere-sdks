@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/mlx",
-  "version": "0.19.13",
+  "version": "0.19.15",
   "description": "MLX backend registration for RunAnywhere React Native SDK on Apple platforms",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -20,8 +20,10 @@
     "*.podspec"
   ],
   "scripts": {
+    "build": "tsc -b",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.ts\"",
+    "clean": "tsc -b --clean && rm -rf lib",
+    "lint": "eslint \"src/**/*.ts\" --max-warnings 0",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "prepublishOnly": "npm run typecheck && npm run lint"
   },
@@ -35,12 +37,13 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@runanywhere/core": ">=0.19.13",
+    "@runanywhere/core": ">=0.19.15",
     "react": ">=19.0.0",
     "react-native": ">=0.83.1",
     "react-native-nitro-modules": "^0.33.9"
   },
   "devDependencies": {
+    "eslint": "^9.39.4",
     "typescript": "^5.9.3"
   }
 }

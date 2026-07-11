@@ -37,6 +37,7 @@ struct SharedOrt {
     const OrtApiBase* api_base = nullptr;
     const OrtApi* api = nullptr;
     OrtEnv* env = nullptr;
+    bool uses_global_thread_pools = false;
     std::string init_error;
 
     SharedOrt() {
@@ -46,11 +47,46 @@ struct SharedOrt {
             init_error = "failed to resolve ONNX Runtime C API";
             return;
         }
-        OrtStatus* status = api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "RunAnywhereONNXRT", &env);
-        if (status != nullptr) {
+        auto capture_error = [this](OrtStatus* status) {
             init_error = api->GetErrorMessage(status);
             api->ReleaseStatus(status);
+        };
+
+#if defined(__wasm__) && defined(__EMSCRIPTEN_PTHREADS__)
+        /* Threaded ONNX Runtime WASM deliberately defaults sessions to the
+         * environment's global pools. Pair that session policy with a global-
+         * pool environment; ORT rejects a plain CreateEnv at session creation.
+         * A single worker-free 1/1 configuration also avoids background WASM
+         * pthread aborts, matching ORT's own threaded-WASM wrapper. */
+        OrtThreadingOptions* threading_options = nullptr;
+        OrtStatus* status = api->CreateThreadingOptions(&threading_options);
+        if (status != nullptr) {
+            capture_error(status);
+            return;
         }
+
+        status = api->SetGlobalIntraOpNumThreads(threading_options, 1);
+        if (status == nullptr) {
+            status = api->SetGlobalInterOpNumThreads(threading_options, 1);
+        }
+        if (status == nullptr) {
+            status = api->CreateEnvWithGlobalThreadPools(
+                ORT_LOGGING_LEVEL_WARNING, "RunAnywhereONNXRT", threading_options, &env);
+        }
+        api->ReleaseThreadingOptions(threading_options);
+
+        if (status != nullptr) {
+            capture_error(status);
+            return;
+        }
+        uses_global_thread_pools = true;
+#else
+        OrtStatus* status =
+            api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "RunAnywhereONNXRT", &env);
+        if (status != nullptr) {
+            capture_error(status);
+        }
+#endif
     }
 
     ~SharedOrt() {
@@ -376,7 +412,12 @@ OrtSessionOptions* prepare_session_options(const SharedOrt& ort, const SessionOp
         return nullptr;
     }
 
-    status = ort.api->SetIntraOpNumThreads(session_options, options.intra_op_threads);
+    /* Threaded WASM sessions must consume the global pools created above.
+     * Native and non-pthread WASM retain independent per-session pools and
+     * continue to honor SessionOptions::intra_op_threads. */
+    status = ort.uses_global_thread_pools
+                 ? ort.api->DisablePerSessionThreads(session_options)
+                 : ort.api->SetIntraOpNumThreads(session_options, options.intra_op_threads);
     if (status != nullptr) {
         if (out_error)
             *out_error = status_message(ort.api, status);

@@ -17,7 +17,7 @@ Pod::Spec.new do |s|
   dart_sdk_include = flutter_root.nil? || flutter_root.empty? ? nil : File.join(flutter_root, 'bin/cache/dart-sdk/include')
 
   s.name             = 'runanywhere'
-  s.version          = '0.19.13'
+  s.version          = '0.19.15'
   s.summary          = 'RunAnywhere: Privacy-first, on-device AI SDK for Flutter'
   s.description      = <<-DESC
 Privacy-first, on-device AI SDK for Flutter. This package provides the core

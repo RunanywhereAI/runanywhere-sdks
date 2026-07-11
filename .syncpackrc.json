@@ -13,7 +13,7 @@
   "dependencyTypes": ["dev", "prod", "peer"],
   "versionGroups": [
     {
-      "label": "Local workspace packages: ignore (managed by workspaces protocol / peer ranges). @runanywhere/proto-ts lives in sdk/shared/proto-ts and is consumed via workspace:* by all TS SDK packages — it is not published to npm.",
+      "label": "First-party workspace packages: ignore here because local workspace/file resolutions and published peer/dependency ranges are intentionally managed by release-version coherence checks. @runanywhere/proto-ts is published with the SDK release train.",
       "dependencies": [
         "@runanywhere/core",
         "@runanywhere/llamacpp",
@@ -84,12 +84,12 @@
     {
       "label": "Pinned: @playwright/test (centralized in dependencies/versions.json)",
       "dependencies": ["@playwright/test"],
-      "pinVersion": "^1.60.0"
+      "pinVersion": "^1.61.1"
     },
     {
       "label": "Pinned: vite (centralized in dependencies/versions.json) — examples/web scope",
       "dependencies": ["vite"],
-      "pinVersion": "^6.4.2"
+      "pinVersion": "^8.1.4"
     },
     {
       "label": "Pinned: react-native (centralized in dependencies/versions.json) — Hermes/JSI/NitroModules ABI tracks this version (dev/prod only; peer ranges handled above)",

@@ -13,7 +13,7 @@ import type {
 import {
   DownloadAdapter,
   type ProtoDownloadProgressHandler,
-} from '../../Adapters/DownloadAdapter';
+} from '../../Adapters/DownloadAdapter.js';
 
 function requireAdapter(): DownloadAdapter {
   const adapter = DownloadAdapter.tryDefault();

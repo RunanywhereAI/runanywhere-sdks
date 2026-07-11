@@ -9,7 +9,8 @@
  *   2. We probe `RunAnywhere.componentLifecycleSnapshot(SDK_COMPONENT_*)` for
  *      LLM / STT / TTS readiness. When all three are READY, the Start
  *      button enables.
- *   3. Start: capture mic at 16 kHz mono Float32 through `AudioCapture`,
+ *   3. Start: capture and endpoint 16 kHz mono audio through the SDK's
+ *      `VoiceAgentMicDriver`,
  *      register backend models via
  *      `RunAnywhere.initializeVoiceAgentWithLoadedModels()`, and consume
  *      `RunAnywhere.streamVoiceAgent()` as `AsyncIterable<VoiceEvent>`.
@@ -19,10 +20,10 @@
  *        - `vad`                → speech-detected indicator
  *        - `userSaid`           → live transcript area
  *        - `assistantToken`     → streamed assistant response
- *        - `audio`              → push PCM bytes to `AudioPlayback`
+ *        - `audio`              → SDK mic driver gates capture through playback
  *        - `error`              → inline error banner
- *   5. Stop: cancel the event-consumer task, stop capture, dispose playback,
- *      and call `RunAnywhere.cleanupVoiceAgent()`.
+ *   5. Stop: cancel the event-consumer task, stop capture/playback through the
+ *      driver, and call `RunAnywhere.cleanupVoiceAgent()`.
  *
  * Backends (llamacpp + ONNX) are registered once at app init by `main.ts` —
  * this view assumes they exist and surfaces the SDK's typed error if a verb
@@ -32,26 +33,21 @@
 import type { TabLifecycle } from '../app';
 import {
   RunAnywhere,
-  AudioEncoding,
   ModelCategory,
   TokenKind,
-  pcm16ToFloat32,
   VoiceEventPipelineState,
   VADStreamEventKind,
   type AssistantTokenEvent,
-  type AudioFrameEvent,
   type ErrorEvent,
   type StateChangeEvent,
   type UserSaidEvent,
   type VADEvent,
   type VoiceEvent,
 } from '@runanywhere/web';
-import {
-  AudioCapture,
-  AudioPlayback,
-} from '@runanywhere/web/browser';
+import { VoiceAgentMicDriver } from '@runanywhere/web/browser';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
+import { appLogger } from '../services/app-logger';
 import { getCatalog, type CatalogEntry } from '../services/model-catalog';
 import { detectDeviceCapabilities } from '../services/device-capabilities';
 import {
@@ -93,8 +89,7 @@ type SessionState =
 let container: HTMLElement;
 let unmounted = false;
 
-let audioCapture: AudioCapture | null = null;
-let audioPlayback: AudioPlayback | null = null;
+let micDriver: VoiceAgentMicDriver | null = null;
 let eventConsumer: AbortController | null = null;
 let sessionState: SessionState = 'disconnected';
 let isSpeechDetected = false;
@@ -190,7 +185,7 @@ function ensureVoicePipeline(): void {
       voicePipeline = recommendVoicePipeline(caps.tier, caps.memoryBudgetBytes, getCatalog());
     })
     .catch((err) => {
-      console.warn('[voice] pipeline recommendation failed', err);
+      appLogger.warning('[voice] pipeline recommendation failed', err);
     })
     .finally(() => {
       pipelineProbePending = false;
@@ -242,9 +237,8 @@ function renderView(): void {
 
       <div class="docs-section">
         <h3>Conversation</h3>
-        <p class="text-secondary">Speak naturally — the agent listens, thinks,
-        and replies out loud, entirely on your device. Nothing leaves the
-        browser.</p>
+        <p class="text-secondary">Speak naturally — after setup, voice capture
+        and AI inference run in this browser.</p>
         <div class="toolbar-actions">
           <button
             class="btn btn-primary"
@@ -314,7 +308,7 @@ function renderSetupCard(allReady: boolean): string {
     : `<button class="btn btn-primary btn-lg" id="voice-setup-btn" ${settingUpPipeline ? 'disabled' : ''}>
          ${settingUpPipeline ? 'Setting up…' : 'Set up Voice AI'}
        </button>
-       <div class="voice-setup__note">Downloads &amp; loads all components. Runs fully offline afterward.</div>`;
+       <div class="voice-setup__note">Downloads &amp; loads all components. Voice inference runs offline afterward.</div>`;
 
   return `
     <div class="voice-setup">
@@ -402,9 +396,25 @@ function attachHandlers(): void {
   container.querySelectorAll<HTMLElement>('[data-change]').forEach((el) => {
     el.addEventListener('click', () => {
       const slot = pipelineSlots().find((s) => s.key === el.dataset.change);
-      if (slot) openSheet({ title: `Choose ${slot.label}`, filterCategories: [slot.category] });
+      if (!slot) return;
+      openSheet({
+        title: `Choose ${slot.label}`,
+        filterCategories: [slot.category],
+        onModelReady: (entry) => updatePipelineSlot(slot.key, entry),
+      });
     });
   });
+}
+
+/** Replace one recommendation after the picker confirms the model is ready. */
+function updatePipelineSlot(
+  key: PipelineSlot['key'],
+  entry: CatalogEntry,
+): void {
+  if (!voicePipeline) return;
+  voicePipeline = { ...voicePipeline, [key]: entry };
+  lastError = null;
+  if (!unmounted) renderView();
 }
 
 // ---------------------------------------------------------------------------
@@ -428,26 +438,36 @@ async function startSession(): Promise<void> {
     // SDK owns the multi-step bootstrap (VAD auto-load + model composition).
     await RunAnywhere.initializeVoiceAgentWithLoadedModels();
 
-    // Start the microphone at the VAD-friendly 16 kHz mono Float32 rate.
-    audioCapture = new AudioCapture({ sampleRate: 16000, channels: 1 });
-    await audioCapture.start(undefined, (level) => {
-      audioLevel = level;
-      updateLevelBar();
-    });
-
-    // Prepare playback for TTS audio chunks. The actual sample rate is
-    // re-derived per `AudioFrameEvent.sampleRateHz`, but we seed at 22050
-    // (Piper default) so the first chunk plays without a context reset.
-    audioPlayback = new AudioPlayback({ sampleRate: 22050 });
-
-    sessionState = 'listening';
-    setEventSummary('Listening...');
-    renderView();
-
     // Start consuming the proto event stream. We track the consumer via an
     // `AbortController` so `stopSession()` can deterministically end it.
     eventConsumer = new AbortController();
     void consumeEvents(eventConsumer.signal);
+
+    // The browser-specific SDK driver owns microphone capture and utterance
+    // endpointing, then submits each completed utterance through the one-call
+    // `RunAnywhere.processVoiceTurn()` provider. The example only renders the
+    // resulting canonical VoiceEvents.
+    micDriver = new VoiceAgentMicDriver();
+    await micDriver.start({
+      onLevel: (level) => {
+        audioLevel = level;
+        updateLevelBar();
+      },
+      onPhase: (phase) => {
+        sessionState = phase === 'processing' ? 'processing' : 'listening';
+        if (phase === 'processing') isSpeechDetected = false;
+        scheduleRender();
+      },
+      onError: (error) => {
+        lastError = `Voice turn failed: ${formatError(error)}`;
+        sessionState = 'error';
+        scheduleRender();
+      },
+    });
+
+    sessionState = 'listening';
+    setEventSummary('Listening...');
+    renderView();
   } catch (err) {
     lastError = `Failed to start voice session: ${formatError(err)}`;
     sessionState = 'error';
@@ -463,14 +483,9 @@ async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
   eventConsumer?.abort();
   eventConsumer = null;
 
-  if (audioCapture) {
-    try { audioCapture.stop(); } catch { /* ignore */ }
-    audioCapture = null;
-  }
-
-  if (audioPlayback) {
-    try { audioPlayback.dispose(); } catch { /* ignore */ }
-    audioPlayback = null;
+  if (micDriver) {
+    try { micDriver.stop(); } catch { /* ignore */ }
+    micDriver = null;
   }
 
   audioLevel = 0;
@@ -501,7 +516,16 @@ async function consumeEvents(signal: AbortSignal): Promise<void> {
     // Swift parity: `streamVoiceAgent()` finishes EMPTY when the agent is not
     // ready — no synthetic error events arrive on the iterator, so a stream
     // that ends right away simply returns the UI to the Ready state below.
-    const stream = RunAnywhere.streamVoiceAgent();
+    const stream = RunAnywhere.streamVoiceAgent({
+      eventFilter: '',
+      sessionId: 'web-voice-agent',
+      categories: [],
+      minSeverity: 0,
+      replayFromSeq: 0,
+      // The SDK mic driver plays the returned audio and keeps capture gated
+      // until playback completes, preventing speaker-to-mic feedback.
+      includeAudio: false,
+    }, signal);
     for await (const event of stream) {
       if (signal.aborted || unmounted) break;
       handleVoiceEvent(event);
@@ -540,9 +564,6 @@ function handleVoiceEvent(event: VoiceEvent): void {
   }
   if (event.assistantToken) {
     applyAssistantToken(event.assistantToken);
-  }
-  if (event.audio) {
-    void applyAudioFrame(event.audio);
   }
   if (event.error) {
     applyErrorEvent(event.error);
@@ -608,6 +629,7 @@ function applyVadEvent(vad: VADEvent): void {
 function applyUserSaid(userSaid: UserSaidEvent): void {
   // Partial hypotheses overwrite; finals stay until the next turn starts.
   userTranscript = userSaid.text;
+  if (userSaid.isFinal) assistantResponse = '';
 }
 
 function applyAssistantToken(token: AssistantTokenEvent): void {
@@ -620,20 +642,6 @@ function applyAssistantToken(token: AssistantTokenEvent): void {
   }
 }
 
-async function applyAudioFrame(frame: AudioFrameEvent): Promise<void> {
-  if (!frame.pcm || frame.pcm.byteLength === 0) return;
-  try {
-    const samples = decodePcm(frame);
-    const rate = frame.sampleRateHz || 22050;
-    audioPlayback = audioPlayback ?? new AudioPlayback({ sampleRate: rate });
-    // Fire-and-forget; subsequent chunks queue via the audio context.
-    void audioPlayback.play(samples, rate);
-  } catch (err) {
-    lastError = `Audio playback failed: ${formatError(err)}`;
-    scheduleRender();
-  }
-}
-
 function applyErrorEvent(err: ErrorEvent): void {
   if (err.message) {
     lastError = err.message;
@@ -643,20 +651,6 @@ function applyErrorEvent(err: ErrorEvent): void {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function decodePcm(frame: AudioFrameEvent): Float32Array {
-  // Copy into a fresh ArrayBuffer (the proto bytes may be a view into a
-  // larger heap buffer).
-  const copy = new Uint8Array(frame.pcm.byteLength);
-  copy.set(frame.pcm);
-  if (frame.encoding === AudioEncoding.AUDIO_ENCODING_PCM_S16_LE) {
-    // SDK-owned Int16→Float32 conversion (Swift parity:
-    // RunAnywhere.pcm16ToFloat32 — no app-side PCM math).
-    return pcm16ToFloat32(copy.buffer);
-  }
-  // Default to PCM-F32 little-endian (encoding 0 / unspecified or explicit).
-  return new Float32Array(copy.buffer);
-}
 
 function setEventSummary(text: string): void {
   lastEventSummary = text;

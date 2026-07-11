@@ -20,8 +20,8 @@ import {
   ModelCategory,
   type CurrentModelResult,
 } from '@runanywhere/proto-ts/model_types';
-import { SDKException } from '../../Foundation/SDKException';
-import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import { SDKException } from '../../Foundation/SDKException.js';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 
 export interface VisionLanguageProvider {
   readonly isInitialized: boolean;

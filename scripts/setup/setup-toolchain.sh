@@ -152,7 +152,7 @@ install_dart_plugin() {
 
 install_ts_proto() {
     if ! have npm; then
-        echo "warning: npm not on PATH — install Node 18+ and retry." >&2
+        echo "warning: npm not on PATH — install Node 20.19+ or 22.12+ and retry." >&2
         return 0
     fi
     npm install -g "ts-proto@^${TS_PROTO_EXPECTED}" protobufjs

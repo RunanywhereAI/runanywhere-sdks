@@ -26,7 +26,7 @@
  *   ```
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
 
 const logger = new SDKLogger('VideoCapture');
 

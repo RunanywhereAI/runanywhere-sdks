@@ -15,6 +15,7 @@ import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { SDKConstants } from '../Foundation/Constants/SDKConstants';
 import {
   DEFAULT_BASE_URL,
+  isUsableHTTPURL,
   isUsableCredential,
 } from '../services/Network/NetworkConfiguration';
 import {
@@ -64,7 +65,10 @@ import { AudioConvert } from './Extensions/Audio/RunAnywhere+AudioConvert';
 import * as ModelManagement from './Extensions/Models/RunAnywhere+ModelRegistry';
 import { formatFramework } from './Helpers/formatFramework';
 import { EventBus } from './Events/EventBus';
-import { SDKException } from '../Foundation/Errors/SDKException';
+import {
+  asSDKException,
+  SDKException,
+} from '../Foundation/Errors/SDKException';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -192,6 +196,27 @@ export const RunAnywhere = {
         const effectiveApiKey = isUsableCredential(options.apiKey)
           ? options.apiKey!.trim()
           : '';
+        const requiresCredentials =
+          environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ||
+          environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
+        if (!isUsableHTTPURL(effectiveBaseURL, {
+          requireHTTPS:
+            environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+        })) {
+          throw SDKException.validationFailed({
+            fieldPath: 'SDKInitOptions.baseURL',
+            message:
+              environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+                ? 'baseURL must be an absolute HTTPS URL without embedded credentials, query, or fragment'
+                : 'baseURL must be an absolute HTTP(S) URL without embedded credentials, query, or fragment',
+          });
+        }
+        if (requiresCredentials && !effectiveApiKey) {
+          throw SDKException.validationFailed({
+            fieldPath: 'SDKInitOptions.apiKey',
+            message: 'apiKey must be non-empty and must not be a placeholder outside development',
+          });
+        }
         const phase1Request: SdkInitPhase1RequestMessage = SdkInitPhase1Request.create();
         phase1Request.environment = mapSdkInitEnvironment(environment);
         phase1Request.apiKey = effectiveApiKey;
@@ -258,7 +283,7 @@ export const RunAnywhere = {
             throw SDKException.notInitialized('Native SDK initialization failed');
           }
 
-          initState = markCoreInitialized(initState, initParams, 'core');
+          initState = markCoreInitialized(initState, initParams);
 
           logger.info('SDK initialized successfully');
 
@@ -273,10 +298,16 @@ export const RunAnywhere = {
             );
           });
         } catch (error) {
-          const msg = error instanceof Error ? error.message : String(error);
-          logger.error(`SDK initialization failed: ${msg}`);
-          initState = markInitializationFailed(initState, error as Error);
-          throw error;
+          const sdkError = asSDKException(error);
+          // Initialization failures can originate in auth/config transports.
+          // Log only structured non-secret identifiers; the full exception is
+          // returned to the caller and must not be copied into device logs.
+          logger.error('SDK initialization failed', {
+            errorCode: sdkError.code,
+            errorCategory: sdkError.category,
+          });
+          initState = markInitializationFailed(initState, sdkError);
+          throw sdkError;
         }
       } finally {
         initializingPromise = null;

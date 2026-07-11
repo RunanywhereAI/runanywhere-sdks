@@ -11,8 +11,9 @@
  *
  * Singleton registry that lets a backend package (`@runanywhere/web-llamacpp`,
  * `@runanywhere/web-onnx`) install the function that constructs the streaming
- * Web Worker. Core stays pure-TS (no bundler-specific `new Worker(new URL(...))`
- * baked in); the factory contains the bundler binding.
+ * Web Worker. Core's worker orchestration stays bundler-neutral (no
+ * backend-specific `new Worker(new URL(...))` is baked in); the factory
+ * contains the bundler binding.
  *
  * If no factory is registered when `OffscreenRuntimeBridge.tryGet()` is called,
  * the bridge falls back to `null` and adapters transparently use the existing
@@ -24,7 +25,7 @@
  *     release the singleton.
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
 
 const logger = new SDKLogger('StreamWorkerFactory');
 

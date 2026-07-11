@@ -121,6 +121,28 @@ rac_storage_callbacks_t callbacks_for(MockStorage* storage) {
     return callbacks;
 }
 
+int test_analyzer_owns_callback_table_copy() {
+    MockStorage storage;
+    storage.path_sizes["/opfs/RunAnywhere/Models/LlamaCpp/callback-copy/model.gguf"] = 73;
+    storage.existing_paths.insert("/opfs/RunAnywhere/Models/LlamaCpp/callback-copy/model.gguf");
+
+    rac_storage_callbacks_t callbacks = callbacks_for(&storage);
+    rac_storage_analyzer_handle_t analyzer = nullptr;
+    ASSERT_EQ(rac_storage_analyzer_create(&callbacks, &analyzer), RAC_SUCCESS);
+
+    // Web frees the malloc'd callback struct after the analyzer has copied it.
+    // Mutating the caller-owned table must not invalidate the native handle.
+    std::memset(&callbacks, 0, sizeof(callbacks));
+    int64_t size = 0;
+    ASSERT_EQ(rac_storage_analyzer_calculate_size(
+                  analyzer, "/opfs/RunAnywhere/Models/LlamaCpp/callback-copy/model.gguf", &size),
+              RAC_SUCCESS);
+    ASSERT_EQ(size, 73);
+
+    rac_storage_analyzer_destroy(analyzer);
+    return 0;
+}
+
 rac_model_info_t model(const char* id, const char* name, const char* local_path,
                        int64_t download_size, int64_t last_used) {
     rac_model_info_t info{};
@@ -602,6 +624,7 @@ int main() {
     } while (0)
 
         RUN(test_info_aggregation_and_model_breakdown);
+        RUN(test_analyzer_owns_callback_table_copy);
         RUN(test_availability_offsets_existing_model_bytes);
         RUN(test_availability_includes_cache_delete_plan);
         RUN(test_delete_plan_blocks_loaded_missing_and_missing_path);

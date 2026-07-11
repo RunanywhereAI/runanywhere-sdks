@@ -18,11 +18,16 @@
  *   ```
  */
 
-import { SDKLogger } from '@runanywhere/web/internal';
-import { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
+import {
+  SDKLogger,
+  type BackendRegistrationState,
+} from '@runanywhere/web/backend';
+import { SherpaONNXBridge } from './Foundation/SherpaONNXBridge.js';
+import { onnxStatus, type ONNXBackendStatus } from './ONNXStatus.js';
 
 const MODULE_ID = 'onnx';
 const logger = new SDKLogger('ONNX');
+let _registrationState: BackendRegistrationState = 'unregistered';
 
 export interface ONNXRegisterOptions {
   /** Override URL to the `racommons-onnx-sherpa.js` glue file. */
@@ -39,6 +44,16 @@ export const ONNX = {
     return SherpaONNXBridge.shared.isBackendRegistered;
   },
 
+  /** Typed registration lifecycle for UI and diagnostics. */
+  get registrationState(): BackendRegistrationState {
+    return _registrationState;
+  },
+
+  /** Current STT/TTS/VAD export availability for this backend package. */
+  status(): ONNXBackendStatus {
+    return onnxStatus();
+  },
+
   /**
    * Register the ONNX Runtime + Sherpa speech backends.
    *
@@ -50,19 +65,31 @@ export const ONNX = {
   async register(options?: ONNXRegisterOptions): Promise<void> {
     const bridge = SherpaONNXBridge.shared;
     if (options?.wasmUrl) bridge.wasmUrl = options.wasmUrl;
-    await bridge.ensureLoaded(options);
-    logger.info('ONNX/Sherpa backends registered (STT/TTS/VAD vtables installed)');
+    _registrationState = 'registering';
+    try {
+      await bridge.ensureLoaded(options);
+      _registrationState = 'registered';
+      logger.info('ONNX/Sherpa backends registered (STT/TTS/VAD vtables installed)');
+    } catch (error) {
+      _registrationState = 'failed';
+      throw error;
+    }
   },
 
   /** Unregister the proto-byte plugins and release the WASM module. */
   unregister(): void {
     SherpaONNXBridge.shared.unregister();
+    _registrationState = 'unregistered';
   },
 };
 
 /** Best-effort registration helper for apps that import the package eagerly. */
 export function autoRegister(options?: ONNXRegisterOptions): Promise<void> {
-  return ONNX.register(options).catch(() => {
-    // Suppress — callers should use `ONNX.register()` directly to inspect failures.
+  return ONNX.register(options).catch((error: unknown) => {
+    logger.warning(
+      `ONNX auto-registration failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    // Preserve best-effort eager registration semantics. Callers that need a
+    // rejecting promise use ONNX.register() directly.
   });
 }

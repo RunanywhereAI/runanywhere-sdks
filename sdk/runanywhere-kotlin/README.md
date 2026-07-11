@@ -30,13 +30,13 @@
 ```kotlin
 dependencies {
     // Core SDK
-    implementation("com.runanywhere.sdk:runanywhere-kotlin:0.19.13")
+    implementation("com.runanywhere.sdk:runanywhere-kotlin:0.19.15")
 
     // Optional: LLM support (llama.cpp backend) - ~34MB
-    implementation("com.runanywhere.sdk:runanywhere-core-llamacpp:0.19.13")
+    implementation("com.runanywhere.sdk:runanywhere-core-llamacpp:0.19.15")
 
     // Optional: STT/TTS/VAD support (Sherpa/ONNX backend) - ~25MB
-    implementation("com.runanywhere.sdk:runanywhere-core-onnx:0.19.13")
+    implementation("com.runanywhere.sdk:runanywhere-core-onnx:0.19.15")
 }
 ```
 

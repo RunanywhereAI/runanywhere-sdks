@@ -1,5 +1,7 @@
 .vercel
-.env*.local
+.vercel-stage
+.env
+.env.*
 
 # Yarn workspace state
 .yarn/cache/

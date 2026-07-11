@@ -9,8 +9,9 @@ import {
   type VLMResult as ProtoVLMResult,
   type VLMStreamEvent as ProtoVLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
-import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge';
-import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm';
+import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
+import { callEmscriptenAsyncNumber } from '../runtime/EmscriptenAsync.js';
+import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
   ensureExports,
@@ -18,7 +19,7 @@ import {
   modalityLogger as logger,
   streamCallback,
   type ModalityProtoModule,
-} from './ProtoAdapterTypes';
+} from './ProtoAdapterTypes.js';
 
 export class VLMProtoAdapter {
   static tryDefault(): VLMProtoAdapter | null {
@@ -36,36 +37,7 @@ export class VLMProtoAdapter {
     ]).length === 0;
   }
 
-  process(
-    handle: number,
-    image: ProtoVLMImage,
-    options: ProtoVLMGenerationOptions,
-  ): ProtoVLMResult | null {
-    if (!ensureExports(this.module, 'vlm.process', ['_rac_vlm_process_proto'])) {
-      return null;
-    }
-    const imageBytes = VLMImage.encode(image).finish();
-    const optionsBytes = VLMGenerationOptions.encode(options).finish();
-    const bridge = this.bridge();
-    return bridge.withHeapBytes(imageBytes, (imagePtr, imageSize) => (
-      bridge.withHeapBytes(optionsBytes, (optionsPtr, optionsSize) => (
-        bridge.callResultProto(
-          VLMResult,
-          (outResult) => this.module._rac_vlm_process_proto!(
-            handle,
-            imagePtr,
-            imageSize,
-            optionsPtr,
-            optionsSize,
-            outResult,
-          ),
-          'rac_vlm_process_proto',
-        )
-      ))
-    ));
-  }
-
-  async processAsync(
+  async process(
     handle: number,
     image: ProtoVLMImage,
     options: ProtoVLMGenerationOptions,
@@ -92,6 +64,14 @@ export class VLMProtoAdapter {
         )
       ))
     ));
+  }
+
+  async processAsync(
+    handle: number,
+    image: ProtoVLMImage,
+    options: ProtoVLMGenerationOptions,
+  ): Promise<ProtoVLMResult | null> {
+    return this.process(handle, image, options);
   }
 
   /**
@@ -134,8 +114,8 @@ export class VLMProtoAdapter {
       VLMStreamEvent,
       'rac_vlm_stream_proto',
       (callbackPtr) => (
-        bridge.withHeapBytes(requestBytes, (requestPtr, requestSize) => (
-          this.module._rac_vlm_stream_proto!(requestPtr, requestSize, callbackPtr, 0)
+        bridge.withHeapBytesAsync(requestBytes, (requestPtr, requestSize) => (
+          this.callStream(requestPtr, requestSize, callbackPtr)
         ))
       ),
       undefined,
@@ -168,26 +148,34 @@ export class VLMProtoAdapter {
     optionsPtr: number,
     optionsSize: number,
     outResult: number,
-  ): number | Promise<number> {
-    if (typeof this.module.ccall === 'function') {
-      const result = this.module.ccall(
-        'rac_vlm_process_proto',
-        'number',
-        ['number', 'number', 'number', 'number', 'number', 'number'],
-        [handle, imagePtr, imageSize, optionsPtr, optionsSize, outResult],
-        { async: true },
-      );
-      return result instanceof Promise
-        ? result.then((value) => Number(value))
-        : Number(result);
-    }
-    return this.module._rac_vlm_process_proto!(
-      handle,
-      imagePtr,
-      imageSize,
-      optionsPtr,
-      optionsSize,
-      outResult,
+  ): Promise<number> {
+    return callEmscriptenAsyncNumber(
+      this.module,
+      'rac_vlm_process_proto',
+      ['number', 'number', 'number', 'number', 'number', 'number'],
+      [handle, imagePtr, imageSize, optionsPtr, optionsSize, outResult],
+      () => this.module._rac_vlm_process_proto!(
+        handle,
+        imagePtr,
+        imageSize,
+        optionsPtr,
+        optionsSize,
+        outResult,
+      ),
+    );
+  }
+
+  private callStream(
+    requestPtr: number,
+    requestSize: number,
+    callbackPtr: number,
+  ): Promise<number> {
+    return callEmscriptenAsyncNumber(
+      this.module,
+      'rac_vlm_stream_proto',
+      ['number', 'number', 'number', 'number'],
+      [requestPtr, requestSize, callbackPtr, 0],
+      () => this.module._rac_vlm_stream_proto!(requestPtr, requestSize, callbackPtr, 0),
     );
   }
 }

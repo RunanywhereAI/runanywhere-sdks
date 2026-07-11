@@ -17,12 +17,13 @@
  */
 
 import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
-import { SDKException } from '../Foundation/SDKException';
-import { RAC_OK, RAC_ERROR_FEATURE_NOT_AVAILABLE } from '../Foundation/RACErrors';
+import { SDKException } from '../Foundation/SDKException.js';
+import { RAC_OK, RAC_ERROR_FEATURE_NOT_AVAILABLE } from '../Foundation/RACErrors.js';
 import {
-  runanywhereModule,
+  getModuleForCapability,
+  tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
-} from '../runtime/EmscriptenModule';
+} from '../runtime/EmscriptenModule.js';
 
 function assertOk(op: string, rc: number): void {
   if (rc === RAC_ERROR_FEATURE_NOT_AVAILABLE) {
@@ -164,13 +165,13 @@ export const SolutionAdapter = {
    *
    * @param input    Typed proto, raw proto bytes, or YAML document.
    * @param module   Optional Emscripten module override — backend
-   *                 packages with their own WASM module pass it here;
-   *                 otherwise the global `runanywhereModule` singleton
-   *                 (set by `setRunanywhereModule()`) is used.
+   *                 packages with their own WASM module pass it here.
+   *                 Otherwise the capability registry selects and pins a
+   *                 concrete module for the handle's complete lifetime.
    */
   run(
     input: SolutionRunInput,
-    module: EmscriptenRunanywhereModule = runanywhereModule,
+    module?: EmscriptenRunanywhereModule,
   ): SolutionHandle {
     if (typeof input !== 'object' || input === null) {
       throw new Error(
@@ -185,14 +186,28 @@ export const SolutionAdapter = {
     };
 
     if (yaml !== undefined) {
-      return createFromYaml(yaml, module);
+      const isRag = isRagSolutionYaml(yaml);
+      const selectedModule = module
+        ?? (isRag ? getModuleForCapability('rag') : null)
+        ?? tryRunanywhereModule();
+      return createFromYaml(
+        yaml,
+        requireSolutionModule(selectedModule, isRag ? 'RAG solution YAML' : 'Solutions'),
+      );
     }
 
     let bytes: Uint8Array;
+    let isRag = false;
     if (configBytes !== undefined) {
       bytes = configBytes;
+      try {
+        isRag = SolutionConfig.decode(bytes).rag !== undefined;
+      } catch {
+        // Preserve native decode/error semantics for malformed raw bytes.
+      }
     } else if (config !== undefined) {
       bytes = SolutionConfig.encode(config).finish();
+      isRag = config.rag !== undefined;
     } else {
       throw new Error(
         'SolutionAdapter.run requires exactly one of config / configBytes / yaml',
@@ -205,9 +220,27 @@ export const SolutionAdapter = {
       );
     }
 
-    return createFromProto(bytes, module);
+    const selectedModule = module
+      ?? (isRag ? getModuleForCapability('rag') : null)
+      ?? tryRunanywhereModule();
+    return createFromProto(
+      bytes,
+      requireSolutionModule(selectedModule, isRag ? 'RAG solution config' : 'Solutions'),
+      isRag,
+    );
   },
 };
+
+function requireSolutionModule(
+  module: EmscriptenRunanywhereModule | null,
+  feature: string,
+): EmscriptenRunanywhereModule {
+  if (module) return module;
+  throw SDKException.backendNotAvailable(
+    feature,
+    'No registered Web WASM module owns the requested solution capability.',
+  );
+}
 
 /**
  * Return a live Uint32Array view of the module's WASM heap.
@@ -233,8 +266,17 @@ function heapU32(m: EmscriptenRunanywhereModule): Uint32Array {
 function createFromProto(
   bytes: Uint8Array,
   module: EmscriptenRunanywhereModule,
+  isRag = false,
 ): SolutionHandle {
   const m = module;
+
+  if (isRag && !moduleSupportsRAG(m)) {
+    throw SDKException.backendNotAvailable(
+      'RAG solution config',
+      'RAG solution config is unavailable in this Web WASM build because the native ' +
+      'rac_rag_* exports are missing, likely because RAC_BACKEND_RAG=OFF.',
+    );
+  }
 
   const bytesPtr = m._malloc(bytes.length);
   // wasm32: pointers are 4 bytes — that's the only emscripten target we ship.

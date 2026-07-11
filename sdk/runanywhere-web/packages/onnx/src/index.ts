@@ -24,5 +24,11 @@
  * @packageDocumentation
  */
 
-export { ONNX, autoRegister } from './ONNX';
-export type { ONNXRegisterOptions } from './ONNX';
+export { ONNX, autoRegister } from './ONNX.js';
+export type { ONNXRegisterOptions } from './ONNX.js';
+export { onnxStatus } from './ONNXStatus.js';
+export type {
+  BackendModalitySupport,
+  ONNXBackendStatus,
+} from './ONNXStatus.js';
+export type { BackendRegistrationState } from '@runanywhere/web/backend';

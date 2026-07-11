@@ -407,18 +407,19 @@ bool SherpaSTT::build_offline_recognizer_locked() {
 
     recognizer_config.model_config.tokens = tokens_path_.c_str();
 #if defined(__EMSCRIPTEN__)
-    // ONNX Runtime tries to spawn an Eigen ThreadPool whenever
-    // num_threads > 1. The vendored sherpa-onnx-c-api WASM build links a
-    // single-threaded ONNX Runtime (the build script forces pthreads=OFF
-    // because the prebuilt .a was not compiled with pthread support). In a
-    // browser without a working pthread pool this aborts with
-    // "PosixThread: pthread_create failed". Run inference single-threaded
-    // on Web so the recognizer can come up without threading support.
+    // The Web artifact is pthread/shared-memory enabled because Sherpa and ORT
+    // must share one atomics ABI. Keep the recognizer's compute count at one:
+    // the validated global pool remains available for runtime plumbing while
+    // compact Whisper avoids per-session thread scheduling overhead.
     recognizer_config.model_config.num_threads = 1;
 #else
     recognizer_config.model_config.num_threads = 2;
 #endif
-    recognizer_config.model_config.debug = 1;
+    // Sherpa routes its debug dump through stderr, which browsers expose as a
+    // console error even for a valid configuration. RACommons already logs
+    // the resolved paths and typed creation failures; keep upstream debug
+    // disabled so successful model loads do not emit false error diagnostics.
+    recognizer_config.model_config.debug = 0;
     recognizer_config.model_config.provider = "cpu";
 
     recognizer_config.model_config.modeling_unit = "cjkchar";
@@ -1475,12 +1476,13 @@ bool SherpaTTS::load_model(const std::string& model_path, TTSModelType model_typ
 
     tts_config.model.provider = "cpu";
 #if defined(__EMSCRIPTEN__)
-    // Match STT: single-threaded ORT on WASM (no pthread pool in racommons-onnx-sherpa).
+    // The Web artifact has a shared-memory pthread pool for ABI compatibility,
+    // but one ORT compute thread avoids pool overhead for this compact voice.
     tts_config.model.num_threads = 1;
 #else
     tts_config.model.num_threads = 2;
 #endif
-    tts_config.model.debug = 1;
+    tts_config.model.debug = 0;
 
     RAC_LOG_INFO("Sherpa.TTS", "Creating SherpaOnnxOfflineTts (VITS/Piper)...");
 

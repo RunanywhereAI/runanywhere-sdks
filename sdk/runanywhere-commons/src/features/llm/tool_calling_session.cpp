@@ -698,6 +698,10 @@ rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t
         std::lock_guard<std::mutex> lg(reg.mu);
         reg.sessions[handle] = session;
     }
+    // Publish the handle before generation can suspend through Asyncify/JSPI.
+    // Web hosts use this slot to cancel the initial generation while this
+    // function is still in flight.
+    *out_session_handle = handle;
 
     // Hold session->mu while run_generate_loop
     // queues events into session.pending_dispatches, then release the lock
@@ -717,7 +721,6 @@ rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t
     }
     drain_and_dispatch(session);
 
-    *out_session_handle = handle;
     return RAC_SUCCESS;
 #endif
 }

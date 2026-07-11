@@ -12,9 +12,10 @@ import {
   SDKEvent,
   type SDKEvent as ProtoSDKEvent,
 } from '@runanywhere/proto-ts/sdk_events';
-import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge';
-import { ProtoWasmBridge } from '../runtime/ProtoWasm';
-import { SDKException } from '../Foundation/SDKException';
+import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
+import { callEmscriptenAsyncNumber } from '../runtime/EmscriptenAsync.js';
+import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
+import { SDKException } from '../Foundation/SDKException.js';
 import {
   adapterState,
   ensureExports,
@@ -23,7 +24,7 @@ import {
   requireExports,
   streamCallback,
   type ModalityProtoModule,
-} from './ProtoAdapterTypes';
+} from './ProtoAdapterTypes.js';
 
 export class LLMProtoAdapter {
   static tryDefault(): LLMProtoAdapter | null {
@@ -41,14 +42,16 @@ export class LLMProtoAdapter {
     ]).length === 0;
   }
 
-  generate(request: ProtoLLMGenerateRequest): ProtoLLMGenerationResult | null {
+  async generate(request: ProtoLLMGenerateRequest): Promise<ProtoLLMGenerationResult | null> {
     if (!this.ensureExports('llm.generate', ['_rac_llm_generate_proto'])) return null;
-    return this.bridge().withEncodedRequest(
+    return this.bridge().withEncodedRequestAsync(
       request,
       LLMGenerateRequest,
       LLMGenerationResult,
-      (requestPtr, requestSize, outResult) => (
-        this.module._rac_llm_generate_proto!(requestPtr, requestSize, outResult)
+      (requestPtr, requestSize, outResult) => this.callGenerate(
+        requestPtr,
+        requestSize,
+        outResult,
       ),
       'rac_llm_generate_proto',
     );
@@ -76,12 +79,11 @@ export class LLMProtoAdapter {
       LLMStreamEvent,
       'rac_llm_generate_stream_proto',
       (callbackPtr) => (
-        this.bridge().withHeapBytes(encoded, (requestPtr, requestSize) => (
-          this.module._rac_llm_generate_stream_proto!(
+        this.bridge().withHeapBytesAsync(encoded, (requestPtr, requestSize) => (
+          this.callGenerateStream(
             requestPtr,
             requestSize,
             callbackPtr,
-            0,
           )
         ))
       ),
@@ -116,6 +118,39 @@ export class LLMProtoAdapter {
 
   private bridge(): ProtoWasmBridge {
     return new ProtoWasmBridge(this.module, logger);
+  }
+
+  private callGenerate(
+    requestPtr: number,
+    requestSize: number,
+    outResult: number,
+  ): Promise<number> {
+    return callEmscriptenAsyncNumber(
+      this.module,
+      'rac_llm_generate_proto',
+      ['number', 'number', 'number'],
+      [requestPtr, requestSize, outResult],
+      () => this.module._rac_llm_generate_proto!(requestPtr, requestSize, outResult),
+    );
+  }
+
+  private callGenerateStream(
+    requestPtr: number,
+    requestSize: number,
+    callbackPtr: number,
+  ): Promise<number> {
+    return callEmscriptenAsyncNumber(
+      this.module,
+      'rac_llm_generate_stream_proto',
+      ['number', 'number', 'number', 'number'],
+      [requestPtr, requestSize, callbackPtr, 0],
+      () => this.module._rac_llm_generate_stream_proto!(
+        requestPtr,
+        requestSize,
+        callbackPtr,
+        0,
+      ),
+    );
   }
 
   private ensureExports(operation: string, required: Array<keyof ModalityProtoModule>): boolean {

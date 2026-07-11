@@ -8,14 +8,14 @@ import {
   VoiceAgentComponentStates,
   type VoiceAgentComponentStates as ProtoVoiceAgentComponentStates,
 } from '@runanywhere/proto-ts/voice_events';
-import { ProtoWasmBridge } from '../runtime/ProtoWasm';
+import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
   ensureExports,
   missingExports,
   modalityLogger as logger,
   type ModalityProtoModule,
-} from './ProtoAdapterTypes';
+} from './ProtoAdapterTypes.js';
 
 export class VoiceAgentProtoAdapter {
   static tryDefault(): VoiceAgentProtoAdapter | null {

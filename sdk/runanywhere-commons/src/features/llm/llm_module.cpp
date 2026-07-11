@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -1613,6 +1614,13 @@ void set_structured_output_if_present(const char* response, LLMGenerationResult*
     if (!response || !out) {
         return;
     }
+    const auto* cursor = reinterpret_cast<const unsigned char*>(response);
+    while (*cursor != '\0' && std::isspace(*cursor)) {
+        ++cursor;
+    }
+    if (*cursor == '\0') {
+        return;
+    }
     rac_structured_output_validation_t validation{};
     if (rac_structured_output_validate(response, nullptr, &validation) == RAC_SUCCESS) {
         if (validation.is_valid == RAC_TRUE && validation.extracted_json) {
@@ -1826,14 +1834,18 @@ void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, Toke
 
     if (kind == runanywhere::v1::TOKEN_KIND_THOUGHT) {
         ctx->thinking_text += token;
-        if (!ctx->emit_thoughts) {
-            return;
-        }
     } else {
         ctx->response_text += token;
     }
 
+    // Completion accounting includes generated reasoning even when thought
+    // events are intentionally hidden from the consumer. Otherwise a stream
+    // that exhausts max_tokens inside <think> is misreported as a natural
+    // "stop" and its terminal result undercounts completion tokens.
     ctx->token_count += 1;
+    if (kind == runanywhere::v1::TOKEN_KIND_THOUGHT && !ctx->emit_thoughts) {
+        return;
+    }
     if (!ctx->first_token_sent) {
         ctx->first_token_sent = true;
         ctx->first_token_ms = now_ms();

@@ -217,7 +217,32 @@
   gap: var(--space-sm-md);
 }
 
+.consumer-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.consumer-recents__empty {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+.consumer-recent-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border-radius: var(--radius-lg);
+}
+
+.consumer-recent-entry.active {
+  background: var(--bg-tertiary);
+}
+
 .consumer-recent-row {
+  min-width: 0;
   text-align: left;
   border: none;
   border-radius: var(--radius-lg);
@@ -230,6 +255,37 @@
 
 .consumer-recent-row:hover {
   background: var(--bg-tertiary);
+}
+
+.consumer-recent-delete {
+  width: 30px;
+  height: 30px;
+  margin-right: var(--space-xs);
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  opacity: 0;
+}
+
+.consumer-recent-entry:hover .consumer-recent-delete,
+.consumer-recent-delete:focus-visible {
+  opacity: 1;
+}
+
+.consumer-recent-delete:hover {
+  background: var(--badge-red);
+  color: var(--status-red);
+}
+
+@media (hover: none) {
+  .consumer-recent-delete {
+    opacity: 1;
+  }
 }
 
 .consumer-recent-row__title,
@@ -2016,6 +2072,9 @@
 .chat-model-overlay.hidden {
   display: none !important;
 }
+.chat-model-overlay.chat-model-overlay--conversation-visible {
+  display: none !important;
+}
 .chat-model-overlay-card {
   max-width: 420px;
   width: 100%;
@@ -3536,130 +3595,6 @@ input[type="range"]::-webkit-slider-thumb {
 @keyframes banner-slide-in {
   from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
-}
-
-/* ============================================================ */
-/*                Conversation History Drawer                   */
-/* ============================================================ */
-
-.conv-drawer {
-  position: absolute;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-}
-
-.conv-drawer.hidden {
-  display: none;
-}
-
-.conv-drawer-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  animation: backdrop-fade 0.18s ease-out;
-}
-
-.conv-drawer-panel {
-  position: relative;
-  width: min(320px, 80vw);
-  height: 100%;
-  background: var(--bg-primary);
-  border-right: 1px solid var(--border-light, rgba(255,255,255,0.08));
-  display: flex;
-  flex-direction: column;
-  box-shadow: 4px 0 24px rgba(0,0,0,0.35);
-  animation: drawer-slide-in 0.2s ease-out;
-}
-
-.conv-drawer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  border-bottom: 1px solid var(--border-light, rgba(255,255,255,0.06));
-}
-
-.conv-drawer-header h3 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.conv-drawer-actions {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-light, rgba(255,255,255,0.06));
-}
-
-.conv-list {
-  list-style: none;
-  margin: 0;
-  padding: 8px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.conv-empty {
-  padding: 24px;
-  text-align: center;
-  color: var(--text-secondary, #94a3b8);
-  font-size: 14px;
-}
-
-.conv-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  border-radius: 8px;
-  padding: 4px;
-  margin-bottom: 4px;
-}
-
-.conv-item:hover {
-  background: var(--background-hover, rgba(255,255,255,0.05));
-}
-
-.conv-item.active {
-  background: var(--background-active, rgba(99, 102, 241, 0.15));
-}
-
-.conv-item-main {
-  flex: 1;
-  text-align: left;
-  background: none;
-  border: none;
-  color: inherit;
-  padding: 8px 10px;
-  cursor: pointer;
-  border-radius: 6px;
-  min-width: 0;
-}
-
-.conv-item-title {
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.conv-item-meta {
-  font-size: 11px;
-  color: var(--text-secondary, #94a3b8);
-  margin-top: 2px;
-}
-
-.conv-item-delete {
-  flex-shrink: 0;
-}
-
-@keyframes backdrop-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes drawer-slide-in {
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(0); }
 }
 
 /* ============================================================ */

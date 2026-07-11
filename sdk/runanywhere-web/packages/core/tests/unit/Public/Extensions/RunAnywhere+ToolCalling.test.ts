@@ -138,11 +138,17 @@ interface SessionScript {
 interface FakeToolCallingModule extends EmscriptenRunanywhereModule {
   capturedCreateRequest: ProtoToolCallingSessionCreateRequest | undefined;
   capturedStepRequests: ProtoToolCallingSessionStepWithResultRequest[];
-  cancelHandles: Array<number | bigint>;
-  destroyHandles: Array<number | bigint>;
+  cancelHandles: bigint[];
+  destroyHandles: bigint[];
   liveCallbacks: Map<number, (...args: number[]) => unknown>;
   activeCallbackIds: Set<number>;
   stepCallCount: number;
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
 }
 
 function makeFakeModule(script: SessionScript): FakeToolCallingModule {
@@ -251,6 +257,12 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
       const requestBytes = heapU8.slice(requestPtr, requestPtr + requestSize);
       fake.capturedCreateRequest = ToolCallingSessionCreateRequest.decode(requestBytes);
 
+      // Publish the session handle as low/high uint32 halves into the
+      // malloc'd 8-byte slot before generation/event delivery begins.
+      const handle = FAKE_SESSION_HANDLE;
+      heapU32[outSessionHandlePtr >>> 2] = Number(handle & 0xffff_ffffn);
+      heapU32[(outSessionHandlePtr >>> 2) + 1] = Number(handle >> 32n);
+
       // Synchronously emit the scripted events through the registered
       // callback — exactly how commons drives the run loop.
       if (script.rawCallbackBytes) {
@@ -258,12 +270,6 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
       } else {
         emitEvents(callbackPtr, script.onCreate);
       }
-
-      // Publish the session handle as low/high uint32 halves into the
-      // malloc'd 8-byte slot.
-      const handle = FAKE_SESSION_HANDLE;
-      heapU32[outSessionHandlePtr >>> 2] = Number(handle & 0xffff_ffffn);
-      heapU32[(outSessionHandlePtr >>> 2) + 1] = Number(handle >> 32n);
       return script.createRc ?? 0;
     },
     _rac_tool_calling_session_step_with_result_proto(
@@ -285,11 +291,11 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
       }
       return script.stepRc ?? 0;
     },
-    _rac_tool_calling_session_destroy_proto(handle: number | bigint): number {
+    _rac_tool_calling_session_destroy_proto(handle: bigint): number {
       fake.destroyHandles!.push(handle);
       return 0;
     },
-    _rac_tool_calling_session_cancel_proto(handle: number | bigint): number {
+    _rac_tool_calling_session_cancel_proto(handle: bigint): number {
       fake.cancelHandles!.push(handle);
       return 0;
     },
@@ -582,7 +588,59 @@ describe('ToolCalling.generateWithTools — addFunction trampoline lifecycle', (
     expect(module.activeCallbackIds.size).toBe(0);
     // session_destroy ran during cleanup.
     expect(module.destroyHandles).toHaveLength(1);
-    expect(module.destroyHandles[0]).toBe(Number(FAKE_SESSION_HANDLE));
+    expect(module.destroyHandles[0]).toBe(FAKE_SESSION_HANDLE);
+  });
+
+  it('keeps the callback live until Asyncify create and step calls resolve', async () => {
+    const module = makeFakeModule({
+      onCreate: [toolCallEvent('echo', { value: 'async' })],
+      onStep: [[finalResultEvent('async complete')]],
+    });
+    const directCreate = module._rac_tool_calling_session_create_proto!.bind(module);
+    const directStep = module._rac_tool_calling_session_step_with_result_proto!.bind(module);
+    const ccallSpy = vi.fn(async (
+      functionName: string,
+      _returnType: string | null,
+      _argumentTypes: string[],
+      args: unknown[],
+      options?: { async?: boolean },
+    ): Promise<number> => {
+      expect(options).toEqual({ async: true });
+      await Promise.resolve();
+      expect(module.activeCallbackIds.size).toBe(1);
+      if (functionName === 'rac_tool_calling_session_create_proto') {
+        return directCreate(
+          Number(args[0]),
+          Number(args[1]),
+          Number(args[2]),
+          Number(args[3]),
+          Number(args[4]),
+        );
+      }
+      if (functionName === 'rac_tool_calling_session_step_with_result_proto') {
+        return directStep(Number(args[0]), Number(args[1]));
+      }
+      throw new Error(`unexpected ccall: ${functionName}`);
+    });
+    module.ccall = ccallSpy;
+    setRunanywhereModule(module);
+
+    ToolCalling.registerTool(
+      ToolDefinition.fromPartial({ name: 'echo', description: '', parameters: [] }),
+      async (args) => ({ echoed: args['value']! }),
+    );
+
+    const result = await ToolCalling.generateWithTools('use echo', {
+      tools: [ToolDefinition.fromPartial({ name: 'echo' })],
+    });
+
+    expect(result.text).toBe('async complete');
+    expect(ccallSpy.mock.calls.map(([functionName]) => functionName)).toEqual([
+      'rac_tool_calling_session_create_proto',
+      'rac_tool_calling_session_step_with_result_proto',
+    ]);
+    expect(module.activeCallbackIds.size).toBe(0);
+    expect(module.destroyHandles).toEqual([FAKE_SESSION_HANDLE]);
   });
 
   it('removes the callback even when the executor closure rejects through the step path', async () => {
@@ -685,9 +743,50 @@ describe('ToolCalling.generateWithTools — cancellation', () => {
     expect(module.cancelHandles.length).toBeGreaterThanOrEqual(1);
     // Cancel arg must match the published session handle (low 32 bits of
     // FAKE_SESSION_HANDLE in this harness).
-    expect(module.cancelHandles[0]).toBe(Number(FAKE_SESSION_HANDLE));
+    expect(module.cancelHandles[0]).toBe(FAKE_SESSION_HANDLE);
     // Cleanup destroys the session exactly once.
     expect(module.destroyHandles).toHaveLength(1);
+  });
+
+  it('cancels an initial Asyncify generation before session_create resolves', async () => {
+    const module = makeFakeModule({ onCreate: [finalResultEvent('must not win')] });
+    const directCreate = module._rac_tool_calling_session_create_proto!.bind(module);
+    const createGate = deferred<number>();
+    module.ccall = vi.fn((
+      functionName: string,
+      _returnType: string | null,
+      _argumentTypes: string[],
+      args: unknown[],
+      options?: { async?: boolean },
+    ): Promise<number> => {
+      expect(functionName).toBe('rac_tool_calling_session_create_proto');
+      expect(options).toEqual({ async: true });
+      const rc = directCreate(
+        Number(args[0]),
+        Number(args[1]),
+        Number(args[2]),
+        Number(args[3]),
+        Number(args[4]),
+      );
+      return createGate.promise.then(() => rc);
+    });
+    setRunanywhereModule(module);
+    const controller = new AbortController();
+
+    const generation = ToolCalling.generateWithTools(
+      'cancel the first generation',
+      { tools: [sampleToolDefinition()] },
+      { signal: controller.signal },
+    );
+    await Promise.resolve();
+    controller.abort();
+
+    expect(module.cancelHandles).toEqual([FAKE_SESSION_HANDLE]);
+    createGate.resolve(0);
+    await expect(generation).rejects.toMatchObject({
+      code: ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED,
+    });
+    expect(module.destroyHandles).toEqual([FAKE_SESSION_HANDLE]);
   });
 });
 

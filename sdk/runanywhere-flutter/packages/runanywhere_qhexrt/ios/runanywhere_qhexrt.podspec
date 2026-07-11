@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_qhexrt'
-  s.version          = '0.19.13'
+  s.version          = '0.19.15'
   s.summary          = 'RunAnywhere QHexRT: private Android-only Qualcomm Hexagon NPU backend'
   s.description      = <<-DESC
 Private Qualcomm Hexagon NPU (QHexRT) backend for RunAnywhere Flutter SDK.

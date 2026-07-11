@@ -315,15 +315,15 @@ Both engines share the **underlying ONNX Runtime** (`libonnxruntime.so` / equiva
 
 | Package / Artifact | Version |
 |---|---|
-| `runanywhere` (Dart package) | 0.19.13 |
-| `runanywhere_llamacpp` | 0.19.13 |
-| `runanywhere_onnx` | 0.19.13 |
-| `runanywhere_qhexrt` | 0.19.13 |
+| `runanywhere` (Dart package) | 0.19.15 |
+| `runanywhere_llamacpp` | 0.19.15 |
+| `runanywhere_onnx` | 0.19.15 |
+| `runanywhere_qhexrt` | 0.19.15 |
 | `RACommons` native | 0.1.6 |
 | QHexRT native | private staged artifact |
 | llama.cpp engine | b7199 |
 | ONNX Runtime | 1.23.2 |
-| Canonical version source | `sdk/runanywhere-commons/VERSION` (0.19.13) |
+| Canonical version source | `sdk/runanywhere-commons/VERSION` (0.19.15) |
 
 ## 2026-07 Callback Architecture Update
 

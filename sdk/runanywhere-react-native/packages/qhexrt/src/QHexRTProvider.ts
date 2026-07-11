@@ -30,7 +30,7 @@ export class QHexRTProvider {
   static readonly moduleName = 'QHexRT';
   // Keep in sync with package.json "version" (same convention as the other
   // backend providers — there is no runtime package.json read in RN bundles).
-  static readonly version = '0.19.13';
+  static readonly version = '0.19.15';
 
   private static registered = false;
 

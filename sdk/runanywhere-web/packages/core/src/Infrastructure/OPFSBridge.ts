@@ -45,12 +45,42 @@
  *   path so OPFS sees `RunAnywhere/Models/...` directly.
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
 
 const logger = new SDKLogger('OPFSBridge');
 
 /** Synthetic prefix shared with C++ (see `rac_model_paths_set_base_dir`). */
 const OPFS_PREFIX = '/opfs';
+
+/**
+ * Persistent root selected by the host through the File System Access API.
+ * When absent, the bridge resolves the origin-private root as before. Keeping
+ * this override inside the bridge is important: every download, hydrate,
+ * model load, and delete must resolve the same synthetic `/opfs/` path tree.
+ */
+let persistentRootOverride: FileSystemDirectoryHandle | null = null;
+const persistentRootIds = new WeakMap<FileSystemDirectoryHandle, number>();
+let nextPersistentRootId = 1;
+
+function persistentRootKey(root: FileSystemDirectoryHandle | null): string {
+  if (root === null) return 'origin-private';
+  let id = persistentRootIds.get(root);
+  if (id === undefined) {
+    id = nextPersistentRootId;
+    nextPersistentRootId += 1;
+    persistentRootIds.set(root, id);
+  }
+  return `selected-${id}`;
+}
+
+function scopedPathKey(rootKey: string, path: string): string {
+  return `${rootKey}\u0000${path}`;
+}
+
+interface SuppressedPersistentPath {
+  path: string;
+  rootKey: string;
+}
 
 /** Minimal Emscripten FS surface OPFSBridge needs at runtime. */
 interface EmscriptenFS {
@@ -62,6 +92,13 @@ interface EmscriptenFS {
   analyzePath?(path: string): { exists: boolean };
   readdir?(path: string): string[];
   isDir?(mode: number): boolean;
+}
+
+/** Async directory iteration is implemented by browsers but not yet present
+ * in every TypeScript DOM lib version. Keep the compatibility shim typed. */
+interface IterableFileSystemDirectoryHandle {
+  entries?(): AsyncIterableIterator<[string, FileSystemHandle]>;
+  values?(): AsyncIterableIterator<FileSystemHandle>;
 }
 
 /** Emscripten POSIX-style file-mode bit for "is directory" (S_IFDIR). */
@@ -124,10 +161,12 @@ function toOwnedArrayBuffer(src: Uint8Array): ArrayBuffer {
 }
 
 /** True when the browser supports the Origin Private File System. */
-function isOPFSSupported(): boolean {
-  return typeof navigator !== 'undefined'
+function isOPFSSupported(
+  root: FileSystemDirectoryHandle | null = persistentRootOverride,
+): boolean {
+  return root !== null || (typeof navigator !== 'undefined'
     && 'storage' in navigator
-    && typeof navigator.storage?.getDirectory === 'function';
+    && typeof navigator.storage?.getDirectory === 'function');
 }
 
 /**
@@ -153,11 +192,12 @@ function pathToOPFSSegments(path: string): string[] | null {
 async function resolveOPFSDirectory(
   segments: string[],
   create: boolean,
+  root: FileSystemDirectoryHandle | null = persistentRootOverride,
 ): Promise<FileSystemDirectoryHandle | null> {
-  if (!isOPFSSupported()) {
+  if (!isOPFSSupported(root)) {
     return null;
   }
-  let dir = await navigator.storage.getDirectory();
+  let dir = root ?? await navigator.storage.getDirectory();
   for (const segment of segments) {
     dir = await dir.getDirectoryHandle(segment, { create });
   }
@@ -245,9 +285,146 @@ async function readBytesFromOPFSFile(handle: FileSystemFileHandle): Promise<Uint
 }
 
 export class OPFSBridge {
+  /**
+   * Paths whose synchronous MEMFS deletion has committed but whose async OPFS
+   * removal is still pending. Hydration/restore treats these as absent from
+   * the moment the native delete callback returns, preventing a stale OPFS
+   * copy from resurrecting the registry entry in the same browser lifetime.
+   */
+  private static readonly suppressedPaths = new Map<string, SuppressedPersistentPath>();
+  private static readonly pendingRemovals = new Map<string, Promise<void>>();
+
   /** Whether the browser supports the OPFS APIs OPFSBridge needs. */
   static get isSupported(): boolean {
     return isOPFSSupported();
+  }
+
+  /**
+   * Route the synthetic `/opfs/` tree through a user-selected persistent
+   * directory. Passing `null` restores the origin-private browser root.
+   * The caller owns permission checks and only installs granted handles.
+   */
+  static setPersistentRoot(handle: FileSystemDirectoryHandle | null): void {
+    persistentRootOverride = handle;
+  }
+
+  /**
+   * Commit a logical deletion immediately and remove its OPFS counterpart on
+   * the browser event loop. The storage analyzer callback is synchronous, so
+   * it cannot await FileSystemDirectoryHandle.removeEntry().
+   */
+  static scheduleRemovePath(path: string): Promise<void> {
+    return OPFSBridge.queueRemovePath(path, true);
+  }
+
+  /**
+   * Remove a persistent path transactionally. Unlike the legacy scheduled
+   * callback path, rejection clears the temporary tombstone because callers
+   * have not yet committed the matching MEMFS or registry deletion.
+   */
+  static async removePath(path: string): Promise<void> {
+    await OPFSBridge.queueRemovePath(path, false);
+  }
+
+  private static queueRemovePath(
+    path: string,
+    retainSuppressionOnFailure: boolean,
+  ): Promise<void> {
+    const segments = pathToOPFSSegments(path);
+    if (!segments) return Promise.resolve();
+    // Capture both the root handle and its logical identity. Resolving the
+    // mutable global root later could delete the same path from a folder the
+    // user selected after this callback returned.
+    const root = persistentRootOverride;
+    const rootKey = persistentRootKey(root);
+    const scopedKey = scopedPathKey(rootKey, path);
+    OPFSBridge.suppressedPaths.set(scopedKey, { path, rootKey });
+    const previous = OPFSBridge.pendingRemovals.get(scopedKey);
+    const removal = (previous ? previous.catch(() => undefined) : Promise.resolve())
+      .then(() => OPFSBridge.removePathFromOPFS(segments, path, root));
+    OPFSBridge.pendingRemovals.set(scopedKey, removal);
+    void removal.then(
+      () => {
+        if (OPFSBridge.pendingRemovals.get(scopedKey) === removal) {
+          OPFSBridge.pendingRemovals.delete(scopedKey);
+          // Physical absence now enforces the deletion, so the temporary
+          // logical tombstone is no longer needed and cannot leak forever.
+          OPFSBridge.suppressedPaths.delete(scopedKey);
+        }
+      },
+      (error: unknown) => {
+        logger.warning(
+          `${retainSuppressionOnFailure ? 'Scheduled' : 'Transactional'} OPFS deletion failed for '${path}': ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        if (OPFSBridge.pendingRemovals.get(scopedKey) === removal) {
+          OPFSBridge.pendingRemovals.delete(scopedKey);
+          if (!retainSuppressionOnFailure) {
+            OPFSBridge.suppressedPaths.delete(scopedKey);
+          }
+          // Scheduled callback deletions retain the tombstone on failure so a
+          // stale file cannot be hydrated after the synchronous side already
+          // committed. Transactional callers clear it because nothing else
+          // has been committed yet.
+        }
+      },
+    );
+    return removal;
+  }
+
+  private static async removePathFromOPFS(
+    segments: string[],
+    path: string,
+    root: FileSystemDirectoryHandle | null,
+  ): Promise<void> {
+    if (!isOPFSSupported(root)) return;
+    try {
+      const dir = await resolveOPFSDirectory(segments.slice(0, -1), false, root);
+      if (!dir) return;
+      await dir.removeEntry(segments[segments.length - 1], { recursive: true });
+      logger.info(`OPFS removed '${path}'`);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotFoundError') return;
+      throw error;
+    }
+  }
+
+  private static isSuppressed(path: string): boolean {
+    const rootKey = persistentRootKey(persistentRootOverride);
+    for (const suppressed of OPFSBridge.suppressedPaths.values()) {
+      if (suppressed.rootKey !== rootKey) continue;
+      if (path === suppressed.path || path.startsWith(`${suppressed.path}/`)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Serialize a new persistent write behind any scheduled deletion that owns
+   * the same path. This prevents a late removeEntry() from deleting bytes that
+   * a user immediately re-downloaded after deletion.
+   */
+  private static async preparePathForWrite(path: string): Promise<void> {
+    const rootKey = persistentRootKey(persistentRootOverride);
+    const pending: Promise<void>[] = [];
+    for (const [key, suppressed] of OPFSBridge.suppressedPaths) {
+      if (
+        suppressed.rootKey === rootKey
+        && (path === suppressed.path || path.startsWith(`${suppressed.path}/`))
+      ) {
+        const removal = OPFSBridge.pendingRemovals.get(key);
+        if (removal) pending.push(removal);
+      }
+    }
+    await Promise.all(pending);
+    for (const [key, suppressed] of OPFSBridge.suppressedPaths) {
+      if (
+        suppressed.rootKey === rootKey
+        && (path === suppressed.path || path.startsWith(`${suppressed.path}/`))
+      ) {
+        OPFSBridge.suppressedPaths.delete(key);
+      }
+    }
   }
 
   /** Byte length of `path` in a module's MEMFS, or 0 when missing/unreadable. */
@@ -270,6 +447,16 @@ export class OPFSBridge {
       if (size > max) max = size;
     }
     return max;
+  }
+
+  /** Modules that expose the Emscripten filesystem required for hydration. */
+  private static filesystemModules(modules: ModuleLike[]): ModuleLike[] {
+    return modules.filter((module) => getFS(module) !== null);
+  }
+
+  /** FS-bearing modules whose private MEMFS does not contain the artifact. */
+  private static modulesMissingPath(modules: ModuleLike[], path: string): ModuleLike[] {
+    return modules.filter((module) => OPFSBridge.memfsFileSize(module, path) === 0);
   }
 
   /**
@@ -315,30 +502,37 @@ export class OPFSBridge {
       }
     }
 
-    if (allModules.length === 0) return;
+    const filesystemModules = OPFSBridge.filesystemModules(allModules);
+    if (filesystemModules.length === 0) return;
 
     // Directory artifacts: mirror the entire tree into every module's MEMFS so
     // a subsequent loadModel that runs in a non-downloader module (e.g. Sherpa
     // STT loading a directory that commons extracted) can find the files.
     if (isDirectoryArtifact) {
-      await OPFSBridge.restoreDirectoryToMemfsAll(allModules, localPath);
+      // Replay the complete OPFS tree to every target. The restore validates
+      // each persisted file, so a module containing only one companion file
+      // cannot masquerade as a fully hydrated model bundle.
+      await OPFSBridge.restoreDirectoryToMemfsAll(filesystemModules, localPath);
       return;
     }
 
-    await OPFSBridge.restoreToMemfsAll(allModules, localPath);
-    const memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(allModules, localPath);
-    if (memfsMax > 0) return;
+    let missingModules = OPFSBridge.modulesMissingPath(filesystemModules, localPath);
+    if (missingModules.length === 0) return;
+    await OPFSBridge.restoreToMemfsAll(missingModules, localPath);
+    missingModules = OPFSBridge.modulesMissingPath(missingModules, localPath);
+    if (missingModules.length === 0) return;
 
     const downloaderOnly = OPFSBridge.memfsFileSize(downloaderModule, localPath);
     if (downloaderOnly > 0 && opfsExpected) {
       await OPFSBridge.flushFromMemfs(downloaderModule, localPath);
-      await OPFSBridge.restoreToMemfsAll(allModules, localPath);
+      await OPFSBridge.restoreToMemfsAll(missingModules, localPath);
     }
 
-    const retryMax = OPFSBridge.maxMemfsFileSizeAcrossModules(allModules, localPath);
-    if (retryMax === 0) {
+    const stillMissing = OPFSBridge.modulesMissingPath(missingModules, localPath);
+    if (stillMissing.length > 0) {
       throw new Error(
-        `Download persist failed: '${localPath}' has 0 bytes in MEMFS after OPFS restore`,
+        `Download persist failed: '${localPath}' is missing from `
+        + `${stillMissing.length} MEMFS module(s) after OPFS restore`,
       );
     }
   }
@@ -351,13 +545,23 @@ export class OPFSBridge {
     modules: ModuleLike[],
     path: string,
   ): Promise<void> {
-    if (modules.length === 0) return;
+    const filesystemModules = OPFSBridge.filesystemModules(modules);
+    if (filesystemModules.length === 0) return;
     const segments = pathToOPFSSegments(path);
     if (!segments) return;
+    if (OPFSBridge.isSuppressed(path)) {
+      throw new Error(`Model load failed: '${path}' was deleted from browser storage`);
+    }
 
-    // Fast-path: any module already has the file in MEMFS with bytes.
-    const memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(modules, path);
-    if (memfsMax > 0) return;
+    let missingModules = OPFSBridge.modulesMissingPath(filesystemModules, path);
+    const anyMemfsDirectory = filesystemModules.some((module) => {
+      const fs = getFS(module);
+      return fs !== null && isMemfsDirectory(fs, path);
+    });
+    // Preserve the zero-I/O fast path for single-file models. Directories must
+    // still be compared against the complete OPFS tree because one surviving
+    // companion file does not prove the bundle is fully hydrated.
+    if (missingModules.length === 0 && !anyMemfsDirectory) return;
 
     // Detect whether the OPFS counterpart is a file or a directory (tar.gz
     // extract). Sherpa STT/TTS and VLM artifacts are directories; the
@@ -366,19 +570,27 @@ export class OPFSBridge {
     const opfsSupported = isOPFSSupported();
     if (opfsSupported) {
       if (await OPFSBridge.isOPFSDirectory(segments)) {
-        await OPFSBridge.restoreDirectoryToMemfsAll(modules, path);
+        await OPFSBridge.restoreDirectoryToMemfsAll(filesystemModules, path);
         return;
-      }
-      if (!(await OPFSBridge.exists(path))) {
-        throw new Error(`Model load failed: '${path}' not found in OPFS`);
       }
     }
 
-    await OPFSBridge.restoreToMemfsAll(modules, path);
-    const memfsMaxRetry = OPFSBridge.maxMemfsFileSizeAcrossModules(modules, path);
-    if (memfsMaxRetry === 0) {
+    // Each Emscripten artifact owns a private MEMFS. A surviving sibling may
+    // retain model bytes after an acceleration switch while the replacement
+    // llama.cpp module is empty, so only return when every FS-bearing module
+    // has the artifact.
+    if (missingModules.length === 0) return;
+
+    if (opfsSupported && !(await OPFSBridge.exists(path))) {
+      throw new Error(`Model load failed: '${path}' not found in OPFS`);
+    }
+
+    await OPFSBridge.restoreToMemfsAll(missingModules, path);
+    missingModules = OPFSBridge.modulesMissingPath(missingModules, path);
+    if (missingModules.length > 0) {
       throw new Error(
-        `Model load failed: '${path}' has 0 bytes in MEMFS after OPFS restore`,
+        `Model load failed: '${path}' is missing from `
+        + `${missingModules.length} MEMFS module(s) after OPFS restore`,
       );
     }
   }
@@ -386,6 +598,7 @@ export class OPFSBridge {
   /** True when `segments` resolves to a directory handle in OPFS. */
   static async isOPFSDirectory(segments: string[]): Promise<boolean> {
     if (!isOPFSSupported()) return false;
+    if (OPFSBridge.isSuppressed(`${OPFS_PREFIX}/${segments.join('/')}`)) return false;
     try {
       const dir = await resolveOPFSDirectory(segments, false);
       return dir != null;
@@ -404,6 +617,7 @@ export class OPFSBridge {
     dirPath: string,
   ): Promise<void> {
     if (!isOPFSSupported()) return;
+    if (OPFSBridge.isSuppressed(dirPath)) return;
     const segments = pathToOPFSSegments(dirPath);
     if (!segments) return;
     const dir = await resolveOPFSDirectory(segments, false);
@@ -412,7 +626,12 @@ export class OPFSBridge {
       const fs = getFS(module);
       if (!fs) continue;
       ensureMemfsDirectory(fs, dirPath);
-      await OPFSBridge.restoreOPFSDirToFs(dir, dirPath, fs);
+      const restoredArtifacts = await OPFSBridge.restoreOPFSDirToFs(dir, dirPath, fs);
+      if (restoredArtifacts === 0) {
+        throw new Error(
+          `OPFS directory '${dirPath}' contains no non-empty model artifacts`,
+        );
+      }
     }
   }
 
@@ -420,35 +639,51 @@ export class OPFSBridge {
     dir: FileSystemDirectoryHandle,
     dirPath: string,
     fs: EmscriptenFS,
-  ): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const entries = (dir as any).entries?.() ?? null;
-    if (!entries) return;
+  ): Promise<number> {
+    const iterable = dir as unknown as IterableFileSystemDirectoryHandle;
+    const entries = iterable.entries?.() ?? null;
+    if (!entries) {
+      throw new Error(`OPFS directory iteration is unavailable for '${dirPath}'`);
+    }
+    let artifactCount = 0;
     for await (const [name, handle] of entries) {
       const childPath = `${dirPath}/${name}`;
       if (handle.kind === 'file') {
+        const fileHandle = handle as FileSystemFileHandle;
+        const file = await fileHandle.getFile();
+        if (file.size === 0) {
+          throw new Error(`OPFS model artifact '${childPath}' is empty`);
+        }
+        let currentSize = 0;
         try {
-          const fileHandle = handle as FileSystemFileHandle;
-          const bytes = await readBytesFromOPFSFile(fileHandle);
+          currentSize = fs.stat(childPath).size;
+        } catch {
+          // Missing from this module's MEMFS — restore below.
+        }
+        if (currentSize !== file.size) {
+          const bytes = new Uint8Array(await file.arrayBuffer());
           const parent = childPath.slice(0, childPath.lastIndexOf('/')) || '/';
           ensureMemfsDirectory(fs, parent);
           fs.writeFile(childPath, bytes);
-        } catch (err) {
-          logger.warning(
-            `restoreDirectoryToMemfsAll: failed to write '${childPath}' to MEMFS: ${
-              err instanceof Error ? err.message : String(err)
-            }`,
+        }
+        const restoredSize = fs.stat(childPath).size;
+        if (restoredSize !== file.size) {
+          throw new Error(
+            `MEMFS restore size mismatch for '${childPath}': `
+            + `expected ${file.size}, received ${restoredSize}`,
           );
         }
+        artifactCount += 1;
       } else if (handle.kind === 'directory') {
         ensureMemfsDirectory(fs, childPath);
-        await OPFSBridge.restoreOPFSDirToFs(
+        artifactCount += await OPFSBridge.restoreOPFSDirToFs(
           handle as FileSystemDirectoryHandle,
           childPath,
           fs,
         );
       }
     }
+    return artifactCount;
   }
 
   /**
@@ -470,6 +705,7 @@ export class OPFSBridge {
       logger.debug(`flushFromMemfs: path '${path}' is not under '${OPFS_PREFIX}/'; skipping`);
       return 0;
     }
+    await OPFSBridge.preparePathForWrite(path);
     if (!isOPFSSupported()) {
       logger.warning(`flushFromMemfs: OPFS not supported in this browser; '${path}' will not persist`);
       return 0;
@@ -535,6 +771,7 @@ export class OPFSBridge {
   static async restoreToMemfs(module: ModuleLike, path: string): Promise<number> {
     const fs = getFS(module);
     if (!fs) return 0;
+    if (OPFSBridge.isSuppressed(path)) return 0;
 
     // Already present in MEMFS with real bytes — nothing to do.
     if (fs.analyzePath?.(path)?.exists) {
@@ -594,6 +831,7 @@ export class OPFSBridge {
    */
   static async restoreToMemfsAll(modules: ModuleLike[], path: string): Promise<number> {
     if (modules.length === 0) return 0;
+    if (OPFSBridge.isSuppressed(path)) return 0;
     const segments = pathToOPFSSegments(path);
     if (!segments || !isOPFSSupported()) return 0;
 
@@ -652,6 +890,7 @@ export class OPFSBridge {
    * paying the cost of reading bytes back.
    */
   static async exists(path: string): Promise<boolean> {
+    if (OPFSBridge.isSuppressed(path)) return false;
     const segments = pathToOPFSSegments(path);
     if (!segments || !isOPFSSupported()) return false;
     const fileName = segments[segments.length - 1];
@@ -674,6 +913,7 @@ export class OPFSBridge {
    */
   static async directoryHasArtifacts(dirSegments: string[]): Promise<boolean> {
     if (!isOPFSSupported()) return false;
+    if (OPFSBridge.isSuppressed(`${OPFS_PREFIX}/${dirSegments.join('/')}`)) return false;
     try {
       const dir = await resolveOPFSDirectory(dirSegments, false);
       if (!dir) return false;
@@ -686,8 +926,8 @@ export class OPFSBridge {
   private static async opfsDirectoryHasAnyFile(
     dir: FileSystemDirectoryHandle,
   ): Promise<boolean> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const entries = (dir as any).values?.() ?? null;
+    const iterable = dir as unknown as IterableFileSystemDirectoryHandle;
+    const entries = iterable.values?.() ?? null;
     if (!entries) return false;
     for await (const handle of entries) {
       if (!handle) continue;
@@ -708,6 +948,7 @@ export class OPFSBridge {
    */
   static async writeFileToOPFS(segments: string[], bytes: Uint8Array): Promise<void> {
     if (!isOPFSSupported()) return;
+    await OPFSBridge.preparePathForWrite(`${OPFS_PREFIX}/${segments.join('/')}`);
     const dir = await resolveOPFSDirectory(segments.slice(0, -1), true);
     if (!dir) return;
     const fileName = segments[segments.length - 1];

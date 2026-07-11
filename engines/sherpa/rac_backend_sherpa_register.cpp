@@ -10,11 +10,13 @@
 #include "rac_tts_sherpa.h"
 #include "rac_vad_sherpa.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <string>
 #include <vector>
 
 #include "rac/audio/rac_audio_convert.h"
@@ -208,6 +210,53 @@ static rac_result_t sherpa_stt_vtable_transcribe_stream(void* impl, const void* 
     // 48k/44.1k captures are not silently re-interpreted as 16k inside the
     // backend feature frontend.
     const int sample_rate = (options && options->sample_rate > 0) ? options->sample_rate : 16000;
+
+    // Offline Whisper recognizers do not emit incremental callbacks from a
+    // single decode. Produce cumulative partials from a bounded number of
+    // prefixes, then run the canonical full utterance below for the final
+    // result. Spacing longer inputs evenly keeps the number of complete
+    // re-decodes constant instead of growing quadratically with duration.
+    constexpr size_t kMaxSyntheticPartialDecodes = 4;
+    const size_t minimum_partial_stride = static_cast<size_t>(sample_rate) * 3;
+    const size_t partial_interval_count = kMaxSyntheticPartialDecodes + 1;
+    const size_t evenly_spaced_stride =
+        float_samples.size() / partial_interval_count +
+        (float_samples.size() % partial_interval_count != 0 ? 1 : 0);
+    const size_t partial_stride = std::max(minimum_partial_stride, evenly_spaced_stride);
+    std::string last_partial;
+    for (size_t partial_index = 1; partial_index <= kMaxSyntheticPartialDecodes;
+         ++partial_index) {
+        const size_t prefix = partial_stride * partial_index;
+        if (prefix >= float_samples.size()) {
+            break;
+        }
+        rac_handle_t partial_stream = nullptr;
+        if (rac_stt_sherpa_create_stream(impl, &partial_stream) != RAC_SUCCESS) {
+            break;
+        }
+        const rac_result_t feed_result = rac_stt_sherpa_feed_audio(
+            impl, partial_stream, float_samples.data(), prefix, sample_rate);
+        if (feed_result != RAC_SUCCESS) {
+            rac_stt_sherpa_destroy_stream(impl, partial_stream);
+            break;
+        }
+        rac_stt_sherpa_input_finished(impl, partial_stream);
+        char* partial_text = nullptr;
+        const rac_result_t decode_result =
+            rac_stt_sherpa_decode_stream(impl, partial_stream, &partial_text);
+        if (decode_result == RAC_SUCCESS && callback && partial_text && partial_text[0] != '\0') {
+            const std::string current_partial(partial_text);
+            if (current_partial != last_partial) {
+                callback(partial_text, RAC_FALSE, user_data);
+                last_partial = current_partial;
+            }
+        }
+        if (partial_text) {
+            free(partial_text);
+        }
+        rac_stt_sherpa_destroy_stream(impl, partial_stream);
+    }
+
     result = rac_stt_sherpa_feed_audio(impl, stream, float_samples.data(), float_samples.size(),
                                        sample_rate);
     if (result != RAC_SUCCESS) {

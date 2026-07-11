@@ -229,6 +229,13 @@ bool load_mock_llm() {
 struct EventSink {
     std::mutex mu;
     std::vector<runanywhere::v1::ToolCallingSessionEvent> events;
+    const uint64_t* published_handle = nullptr;
+    bool callback_saw_published_handle = false;
+
+    bool saw_published_handle() {
+        std::lock_guard<std::mutex> lg(mu);
+        return callback_saw_published_handle;
+    }
 
     int count_kind(runanywhere::v1::ToolCallingSessionEvent::KindCase kind) {
         std::lock_guard<std::mutex> lg(mu);
@@ -264,8 +271,12 @@ struct EventSink {
 void sink_callback(const uint8_t* bytes, size_t size, void* user_data) {
     auto* sink = static_cast<EventSink*>(user_data);
     runanywhere::v1::ToolCallingSessionEvent event;
-    if (size > 0 && event.ParseFromArray(bytes, static_cast<int>(size))) {
-        std::lock_guard<std::mutex> lg(sink->mu);
+    const bool parsed = size > 0 && event.ParseFromArray(bytes, static_cast<int>(size));
+    std::lock_guard<std::mutex> lg(sink->mu);
+    sink->callback_saw_published_handle =
+        sink->callback_saw_published_handle ||
+        (sink->published_handle != nullptr && *sink->published_handle != 0);
+    if (parsed) {
         sink->events.push_back(event);
     }
 }
@@ -327,10 +338,12 @@ int test_session_emits_tool_call() {
     CHECK(serialize(request, &bytes), "serialize create request");
 
     uint64_t handle = 0;
+    sink.published_handle = &handle;
     rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
                                                             sink_callback, &sink, &handle);
     CHECK(rc == RAC_SUCCESS, "session_create RAC_SUCCESS");
     CHECK(handle != 0, "handle non-zero");
+    CHECK(sink.saw_published_handle(), "handle published before event callback");
 
     using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
     CHECK(sink.count_kind(EvCase::kToolCall) == 1, "one tool_call event");

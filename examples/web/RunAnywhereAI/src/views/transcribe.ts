@@ -78,7 +78,7 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
 }
 
 function renderTranscribe(): void {
-  const supportsProto = RunAnywhere.stt.supportsProtoSTT();
+  const supportsProto = RunAnywhere.stt.supportsLifecycleProtoSTT();
   const loadedModel = findLoadedModelForCategory(
     ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
   );
@@ -132,11 +132,11 @@ function renderTranscribe(): void {
             <p class="text-secondary">
               Once a speech-capable backend is registered against a WASM build
               that includes <code>RAC_WASM_ONNX=ON</code>, this view dispatches
-              transcription through <code>RunAnywhere.transcribe(audio, options)</code>.
+              transcription through <code>RunAnywhere.transcribeStream(audio, options)</code>.
             </p>
             <ul class="feature-unavailable__list">
               <li><code>RunAnywhere.loadModel(...)</code></li>
-              <li><code>RunAnywhere.transcribe(audio, { modelPath })</code></li>
+              <li><code>RunAnywhere.transcribeStream(audio)</code></li>
             </ul>
           </div>`}
     </div>
@@ -251,32 +251,17 @@ async function runTranscribe(samples: Float32Array): Promise<void> {
  * folding mirrors STTViewModel.swift:387-408 — non-final partials preview
  * the utterance, the final replaces them).
  *
- * The Web streaming verb is handle-scoped (`RunAnywhere.stt.create()` /
- * `loadModel(handle, ...)` / `transcribeStream(handle, audio)`); the model
- * path comes from the canonical lifecycle via `RunAnywhere.currentModel`.
+ * The top-level Web streaming verb is lifecycle-owned, matching batch mode:
+ * commons resolves the model already loaded by `RunAnywhere.loadModel(...)`.
  */
 async function runTranscribeStream(samples: Float32Array): Promise<void> {
   isProcessing = true;
   renderTranscribe();
   setStatus(`Streaming ${(samples.length / 16000).toFixed(2)}s of audio...`);
 
-  let handle: number | null = null;
   try {
-    const current = RunAnywhere.currentModel({
-      category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-      includeModelMetadata: true,
-    });
-    const modelPath = current?.resolvedPath || current?.modelId;
-    if (!modelPath) {
-      setStatus('No STT model loaded.');
-      return;
-    }
-
-    handle = RunAnywhere.stt.create();
-    RunAnywhere.stt.loadModel(handle, modelPath, current?.modelId);
-
     transcript = '';
-    for await (const partial of RunAnywhere.transcribeStream(handle, samples, undefined)) {
+    for await (const partial of RunAnywhere.transcribeStream(samples)) {
       const text = partial.text.trim();
       if (partial.isFinal) {
         // Stream errors surface as a terminal partial carrying the failure
@@ -296,7 +281,6 @@ async function runTranscribeStream(samples: Float32Array): Promise<void> {
   } catch (err) {
     setStatus(`Transcribe failed: ${formatError(err)}`);
   } finally {
-    if (handle != null) RunAnywhere.stt.destroy(handle);
     isProcessing = false;
     renderTranscribe();
   }

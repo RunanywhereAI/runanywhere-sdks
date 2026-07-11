@@ -154,6 +154,18 @@ rac_link_archive_deps(test_device_identity)
 target_compile_features(test_device_identity PRIVATE cxx_std_17)
 add_test(NAME device_identity_tests COMMAND test_device_identity --run-all)
 
+# Device callback ownership: Web installs Emscripten function-table entries,
+# so native callback storage must be clearable before those entries are freed.
+add_executable(test_device_manager_callbacks test_device_manager_callbacks.cpp)
+target_include_directories(test_device_manager_callbacks PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_device_manager_callbacks PRIVATE rac_commons)
+rac_link_archive_deps(test_device_manager_callbacks)
+target_compile_features(test_device_manager_callbacks PRIVATE cxx_std_17)
+add_test(NAME device_manager_callback_tests COMMAND test_device_manager_callbacks --run-all)
+
 # --- Model path layout tests ----------------------------------------
 add_executable(test_model_paths test_model_paths.cpp)
 target_include_directories(test_model_paths PRIVATE

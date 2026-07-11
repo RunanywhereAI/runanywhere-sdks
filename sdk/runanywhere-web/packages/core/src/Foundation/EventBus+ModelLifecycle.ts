@@ -26,7 +26,7 @@ import {
   type SDKComponent,
   type SDKEvent as ProtoSDKEvent,
 } from '@runanywhere/proto-ts/sdk_events';
-import { EventBus } from './EventBus';
+import { EventBus } from './EventBus.js';
 
 // MARK: - Typed change
 

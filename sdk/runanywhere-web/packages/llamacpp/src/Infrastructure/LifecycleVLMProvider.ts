@@ -11,7 +11,7 @@ import {
   SDKException,
   VLMProtoAdapter,
   type VisionLanguageProvider,
-} from '@runanywhere/web/internal';
+} from '@runanywhere/web/backend';
 import type { CurrentModelResult } from '@runanywhere/proto-ts/model_types';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import type {

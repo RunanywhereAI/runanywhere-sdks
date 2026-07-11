@@ -25,6 +25,9 @@ import {
   publishSDKEvent,
   subscribeSDKEvents,
 } from '../Extensions/Events/RunAnywhere+SDKEvents';
+import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+
+const logger = new SDKLogger('EventBus');
 
 export type SDKEventHandler = (event: SDKEventMessage) => void;
 export type EventBusCancellable = () => void;
@@ -127,7 +130,9 @@ export class EventBus {
       try {
         listener(event);
       } catch (e) {
-        console.warn('SDK EventBus listener error:', e);
+        logger.warning('SDK event listener failed', {
+          errorType: e instanceof Error ? e.name : typeof e,
+        });
       }
     }
     const categoryListeners = this.categoryListeners.get(event.category);
@@ -138,7 +143,9 @@ export class EventBus {
       try {
         listener(event);
       } catch (e) {
-        console.warn('SDK EventBus category listener error:', e);
+        logger.warning('SDK category listener failed', {
+          errorType: e instanceof Error ? e.name : typeof e,
+        });
       }
     }
   }

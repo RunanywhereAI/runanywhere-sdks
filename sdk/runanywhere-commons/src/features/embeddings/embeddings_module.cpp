@@ -625,6 +625,24 @@ rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_p
         return parse_error(out_result, "failed to parse EmbeddingsRequest");
     }
 
+    // The generated-proto contract requires exactly one output vector per
+    // input text, in the original order. Match the handle-based ABI by
+    // rejecting empty entries instead of filtering them and shifting every
+    // subsequent input_index.
+    if (request.texts_size() == 0) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          "EmbeddingsRequest.texts is required");
+    }
+    std::vector<std::string> texts;
+    texts.reserve(static_cast<size_t>(request.texts_size()));
+    for (const auto& text : request.texts()) {
+        if (text.empty()) {
+            return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                              "EmbeddingsRequest.texts contains an empty entry");
+        }
+        texts.push_back(text);
+    }
+
     rac::lifecycle::LifecycleEmbeddingsRef ref;
     rac_result_t rc = rac::lifecycle::acquire_lifecycle_embeddings(&ref);
     if (rc != RAC_SUCCESS) {
@@ -637,18 +655,6 @@ rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_p
     if (rc != RAC_SUCCESS) {
         rac::lifecycle::release_lifecycle_embeddings(&ref);
         return rc;
-    }
-
-    std::vector<std::string> texts;
-    texts.reserve(static_cast<size_t>(request.texts_size()));
-    for (const auto& text : request.texts()) {
-        if (!text.empty())
-            texts.push_back(text);
-    }
-    if (texts.empty()) {
-        rac::lifecycle::release_lifecycle_embeddings(&ref);
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
-                                          "EmbeddingsRequest.texts is required");
     }
 
     // Telemetry: the lifecycle embed path is the one platform SDKs call, so it

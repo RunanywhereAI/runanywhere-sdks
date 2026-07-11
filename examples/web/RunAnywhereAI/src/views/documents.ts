@@ -37,8 +37,10 @@ let isBusy = false;
  * embedding + LLM model picker rows). */
 let selectedEmbeddingModelId = '';
 let selectedLlmModelId = '';
-/** Model-id pair the current native pipeline was created with. */
+/** Model-id pair the currently live RAG provider was created with. */
 let createdPipelineKey: string | null = null;
+/** Facade generation captured with createdPipelineKey. */
+let createdPipelineGeneration: number | null = null;
 
 // ---------------------------------------------------------------------------
 // Init
@@ -75,7 +77,8 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
       <div class="docs-section">
         <h3>Indexed documents</h3>
         <p class="text-secondary">Upload <code>.txt</code>, <code>.md</code>, or <code>.json</code> files to index through the core RAG facade.
-        A native RAG provider or WASM RAG session is required.</p>
+        A native RAG provider or WASM RAG session is required. The current Web
+        RAG index is session-only and is not restored after a page reload.</p>
         <div class="docs-actions">
           <input type="file" id="docs-file" accept=".txt,.md,.json" multiple style="display:none" />
           <button class="btn btn-primary" id="docs-upload-btn">Upload</button>
@@ -117,7 +120,16 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
   });
   refreshModelButtons();
 
-  return {};
+  return {
+    onActivate: () => {
+      // Settings can reinitialize every backend while this view remains
+      // mounted. Treat the cached model pair as valid only while the SDK still
+      // reports a live provider; otherwise the next action must recreate it.
+      if (!createdPipelineIsLive(selectedPipelineKey())) resetCreatedPipeline();
+      refreshModelButtons();
+      void renderDocList();
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -339,16 +351,16 @@ async function askQuestion(): Promise<void> {
   try {
     documentCount = await RunAnywhere.ragGetDocumentCount();
   } catch (err) {
-    setAnswer(`Failed: ${formatError(err)}`);
+    setAnswerText(`Failed: ${formatError(err)}`);
     return;
   }
   if (documentCount === 0) {
-    setAnswer('Upload a document first.');
+    setAnswerText('Upload a document first.');
     return;
   }
 
   isBusy = true;
-  setAnswer('Searching...');
+  setAnswerText('Searching...');
   try {
     // Full-options overload (Swift parity: `ragQuery(_ options:)` with
     // RARAGQueryOptions.defaults(question:) — RAGViewModel.swift:137-144).
@@ -361,18 +373,18 @@ async function askQuestion(): Promise<void> {
     });
 
     if (result.errorCode !== 0) {
-      setAnswer(`Failed: ${result.errorMessage ?? 'RAG query failed'}`);
+      setAnswerText(`Failed: ${result.errorMessage ?? 'RAG query failed'}`);
       return;
     }
 
     if (result.retrievedChunks.length === 0) {
-      setAnswer('No relevant chunks found.');
+      setAnswerText('No relevant chunks found.');
       return;
     }
 
-    setAnswer(formatAnswer(result.answer, result.retrievedChunks, result.thinkingContent));
+    setAnswerHtml(formatAnswer(result.answer, result.retrievedChunks, result.thinkingContent));
   } catch (err) {
-    setAnswer(`Failed: ${formatError(err)}`);
+    setAnswerText(`Failed: ${formatError(err)}`);
   } finally {
     isBusy = false;
   }
@@ -451,34 +463,65 @@ function setStatus(msg: string): void {
   if (el) el.textContent = msg;
 }
 
-function setAnswer(msg: string): void {
-  const el = container.querySelector('#docs-answer') as HTMLElement;
-  el.innerHTML = msg;
+function answerElement(): HTMLElement | null {
+  return container.querySelector<HTMLElement>('#docs-answer');
+}
+
+function setAnswerText(message: string): void {
+  const el = answerElement();
+  if (el) el.textContent = message;
+}
+
+/** Accepts only markup assembled by formatAnswer(), which escapes every value. */
+function setAnswerHtml(html: string): void {
+  const el = answerElement();
+  if (el) el.innerHTML = html;
 }
 
 /**
  * Create the RAG pipeline for the user-selected model pair (iOS parity:
  * RAGViewModel.swift:100-103 `ragCreatePipeline(embeddingModel:llmModel:)`).
- * Recreates the native session whenever the selection changes.
+ * Recreates the provider whenever the selection changes or runtime teardown
+ * invalidates the previously cached provider.
  */
 async function ensureRAGReady(): Promise<boolean> {
   if (!selectedEmbeddingModelId || !selectedLlmModelId) {
     setStatus('Select an embedding model and an LLM model first.');
     return false;
   }
-  const key = `${selectedEmbeddingModelId}|${selectedLlmModelId}`;
-  if (createdPipelineKey === key) return true;
+  const key = selectedPipelineKey();
+  if (createdPipelineIsLive(key)) return true;
+  resetCreatedPipeline();
   try {
     setStatus('Creating RAG pipeline...');
     await RunAnywhere.ragCreatePipeline(selectedEmbeddingModelId, selectedLlmModelId);
+    createdPipelineGeneration = RunAnywhere.rag.pipelineState().generation;
     createdPipelineKey = key;
     setStatus('RAG pipeline ready.');
     return true;
   } catch (err) {
-    createdPipelineKey = null;
+    resetCreatedPipeline();
     setStatus(`RAG init failed: ${formatError(err)}`);
     return false;
   }
+}
+
+function selectedPipelineKey(): string {
+  return `${selectedEmbeddingModelId}|${selectedLlmModelId}`;
+}
+
+function createdPipelineIsLive(key: string): boolean {
+  if (createdPipelineKey !== key || createdPipelineGeneration === null) return false;
+  if (!RunAnywhere.rag.availability().available) return false;
+  const state = RunAnywhere.rag.pipelineState();
+  return state.generation === createdPipelineGeneration
+    && state.configuration?.embeddingModelId === selectedEmbeddingModelId
+    && state.configuration.llmModelId === selectedLlmModelId;
+}
+
+function resetCreatedPipeline(): void {
+  createdPipelineKey = null;
+  createdPipelineGeneration = null;
 }
 
 /**

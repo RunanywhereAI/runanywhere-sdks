@@ -5,24 +5,31 @@
  * kept out of the root facade so `@runanywhere/web` can mirror Swift.
  */
 
-export { AudioCapture } from './Infrastructure/AudioCapture';
+export { AudioCapture } from './Infrastructure/AudioCapture.js';
 export type {
   AudioCaptureConfig,
   AudioChunkCallback,
   AudioLevelCallback,
-} from './Infrastructure/AudioCapture';
+} from './Infrastructure/AudioCapture.js';
 
-export { AudioPlayback } from './Infrastructure/AudioPlayback';
+export { VoiceAgentMicDriver } from './Infrastructure/VoiceAgentMicDriver.js';
+export type {
+  VoiceAgentMicCallbacks,
+  VoiceAgentMicPhase,
+  VoiceAgentMicTurn,
+} from './Infrastructure/VoiceAgentMicDriver.js';
+
+export { AudioPlayback } from './Infrastructure/AudioPlayback.js';
 export type {
   PlaybackCompleteCallback,
   PlaybackConfig,
-} from './Infrastructure/AudioPlayback';
+} from './Infrastructure/AudioPlayback.js';
 
-export { AudioFileLoader } from './Infrastructure/AudioFileLoader';
-export type { AudioFileLoaderResult } from './Infrastructure/AudioFileLoader';
+export { AudioFileLoader } from './Infrastructure/AudioFileLoader.js';
+export type { AudioFileLoaderResult } from './Infrastructure/AudioFileLoader.js';
 
-export { VideoCapture } from './Infrastructure/VideoCapture';
-export type { CapturedFrame, VideoCaptureConfig } from './Infrastructure/VideoCapture';
+export { VideoCapture } from './Infrastructure/VideoCapture.js';
+export type { CapturedFrame, VideoCaptureConfig } from './Infrastructure/VideoCapture.js';
 
-export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabilities';
-export type { WebCapabilities } from './Infrastructure/DeviceCapabilities';
+export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabilities.js';
+export type { WebCapabilities } from './Infrastructure/DeviceCapabilities.js';

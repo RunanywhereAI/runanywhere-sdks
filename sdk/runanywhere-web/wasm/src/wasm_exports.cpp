@@ -27,6 +27,7 @@
 
 // Infrastructure
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
+#include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_download.h"
@@ -651,6 +652,194 @@ rac_wasm_offsetof_diffusion_result_generation_time_ms(void) {
 EMSCRIPTEN_KEEPALIVE int
 rac_wasm_offsetof_diffusion_result_safety_flagged(void) {
   return (int)offsetof(rac_diffusion_result_t, safety_flagged);
+}
+
+// =============================================================================
+// DEVICE REGISTRATION STRUCT HELPERS
+//
+// The Web host installs typed JavaScript callbacks into the commons device
+// manager. Expose compiler-derived layouts for every struct field the host
+// touches so wasm32 padding or future C ABI changes cannot corrupt memory.
+// =============================================================================
+
+// ---- rac_device_callbacks_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_device_callbacks(void) {
+  return (int)sizeof(rac_device_callbacks_t);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_callbacks_get_device_info(void) {
+  return (int)offsetof(rac_device_callbacks_t, get_device_info);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_callbacks_get_device_id(void) {
+  return (int)offsetof(rac_device_callbacks_t, get_device_id);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_callbacks_is_registered(void) {
+  return (int)offsetof(rac_device_callbacks_t, is_registered);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_callbacks_set_registered(void) {
+  return (int)offsetof(rac_device_callbacks_t, set_registered);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_callbacks_http_post(void) {
+  return (int)offsetof(rac_device_callbacks_t, http_post);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_callbacks_user_data(void) {
+  return (int)offsetof(rac_device_callbacks_t, user_data);
+}
+
+// ---- rac_device_registration_info_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_device_registration_info(void) {
+  return (int)sizeof(rac_device_registration_info_t);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_device_id(void) {
+  return (int)offsetof(rac_device_registration_info_t, device_id);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_device_model(void) {
+  return (int)offsetof(rac_device_registration_info_t, device_model);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_device_name(void) {
+  return (int)offsetof(rac_device_registration_info_t, device_name);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_platform(void) {
+  return (int)offsetof(rac_device_registration_info_t, platform);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_os_version(void) {
+  return (int)offsetof(rac_device_registration_info_t, os_version);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_form_factor(void) {
+  return (int)offsetof(rac_device_registration_info_t, form_factor);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_architecture(void) {
+  return (int)offsetof(rac_device_registration_info_t, architecture);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_chip_name(void) {
+  return (int)offsetof(rac_device_registration_info_t, chip_name);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_total_memory(void) {
+  return (int)offsetof(rac_device_registration_info_t, total_memory);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_available_memory(void) {
+  return (int)offsetof(rac_device_registration_info_t, available_memory);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_has_neural_engine(void) {
+  return (int)offsetof(rac_device_registration_info_t, has_neural_engine);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_neural_engine_cores(void) {
+  return (int)offsetof(rac_device_registration_info_t, neural_engine_cores);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_gpu_family(void) {
+  return (int)offsetof(rac_device_registration_info_t, gpu_family);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_battery_level(void) {
+  return (int)offsetof(rac_device_registration_info_t, battery_level);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_battery_state(void) {
+  return (int)offsetof(rac_device_registration_info_t, battery_state);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_is_low_power_mode(void) {
+  return (int)offsetof(rac_device_registration_info_t, is_low_power_mode);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_core_count(void) {
+  return (int)offsetof(rac_device_registration_info_t, core_count);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_performance_cores(void) {
+  return (int)offsetof(rac_device_registration_info_t, performance_cores);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_efficiency_cores(void) {
+  return (int)offsetof(rac_device_registration_info_t, efficiency_cores);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_registration_info_device_fingerprint(void) {
+  return (int)offsetof(rac_device_registration_info_t, device_fingerprint);
+}
+
+// ---- rac_device_http_response_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_device_http_response(void) {
+  return (int)sizeof(rac_device_http_response_t);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_http_response_result(void) {
+  return (int)offsetof(rac_device_http_response_t, result);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_http_response_status_code(void) {
+  return (int)offsetof(rac_device_http_response_t, status_code);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_http_response_response_body(void) {
+  return (int)offsetof(rac_device_http_response_t, response_body);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_device_http_response_error_message(void) {
+  return (int)offsetof(rac_device_http_response_t, error_message);
+}
+
+// =============================================================================
+// STORAGE ANALYZER CALLBACK STRUCT HELPERS
+//
+// The browser installs JavaScript callbacks into rac_storage_callbacks_t.
+// Keep every offset compiler-derived so wasm32 padding or future field changes
+// cannot corrupt the callback table.
+// =============================================================================
+
+EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_storage_callbacks(void) {
+  return (int)sizeof(rac_storage_callbacks_t);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_storage_callbacks_calculate_dir_size(void) {
+  return (int)offsetof(rac_storage_callbacks_t, calculate_dir_size);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_storage_callbacks_get_file_size(void) {
+  return (int)offsetof(rac_storage_callbacks_t, get_file_size);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_storage_callbacks_path_exists(void) {
+  return (int)offsetof(rac_storage_callbacks_t, path_exists);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_storage_callbacks_get_available_space(void) {
+  return (int)offsetof(rac_storage_callbacks_t, get_available_space);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_storage_callbacks_get_total_space(void) {
+  return (int)offsetof(rac_storage_callbacks_t, get_total_space);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_storage_callbacks_delete_path(void) {
+  return (int)offsetof(rac_storage_callbacks_t, delete_path);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_storage_callbacks_is_model_loaded(void) {
+  return (int)offsetof(rac_storage_callbacks_t, is_model_loaded);
+}
+EMSCRIPTEN_KEEPALIVE int
+rac_wasm_offsetof_storage_callbacks_unload_model(void) {
+  return (int)offsetof(rac_storage_callbacks_t, unload_model);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_storage_callbacks_user_data(void) {
+  return (int)offsetof(rac_storage_callbacks_t, user_data);
 }
 
 // =============================================================================

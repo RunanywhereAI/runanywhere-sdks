@@ -20,8 +20,8 @@ import {
   type DownloadStartResult as ProtoDownloadStartResult,
   type DownloadSubscribeRequest as ProtoDownloadSubscribeRequest,
 } from '@runanywhere/proto-ts/download_service';
-import { SDKLogger } from '../Foundation/SDKLogger';
-import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm.js';
 
 const logger = new SDKLogger('DownloadAdapter');
 
