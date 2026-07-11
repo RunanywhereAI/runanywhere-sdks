@@ -905,6 +905,9 @@ function makeRAGQuery(
     stream: options.stream ?? false,
     // Structured flag — commons prepends the model's no-think directive.
     disableThinking: options.disableThinking ?? false,
+    enableMultiQuery: options.enableMultiQuery ?? defaults.enableMultiQuery,
+    multiQueryCount: options.multiQueryCount ?? defaults.multiQueryCount,
+    scopePrefix: options.scopePrefix ?? defaults.scopePrefix,
   };
 }
 
