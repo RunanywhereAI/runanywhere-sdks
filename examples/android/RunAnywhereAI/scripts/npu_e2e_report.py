@@ -14,6 +14,7 @@ aggregates but the production intelligibility gate fails closed. No device acces
 pure post-processing.
 """
 import hashlib
+from importlib import metadata
 import json
 import re
 import subprocess
@@ -30,6 +31,11 @@ _DIGIT_WORDS = {
 APP_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = APP_ROOT.parents[2]
 SUITES = APP_ROOT / "app" / "src" / "androidTest" / "assets" / "npu_suites"
+FIXTURES = SUITES.parent / "qhexrt_fixtures"
+WHISPER_PACKAGE = "openai-whisper"
+WHISPER_PACKAGE_VERSION = "20250625"
+WHISPER_MODEL = "base"
+WHISPER_CHECKPOINT_SHA256 = "ed3a0b6b1c0edf879ad9b11b1af5a0e6ab5db9205f891f668f8b0e6c6326e34e"
 
 GATE_SPECS = {
     "answer_keyword_coherence": {
@@ -68,6 +74,13 @@ GATE_SPECS = {
             "maximum_unmasked_p99_absolute_error_rgb8",
             "minimum_unmasked_rgb8_within_one_lsb_fraction",
             "minimum_hole_changed_fraction",
+        },
+        "optional": set(),
+    },
+    "inpaint_execution_smoke": {
+        "required": {
+            "metric", "suite_pass_frac", "min_inputs",
+            "maximum_unmasked_mean_absolute_error_rgb8", "minimum_hole_changed_fraction",
         },
         "optional": set(),
     },
@@ -134,6 +147,8 @@ def _executable_suite_cases(metric, cases):
     if metric == "inpaint_forge_parity+passthrough_detection":
         return [case for case in cases if nested(case).get("image_asset") and nested(case).get("mask_asset")
                 and case.get("reference_image_asset")]
+    if metric == "inpaint_execution_smoke":
+        return [case for case in cases if nested(case).get("image_asset") and nested(case).get("mask_asset")]
     return []
 
 
@@ -150,11 +165,33 @@ def _validate_suite_payload(payload, path):
         "audio_sanity_intelligibility": {"tts"},
         "embedding_retrieval_ranking": {"embedding"},
         "inpaint_forge_parity+passthrough_detection": {"inpaint"},
+        "inpaint_execution_smoke": {"inpaint"},
     }
     if payload.get("schema") != "npu_suite/v1":
         errors.append("schema must be npu_suite/v1")
     if payload.get("model_id") != path.stem:
         errors.append("model_id must equal the suite filename")
+    model_arch = re.search(r"_(v[0-9]+)$", str(payload.get("model_id") or ""))
+    if model_arch is None or payload.get("arch") != model_arch.group(1):
+        errors.append("model_id architecture suffix must exactly equal arch")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(payload.get("hf_revision") or "")):
+        errors.append("hf_revision must be an immutable 40-hex commit")
+    coverage = payload.get("coverage") if isinstance(payload.get("coverage"), dict) else {}
+    if coverage.get("scope") not in {"acceptance", "smoke_only"}:
+        errors.append("coverage.scope must be acceptance or smoke_only")
+    if metric == "inpaint_execution_smoke" and coverage.get("scope") != "smoke_only":
+        errors.append("inpaint_execution_smoke can never claim acceptance")
+    published = payload.get("published_bundle") if isinstance(payload.get("published_bundle"), dict) else None
+    if published is not None:
+        if published.get("revision") != payload.get("hf_revision"):
+            errors.append("published_bundle revision must equal hf_revision")
+        artifacts = published.get("artifact_sha256s")
+        if not isinstance(artifacts, dict) or not artifacts or any(
+            not isinstance(name, str) or not name or
+            not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
+            for name, digest in (artifacts.items() if isinstance(artifacts, dict) else [])
+        ):
+            errors.append("published_bundle artifact hashes are invalid")
     if not cases:
         errors.append("cases must be non-empty")
     if spec is None:
@@ -229,11 +266,17 @@ def _validate_suite_payload(payload, path):
         elif metric == "inpaint_forge_parity+passthrough_detection":
             for key in GATE_SPECS[metric]["required"] - {"metric", "min_inputs"}:
                 float(gate[key])
+        elif metric == "inpaint_execution_smoke":
+            if float(gate["maximum_unmasked_mean_absolute_error_rgb8"]) < 0:
+                errors.append("inpaint smoke unmasked MAE ceiling must be non-negative")
+            changed = float(gate["minimum_hole_changed_fraction"])
+            if not 0.0 < changed <= 1.0:
+                errors.append("inpaint smoke changed-hole threshold must be in (0, 1]")
     except (TypeError, ValueError, KeyError) as exc:
         errors.append(f"invalid threshold value: {exc}")
     for case in executable:
         for name in _suite_case_assets(case):
-            asset = SUITES.parent / name
+            asset = FIXTURES / name
             if not asset.is_file():
                 errors.append(f"missing suite asset: {name}")
     bindings = payload.get("asset_bindings") if isinstance(payload.get("asset_bindings"), list) else []
@@ -246,16 +289,19 @@ def _validate_suite_payload(payload, path):
         digest_fields = {
             "source_image_sha256": lambda case: case.get("input", {}).get("image_asset"),
             "source_mask_sha256": lambda case: case.get("input", {}).get("mask_asset"),
-            "metric_image_sha256": lambda case: case.get("metric_image_asset"),
-            "metric_mask_sha256": lambda case: case.get("metric_mask_asset"),
-            "reference_rgb8_sha256": lambda case: case.get("reference_image_asset"),
         }
+        if metric != "inpaint_execution_smoke":
+            digest_fields.update({
+                "metric_image_sha256": lambda case: case.get("metric_image_asset"),
+                "metric_mask_sha256": lambda case: case.get("metric_mask_asset"),
+                "reference_rgb8_sha256": lambda case: case.get("reference_image_asset"),
+            })
         for case in executable:
             binding = binding_by_id.get(case.get("id"), {})
             for digest_key, asset_name in digest_fields.items():
                 name = asset_name(case)
                 expected = binding.get(digest_key)
-                asset = SUITES.parent / name if name else None
+                asset = FIXTURES / name if name else None
                 if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
                     errors.append(f"invalid {digest_key} for case {case.get('id')}")
                 elif asset is None or not asset.is_file() or _sha256(asset) != expected:
@@ -277,6 +323,11 @@ def _suite_gate(mid, arch=None):
             "suite_model_id": None,
             "suite_cases": 0,
             "suite_metric": None,
+            "coverage_scope": None,
+            "coverage_reason": None,
+            "hf_revision": None,
+            "published_revision": None,
+            "input_asset_sha256s": {},
             "gate": {},
             "cases": [],
             "executable_cases": [],
@@ -290,6 +341,10 @@ def _suite_gate(mid, arch=None):
         gate = payload.get("gate", {}) if isinstance(payload.get("gate"), dict) else {}
         cases = payload.get("cases", []) if isinstance(payload.get("cases"), list) else []
         validation_errors, executable = _validate_suite_payload(payload, path)
+        if arch is not None and payload.get("arch") != arch:
+            validation_errors.append(
+                f"suite arch={payload.get('arch')!r} does not match requested arch={arch!r}"
+            )
         suite_valid = not validation_errors
     except Exception as exc:  # noqa: BLE001
         payload = {}
@@ -298,6 +353,12 @@ def _suite_gate(mid, arch=None):
         executable = []
         validation_errors = [f"{type(exc).__name__}: {exc}"]
         suite_valid = False
+    input_asset_sha256s = {}
+    for case in executable:
+        for name in _suite_case_assets(case):
+            asset = FIXTURES / name
+            if asset.is_file():
+                input_asset_sha256s[name] = _sha256(asset)
     return {
         "suite_id": path.stem,
         "suite_sha256": hashlib.sha256(raw).hexdigest(),
@@ -306,6 +367,14 @@ def _suite_gate(mid, arch=None):
         "suite_model_id": payload.get("model_id"),
         "suite_cases": len(payload.get("cases", [])) if isinstance(payload.get("cases"), list) else 0,
         "suite_metric": gate.get("metric") if isinstance(gate, dict) else None,
+        "coverage_scope": (payload.get("coverage") or {}).get("scope")
+            if isinstance(payload.get("coverage"), dict) else None,
+        "coverage_reason": (payload.get("coverage") or {}).get("reason")
+            if isinstance(payload.get("coverage"), dict) else None,
+        "hf_revision": payload.get("hf_revision"),
+        "published_revision": (payload.get("published_bundle") or {}).get("revision")
+            if isinstance(payload.get("published_bundle"), dict) else None,
+        "input_asset_sha256s": dict(sorted(input_asset_sha256s.items())),
         "gate": gate,
         "cases": cases,
         "executable_cases": executable,
@@ -378,6 +447,11 @@ def _apply_production_provenance(report, report_path, report_dir, run_inputs, ru
         "model_id": suite["suite_model_id"],
         "case_count": suite["suite_cases"],
         "metric": suite["suite_metric"],
+        "coverage_scope": suite["coverage_scope"],
+        "coverage_reason": suite["coverage_reason"],
+        "hf_revision": suite["hf_revision"],
+        "published_revision": suite["published_revision"],
+        "input_asset_sha256s": suite["input_asset_sha256s"],
         "validation_errors": suite["validation_errors"],
         "declared_gate_keys": sorted(suite["gate"]),
         "exact_match": suite_matches,
@@ -392,6 +466,35 @@ def _apply_production_provenance(report, report_path, report_dir, run_inputs, ru
         else:
             state = "does not match the test-APK receipt"
         _fail_report(report, f"canonical suite {state} for model_id={mid!r}, arch={report.get('arch')!r}")
+
+    immutable_bundle = report.get("bundle_revision_verified") is True
+    expected_acceptance = suite["coverage_scope"] == "acceptance" and immutable_bundle
+    scope_receipt_ok = (
+        report.get("hf_revision") == suite["hf_revision"]
+        and report.get("declared_validation_scope") == suite["coverage_scope"]
+        and report.get("validation_scope") == ("acceptance" if expected_acceptance else "smoke_only")
+        and report.get("acceptance_eligible") is expected_acceptance
+    )
+    gates["suite_scope_receipt"] = scope_receipt_ok
+    reported_assets = report.get("input_asset_sha256s")
+    fixture_receipt_ok = (
+        isinstance(reported_assets, dict)
+        and reported_assets == suite["input_asset_sha256s"]
+    )
+    gates["suite_fixture_receipt"] = fixture_receipt_ok
+    report["suite_provenance"].update({
+        "bundle_revision_verified": immutable_bundle,
+        "expected_acceptance_eligible": expected_acceptance,
+        "scope_receipt_exact": scope_receipt_ok,
+        "fixture_receipt_exact": fixture_receipt_ok,
+    })
+    if not scope_receipt_ok:
+        _fail_report(report, "suite coverage/revision evidence is missing or inconsistent")
+    elif not fixture_receipt_ok:
+        _fail_report(report, "suite input fixture SHA-256 receipt is missing or inconsistent")
+    elif not expected_acceptance and report.get("status") == "PASS":
+        report["status"] = "SMOKE_PASS"
+        report["detail"] = "mutable or smoke-scoped evidence; acceptance was not claimed"
 
     deletion = report.get("delete") if isinstance(report.get("delete"), dict) else {}
     delete_not_applicable = (
@@ -476,6 +579,23 @@ def _word_repeat_ratio(value):
     return sum(words[index] == words[index - 1] for index in range(1, len(words))) / (len(words) - 1)
 
 
+def _answer_text(value):
+    return re.sub(
+        r"<think\b[^>]*>.*?(?:</think\s*>|\Z)",
+        " ",
+        str(value),
+        flags=re.IGNORECASE | re.DOTALL,
+    ).strip()
+
+
+def _contains_keyword(text, keyword):
+    haystack, needle = _words(text), _words(str(keyword))
+    return bool(needle) and any(
+        haystack[index:index + len(needle)] == needle
+        for index in range(len(haystack) - len(needle) + 1)
+    )
+
+
 def _apply_canonical_thresholds(report, suite):
     """Recompute every declared Android gate from raw report samples; missing coverage fails closed."""
     gate = suite.get("gate", {})
@@ -523,6 +643,7 @@ def _apply_canonical_thresholds(report, suite):
         "audio_sanity_intelligibility": "tts",
         "embedding_retrieval_ranking": "embedding",
         "inpaint_forge_parity+passthrough_detection": "inpaint",
+        "inpaint_execution_smoke": "inpaint",
     }.get(metric)
     check("metric", report.get("modality") == expected_modality,
           f"metric={metric!r} is incompatible with report modality={report.get('modality')!r}")
@@ -573,8 +694,11 @@ def _apply_canonical_thresholds(report, suite):
             budget_passes = []
             for case, sample in ordered:
                 output = str(sample.get("output") or "")
+                visible_answer = _answer_text(output)
                 keywords = case.get("expect_keywords") or []
-                keyword_ok = any(str(keyword).lower() in output.lower() for keyword in keywords)
+                keyword_ok = bool(visible_answer) and any(
+                    _contains_keyword(visible_answer, keyword) for keyword in keywords
+                )
                 coherent = bool(output.strip()) and _word_repeat_ratio(output) < 0.50
                 passed = keyword_ok and coherent
                 case_passes.append(passed)
@@ -600,7 +724,7 @@ def _apply_canonical_thresholds(report, suite):
             case_passes = []
             for case, sample in ordered:
                 score = wer(case.get("gold_text", ""), str(sample.get("output") or ""))
-                passed = score <= ceiling + 1e-12
+                passed = score <= ceiling
                 case_passes.append(passed)
                 case_results.append({"id": case.get("id"), "pass": passed, "wer": round(score, 6)})
             check("wer_max", bool(case_passes), f"WER cases were not evaluable against wer_max={ceiling}")
@@ -610,8 +734,11 @@ def _apply_canonical_thresholds(report, suite):
             budget_passes = []
             for case, sample in ordered:
                 output = str(sample.get("output") or "")
+                visible_answer = _answer_text(output)
                 keywords = case.get("expect_keywords") or []
-                passed = bool(output.strip()) and any(str(keyword).lower() in output.lower() for keyword in keywords)
+                passed = bool(visible_answer) and any(
+                    _contains_keyword(visible_answer, keyword) for keyword in keywords
+                )
                 case_passes.append(passed)
                 if "max_new" in gate:
                     try:
@@ -628,7 +755,7 @@ def _apply_canonical_thresholds(report, suite):
             rms_floor = number(gate.get("rms_min"), "rms_min")
             seconds_floor = number(gate.get("min_seconds"), "min_seconds")
             wer_ceiling = number(gate.get("intelligibility_wer_max"), "intelligibility_wer_max")
-            rate_checks, rms_checks, duration_checks, wers = [], [], [], []
+            rate_checks, rms_checks, duration_checks, intelligibility_checks, wers = [], [], [], [], []
             case_passes = []
             for case, sample in ordered:
                 try:
@@ -641,9 +768,12 @@ def _apply_canonical_thresholds(report, suite):
                 try:
                     intelligibility = number(sample.get("intelligibility_wer"), "intelligibility_wer")
                     wers.append(intelligibility)
+                    intelligibility_ok = intelligibility <= wer_ceiling
                 except (TypeError, ValueError):
                     intelligibility = None
-                passed = rate_ok and rms_ok and duration_ok
+                    intelligibility_ok = False
+                intelligibility_checks.append(intelligibility_ok)
+                passed = rate_ok and rms_ok and duration_ok and intelligibility_ok
                 case_passes.append(passed)
                 case_results.append({"id": case.get("id"), "pass": passed,
                                      "intelligibility_wer": intelligibility})
@@ -654,8 +784,11 @@ def _apply_canonical_thresholds(report, suite):
             check("min_seconds", bool(duration_checks) and all(duration_checks),
                   f"one or more TTS WAVs are below min_seconds={seconds_floor}")
             mean_wer = sum(wers) / len(wers) if len(wers) == len(cases) and wers else None
-            check("intelligibility_wer_max", mean_wer is not None and mean_wer <= wer_ceiling + 1e-12,
-                  f"mean TTS intelligibility WER {mean_wer} exceeds {wer_ceiling} or is incomplete")
+            check(
+                "intelligibility_wer_max",
+                mean_wer is not None and mean_wer <= wer_ceiling and all(intelligibility_checks),
+                f"TTS intelligibility WER exceeds {wer_ceiling} per-case or mean={mean_wer} is incomplete",
+            )
             report["intelligibility_wer"] = round(mean_wer, 6) if mean_wer is not None else None
 
         elif metric == "embedding_retrieval_ranking":
@@ -672,7 +805,7 @@ def _apply_canonical_thresholds(report, suite):
             for case, sample in ordered:
                 try:
                     dimension_ok = int(sample.get("dim")) == expected_dimension
-                    margin_ok = number(sample.get("margin"), "margin") >= min_margin - 1e-12
+                    margin_ok = number(sample.get("margin"), "margin") >= min_margin
                     norm_ok = all(
                         norm_min <= number(sample.get(key), key) <= norm_max
                         for key in ("query_l2", "positive_l2", "negative_l2")
@@ -729,6 +862,31 @@ def _apply_canonical_thresholds(report, suite):
             for key, results in threshold_results.items():
                 check(key, bool(results) and all(results), f"inpaint samples failed {key}")
 
+        elif metric == "inpaint_execution_smoke":
+            thresholds = {
+                "maximum_unmasked_mean_absolute_error_rgb8": (
+                    "unmasked_mae_rgb8", lambda value, bar: value <= bar,
+                ),
+                "minimum_hole_changed_fraction": (
+                    "hole_changed_fraction", lambda value, bar: value >= bar,
+                ),
+            }
+            threshold_results = {key: [] for key in thresholds}
+            case_passes = []
+            for case, sample in ordered:
+                passed = True
+                for key, (sample_key, comparator) in thresholds.items():
+                    try:
+                        ok = comparator(number(sample.get(sample_key), sample_key), number(gate.get(key), key))
+                    except (TypeError, ValueError):
+                        ok = False
+                    threshold_results[key].append(ok)
+                    passed = passed and ok
+                case_passes.append(passed)
+                case_results.append({"id": case.get("id"), "pass": passed})
+            for key, results in threshold_results.items():
+                check(key, bool(results) and all(results), f"inpaint smoke samples failed {key}")
+
         else:
             case_passes = []
     except (TypeError, ValueError, KeyError) as exc:
@@ -738,7 +896,7 @@ def _apply_canonical_thresholds(report, suite):
     try:
         pass_fraction = sum(bool(value) for value in case_passes) / len(case_passes)
         required_fraction = number(gate.get("suite_pass_frac"), "suite_pass_frac")
-        check("suite_pass_frac", pass_fraction >= required_fraction - 1e-12,
+        check("suite_pass_frac", pass_fraction >= required_fraction,
               f"canonical case pass fraction {pass_fraction:.6f} < suite_pass_frac={required_fraction}")
     except (TypeError, ValueError, ZeroDivisionError) as exc:
         pass_fraction = 0.0
@@ -764,13 +922,45 @@ def _apply_canonical_thresholds(report, suite):
     return ok
 
 
+def _whisper_evaluator_identity():
+    import whisper  # type: ignore
+    version = metadata.version(WHISPER_PACKAGE)
+    if version != WHISPER_PACKAGE_VERSION:
+        raise RuntimeError(
+            f"Whisper package mismatch: expected {WHISPER_PACKAGE_VERSION}, found {version}"
+        )
+    model_url = getattr(whisper, "_MODELS", {}).get(WHISPER_MODEL, "")
+    if f"/{WHISPER_CHECKPOINT_SHA256}/{WHISPER_MODEL}.pt" not in model_url:
+        raise RuntimeError("Whisper base checkpoint mapping does not match the pinned SHA-256")
+    return {
+        "package": WHISPER_PACKAGE,
+        "package_version": WHISPER_PACKAGE_VERSION,
+        "model": WHISPER_MODEL,
+        "checkpoint_sha256": WHISPER_CHECKPOINT_SHA256,
+        "language": "en",
+        "task": "transcribe",
+        "temperature": 0.0,
+        "condition_on_previous_text": False,
+        "fp16": False,
+        "verified": True,
+    }
+
+
 def _load_whisper():
     try:
         import whisper  # type: ignore
-        return whisper.load_model("base")
+        identity = _whisper_evaluator_identity()
+        return whisper.load_model(identity["model"]), identity
     except Exception as e:  # noqa: BLE001
         print(f"  (whisper unavailable — failing TTS intelligibility: {type(e).__name__})")
-        return None
+        return None, {
+            "package": WHISPER_PACKAGE,
+            "package_version": WHISPER_PACKAGE_VERSION,
+            "model": WHISPER_MODEL,
+            "checkpoint_sha256": WHISPER_CHECKPOINT_SHA256,
+            "verified": False,
+            "error": f"{type(e).__name__}: {e}",
+        }
 
 
 def _transcribe(model, wav_path):
@@ -779,9 +969,22 @@ def _transcribe(model, wav_path):
         n, sr = w.getnframes(), w.getframerate()
         audio = np.frombuffer(w.readframes(n), dtype=np.int16).astype(np.float32) / 32768.0
     if sr != 16000:  # whisper assumes a raw array is 16 kHz — resample TTS output (e.g. MeloTTS 44100) first
-        audio = np.interp(np.linspace(0, len(audio), int(len(audio) * 16000 / sr), endpoint=False),
+        audio = np.interp(np.linspace(0, len(audio), _resampled_sample_count(len(audio), sr), endpoint=False),
                           np.arange(len(audio)), audio).astype(np.float32)
-    return model.transcribe(audio, language="en", fp16=False)["text"].strip()
+    return model.transcribe(
+        audio,
+        language="en",
+        task="transcribe",
+        temperature=0.0,
+        condition_on_previous_text=False,
+        fp16=False,
+    )["text"].strip()
+
+
+def _resampled_sample_count(source_count, source_rate):
+    if source_count <= 0 or source_rate <= 0:
+        raise ValueError("resampling requires positive sample count and rate")
+    return max(1, int(round(source_count * 16000 / source_rate)))
 
 
 def main():
@@ -797,6 +1000,7 @@ def main():
     run_inputs, run_inputs_sha256 = _load_run_inputs(d)
     local_git = _local_git_state()
     wmodel = None
+    whisper_identity = None
     whisper_attempted = False
     rows = []
     for rp in reports:
@@ -810,9 +1014,10 @@ def main():
         if modality == "tts":
             samples = r.get("samples", []) if isinstance(r.get("samples"), list) else []
             wavs = sorted(d.glob(f"tts_{mid}_*.wav"))
-            if wavs and not whisper_attempted:
+            if not whisper_attempted:
                 whisper_attempted = True
-                wmodel = _load_whisper()
+                wmodel, whisper_identity = _load_whisper()
+            r["evaluator"] = whisper_identity
             wers = []
             tts_error = None
             if not samples:
@@ -880,6 +1085,11 @@ def main():
             "suite_id": r.get("suite_id"),
             "suite_sha256": r.get("suite_sha256"),
             "suite_exact": r.get("suite_provenance", {}).get("exact_match"),
+            "hf_revision": r.get("hf_revision"),
+            "validation_scope": r.get("validation_scope"),
+            "acceptance_eligible": r.get("acceptance_eligible"),
+            "bundle_revision_verified": r.get("bundle_revision_verified"),
+            "evaluator": r.get("evaluator"),
             "delete_model": gates.get("delete_model"),
             "source_provenance": gates.get("source_provenance"),
             "canonical_thresholds": gates.get("canonical_thresholds"),
@@ -921,7 +1131,9 @@ def main():
     for x in rows:
         lines.append("| " + " | ".join([
             x["model"], x["modality"],
-            "✅" if x["status"] == "PASS" else "❌ " + x["status"],
+            "✅" if x["status"] == "PASS" else (
+                "🟡 SMOKE_PASS" if x["status"] == "SMOKE_PASS" else "❌ " + x["status"]
+            ),
             f"{x['suite_id'] or 'missing'}@{(x['suite_sha256'] or '')[:12]}",
             "✅" if x["canonical_thresholds"] else "❌",
             "—" if x["delete_model"] is None else ("✅" if x["delete_model"] else "❌"),
@@ -934,13 +1146,21 @@ def main():
             f"{x['gates_pass']}/{x['gates_total']}",
         ]) + " |")
     npass = sum(1 for x in rows if x["status"] == "PASS")
-    lines += ["", f"**{npass}/{len(rows)} models PASS.** Per-model detail: the `npu_e2e_*.json` files in this dir."]
+    nsmoke = sum(1 for x in rows if x["status"] == "SMOKE_PASS")
+    nfail = len(rows) - npass - nsmoke
+    lines += [
+        "",
+        f"**{npass} acceptance PASS, {nsmoke} non-acceptance SMOKE_PASS, {nfail} FAIL.** "
+        "Per-model detail: the `npu_e2e_*.json` files in this dir.",
+    ]
     for x in rows:
-        if x["status"] != "PASS":
+        if x["status"] == "FAIL":
             lines.append(f"- ❌ `{x['model']}` — {x['detail']}")
+        elif x["status"] == "SMOKE_PASS":
+            lines.append(f"- 🟡 `{x['model']}` — smoke evidence only; acceptance was not claimed")
     (d / "summary.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
-    return 0 if npass == len(rows) else 1
+    return 0 if nfail == 0 else 1
 
 
 if __name__ == "__main__":

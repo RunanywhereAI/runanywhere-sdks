@@ -27,14 +27,15 @@ class RACLogTelemetryE2ETest {
             withTimeout(60_000) { GlobalState.awaitBootstrapComplete() }
         }
 
-        val marker = "raclog-telemetry-e2e"
+        val rawMarker = "raclog-telemetry-e2e"
+        val expectedDiagnostic = "source=app;event=operation_failed;kind=none"
         val received = AtomicReference<SDKEvent>()
         val receivedLatch = CountDownLatch(1)
         val subscription =
             RunAnywhere.subscribeSDKEvents { event ->
                 if (
                     event.operation_id == "raclog.warning" &&
-                    event.error?.message?.contains(marker) == true
+                    event.error?.message == expectedDiagnostic
                 ) {
                     received.compareAndSet(null, event)
                     receivedLatch.countDown()
@@ -43,7 +44,7 @@ class RACLogTelemetryE2ETest {
         assertTrue("Native SDK-event subscription must be available", subscription > 0L)
 
         try {
-            RACLog.w(marker)
+            RACLog.w(rawMarker)
             assertTrue(
                 "RACLog warning must return through the native SDK-event stream",
                 receivedLatch.await(10, TimeUnit.SECONDS),
@@ -54,6 +55,11 @@ class RACLogTelemetryE2ETest {
             assertEquals(ErrorCode.ERROR_CODE_PROCESSING_FAILED, event.error?.code)
             assertEquals(true, event.failure?.recoverable)
             assertEquals("raclog.warning", event.operation_id)
+            assertEquals(expectedDiagnostic, event.error?.message)
+            assertTrue(
+                "Raw log text must not cross the remote diagnostics boundary",
+                event.error?.message?.contains(rawMarker) == false,
+            )
         } finally {
             RunAnywhere.unsubscribeSDKEvents(subscription)
         }

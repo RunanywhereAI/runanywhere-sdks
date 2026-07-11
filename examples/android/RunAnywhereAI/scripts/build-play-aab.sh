@@ -60,8 +60,8 @@ Options:
   -h, --help             Show this help.
 
 Environment variables take precedence over Keychain items. Keychain account
-names must exactly match the required environment-variable names documented in
-docs/PLAY_STORE_RELEASE.md under service com.runanywhere.android.release.
+names must exactly match the environment-variable names requested by this
+script, under service com.runanywhere.android.release.
 USAGE
 }
 
@@ -364,20 +364,13 @@ if [[ "${SKIP_NATIVE_REBUILD}" -eq 0 ]]; then
         -DQHEXRT_QNN_SDK_ROOT="${QNN_SDK_ROOT}" \
         -DQHEXRT_BUILD_TOOLS=OFF
     cmake --build "${QHEXRT_SOURCE_DIR}/build-android" \
-        --target qhexrt_core qhexrt_host \
+        --target qhexrt_build_receipt \
         --parallel 2
 
-    qhexrt_prebuilt="${REPO_ROOT}/engines/qhexrt/prebuilt"
-    mkdir -p "${qhexrt_prebuilt}/include/qhexrt" "${qhexrt_prebuilt}/lib/arm64-v8a"
-    install -m 0644 \
-        "${QHEXRT_SOURCE_DIR}/include/qhexrt/qhexrt_c.h" \
-        "${qhexrt_prebuilt}/include/qhexrt/qhexrt_c.h"
-    install -m 0644 \
-        "${QHEXRT_SOURCE_DIR}/build-android/libqhexrt_core.a" \
-        "${qhexrt_prebuilt}/lib/arm64-v8a/libqhexrt_core.a"
-    install -m 0644 \
-        "${QHEXRT_SOURCE_DIR}/build-android/libqhexrt_host.a" \
-        "${qhexrt_prebuilt}/lib/arm64-v8a/libqhexrt_host.a"
+    "${QHEXRT_SOURCE_DIR}/tools/scripts/stage_prebuilt_for_sdk.sh" \
+        --sdk-root "${REPO_ROOT}" \
+        --build-dir "${QHEXRT_SOURCE_DIR}/build-android" \
+        --android-abi arm64-v8a
 
     echo "==> Rebuilding and staging arm64-v8a SDK native libraries from a clean tree"
     cmake -E remove_directory "${REPO_ROOT}/build/android-arm64"
@@ -460,17 +453,22 @@ shopt -u nullglob
 [[ "${#staged_skel_files[@]}" -eq 3 ]] || fail "staged QHexRT assets must contain exactly three DSP skels"
 [[ "${#staged_jni_skels[@]}" -eq 0 ]] || fail "DSP skels must not be staged as Android JNI libraries"
 
-strings "${staged_qhexrt}/librac_backend_qhexrt.so" | \
-    grep -F 'qhexrt:engine-available' >/dev/null || fail "staged QHexRT backend was compiled as a stub"
+grep -aFq 'qhexrt:engine-available' "${staged_qhexrt}/librac_backend_qhexrt.so" || \
+    fail "staged QHexRT backend was compiled as a stub"
 
 minimum_elf_load_alignment() {
     local elf_file="$1"
     local align_hex
     local align_dec
+    local headers
     local load_count=0
     local minimum=0
+    if ! headers="$("${ANDROID_READELF}" -l "${elf_file}" 2>/dev/null)"; then
+        return 1
+    fi
     while IFS= read -r align_hex; do
-        [[ "${align_hex}" == 0x* ]] || continue
+        [[ -n "${align_hex}" ]] || continue
+        [[ "${align_hex}" == 0x* ]] || return 1
         align_dec=$((align_hex))
         load_count=$((load_count + 1))
         if [[ "${align_dec}" -lt 16384 ]]; then
@@ -479,8 +477,7 @@ minimum_elf_load_alignment() {
         if [[ "${minimum}" -eq 0 || "${align_dec}" -lt "${minimum}" ]]; then
             minimum="${align_dec}"
         fi
-    done < <("${ANDROID_READELF}" -l "${elf_file}" 2>/dev/null | \
-        awk '/^[[:space:]]*LOAD[[:space:]]/ {print $NF}')
+    done <<< "$(printf '%s\n' "${headers}" | awk '/^[[:space:]]*LOAD[[:space:]]/ {print $NF}')"
     [[ "${load_count}" -gt 0 ]] || return 1
     printf '0x%x\n' "${minimum}"
 }

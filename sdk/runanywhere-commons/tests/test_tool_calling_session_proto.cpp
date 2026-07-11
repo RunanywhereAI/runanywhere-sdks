@@ -22,6 +22,7 @@
 #include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
+#include "errors.pb.h"
 #include "llm_service.pb.h"
 #include "model_types.pb.h"
 #include "tool_calling.pb.h"
@@ -51,6 +52,7 @@ struct MockLlm {
 
 std::mutex g_responses_mutex;
 std::vector<std::string> g_responses;
+std::vector<std::string> g_prompts;
 int g_generate_calls = 0;
 
 char* dup_cstr(const char* value) {
@@ -75,7 +77,7 @@ rac_result_t mock_initialize(void*, const char*) {
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_generate(void*, const char*, const rac_llm_options_t*,
+rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t*,
                            rac_llm_result_t* out_result) {
     if (!out_result)
         return RAC_ERROR_NULL_POINTER;
@@ -83,6 +85,7 @@ rac_result_t mock_generate(void*, const char*, const rac_llm_options_t*,
     {
         std::lock_guard<std::mutex> lg(g_responses_mutex);
         g_generate_calls++;
+        g_prompts.emplace_back(prompt ? prompt : "");
         if (g_responses.empty()) {
             response = "empty-response";
         } else {
@@ -155,11 +158,17 @@ void set_responses(std::vector<std::string> responses) {
     std::lock_guard<std::mutex> lg(g_responses_mutex);
     g_responses = std::move(responses);
     g_generate_calls = 0;
+    g_prompts.clear();
 }
 
 int generate_calls() {
     std::lock_guard<std::mutex> lg(g_responses_mutex);
     return g_generate_calls;
+}
+
+std::vector<std::string> generated_prompts() {
+    std::lock_guard<std::mutex> lg(g_responses_mutex);
+    return g_prompts;
 }
 
 runanywhere::v1::ModelInfo build_llm_model() {
@@ -261,6 +270,12 @@ void sink_callback(const uint8_t* bytes, size_t size, void* user_data) {
     }
 }
 
+bool parse_first_error(EventSink& sink, runanywhere::v1::SDKError* out_error) {
+    using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+    const auto* event = sink.find_first(EvCase::kErrorBytes);
+    return event && out_error && out_error->ParseFromString(event->error_bytes());
+}
+
 runanywhere::v1::ToolDefinition make_weather_tool() {
     runanywhere::v1::ToolDefinition tool;
     tool.set_name("get_weather");
@@ -269,6 +284,17 @@ runanywhere::v1::ToolDefinition make_weather_tool() {
     param->set_name("location");
     param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
     param->set_description("City name");
+    param->set_required(true);
+    return tool;
+}
+
+runanywhere::v1::ToolDefinition make_calculate_tool() {
+    runanywhere::v1::ToolDefinition tool;
+    tool.set_name("calculate");
+    tool.set_description("Evaluate a math expression");
+    auto* param = tool.add_parameters();
+    param->set_name("expression");
+    param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
     param->set_required(true);
     return tool;
 }
@@ -428,6 +454,242 @@ int test_iteration_cap_respected() {
     return 0;
 }
 
+int test_forced_tool_name_only_promotes_session_to_specific() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+    });
+
+    EventSink sink;
+    auto request = make_request("Use the selected tool.");
+    request.set_forced_tool_name("get_weather");
+    *request.add_tools() = make_calculate_tool();
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    uint64_t handle = 0;
+    const rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
+                                                                  sink_callback, &sink, &handle);
+    CHECK(rc == RAC_SUCCESS, "forced-name-only session create succeeds");
+    CHECK(handle != 0, "forced-name-only session publishes handle");
+
+    using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+    CHECK(sink.count_kind(EvCase::kToolCall) == 1,
+          "forced-name-only session emits selected tool call");
+    CHECK(sink.count_kind(EvCase::kErrorBytes) == 0,
+          "forced-name-only session has no policy error");
+    const auto prompts = generated_prompts();
+    CHECK(prompts.size() == 1, "forced-name-only session generates once");
+    if (prompts.size() == 1) {
+        CHECK(prompts[0].find("get_weather") != std::string::npos,
+              "forced-name-only session advertises selected tool");
+        CHECK(prompts[0].find("calculate") == std::string::npos,
+              "forced-name-only session narrows away unrelated tools");
+    }
+
+    rac_tool_calling_session_destroy_proto(handle);
+    cleanup_environment();
+    return 0;
+}
+
+int test_none_vetoes_forced_name_in_session() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"No tool is needed."});
+
+    EventSink sink;
+    auto request = make_request("Answer directly without tools.");
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    request.set_forced_tool_name("get_weather");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    uint64_t handle = 0;
+    const rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
+                                                                  sink_callback, &sink, &handle);
+    CHECK(rc == RAC_SUCCESS, "NONE plus forced name session create succeeds");
+
+    using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+    CHECK(sink.count_kind(EvCase::kFinalResult) == 1,
+          "NONE plus forced name permits a plain final response");
+    CHECK(sink.count_kind(EvCase::kToolCall) == 0, "NONE plus forced name emits no tool call");
+    CHECK(sink.count_kind(EvCase::kErrorBytes) == 0, "NONE plus forced name emits no error");
+    const auto prompts = generated_prompts();
+    CHECK(prompts.size() == 1, "NONE plus forced name session generates once");
+    if (prompts.size() == 1) {
+        CHECK(prompts[0] == request.prompt(), "NONE veto suppresses session tool schemas");
+    }
+
+    rac_tool_calling_session_destroy_proto(handle);
+    cleanup_environment();
+    return 0;
+}
+
+int test_none_blocks_session_call_when_validation_disabled() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+    });
+
+    EventSink sink;
+    auto request = make_request("Answer directly without tools.");
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    request.set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    uint64_t handle = 0;
+    const rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
+                                                                  sink_callback, &sink, &handle);
+    CHECK(rc == RAC_SUCCESS, "NONE session policy failure is emitted asynchronously");
+
+    using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+    CHECK(sink.count_kind(EvCase::kToolCall) == 0,
+          "NONE session never publishes a call for host execution");
+    CHECK(sink.count_kind(EvCase::kLlmStreamEventBytes) == 0,
+          "NONE hallucinated call emits no completed LLM event");
+    CHECK(sink.count_kind(EvCase::kFinalResult) == 0,
+          "NONE hallucinated call is not reported as successful");
+    CHECK(sink.count_kind(EvCase::kErrorBytes) == 1,
+          "NONE hallucinated call emits one policy error");
+    runanywhere::v1::SDKError error;
+    CHECK(parse_first_error(sink, &error), "NONE session error decodes");
+    CHECK(error.c_abi_code() == RAC_ERROR_VALIDATION_FAILED,
+          "NONE session error carries validation failure");
+    CHECK(error.message() == "Tool calls are disabled by tool_choice=NONE",
+          "NONE session error carries deterministic policy message");
+
+    rac_tool_calling_session_destroy_proto(handle);
+    cleanup_environment();
+    return 0;
+}
+
+int test_forced_target_blocks_wrong_session_call_when_validation_disabled() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+    });
+
+    EventSink sink;
+    auto request = make_request("Use calculate only.");
+    *request.add_tools() = make_calculate_tool();
+    request.set_forced_tool_name("calculate");
+    request.set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    uint64_t handle = 0;
+    const rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
+                                                                  sink_callback, &sink, &handle);
+    CHECK(rc == RAC_SUCCESS, "wrong forced-target session call emits asynchronously");
+
+    using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+    CHECK(sink.count_kind(EvCase::kToolCall) == 0,
+          "wrong forced-target session call is never published to host");
+    CHECK(sink.count_kind(EvCase::kLlmStreamEventBytes) == 0,
+          "wrong forced-target session call emits no completed LLM event");
+    CHECK(sink.count_kind(EvCase::kFinalResult) == 0,
+          "wrong forced-target session call is not reported as successful");
+    CHECK(sink.count_kind(EvCase::kErrorBytes) == 1,
+          "wrong forced-target session call emits one policy error");
+    runanywhere::v1::SDKError error;
+    CHECK(parse_first_error(sink, &error), "forced-target session error decodes");
+    CHECK(error.c_abi_code() == RAC_ERROR_VALIDATION_FAILED,
+          "forced-target session error carries validation failure");
+    CHECK(error.message() == "Tool call must use tool_choice=SPECIFIC target: calculate",
+          "forced-target session error carries deterministic policy message");
+
+    rac_tool_calling_session_destroy_proto(handle);
+    cleanup_environment();
+    return 0;
+}
+
+int test_specific_session_target_must_be_nonempty_and_present() {
+    if (!load_mock_llm())
+        return 1;
+
+    const auto run_invalid_request = [](runanywhere::v1::ToolCallingSessionCreateRequest request,
+                                        const char* label) {
+        EventSink sink;
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 99;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, &handle);
+        CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, label);
+        CHECK(handle == 0, "invalid SPECIFIC session does not publish handle");
+        using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+        CHECK(sink.count_kind(EvCase::kToolCall) == 0,
+              "invalid SPECIFIC session emits no tool call");
+    };
+
+    auto empty_target = make_request("Use a specific tool.");
+    empty_target.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    run_invalid_request(empty_target, "SPECIFIC session without target is rejected");
+
+    auto missing_target = make_request("Use the missing tool.");
+    missing_target.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    missing_target.set_forced_tool_name("missing_tool");
+    run_invalid_request(missing_target, "SPECIFIC session target absent from tools is rejected");
+    CHECK(generate_calls() == 0, "invalid SPECIFIC sessions fail before generation");
+
+    cleanup_environment();
+    return 0;
+}
+
+int test_specific_and_required_sessions_reject_initial_no_call() {
+    if (!load_mock_llm())
+        return 1;
+
+    const auto run_required_choice = [](runanywhere::v1::ToolChoiceMode mode,
+                                        const std::string& expected_message, const char* label) {
+        set_responses({"I decided not to call a tool."});
+        EventSink sink;
+        auto request = make_request("A tool call is mandatory.");
+        request.set_tool_choice(mode);
+        if (mode == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC) {
+            request.set_forced_tool_name("get_weather");
+        }
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, &handle);
+        CHECK(rc == RAC_SUCCESS, label);
+
+        using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+        CHECK(sink.count_kind(EvCase::kToolCall) == 0,
+              "required session no-call emits no host-executable call");
+        CHECK(sink.count_kind(EvCase::kLlmStreamEventBytes) == 0,
+              "required session no-call emits no completed LLM event");
+        CHECK(sink.count_kind(EvCase::kFinalResult) == 0,
+              "required session no-call is not reported as successful");
+        CHECK(sink.count_kind(EvCase::kErrorBytes) == 1,
+              "required session no-call emits one policy error");
+        runanywhere::v1::SDKError error;
+        CHECK(parse_first_error(sink, &error), "required session error decodes");
+        CHECK(error.c_abi_code() == RAC_ERROR_VALIDATION_FAILED,
+              "required session error carries validation failure");
+        CHECK(error.message() == expected_message,
+              "required session error carries deterministic policy message");
+
+        rac_tool_calling_session_destroy_proto(handle);
+    };
+
+    run_required_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC,
+                        "tool_choice=SPECIFIC requires a tool call",
+                        "SPECIFIC session no-call emits a policy failure");
+    run_required_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED,
+                        "tool_choice=REQUIRED requires a tool call",
+                        "REQUIRED session no-call emits a policy failure");
+
+    cleanup_environment();
+    return 0;
+}
+
 int test_destroy_clears_state() {
     if (!load_mock_llm())
         return 1;
@@ -479,6 +741,12 @@ int main() {
         test_session_emits_tool_call();
         test_step_with_result_emits_final();
         test_iteration_cap_respected();
+        test_forced_tool_name_only_promotes_session_to_specific();
+        test_none_vetoes_forced_name_in_session();
+        test_none_blocks_session_call_when_validation_disabled();
+        test_forced_target_blocks_wrong_session_call_when_validation_disabled();
+        test_specific_session_target_must_be_nonempty_and_present();
+        test_specific_and_required_sessions_reject_initial_no_call();
         test_destroy_clears_state();
         if (g_registry) {
             rac_model_registry_destroy(g_registry);

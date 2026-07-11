@@ -29,7 +29,6 @@ import com.runanywhere.sdk.public.types.RARAGDocument
 import com.runanywhere.sdk.public.types.RARAGStatistics
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 // MARK: - Pipeline Lifecycle
@@ -56,6 +55,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 // still being observable for backend development. The ONNX load failure
 // remains a WARNING because it really does block RAG pipeline creation.
 private val ragNativeLibsLoaded = AtomicBoolean(false)
+private val ragNativeRequests = NativeUnaryRequestCoordinator()
 
 private fun ensureRagNativeLibsLoaded() {
     if (!ragNativeLibsLoaded.compareAndSet(false, true)) return
@@ -153,14 +153,17 @@ suspend fun RunAnywhere.ragCreatePipeline(config: RARAGConfiguration) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()
     ensureRagNativeLibsLoaded()
-    withContext(Dispatchers.IO) {
+    // Creation replaces any existing bridge session. Enqueue the lifecycle
+    // owner before cancelling the current query so no successor can capture
+    // the session this operation is about to replace.
+    ragNativeRequests.withExclusiveOperation(interruptActiveRequest = true) {
         CppBridgeRAG.create(config)
     }
 }
 
 /** Destroy the RAG pipeline and release all resources. */
 suspend fun RunAnywhere.ragDestroyPipeline() {
-    withContext(Dispatchers.IO) {
+    ragNativeRequests.withExclusiveOperation(interruptActiveRequest = true) {
         CppBridgeRAG.destroy()
     }
 }
@@ -169,7 +172,7 @@ suspend fun RunAnywhere.ragIngest(text: String, metadataJSON: String? = null) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()
     val document = RAGDocument.create(text = text, metadataJSON = metadataJSON)
-    withContext(Dispatchers.IO) {
+    ragNativeRequests.withExclusiveOperation {
         CppBridgeRAG.ingest(document)
     }
 }
@@ -177,7 +180,7 @@ suspend fun RunAnywhere.ragIngest(text: String, metadataJSON: String? = null) {
 suspend fun RunAnywhere.ragIngest(document: RARAGDocument): RARAGStatistics {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()
-    return withContext(Dispatchers.IO) {
+    return ragNativeRequests.withExclusiveOperation {
         CppBridgeRAG.ingest(document)
     }
 }
@@ -185,7 +188,7 @@ suspend fun RunAnywhere.ragIngest(document: RARAGDocument): RARAGStatistics {
 suspend fun RunAnywhere.ragClearDocuments() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()
-    withContext(Dispatchers.IO) {
+    ragNativeRequests.withExclusiveOperation {
         CppBridgeRAG.clear()
     }
 }
@@ -196,7 +199,7 @@ suspend fun RunAnywhere.ragClearDocuments() {
  * @return Number of indexed chunks in the pipeline, or 0 if not initialized.
  */
 suspend fun RunAnywhere.ragGetDocumentCount(): Int =
-    withContext(Dispatchers.IO) {
+    ragNativeRequests.withExclusiveOperation {
         try {
             CppBridgeRAG.stats().indexed_chunks.toInt()
         } catch (_: Exception) {
@@ -217,9 +220,10 @@ suspend fun RunAnywhere.ragQuery(
         (options ?: RAGQueryOptions.defaults(question)).let {
             if (it.question.isEmpty()) it.copy(question = question) else it
         }
+    val nativeRequest = CppBridgeRAG.prepareQuery(queryOptions)
     return runCancellableNativeRagQuery(
-        query = { CppBridgeRAG.query(queryOptions) },
-        cancel = CppBridgeRAG::cancelQuery,
+        query = { requestId -> CppBridgeRAG.queryRequest(requestId, nativeRequest) },
+        cancel = CppBridgeRAG::cancelQueryRequest,
     )
 }
 
@@ -228,10 +232,10 @@ suspend fun RunAnywhere.ragQuery(options: RAGQueryOptions): RAGResult =
 
 /** Immediately request cancellation of the active native RAG query. */
 suspend fun RunAnywhere.ragCancelQuery() {
-    // Do not dispatch this lock-free ABI call to Dispatchers.IO. The blocking
-    // query itself runs there, so a saturated pool could queue its own cancel
-    // behind the work it needs to interrupt.
-    CppBridgeRAG.cancelQuery()
+    // The coordinator routes the potentially blocking request-scoped JNI
+    // relay through its dedicated elastic cancellation dispatcher, keeping it
+    // off Main and independent of a caller-supplied inference dispatcher.
+    ragNativeRequests.cancelActive()
 }
 
 /**
@@ -240,10 +244,12 @@ suspend fun RunAnywhere.ragCancelQuery() {
  */
 internal suspend fun <T> runCancellableNativeRagQuery(
     dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    query: () -> T,
-    cancel: () -> Unit,
+    coordinator: NativeUnaryRequestCoordinator = ragNativeRequests,
+    query: (requestId: Long) -> T,
+    cancel: (requestId: Long) -> Unit,
 ): T =
     runCancellableNativeUnaryRequest(
+        coordinator = coordinator,
         dispatcher = dispatcher,
         request = query,
         cancel = cancel,
@@ -253,7 +259,7 @@ suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RARAGDocument>) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     if (documents.isEmpty()) return
     ensureServicesReady()
-    withContext(Dispatchers.IO) {
+    ragNativeRequests.withExclusiveOperation {
         documents.forEach { document ->
             CppBridgeRAG.ingest(document)
         }
@@ -263,7 +269,7 @@ suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RARAGDocument>) {
 suspend fun RunAnywhere.ragGetStatistics(): RARAGStatistics {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()
-    return withContext(Dispatchers.IO) {
+    return ragNativeRequests.withExclusiveOperation {
         CppBridgeRAG.stats()
     }
 }

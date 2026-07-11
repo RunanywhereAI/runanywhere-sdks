@@ -146,6 +146,7 @@ struct LLMStreamCtx {
     std::string* accumulated_answer;
     const RAGTokenSink* on_token;
     const std::atomic<bool>* cancel_requested;
+    std::atomic<bool>* consumer_stop_requested;
 };
 
 rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
@@ -153,8 +154,11 @@ rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
     if (!token || !ctx)
         return RAC_TRUE;
 
-    if (ctx->cancel_requested &&
-        ctx->cancel_requested->load(std::memory_order_acquire)) {
+    if (ctx->cancel_requested && ctx->cancel_requested->load(std::memory_order_acquire)) {
+        return RAC_FALSE;
+    }
+    if (ctx->consumer_stop_requested &&
+        ctx->consumer_stop_requested->load(std::memory_order_acquire)) {
         return RAC_FALSE;
     }
 
@@ -164,6 +168,9 @@ rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
     if (ctx->on_token && *ctx->on_token) {
         const bool keep_going = (*ctx->on_token)(s);
         if (!keep_going) {
+            if (ctx->consumer_stop_requested) {
+                ctx->consumer_stop_requested->store(true, std::memory_order_release);
+            }
             return RAC_FALSE;
         }
     }
@@ -186,8 +193,7 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
     }
 
     const auto cancelled = [&inputs]() {
-        return inputs.cancel_requested &&
-               inputs.cancel_requested->load(std::memory_order_acquire);
+        return inputs.cancel_requested && inputs.cancel_requested->load(std::memory_order_acquire);
     };
     if (cancelled())
         return RAC_ERROR_CANCELLED;
@@ -309,9 +315,20 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
     if (!prompt.empty()) {
         if (cancelled())
             return RAC_ERROR_CANCELLED;
-        LLMStreamCtx ctx{&out_result.answer, &on_token, inputs.cancel_requested};
+        std::atomic<bool> consumer_stop_requested{false};
+        LLMStreamCtx ctx{&out_result.answer, &on_token, inputs.cancel_requested,
+                         &consumer_stop_requested};
         status = rac_llm_generate_stream(llm_handle, prompt.c_str(), &llm_options,
                                          llm_stream_trampoline, &ctx);
+        // Callback-stop semantics differ by provider: one backend may report
+        // inference failure while another treats the consumer stop as success.
+        // The request-owned latch is the portable source of truth, so normalize
+        // a delivered cancellation before interpreting the provider status or
+        // exposing a partial answer as successful.
+        if (cancelled() || consumer_stop_requested.load(std::memory_order_acquire)) {
+            out_result.status = RAC_ERROR_CANCELLED;
+            return out_result.status;
+        }
         if (status != RAC_SUCCESS) {
             LOGE("RAG LLM generate_stream failed (%d)", status);
             out_result.status = status;

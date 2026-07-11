@@ -25,6 +25,7 @@
 #     --repo/--modality/--files  run ONE ad-hoc HF repo instead of a catalog id
 #     --local-bundle <dir>  stage ONE private bundle locally; use with one catalog model id
 #     --local-download <dir> serve ONE private bundle over adb-reversed loopback and download it
+#     --qhexrt-root <dir> explicitly sync canonical suites/fixtures from this QHexRT checkout
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,6 +51,7 @@ ARCH="${ARCH:-v81}"
 MAX_NEW="${MAX_NEW:-}"
 BUILD=0
 REPO="" ; MODALITY="" ; FILES="" ; LOCAL_BUNDLE="" ; LOCAL_DOWNLOAD=""
+QHEXRT_ROOT=""
 MODELS=()
 
 while [ $# -gt 0 ]; do
@@ -64,6 +66,7 @@ while [ $# -gt 0 ]; do
     --files)  FILES="$2"; shift 2;;
     --local-bundle) LOCAL_BUNDLE="$2"; shift 2;;
     --local-download) LOCAL_DOWNLOAD="$2"; shift 2;;
+    --qhexrt-root) QHEXRT_ROOT="$2"; shift 2;;
     -h|--help) sed -n '2,30p' "$0"; exit 0;;
     *) MODELS+=("$1"); shift;;
   esac
@@ -93,6 +96,27 @@ if [ -n "$LOCAL_SOURCE" ]; then
   LOCAL_SOURCE="$(cd "$LOCAL_SOURCE" && pwd)"
   if [ -n "$LOCAL_BUNDLE" ]; then LOCAL_BUNDLE="$LOCAL_SOURCE"; else LOCAL_DOWNLOAD="$LOCAL_SOURCE"; fi
 fi
+
+# Suites and their exact fixture hashes are build inputs, so validate them
+# before any ADB, Gradle, download, or model-load work. Auto-sync is allowed
+# only when the caller explicitly supplies the private QHexRT checkout.
+SDK_ROOT="$(cd "$APP_ROOT/../../.." && pwd)"
+ASSET_ROOT="$APP_ROOT/app/src/androidTest/assets"
+if [ -n "$QHEXRT_ROOT" ]; then
+  [ -d "$QHEXRT_ROOT/device_suites" ] || {
+    echo "--qhexrt-root is not a QHexRT checkout: $QHEXRT_ROOT" >&2
+    exit 2
+  }
+  QHEXRT_ROOT="$(cd "$QHEXRT_ROOT" && pwd)"
+  "$QHEXRT_ROOT/device_suites/sync_android_assets.sh" "$SDK_ROOT"
+fi
+ASSET_PREFLIGHT=(python3 "$SCRIPT_DIR/preflight_npu_assets.py" --assets "$ASSET_ROOT" --arch "$ARCH")
+if [ -n "$REPO" ]; then
+  ASSET_PREFLIGHT+=(--hf-repo "$REPO" --modality "$MODALITY")
+else
+  for id in "${MODELS[@]}"; do ASSET_PREFLIGHT+=(--model "$id"); done
+fi
+"${ASSET_PREFLIGHT[@]}"
 
 TS="$(date +%Y%m%d_%H%M%S)"
 OUT="$APP_ROOT/reports/npu_e2e/$TS"

@@ -130,7 +130,7 @@ elif [[ "$STRICT" -eq 1 ]]; then
 fi
 
 echo
-echo "This is archive evidence, not legal approval. Review docs/THIRD_PARTY_NOTICES_AUDIT.md."
+echo "This is archive evidence, not legal approval; obtain release/legal-owner review."
 
 if [[ "$STRICT" -eq 1 && "$missing_local" -ne 0 ]]; then
     echo "ERROR: $missing_local local RunAnywhere AAR(s) have no packaged notice evidence" >&2

@@ -69,6 +69,25 @@ bool is_hf_ref(const std::string& ref);
 bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext);
 
 /**
+ * True when @p ref is a logical repository/manifest bundle ref that can have
+ * an engine-selected variant folder inserted. Already-pinned folders,
+ * concrete /resolve/ URLs, and ordinary explicit file refs return false.
+ */
+bool is_logical_variant_folder_ref(const std::string& ref, const char* manifest_leaf_ext);
+
+/**
+ * Rewrite a logical bundle ref with one validated engine-selected folder:
+ *
+ *   hf.co/org/repo            + v81 -> hf.co/org/repo/v81
+ *   hf.co/org/repo/model.json + v81 -> hf.co/org/repo/v81/model.json
+ *
+ * Returns false for unsafe variant segments, already-pinned refs, and non-HF
+ * references.
+ */
+bool make_variant_folder_ref(const std::string& ref, const std::string& variant,
+                             const char* manifest_leaf_ext, std::string* out_ref);
+
+/**
  * Normalize an explicit-file HF ref (org/repo/path/file or an hf-hosted
  * /resolve/ URL) to a direct https download URL. Returns "" when @p ref is a
  * repo-level reference that needs full resolution instead.

@@ -82,6 +82,19 @@ rac_bool_t mlx_test_is_manifest(const char* relative_path) {
                                                                                       : RAC_FALSE;
 }
 
+rac_bool_t qhexrt_test_is_manifest(const char* relative_path) {
+    return relative_path != nullptr && std::strcmp(relative_path, "test.json") == 0 ? RAC_TRUE
+                                                                                    : RAC_FALSE;
+}
+
+rac_result_t resolve_test_v81(char* out_variant, size_t out_variant_size, char*, size_t) {
+    if (out_variant == nullptr || out_variant_size < 4) {
+        return RAC_ERROR_BUFFER_TOO_SMALL;
+    }
+    std::memcpy(out_variant, "v81", 4);
+    return RAC_SUCCESS;
+}
+
 const rac_bundle_policy_t kTestMlxPolicy = {
     /* .struct_size                = */ (uint32_t)sizeof(rac_bundle_policy_t),
     /* .framework                  = */ RAC_FRAMEWORK_MLX,
@@ -89,7 +102,18 @@ const rac_bundle_policy_t kTestMlxPolicy = {
     /* .manifest_extension         = */ ".json",
     /* .manifest_leaf_names_bundle = */ RAC_FALSE,
     /* .is_bundle_manifest         = */ mlx_test_is_manifest,
-    /* .reserved_0                 = */ 0,
+    /* .resolve_variant            = */ {nullptr},
+    /* .reserved_1                 = */ 0,
+};
+
+const rac_bundle_policy_t kTestQhexrtPolicy = {
+    /* .struct_size                = */ (uint32_t)sizeof(rac_bundle_policy_t),
+    /* .framework                  = */ RAC_FRAMEWORK_QHEXRT,
+    /* .model_format               = */ RAC_MODEL_FORMAT_QNN_CONTEXT,
+    /* .manifest_extension         = */ ".json",
+    /* .manifest_leaf_names_bundle = */ RAC_TRUE,
+    /* .is_bundle_manifest         = */ qhexrt_test_is_manifest,
+    /* .resolve_variant            = */ {resolve_test_v81},
     /* .reserved_1                 = */ 0,
 };
 
@@ -102,22 +126,34 @@ const char* kMlxFolderTreeJson = R"JSON([
   {"type":"file","path":"tokenizer_config.json","size":99}
 ])JSON";
 
+const char* kQhexrtFolderTreeJson = R"JSON([
+  {"type":"file","path":"v75/test.json","size":11},
+  {"type":"file","path":"v75/context.bin","size":12},
+  {"type":"file","path":"v81/test.json","size":21},
+  {"type":"file","path":"v81/context.bin","size":22}
+])JSON";
+
 rac_result_t fake_hf_tree_send(void*, const rac_http_request_t* req, rac_http_response_t* out_resp) {
     if (!req || !req->url || !out_resp) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     std::memset(out_resp, 0, sizeof(*out_resp));
-    if (std::string(req->url).find("/api/models/mlx-community/FastVLM-0.5B-BF16/tree/main") ==
-        std::string::npos) {
+    const std::string url(req->url);
+    const char* body = nullptr;
+    if (url.find("/api/models/mlx-community/FastVLM-0.5B-BF16/tree/main") != std::string::npos) {
+        body = kMlxFolderTreeJson;
+    } else if (url.find("/api/models/runanywhere/test_HNPU/tree/main") != std::string::npos) {
+        body = kQhexrtFolderTreeJson;
+    } else {
         out_resp->status = 404;
         return RAC_SUCCESS;
     }
-    const size_t len = std::strlen(kMlxFolderTreeJson);
+    const size_t len = std::strlen(body);
     out_resp->body_bytes = static_cast<uint8_t*>(std::malloc(len));
     if (!out_resp->body_bytes) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    std::memcpy(out_resp->body_bytes, kMlxFolderTreeJson, len);
+    std::memcpy(out_resp->body_bytes, body, len);
     out_resp->body_len = len;
     out_resp->status = 200;
     return RAC_SUCCESS;
@@ -361,6 +397,39 @@ int test_register_mlx_repo_root_uses_folder_bundle_policy() {
     return 0;
 }
 
+int test_register_qhexrt_logical_ref_uses_engine_variant_policy() {
+    install_noop_adapter();
+    ASSERT_EQ(rac_bundle_policy_register(&kTestQhexrtPolicy), RAC_SUCCESS);
+    ASSERT_EQ(rac_http_transport_register(&kFakeHfTreeTransport, nullptr), RAC_SUCCESS);
+
+    RegisterArgs args;
+    args.url = "https://huggingface.co/runanywhere/test_HNPU/test.json";
+    args.name = "Generic QHexRT compatibility";
+    args.has_framework = true;
+    args.framework = runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
+    args.has_category = true;
+    args.category = runanywhere::v1::MODEL_CATEGORY_LANGUAGE;
+
+    runanywhere::v1::ModelInfo saved;
+    ASSERT_TRUE(register_proto(args, &saved));
+    ASSERT_EQ(saved.framework(), runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT);
+    ASSERT_EQ(saved.format(), runanywhere::v1::MODEL_FORMAT_QNN_CONTEXT);
+    ASSERT_TRUE(saved.has_multi_file());
+    ASSERT_EQ(saved.multi_file().files_size(), 2);
+    ASSERT_EQ(saved.multi_file().files(0).filename(), std::string("test.json"));
+    ASSERT_TRUE(saved.multi_file().files(0).url().find("/resolve/main/v81/test.json") !=
+                std::string::npos);
+    ASSERT_EQ(saved.multi_file().files(1).filename(), std::string("context.bin"));
+    ASSERT_TRUE(saved.multi_file().files(1).url().find("/resolve/main/v81/context.bin") !=
+                std::string::npos);
+
+    remove_by_id(saved.id());
+    rac_http_transport_register(nullptr, nullptr);
+    rac_bundle_policy_unregister(RAC_FRAMEWORK_QHEXRT);
+    clear_adapter();
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Negative paths.
 // ---------------------------------------------------------------------------
@@ -568,6 +637,8 @@ int main(int /*argc*/, char** /*argv*/) {
         {"register_with_source_override", test_register_with_source_override},
         {"register_mlx_repo_root_uses_folder_bundle_policy",
          test_register_mlx_repo_root_uses_folder_bundle_policy},
+        {"register_qhexrt_logical_ref_uses_engine_variant_policy",
+         test_register_qhexrt_logical_ref_uses_engine_variant_policy},
         {"null_out_pointer", test_null_out_pointer},
         {"invalid_input_bytes", test_invalid_input_bytes},
         {"empty_input_rejected", test_empty_input_rejected},

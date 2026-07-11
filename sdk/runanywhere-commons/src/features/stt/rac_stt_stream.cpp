@@ -7,9 +7,9 @@
  *   - Per-handle CallbackSlot registry guarded by a mutex.
  *   - Session map indexed by monotonically-increasing 64-bit ids that the
  *     lifecycle manager owns. start() seeds a session, stop()/cancel()
- *     tear it down. Unloading a model SHOULD walk all sessions for the
- *     handle and cancel them — wired in via the lifecycle service when
- *     the SDK migration lands.
+ *     tear it down. Component load/unload/reset/destroy closes a private
+ *     start gate, cancels every session for that handle, and drains provider
+ *     work before mutating the model lifecycle.
  *   - dispatch_stt_stream_event() is invoked by stt_component.cpp and
  *     the streaming engines to emit serialized STTStreamEvent bytes.
  *
@@ -27,12 +27,15 @@
 
 #include "rac/features/stt/rac_stt_stream.h"
 
-#include <atomic>
 #include <algorithm>
-#include <cmath>
+#include <atomic>
 #include <chrono>
+#include <cmath>
+#include <condition_variable>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -40,14 +43,16 @@
 #include <vector>
 
 #include "features/common/rac_stream_registry_internal.h"
+#include "features/stt/rac_stt_stream_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_types.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include "infrastructure/events/sdk_event_publish.h"
 #include "sdk_events.pb.h"
 #include "stt_options.pb.h"
+
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 namespace {
@@ -58,6 +63,31 @@ namespace {
 // dispatch_stt_stream_event so destroy/teardown can spin-wait until any
 // in-flight slot.fn() returns before freeing user_data.
 std::atomic<int> g_in_flight{0};
+thread_local int g_dispatch_depth = 0;
+
+enum class SessionTermination {
+    kActive,
+    kStop,
+    kCancel,
+};
+
+// Feed/provider calls and callback dispatches outlive the short critical
+// sections protecting g_sessions(). Keep their lifetime state separately so a
+// stop/cancel can close the session, wait for external callers, or defer
+// cleanup when invoked re-entrantly from the session's own callback.
+struct StreamOperationState {
+    std::mutex mutex;
+    std::condition_variable cv;
+    SessionTermination termination = SessionTermination::kActive;
+    bool drop_events = false;
+    bool cleanup_deferred = false;
+    bool cleanup_claimed = false;
+    bool cleanup_finished = false;
+    size_t in_flight_feeds = 0;
+    size_t in_flight_dispatches = 0;
+    rac_handle_t backend_stream_handle = nullptr;
+    bool backend_stream_unsupported = false;
+};
 
 struct StreamSession {
     rac_handle_t handle = nullptr;
@@ -69,6 +99,11 @@ struct StreamSession {
     std::string language;
     int32_t sample_rate = 16000;
     rac_audio_format_enum_t audio_format = RAC_AUDIO_FORMAT_PCM;
+    // The public streaming feed ABI accepts raw signed 16-bit little-endian
+    // PCM only. Keep this separate from audio_format because proto-only
+    // containers such as OGG/M4A have no corresponding C enum and must never
+    // be silently collapsed to PCM.
+    bool accepts_raw_pcm_s16le = true;
     bool enable_punctuation = true;
     bool enable_diarization = false;
     int32_t max_speakers = 0;
@@ -79,8 +114,7 @@ struct StreamSession {
     // Backends that don't implement the slot leave this nullptr and
     // rac_stt_stream_feed_audio_proto falls back to the legacy per-chunk
     // transcribe_stream path.
-    rac_handle_t backend_stream_handle = nullptr;
-    bool backend_stream_unsupported = false;
+    std::shared_ptr<StreamOperationState> operations = std::make_shared<StreamOperationState>();
     // Fallback endpointing for engines (QHexRT/Whisper) that expose only
     // one-shot transcription. Feeding each 100 ms mic chunk as a fresh
     // inference produces empty text and an unbounded queue; keep a bounded
@@ -97,6 +131,25 @@ struct StreamSession {
     uint64_t chunks_fed = 0;
     uint64_t audio_bytes = 0;
 };
+
+// Identifies a stop/cancel invoked from the currently executing callback. Such
+// a call cannot synchronously wait for its own dispatch/feed without deadlock;
+// the last operation guard owns deferred cleanup instead.
+#if defined(RAC_HAVE_PROTOBUF)
+thread_local uint64_t g_dispatching_session_id = 0;
+thread_local uint64_t g_draining_stop_session_id = 0;
+
+class StopDrainDispatchScope {
+   public:
+    explicit StopDrainDispatchScope(uint64_t session_id) : previous_(g_draining_stop_session_id) {
+        g_draining_stop_session_id = session_id;
+    }
+    ~StopDrainDispatchScope() { g_draining_stop_session_id = previous_; }
+
+   private:
+    uint64_t previous_;
+};
+#endif
 
 std::mutex& g_mu() {
     static std::mutex m;
@@ -116,24 +169,85 @@ std::unordered_map<uint64_t, StreamSession>& g_sessions() {
     return m;
 }
 
+struct StreamComponentState {
+    bool accepting_sessions = true;
+    uint64_t owner_id = 0;
+    uint64_t stream_epoch = 0;
+};
+
+std::unordered_map<rac_handle_t, StreamComponentState>& g_stream_components() {
+    static std::unordered_map<rac_handle_t, StreamComponentState> m;
+    return m;
+}
+
+uint64_t& g_next_component_generation() {
+    static uint64_t generation = 0;
+    return generation;
+}
+
+uint64_t next_component_generation_locked() {
+    uint64_t& generation = g_next_component_generation();
+    ++generation;
+    if (generation == 0) {
+        ++generation;
+    }
+    return generation;
+}
+
+std::condition_variable& g_stream_component_cv() {
+    static std::condition_variable cv;
+    return cv;
+}
+
+rac::stt::StopFlushAdmissionTestHook& g_stop_flush_admission_test_hook() {
+    static rac::stt::StopFlushAdmissionTestHook hook = nullptr;
+    return hook;
+}
+
+void*& g_stop_flush_admission_test_user_data() {
+    static void* user_data = nullptr;
+    return user_data;
+}
+
+thread_local std::vector<rac_handle_t> g_stream_teardown_stack;
+
+bool current_thread_owns_stream_teardown(rac_handle_t handle) {
+    return std::find(g_stream_teardown_stack.begin(), g_stream_teardown_stack.end(), handle) !=
+           g_stream_teardown_stack.end();
+}
+
+void release_current_thread_stream_teardown(rac_handle_t handle) {
+    const auto it =
+        std::find(g_stream_teardown_stack.rbegin(), g_stream_teardown_stack.rend(), handle);
+    if (it != g_stream_teardown_stack.rend()) {
+        g_stream_teardown_stack.erase(std::next(it).base());
+    }
+}
+
 constexpr int kFallbackFrameMs = 100;
-constexpr int kFallbackSampleRate = 16000;
-constexpr size_t kFallbackFrameBytes =
-    static_cast<size_t>(kFallbackSampleRate * kFallbackFrameMs / 1000) * sizeof(int16_t);
-constexpr size_t kFallbackPreRollBytes = kFallbackFrameBytes * 3;
 constexpr int kFallbackMinSpeechMs = 300;
 constexpr int kFallbackEndSilenceMs = 800;
 constexpr int kFallbackMaxUtteranceMs = 15000;
 constexpr float kFallbackSpeechRms = 0.01f;
 
+size_t fallback_frame_bytes(const StreamSession& session) {
+    const int32_t sample_rate =
+        session.sample_rate > 0 ? session.sample_rate : RAC_STT_DEFAULT_SAMPLE_RATE;
+    return (static_cast<size_t>(sample_rate) * static_cast<size_t>(kFallbackFrameMs) / 1000U) *
+           sizeof(int16_t);
+}
+
 float fallback_frame_rms(const uint8_t* bytes, size_t size) {
     const size_t count = size / sizeof(int16_t);
     if (!bytes || count == 0)
         return 0.0f;
-    const auto* samples = reinterpret_cast<const int16_t*>(bytes);
     double sum = 0.0;
     for (size_t i = 0; i < count; ++i) {
-        const double sample = static_cast<double>(samples[i]);
+        int16_t raw_sample = 0;
+        // The byte accumulator has byte alignment, so read without an
+        // unaligned int16_t reinterpret_cast.
+        std::memcpy(&raw_sample, bytes + i * sizeof(int16_t), sizeof(raw_sample));
+        const double sample = static_cast<double>(raw_sample);
         sum += sample * sample;
     }
     return static_cast<float>(std::sqrt(sum / static_cast<double>(count)) / 32767.0);
@@ -146,29 +260,34 @@ void reset_fallback_utterance(StreamSession& session) {
     session.fallback_silence_ms = 0;
 }
 
-bool feed_fallback_utterance(StreamSession& session, const uint8_t* audio_bytes,
-                             size_t audio_size, bool is_final, std::string* out_audio) {
+bool feed_fallback_utterance(StreamSession& session, const uint8_t* audio_bytes, size_t audio_size,
+                             bool is_final, std::string* out_audio) {
+    const size_t frame_bytes = fallback_frame_bytes(session);
+    const size_t pre_roll_bytes = frame_bytes * 3U;
+    if (frame_bytes == 0) {
+        return false;
+    }
     if (audio_bytes && audio_size > 0) {
         session.fallback_frame_accum.insert(session.fallback_frame_accum.end(), audio_bytes,
                                             audio_bytes + audio_size);
     }
 
-    while (session.fallback_frame_accum.size() >= kFallbackFrameBytes) {
+    while (session.fallback_frame_accum.size() >= frame_bytes) {
         const uint8_t* frame = session.fallback_frame_accum.data();
-        const bool is_speech = fallback_frame_rms(frame, kFallbackFrameBytes) >= kFallbackSpeechRms;
+        const bool is_speech = fallback_frame_rms(frame, frame_bytes) >= kFallbackSpeechRms;
 
         session.fallback_utterance.insert(session.fallback_utterance.end(), frame,
-                                          frame + kFallbackFrameBytes);
+                                          frame + frame_bytes);
         session.fallback_frame_accum.erase(session.fallback_frame_accum.begin(),
                                            session.fallback_frame_accum.begin() +
-                                               static_cast<std::ptrdiff_t>(kFallbackFrameBytes));
+                                               static_cast<std::ptrdiff_t>(frame_bytes));
 
         if (!session.fallback_in_speech) {
-            if (session.fallback_utterance.size() > kFallbackPreRollBytes) {
-                const size_t excess = session.fallback_utterance.size() - kFallbackPreRollBytes;
-                session.fallback_utterance.erase(
-                    session.fallback_utterance.begin(),
-                    session.fallback_utterance.begin() + static_cast<std::ptrdiff_t>(excess));
+            if (session.fallback_utterance.size() > pre_roll_bytes) {
+                const size_t excess = session.fallback_utterance.size() - pre_roll_bytes;
+                session.fallback_utterance.erase(session.fallback_utterance.begin(),
+                                                 session.fallback_utterance.begin() +
+                                                     static_cast<std::ptrdiff_t>(excess));
             }
             if (is_speech) {
                 session.fallback_in_speech = true;
@@ -187,7 +306,9 @@ bool feed_fallback_utterance(StreamSession& session, const uint8_t* audio_bytes,
 
         const int utterance_ms = static_cast<int>(
             session.fallback_utterance.size() * 1000 /
-            (static_cast<size_t>(kFallbackSampleRate) * sizeof(int16_t)));
+            (static_cast<size_t>(session.sample_rate > 0 ? session.sample_rate
+                                                         : RAC_STT_DEFAULT_SAMPLE_RATE) *
+             sizeof(int16_t)));
         if (session.fallback_silence_ms >= kFallbackEndSilenceMs ||
             utterance_ms >= kFallbackMaxUtteranceMs) {
             if (session.fallback_speech_ms >= kFallbackMinSpeechMs) {
@@ -210,8 +331,7 @@ bool feed_fallback_utterance(StreamSession& session, const uint8_t* audio_bytes,
                                               session.fallback_frame_accum.end());
             session.fallback_frame_accum.clear();
         }
-        if (session.fallback_in_speech &&
-            session.fallback_speech_ms >= kFallbackMinSpeechMs &&
+        if (session.fallback_in_speech && session.fallback_speech_ms >= kFallbackMinSpeechMs &&
             !session.fallback_utterance.empty()) {
             out_audio->assign(reinterpret_cast<const char*>(session.fallback_utterance.data()),
                               session.fallback_utterance.size());
@@ -316,8 +436,8 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
 namespace {
 
 rac_result_t transcribe_fallback_utterance(rac_handle_t component_handle, uint64_t session_id,
-                                            const std::string& audio,
-                                            const rac_stt_options_t& options) {
+                                           const std::string& audio,
+                                           const rac_stt_options_t& options) {
     if (!component_handle || audio.empty()) {
         return RAC_SUCCESS;
     }
@@ -360,16 +480,458 @@ rac_result_t transcribe_fallback_utterance(rac_handle_t component_handle, uint64
     const rac_result_t rc = rac_stt_component_transcribe_stream(
         component_handle, audio.data(), audio.size(), &options, bridge, &ctx);
     if (rc != RAC_SUCCESS) {
-        rac::stt::dispatch_stt_stream_event(
-            component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
-            /*partial=*/nullptr, /*final_output=*/nullptr, "STT streaming utterance failed", rc,
-            session_id);
+        rac::stt::dispatch_stt_stream_event(component_handle,
+                                            runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+                                            /*partial=*/nullptr, /*final_output=*/nullptr,
+                                            "STT streaming utterance failed", rc, session_id);
     }
     return rc;
 }
 
+struct SessionCleanupSnapshot {
+    rac_handle_t component_handle = nullptr;
+    rac_handle_t backend_stream_handle = nullptr;
+    std::string request_id;
+    std::string language;
+    int32_t sample_rate = 0;
+    rac_audio_format_enum_t audio_format = RAC_AUDIO_FORMAT_PCM;
+    bool detect_language = false;
+    bool enable_punctuation = true;
+    bool enable_diarization = false;
+    int32_t max_speakers = 0;
+    bool enable_timestamps = true;
+    int64_t started_at_ms = 0;
+    uint64_t chunks_fed = 0;
+    uint64_t audio_bytes = 0;
+    std::string final_utterance;
+};
+
+bool operations_quiescent(const StreamOperationState& state) {
+    return state.in_flight_feeds == 0 && state.in_flight_dispatches == 0;
+}
+
+void publish_session_summary(const SessionCleanupSnapshot& snapshot,
+                             SessionTermination termination) {
+    if (snapshot.chunks_fed == 0) {
+        return;
+    }
+    const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::system_clock::now().time_since_epoch())
+                               .count();
+    runanywhere::v1::VoiceLifecycleEvent voice;
+    voice.set_kind(termination == SessionTermination::kCancel
+                       ? runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED
+                       : runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED);
+    if (snapshot.component_handle) {
+        if (const char* model_id = rac_stt_component_get_model_id(snapshot.component_handle)) {
+            voice.set_model_id(model_id);
+        }
+    }
+    voice.set_is_streaming(true);
+    voice.set_audio_size_bytes(static_cast<int32_t>(snapshot.audio_bytes));
+    if (snapshot.started_at_ms > 0 && now_ms > snapshot.started_at_ms) {
+        voice.set_duration_ms(now_ms - snapshot.started_at_ms);
+    }
+    if (!snapshot.language.empty()) {
+        voice.set_language(snapshot.language);
+    }
+    if (snapshot.sample_rate > 0) {
+        voice.set_sample_rate(snapshot.sample_rate);
+    }
+    rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                      runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
+                                      snapshot.request_id.c_str());
+}
+
+// Called only by the thread that atomically claimed cleanup after all feeds and
+// callback dispatches quiesced. A normal stop may flush the fallback utterance
+// while the session remains addressable; re-entrant stop/cancel cleanup cannot
+// emit after the initiating callback returns, so it skips that optional flush.
+rac_result_t finalize_terminated_session(uint64_t session_id,
+                                         const std::shared_ptr<StreamOperationState>& state,
+                                         bool allow_stop_flush) {
+    SessionTermination termination = SessionTermination::kCancel;
+    bool backend_stream_unsupported = false;
+    {
+        std::lock_guard<std::mutex> operation_lock(state->mutex);
+        termination = state->termination;
+        backend_stream_unsupported = state->backend_stream_unsupported;
+    }
+
+    SessionCleanupSnapshot snapshot;
+    rac::stt::StopFlushAdmissionTestHook stop_flush_hook = nullptr;
+    void* stop_flush_hook_user_data = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it != g_sessions().end() && it->second.operations.get() == state.get()) {
+            StreamSession& session = it->second;
+            snapshot.component_handle = session.handle;
+            snapshot.request_id = session.request_id;
+            snapshot.language = session.language;
+            snapshot.sample_rate = session.sample_rate;
+            snapshot.audio_format = session.audio_format;
+            snapshot.detect_language = session.detect_language;
+            snapshot.enable_punctuation = session.enable_punctuation;
+            snapshot.enable_diarization = session.enable_diarization;
+            snapshot.max_speakers = session.max_speakers;
+            snapshot.enable_timestamps = session.enable_timestamps;
+            snapshot.started_at_ms = session.started_at_ms;
+            snapshot.chunks_fed = session.chunks_fed;
+            snapshot.audio_bytes = session.audio_bytes;
+            if (allow_stop_flush && termination == SessionTermination::kStop &&
+                backend_stream_unsupported) {
+                (void)feed_fallback_utterance(session, nullptr, 0, true, &snapshot.final_utterance);
+            }
+        }
+        if (!snapshot.final_utterance.empty()) {
+            stop_flush_hook = g_stop_flush_admission_test_hook();
+            stop_flush_hook_user_data = g_stop_flush_admission_test_user_data();
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> operation_lock(state->mutex);
+        snapshot.backend_stream_handle = state->backend_stream_handle;
+        state->backend_stream_handle = nullptr;
+    }
+
+    if (stop_flush_hook) {
+        stop_flush_hook(session_id, stop_flush_hook_user_data);
+    }
+
+    // A concurrent cancel that wins before this admission drops the pending
+    // fallback utterance. Once admitted, the provider call is treated like any
+    // other already-accepted work and cancellation waits for it to drain.
+    bool run_stop_flush = false;
+    if (!snapshot.final_utterance.empty()) {
+        std::lock_guard<std::mutex> operation_lock(state->mutex);
+        if (state->termination == SessionTermination::kStop && !state->drop_events) {
+            run_stop_flush = true;
+        } else {
+            snapshot.final_utterance.clear();
+        }
+    }
+
+    rac_result_t flush_rc = RAC_SUCCESS;
+    if (run_stop_flush) {
+        rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+        options.language = snapshot.language.empty() ? nullptr : snapshot.language.c_str();
+        options.detect_language = snapshot.detect_language ? RAC_TRUE : RAC_FALSE;
+        options.enable_punctuation = snapshot.enable_punctuation ? RAC_TRUE : RAC_FALSE;
+        options.enable_diarization = snapshot.enable_diarization ? RAC_TRUE : RAC_FALSE;
+        options.max_speakers = snapshot.max_speakers;
+        options.enable_timestamps = snapshot.enable_timestamps ? RAC_TRUE : RAC_FALSE;
+        options.sample_rate = snapshot.sample_rate;
+        options.audio_format = snapshot.audio_format;
+        StopDrainDispatchScope drain_scope(session_id);
+        flush_rc = transcribe_fallback_utterance(snapshot.component_handle, session_id,
+                                                 snapshot.final_utterance, options);
+    }
+
+    // Close the dispatch gate before erasing the session or destroying its
+    // provider handle. An explicit session id that is missing/closed is always
+    // dropped by dispatch_stt_stream_event below.
+    {
+        std::lock_guard<std::mutex> operation_lock(state->mutex);
+        state->drop_events = true;
+        termination = state->termination;
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it != g_sessions().end() && it->second.operations.get() == state.get()) {
+            g_sessions().erase(it);
+        }
+    }
+    if (snapshot.component_handle && snapshot.backend_stream_handle) {
+        (void)rac_stt_component_stream_destroy(snapshot.component_handle,
+                                               snapshot.backend_stream_handle);
+    }
+    publish_session_summary(snapshot, termination);
+
+    {
+        std::lock_guard<std::mutex> operation_lock(state->mutex);
+        state->cleanup_finished = true;
+    }
+    state->cv.notify_all();
+    return termination == SessionTermination::kCancel ? RAC_SUCCESS : flush_rc;
+}
+
+void release_session_operation(uint64_t session_id,
+                               const std::shared_ptr<StreamOperationState>& state, bool feed) {
+    bool finalize_deferred = false;
+    {
+        std::lock_guard<std::mutex> operation_lock(state->mutex);
+        size_t& count = feed ? state->in_flight_feeds : state->in_flight_dispatches;
+        if (count > 0) {
+            --count;
+        }
+        if (operations_quiescent(*state)) {
+            state->cv.notify_all();
+            if (state->cleanup_deferred && !state->cleanup_claimed) {
+                state->cleanup_claimed = true;
+                finalize_deferred = true;
+            }
+        }
+    }
+    if (finalize_deferred) {
+        (void)finalize_terminated_session(session_id, state, /*allow_stop_flush=*/false);
+    }
+}
+
+class FeedOperationGuard {
+   public:
+    FeedOperationGuard(uint64_t session_id, std::shared_ptr<StreamOperationState> state)
+        : session_id_(session_id), state_(std::move(state)) {}
+    ~FeedOperationGuard() {
+        if (state_) {
+            release_session_operation(session_id_, state_, /*feed=*/true);
+        }
+    }
+    FeedOperationGuard(const FeedOperationGuard&) = delete;
+    FeedOperationGuard& operator=(const FeedOperationGuard&) = delete;
+
+   private:
+    uint64_t session_id_;
+    std::shared_ptr<StreamOperationState> state_;
+};
+
+class DispatchOperationGuard {
+   public:
+    DispatchOperationGuard(uint64_t session_id, std::shared_ptr<StreamOperationState> state)
+        : session_id_(session_id), state_(std::move(state)) {}
+    ~DispatchOperationGuard() {
+        if (state_) {
+            release_session_operation(session_id_, state_, /*feed=*/false);
+        }
+    }
+    DispatchOperationGuard(const DispatchOperationGuard&) = delete;
+    DispatchOperationGuard& operator=(const DispatchOperationGuard&) = delete;
+
+   private:
+    uint64_t session_id_;
+    std::shared_ptr<StreamOperationState> state_;
+};
+
+class DispatchSessionScope {
+   public:
+    explicit DispatchSessionScope(uint64_t session_id) : previous_(g_dispatching_session_id) {
+        g_dispatching_session_id = session_id;
+    }
+    ~DispatchSessionScope() { g_dispatching_session_id = previous_; }
+
+   private:
+    uint64_t previous_;
+};
+
+class DispatchDepthScope {
+   public:
+    DispatchDepthScope() { ++g_dispatch_depth; }
+    ~DispatchDepthScope() { --g_dispatch_depth; }
+
+    DispatchDepthScope(const DispatchDepthScope&) = delete;
+    DispatchDepthScope& operator=(const DispatchDepthScope&) = delete;
+};
+
+rac_result_t terminate_stream_session(uint64_t session_id, SessionTermination requested) {
+    std::shared_ptr<StreamOperationState> state;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it == g_sessions().end()) {
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        it->second.is_cancelled.store(true, std::memory_order_release);
+        state = it->second.operations;
+    }
+
+    const bool reentrant = g_dispatching_session_id == session_id;
+    {
+        std::unique_lock<std::mutex> operation_lock(state->mutex);
+        if (state->termination == SessionTermination::kActive ||
+            requested == SessionTermination::kCancel) {
+            state->termination = requested;
+        }
+        if (requested == SessionTermination::kCancel || reentrant) {
+            // Cancellation is fail-closed immediately. A re-entrant stop must
+            // also suppress anything after its current callback because it
+            // cannot wait for itself before returning.
+            state->drop_events = true;
+        }
+
+        if (reentrant) {
+            if (!state->cleanup_claimed) {
+                state->cleanup_deferred = true;
+            }
+            return RAC_SUCCESS;
+        }
+
+        state->cv.wait(operation_lock,
+                       [&] { return operations_quiescent(*state) || state->cleanup_claimed; });
+        if (state->cleanup_claimed) {
+            state->cv.wait(operation_lock, [&] { return state->cleanup_finished; });
+            return RAC_SUCCESS;
+        }
+        state->cleanup_claimed = true;
+    }
+
+    const bool allow_stop_flush = requested == SessionTermination::kStop;
+    return finalize_terminated_session(session_id, state, allow_stop_flush);
+}
+
 }  // namespace
 #endif
+
+namespace rac::stt {
+
+void register_stream_component(rac_handle_t handle) {
+    if (!handle) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(g_mu());
+    const uint64_t owner_id = next_component_generation_locked();
+    g_stream_components()[handle] = StreamComponentState{
+        .accepting_sessions = true,
+        .owner_id = owner_id,
+        .stream_epoch = owner_id,
+    };
+}
+
+void unregister_stream_component(rac_handle_t handle) {
+    if (!handle) {
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        g_slots().erase(handle);
+        g_stream_components().erase(handle);
+    }
+    release_current_thread_stream_teardown(handle);
+    g_stream_component_cv().notify_all();
+}
+
+rac_result_t begin_stream_component_teardown(rac_handle_t handle) {
+    if (!handle) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    if (current_thread_owns_stream_teardown(handle)) {
+        return RAC_ERROR_SERVICE_BUSY;
+    }
+
+#if defined(RAC_HAVE_PROTOBUF)
+    std::vector<uint64_t> session_ids;
+#endif
+    {
+        std::unique_lock<std::mutex> lock(g_mu());
+        auto component = g_stream_components().find(handle);
+        if (component == g_stream_components().end()) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
+        const uint64_t owner_id = component->second.owner_id;
+#if defined(RAC_HAVE_PROTOBUF)
+        if (g_dispatching_session_id != 0) {
+            auto dispatching = g_sessions().find(g_dispatching_session_id);
+            if (dispatching != g_sessions().end() && dispatching->second.handle == handle) {
+                // A callback cannot synchronously wait for its own feed and
+                // dispatch to drain. Refuse the lifecycle mutation instead of
+                // deadlocking or tearing the model down beneath that callback.
+                return RAC_ERROR_SERVICE_BUSY;
+            }
+        }
+#endif
+        g_stream_component_cv().wait(lock, [&] {
+            const auto current = g_stream_components().find(handle);
+            return current == g_stream_components().end() || current->second.owner_id != owner_id ||
+                   current->second.accepting_sessions;
+        });
+        component = g_stream_components().find(handle);
+        if (component == g_stream_components().end() || component->second.owner_id != owner_id) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
+        component->second.accepting_sessions = false;
+        component->second.stream_epoch = next_component_generation_locked();
+        g_stream_teardown_stack.push_back(handle);
+#if defined(RAC_HAVE_PROTOBUF)
+        for (const auto& [session_id, session] : g_sessions()) {
+            if (session.handle == handle) {
+                session_ids.push_back(session_id);
+            }
+        }
+#endif
+    }
+
+#if defined(RAC_HAVE_PROTOBUF)
+    for (uint64_t session_id : session_ids) {
+        const rac_result_t rc = terminate_stream_session(session_id, SessionTermination::kCancel);
+        if (rc != RAC_SUCCESS && rc != RAC_ERROR_INVALID_ARGUMENT) {
+            end_stream_component_teardown(handle);
+            return rc;
+        }
+    }
+#endif
+    return RAC_SUCCESS;
+}
+
+void end_stream_component_teardown(rac_handle_t handle) {
+    if (!handle) {
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto component = g_stream_components().find(handle);
+        if (component != g_stream_components().end()) {
+            component->second.accepting_sessions = true;
+        }
+    }
+    release_current_thread_stream_teardown(handle);
+    g_stream_component_cv().notify_all();
+}
+
+void set_stop_flush_admission_test_hook(StopFlushAdmissionTestHook hook, void* user_data) {
+    std::lock_guard<std::mutex> lock(g_mu());
+    g_stop_flush_admission_test_hook() = hook;
+    g_stop_flush_admission_test_user_data() = user_data;
+}
+
+bool stream_session_termination_started_for_testing(uint64_t session_id) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)session_id;
+    return false;
+#else
+    std::lock_guard<std::mutex> lock(g_mu());
+    const auto session = g_sessions().find(session_id);
+    if (session == g_sessions().end()) {
+        return false;
+    }
+    std::lock_guard<std::mutex> operation_lock(session->second.operations->mutex);
+    return session->second.operations->termination != SessionTermination::kActive;
+#endif
+}
+
+bool stream_session_cancel_requested_for_testing(uint64_t session_id) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)session_id;
+    return false;
+#else
+    std::lock_guard<std::mutex> lock(g_mu());
+    const auto session = g_sessions().find(session_id);
+    if (session == g_sessions().end()) {
+        return false;
+    }
+    std::lock_guard<std::mutex> operation_lock(session->second.operations->mutex);
+    return session->second.operations->termination == SessionTermination::kCancel;
+#endif
+}
+
+bool has_stream_callback_for_testing(rac_handle_t handle) {
+    std::lock_guard<std::mutex> lock(g_mu());
+    const auto slot = g_slots().find(handle);
+    return slot != g_slots().end() && slot->second.fn != nullptr;
+}
+
+}  // namespace rac::stt
 
 extern "C" {
 
@@ -383,6 +945,13 @@ rac_result_t rac_stt_set_stream_proto_callback(rac_handle_t handle,
     if (callback == nullptr) {
         g_slots().erase(handle);
     } else {
+        const auto component = g_stream_components().find(handle);
+        if (component == g_stream_components().end()) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
+        if (!component->second.accepting_sessions) {
+            return RAC_ERROR_SERVICE_BUSY;
+        }
         g_slots()[handle] = rac::stream::CallbackSlot<rac_stt_stream_proto_callback_fn>{
             .fn = callback, .user_data = user_data, .seq = 0};
     }
@@ -405,7 +974,11 @@ rac_result_t rac_stt_unset_stream_proto_callback(rac_handle_t handle) {
 // tearing down the STT component, MUST call this after the unset to avoid
 // a use-after-free in the dispatch thread.
 void rac_stt_proto_quiesce(void) {
-    while (g_in_flight.load(std::memory_order_acquire) > 0) {
+    // A callback may unregister itself and quiesce re-entrantly. Its own
+    // InFlightGuard cannot retire until that callback returns, so wait for all
+    // *other* dispatches rather than spinning forever on the current stack.
+    const int current_thread_dispatches = g_dispatch_depth;
+    while (g_in_flight.load(std::memory_order_acquire) > current_thread_dispatches) {
         std::this_thread::yield();
     }
 }
@@ -416,15 +989,30 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         return RAC_ERROR_INVALID_HANDLE;
     if (out_session_id == nullptr)
         return RAC_ERROR_NULL_POINTER;
+    *out_session_id = 0;
     if (options_proto_size > 0 && options_proto_bytes == nullptr) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)options_proto_bytes;
     (void)options_proto_size;
-    *out_session_id = 0;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
+    uint64_t component_owner_id = 0;
+    uint64_t component_stream_epoch = 0;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        const auto component = g_stream_components().find(handle);
+        if (component == g_stream_components().end()) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
+        if (!component->second.accepting_sessions) {
+            return RAC_ERROR_SERVICE_BUSY;
+        }
+        component_owner_id = component->second.owner_id;
+        component_stream_epoch = component->second.stream_epoch;
+    }
+
     runanywhere::v1::STTOptions parsed;
     if (options_proto_size > 0 &&
         !parsed.ParseFromArray(options_proto_bytes, static_cast<int>(options_proto_size))) {
@@ -434,6 +1022,17 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
     const uint64_t id = g_session_ids.next();
     {
         std::lock_guard<std::mutex> lock(g_mu());
+        const auto component = g_stream_components().find(handle);
+        if (component == g_stream_components().end()) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
+        if (component->second.owner_id != component_owner_id) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
+        if (!component->second.accepting_sessions ||
+            component->second.stream_epoch != component_stream_epoch) {
+            return RAC_ERROR_SERVICE_BUSY;
+        }
         StreamSession& s = g_sessions()[id];
         s.handle = handle;
         s.request_id = "stt-" + std::to_string(id);
@@ -475,27 +1074,41 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         switch (parsed.audio_format()) {
             case runanywhere::v1::AUDIO_FORMAT_WAV:
                 s.audio_format = RAC_AUDIO_FORMAT_WAV;
+                s.accepts_raw_pcm_s16le = false;
                 break;
             case runanywhere::v1::AUDIO_FORMAT_MP3:
                 s.audio_format = RAC_AUDIO_FORMAT_MP3;
+                s.accepts_raw_pcm_s16le = false;
                 break;
             case runanywhere::v1::AUDIO_FORMAT_OPUS:
                 s.audio_format = RAC_AUDIO_FORMAT_OPUS;
+                s.accepts_raw_pcm_s16le = false;
                 break;
             case runanywhere::v1::AUDIO_FORMAT_AAC:
                 s.audio_format = RAC_AUDIO_FORMAT_AAC;
+                s.accepts_raw_pcm_s16le = false;
                 break;
             case runanywhere::v1::AUDIO_FORMAT_FLAC:
                 s.audio_format = RAC_AUDIO_FORMAT_FLAC;
+                s.accepts_raw_pcm_s16le = false;
+                break;
+            case runanywhere::v1::AUDIO_FORMAT_OGG:
+            case runanywhere::v1::AUDIO_FORMAT_M4A:
+                // No C enum equivalents exist. Preserve the public C options
+                // default while retaining the proto format as unsupported for
+                // raw stream ingestion via the explicit policy flag.
+                s.audio_format = RAC_AUDIO_FORMAT_PCM;
+                s.accepts_raw_pcm_s16le = false;
                 break;
             case runanywhere::v1::AUDIO_FORMAT_PCM:
             case runanywhere::v1::AUDIO_FORMAT_PCM_S16LE:
             case runanywhere::v1::AUDIO_FORMAT_UNSPECIFIED:
-            default:
-                // Container formats with no C enum equivalent (OGG, M4A) and
-                // proto3 unset default both map to PCM, mirroring
-                // audio_format_from_proto() in rac_proto_adapters.cpp.
                 s.audio_format = RAC_AUDIO_FORMAT_PCM;
+                s.accepts_raw_pcm_s16le = true;
+                break;
+            default:
+                s.audio_format = RAC_AUDIO_FORMAT_PCM;
+                s.accepts_raw_pcm_s16le = false;
                 break;
         }
         // STTOptions.beam_size and .max_alternatives have no equivalent slots
@@ -532,6 +1145,8 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     bool enable_timestamps = true;
     int32_t sample_rate = RAC_STT_DEFAULT_SAMPLE_RATE;
     rac_audio_format_enum_t audio_format = RAC_AUDIO_FORMAT_PCM;
+    bool accepts_raw_pcm_s16le = true;
+    std::shared_ptr<StreamOperationState> operation_state;
     rac_handle_t backend_stream_handle = nullptr;
     bool backend_stream_unsupported = false;
     std::string request_id;
@@ -553,21 +1168,57 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         enable_timestamps = it->second.enable_timestamps;
         sample_rate = it->second.sample_rate;
         audio_format = it->second.audio_format;
-        backend_stream_handle = it->second.backend_stream_handle;
-        backend_stream_unsupported = it->second.backend_stream_unsupported;
+        accepts_raw_pcm_s16le = it->second.accepts_raw_pcm_s16le;
+        operation_state = it->second.operations;
         request_id = it->second.request_id;
-        if (audio_size > 0) {
-            // Aggregate for the one summary telemetry row emitted at stop.
-            first_chunk = (it->second.chunks_fed == 0);
-            it->second.chunks_fed += 1;
-            it->second.audio_bytes += audio_size;
-        }
     }
     if (component_handle == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     if (audio_size == 0) {
         return RAC_SUCCESS;
+    }
+    if (!accepts_raw_pcm_s16le) {
+        rac::stt::dispatch_stt_stream_event(
+            component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+            /*partial=*/nullptr, /*final_output=*/nullptr,
+            "STT stream ingestion requires signed 16-bit little-endian PCM audio",
+            RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED, session_id);
+        return RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED;
+    }
+    if (audio_size % sizeof(int16_t) != 0) {
+        rac::stt::dispatch_stt_stream_event(
+            component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+            /*partial=*/nullptr, /*final_output=*/nullptr,
+            "STT signed 16-bit PCM input must contain whole samples", RAC_ERROR_INVALID_ARGUMENT,
+            session_id);
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // Own one feed operation before accounting, event emission, provider
+    // creation/feed, and fallback mutation. stop/cancel closes this gate before
+    // waiting, so a provider handle cannot be destroyed between the snapshot
+    // above and its eventual use below.
+    {
+        std::lock_guard<std::mutex> operation_lock(operation_state->mutex);
+        if (operation_state->termination != SessionTermination::kActive) {
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        ++operation_state->in_flight_feeds;
+        backend_stream_handle = operation_state->backend_stream_handle;
+        backend_stream_unsupported = operation_state->backend_stream_unsupported;
+    }
+    FeedOperationGuard feed_guard(session_id, operation_state);
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it == g_sessions().end() || it->second.operations.get() != operation_state.get()) {
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        // Aggregate for the one summary telemetry row emitted at stop.
+        first_chunk = (it->second.chunks_fed == 0);
+        it->second.chunks_fed += 1;
+        it->second.audio_bytes += audio_size;
     }
 
     // Session-level started — pairs with the one STT_COMPLETED summary emitted
@@ -616,33 +1267,39 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
             rac_result_t create_rc =
                 rac_stt_component_stream_create(component_handle, &options, &new_stream);
             if (create_rc == RAC_SUCCESS && new_stream != nullptr) {
-                std::lock_guard<std::mutex> lock(g_mu());
-                auto it = g_sessions().find(session_id);
-                if (it == g_sessions().end() ||
-                    it->second.is_cancelled.load(std::memory_order_relaxed)) {
-                    // Session torn down while we were creating — drop the
-                    // freshly-allocated backend handle so we don't leak.
-                    (void)rac_stt_component_stream_destroy(component_handle, new_stream);
-                    return RAC_ERROR_INVALID_ARGUMENT;
+                rac_handle_t redundant_stream = nullptr;
+                bool cancelled = false;
+                {
+                    std::lock_guard<std::mutex> operation_lock(operation_state->mutex);
+                    cancelled = operation_state->termination == SessionTermination::kCancel;
+                    if (cancelled) {
+                        redundant_stream = new_stream;
+                    } else if (operation_state->backend_stream_handle != nullptr) {
+                        // Another concurrent feed may have raced us; keep the
+                        // first-in-wins handle and destroy ours if so.
+                        redundant_stream = new_stream;
+                        backend_stream_handle = operation_state->backend_stream_handle;
+                    } else {
+                        operation_state->backend_stream_handle = new_stream;
+                        backend_stream_handle = new_stream;
+                    }
                 }
-                // Another concurrent feed may have raced us; keep the
-                // first-in-wins handle and destroy ours if so.
-                if (it->second.backend_stream_handle != nullptr) {
-                    (void)rac_stt_component_stream_destroy(component_handle, new_stream);
-                    backend_stream_handle = it->second.backend_stream_handle;
-                } else {
-                    it->second.backend_stream_handle = new_stream;
-                    backend_stream_handle = new_stream;
+                if (redundant_stream != nullptr) {
+                    (void)rac_stt_component_stream_destroy(component_handle, redundant_stream);
+                }
+                if (cancelled) {
+                    return RAC_ERROR_INVALID_ARGUMENT;
                 }
             } else if (create_rc == RAC_ERROR_NOT_SUPPORTED) {
                 // Backend didn't wire the new slot — remember so subsequent
                 // chunks skip the create probe and take the legacy path
                 // straight away.
-                std::lock_guard<std::mutex> lock(g_mu());
-                auto it = g_sessions().find(session_id);
-                if (it != g_sessions().end()) {
-                    it->second.backend_stream_unsupported = true;
+                std::lock_guard<std::mutex> operation_lock(operation_state->mutex);
+                if (operation_state->termination == SessionTermination::kCancel) {
+                    return RAC_ERROR_INVALID_ARGUMENT;
                 }
+                operation_state->backend_stream_unsupported = true;
+                backend_stream_unsupported = true;
             } else {
                 rac::stt::dispatch_stt_stream_event(
                     component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
@@ -656,8 +1313,9 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
             // audio_size is in bytes; convert to Int16 sample count. We
             // assume Int16 PCM mono — matches rac_audio_format_enum_t /
             // RAC_AUDIO_FORMAT_PCM which every current STT backend expects.
-            const int16_t* samples = reinterpret_cast<const int16_t*>(audio_bytes);
             const size_t count = audio_size / sizeof(int16_t);
+            std::vector<int16_t> aligned_samples(count);
+            std::memcpy(aligned_samples.data(), audio_bytes, audio_size);
 
             struct BridgeCtxStream {
                 rac_handle_t handle;
@@ -692,7 +1350,8 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
             };
 
             rac_result_t feed_rc = rac_stt_component_stream_feed_audio_chunk(
-                component_handle, backend_stream_handle, samples, count, bridge, &ctx);
+                component_handle, backend_stream_handle, aligned_samples.data(), count, bridge,
+                &ctx);
             if (feed_rc != RAC_SUCCESS) {
                 rac::stt::dispatch_stt_stream_event(
                     component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
@@ -711,8 +1370,7 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
-        if (it == g_sessions().end() ||
-            it->second.is_cancelled.load(std::memory_order_relaxed)) {
+        if (it == g_sessions().end() || it->second.operations.get() != operation_state.get()) {
             return RAC_ERROR_INVALID_ARGUMENT;
         }
         if (!feed_fallback_utterance(it->second, audio_bytes, audio_size, false, &utterance)) {
@@ -726,176 +1384,21 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
 rac_result_t rac_stt_stream_stop_proto(uint64_t session_id) {
     if (session_id == 0)
         return RAC_ERROR_INVALID_ARGUMENT;
-
-    // Detach the session's backend handle under the lock, then destroy it
-    // outside of g_mu() to avoid holding the lock across a backend cleanup
-    // path that may re-enter commons.
-    rac_handle_t component_handle = nullptr;
-    rac_handle_t backend_stream_handle = nullptr;
-    std::string request_id;
-    std::string language;
-    int32_t sample_rate = 0;
-    rac_audio_format_enum_t audio_format = RAC_AUDIO_FORMAT_PCM;
-    bool detect_language = false;
-    bool enable_punctuation = true;
-    bool enable_diarization = false;
-    int32_t max_speakers = 0;
-    bool enable_timestamps = true;
-    int64_t started_at_ms = 0;
-    uint64_t chunks_fed = 0;
-    uint64_t audio_bytes = 0;
-    std::string final_utterance;
-    {
-        std::lock_guard<std::mutex> lock(g_mu());
-        auto it = g_sessions().find(session_id);
-        if (it == g_sessions().end())
-            return RAC_ERROR_INVALID_ARGUMENT;
-        // Reject any racing feed while final-flush inference runs, but keep
-        // the session in the map until callback dispatch has copied its
-        // request id.
-        it->second.is_cancelled.store(true, std::memory_order_relaxed);
-        component_handle = it->second.handle;
-        backend_stream_handle = it->second.backend_stream_handle;
-        it->second.backend_stream_handle = nullptr;
-        request_id = it->second.request_id;
-        language = it->second.language;
-        sample_rate = it->second.sample_rate;
-        audio_format = it->second.audio_format;
-        detect_language = it->second.detect_language;
-        enable_punctuation = it->second.enable_punctuation;
-        enable_diarization = it->second.enable_diarization;
-        max_speakers = it->second.max_speakers;
-        enable_timestamps = it->second.enable_timestamps;
-        started_at_ms = it->second.started_at_ms;
-        chunks_fed = it->second.chunks_fed;
-        audio_bytes = it->second.audio_bytes;
-        if (it->second.backend_stream_unsupported) {
-            (void)feed_fallback_utterance(it->second, nullptr, 0, true, &final_utterance);
-        }
-    }
-    rac_result_t flush_rc = RAC_SUCCESS;
-    if (!final_utterance.empty()) {
-        rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
-        options.language = language.empty() ? nullptr : language.c_str();
-        options.detect_language = detect_language ? RAC_TRUE : RAC_FALSE;
-        options.enable_punctuation = enable_punctuation ? RAC_TRUE : RAC_FALSE;
-        options.enable_diarization = enable_diarization ? RAC_TRUE : RAC_FALSE;
-        options.max_speakers = max_speakers;
-        options.enable_timestamps = enable_timestamps ? RAC_TRUE : RAC_FALSE;
-        options.sample_rate = sample_rate;
-        options.audio_format = audio_format;
-        flush_rc = transcribe_fallback_utterance(component_handle, session_id, final_utterance,
-                                                 options);
-    }
-    {
-        std::lock_guard<std::mutex> lock(g_mu());
-        g_sessions().erase(session_id);
-    }
-    if (component_handle && backend_stream_handle) {
-        (void)rac_stt_component_stream_destroy(component_handle, backend_stream_handle);
-    }
-
 #if defined(RAC_HAVE_PROTOBUF)
-    // ONE telemetry summary per streaming session. Per-chunk events are
-    // PUBLIC-only (they were producing telemetry rows + an HTTP flush per
-    // chunk); this row carries the session aggregates instead.
-    if (chunks_fed > 0) {
-        const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                   std::chrono::system_clock::now().time_since_epoch())
-                                   .count();
-        runanywhere::v1::VoiceLifecycleEvent voice;
-        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED);
-        if (component_handle) {
-            if (const char* model_id = rac_stt_component_get_model_id(component_handle)) {
-                voice.set_model_id(model_id);
-            }
-        }
-        voice.set_is_streaming(true);
-        voice.set_audio_size_bytes(static_cast<int32_t>(audio_bytes));
-        // Session wall-clock duration; chunk count rides on segment-less
-        // word_count-free schema via audio size + duration.
-        if (started_at_ms > 0 && now_ms > started_at_ms) {
-            voice.set_duration_ms(now_ms - started_at_ms);
-        }
-        if (!language.empty()) {
-            voice.set_language(language);
-        }
-        if (sample_rate > 0) {
-            voice.set_sample_rate(sample_rate);
-        }
-        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
-                                          runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
-                                          request_id.c_str());
-    }
+    return terminate_stream_session(session_id, SessionTermination::kStop);
+#else
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #endif
-    return flush_rc;
 }
 
 rac_result_t rac_stt_stream_cancel_proto(uint64_t session_id) {
     if (session_id == 0)
         return RAC_ERROR_INVALID_ARGUMENT;
-
-    rac_handle_t component_handle = nullptr;
-    rac_handle_t backend_stream_handle = nullptr;
-    std::string request_id;
-    std::string language;
-    int32_t sample_rate = 0;
-    int64_t started_at_ms = 0;
-    uint64_t chunks_fed = 0;
-    uint64_t audio_bytes = 0;
-    {
-        std::lock_guard<std::mutex> lock(g_mu());
-        auto it = g_sessions().find(session_id);
-        if (it == g_sessions().end())
-            return RAC_ERROR_INVALID_ARGUMENT;
-        it->second.is_cancelled.store(true, std::memory_order_relaxed);
-        component_handle = it->second.handle;
-        backend_stream_handle = it->second.backend_stream_handle;
-        it->second.backend_stream_handle = nullptr;
-        request_id = it->second.request_id;
-        language = it->second.language;
-        sample_rate = it->second.sample_rate;
-        started_at_ms = it->second.started_at_ms;
-        chunks_fed = it->second.chunks_fed;
-        audio_bytes = it->second.audio_bytes;
-        g_sessions().erase(it);
-    }
-    if (component_handle && backend_stream_handle) {
-        (void)rac_stt_component_stream_destroy(component_handle, backend_stream_handle);
-    }
-
 #if defined(RAC_HAVE_PROTOBUF)
-    // ONE telemetry summary per streaming session — mirror stop_proto, but mark
-    // the session FAILED. The Kotlin streaming path calls cancel (not stop) on
-    // cancellation/feed errors, so this is the only summary those sessions get.
-    if (chunks_fed > 0) {
-        const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                   std::chrono::system_clock::now().time_since_epoch())
-                                   .count();
-        runanywhere::v1::VoiceLifecycleEvent voice;
-        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED);
-        if (component_handle) {
-            if (const char* model_id = rac_stt_component_get_model_id(component_handle)) {
-                voice.set_model_id(model_id);
-            }
-        }
-        voice.set_is_streaming(true);
-        voice.set_audio_size_bytes(static_cast<int32_t>(audio_bytes));
-        if (started_at_ms > 0 && now_ms > started_at_ms) {
-            voice.set_duration_ms(now_ms - started_at_ms);
-        }
-        if (!language.empty()) {
-            voice.set_language(language);
-        }
-        if (sample_rate > 0) {
-            voice.set_sample_rate(sample_rate);
-        }
-        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
-                                          runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
-                                          request_id.c_str());
-    }
+    return terminate_stream_session(session_id, SessionTermination::kCancel);
+#else
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #endif
-    return RAC_SUCCESS;
 }
 
 }  // extern "C"
@@ -926,13 +1429,13 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
     rac::stream::CallbackSlot<rac_stt_stream_proto_callback_fn> slot;
     uint64_t seq = 0;
     std::string request_id;
+    uint64_t correlated_session_id = session_id;
+    std::shared_ptr<StreamOperationState> operation_state;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_slots().find(handle);
         if (it == g_slots().end() || it->second.fn == nullptr)
             return;
-        slot = it->second;
-        seq = ++(it->second.seq);
         // Prefer the caller-supplied session_id when known so events stay
         // bound to the producing session even with multiple concurrent
         // sessions on the same component handle. Fall back to the legacy
@@ -940,20 +1443,44 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
         // threaded through (e.g. legacy callbacks emitting handle-only).
         if (session_id != 0) {
             auto sit = g_sessions().find(session_id);
-            if (sit != g_sessions().end() && sit->second.handle == handle) {
-                request_id = sit->second.request_id;
+            if (sit == g_sessions().end() || sit->second.handle != handle) {
+                // Never relabel a late explicit-session event onto another
+                // session sharing the same component handle.
+                return;
             }
+            request_id = sit->second.request_id;
+            operation_state = sit->second.operations;
         }
-        if (request_id.empty()) {
-            for (const auto& [_, session] : g_sessions()) {
+        if (session_id == 0) {
+            for (const auto& [candidate_id, session] : g_sessions()) {
                 if (session.handle == handle &&
                     !session.is_cancelled.load(std::memory_order_relaxed)) {
                     request_id = session.request_id;
+                    correlated_session_id = candidate_id;
+                    operation_state = session.operations;
                     break;
                 }
             }
         }
+        if (operation_state) {
+            std::lock_guard<std::mutex> operation_lock(operation_state->mutex);
+            const bool draining_accepted_feed =
+                operation_state->termination == SessionTermination::kStop &&
+                operation_state->in_flight_feeds > 0;
+            const bool draining_stop_flush =
+                operation_state->termination == SessionTermination::kStop &&
+                g_draining_stop_session_id == correlated_session_id;
+            if (operation_state->drop_events || operation_state->cleanup_finished ||
+                (operation_state->termination != SessionTermination::kActive &&
+                 !draining_accepted_feed && !draining_stop_flush)) {
+                return;
+            }
+            ++operation_state->in_flight_dispatches;
+        }
+        slot = it->second;
+        seq = ++(it->second.seq);
     }
+    DispatchOperationGuard dispatch_guard(correlated_session_id, operation_state);
 
     thread_local runanywhere::v1::STTStreamEvent proto_event;
     thread_local std::vector<uint8_t> scratch;
@@ -985,6 +1512,8 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
         RAC_LOG_WARNING("stt", "dispatch_stt_stream_event: SerializeToArray failed");
         return;
     }
+    DispatchSessionScope dispatch_scope(correlated_session_id);
+    DispatchDepthScope dispatch_depth_scope;
     slot.fn(scratch.data(), needed, slot.user_data);
 }
 

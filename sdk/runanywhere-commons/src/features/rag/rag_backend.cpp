@@ -626,7 +626,6 @@ rac_result_t RAGBackend::cancel_query() {
     if (!active_query_cancel_) {
         // Idempotent idle cancellation must not affect a future query or its
         // provider session.
-        LOGI("Cancel requested while no RAG query is active");
         return RAC_SUCCESS;
     }
     active_query_cancel_->store(true, std::memory_order_release);
@@ -636,7 +635,6 @@ rac_result_t RAGBackend::cancel_query() {
     // retire and publish a successor between selecting the token and issuing
     // its native cancel.
     const rac_result_t rc = llm_service_ ? rac_llm_cancel(llm_service_) : RAC_SUCCESS;
-    LOGI("Active RAG query cancellation routed to LLM service (rc=%d)", static_cast<int>(rc));
     return rc;
 }
 

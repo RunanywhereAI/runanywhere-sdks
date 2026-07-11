@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.runanywhere.runanywhereai.data.security.migrateSensitiveString
 import com.runanywhere.runanywhereai.data.security.securePreferences
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.hybrid.Cloud
@@ -15,6 +16,7 @@ import kotlinx.serialization.json.Json
 // the SDK (Cloud.registerProvider + Cloud.register). The provider name and the
 // router registry id are the same per-config unique string.
 object CloudProviderRepository {
+    private const val LEGACY_PREFS = "cloud_providers"
     private const val SECURE_PREFS = "cloud_secure_providers"
     private const val KEY_LIST = "providers"
 
@@ -28,22 +30,44 @@ object CloudProviderRepository {
     val defaultProviderId: String?
         get() = providers.firstOrNull()?.id
 
-    fun initialize(context: Context) {
+    fun initialize(context: Context) = initialize(context, ::securePreferences)
+
+    internal fun initialize(
+        context: Context,
+        securePreferencesFactory: (Context, String) -> SharedPreferences,
+    ) {
         if (prefs != null) return
-        val secure = runCatching { securePreferences(context, SECURE_PREFS) }
+        val secure = runCatching { securePreferencesFactory(context, SECURE_PREFS) }
             .onFailure { RACLog.w("Secure cloud-provider storage unavailable; providers cannot be loaded or saved") }
             .getOrNull()
         if (secure == null) {
             providers = emptyList()
             return
         }
-        providers = runCatching {
-            secure.getString(KEY_LIST, null)?.let { json.decodeFromString(serializer, it) }.orEmpty()
-        }.onSuccess {
-            prefs = secure
-        }.onFailure {
-            RACLog.w("Secure cloud-provider storage could not be read; providers are unavailable")
-        }.getOrDefault(emptyList())
+        val legacy = context.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE)
+        val migration = migrateSensitiveString(
+            readSecure = { secure.getString(KEY_LIST, null) },
+            readLegacy = { legacy.getString(KEY_LIST, null) },
+            writeSecure = { secure.edit().putString(KEY_LIST, it).commit() },
+            removeLegacy = { legacy.edit().remove(KEY_LIST).commit() },
+            validate = { encoded ->
+                runCatching { json.decodeFromString(serializer, encoded) }.isSuccess
+            },
+        )
+        if (migration.failure != null) {
+            RACLog.w("cloud_provider_credential_migration_${migration.failure.name.lowercase()}")
+        }
+        providers = migration.value?.let { encoded ->
+            runCatching { json.decodeFromString(serializer, encoded) }
+                .onFailure { RACLog.w("secure_cloud_provider_value_invalid") }
+                .getOrDefault(emptyList())
+        }.orEmpty()
+        prefs = secure
+    }
+
+    internal fun resetForTesting() {
+        prefs = null
+        providers = emptyList()
     }
 
     // Register every saved provider with the SDK. Call once after RunAnywhere.initialize.

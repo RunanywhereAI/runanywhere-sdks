@@ -96,11 +96,17 @@ void fill_inputs(qhx_inputs* in, const char* prompt, const rac_llm_options_t* o)
         in->history = o->history;
         in->n_history = o->n_history;
     }
-    // QHexRT owns chat templating, so forward the semantic hard switch instead of trying to synthesize an
-    // assistant prefill in this backend adapter. The runtime applies it only to model families with a known
-    // hard non-thinking template (currently Qwen3.5); all other models retain their previous behavior.
-    if (o != nullptr && o->disable_thinking != RAC_FALSE) {
-        in->disable_thinking = 1;
+}
+
+void fill_generate_options(qhx_generate_options* out, const rac_llm_options_t* options) {
+    qhx_generate_options_default(out);
+    // QHexRT owns chat templating, so forward the semantic hard switch through
+    // the additive, size-versioned request options API. Keeping this policy out
+    // of qhx_inputs preserves the original stable C struct layout for legacy
+    // callers while supported models (currently Qwen3.5) receive the hard
+    // non-thinking assistant prefill.
+    if (options != nullptr && options->disable_thinking != RAC_FALSE) {
+        out->disable_thinking = 1;
     }
 }
 
@@ -144,6 +150,14 @@ struct StopCtx {
     Session* session;
     uint64_t request_id;
 };
+
+int should_cancel_trampoline(void* user) {
+    auto* c = static_cast<StopCtx*>(user);
+    return c != nullptr && c->session != nullptr &&
+                   c->session->llm_requests.is_cancelled(c->request_id)
+               ? 1
+               : 0;
+}
 
 int stop_trampoline(void* user, const char* /*utf8*/, int /*len*/, int /*token_id*/,
                     int /*is_final*/) {
@@ -227,9 +241,14 @@ rac_result_t qhexrt_llm_generate(void* impl, const char* prompt, const rac_llm_o
         fill_inputs(&in, prompt, options);
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
+        qhx_generate_options generate_options;
+        fill_generate_options(&generate_options, options);
         StopCtx stop_ctx{c, request.id()};
+        generate_options.should_cancel = should_cancel_trampoline;
+        generate_options.should_cancel_user = &stop_ctx;
         qhx_output out{};
-        qhx_status st = qhx_generate(c->sess, &in, &cfg, stop_trampoline, &stop_ctx, &out);
+        qhx_status st = qhx_generate_ex(c->sess, &in, &cfg, &generate_options, stop_trampoline,
+                                        &stop_ctx, &out);
         if (request.cancelled()) {
             RAC_LOG_INFO(LOG_CAT, "LLM request %llu cancelled during batch generation",
                          static_cast<unsigned long long>(request.id()));
@@ -267,9 +286,15 @@ rac_result_t qhexrt_llm_generate_stream(void* impl, const char* prompt,
         fill_inputs(&in, prompt, options);
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
+        qhx_generate_options generate_options;
+        fill_generate_options(&generate_options, options);
+        StopCtx stop_ctx{c, request.id()};
+        generate_options.should_cancel = should_cancel_trampoline;
+        generate_options.should_cancel_user = &stop_ctx;
         StreamCtx ctx{callback, user_data, c, request.id(), false, std::string()};
         qhx_output out{};
-        qhx_status st = qhx_generate(c->sess, &in, &cfg, stream_trampoline, &ctx, &out);
+        qhx_status st = qhx_generate_ex(c->sess, &in, &cfg, &generate_options, stream_trampoline,
+                                        &ctx, &out);
         if (ctx.cancelled || request.cancelled()) {
             RAC_LOG_INFO(LOG_CAT, "LLM request %llu cancelled during streaming generation",
                          static_cast<unsigned long long>(request.id()));
@@ -307,9 +332,10 @@ rac_result_t qhexrt_llm_cancel(void* impl) {
     if (c != nullptr) {
         const uint64_t request_id = c->llm_requests.active_id.load(std::memory_order_acquire);
         c->llm_requests.cancel_active();
-        if (c->sess != nullptr) {
-            qhx_session_cancel(c->sess);
-        }
+        // The size-versioned should_cancel probe carries this exact SDK request
+        // id into QHexRT setup and every execution boundary. Do not issue a
+        // second unkeyed qhx_session_cancel() here: a delayed dispatch could
+        // otherwise land on a successor after this request has finished.
         RAC_LOG_INFO(LOG_CAT, "LLM cancel routed to request %llu",
                      static_cast<unsigned long long>(request_id));
     }

@@ -17,7 +17,10 @@ class SuiteGateTest(unittest.TestCase):
         payload = {
             "schema": "npu_suite/v1",
             "model_id": model_id,
+            "arch": model_id.rsplit("_", 1)[-1],
+            "hf_revision": "1" * 40,
             "modality": "llm",
+            "coverage": {"scope": "acceptance", "rubric_min_inputs": 1},
             "cases": [{
                 "id": "case0",
                 "input": {"text": "The capital of France is"},
@@ -68,19 +71,26 @@ class SuiteGateTest(unittest.TestCase):
             self.assertEqual(gate["suite_id"], "melotts_en_v81")
             self.assertFalse(gate["suite_valid"])
 
-    def test_every_synced_suite_has_executable_known_gate_coverage(self):
-        suites = sorted(npu_e2e_report.SUITES.glob("*.json"))
-        self.assertTrue(suites)
-        for path in suites:
-            with self.subTest(suite=path.name):
-                suite = npu_e2e_report._suite_gate(path.stem)
-                self.assertTrue(suite["suite_valid"], suite["validation_errors"])
-                spec = npu_e2e_report.GATE_SPECS[suite["suite_metric"]]
-                self.assertEqual(
-                    set(suite["gate"]),
-                    spec["required"] | (set(suite["gate"]) & spec["optional"]),
-                )
-                self.assertEqual(len(suite["cases"]), len(suite["executable_cases"]))
+    def test_suite_payload_arch_must_match_requested_arch_and_suffix(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            suites = Path(tmp)
+            path = suites / "model_v81.json"
+            payload = self.write_suite(path, "model_v81")
+            payload["arch"] = "v79"
+            path.write_text(json.dumps(payload))
+            with mock.patch.object(npu_e2e_report, "SUITES", suites):
+                gate = npu_e2e_report._suite_gate("model", "v81")
+            self.assertFalse(gate["suite_valid"])
+            self.assertIn("architecture suffix", " ".join(gate["validation_errors"]))
+
+    def test_gate_registry_has_disjoint_required_and_optional_keys(self):
+        # Full 41-suite catalog coverage is owned by QHexRT's canonical CI.
+        # This public-repo unit test stays hermetic and validates the reporter registry itself.
+        self.assertTrue(npu_e2e_report.GATE_SPECS)
+        for metric, spec in npu_e2e_report.GATE_SPECS.items():
+            with self.subTest(metric=metric):
+                self.assertIn("metric", spec["required"])
+                self.assertFalse(spec["required"] & spec["optional"])
 
     def test_impossible_min_inputs_is_invalid(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -132,6 +142,56 @@ class SuiteGateTest(unittest.TestCase):
 
 class CanonicalThresholdEvaluationTest(unittest.TestCase):
     @staticmethod
+    def qwen_suite():
+        cases = [
+            {"id": f"q{i}", "input": {"text": f"prompt {i}"}, "expect_keywords": [f"answer{i}"]}
+            for i in range(6)
+        ]
+        return {
+            "suite_valid": True, "validation_errors": [], "cases": cases,
+            "executable_cases": cases,
+            "gate": {
+                "metric": "answer_keyword_coherence", "suite_pass_frac": 1.0,
+                "min_inputs": 6, "min_decode_toks": 15.0, "max_new": 128,
+            },
+        }
+
+    @staticmethod
+    def embedding_suite():
+        cases = [
+            {"id": f"e{i}", "input": {
+                "query": f"query: q{i}",
+                "positive": f"document: relevant p{i}",
+                "negative": f"document: irrelevant n{i}",
+            }}
+            for i in range(4)
+        ]
+        return {
+            "suite_valid": True, "validation_errors": [], "cases": cases,
+            "executable_cases": cases,
+            "gate": {
+                "metric": "embedding_retrieval_ranking", "suite_pass_frac": 1.0,
+                "min_inputs": 4, "min_triples": 4, "expected_dimension": 768,
+                "minimum_pairwise_margin": 0.05, "l2_norm_min": 0.99,
+                "l2_norm_max": 1.01, "query_prefix": "query: ",
+                "document_prefix": "document: ",
+            },
+        }
+
+    @staticmethod
+    def inpaint_suite():
+        cases = [{"id": "i0", "input": {"image_asset": "source.png", "mask_asset": "mask.png"}}]
+        return {
+            "suite_valid": True, "validation_errors": [], "cases": cases,
+            "executable_cases": cases,
+            "gate": {
+                "metric": "inpaint_execution_smoke", "suite_pass_frac": 1.0,
+                "min_inputs": 1, "maximum_unmasked_mean_absolute_error_rgb8": 2.0,
+                "minimum_hole_changed_fraction": 0.1,
+            },
+        }
+
+    @staticmethod
     def report(modality, cases, samples):
         ids = [case["id"] for case in cases]
         return {
@@ -145,7 +205,7 @@ class CanonicalThresholdEvaluationTest(unittest.TestCase):
         }
 
     def test_qwen_decode_floor_regression_fails_without_unapplied_keys(self):
-        suite = npu_e2e_report._suite_gate("qwen3_5_0_8b", "v81")
+        suite = self.qwen_suite()
         self.assertTrue(suite["suite_valid"], suite["validation_errors"])
         samples = []
         for index, case in enumerate(suite["cases"]):
@@ -163,7 +223,7 @@ class CanonicalThresholdEvaluationTest(unittest.TestCase):
         self.assertIn("below min_decode_toks=15.0", report["detail"])
 
     def test_all_qwen_declared_keys_apply_on_a_passing_fixture(self):
-        suite = npu_e2e_report._suite_gate("qwen3_5_0_8b", "v81")
+        suite = self.qwen_suite()
         samples = [{
             "id": case["id"], "output": case["expect_keywords"][0],
             "decode_toks": 15.0, "max_new": 128,
@@ -174,7 +234,7 @@ class CanonicalThresholdEvaluationTest(unittest.TestCase):
         self.assertEqual(report["unapplied_gate_keys"], [])
         self.assertEqual(set(report["applied_gate_keys"]), set(suite["gate"]))
 
-    def test_tts_uses_mean_intelligibility_wer_and_applies_every_field(self):
+    def test_tts_requires_each_case_and_mean_intelligibility_wer(self):
         gate = {
             "metric": "audio_sanity_intelligibility", "suite_pass_frac": 1.0,
             "min_inputs": 3, "expected_sample_rate": 24000,
@@ -189,12 +249,12 @@ class CanonicalThresholdEvaluationTest(unittest.TestCase):
         } for i, value in enumerate((0.0, 0.0, 0.3))]
         report = self.report("tts", cases, samples)
 
-        self.assertTrue(npu_e2e_report._apply_canonical_thresholds(report, suite), report["detail"])
+        self.assertFalse(npu_e2e_report._apply_canonical_thresholds(report, suite))
         self.assertAlmostEqual(report["intelligibility_wer"], 0.1)
         self.assertEqual(set(report["applied_gate_keys"]), set(gate))
 
     def test_unknown_gate_key_is_unapplied_and_fails(self):
-        suite = npu_e2e_report._suite_gate("qwen3_5_0_8b", "v81")
+        suite = self.qwen_suite()
         suite = dict(suite)
         suite["gate"] = dict(suite["gate"], edit_tol=0.1)
         samples = [{
@@ -207,7 +267,7 @@ class CanonicalThresholdEvaluationTest(unittest.TestCase):
         self.assertEqual(report["unapplied_gate_keys"], ["edit_tol"])
 
     def test_embedding_applies_every_declared_field(self):
-        suite = npu_e2e_report._suite_gate("embeddinggemma_300m", "v81")
+        suite = self.embedding_suite()
         samples = [{
             "id": case["id"], "dim": 768, "margin": 0.1,
             "query_l2": 1.0, "positive_l2": 1.0, "negative_l2": 1.0,
@@ -217,14 +277,21 @@ class CanonicalThresholdEvaluationTest(unittest.TestCase):
         self.assertTrue(npu_e2e_report._apply_canonical_thresholds(report, suite), report["detail"])
         self.assertEqual(set(report["applied_gate_keys"]), set(suite["gate"]))
 
-    def test_inpaint_applies_every_declared_field(self):
-        suite = npu_e2e_report._suite_gate("lama_dilated", "v81")
+    def test_embedding_margin_does_not_receive_an_epsilon_grace(self):
+        suite = copy.deepcopy(self.embedding_suite())
+        suite["gate"]["minimum_pairwise_margin"] = 0.1000000000005
         samples = [{
-            "id": case["id"], "full_cosine": 1.0, "hole_cosine": 1.0,
-            "hole_relative_l2": 0.0, "full_psnr_db": 99.0, "hole_psnr_db": 99.0,
-            "seam_psnr_db": 99.0, "unmasked_mae_rgb8": 0.0,
-            "unmasked_p99_rgb8": 0.0, "unmasked_within_one_lsb": 1.0,
-            "hole_changed_fraction": 1.0,
+            "id": case["id"], "dim": 768, "margin": 0.1,
+            "query_l2": 1.0, "positive_l2": 1.0, "negative_l2": 1.0,
+        } for case in suite["cases"]]
+        report = self.report("embedding", suite["cases"], samples)
+        self.assertFalse(npu_e2e_report._apply_canonical_thresholds(report, suite))
+        self.assertIn("minimum_pairwise_margin", report["applied_gate_keys"])
+
+    def test_inpaint_applies_every_declared_field(self):
+        suite = self.inpaint_suite()
+        samples = [{
+            "id": case["id"], "unmasked_mae_rgb8": 0.0, "hole_changed_fraction": 1.0,
         } for case in suite["cases"]]
         report = self.report("inpaint", suite["cases"], samples)
 
@@ -261,23 +328,12 @@ class CanonicalThresholdEvaluationTest(unittest.TestCase):
                 self.assertIn(name, report["applied_gate_keys"])
 
     def test_inpaint_each_image_threshold_fails_when_violated(self):
-        suite = npu_e2e_report._suite_gate("lama_dilated", "v81")
+        suite = self.inpaint_suite()
         passing = {
-            "full_cosine": 1.0, "hole_cosine": 1.0, "hole_relative_l2": 0.0,
-            "full_psnr_db": 99.0, "hole_psnr_db": 99.0, "seam_psnr_db": 99.0,
-            "unmasked_mae_rgb8": 0.0, "unmasked_p99_rgb8": 0.0,
-            "unmasked_within_one_lsb": 1.0, "hole_changed_fraction": 1.0,
+            "unmasked_mae_rgb8": 0.0, "hole_changed_fraction": 1.0,
         }
         violations = {
-            "minimum_full_cosine": ("full_cosine", 0.0),
-            "minimum_hole_cosine": ("hole_cosine", 0.0),
-            "maximum_hole_relative_l2": ("hole_relative_l2", 1.0),
-            "minimum_full_psnr_db": ("full_psnr_db", 0.0),
-            "minimum_hole_psnr_db": ("hole_psnr_db", 0.0),
-            "minimum_seam_psnr_db": ("seam_psnr_db", 0.0),
             "maximum_unmasked_mean_absolute_error_rgb8": ("unmasked_mae_rgb8", 10.0),
-            "maximum_unmasked_p99_absolute_error_rgb8": ("unmasked_p99_rgb8", 10.0),
-            "minimum_unmasked_rgb8_within_one_lsb_fraction": ("unmasked_within_one_lsb", 0.0),
             "minimum_hole_changed_fraction": ("hole_changed_fraction", 0.0),
         }
         for gate_key, (sample_key, value) in violations.items():
@@ -313,6 +369,12 @@ class ProductionProvenanceTest(unittest.TestCase):
             "suite": "npu_suite/v1:answer_keyword_coherence:1cases",
             "suite_id": "model_v81",
             "suite_sha256": self.suite_sha,
+            "hf_revision": "1" * 40,
+            "declared_validation_scope": "acceptance",
+            "validation_scope": "acceptance",
+            "acceptance_eligible": True,
+            "bundle_revision_verified": True,
+            "input_asset_sha256s": {},
             "executed_case_ids": ["case0"],
             "executed_case_count": 1,
             "samples": [{
@@ -389,6 +451,19 @@ class ProductionProvenanceTest(unittest.TestCase):
         self.assertEqual(report["status"], "FAIL")
         self.assertFalse(report["gates"]["canonical_suite"])
         self.assertIn("does not match", report["detail"])
+
+    def test_mutable_remote_run_is_truthfully_downgraded_to_smoke(self):
+        report = self.report()
+        report.update({
+            "status": "PASS",
+            "bundle_revision_verified": False,
+            "validation_scope": "smoke_only",
+            "acceptance_eligible": False,
+        })
+        report, _ = self.apply(report)
+        self.assertEqual(report["status"], "SMOKE_PASS")
+        self.assertTrue(report["gates"]["suite_scope_receipt"])
+        self.assertFalse(report["suite_provenance"]["expected_acceptance_eligible"])
 
     def test_missing_delete_receipt_fails_closed(self):
         report = self.report()
@@ -528,6 +603,55 @@ class ProductionProvenanceTest(unittest.TestCase):
         summary = json.loads((self.report_dir / "summary.json").read_text())
         self.assertEqual(summary[0]["status"], "FAIL")
         self.assertFalse(summary[0]["delete_model"])
+
+    def test_main_treats_truthful_smoke_pass_as_non_failure(self):
+        report = self.report()
+        report.update({
+            "status": "SMOKE_PASS",
+            "bundle_revision_verified": False,
+            "validation_scope": "smoke_only",
+            "acceptance_eligible": False,
+        })
+        (self.report_dir / "npu_e2e_model.json").write_text(json.dumps(report))
+        (self.report_dir / "run_inputs.json").write_text(json.dumps(self.run_inputs()))
+        with (
+            mock.patch.object(npu_e2e_report, "SUITES", self.suites),
+            mock.patch.object(npu_e2e_report, "_local_git_state", return_value={"revision": "abc123", "dirty": False}),
+            mock.patch.object(npu_e2e_report.sys, "argv", ["npu_e2e_report.py", str(self.report_dir)]),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = npu_e2e_report.main()
+        self.assertEqual(result, 0)
+        summary = json.loads((self.report_dir / "summary.json").read_text())
+        self.assertEqual(summary[0]["status"], "SMOKE_PASS")
+        self.assertIn("non-acceptance SMOKE_PASS", (self.report_dir / "summary.md").read_text())
+
+
+class WhisperIdentityTest(unittest.TestCase):
+    def test_resample_count_matches_plane_a_rounding_at_boundaries(self):
+        self.assertEqual(npu_e2e_report._resampled_sample_count(1, 24000), 1)
+        self.assertEqual(npu_e2e_report._resampled_sample_count(2, 44100), 1)
+        self.assertEqual(
+            npu_e2e_report._resampled_sample_count(24001, 24000),
+            int(round(24001 * 16000 / 24000)),
+        )
+        self.assertEqual(
+            npu_e2e_report._resampled_sample_count(44101, 44100),
+            int(round(44101 * 16000 / 44100)),
+        )
+
+    def test_evaluator_version_drift_fails_closed(self):
+        fake = mock.Mock()
+        fake._MODELS = {
+            npu_e2e_report.WHISPER_MODEL:
+                f"https://example.invalid/{npu_e2e_report.WHISPER_CHECKPOINT_SHA256}/base.pt",
+        }
+        with (
+            mock.patch.dict("sys.modules", {"whisper": fake}),
+            mock.patch.object(npu_e2e_report.metadata, "version", return_value="stale"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "package mismatch"):
+                npu_e2e_report._whisper_evaluator_identity()
 
 
 if __name__ == "__main__":

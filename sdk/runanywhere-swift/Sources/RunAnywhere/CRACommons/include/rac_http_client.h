@@ -260,6 +260,15 @@ RAC_API rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_k
  */
 RAC_API void rac_http_hf_token_set(const char* token);
 
+/**
+ * @brief Returns whether a non-empty Hugging Face token is currently active.
+ *
+ * This uses the same explicit-token / `HF_TOKEN` fallback resolution as the
+ * request dispatcher. It lets native catalog policy skip known private repos
+ * before any network request without exposing the token itself.
+ */
+RAC_API rac_bool_t rac_http_hf_token_is_configured(void);
+
 // =============================================================================
 // RESULT CODES
 // =============================================================================

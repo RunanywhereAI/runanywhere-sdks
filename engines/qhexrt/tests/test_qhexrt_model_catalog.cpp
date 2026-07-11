@@ -10,6 +10,7 @@
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/infrastructure/device/rac_npu_capability.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/qhexrt/rac_qhexrt.h"
@@ -38,6 +39,13 @@ namespace {
     } while (0)
 
 int test_supported_arch_policy() {
+    static_assert(static_cast<int32_t>(RAC_HEXAGON_ARCH_V75) ==
+                  static_cast<int32_t>(RAC_QHEXRT_HEXAGON_ARCH_V75));
+    static_assert(static_cast<int32_t>(RAC_HEXAGON_ARCH_V79) ==
+                  static_cast<int32_t>(RAC_QHEXRT_HEXAGON_ARCH_V79));
+    static_assert(static_cast<int32_t>(RAC_HEXAGON_ARCH_V81) ==
+                  static_cast<int32_t>(RAC_QHEXRT_HEXAGON_ARCH_V81));
+
     ASSERT_EQ(rac_qhexrt_arch_is_supported(RAC_QHEXRT_HEXAGON_ARCH_V75), RAC_TRUE);
     ASSERT_EQ(rac_qhexrt_arch_is_supported(RAC_QHEXRT_HEXAGON_ARCH_V79), RAC_TRUE);
     ASSERT_EQ(rac_qhexrt_arch_is_supported(RAC_QHEXRT_HEXAGON_ARCH_V81), RAC_TRUE);
@@ -51,6 +59,17 @@ int test_supported_arch_policy() {
     ASSERT_EQ(std::string(rac_qhexrt_arch_name(RAC_QHEXRT_HEXAGON_ARCH_V81)), std::string("v81"));
     ASSERT_EQ(std::string(rac_qhexrt_arch_name(static_cast<rac_qhexrt_hexagon_arch_t>(83))),
               std::string("unknown"));
+
+    rac_npu_info_t legacy{};
+    rac_qhexrt_device_info_t engine{};
+    ASSERT_EQ(rac_npu_probe(&legacy), RAC_SUCCESS);
+    ASSERT_EQ(rac_qhexrt_probe(&engine), RAC_SUCCESS);
+    ASSERT_EQ(std::string(legacy.soc_model), std::string(engine.soc_model));
+    ASSERT_EQ(legacy.soc_id, engine.soc_id);
+    ASSERT_EQ(static_cast<int32_t>(legacy.hexagon_arch), static_cast<int32_t>(engine.hexagon_arch));
+    ASSERT_EQ(legacy.qhexrt_supported, engine.supported);
+    ASSERT_EQ(std::string(rac_hexagon_arch_name(legacy.hexagon_arch)),
+              std::string(rac_qhexrt_arch_name(engine.hexagon_arch)));
     return 0;
 }
 
@@ -65,18 +84,13 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "nv_embedqa_1b",        "nv_rerankqa_1b",      "siglip2_base",
     };
     const std::unordered_set<std::string> v79 = {
-        "lfm2_5_230m",         "lfm2_5_350m",
-        "qwen3_0_6b",          "llama3_2_1b",
-        "gemma4_e2b",          "phi_tiny_moe",
-        "qwen3_5_0_8b",        "qwen3_5_2b",
-        "qwen3_5_4b",          "deepseek_r1_distill_qwen_1_5b",
-        "internvl3_5_1b",      "qwen3_vl",
-        "gemma4_e2b_vlm",      "whisper_base",
-        "whisper_small",       "moonshine_base",
-        "moonshine_tiny",      "melotts_en",
-        "nv_embedqa_1b",       "nv_rerankqa_1b",
-        "embeddinggemma_300m", "siglip2_base",
-        "lama_dilated",
+        "lfm2_5_230m",    "lfm2_5_350m",   "llama3_2_1b",
+        "gemma4_e2b",     "phi_tiny_moe",  "qwen3_5_0_8b",
+        "qwen3_5_2b",     "qwen3_5_4b",    "deepseek_r1_distill_qwen_1_5b",
+        "internvl3_5_1b", "qwen3_vl",      "gemma4_e2b_vlm",
+        "whisper_base",   "whisper_small", "moonshine_base",
+        "moonshine_tiny", "melotts_en",    "embeddinggemma_300m",
+        "siglip2_base",   "lama_dilated",
     };
     const std::unordered_set<std::string> v81 = {
         "qwen3_0_6b",
@@ -176,6 +190,12 @@ int test_native_catalog_owns_arch_and_auth_policy() {
     ASSERT_EQ(rac_qhexrt_catalog_model_is_known("not-in-product-catalog"), RAC_FALSE);
     ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth("not-in-product-catalog"), RAC_FALSE);
     ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch("qwen3_5_0_8b", RAC_QHEXRT_HEXAGON_ARCH_V73),
+              RAC_FALSE);
+    ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch("qwen3_0_6b", RAC_QHEXRT_HEXAGON_ARCH_V79),
+              RAC_FALSE);
+    ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch("nv_embedqa_1b", RAC_QHEXRT_HEXAGON_ARCH_V79),
+              RAC_FALSE);
+    ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch("nv_rerankqa_1b", RAC_QHEXRT_HEXAGON_ARCH_V79),
               RAC_FALSE);
     return 0;
 }

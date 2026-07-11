@@ -72,11 +72,18 @@ void qhx_gen_cfg_default(qhx_gen_cfg* cfg) {
     if (cfg != nullptr) std::memset(cfg, 0, sizeof(*cfg));
 }
 
-qhx_status qhx_generate(qhx_session*, const qhx_inputs* inputs, const qhx_gen_cfg*,
-                        qhx_token_cb callback, void* user, qhx_output* output) {
+void qhx_generate_options_default(qhx_generate_options* options) {
+    if (options == nullptr) return;
+    std::memset(options, 0, sizeof(*options));
+    options->struct_size = sizeof(*options);
+}
+
+qhx_status qhx_generate_ex(qhx_session*, const qhx_inputs* inputs, const qhx_gen_cfg*,
+                           const qhx_generate_options* options,
+                           qhx_token_cb callback, void* user, qhx_output* output) {
     ++g_generate_calls;
     g_prompt = inputs && inputs->text ? inputs->text : "";
-    g_disable_thinking = inputs ? inputs->disable_thinking : -1;
+    g_disable_thinking = options ? options->disable_thinking : -1;
     static const char kText[] = "ok";
     if (callback != nullptr) {
         (void)callback(user, kText, 2, 1, 0);
@@ -89,6 +96,11 @@ qhx_status qhx_generate(qhx_session*, const qhx_inputs* inputs, const qhx_gen_cf
         output->n_prompt = 1;
     }
     return 0;
+}
+
+qhx_status qhx_generate(qhx_session* session, const qhx_inputs* inputs, const qhx_gen_cfg* cfg,
+                        qhx_token_cb callback, void* user, qhx_output* output) {
+    return qhx_generate_ex(session, inputs, cfg, nullptr, callback, user, output);
 }
 
 const char* qhx_status_str(qhx_status) { return "fake"; }

@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.BuildConfig
 import com.runanywhere.runanywhereai.data.conversation.ConversationRepository
 import com.runanywhere.runanywhereai.data.conversation.GenerationMode
 import com.runanywhere.runanywhereai.data.conversation.StoredAttachment
@@ -27,6 +28,8 @@ import com.runanywhere.runanywhereai.data.conversation.SmartTitleLifecycle
 import com.runanywhere.runanywhereai.data.conversation.SmartTitlePolicy
 import com.runanywhere.runanywhereai.data.rag.DocumentExtractor
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.data.settings.WebSearchConsentPolicy
+import com.runanywhere.runanywhereai.data.settings.WebSearchConsentState
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.ui.screens.models.LlmModelChangeInterlock
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
@@ -101,8 +104,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     // The preference records user intent; availability is derived from the
     // lifecycle-confirmed model capability so an undersized context model can
     // never reach the native tool run loop.
-    private val toolsRequested: Boolean get() = SettingsRepository.settings.toolCallingEnabled
+    private val toolsRequested: Boolean
+        get() = WebSearchConsentPolicy.permitsTransfer(
+            WebSearchConsentState(
+                toolsEnabled = SettingsRepository.settings.toolCallingEnabled,
+                acceptedScope = SettingsRepository.settings.webSearchConsentScope,
+                currentScope = WebSearchConsentPolicy.routeFor(BuildConfig.WEB_SEARCH_URL)?.scope,
+            ),
+        )
     private var showToolGateNotice by mutableStateOf(false)
+
+    var showWebSearchDisclosure by mutableStateOf(false)
+        private set
 
     val toolsEnabled: Boolean
         get() = toolsRequested && ToolCallingModelPolicy.evaluate(GlobalState.model.loaded).isAvailable
@@ -192,17 +205,27 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleTools() {
         if (toolsRequested) {
-            SettingsRepository.setToolCallingEnabled(false)
+            SettingsRepository.setWebToolsTransferEnabled(false)
             showToolGateNotice = false
             return
         }
         val availability = ToolCallingModelPolicy.evaluate(GlobalState.model.loaded)
         if (availability.isAvailable) {
-            SettingsRepository.setToolCallingEnabled(true)
+            showWebSearchDisclosure = true
             showToolGateNotice = false
         } else {
             showToolGateNotice = true
         }
+    }
+
+    fun acceptWebSearchDisclosure() {
+        SettingsRepository.setWebToolsTransferEnabled(true)
+        showWebSearchDisclosure = false
+        showToolGateNotice = false
+    }
+
+    fun dismissWebSearchDisclosure() {
+        showWebSearchDisclosure = false
     }
 
     fun send() {

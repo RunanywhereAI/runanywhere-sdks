@@ -12,14 +12,15 @@ all other parts are declined and the SDK can fall back to CPU engines.
 `src/main/jniLibs/arm64-v8a/`:
 
 - `librac_backend_qhexrt_jni.so` — JNI bridge (registration + NPU probe)
-- `librac_backend_qhexrt.so` — QHexRT C++ engine (QNN runtime statically linked)
+- `librac_backend_qhexrt.so` — QHexRT C++ engine (QHexRT archives linked into the plugin)
+- `libQnn*.so` + versioned HTP skels — separately packaged QAIRT/QNN runtime libraries loaded at runtime
 - `libc++_shared.so` — NDK C++ runtime (16 KB-aligned)
 
 These are build outputs (gitignored). Rebuild with:
 
 ```
 ANDROID_NDK_HOME=<ndk> cmake --preset android-arm64 \
-  -DRAC_BACKEND_QHEXRT=ON -DQHEXRT_ROOT=<repo>/engines/qhexrt/prebuilt
+  -DRAC_BACKEND_QHEXRT=ON -DQHEXRT_ROOT=<repo>/engines/qhexrt/prebuilt/current
 cmake --build build/android-arm64 --target rac_backend_qhexrt_jni -j12
 ```
 

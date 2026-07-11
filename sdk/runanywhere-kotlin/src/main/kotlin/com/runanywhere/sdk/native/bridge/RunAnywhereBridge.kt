@@ -421,6 +421,15 @@ object RunAnywhereBridge {
         optionsProto: ByteArray,
     ): ByteArray?
 
+    /** JNI-private request-scoped wrapper used by cancellable Kotlin calls. */
+    @JvmStatic
+    external fun racVlmProcessRequestProto(
+        requestId: Long,
+        handle: Long,
+        imageProto: ByteArray,
+        optionsProto: ByteArray,
+    ): ByteArray?
+
     /**
      * Typed stream ABI (`rac_vlm_stream_proto`): serialized
      * `VLMGenerationRequest` in, serialized `VLMStreamEvent` per listener
@@ -430,6 +439,14 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racVlmStreamProto(
+        requestProto: ByteArray,
+        listener: NativeProtoProgressListener?,
+    ): Int
+
+    /** JNI-private request-scoped stream wrapper used by cancellable Kotlin calls. */
+    @JvmStatic
+    external fun racVlmStreamRequestProto(
+        requestId: Long,
         requestProto: ByteArray,
         listener: NativeProtoProgressListener?,
     ): Int
@@ -450,6 +467,10 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racVlmCancelLifecycleProto(): ByteArray?
+
+    /** Cancel only the matching request-scoped VLM JNI wrapper. */
+    @JvmStatic
+    external fun racVlmCancelRequestLifecycleProto(requestId: Long): ByteArray?
 
     @JvmStatic
     external fun racVlmDestroy(handle: Long)
@@ -1301,8 +1322,14 @@ object RunAnywhereBridge {
     /** Run a query and return serialized RAGResult proto bytes. Null on error. */
     @JvmStatic external fun racRagQueryProto(handle: Long, queryProto: ByteArray): ByteArray?
 
+    /** Request-scoped query wrapper used by cancellable Kotlin calls. */
+    @JvmStatic external fun racRagQueryRequestProto(requestId: Long, handle: Long, queryProto: ByteArray): ByteArray?
+
     /** Request cancellation of the active query on this RAG session. */
     @JvmStatic external fun racRagCancelProto(handle: Long): Int
+
+    /** Cancel only the matching request-scoped RAG JNI wrapper. */
+    @JvmStatic external fun racRagCancelRequestProto(requestId: Long, handle: Long): Int
 
     /** Clear all ingested documents and return serialized RAGStatistics bytes. */
     @JvmStatic external fun racRagClearProto(handle: Long): ByteArray?

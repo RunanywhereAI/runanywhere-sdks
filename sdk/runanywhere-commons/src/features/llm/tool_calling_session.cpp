@@ -39,7 +39,6 @@
 #if defined(RAC_HAVE_PROTOBUF)
 #include "errors.pb.h"
 #include "llm_service.pb.h"
-
 #include "tool_calling.pb.h"
 #endif
 
@@ -124,6 +123,70 @@ struct ToolCallingSession {
     // outer scope (see drain_and_dispatch).
     std::vector<std::vector<uint8_t>> pending_dispatches;
 };
+
+bool apply_explicit_tool_choice(ToolCallingSession* session, std::string* out_error) {
+    if (!session) {
+        return false;
+    }
+
+    // NONE is an authorization veto and must win over forced_tool_name.
+    if (session->has_tool_choice &&
+        session->tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE) {
+        session->forced_tool_name.clear();
+        return true;
+    }
+
+    if (!session->forced_tool_name.empty()) {
+        session->has_tool_choice = true;
+        session->tool_choice = runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
+    }
+
+    if (!session->has_tool_choice ||
+        session->tool_choice != runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC) {
+        return true;
+    }
+    if (session->forced_tool_name.empty()) {
+        if (out_error) {
+            *out_error = "tool_choice=SPECIFIC requires a non-empty forced_tool_name";
+        }
+        return false;
+    }
+    for (const auto& tool : session->tool_options.tools()) {
+        if (tool.name() == session->forced_tool_name) {
+            return true;
+        }
+    }
+    if (out_error) {
+        *out_error = "tool_choice=SPECIFIC target is not present in request.tools: " +
+                     session->forced_tool_name;
+    }
+    return false;
+}
+
+bool tool_choice_requires_call(const ToolCallingSession& session) {
+    return session.has_tool_choice &&
+           (session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED ||
+            session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+}
+
+std::string missing_required_tool_call_error(const ToolCallingSession& session) {
+    return session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC
+               ? "tool_choice=SPECIFIC requires a tool call"
+               : "tool_choice=REQUIRED requires a tool call";
+}
+
+std::string tool_choice_policy_error(const ToolCallingSession& session,
+                                     const runanywhere::v1::ToolCall& tool_call) {
+    if (session.has_tool_choice && session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE) {
+        return "Tool calls are disabled by tool_choice=NONE";
+    }
+    if (session.has_tool_choice &&
+        session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
+        tool_call.name() != session.forced_tool_name) {
+        return "Tool call must use tool_choice=SPECIFIC target: " + session.forced_tool_name;
+    }
+    return {};
+}
 
 struct SessionRegistry {
     std::mutex mu;
@@ -451,9 +514,9 @@ void run_generate_loop(ToolCallingSession& session) {
         rac_result_t rc = RAC_SUCCESS;
         rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
             &session.active_ref_mu, &session.active_ref, &session.cancel_requested};
-        if (!rac::llm::tool_calling::run_generate_once(
-                session.generation, cancel_binding, session.current_prompt, &response, &rc,
-                &loop_telemetry.agg)) {
+        if (!rac::llm::tool_calling::run_generate_once(session.generation, cancel_binding,
+                                                       session.current_prompt, &response, &rc,
+                                                       &loop_telemetry.agg)) {
             // Distinguish cancel from other generate failures.
             // A cancel that landed before or during generate makes the session
             // terminal — emit a cancel error and mark state kCancelled so the
@@ -472,14 +535,41 @@ void run_generate_loop(ToolCallingSession& session) {
 
         rac::llm::tool_calling::split_display_text_and_thinking(
             clean_text, &session.final_text, &session.final_thinking_content, session.generation);
-        emit_llm_chunk(session, session.final_text, true, "stop");
 
         if (!has_call) {
+            if (session.all_tool_calls.empty() && tool_choice_requires_call(session)) {
+                emit_error_event(session, RAC_ERROR_VALIDATION_FAILED,
+                                 missing_required_tool_call_error(session));
+                session.state = SessionState::kFailed;
+                return;
+            }
+            emit_llm_chunk(session, session.final_text, true, "stop");
             RAC_LOG_DEBUG(kTag, "no tool call found; loop complete");
             emit_final_event(session, true);
             session.state = SessionState::kCompleted;
             return;
         }
+
+        // Tool-choice policy is an authorization constraint, not optional
+        // schema validation. It must run even when validate_calls=false.
+        const std::string policy_error = tool_choice_policy_error(session, parsed_call);
+        if (!policy_error.empty()) {
+            runanywhere::v1::ToolResult failed;
+            failed.set_tool_call_id(parsed_call.id());
+            failed.set_name(parsed_call.name());
+            failed.set_error(policy_error);
+            failed.set_success(false);
+            failed.set_started_at_ms(now_ms());
+            failed.set_completed_at_ms(now_ms());
+            session.all_tool_calls.push_back(parsed_call);
+            session.all_tool_results.push_back(failed);
+
+            emit_error_event(session, RAC_ERROR_VALIDATION_FAILED, policy_error);
+            session.state = SessionState::kFailed;
+            return;
+        }
+
+        emit_llm_chunk(session, session.final_text, true, "stop");
 
         if (session.validate_calls) {
             auto validation = validate_tool_call(session, parsed_call);
@@ -594,6 +684,11 @@ rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t
 
     for (const auto& tool : request.tools()) {
         *session->tool_options.add_tools() = tool;
+    }
+
+    std::string tool_choice_error;
+    if (!apply_explicit_tool_choice(session.get(), &tool_choice_error)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
     }
 
     auto& reg = registry();

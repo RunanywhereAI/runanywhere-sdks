@@ -120,7 +120,12 @@ fun NavDestination?.isSelected(route: Any): Boolean =
 fun NavDestination?.isConsumerTopLevel(): Boolean =
     ConsumerDestination.entries.any { isSelected(it.route) }
 
-fun NavHostController.navigateTopLevel(route: Any, restoreState: Boolean = true) {
+internal fun shouldRestoreTopLevelState(route: Any): Boolean = route !is Vision
+
+fun NavHostController.navigateTopLevel(
+    route: Any,
+    restoreState: Boolean = shouldRestoreTopLevelState(route),
+) {
     navigate(route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true

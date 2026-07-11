@@ -1,6 +1,9 @@
 package com.runanywhere.runanywhereai
 
 import com.runanywhere.runanywhereai.tools.WebSearchTool
+import com.runanywhere.runanywhereai.tools.InvalidWebSearchDeviceIdentityException
+import com.runanywhere.runanywhereai.util.RACLog
+import com.runanywhere.sdk.public.extensions.LLM.RAToolValue
 import com.runanywhere.sdk.public.extensions.LLM.array
 import com.runanywhere.sdk.public.extensions.LLM.string
 import kotlinx.coroutines.runBlocking
@@ -11,6 +14,15 @@ import org.junit.Test
 import okio.Buffer
 
 class WebSearchToolTest {
+    @Test
+    fun `registered web tool fails closed before consent without network access`() = runBlocking {
+        val result = WebSearchTool.execute(
+            mapOf("query" to RAToolValue.string("private query")),
+        )
+
+        assertEquals("Web search requires affirmative permission", result.getValue("error").string)
+    }
+
     @Test
     fun `lite results parse titles snippets and safe source URLs`() {
         val html = """
@@ -48,6 +60,29 @@ class WebSearchToolTest {
     }
 
     @Test
+    fun `instant answer rejects unsafe abstract URLs and uses fixed search fallback`() {
+        listOf(
+            "javascript:alert(1)",
+            "https:///missing-host",
+            "https://user:secret@example.com/private",
+            "https://example.com/unsafe\\u0000path",
+        ).forEach { abstractUrl ->
+            val payload = """{
+              "Heading":"Result",
+              "AbstractText":"A safe summary.",
+              "AbstractURL":"$abstractUrl"
+            }"""
+
+            val result = WebSearchTool.parseInstantAnswer("private query", payload)
+
+            assertEquals(
+                "https://duckduckgo.com/?q=private%20query",
+                result.getValue("source_url").string,
+            )
+        }
+    }
+
+    @Test
     fun `query is encoded into fixed HTTPS search origin`() {
         val url = WebSearchTool.buildLiteSearchUrl("current NPU & Android")
         assertTrue(url.startsWith("https://lite.duckduckgo.com/lite/?"))
@@ -76,6 +111,60 @@ class WebSearchToolTest {
         assertEquals(2, requestedUrls.size)
         assertTrue(requestedUrls[1].startsWith("https://api.duckduckgo.com/"))
         assertEquals("Fallback response.", result.getValue("summary").string)
+    }
+
+    @Test
+    fun `lite parser drift emits only a fixed diagnostic before safe fallback`() = runBlocking {
+        val diagnostics = mutableListOf<String>()
+        val previousEnabled = RACLog.enabled
+        val previousReporter = RACLog.errorReporter
+        RACLog.enabled = false
+        RACLog.errorReporter = { _, _, message, _ -> diagnostics += message }
+        try {
+            suspend fun searchWithChangedMarkup() =
+                WebSearchTool.search(
+                    query = "private query must not be logged",
+                    backendUrl = "",
+                    publicFetcher = { url ->
+                        if (url.startsWith("https://lite.duckduckgo.com/")) {
+                            "<html><div class='changed-result'>private response</div></html>"
+                        } else {
+                            """{"Heading":"Fallback","Answer":"Safe answer"}"""
+                        }
+                    },
+                )
+            val results = listOf(searchWithChangedMarkup(), searchWithChangedMarkup())
+
+            assertTrue(results.all { it.getValue("summary").string == "Safe answer" })
+            assertEquals(listOf("web_search_lite_parser_no_results"), diagnostics)
+            assertTrue(diagnostics.none { it.contains("private") })
+        } finally {
+            RACLog.enabled = previousEnabled
+            RACLog.errorReporter = previousReporter
+        }
+    }
+
+    @Test
+    fun `invalid proxy device identity emits a fixed redacted diagnostic`() = runBlocking {
+        val diagnostics = mutableListOf<String>()
+        val previousEnabled = RACLog.enabled
+        val previousReporter = RACLog.errorReporter
+        RACLog.enabled = false
+        RACLog.errorReporter = { _, _, message, _ -> diagnostics += message }
+        try {
+            val result = WebSearchTool.search(
+                query = "private query must not be logged",
+                backendUrl = "https://search.runanywhere.example/v1/search",
+                backendFetcher = { _, _ -> throw InvalidWebSearchDeviceIdentityException() },
+            )
+
+            assertTrue(result.containsKey("error"))
+            assertEquals(listOf("web_search_invalid_device_identity"), diagnostics)
+            assertTrue(diagnostics.none { it.contains("private") || it.contains("device-id") })
+        } finally {
+            RACLog.enabled = previousEnabled
+            RACLog.errorReporter = previousReporter
+        }
     }
 
     @Test
@@ -184,5 +273,14 @@ class WebSearchToolTest {
                 )
             }.isFailure,
         )
+    }
+
+    @Test
+    fun `device identity validation is canonical and testable without a network request`() {
+        assertEquals(
+            "123e4567-e89b-12d3-a456-426614174000",
+            WebSearchTool.validateDeviceId("123e4567-e89b-12d3-a456-426614174000"),
+        )
+        assertTrue(runCatching { WebSearchTool.validateDeviceId("not-a-uuid") }.isFailure)
     }
 }

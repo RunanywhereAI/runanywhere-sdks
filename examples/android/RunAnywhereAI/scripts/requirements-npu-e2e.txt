@@ -1,0 +1,2 @@
+# npu_e2e_report.py also verifies this version and checkpoint mapping at runtime.
+openai-whisper==20250625

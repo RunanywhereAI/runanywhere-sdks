@@ -5,6 +5,7 @@ import android.util.Log
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Events.publishSDKFailure
 import java.util.ArrayDeque
+import java.util.concurrent.CancellationException
 
 /**
  * Bridges application warnings and errors into the SDK's canonical event and telemetry pipeline.
@@ -167,19 +168,57 @@ internal class RACLogTelemetryReporter(
         tag: String,
         message: String,
         throwable: Throwable?,
-    ): String =
-        buildString {
-            append('[')
-            append(tag)
-            append("] ")
-            append(message)
-            if (throwable != null) {
-                append('\n')
-                append(throwable.stackTraceToString())
-            }
-        }
+    ): String = TelemetryDiagnosticPolicy.format(tag, message, throwable)
 
     private companion object {
         const val APP_COMPONENT = "app"
+    }
+}
+
+/**
+ * The only text boundary allowed to reach remote diagnostics from application logs.
+ *
+ * Raw messages, exception messages, stack traces, URLs, paths, model identifiers, and user
+ * content are intentionally ignored. Only values from these finite allowlists are emitted, and
+ * the final payload has a defensive length bound.
+ */
+internal object TelemetryDiagnosticPolicy {
+    internal const val MAX_MESSAGE_CHARS = 96
+
+    private val sourceCodes = mapOf(
+        "ChatViewModel" to "chat",
+        "CloudProviderRepository" to "cloud_provider",
+        "ConversationRepository" to "conversation",
+        "ConversationStore" to "conversation_store",
+        "ModelBootstrap" to "model_bootstrap",
+        "RagViewModel" to "rag",
+        "RunAnywhereApplication" to "startup",
+        "SettingsRepository" to "settings",
+        "SettingsViewModel" to "settings",
+        "SttViewModel" to "stt",
+        "VadViewModel" to "vad",
+        "VisionViewModel" to "vision",
+        "VoiceViewModel" to "voice",
+        "WebSearchTool" to "web_search",
+    )
+    private val eventCodes = setOf(
+        "web_search_invalid_device_identity",
+        "web_search_lite_fetch_failed",
+        "web_search_lite_parser_no_results",
+    )
+
+    fun format(tag: String, message: String, throwable: Throwable?): String {
+        val source = sourceCodes[tag] ?: "app"
+        val event = message.takeIf(eventCodes::contains) ?: "operation_failed"
+        val kind = when (throwable) {
+            null -> "none"
+            is CancellationException -> "cancelled"
+            is SecurityException -> "security"
+            is java.io.IOException -> "io"
+            is IllegalArgumentException -> "invalid_input"
+            is IllegalStateException -> "invalid_state"
+            else -> "unexpected"
+        }
+        return "source=$source;event=$event;kind=$kind".take(MAX_MESSAGE_CHARS)
     }
 }

@@ -57,6 +57,23 @@ object NpuMetrics {
         return out
     }
 
+    /** Strip hidden reasoning before answer-keyword scoring. */
+    fun answerText(s: String): String =
+        Regex(
+            "<think\\b[^>]*>.*?(?:</think\\s*>|\\z)",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+        ).replace(s, " ").trim()
+
+    /** Exact contiguous token/phrase match; substrings such as comparison!=Paris do not pass. */
+    fun containsKeyword(text: String, keyword: String): Boolean {
+        val haystack = words(text)
+        val needle = words(keyword)
+        if (needle.isEmpty() || haystack.size < needle.size) return false
+        return (0..haystack.size - needle.size).any { start ->
+            haystack.subList(start, start + needle.size) == needle
+        }
+    }
+
     /** word-level WER = Levenshtein(ref_words, hyp_words) / |ref_words|  (forge text.wer). */
     fun wer(ref: String, hyp: String): Double {
         val r = words(ref); val h = words(hyp)
@@ -400,7 +417,7 @@ class RunReport(
     }
 }
 
-/** One case from a canonical `npu_suite/v1` file (QHexRT2/testing/gen/build_suites.py). */
+/** One case from a canonical `npu_suite/v1` file (`QHexRT/device_suites/gen/build_suites.py`). */
 class SuiteCase(private val o: JSONObject) {
     private val input = o.optJSONObject("input") ?: JSONObject()
     val id: String get() = o.optString("id")
@@ -424,11 +441,20 @@ class SuiteCase(private val o: JSONObject) {
     val goldTokens: List<Int>? get() = o.optJSONArray("gold_tokens")
         ?.let { a -> (0 until a.length()).map { a.getInt(it) } }?.takeIf { it.isNotEmpty() }
     val maxNew: Int get() = o.optInt("max_new", 0)
+    val assetNames: List<String>
+        get() = listOfNotNull(
+            wavAsset,
+            imageAsset,
+            maskAsset,
+            metricImageAsset,
+            metricMaskAsset,
+            referenceImageAsset,
+        )
 }
 
 /**
  * A canonical per-model device-test suite — the SAME cases + gold + thresholds forge/goal_npu validates
- * against (`QHexRT2/testing/suites/<modelId>.json`, synced into `androidTest/assets/npu_suites/`). When a
+ * against (`QHexRT/device_suites/suites/<modelId>.json`, synced into `androidTest/assets/npu_suites/`). When a
  * suite is shipped for a model, the harness runs THESE cases with its declared Android-executable metric.
  * The host aggregator rejects unknown or unapplied gate fields.
  */
@@ -438,24 +464,48 @@ class NpuSuite(
     val sha256: String,
 ) {
     val modality: String get() = o.optString("modality")
+    val hfRevision: String get() = o.optString("hf_revision")
+    private val coverage: JSONObject get() = o.optJSONObject("coverage") ?: JSONObject()
+    val coverageScope: String get() = coverage.optString("scope")
+    val coverageReason: String get() = coverage.optString("reason")
     private val selectedProfile: JSONObject get() = o.optJSONObject("selected_profile") ?: JSONObject()
+    private val publishedBundle: JSONObject get() = o.optJSONObject("published_bundle") ?: JSONObject()
+    val publishedRevision: String get() = publishedBundle.optString("revision")
     private val gate: JSONObject get() = o.optJSONObject("gate") ?: JSONObject()
     val policySha256: String get() = selectedProfile.optString("policy_sha256")
-    val manifestSha256: String get() = selectedProfile.optString("manifest_sha256")
-    val contextSha256: String get() = selectedProfile.optString("context_sha256")
+    val manifestSha256: String
+        get() =
+            selectedProfile.optString("manifest_sha256").takeIf { it.isNotBlank() }
+                ?: artifactSha256s.entries.firstOrNull {
+                    it.key.endsWith(".json") &&
+                        !it.key.endsWith("tokenizer.json") &&
+                        !it.key.endsWith("config.json")
+                }?.value.orEmpty()
+    val contextSha256: String get() = contextSha256s.firstOrNull().orEmpty()
     val contextSha256s: List<String>
-        get() = selectedProfile.optJSONArray("context_sha256s")
-            ?.let { a -> (0 until a.length()).map { a.getString(it) } }
-            ?.takeIf { it.isNotEmpty() }
-            ?: listOfNotNull(contextSha256.takeIf { it.isNotBlank() })
+        get() {
+            val selected =
+                selectedProfile.optJSONArray("context_sha256s")
+                    ?.let { a -> (0 until a.length()).map { a.getString(it) } }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: selectedProfile.optString("context_sha256")
+                        .takeIf { it.isNotBlank() }
+                        ?.let(::listOf)
+            return selected ?: artifactSha256s.filterKeys { it.endsWith(".bin") }.values.toList()
+        }
     val artifactSha256s: Map<String, String>
         get() {
-            val values = selectedProfile.optJSONObject("artifact_sha256s") ?: return emptyMap()
             val result = linkedMapOf<String, String>()
-            val keys = values.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                result[key] = values.getString(key)
+            for (values in listOf(
+                publishedBundle.optJSONObject("artifact_sha256s"),
+                selectedProfile.optJSONObject("artifact_sha256s"),
+            )) {
+                if (values == null) continue
+                val keys = values.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    result[key] = values.getString(key)
+                }
             }
             return result
         }
@@ -517,22 +567,34 @@ class NpuSuite(
     )
     val cases: List<SuiteCase> get() = o.optJSONArray("cases")
         ?.let { a -> (0 until a.length()).map { SuiteCase(a.getJSONObject(it)) } } ?: emptyList()
+    val inputAssetNames: List<String> get() = cases.flatMap { it.assetNames }.distinct().sorted()
 
     companion object {
         /** Load `assets/npu_suites/<modelId>.json` from the TEST apk; null if none shipped for this model. */
-        fun load(assets: android.content.res.AssetManager, modelId: String): NpuSuite? = try {
-            val raw = assets.open("npu_suites/$modelId.json").use { it.readBytes() }
+        fun load(assets: android.content.res.AssetManager, modelId: String): NpuSuite? {
+            val filename = "$modelId.json"
+            if (filename !in (assets.list("npu_suites")?.toSet() ?: emptySet())) return null
+            val raw = assets.open("npu_suites/$filename").use { it.readBytes() }
             val payload = JSONObject(String(raw, Charsets.UTF_8))
             require(payload.optString("schema") == "npu_suite/v1")
             require(payload.optString("model_id") == modelId)
+            val expectedArch = Regex("_(v[0-9]+)$").find(modelId)?.groupValues?.get(1)
+            require(expectedArch != null && payload.optString("arch") == expectedArch)
+            require(payload.optString("hf_revision").matches(Regex("[0-9a-f]{40}")))
+            val scope = payload.optJSONObject("coverage")?.optString("scope")
+            require(scope == "acceptance" || scope == "smoke_only")
+            payload.optJSONObject("published_bundle")?.let { published ->
+                require(published.optString("revision") == payload.optString("hf_revision"))
+                require((published.optJSONObject("artifact_sha256s")?.length() ?: 0) > 0)
+            }
             require((payload.optJSONArray("cases")?.length() ?: 0) > 0)
             require(payload.optJSONObject("gate") != null)
-            NpuSuite(
+            return NpuSuite(
                 o = payload,
                 suiteId = modelId,
                 sha256 = MessageDigest.getInstance("SHA-256").digest(raw)
                     .joinToString("") { "%02x".format(it.toInt() and 0xff) },
             )
-        } catch (e: Exception) { null }
+        }
     }
 }

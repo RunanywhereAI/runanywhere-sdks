@@ -167,6 +167,43 @@ const char* manifest_leaf_ext_for(const rac_bundle_policy_t* policy) {
                : nullptr;
 }
 
+// Let an engine-owned policy select a device/runtime-specific folder while
+// commons remains responsible only for validating and inserting the returned
+// path segment. Policies without a resolver keep the existing folder behavior.
+rac_result_t maybe_resolve_logical_bundle_ref(const rac_bundle_policy_t* policy,
+                                              runanywhere::v1::RegisterModelFromUrlRequest* request,
+                                              rac_proto_buffer_t* out_proto) {
+    if (policy == nullptr || policy->resolve_variant == nullptr || request == nullptr) {
+        return RAC_SUCCESS;
+    }
+
+    namespace hf = rac::infra::model_management::hf;
+    const char* manifest_leaf_ext = manifest_leaf_ext_for(policy);
+    if (!hf::is_logical_variant_folder_ref(request->url(), manifest_leaf_ext)) {
+        return RAC_SUCCESS;
+    }
+
+    char variant[64] = {};
+    char error_message[256] = {};
+    const rac_result_t resolve_rc =
+        policy->resolve_variant(variant, sizeof(variant), error_message, sizeof(error_message));
+    if (resolve_rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(
+            out_proto, resolve_rc,
+            error_message[0] != '\0' ? error_message : "bundle variant resolution failed");
+    }
+
+    std::string resolved_ref;
+    if (!hf::make_variant_folder_ref(request->url(), variant, manifest_leaf_ext, &resolved_ref)) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_INVALID_ARGUMENT,
+                                          "bundle policy returned an invalid variant folder");
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "Resolved logical bundle with engine variant %s", variant);
+    request->set_url(resolved_ref);
+    return RAC_SUCCESS;
+}
+
 // Resolve a folder-level Hugging Face ref (hf.co/org/repo/<subdir>, or a
 // manifest-leaf ref when the framework's bundle policy allows it) into a
 // multi-file registration carrying EVERY file under the subfolder — the
@@ -325,6 +362,11 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
             // specifics live in the policy — none here.
             const rac_inference_framework_t framework = framework_for(request);
             const rac_bundle_policy_t* policy = bundle_policy_for(framework);
+            const rac_result_t variant_rc =
+                maybe_resolve_logical_bundle_ref(policy, &request, out_proto);
+            if (variant_rc != RAC_SUCCESS) {
+                return variant_rc;
+            }
             const char* manifest_leaf_ext = manifest_leaf_ext_for(policy);
             if (hf::is_folder_ref(request.url(), manifest_leaf_ext)) {
                 return register_from_hf_folder(request, policy, out_proto);

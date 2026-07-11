@@ -249,8 +249,7 @@ int test_build_search_web_followup_prompt() {
     ASSERT_SUBSTR(prompt, "API 34");
     ASSERT_SUBSTR(prompt, "API 35");
     ASSERT_SUBSTR(prompt, "API 36");
-    ASSERT_SUBSTR(prompt,
-                  "https://developer.android.com/google/play/requirements/target-sdk");
+    ASSERT_SUBSTR(prompt, "https://developer.android.com/google/play/requirements/target-sdk");
     ASSERT_TRUE(std::strstr(prompt, "discarded noisy result") == nullptr);
     ASSERT_TRUE(std::strlen(prompt) < 2600);
     rac_free(prompt);
@@ -477,38 +476,117 @@ int test_format_prompt_proto_round_trip() {
 #if !defined(RAC_HAVE_PROTOBUF)
     return 0;
 #else
-    runanywhere::v1::ToolPromptFormatRequest request;
-    auto* options = request.mutable_options();
-    options->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_PYTHONIC);
-    auto* tool = options->add_tools();
-    tool->set_name("get_weather");
-    tool->set_description("Get weather for a city");
-    auto* param = tool->add_parameters();
-    param->set_name("location");
-    param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
-    param->set_description("City name");
-    param->set_required(true);
+    for (const auto format : {runanywhere::v1::TOOL_CALL_FORMAT_NAME_PYTHONIC,
+                              runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON}) {
+        runanywhere::v1::ToolPromptFormatRequest request;
+        request.set_user_prompt("Invoke the typed tool with every required argument.");
+        auto* options = request.mutable_options();
+        options->set_format(format);
+        options->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+        options->set_forced_tool_name("typed_tool");
+        options->set_require_json_arguments(true);
+        auto* tool = options->add_tools();
+        tool->set_name("typed_tool");
+        tool->set_description("Exercise every portable parameter type");
+        const auto add_parameter = [tool](const char* name,
+                                          runanywhere::v1::ToolParameterType type) {
+            auto* parameter = tool->add_parameters();
+            parameter->set_name(name);
+            parameter->set_type(type);
+            parameter->set_required(true);
+        };
+        add_parameter("text", runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
+        add_parameter("score", runanywhere::v1::TOOL_PARAMETER_TYPE_NUMBER);
+        add_parameter("enabled", runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN);
+        add_parameter("metadata", runanywhere::v1::TOOL_PARAMETER_TYPE_OBJECT);
+        add_parameter("items", runanywhere::v1::TOOL_PARAMETER_TYPE_ARRAY);
+        add_parameter("fallback", runanywhere::v1::TOOL_PARAMETER_TYPE_UNSPECIFIED);
 
-    std::string request_bytes;
-    ASSERT_TRUE(request.SerializeToString(&request_bytes));
+        std::string request_bytes;
+        ASSERT_TRUE(request.SerializeToString(&request_bytes));
 
-    rac_proto_buffer_t result_bytes{};
-    rac_proto_buffer_init(&result_bytes);
-    const rac_result_t rc =
-        rac_tool_call_format_prompt_proto(reinterpret_cast<const uint8_t*>(request_bytes.data()),
-                                          request_bytes.size(), &result_bytes);
-    ASSERT_EQ_INT(rc, RAC_SUCCESS);
-    ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
-    ASSERT_TRUE(result_bytes.data != nullptr);
+        rac_proto_buffer_t result_bytes{};
+        rac_proto_buffer_init(&result_bytes);
+        rac_result_t rc = rac_tool_call_format_prompt_proto(
+            reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
+            &result_bytes);
+        ASSERT_EQ_INT(rc, RAC_SUCCESS);
+        ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
+        ASSERT_TRUE(result_bytes.data != nullptr);
 
-    runanywhere::v1::ToolPromptFormatResult result;
-    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
-    ASSERT_EQ_INT(result.error_code(), RAC_SUCCESS);
-    ASSERT_EQ_STR(result.format_hint().c_str(), "lfm2");
-    ASSERT_SUBSTR(result.formatted_prompt().c_str(), "get_weather");
-    ASSERT_SUBSTR(result.formatted_prompt().c_str(), "<|tool_call_start|>");
+        runanywhere::v1::ToolPromptFormatResult format_result;
+        ASSERT_TRUE(
+            format_result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
+        ASSERT_EQ_INT(format_result.error_code(), RAC_SUCCESS);
+        ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "typed_tool");
+        ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "\"type\":\"string\"");
+        ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "\"type\":\"number\"");
+        ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "\"type\":\"boolean\"");
+        ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "\"type\":\"object\"");
+        ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "\"type\":\"array\"");
+        rac_proto_buffer_free(&result_bytes);
 
-    rac_proto_buffer_free(&result_bytes);
+        std::string model_output;
+        if (format == runanywhere::v1::TOOL_CALL_FORMAT_NAME_PYTHONIC) {
+            ASSERT_EQ_STR(format_result.format_hint().c_str(), "lfm2");
+            ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "score=0");
+            ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "enabled=true");
+            ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "metadata={}");
+            ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "items=[]");
+            model_output =
+                R"(<|tool_call_start|>[typed_tool(text="hello, world", score=12.5, enabled=true, metadata={"nested":{"values":[1,2]},"label":"x,y"}, items=[{"id":1},{"id":2}], fallback="plain")]<|tool_call_end|>)";
+        } else {
+            ASSERT_EQ_STR(format_result.format_hint().c_str(), "default");
+            ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "\"metadata\":{}");
+            ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "\"items\":[]");
+            model_output =
+                R"(<tool_call>{"tool":"typed_tool","arguments":{"text":"hello, world","score":12.5,"enabled":true,"metadata":{"nested":{"values":[1,2]},"label":"x,y"},"items":[{"id":1},{"id":2}],"fallback":"plain"}}</tool_call>)";
+        }
+
+        runanywhere::v1::ToolParseRequest parse_request;
+        parse_request.set_text(model_output);
+        *parse_request.mutable_options() = *options;
+        std::string parse_bytes;
+        ASSERT_TRUE(parse_request.SerializeToString(&parse_bytes));
+        rac_proto_buffer_init(&result_bytes);
+        rc = rac_tool_call_parse_proto(reinterpret_cast<const uint8_t*>(parse_bytes.data()),
+                                       parse_bytes.size(), &result_bytes);
+        ASSERT_EQ_INT(rc, RAC_SUCCESS);
+        runanywhere::v1::ToolParseResult parse_result;
+        ASSERT_TRUE(
+            parse_result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
+        ASSERT_EQ_INT(parse_result.has_tool_call(), true);
+        ASSERT_EQ_INT(parse_result.tool_calls_size(), 1);
+        ASSERT_EQ_STR(parse_result.tool_calls(0).name().c_str(), "typed_tool");
+        ASSERT_SUBSTR(parse_result.tool_calls(0).arguments_json().c_str(), "\"score\":12.5");
+        ASSERT_SUBSTR(parse_result.tool_calls(0).arguments_json().c_str(), "\"enabled\":true");
+        ASSERT_SUBSTR(parse_result.tool_calls(0).arguments_json().c_str(), "\"nested\"");
+        ASSERT_SUBSTR(parse_result.tool_calls(0).arguments_json().c_str(), "\"items\":[{");
+        rac_proto_buffer_free(&result_bytes);
+
+        runanywhere::v1::ToolCallValidationRequest validation_request;
+        *validation_request.mutable_tool_call() = parse_result.tool_calls(0);
+        *validation_request.mutable_options() = *options;
+        std::string validation_bytes;
+        ASSERT_TRUE(validation_request.SerializeToString(&validation_bytes));
+        rac_proto_buffer_init(&result_bytes);
+        rc = rac_tool_call_validate_proto(reinterpret_cast<const uint8_t*>(validation_bytes.data()),
+                                          validation_bytes.size(), &result_bytes);
+        ASSERT_EQ_INT(rc, RAC_SUCCESS);
+        runanywhere::v1::ToolCallValidationResult validation_result;
+        ASSERT_TRUE(validation_result.ParseFromArray(result_bytes.data,
+                                                     static_cast<int>(result_bytes.size)));
+        if (!validation_result.is_valid()) {
+            std::fprintf(stderr, "typed arguments: %s\n",
+                         parse_result.tool_calls(0).arguments_json().c_str());
+            for (const auto& error : validation_result.validation_errors()) {
+                std::fprintf(stderr, "typed validation error: %s\n", error.c_str());
+            }
+        }
+        ASSERT_EQ_INT(validation_result.is_valid(), true);
+        ASSERT_EQ_INT(validation_result.validation_errors_size(), 0);
+        rac_proto_buffer_free(&result_bytes);
+    }
     return 0;
 #endif
 }
@@ -588,8 +666,7 @@ int main(int argc, char** argv) {
         {.name = "build_initial_prompt_e2e", .fn = test_build_initial_prompt_end_to_end},
         {.name = "build_followup_prompt_no_tools", .fn = test_build_followup_prompt_no_tools},
         {.name = "build_followup_prompt_keep_tools", .fn = test_build_followup_prompt_keep_tools},
-        {.name = "build_search_web_followup_prompt",
-         .fn = test_build_search_web_followup_prompt},
+        {.name = "build_search_web_followup_prompt", .fn = test_build_search_web_followup_prompt},
         {.name = "normalize_json_unquoted_keys", .fn = test_normalize_json_unquoted_keys},
         {.name = "free_functions_idempotent", .fn = test_free_functions_idempotent},
         {.name = "format_name_round_trip", .fn = test_format_name_round_trip},

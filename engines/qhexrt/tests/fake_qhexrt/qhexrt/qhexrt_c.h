@@ -15,6 +15,7 @@ typedef struct qhx_session qhx_session;
 typedef int qhx_status;
 
 typedef int (*qhx_token_cb)(void* user, const char* utf8, int len, int token_id, int is_final);
+typedef int (*qhx_should_cancel_cb)(void* user);
 
 typedef struct {
     float temperature;
@@ -46,8 +47,14 @@ typedef struct {
     const float* audio;
     int n_audio;
     int audio_sr;
-    int disable_thinking;
 } qhx_inputs;
+
+typedef struct {
+    size_t struct_size;
+    int disable_thinking;
+    qhx_should_cancel_cb should_cancel;
+    void* should_cancel_user;
+} qhx_generate_options;
 
 typedef struct {
     qhx_status status;
@@ -70,8 +77,12 @@ typedef struct {
 void qhx_session_reset(qhx_session* session);
 void qhx_session_cancel(qhx_session* session);
 void qhx_gen_cfg_default(qhx_gen_cfg* cfg);
+void qhx_generate_options_default(qhx_generate_options* options);
 qhx_status qhx_generate(qhx_session* session, const qhx_inputs* inputs, const qhx_gen_cfg* cfg,
                         qhx_token_cb callback, void* user, qhx_output* output);
+qhx_status qhx_generate_ex(qhx_session* session, const qhx_inputs* inputs, const qhx_gen_cfg* cfg,
+                           const qhx_generate_options* options,
+                           qhx_token_cb callback, void* user, qhx_output* output);
 const char* qhx_status_str(qhx_status status);
 
 #ifdef __cplusplus

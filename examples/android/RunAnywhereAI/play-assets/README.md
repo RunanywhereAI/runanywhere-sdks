@@ -51,6 +51,6 @@ dimensions, type, and depth. Both raw and Play-ready directories include
 - `STORE_LISTING_DRAFT.md`: proposed English listing copy and screenshot alt
   text. Publisher contact and policy fields still require confirmation.
 
-Do not upload a release until the policy, privacy/Data Safety, licensing,
-production search proxy, and Play Console declaration gates in
-`docs/PLAY_STORE_RELEASE.md` are complete.
+Do not upload a release until the project's internal policy, privacy/Data
+Safety, licensing, production-search, and Play Console declaration gates are
+complete.

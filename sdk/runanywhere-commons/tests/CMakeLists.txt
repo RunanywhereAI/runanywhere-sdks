@@ -73,6 +73,16 @@ set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 # subdirectory of the top-level project.
 include_directories(${CMAKE_CURRENT_LIST_DIR}/../src)
 
+# --- Kotlin JNI request cancellation admission ----------------------
+# Header-only relay used by request-scoped VLM/RAG JNI wrappers. Covers
+# cancel-before-entry ownership, backend-publication retry, and the completion
+# exclusion that prevents a stale pulse from reaching a successor request.
+find_package(Threads REQUIRED)
+add_executable(test_jni_request_cancellation_relay test_jni_request_cancellation_relay.cpp)
+target_compile_features(test_jni_request_cancellation_relay PRIVATE cxx_std_20)
+target_link_libraries(test_jni_request_cancellation_relay PRIVATE Threads::Threads)
+add_test(NAME jni_request_cancellation_relay_tests COMMAND test_jni_request_cancellation_relay)
+
 # --- DAG graph primitives unit tests --------------------------
 # CancelToken + RingBuffer + StreamEdge. Header-only
 # primitives; no backend dependency. Always built.
@@ -1468,11 +1478,15 @@ add_test(NAME hf_resolver_folder_tests COMMAND test_hf_resolver_folder)
 # Registry semantics plus the real QHexRT manifest predicate, included
 # header-only from engines/qhexrt (public-repo source; no prebuilt engine
 # needed) and driven through the generic folder resolver.
-add_executable(test_bundle_policy test_bundle_policy.cpp)
+add_executable(test_bundle_policy
+    test_bundle_policy.cpp
+    ${CMAKE_SOURCE_DIR}/engines/qhexrt/qhexrt_device_capability.cpp
+)
 target_include_directories(test_bundle_policy PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
     ${CMAKE_SOURCE_DIR}/engines/qhexrt
+    ${CMAKE_SOURCE_DIR}/engines/qhexrt/include
 )
 target_link_libraries(test_bundle_policy PRIVATE rac_commons)
 rac_link_archive_deps(test_bundle_policy)

@@ -56,8 +56,8 @@ RAC_API rac_result_t rac_backend_rag_unregister(void);
 /**
  * @brief Create a RAG session from serialized runanywhere.v1.RAGConfiguration bytes.
  *
- * The returned handle is an internal RAG pipeline carried as rac_handle_t for
- * uniform frontend FFI. Destroy it with rac_rag_session_destroy_proto().
+ * The returned handle is an opaque RAG-session token carried as rac_handle_t
+ * for uniform frontend FFI. Destroy it with rac_rag_session_destroy_proto().
  */
 RAC_API rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
                                                   size_t config_proto_size,
@@ -65,6 +65,11 @@ RAC_API rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_by
 
 /**
  * @brief Destroy a RAG session created by rac_rag_session_create_proto().
+ *
+ * The handle stops admitting new operations before active query cancellation
+ * is requested. Resources remain valid until already-admitted operations have
+ * returned, so this function is safe to call concurrently with all other RAG
+ * session operations.
  */
 RAC_API void rac_rag_session_destroy_proto(rac_handle_t session);
 

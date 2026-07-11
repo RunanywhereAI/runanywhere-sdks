@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.ui.components.WebSearchDisclosureDialog
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -69,6 +70,13 @@ fun ToolsScreen(viewModel: ToolsViewModel = viewModel()) {
                 }
             }
         }
+    }
+
+    if (viewModel.showWebSearchDisclosure) {
+        WebSearchDisclosureDialog(
+            onAllow = viewModel::acceptWebSearchDisclosure,
+            onDismiss = viewModel::dismissWebSearchDisclosure,
+        )
     }
 }
 

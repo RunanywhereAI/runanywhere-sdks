@@ -44,6 +44,7 @@ import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
@@ -58,7 +59,8 @@ import java.security.MessageDigest
  *     anything the SDK does not surface (load ms, peak RSS/PSS, RTF, tok/s);
  *  2. compares the output to a baseline with the same rubric forge holds every model
  *     to (ASR WER<=0.05, LLM answer+coherence, TTS exact sample-rate + non-silence,
- *     VLM keyword, inpaint PSNR + unmasked preservation) — see [NpuBench.kt];
+ *     VLM keyword, and inpaint execution-smoke shape/unmasked-preservation/
+ *     masked-region-change checks with no fp32 or perceptual-quality claim) — see [NpuBench.kt];
  *  3. asserts the NPU actually served it (loaded framework == QHEXRT, arch match).
  *
  * A rich JSON report lands in the app external-files dir (adb-pullable) plus a compact
@@ -105,6 +107,7 @@ class NpuModelE2ETest {
         val baseUrl: String?,
         val treeSha256: String,
         val files: List<LocalBundleFile>,
+        val canonicalReceiptVerified: Boolean,
     )
 
     @Test
@@ -112,9 +115,17 @@ class NpuModelE2ETest {
         val args = InstrumentationRegistry.getArguments()
         val selection = resolveModel(args) ?: run {
             val requestedModelId = args.getString("modelId")?.takeIf { it.isNotBlank() }
+            val requestedHfRepo = args.getString("hfRepo")?.takeIf { it.isNotBlank() }
+            if (requestedModelId == null && requestedHfRepo == null) {
+                val message =
+                    "NPU model arguments are required; run scripts/run_npu_e2e.sh or pass -e modelId <id>"
+                Log.i(tag, "NPU_E2E status=SKIP phase=lookup detail=\"$message\"")
+                assumeTrue(message, false)
+                return
+            }
             val message = requestedModelId?.let {
                 "unknown -e modelId '$it' (expected a ModelCatalog.npuCatalog id, optionally suffixed with _v75/_v79/_v81/_v83)"
-            } ?: "invalid selection: use -e modelId <id> or a catalog-backed -e hfRepo <repo> with modality and manifest"
+            } ?: "invalid selection for -e hfRepo '$requestedHfRepo': use a catalog-backed repo with modality and manifest"
             Log.i(tag, "NPU_E2E status=FAIL phase=lookup detail=\"$message\"")
             assertTrue(message, false)
             return
@@ -157,6 +168,7 @@ class NpuModelE2ETest {
         var finalPhase = phase
         var finalDetail = "run did not complete"
         var registrationPersisted = false
+        var acceptanceEligible = false
         runBlocking {
             try {
                 awaitSdkReady(180_000)
@@ -183,6 +195,23 @@ class NpuModelE2ETest {
 
                 val acquisitionSuite = loadSuite(model.id, expectedArch)
                 val localBundle = validateLocalBundle(args, acquisitionSuite, report)
+                val declaredScope = acquisitionSuite?.coverageScope ?: "smoke_only"
+                val immutableBundleVerified = localBundle?.canonicalReceiptVerified == true
+                acceptanceEligible = declaredScope == "acceptance" && immutableBundleVerified
+                report.put("hf_revision", acquisitionSuite?.hfRevision)
+                    .put("declared_validation_scope", declaredScope)
+                    .put("validation_scope", if (acceptanceEligible) "acceptance" else "smoke_only")
+                    .put("acceptance_eligible", acceptanceEligible)
+                    .put("bundle_revision_verified", immutableBundleVerified)
+                    .put(
+                        "scope_reason",
+                        when {
+                            declaredScope == "smoke_only" -> acquisitionSuite?.coverageReason.orEmpty()
+                            !immutableBundleVerified ->
+                                "SDK HF registration resolves mutable remote state; no exact-hash local bundle was verified."
+                            else -> "canonical acceptance suite with exact-hash local bundle"
+                        },
+                    )
 
                 phase = "register"
                 val registered =
@@ -339,6 +368,14 @@ class NpuModelE2ETest {
                     .put("suite_id", suite?.suiteId)
                     .put("suite_sha256", suite?.sha256)
                     .put("declared_gate_keys", JSONArray(suite?.gateKeys.orEmpty()))
+                    .put(
+                        "input_asset_sha256s",
+                        JSONObject().also { hashes ->
+                            suite?.inputAssetNames?.forEach { name ->
+                                hashes.put(name, sha256(testAsset(name)))
+                            }
+                        },
+                    )
                     .gate("canonical_suite", suite != null)
                 when (model.category) {
                     ModelCategory.MODEL_CATEGORY_LANGUAGE -> runLlm(report, suite, maxNew)
@@ -354,9 +391,12 @@ class NpuModelE2ETest {
                     .put("peak_pss_mb", round2(NpuMetrics.totalPssKb() / 1024.0))
 
                 phase = "done"
-                finalStatus = if (report.allGatesPass()) "PASS" else "FAIL"
+                finalStatus =
+                    if (!report.allGatesPass()) "FAIL"
+                    else if (acceptanceEligible) "PASS"
+                    else "SMOKE_PASS"
                 finalPhase = phase
-                finalDetail = if (finalStatus == "PASS") "ok" else "gate(s) failed"
+                finalDetail = if (finalStatus == "FAIL") "gate(s) failed" else "ok"
             } catch (e: TimeoutCancellationException) {
                 finalPhase = phase
                 finalDetail = "timeout in $phase"
@@ -384,7 +424,7 @@ class NpuModelE2ETest {
                         .put("success", false)
                         .put("reason", "keepModel=true"))
                         .gate("delete_model", false)
-                    val deleteWasPrimaryFailure = finalStatus == "PASS"
+                    val deleteWasPrimaryFailure = finalStatus in setOf("PASS", "SMOKE_PASS")
                     finalStatus = "FAIL"
                     if (deleteWasPrimaryFailure) finalPhase = "delete"
                     finalDetail = appendDetail(finalDetail, "model deletion skipped because keepModel=true")
@@ -412,7 +452,7 @@ class NpuModelE2ETest {
                             .put("error_message", result.error_message))
                             .gate("delete_model", deleteOk)
                         if (!deleteOk) {
-                            val deleteWasPrimaryFailure = finalStatus == "PASS"
+                            val deleteWasPrimaryFailure = finalStatus in setOf("PASS", "SMOKE_PASS")
                             finalStatus = "FAIL"
                             if (deleteWasPrimaryFailure) finalPhase = "delete"
                             val reason = result.error_message.ifBlank {
@@ -428,7 +468,7 @@ class NpuModelE2ETest {
                             .put("duration_ms", System.currentTimeMillis() - deleteStart)
                             .put("error_message", "${e.javaClass.simpleName}: ${e.message}"))
                             .gate("delete_model", false)
-                        val deleteWasPrimaryFailure = finalStatus == "PASS"
+                        val deleteWasPrimaryFailure = finalStatus in setOf("PASS", "SMOKE_PASS")
                         finalStatus = "FAIL"
                         if (deleteWasPrimaryFailure) finalPhase = "delete"
                         finalDetail = appendDetail(finalDetail, "model deletion failed: ${e.javaClass.simpleName}: ${e.message}")
@@ -439,7 +479,10 @@ class NpuModelE2ETest {
             }
         }
         Log.i(tag, line)
-        assertTrue("NPU_E2E FAIL — see the NPU_E2E line / report json ($line)", line.contains("status=PASS"))
+        assertTrue(
+            "NPU_E2E FAIL — see the NPU_E2E line / report json ($line)",
+            line.contains("status=PASS") || line.contains("status=SMOKE_PASS"),
+        )
     }
 
     private fun appendDetail(current: String, extra: String): String =
@@ -476,7 +519,10 @@ class NpuModelE2ETest {
                 val drift = gold?.let { NpuMetrics.normalizedTokenEdit(g.tokenIds, it) } // vs base gold (informational)
                 val repetitionRatio = NpuMetrics.wordRepeatRatio(g.text)
                 val coherent = g.text.isNotBlank() && repetitionRatio < NpuRubric.REPEAT_MAX
-                val keywordMatch = c.keywords.any { g.text.contains(it, ignoreCase = true) }
+                val visibleAnswer = NpuMetrics.answerText(g.text)
+                val keywordMatch = visibleAnswer.isNotBlank() && c.keywords.any {
+                    NpuMetrics.containsKeyword(visibleAnswer, it)
+                }
                 val pass = coherent && keywordMatch
                 if (pass) passN++
                 if (g.outTok > 0) {
@@ -499,8 +545,8 @@ class NpuModelE2ETest {
             }
             val frac = passN.toDouble() / suiteCases.size
             report.put("suite_pass_frac", round2(frac))
-            report.gate("llm_answer_suite", frac >= suite.passFrac - 1e-9)
-            val decodeGate = n == suiteCases.size && minimumDecodeToks >= suite.minDecodeToks - 1e-9
+            report.gate("llm_answer_suite", frac >= suite.passFrac)
+            val decodeGate = n == suiteCases.size && minimumDecodeToks >= suite.minDecodeToks
             report.gate("llm_min_decode_toks", decodeGate)
                 .put("minimum_decode_toks", if (n > 0) round2(minimumDecodeToks) else 0.0)
                 .put("required_min_decode_toks", suite.minDecodeToks)
@@ -573,7 +619,8 @@ class NpuModelE2ETest {
                     RAVLMGenerationOptions(prompt = prompt, max_tokens = budget, temperature = 0f, top_p = 0f, top_k = 0))
             }
             val text = r.text.trim()
-            val pass = text.isNotBlank() && kws.any { text.contains(it, ignoreCase = true) }
+            val visibleAnswer = NpuMetrics.answerText(text)
+            val pass = visibleAnswer.isNotBlank() && kws.any { NpuMetrics.containsKeyword(visibleAnswer, it) }
             if (pass) passed++
             report.addSample(JSONObject().put("idx", i).put("id", id).put("input", prompt)
                 .put("output", text).put("expect_keywords", JSONArray(kws))
@@ -589,7 +636,7 @@ class NpuModelE2ETest {
         }
         val passFraction = passed.toDouble() / imgCases.size
         report.put("suite_pass_frac", round6(passFraction))
-            .gate("vlm_keyword_suite", passFraction >= suite.passFrac - 1e-9)
+            .gate("vlm_keyword_suite", passFraction >= suite.passFrac)
     }
 
     // ------------------------------------------------------------ INPAINT ----
@@ -600,17 +647,24 @@ class NpuModelE2ETest {
         outDir: File?,
     ) {
         requireNotNull(suite) { "inpaint requires a canonical npu_suite/v1 baseline" }
+        val smokeOnly = suite.metric == "inpaint_execution_smoke"
+        require(smokeOnly || suite.metric == "inpaint_forge_parity+passthrough_detection") {
+            "unsupported inpaint suite metric ${suite.metric}"
+        }
         val cases =
             suite.cases.filter {
-                it.imageAsset != null && it.maskAsset != null && it.referenceImageAsset != null
+                it.imageAsset != null && it.maskAsset != null && (smokeOnly || it.referenceImageAsset != null)
             }
-        require(cases.isNotEmpty()) { "inpaint suite has no image+mask+reference cases" }
+        require(cases.isNotEmpty()) {
+            if (smokeOnly) "inpaint smoke suite has no image+mask cases"
+            else "inpaint parity suite has no image+mask+reference cases"
+        }
         require(cases.size >= suite.minInputs) {
             "inpaint suite has ${cases.size} cases, requires at least ${suite.minInputs}"
         }
         report.gate("inpaint_min_inputs", cases.size >= suite.minInputs)
         recordExecutedCases(report, cases)
-        report.put("parity_metric", "inpaint_forge_parity+passthrough_detection")
+        report.put("parity_metric", suite.metric)
 
         var passed = 0
         var totalLatencyMs = 0.0
@@ -630,7 +684,6 @@ class NpuModelE2ETest {
             val expectedHeight = case.expectedHeight.takeIf { it > 0 } ?: 512
             val imageBytes = testAsset(case.imageAsset!!)
             val maskBytes = testAsset(case.maskAsset!!)
-            val referenceBytes = testAsset(case.referenceImageAsset!!)
             val started = System.currentTimeMillis()
             val result =
                 withTimeout(INFER_TIMEOUT_MS) {
@@ -669,7 +722,9 @@ class NpuModelE2ETest {
             val metricMaskBytes = case.metricMaskAsset?.let(::testAsset) ?: maskBytes
             val inputRgb = decodeRgb(metricImageBytes, expectedWidth, expectedHeight)
             val mask = decodeMask(metricMaskBytes, expectedWidth, expectedHeight)
-            val referenceRgb = decodeRgb(referenceBytes, expectedWidth, expectedHeight)
+            val referenceRgb =
+                if (smokeOnly) inputRgb
+                else decodeRgb(testAsset(requireNotNull(case.referenceImageAsset)), expectedWidth, expectedHeight)
             val candidateRgb = rgbaToRgb(rgba)
             val metric =
                 NpuMetrics.inpaintMetrics(
@@ -682,27 +737,34 @@ class NpuModelE2ETest {
                 )
             measuredCases++
             val pass =
-                metric.fullCosine >= suite.fullCosineMin &&
-                    metric.holeCosine >= suite.holeCosineMin &&
-                    metric.holeRelativeL2 <= suite.holeRelativeL2Max &&
-                    metric.fullPsnrDb >= suite.fullPsnrMin &&
-                    metric.holePsnrDb >= suite.holePsnrMin &&
-                    metric.seamPsnrDb >= suite.seamPsnrMin &&
+                if (smokeOnly) {
                     metric.unmaskedMeanAbsoluteError <= suite.unmaskedMaeMax &&
-                    metric.unmaskedP99AbsoluteError <= suite.unmaskedP99Max &&
-                    metric.unmaskedWithinOneLsbFraction >= suite.unmaskedWithinOneMin &&
-                    metric.holeChangedFraction >= suite.holeChangedMin
+                        metric.holeChangedFraction >= suite.holeChangedMin
+                } else {
+                    metric.fullCosine >= suite.fullCosineMin &&
+                        metric.holeCosine >= suite.holeCosineMin &&
+                        metric.holeRelativeL2 <= suite.holeRelativeL2Max &&
+                        metric.fullPsnrDb >= suite.fullPsnrMin &&
+                        metric.holePsnrDb >= suite.holePsnrMin &&
+                        metric.seamPsnrDb >= suite.seamPsnrMin &&
+                        metric.unmaskedMeanAbsoluteError <= suite.unmaskedMaeMax &&
+                        metric.unmaskedP99AbsoluteError <= suite.unmaskedP99Max &&
+                        metric.unmaskedWithinOneLsbFraction >= suite.unmaskedWithinOneMin &&
+                        metric.holeChangedFraction >= suite.holeChangedMin
+                }
             if (pass) passed++
-            minimumFullCosine = minOf(minimumFullCosine, metric.fullCosine)
-            minimumHoleCosine = minOf(minimumHoleCosine, metric.holeCosine)
-            maximumHoleRelativeL2 = maxOf(maximumHoleRelativeL2, metric.holeRelativeL2)
-            minimumFullPsnr = minOf(minimumFullPsnr, metric.fullPsnrDb)
-            minimumHolePsnr = minOf(minimumHolePsnr, metric.holePsnrDb)
-            minimumSeamPsnr = minOf(minimumSeamPsnr, metric.seamPsnrDb)
+            if (!smokeOnly) {
+                minimumFullCosine = minOf(minimumFullCosine, metric.fullCosine)
+                minimumHoleCosine = minOf(minimumHoleCosine, metric.holeCosine)
+                maximumHoleRelativeL2 = maxOf(maximumHoleRelativeL2, metric.holeRelativeL2)
+                minimumFullPsnr = minOf(minimumFullPsnr, metric.fullPsnrDb)
+                minimumHolePsnr = minOf(minimumHolePsnr, metric.holePsnrDb)
+                minimumSeamPsnr = minOf(minimumSeamPsnr, metric.seamPsnrDb)
+                maximumUnmaskedP99 = maxOf(maximumUnmaskedP99, metric.unmaskedP99AbsoluteError)
+                minimumUnmaskedWithinOne =
+                    minOf(minimumUnmaskedWithinOne, metric.unmaskedWithinOneLsbFraction)
+            }
             maximumUnmaskedMae = maxOf(maximumUnmaskedMae, metric.unmaskedMeanAbsoluteError)
-            maximumUnmaskedP99 = maxOf(maximumUnmaskedP99, metric.unmaskedP99AbsoluteError)
-            minimumUnmaskedWithinOne =
-                minOf(minimumUnmaskedWithinOne, metric.unmaskedWithinOneLsbFraction)
             minimumHoleChanged = minOf(minimumHoleChanged, metric.holeChangedFraction)
             outDir?.let {
                 writeRgbaPng(
@@ -712,7 +774,7 @@ class NpuModelE2ETest {
                     expectedHeight,
                 )
             }
-            report.addSample(
+            val sample =
                 JSONObject()
                     .put("idx", index)
                     .put("id", case.id)
@@ -720,42 +782,46 @@ class NpuModelE2ETest {
                     .put("mask", case.maskAsset)
                     .put("metric_input", case.metricImageAsset ?: case.imageAsset)
                     .put("metric_mask", case.metricMaskAsset ?: case.maskAsset)
-                    .put("reference", case.referenceImageAsset)
+                    .put("reference", case.referenceImageAsset ?: JSONObject.NULL)
                     .put("output", "rgba:${rgba.size}bytes@${expectedWidth}x$expectedHeight")
                     .put("latency_ms", round2(latencyMs))
-                    .put("full_cosine", round6(metric.fullCosine))
+                    .put("unmasked_mae_rgb8", round3(metric.unmaskedMeanAbsoluteError))
+                    .put("hole_changed_fraction", round3(metric.holeChangedFraction))
+                    .put("hole_pixels", metric.holePixels)
+                    .put("metric", suite.metric)
+                    .put("pass", pass)
+            if (!smokeOnly) {
+                sample.put("full_cosine", round6(metric.fullCosine))
                     .put("hole_cosine", round6(metric.holeCosine))
                     .put("hole_relative_l2", round6(metric.holeRelativeL2))
                     .put("full_psnr_db", round3(metric.fullPsnrDb))
                     .put("hole_psnr_db", round3(metric.holePsnrDb))
                     .put("seam_psnr_db", round3(metric.seamPsnrDb))
-                    .put("unmasked_mae_rgb8", round3(metric.unmaskedMeanAbsoluteError))
                     .put("unmasked_p99_rgb8", round3(metric.unmaskedP99AbsoluteError))
                     .put("unmasked_within_one_lsb", round3(metric.unmaskedWithinOneLsbFraction))
-                    .put("hole_changed_fraction", round3(metric.holeChangedFraction))
-                    .put("hole_pixels", metric.holePixels)
                     .put("seam_pixels", metric.seamPixels)
-                    .put("metric", "inpaint_forge_parity+passthrough_detection")
-                    .put("pass", pass),
-            )
+            }
+            report.addSample(sample)
             report.gate("inpaint_case_$index", pass)
         }
         val passFraction = passed.toDouble() / cases.size
         report.put("suite_pass_frac", round2(passFraction))
             .put("inpaint_ms", round2(totalLatencyMs / cases.size))
             .put("inpaint_measured_cases", measuredCases)
-            .gate("inpaint_suite", passFraction >= suite.passFrac - 1e-9)
+            .gate("inpaint_suite", passFraction >= suite.passFrac)
         if (measuredCases > 0) {
-            report.put("full_cosine", round6(minimumFullCosine))
-                .put("hole_cosine", round6(minimumHoleCosine))
-                .put("hole_relative_l2", round6(maximumHoleRelativeL2))
-                .put("full_psnr_db", round3(minimumFullPsnr))
-                .put("hole_psnr_db", round3(minimumHolePsnr))
-                .put("seam_psnr_db", round3(minimumSeamPsnr))
-                .put("unmasked_mae_rgb8", round3(maximumUnmaskedMae))
-                .put("unmasked_p99_rgb8", round3(maximumUnmaskedP99))
-                .put("unmasked_within_one_lsb", round6(minimumUnmaskedWithinOne))
+            report.put("unmasked_mae_rgb8", round3(maximumUnmaskedMae))
                 .put("hole_changed_fraction", round6(minimumHoleChanged))
+            if (!smokeOnly) {
+                report.put("full_cosine", round6(minimumFullCosine))
+                    .put("hole_cosine", round6(minimumHoleCosine))
+                    .put("hole_relative_l2", round6(maximumHoleRelativeL2))
+                    .put("full_psnr_db", round3(minimumFullPsnr))
+                    .put("hole_psnr_db", round3(minimumHolePsnr))
+                    .put("seam_psnr_db", round3(minimumSeamPsnr))
+                    .put("unmasked_p99_rgb8", round3(maximumUnmaskedP99))
+                    .put("unmasked_within_one_lsb", round6(minimumUnmaskedWithinOne))
+            }
         }
     }
 
@@ -795,7 +861,7 @@ class NpuModelE2ETest {
         }
         val passFraction = passed.toDouble() / cases.size
         report.put("suite_pass_frac", round6(passFraction))
-            .gate("asr_wer_suite", passFraction >= suite.passFrac - 1e-9)
+            .gate("asr_wer_suite", passFraction >= suite.passFrac)
         if (n > 0) report.put("rtf", round2(rtfSum / n)).put("wer", round3(worstWer))
     }
 
@@ -867,7 +933,7 @@ class NpuModelE2ETest {
                 val negativeCosine = if (caseDimensionOk) cosine(q, n) else 0.0
                 val margin = positiveCosine - negativeCosine
                 minimumMargin = minOf(minimumMargin, margin)
-                val casePass = caseDimensionOk && margin >= suite.minimumPairwiseMargin - 1e-9
+                val casePass = caseDimensionOk && margin >= suite.minimumPairwiseMargin
                 if (casePass) passed++
                 report.addSample(
                     JSONObject()
@@ -891,7 +957,7 @@ class NpuModelE2ETest {
             val passFraction = passed.toDouble() / retrievalCases.size
             report.gate("embed_dim_ok", dimensionOk)
                 .gate("embed_l2_normalized", normalized)
-                .gate("embed_retrieval_ranking", passFraction >= suite.passFrac - 1e-9)
+                .gate("embed_retrieval_ranking", passFraction >= suite.passFrac)
                 .put("embedding_dim", expectedDim)
                 .put("embed_inputs", distinctInputCount)
                 .put("embed_triples", retrievalCases.size)
@@ -959,7 +1025,7 @@ class NpuModelE2ETest {
         val passFraction = passed.toDouble() / cases.size
         report.put("suite_pass_frac", round6(passFraction))
             .put("required_intelligibility_wer_max", suite.intelligibilityWerMax)
-            .gate("tts_device_suite", passFraction >= suite.passFrac - 1e-9)
+            .gate("tts_device_suite", passFraction >= suite.passFrac)
         if (n > 0) report.put("rtf", round2(rtfSum / n))
     }
 
@@ -1017,13 +1083,10 @@ class NpuModelE2ETest {
             args.getString("localBundleTreeSha256")?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
                 ?: throw AssertionError("valid localBundleTreeSha256 is required in local bundle mode")
         val expectedSuite = requireNotNull(suite) { "local bundle mode requires a canonical suite" }
-        require(expectedSuite.manifestSha256.matches(Regex("[0-9a-f]{64}"))) {
-            "suite does not pin a manifest SHA-256"
-        }
+        val manifestPinned = expectedSuite.manifestSha256.matches(Regex("[0-9a-f]{64}"))
         val expectedContexts = expectedSuite.contextSha256s
-        require(expectedContexts.isNotEmpty() && expectedContexts.all { it.matches(Regex("[0-9a-f]{64}")) }) {
-            "suite does not pin valid context SHA-256 values"
-        }
+        val contextsPinned =
+            expectedContexts.isNotEmpty() && expectedContexts.all { it.matches(Regex("[0-9a-f]{64}")) }
         val expectedArtifacts = expectedSuite.artifactSha256s
         require(expectedArtifacts.all { (path, digest) ->
             path.isNotBlank() && !path.startsWith('/') &&
@@ -1070,11 +1133,15 @@ class NpuModelE2ETest {
                 }.toByteArray(),
             )
         require(computedTree == expectedTree) { "local bundle tree SHA-256 mismatch" }
-        val exactManifest = files.any { it.sha256 == expectedSuite.manifestSha256 }
-        val exactContexts = expectedContexts.all { digest -> files.any { it.sha256 == digest } }
-        val exactArtifacts = expectedArtifacts.all { (path, digest) ->
+        val exactManifest = manifestPinned && files.any { it.sha256 == expectedSuite.manifestSha256 }
+        val exactContexts = contextsPinned && expectedContexts.all { digest -> files.any { it.sha256 == digest } }
+        val exactArtifacts = expectedArtifacts.isNotEmpty() && expectedArtifacts.all { (path, digest) ->
             files.any { it.relativePath == path && it.sha256 == digest }
         }
+        val canonicalReceiptAvailable = manifestPinned && contextsPinned
+        val canonicalReceiptVerified =
+            canonicalReceiptAvailable && exactManifest && exactContexts &&
+                (expectedArtifacts.isEmpty() || exactArtifacts)
         val mode = if (root != null) "local_adb_import" else "local_loopback_download"
         if (root != null) require(verifyBundleFiles(root, files) == computedTree) {
             "local bundle files do not match the index"
@@ -1089,6 +1156,8 @@ class NpuModelE2ETest {
                 .put("hf_download_exercised", false)
                 .put("source_label", index.optString("source_label"))
                 .put("tree_sha256", computedTree)
+                .put("canonical_receipt_available", canonicalReceiptAvailable)
+                .put("canonical_receipt_verified", canonicalReceiptVerified)
                 .put("manifest_sha256", expectedSuite.manifestSha256)
                 .put("context_sha256", expectedSuite.contextSha256)
                 .put("context_sha256s", JSONArray(expectedContexts))
@@ -1110,15 +1179,19 @@ class NpuModelE2ETest {
                         }
                     },
                 ),
-        ).gate("local_bundle_manifest_exact", exactManifest)
-            .gate("local_bundle_context_exact", exactContexts)
-            .gate("local_bundle_contexts_exact", exactContexts)
-            .gate("local_bundle_artifacts_exact", exactArtifacts)
-            .gate("local_bundle_tree_exact", true)
-        require(exactManifest) { "local bundle does not contain the suite-pinned manifest" }
-        require(exactContexts) { "local bundle does not contain every suite-pinned context" }
-        require(exactArtifacts) { "local bundle does not match every suite-pinned artifact" }
-        return LocalBundle(mode, root, rawBaseUrl, computedTree, files)
+        ).gate("local_bundle_tree_exact", true)
+        if (canonicalReceiptAvailable) {
+            report.gate("local_bundle_manifest_exact", exactManifest)
+                .gate("local_bundle_context_exact", exactContexts)
+                .gate("local_bundle_contexts_exact", exactContexts)
+            if (expectedArtifacts.isNotEmpty()) {
+                report.gate("local_bundle_artifacts_exact", exactArtifacts)
+            }
+            require(canonicalReceiptVerified) {
+                "local bundle does not match the suite-pinned canonical artifact receipt"
+            }
+        }
+        return LocalBundle(mode, root, rawBaseUrl, computedTree, files, canonicalReceiptVerified)
     }
 
     private fun verifyBundleFiles(root: File, bundle: LocalBundle): String =
@@ -1225,7 +1298,9 @@ class NpuModelE2ETest {
     }
 
     private fun testAsset(name: String): ByteArray =
-        InstrumentationRegistry.getInstrumentation().context.assets.open(name).use { it.readBytes() }
+        InstrumentationRegistry.getInstrumentation().context.assets
+            .open("qhexrt_fixtures/$name")
+            .use { it.readBytes() }
 
     private fun decodeRgb(encoded: ByteArray, width: Int, height: Int): ByteArray {
         val bitmap =

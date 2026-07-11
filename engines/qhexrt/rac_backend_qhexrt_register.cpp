@@ -41,7 +41,11 @@ rac_result_t rac_backend_qhexrt_register(void) {
     // selection, QNN_CONTEXT format) for one-line HF registrations. Inert
     // metadata, so it registers BEFORE the arch gate — deterministic on
     // stub builds and unsupported devices alike.
-    rac_bundle_policy_register(qhexrt_bundle_policy());
+    const rac_result_t policy_rc = rac_bundle_policy_register(qhexrt_bundle_policy());
+    if (policy_rc != RAC_SUCCESS) {
+        RAC_LOG_WARNING(LOG_CAT, "QHexRT bundle policy registration failed: %d", policy_rc);
+        return policy_rc;
+    }
     // Arch gate: only register on a device-validated Hexagon v75/v79/v81 part.
     // On unsupported devices QHexRT cannot run, and registering its providers
     // would make the router select QHexRT for *all* LLM/VLM/STT/TTS loads
@@ -77,12 +81,13 @@ rac_result_t rac_backend_qhexrt_register(void) {
 
 rac_result_t rac_backend_qhexrt_unregister(void) {
     std::lock_guard<std::mutex> lock(g_mutex);
-    if (!g_registered) {
-        return RAC_SUCCESS;
+    if (g_registered) {
+        rac_plugin_unregister("qhexrt");
+        g_registered = false;
     }
-    rac_plugin_unregister("qhexrt");
+    // The policy is installed before the device gate, so always remove it even
+    // when plugin registration was rejected on an unsupported device.
     rac_bundle_policy_unregister(RAC_FRAMEWORK_QHEXRT);
-    g_registered = false;
     return RAC_SUCCESS;
 }
 

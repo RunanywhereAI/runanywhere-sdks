@@ -28,7 +28,7 @@ static inline const rac_bundle_policy_t* mlx_bundle_policy(void) {
         /* .manifest_extension         = */ ".json",
         /* .manifest_leaf_names_bundle = */ RAC_FALSE,
         /* .is_bundle_manifest         = */ mlx_is_bundle_manifest,
-        /* .reserved_0                 = */ 0,
+        /* .resolve_variant            = */ {NULL},
         /* .reserved_1                 = */ 0,
     };
     return &policy;

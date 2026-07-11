@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.data.rag.DocumentExtractor
+import com.runanywhere.runanywhereai.ui.components.WebSearchDisclosureDialog
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
@@ -283,6 +284,12 @@ fun ChatScreen(
     }
     if (showDocumentAnswerSheet) {
         ModelSelectionSheet(viewModel = documentAnswerVm, onDismiss = { showDocumentAnswerSheet = false })
+    }
+    if (viewModel.showWebSearchDisclosure) {
+        WebSearchDisclosureDialog(
+            onAllow = viewModel::acceptWebSearchDisclosure,
+            onDismiss = viewModel::dismissWebSearchDisclosure,
+        )
     }
 }
 

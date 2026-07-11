@@ -82,6 +82,31 @@ void test_is_folder_ref(std::vector<TestResult>& results) {
                !hf::is_folder_ref("https://huggingface.co/org/repo/resolve/main/v81", ".json")));
 }
 
+void test_logical_variant_refs(std::vector<TestResult>& results) {
+    results.push_back(expect("logical variant: repo root",
+                             hf::is_logical_variant_folder_ref("hf.co/org/repo", ".json")));
+    results.push_back(
+        expect("logical variant: repo-root manifest",
+               hf::is_logical_variant_folder_ref("hf.co/org/repo/model.json", ".json")));
+    results.push_back(
+        expect("logical variant: pinned folder unchanged",
+               !hf::is_logical_variant_folder_ref("hf.co/org/repo/v81", ".json") &&
+                   !hf::is_logical_variant_folder_ref("hf.co/org/repo/v81/model.json", ".json")));
+
+    std::string resolved;
+    results.push_back(
+        expect("logical variant: repo root rewritten",
+               hf::make_variant_folder_ref("hf.co/org/repo", "v81", ".json", &resolved) &&
+                   resolved == "https://huggingface.co/org/repo/v81"));
+    results.push_back(expect(
+        "logical variant: manifest rewritten",
+        hf::make_variant_folder_ref("hf.co/org/repo/model.json", "v75", ".json", &resolved) &&
+            resolved == "https://huggingface.co/org/repo/v75/model.json"));
+    results.push_back(
+        expect("logical variant: unsafe segment rejected",
+               !hf::make_variant_folder_ref("hf.co/org/repo", "../v81", ".json", &resolved)));
+}
+
 void test_subdir_resolution(std::vector<TestResult>& results) {
     hf::ResolvedModel resolved;
     std::string error;
@@ -211,6 +236,7 @@ void test_errors(std::vector<TestResult>& results) {
 int main() {
     std::vector<TestResult> results;
     test_is_folder_ref(results);
+    test_logical_variant_refs(results);
     test_subdir_resolution(results);
     test_multi_manifest(results);
     test_no_policy(results);

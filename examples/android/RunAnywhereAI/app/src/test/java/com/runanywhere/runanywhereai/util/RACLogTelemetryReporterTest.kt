@@ -57,8 +57,8 @@ class RACLogTelemetryReporterTest {
         reporter.markSDKInitialized()
 
         assertEquals(2, published.size)
-        assertEquals("[Startup] first", published[0].message)
-        assertTrue(published[1].message.startsWith("[Startup] second\njava.lang.IllegalStateException: broken"))
+        assertEquals("source=app;event=operation_failed;kind=none", published[0].message)
+        assertEquals("source=app;event=operation_failed;kind=invalid_state", published[1].message)
     }
 
     @Test
@@ -71,7 +71,13 @@ class RACLogTelemetryReporterTest {
         reporter.report(Log.WARN, "Startup", "three", null)
         reporter.markSDKInitialized()
 
-        assertEquals(listOf("[Startup] two", "[Startup] three"), published.map { it.message })
+        assertEquals(
+            listOf(
+                "source=app;event=operation_failed;kind=none",
+                "source=app;event=operation_failed;kind=none",
+            ),
+            published.map { it.message },
+        )
     }
 
     @Test
@@ -94,7 +100,7 @@ class RACLogTelemetryReporterTest {
         reporter.report(Log.ERROR, "Runtime", "second", null)
 
         assertEquals(3, attempts)
-        assertEquals(listOf("[Runtime] first", "[Runtime] second"), published.map { it.message })
+        assertEquals(2, published.size)
     }
 
     @Test
@@ -118,7 +124,7 @@ class RACLogTelemetryReporterTest {
         reporter.report(Log.ERROR, "Runtime", "second", null)
 
         assertEquals(3, attempts)
-        assertEquals(listOf("[Runtime] first", "[Runtime] second"), published.map { it.message })
+        assertEquals(2, published.size)
     }
 
     @Test
@@ -139,6 +145,45 @@ class RACLogTelemetryReporterTest {
         reporter.report(Log.ERROR, "Runtime", "outer", null)
 
         assertEquals(1, attempts)
+    }
+
+    @Test
+    fun `remote diagnostics discard raw content paths URLs secrets and stack messages`() {
+        val published = mutableListOf<SDKFailureDiagnostic>()
+        val reporter = reporter(published)
+        reporter.markSDKInitialized()
+        val raw = "prompt=private words token=hf_secret https://example.test /data/user/0/private"
+
+        reporter.report(
+            Log.ERROR,
+            "UntrustedTag-$raw",
+            raw,
+            IllegalStateException("provider response: $raw"),
+        )
+
+        val diagnostic = published.single().message
+        assertEquals("source=app;event=operation_failed;kind=invalid_state", diagnostic)
+        assertFalse(diagnostic.contains("private"))
+        assertFalse(diagnostic.contains("hf_"))
+        assertFalse(diagnostic.contains("http"))
+        assertFalse(diagnostic.contains("/data"))
+        assertTrue(diagnostic.length <= TelemetryDiagnosticPolicy.MAX_MESSAGE_CHARS)
+    }
+
+    @Test
+    fun `only explicitly allowlisted structured event codes are transmitted`() {
+        assertEquals(
+            "source=web_search;event=web_search_invalid_device_identity;kind=none",
+            TelemetryDiagnosticPolicy.format(
+                "WebSearchTool",
+                "web_search_invalid_device_identity",
+                null,
+            ),
+        )
+        assertEquals(
+            "source=web_search;event=operation_failed;kind=none",
+            TelemetryDiagnosticPolicy.format("WebSearchTool", "query=private", null),
+        )
     }
 
     private fun reporter(

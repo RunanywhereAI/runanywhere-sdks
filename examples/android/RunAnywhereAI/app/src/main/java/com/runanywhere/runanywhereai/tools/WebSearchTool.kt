@@ -3,6 +3,10 @@ package com.runanywhere.runanywhereai.tools
 import ai.runanywhere.proto.v1.ToolParameter
 import ai.runanywhere.proto.v1.ToolParameterType
 import com.runanywhere.runanywhereai.BuildConfig
+import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.data.settings.WebSearchConsentPolicy
+import com.runanywhere.runanywhereai.data.settings.WebSearchConsentState
+import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.RAToolValue
 import com.runanywhere.sdk.public.extensions.LLM.array
@@ -30,6 +34,7 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /** Web search through a configured proxy or the keyless DuckDuckGo fallback. */
@@ -38,6 +43,12 @@ internal object WebSearchTool {
     private const val MAX_RESPONSE_BYTES = 1_000_000
     private const val MAX_QUERY_CHARS = 400
     private const val MAX_QUERY_WORDS = 50
+    private val reportableDiagnosticCodes = setOf(
+        "web_search_invalid_device_identity",
+        "web_search_lite_fetch_failed",
+        "web_search_lite_parser_no_results",
+    )
+    private val reportedDiagnosticCodes = ConcurrentHashMap.newKeySet<String>()
     private val userAgent = "Mozilla/5.0 RunAnywhere/${BuildConfig.VERSION_NAME}"
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
@@ -65,8 +76,22 @@ internal object WebSearchTool {
         category = "Web",
     )
 
-    suspend fun execute(args: Map<String, RAToolValue>): Map<String, RAToolValue> =
-        search(args["query"]?.string.orEmpty())
+    suspend fun execute(args: Map<String, RAToolValue>): Map<String, RAToolValue> {
+        val settings = SettingsRepository.settings
+        val route = WebSearchConsentPolicy.routeFor(BuildConfig.WEB_SEARCH_URL)
+        if (
+            !WebSearchConsentPolicy.permitsTransfer(
+                WebSearchConsentState(
+                    toolsEnabled = settings.toolCallingEnabled,
+                    acceptedScope = settings.webSearchConsentScope,
+                    currentScope = route?.scope,
+                ),
+            )
+        ) {
+            return errorPayload("Web search requires affirmative permission")
+        }
+        return search(args["query"]?.string.orEmpty())
+    }
 
     internal suspend fun search(
         query: String,
@@ -93,17 +118,28 @@ internal object WebSearchTool {
                 val results = parseBackendResults(backendFetcher(endpoint, trimmed)).take(MAX_RESULTS)
                 check(results.isNotEmpty()) { "Search service returned no results" }
                 resultPayload(trimmed, results)
-            }.getOrElse {
+            }.getOrElse { failure ->
+                if (failure is InvalidWebSearchDeviceIdentityException) {
+                    // This fixed code is safe for both local logs and the allowlisted telemetry mapper.
+                    reportDiagnostic("web_search_invalid_device_identity")
+                }
                 errorPayload("Web search is temporarily unavailable")
             }
         }
 
         // Builds without a configured proxy use a keyless public endpoint, so no
         // confidential search-provider credential is embedded in the APK.
-        val liteResults = runCatching {
+        val liteAttempt = runCatching {
             parseLiteResults(publicFetcher(buildLiteSearchUrl(trimmed))).take(MAX_RESULTS)
-        }.getOrDefault(emptyList())
+        }.onFailure {
+            reportDiagnostic("web_search_lite_fetch_failed")
+        }
+        val liteResults = liteAttempt.getOrDefault(emptyList())
         if (liteResults.isNotEmpty()) return resultPayload(trimmed, liteResults)
+        if (liteAttempt.isSuccess) {
+            // Do not include the query or response body: this is only a bounded markup-drift signal.
+            reportDiagnostic("web_search_lite_parser_no_results")
+        }
 
         return runCatching {
             parseInstantAnswer(trimmed, publicFetcher(buildInstantAnswerUrl(trimmed)))
@@ -166,7 +202,7 @@ internal object WebSearchTool {
         deviceId: String,
     ): Request {
         require(apiKey.isNotBlank()) { "Web search backend authentication is not configured" }
-        val canonicalDeviceId = UUID.fromString(deviceId).toString()
+        val canonicalDeviceId = validateDeviceId(deviceId)
         val payload = buildJsonObject {
             put("query", query)
             put("count", MAX_RESULTS)
@@ -180,6 +216,10 @@ internal object WebSearchTool {
             .post(payload.toRequestBody(jsonMediaType))
             .build()
     }
+
+    internal fun validateDeviceId(deviceId: String): String =
+        runCatching { UUID.fromString(deviceId).toString() }
+            .getOrElse { throw InvalidWebSearchDeviceIdentityException() }
 
     private suspend fun fetch(request: Request): String = withContext(Dispatchers.IO) {
         client.newCall(request).execute().use { response ->
@@ -253,7 +293,7 @@ internal object WebSearchTool {
             return errorPayload("Web search is temporarily unavailable")
         }
         val summary = directAnswer.ifBlank { related.first().snippet }
-        val source = root.string("AbstractURL").ifBlank { buildSearchResultsUrl(query) }
+        val source = safeHttpUrl(root.string("AbstractURL")).ifBlank { buildSearchResultsUrl(query) }
         return linkedMapOf(
             "query" to RAToolValue.string(query),
             "result_count" to RAToolValue.string((related.size + if (directAnswer.isBlank()) 0 else 1).toString()),
@@ -306,6 +346,14 @@ internal object WebSearchTool {
     private fun errorPayload(message: String): Map<String, RAToolValue> =
         mapOf("error" to RAToolValue.string(message))
 
+    private fun reportDiagnostic(code: String) {
+        // Each fixed code is emitted at most once per process: useful for diagnosis without
+        // turning repeated model searches into an unbounded diagnostic stream.
+        if (code !in reportableDiagnosticCodes || !reportedDiagnosticCodes.add(code)) return
+        // Observability must not make search fail (including plain JVM tests without android.util.Log).
+        runCatching { RACLog.w(code) }
+    }
+
     private fun buildSearchResultsUrl(query: String): String =
         "https://duckduckgo.com/".toHttpUrl().newBuilder()
             .addQueryParameter("q", query)
@@ -327,7 +375,11 @@ internal object WebSearchTool {
 
     private fun safeHttpUrl(value: String): String = runCatching {
         val uri = URI(value.trim())
-        if ((uri.scheme.equals("https", true) || uri.scheme.equals("http", true)) && !uri.host.isNullOrBlank()) {
+        if (
+            (uri.scheme.equals("https", true) || uri.scheme.equals("http", true)) &&
+            !uri.host.isNullOrBlank() &&
+            uri.userInfo == null
+        ) {
             uri.toString()
         } else {
             ""
@@ -361,3 +413,6 @@ internal object WebSearchTool {
     private fun JsonObject.string(key: String): String =
         this[key]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
 }
+
+internal class InvalidWebSearchDeviceIdentityException :
+    IllegalArgumentException("Web search device identity is unavailable")
