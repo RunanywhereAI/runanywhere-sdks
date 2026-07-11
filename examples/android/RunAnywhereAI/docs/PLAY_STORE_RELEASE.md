@@ -11,7 +11,9 @@ not publishable until every required item is checked and its evidence is retaine
   retention terms, and a tested real-result response contract. A client-supplied
   device UUID and extractable APK key do not replace Play Integrity or equivalent
   attestation for a larger public rollout.
-- [ ] Final public HTTPS privacy-policy URL and completed policy placeholders.
+- [ ] Final public HTTPS privacy-policy URL and completed policy placeholders. The
+  page must describe the exact candidate; the currently deployed legacy page says
+  no analytics or transmission and cannot be used for this build.
 - [ ] Play App Signing enrollment plus upload keystore, alias, passwords, and
   expected upload-certificate SHA-256.
 - [ ] Unique version code confirmed against every Play track.
@@ -24,7 +26,16 @@ not publishable until every required item is checked and its evidence is retaine
   not an in-flow disclosure.
 - [ ] Raw telemetry error strings are either comprehensively redacted and tested
   or disclosed under the applicable Play user-content category without an
-  absolute "content is never collected" claim.
+  absolute "content is never collected" claim. Include app `RACLog` warnings,
+  errors, and complete throwable stacks as well as SDK errors.
+- [ ] A working in-app report/flag action for offensive AI-generated content and
+  an operational developer receiving/moderation path are tested, as required by
+  [Google Play's AI-Generated Content policy](https://support.google.com/googleplay/android-developer/answer/13985936).
+  The current app intentionally has no such experience; do not submit it as a
+  generative chatbot until this is resolved.
+- [ ] Contextual disclosures for web-search query/device-ID transfer and Hybrid
+  (Beta) audio/provider transfer are approved and shown before the applicable
+  network flow, or those connected features are excluded from the Play artifact.
 - [ ] Reviewer instructions include an entitled non-personal Hugging Face test
   token, the exact small models to install, and steps for private HNPU access.
 - [ ] Every shipped library, font, model, adapter, and native binary has a
@@ -140,6 +151,8 @@ pinned.
   passes, and its SBOM and notice inventory match the artifacts archived for
   this release. A mechanical pass does not replace publisher/legal approval.
 - [ ] Play pre-launch report and policy/SDK warnings are clean.
+- [ ] AI-content reporting reaches the staffed moderation destination without
+  leaving the app, and the reviewer flow is documented.
 
 ## Device acceptance
 

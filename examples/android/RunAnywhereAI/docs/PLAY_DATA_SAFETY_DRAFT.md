@@ -23,17 +23,18 @@ whether each data type is collected ephemerally before submitting.
 | Device or other IDs | Random persistent SDK device ID / fingerprint | App functionality, SDK installation registration, fraud/abuse prevention | Transferred automatically to create or update registration during first and subsequent SDK initializations while the production control plane is enabled |
 | Personal info / User IDs (confirm association) | Backend-returned user or organization identifier when the app credential is associated with one | App functionality, authentication, SDK registration | Verify whether the production backend associates diagnostics with an identifiable user or organization and declare linked status accordingly |
 | App activity | Feature lifecycle and interaction events | Analytics, diagnostics, app functionality | Collected automatically in configured production builds; no prompt/response body |
-| App info and performance | App/SDK version, model/framework IDs, latency, available-memory and token/count metrics, errors | Analytics, diagnostics, app functionality | Collected automatically in configured production builds |
+| App info and performance | App/SDK version, model/framework IDs, latency, available-memory and token/count metrics, app and SDK warning/error text, and full throwable stack traces | Analytics, diagnostics, app functionality | Collected automatically in configured production builds. The Android app forwards `RACLog` warnings/errors into the SDK failure-event pipeline after SDK initialization |
 | Device info | Device/OS details, app package/name/version/build, locale/timezone, CPU architecture and chip, form factor, total and available memory, neural-acceleration availability, CPU/GPU/NPU core details, and battery/power details | App functionality, SDK registration, analytics | Collected automatically in configured production builds |
-| Other user-generated content (until redaction is proven) | Raw SDK `error_message` text, which can include user/generated content, URLs, paths, transcript fragments, or provider responses | Diagnostics, app functionality | The current telemetry JSON path sends raw error strings without a universal proven content-redaction boundary; do not claim content is excluded unless the final candidate sanitizes and tests every path |
+| Other user-generated content (until redaction is proven) | Raw app/SDK `error_message` text and complete throwable stacks, which can include user/generated content, URLs, paths, transcript fragments, or provider responses | Diagnostics, app functionality | The current telemetry path sends app and SDK errors without a universal proven content-redaction boundary; do not claim content is excluded unless the final candidate sanitizes and tests every path |
 | In-app search history | Search query generated from the user's prompt | App functionality | Developer builds can send directly to DuckDuckGo when no proxy is configured. The current device-tested APK still has a blank proxy URL and uses DuckDuckGo; it is not the final Play candidate. The Play build must send the query to the RunAnywhere proxy and Brave Search. Do not describe it as ephemeral until Brave and infrastructure retention are verified |
 
 Mark each row as linked or not linked based on the production backend's ability
 to associate it with an identifiable user, organization, app credential, or
 persistent device ID. Production startup automatically performs SDK authentication,
 device registration, model-assignment fetch, and telemetry flush. Feature,
-performance, and error diagnostics are sent automatically; the app does not present
-a separate diagnostics-consent screen or preference.
+performance, app warning/error, SDK error, and full throwable diagnostics are sent
+automatically; the app does not present a separate diagnostics-consent screen or
+preference.
 
 ## Data sent to third parties at the user's direction
 
@@ -72,3 +73,6 @@ exports/shares a benchmark, or the user opens an external service.
 - Obtain publisher/privacy review of whether automatic pre-UI production collection
   requires an in-flow prominent disclosure and affirmative consent under Play's User
   Data policy. The current Settings link alone is not an in-flow disclosure.
+- Inventory every production `RACLog.warn`/`RACLog.error` and SDK failure publisher,
+  then test representative prompts, transcripts, provider responses, URLs, local
+  paths, and credentials before making any content-exclusion or redaction claim.
