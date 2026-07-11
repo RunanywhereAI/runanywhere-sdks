@@ -28,7 +28,6 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.httptransport.OkHttpHttpTransport
-import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
@@ -477,5 +476,4 @@ object CppBridge {
         if (!CppBridgeState.isInitialized || !isNativeLibraryLoaded) return false
         return RunAnywhereBridge.racIsInitialized()
     }
-
 }

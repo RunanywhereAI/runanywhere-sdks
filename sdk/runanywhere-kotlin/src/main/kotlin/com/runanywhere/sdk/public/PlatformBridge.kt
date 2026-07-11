@@ -123,11 +123,12 @@ private fun readPackageInfo(context: Context): PackageInfo? {
             PackageManager.PackageInfoFlags.of(0),
         )
     } else {
-        val method = PackageManager::class.java.getMethod(
-            "getPackageInfo",
-            String::class.java,
-            Int::class.javaPrimitiveType,
-        )
+        val method =
+            PackageManager::class.java.getMethod(
+                "getPackageInfo",
+                String::class.java,
+                Int::class.javaPrimitiveType,
+            )
         method.invoke(packageManager, context.packageName, 0) as? PackageInfo
     }
 }

@@ -642,13 +642,13 @@ object OkHttpHttpTransport {
 
     private fun resolveClient(timeoutMs: Long, followRedirects: Boolean): OkHttpClient {
         val base = clientRef.get() ?: defaultClient
-        return base.newBuilder()
+        return base
+            .newBuilder()
             .followRedirects(followRedirects)
             .followSslRedirects(followRedirects)
             .apply {
                 if (timeoutMs > 0) callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
-            }
-            .build()
+            }.build()
     }
 
     /**
@@ -659,13 +659,13 @@ object OkHttpHttpTransport {
      */
     private fun resolveStreamingClient(timeoutMs: Long, followRedirects: Boolean): OkHttpClient {
         val base = streamingClient
-        return base.newBuilder()
+        return base
+            .newBuilder()
             .followRedirects(followRedirects)
             .followSslRedirects(followRedirects)
             .apply {
                 if (timeoutMs > 0) callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
-            }
-            .build()
+            }.build()
     }
 
     private fun flattenHeaders(headers: Headers): Array<String> {

@@ -28,28 +28,29 @@ internal suspend fun <T> runCancellableNativeUnaryRequest(
     dispatcher: CoroutineDispatcher = Dispatchers.IO,
     request: () -> T,
     cancel: () -> Unit,
-): T = coroutineScope {
-    val admission = NativeUnaryRequestAdmission(cancel)
-    val worker =
-        async(dispatcher) {
-            if (!admission.tryEnter()) {
-                throw CancellationException("Native request cancelled before entry")
+): T =
+    coroutineScope {
+        val admission = NativeUnaryRequestAdmission(cancel)
+        val worker =
+            async(dispatcher) {
+                if (!admission.tryEnter()) {
+                    throw CancellationException("Native request cancelled before entry")
+                }
+                try {
+                    request()
+                } finally {
+                    admission.complete()
+                }
             }
-            try {
-                request()
-            } finally {
-                admission.complete()
-            }
-        }
 
-    try {
-        worker.await()
-    } catch (error: CancellationException) {
-        admission.requestCancellation()
-        withContext(NonCancellable) { joinAll(worker) }
-        throw error
+        try {
+            worker.await()
+        } catch (error: CancellationException) {
+            admission.requestCancellation()
+            withContext(NonCancellable) { joinAll(worker) }
+            throw error
+        }
     }
-}
 
 private class NativeUnaryRequestAdmission(
     private val cancel: () -> Unit,

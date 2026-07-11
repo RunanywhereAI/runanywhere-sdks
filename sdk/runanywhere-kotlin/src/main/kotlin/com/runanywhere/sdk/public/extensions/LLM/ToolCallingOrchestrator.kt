@@ -333,13 +333,14 @@ internal object ToolCallingOrchestrator {
             // base LLM generation options field-by-field. Optional validation
             // remains unset when the caller does not provide it, preserving
             // commons' secure default (validate=true).
-            val request = makeToolCallingRunLoopRequest(
-                prompt = prompt,
-                options = effectiveOpts,
-                llmOptions = llmOpts,
-                tools = tools,
-                validateCalls = validateCalls,
-            )
+            val request =
+                makeToolCallingRunLoopRequest(
+                    prompt = prompt,
+                    options = effectiveOpts,
+                    llmOptions = llmOpts,
+                    tools = tools,
+                    validateCalls = validateCalls,
+                )
 
             val parentJob = checkNotNull(currentCoroutineContext()[Job])
             val cancellationController =
