@@ -80,13 +80,16 @@ QHexRT static libraries, stages them into the SDK, rebuilds the arm64 Android
 native layer, and rebuilds/stages every release AAR before the guarded AAB
 build. `--skip-native-rebuild` is only for a repeat signing/archive run after
 those native outputs have already been validated; it still validates the staged
-runtime set and rebuilds/stages the release AARs.
+runtime set, rebuilds/stages the release AARs, and invalidates cached native
+symbol-table/ZIP outputs so the archive is regenerated as arm64-only.
 
 Both SDK and QHexRT worktrees must be clean, including untracked files. The
 `--allow-dirty` override is only for traceable development validation; its
 archive is explicitly labeled not Play-ready. A default run also cleans the SDK
 and app Gradle outputs, runs app unit tests and release lint, and pins QAIRT
-2.47.0 build 260601114230 plus Android NDK 27.3.13750724.
+2.47.0 build 260601114230 plus Android NDK 27.3.13750724. The guarded release
+invocation builds both the APK (which regenerates AGP's native-debug-symbol ZIP)
+and the Play bundle from the same signing/configuration environment.
 
 The wrapper uses only the checksum-pinned official bundletool jar cached under
 the ignored app `build/` directory. It verifies complete JAR-signature coverage,

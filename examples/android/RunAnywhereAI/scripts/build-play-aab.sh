@@ -471,13 +471,28 @@ fi
 echo "==> Building and staging release AARs"
 run_sdk_versioned "${APP_ROOT}/scripts/stage-sdk-aars.sh" release
 
+# packageReleaseBundle owns the native-symbol ZIP, but AGP can update an
+# existing archive without deleting entries from an older multi-ABI build.
+# Reuse mode keeps app/build, so invalidate both the extractor output and the
+# final ZIP. assembleRelease then runs mergeReleaseNativeDebugMetadata to
+# recreate it from the current arm64-only AARs without recompiling the SDK.
+if [[ "${SKIP_NATIVE_REBUILD}" -eq 1 ]]; then
+    echo "==> Invalidating cached release native-symbol packaging"
+    cmake -E remove_directory \
+        "${APP_ROOT}/app/build/intermediates/native_symbol_tables/release"
+    cmake -E remove_directory \
+        "${APP_ROOT}/app/build/outputs/native-debug-symbols/release"
+fi
+
 echo "==> Running Android unit tests and release lint"
 run_app_gradle \
     :app:testDebugUnitTest \
     :app:lintRelease
 
-echo "==> Building guarded Play release bundle"
-run_release_gradle :app:bundleRelease
+echo "==> Building guarded release APK and Play bundle"
+run_release_gradle \
+    :app:assembleRelease \
+    :app:bundleRelease
 
 # No post-build verifier needs backend or signing inputs. Drop them before
 # invoking bundletool, jarsigner, jq, or archival helpers.
