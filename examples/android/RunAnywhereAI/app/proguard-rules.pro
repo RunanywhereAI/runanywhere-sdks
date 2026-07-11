@@ -91,6 +91,7 @@
 -keep class com.runanywhere.runanywhereai.data.SingleFileModel { *; }
 -keep class com.runanywhere.runanywhereai.state.GlobalState { *; }
 -keep class com.runanywhere.runanywhereai.tools.WebSearchTool { *; }
+-keep class com.runanywhere.runanywhereai.util.RACLog { *; }
 -keep class kotlin.Unit { *; }
 -keep class kotlin.Result** { *; }
 -keep class kotlin.ResultKt { *; }
