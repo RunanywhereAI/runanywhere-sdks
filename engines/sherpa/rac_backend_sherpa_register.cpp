@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <string>
 #include <vector>
 
 #include "rac/audio/rac_audio_convert.h"
