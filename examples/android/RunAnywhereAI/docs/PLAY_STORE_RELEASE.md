@@ -14,6 +14,14 @@ not publishable until every required item is checked and its evidence is retaine
 - [ ] Unique version code confirmed against every Play track.
 - [ ] Developer identity/contact verification, support email, target audience,
   ads declaration, IARC rating, Data safety answers, and reviewer instructions.
+- [ ] Backend retention schedule and an operational, tested deletion-request SOP
+  with a reliable installation-record lookup method.
+- [ ] Publisher/privacy determination on Play's in-flow prominent-disclosure and
+  affirmative-consent rule for automatic pre-UI diagnostics; a Settings link is
+  not an in-flow disclosure.
+- [ ] Raw telemetry error strings are either comprehensively redacted and tested
+  or disclosed under the applicable Play user-content category without an
+  absolute "content is never collected" claim.
 - [ ] Reviewer instructions include an entitled non-personal Hugging Face test
   token, the exact small models to install, and steps for private HNPU access.
 - [ ] Every shipped library, font, model, adapter, and native binary has a

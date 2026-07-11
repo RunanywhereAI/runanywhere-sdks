@@ -13,7 +13,10 @@ RunAnywhere is published by [developer legal name] ("RunAnywhere," "we," or
 The app can run language, vision, speech, embedding, and document-retrieval
 models on the device. By default, prompts, generated answers, selected images,
 camera frames, microphone recordings, document contents, conversation history,
-model files, and Hugging Face credentials are stored or processed on the device.
+model files, Hugging Face credentials, and cloud-provider credentials are stored
+or processed on the device. Production SDK authentication can also store access
+and refresh tokens plus backend-assigned device, user, or organization identifiers
+in the app's secure storage.
 Conversation history and copied attachments remain in app-private storage until
 the user deletes the conversation or the app. Android backup and device transfer
 are disabled for this app.
@@ -21,16 +24,29 @@ are disabled for this app.
 ## Data sent to RunAnywhere
 
 During the first and each subsequent SDK initialization, the app automatically
-sends a randomly generated persistent device identifier; device, operating-system,
-app, and SDK details; CPU architecture and chip name; form factor; total and
-available memory; neural-acceleration availability; CPU/GPU/NPU core and
-battery/power details; model identifiers; feature lifecycle events; performance
-measurements; token or character counts; audio duration and size; image count and
-resolution; and error diagnostics to [backend operator and country]. This data is
-used to create or update the SDK installation registration and to operate, analyze,
-and diagnose the app. These diagnostics do not include prompt text, generated
-response text, document contents, images, raw audio, or transcripts. The app does
-not present a separate diagnostics-consent screen or Settings preference.
+authenticates with the RunAnywhere control plane, creates or updates the SDK
+installation registration, fetches model assignments, and flushes telemetry. It
+sends a randomly generated persistent device identifier; possible backend user
+or organization identifiers; app package identifier, app name, version, and build;
+locale and timezone; device, operating-system, and SDK details; CPU architecture
+and chip name; form factor; total and available memory; neural-acceleration
+availability; CPU/GPU/NPU core and battery/power details; model and framework
+identifiers; feature lifecycle and cancellation events; performance measurements;
+token or character counts; audio duration and size; image count and resolution;
+network status; and error diagnostics to [backend operator and country]. This data
+is used for SDK authentication and assignment sync and to operate, analyze, secure,
+and diagnose the app. The app does not present a separate diagnostics-consent
+screen or Settings preference.
+
+Ordinary structured modality telemetry is designed to send measurements and
+counts rather than prompt, response, document, image, audio, or transcript bodies.
+However, the current telemetry path also transmits raw SDK `error_message` text
+without a demonstrated universal content-redaction boundary. An error string may
+therefore contain user or generated content, a URL, a local path, a transcript
+fragment, or a provider response. Do not publish an absolute claim that diagnostics
+never include content, and declare the applicable Play user-content category,
+unless every transmitted error path is sanitized and covered by tests before the
+final release.
 
 Before publication, state the registration and diagnostics retention
 periods here: [retention periods and deletion/anonymization process].
@@ -41,15 +57,23 @@ periods here: [retention periods and deletion/anonymization process].
   Face token is stored with Android encrypted preferences and sent only to
   Hugging Face to authorize private model downloads.
 - A user may add a third-party cloud speech-to-text provider. When the user
-  explicitly uses that provider, microphone audio and the provider request are
-  sent directly to the configured provider under that provider's privacy terms.
-  Provider API keys are stored with Android encrypted preferences.
+  configures and selects Hybrid (Beta), the router may choose that provider based
+  on network, battery, confidence, and ranking. Microphone audio, language/model
+  settings, request metadata, and the provider credential are then sent directly
+  to Sarvam, OpenAI, OpenRouter, or the user-configured HTTPS host under that
+  provider's privacy terms. Provider API keys are stored with Android encrypted
+  preferences.
 - Tool calling is disabled by default. If the user enables it and the model
   invokes the built-in web-search tool, the generated search query and ordinary
-  network metadata are sent to [RunAnywhere search-proxy operator/country] and
-  [production search provider]. The query may be derived from the user's prompt.
-  Developer builds without the production proxy may send it directly to DuckDuckGo.
-  Name the production provider and link both applicable privacy terms before release.
+  network metadata are sent either directly to DuckDuckGo when no proxy URL is
+  configured or to [RunAnywhere search-proxy operator/country] and [production
+  search provider] when a proxy is configured. The query may be derived from the
+  user's prompt. The tested signed APK has no proxy URL and contacts DuckDuckGo
+  directly; the Play AAB gate requires a real HTTPS proxy. Name the production
+  provider and link all applicable privacy terms before release.
+- A user can copy benchmark text to the system clipboard or share it with another
+  app. The clipboard, selected app, and operating system handle that exported text
+  under their own privacy and retention behavior.
 - Opening Documentation, Privacy policy, or social links sends the user to the
   selected website or app and is governed by that service's privacy terms.
 
@@ -80,11 +104,26 @@ the publisher's organizational safeguards and incident process here: [details].
 ## Choices, deletion, and retention
 
 Users can delete individual conversations and their copied attachments, remove
-downloaded models, clear caches and temporary files, clear saved credentials, or
-uninstall the app to remove app-private data. To request deletion of telemetry
-associated with a device identifier, contact [privacy email or public
-deletion-request URL]. State verification steps and response timelines here:
-[details].
+downloaded models, clear caches, clear saved credentials, or uninstall the app to
+remove app-private data. Some temporary files are deleted automatically, and
+Android may evict cache files. Before claiming that users can delete backend data,
+make an operational deletion process available at [privacy email or public
+deletion-request URL], expose or otherwise provide a reliable installation-record
+lookup method, and document requester verification, responsible operator, response
+timeline, deletion scope, and a tested outcome. The current app does not display
+its installation identifier, and the current engineering inventory does not prove
+that this backend deletion process exists.
+
+## Prominent disclosure and consent release decision
+
+Production authentication, device registration, assignment sync, and diagnostics
+begin automatically from `Application.onCreate`, before a user can reach the
+Settings privacy link. The current app intentionally has no standalone privacy or
+diagnostics-consent screen. Before Play submission, obtain publisher/privacy review
+of whether this collection is within users' reasonable expectations. If Google
+Play's prominent-disclosure rule applies, the website policy and Settings link are
+not sufficient: the app will need an in-flow disclosure and affirmative consent
+before collection, despite the current product preference to avoid an extra screen.
 
 ## Children and international transfers
 
