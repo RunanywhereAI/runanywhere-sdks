@@ -8,8 +8,8 @@ on a Qualcomm SM8850 / Hexagon v81 device running Android 16.
 - Package: `com.runanywhere.runanywhereai`
 - Version: `0.1.5` (`versionCode` 14)
 - Latest installed APK SHA-256:
-  `a11345bbe0efd58695760b5a074c7e044f73eb6d5079f1aa3aced85eebc2b4e7`
-- Latest source checkpoint: `b67f6fef1c1b9cfc3354053d4bf1a911a23d8461`
+  `7d9c700231090e68117cb2da02c4a0800f858e84732647e24312cf856fc1095a`
+- Latest source checkpoint: `564ea7eadd99a5e00e26c6dc87058203bda54742`
 - Capture dates: July 10–11, 2026
 - Raw device captures: `screenshots/v81/`
 - Play-ready phone captures: `play-console/phone/`
@@ -17,7 +17,8 @@ on a Qualcomm SM8850 / Hexagon v81 device running Android 16.
 Captures 01–05 came from the July 10 candidate
 `6ab0decfd72bfeec8c4bdaa07fde7647b6e2189b7dcb723057dd5204c422ab8b`.
 Captures 06–07 came from the latest July 11 candidate above after the shared
-C++ QHexRT catalog and landscape IME fixes. In both runs, the installed
+C++ QHexRT catalog, app-diagnostics telemetry bridge, and stable landscape IME
+validation. In both runs, the installed
 `base.apk` was pulled back from the device and matched the local artifact.
 
 ## Screenshot evidence
@@ -30,7 +31,7 @@ C++ QHexRT catalog and landscape IME fixes. In both runs, the installed
    identifies the increasing trend; the result is revealed automatically.
 5. Talk — Whisper, Qwen, Kokoro, and Silero VAD all report ready.
 6. QHexRT — public Qwen3.5 0.8B is loaded through QNN on Hexagon v81 and
-   returns exactly `4`, with TTFT, tokens, and throughput visible.
+   returns exactly `QHEXRT_OK`, with TTFT, tokens, and throughput visible.
 7. Web search — the model invokes `search_web` and cites the official
    `https://aihub.qualcomm.com/` URL while `Web & tools` is explicitly on.
 

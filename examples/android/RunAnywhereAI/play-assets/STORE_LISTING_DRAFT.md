@@ -43,7 +43,7 @@ Initial Android release with on-device chat, vision, voice, document search, too
 ## Screenshot order and accessibility copy
 
 1. `01-home.png` — RunAnywhere home screen with Qwen3.5 0.8B loaded and NPU ready for local prompts.
-2. `06-qhexrt-v81.png` — Real Qwen3.5 generation on a Hexagon v81 NPU with visible latency and throughput metrics.
+2. `06-qhexrt-v81.png` — Real Qwen3.5 `QHEXRT_OK` generation on a Hexagon v81 NPU with visible latency and throughput metrics.
 3. `02-documents-rag.png` — Documents screen answering a Project Aurora question with one cited source.
 4. `07-web-search.png` — Qwen invoking `search_web` and citing the official Qualcomm AI Hub URL while Web & tools is enabled.
 5. `03-tools-calculate.png` — Local Qwen model using the calculator tool to answer 45 multiplied by 12.
