@@ -28,6 +28,7 @@ import {
 import {
   onModelStateChange,
   openSheet as openModelSheet,
+  refreshModelSelectionState,
 } from '../components/model-selection';
 import { getCatalog } from '../services/model-catalog';
 import { escapeHtml } from '../services/escape-html';
@@ -327,6 +328,7 @@ async function deleteModel(modelId: string): Promise<void> {
       showToast(result.errorMessage || 'Failed to delete model', 'warning');
       return;
     }
+    refreshModelSelectionState();
     showToast(`Deleted ${modelId}`, 'success');
   } catch (err) {
     showToast(`Failed to delete model: ${formatError(err)}`, 'warning');

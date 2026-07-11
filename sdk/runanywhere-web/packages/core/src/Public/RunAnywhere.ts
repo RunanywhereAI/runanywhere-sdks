@@ -1639,8 +1639,7 @@ export const RunAnywhere = {
       if (!exists) {
         if (existing.localPath || existing.isDownloaded) {
           try {
-            ModelRegistryCapability.updateModel({ ...existing, localPath: '', isDownloaded: false });
-            patched++;
+            if (ModelRegistryCapability.updateDownloadStatus(existing.id, null)) patched++;
           } catch { /* ignore */ }
         }
         continue;
@@ -1649,8 +1648,7 @@ export const RunAnywhere = {
       if (existing.localPath && existing.isDownloaded) continue;
 
       try {
-        ModelRegistryCapability.updateModel({ ...existing, localPath, isDownloaded: true });
-        patched++;
+        if (ModelRegistryCapability.updateDownloadStatus(existing.id, localPath)) patched++;
       } catch { /* ignore */ }
     }
     if (patched > 0) {

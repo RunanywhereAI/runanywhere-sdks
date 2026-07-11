@@ -562,6 +562,11 @@ export interface EmscriptenRunanywhereModule {
     protoBytes: number,
     protoSize: number,
   ): number;
+  _rac_model_registry_update_download_status?(
+    handle: number,
+    modelId: number,
+    localPath: number,
+  ): number;
   _rac_model_registry_get_proto?(
     handle: number,
     modelId: number,

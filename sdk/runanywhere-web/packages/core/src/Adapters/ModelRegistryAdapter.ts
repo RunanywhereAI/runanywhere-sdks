@@ -83,6 +83,11 @@ export interface ModelRegistryModule {
     protoBytes: number,
     protoSize: number,
   ): number;
+  _rac_model_registry_update_download_status?(
+    handle: number,
+    modelId: number,
+    localPath: number,
+  ): number;
   _rac_model_registry_get_proto?(
     handle: number,
     modelId: number,
@@ -350,6 +355,39 @@ export class ModelRegistryAdapter {
   }
 
   /**
+   * Set or explicitly clear a model's downloaded path in every known WASM
+   * registry. The dedicated C ABI is required for clears: proto3 cannot
+   * distinguish an omitted string from an explicitly empty `local_path`, so
+   * `update(...)` intentionally preserves the existing path in that case.
+   * Passing `null` forwards a null C pointer and resets downloaded state.
+   */
+  updateDownloadStatus(modelId: string, localPath: string | null): boolean {
+    if (modelId.length === 0) {
+      logger.warning('rac_model_registry_update_download_status requires a model id');
+      return false;
+    }
+    return this.broadcastWrite(
+      'rac_model_registry_update_download_status',
+      (mod, handle) => {
+        const idPtr = this.allocUtf8OnModule(mod, modelId);
+        if (!idPtr) return RAC_ERROR_INVALID_ARGUMENT;
+        const pathPtr = localPath === null ? 0 : this.allocUtf8OnModule(mod, localPath);
+        if (localPath !== null && !pathPtr) {
+          mod._free?.(idPtr);
+          return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        try {
+          return mod._rac_model_registry_update_download_status!(handle, idPtr, pathPtr);
+        } finally {
+          mod._free?.(idPtr);
+          if (pathPtr) mod._free?.(pathPtr);
+        }
+      },
+      '_rac_model_registry_update_download_status',
+    );
+  }
+
+  /**
    * Import a model through `rac_model_registry_import_proto` so commons owns
    * the import semantics (merge, overwrite, validation). Swift parity:
    * `CppBridge.ModelRegistry.importModel(request)`.
@@ -602,6 +640,7 @@ export class ModelRegistryAdapter {
   private broadcastWrite(
     functionName: string,
     invoke: (mod: ModelRegistryModule, handle: number) => number,
+    requiredExport?: keyof ModelRegistryModule,
   ): boolean {
     const primary = this.module;
     let primaryResult: boolean | null = null;
@@ -618,6 +657,11 @@ export class ModelRegistryAdapter {
       const isPrimary = mod === primary;
       const tempAdapter = isPrimary ? this : new ModelRegistryAdapter(mod);
       if (!tempAdapter.ensureProtoExports(functionName)) {
+        if (isPrimary) primaryResult = false;
+        continue;
+      }
+      if (requiredExport && typeof mod[requiredExport] !== 'function') {
+        logger.warning(`${functionName}: module missing export ${String(requiredExport)}`);
         if (isPrimary) primaryResult = false;
         continue;
       }

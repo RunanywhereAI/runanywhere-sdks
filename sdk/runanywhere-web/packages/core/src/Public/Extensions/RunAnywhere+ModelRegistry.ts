@@ -64,6 +64,10 @@ export const ModelRegistry = {
     return requireAdapter().update(model);
   },
 
+  updateDownloadStatus(modelId: string, localPath: string | null): boolean {
+    return requireAdapter().updateDownloadStatus(modelId, localPath);
+  },
+
   getModel(modelId: string): ModelInfo | null {
     return requireAdapter().get(modelId);
   },

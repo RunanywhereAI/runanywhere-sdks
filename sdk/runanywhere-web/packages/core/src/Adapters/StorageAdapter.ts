@@ -185,10 +185,6 @@ export class StorageAdapter {
 
   delete(request: ProtoStorageDeleteRequest): ProtoStorageDeleteResult | null {
     if (!this.ensureExports('delete', ['_rac_storage_analyzer_delete_proto'])) return null;
-    const requestedModelIds = request.modelIds.length > 0
-      ? request.modelIds
-      : (request.plan?.candidates ?? []).map((candidate) => candidate.modelId);
-    const modelSnapshots = this.modelSnapshots(requestedModelIds);
     defaultAnalyzerLifecycle?.prepareDelete(request);
     const result = this.bridge().withEncodedRequest(
       request,
@@ -206,7 +202,7 @@ export class StorageAdapter {
       'rac_storage_analyzer_delete_proto',
     );
     if (result && request.clearRegistryPaths && !request.dryRun) {
-      this.synchronizeClearedRegistryPaths(result.deletedModelIds, modelSnapshots);
+      this.synchronizeClearedRegistryPaths(result.deletedModelIds);
     }
     return result;
   }
@@ -220,32 +216,14 @@ export class StorageAdapter {
     return new ProtoWasmBridge(this.module, logger);
   }
 
-  private modelSnapshots(modelIds: readonly string[]): ReadonlyMap<string, ModelInfo> {
-    const registry = ModelRegistryAdapter.tryDefault();
-    if (!registry) return new Map();
-    const snapshots = new Map<string, ModelInfo>();
-    for (const modelId of new Set(modelIds.filter((id) => id.length > 0))) {
-      try {
-        const model = registry.get(modelId);
-        if (model) snapshots.set(modelId, model);
-      } catch {
-        // Native delete remains authoritative when a sibling registry is unavailable.
-      }
-    }
-    return snapshots;
-  }
-
-  private synchronizeClearedRegistryPaths(
-    deletedModelIds: readonly string[],
-    snapshots: ReadonlyMap<string, ModelInfo>,
-  ): void {
+  private synchronizeClearedRegistryPaths(deletedModelIds: readonly string[]): void {
     const registry = ModelRegistryAdapter.tryDefault();
     if (!registry) return;
-    for (const modelId of deletedModelIds) {
-      const model = snapshots.get(modelId);
-      if (!model) continue;
+    for (const modelId of new Set(deletedModelIds.filter((id) => id.length > 0))) {
       try {
-        registry.update({ ...model, localPath: '', isDownloaded: false });
+        if (!registry.updateDownloadStatus(modelId, null)) {
+          logger.warning(`Failed to synchronize cleared storage metadata for model '${modelId}'.`);
+        }
       } catch {
         logger.warning(`Failed to synchronize cleared storage metadata for model '${modelId}'.`);
       }

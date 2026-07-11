@@ -1330,14 +1330,12 @@ function(rac_wasm_add_target)
 
     # Threading (optional)
     if(RAC_WASM_PTHREADS)
-        # Sherpa's official browser artifacts use a four-worker pool. Keep the
-        # speech module on that validated topology; llama.cpp retains eight
-        # workers so VLM chunk evaluation never needs an on-demand spawn.
-        if(RWT_NAME STREQUAL "racommons_onnx_wasm")
-            set(_pthread_pool_size 4)
-        else()
-            set(_pthread_pool_size 8)
-        endif()
+        # ONNX/Sherpa owns RAG Solutions. A compiled RAG graph starts four
+        # operator threads plus three payload-guard threads, so every threaded
+        # release module pre-spawns eight workers. This keeps an immediate
+        # destroy/join from waiting on a Worker that cannot start until the
+        # browser event loop.
+        set(_pthread_pool_size 8)
         list(APPEND _link_flags
             "-pthread"
             # Pre-spawn the target's validated pool. This prevents synchronous
