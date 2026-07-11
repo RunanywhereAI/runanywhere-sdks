@@ -47,12 +47,12 @@ import {
   unloadModelsForCategory,
 } from '../utils/runAnywhereLifecycle';
 import { refreshNpuCatalog } from '../services/ModelCatalogBootstrap';
+import {
+  listDownloadedCatalogModels,
+  listVisibleCatalogModels,
+} from '../services/ModelRegistryQueries';
 
 const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
-const listModels = async (): Promise<ModelInfo[]> =>
-  (await RunAnywhere.listModels()).models?.models ?? [];
-const listDownloadedModels = async (): Promise<ModelInfo[]> =>
-  (await RunAnywhere.downloadedModels()).models?.models ?? [];
 
 const STORAGE_KEYS = APP_STORAGE_KEYS;
 
@@ -466,7 +466,8 @@ export const SettingsScreen: React.FC = () => {
       try {
         await AsyncStorage.setItem(STORAGE_KEYS.HF_TOKEN, trimmed);
         await RunAnywhere.setHfToken(trimmed);
-        await refreshNpuCatalog();
+        await refreshNpuCatalog({ skipHfAuthModels: !trimmed });
+        setAvailableModels(await listVisibleCatalogModels());
         if (options.showFeedback) {
           Alert.alert(
             trimmed ? 'Saved' : 'Cleared',
@@ -675,14 +676,14 @@ export const SettingsScreen: React.FC = () => {
       const vadLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION);
       console.warn('[Settings] Models loaded - STT:', sttLoaded, 'TTS:', ttsLoaded, 'Text:', textLoaded, 'VAD:', vadLoaded);
       try {
-        const available = await listModels();
+        const available = await listVisibleCatalogModels();
         console.warn('[Settings] Available models:', available);
         setAvailableModels(available);
       } catch (err) {
         console.warn('[Settings] Failed to get available models:', err);
       }
       try {
-        const downloaded = await listDownloadedModels();
+        const downloaded = await listDownloadedCatalogModels();
         console.warn('[Settings] Downloaded models:', downloaded);
         setDownloadedModels(downloaded);
       } catch (err) {

@@ -23,6 +23,7 @@ import {
   getModelDownloadSizeBytes,
   getPrimaryFramework,
 } from '../utils/modelDisplay';
+import { listDownloadedCatalogModels } from '../services/ModelRegistryQueries';
 
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return '0 B';
@@ -46,10 +47,10 @@ export const StorageScreen: React.FC = () => {
     try {
       const [storage, models] = await Promise.all([
         RunAnywhere.getStorageInfo(),
-        RunAnywhere.downloadedModels(),
+        listDownloadedCatalogModels(),
       ]);
       setStorageInfo(storage);
-      setDownloadedModels(models.models?.models ?? []);
+      setDownloadedModels(models);
     } finally {
       setIsRefreshing(false);
     }

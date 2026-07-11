@@ -28,6 +28,7 @@ import {
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import type { VADResult } from '@runanywhere/proto-ts/vad_options';
+import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
 
 function chunkToArrayBuffer(chunk: Uint8Array): ArrayBuffer {
   return chunk.buffer.slice(
@@ -78,7 +79,7 @@ export const VADScreen: React.FC = () => {
     const loaded = await RunAnywhere.modelInfoForCategory(
       ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
     ).catch(() => null);
-    if (loaded) setCurrentModel(loaded);
+    setCurrentModel(visibleNativeNpuCatalogModelOrNull(loaded));
   }, []);
 
   useEffect(() => {

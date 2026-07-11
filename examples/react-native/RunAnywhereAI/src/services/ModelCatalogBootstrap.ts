@@ -9,6 +9,7 @@
  */
 
 import { RunAnywhere } from '@runanywhere/core';
+import { QHexRT } from '@runanywhere/qhexrt';
 import {
   ModelCategory,
   InferenceFramework,
@@ -16,6 +17,11 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import { LoraAdapterCatalogEntry } from '@runanywhere/proto-ts/lora_options';
 import { logDiagnostic } from '../utils/diagnostics';
+import {
+  NPU_BUNDLES,
+  publishNpuCatalogAcceptance,
+  toNpuRegistrationRequest,
+} from './NpuModelCatalog';
 
 // Canonical SDK methods (Swift parity).
 const { registerModel, registerMultiFileModel } = RunAnywhere;
@@ -27,12 +33,19 @@ export type BackendRegistrationState = {
   qhexrtRegistered: boolean;
 };
 
+export type CatalogRegistrationOptions = {
+  skipHfAuthModels?: boolean;
+};
+
+let qhexrtBackendRegistered = false;
+
 /**
  * Register the curated model catalog for every successfully-registered
  * backend. Matches iOS `ModelCatalogBootstrap.registerAll()`.
  */
 export async function registerAll(
-  backendState: BackendRegistrationState
+  backendState: BackendRegistrationState,
+  options: CatalogRegistrationOptions = {}
 ): Promise<void> {
   const { llamaRegistered, onnxRegistered, mlxRegistered, qhexrtRegistered } =
     backendState;
@@ -231,80 +244,85 @@ export async function registerAll(
   // =========================================================================
   // ONNX backend + STT/TTS models
   // =========================================================================
-  if (!onnxRegistered) {
-    return;
+  if (onnxRegistered) {
+    await Promise.all([
+      // Sherpa-ONNX speech models — served by the Sherpa engine plugin
+      registerModel({
+        id: 'sherpa-onnx-whisper-tiny.en',
+        name: 'Sherpa Whisper Tiny (ONNX)',
+        url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+        artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+        memoryRequirement: 75_000_000,
+      }),
+      registerModel({
+        id: 'vits-piper-en_US-lessac-medium',
+        name: 'Piper TTS (US English - Medium)',
+        url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+        memoryRequirement: 65_000_000,
+      }),
+      registerModel({
+        id: 'vits-piper-en_GB-alba-medium',
+        name: 'Piper TTS (British English)',
+        url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+        memoryRequirement: 65_000_000,
+      }),
+      // Silero VAD — one-per-modality minimum for voice-agent parity with
+      // iOS. Small .onnx file served directly from the upstream repo.
+      registerModel({
+        id: 'silero-vad',
+        name: 'Silero VAD',
+        url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+        modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+        // Actual silero_vad.onnx Content-Length for catalog display/storage
+        // planning; the SDK keeps downloadSizeBytes separate.
+        memoryRequirement: 2_327_524,
+      }),
+      // Embedding model for RAG (multi-file: model.onnx + vocab.txt co-located)
+      // Identical to iOS: RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)
+      registerMultiFileModel({
+        id: 'all-minilm-l6-v2',
+        name: 'All MiniLM L6 v2 (Embedding)',
+        files: [
+          {
+            url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
+            filename: 'model.onnx',
+            isRequired: true,
+          },
+          {
+            url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
+            filename: 'vocab.txt',
+            isRequired: true,
+          },
+        ],
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+        modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+        // Sum of file Content-Lengths: model.onnx (90 MB) + vocab.txt (232 KB).
+        memoryRequirement: 90_619_114,
+      }),
+    ]);
   }
-
-  await Promise.all([
-    // Sherpa-ONNX speech models — served by the Sherpa engine plugin
-    registerModel({
-      id: 'sherpa-onnx-whisper-tiny.en',
-      name: 'Sherpa Whisper Tiny (ONNX)',
-      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-      modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-      artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
-      memoryRequirement: 75_000_000,
-    }),
-    registerModel({
-      id: 'vits-piper-en_US-lessac-medium',
-      name: 'Piper TTS (US English - Medium)',
-      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-      artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
-      memoryRequirement: 65_000_000,
-    }),
-    registerModel({
-      id: 'vits-piper-en_GB-alba-medium',
-      name: 'Piper TTS (British English)',
-      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-      artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
-      memoryRequirement: 65_000_000,
-    }),
-    // Silero VAD — one-per-modality minimum for voice-agent parity with
-    // iOS. Small .onnx file served directly from the upstream repo.
-    registerModel({
-      id: 'silero-vad',
-      name: 'Silero VAD',
-      url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-      modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-      // Actual silero_vad.onnx Content-Length for catalog display/storage
-      // planning; the SDK keeps downloadSizeBytes separate.
-      memoryRequirement: 2_327_524,
-    }),
-    // Embedding model for RAG (multi-file: model.onnx + vocab.txt co-located)
-    // Identical to iOS: RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)
-    registerMultiFileModel({
-      id: 'all-minilm-l6-v2',
-      name: 'All MiniLM L6 v2 (Embedding)',
-      files: [
-        {
-          url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
-          filename: 'model.onnx',
-          isRequired: true,
-        },
-        {
-          url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
-          filename: 'vocab.txt',
-          isRequired: true,
-        },
-      ],
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-      modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
-      // Sum of file Content-Lengths: model.onnx (90 MB) + vocab.txt (232 KB).
-      memoryRequirement: 90_619_114,
-    }),
-  ]);
 
   // =========================================================================
   // QHexRT (Hexagon NPU) bundles — logical URLs resolved natively
   // =========================================================================
-  if (qhexrtRegistered) {
-    await registerNpuBundles();
+  qhexrtBackendRegistered = qhexrtRegistered;
+  if (await isNpuCatalogReady()) {
+    const result = await registerNpuBundles(options.skipHfAuthModels ?? false);
+    publishNpuCatalogAcceptance(result.registeredIds);
+  } else {
+    publishNpuCatalogAcceptance([]);
+    logDiagnostic(
+      '[App] Skipping QHexRT catalog - native backend/device unsupported'
+    );
   }
 
   logDiagnostic('[App] All models registered');
@@ -557,325 +575,106 @@ async function registerLoraAdapters(): Promise<void> {
   }
 }
 
-type NpuBundle = {
-  id: string;
-  name: string;
-  url: string;
-  modality: ModelCategory;
-  estimatedSizeBytes: number;
-};
+type NpuSeedResult = Readonly<{
+  registeredIds: ReadonlySet<string>;
+  registered: number;
+  failed: number;
+  skippedHfAuth: number;
+  skippedNative: number;
+}>;
 
-const NPU_BUNDLES: NpuBundle[] = [
-  {
-    id: 'lfm2_5_230m',
-    name: 'LFM2.5 230M (HNPU)',
-    url: 'https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 886_089_241,
-  },
-  {
-    id: 'lfm2_5_350m',
-    name: 'LFM2.5 350M (HNPU)',
-    url: 'https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 1_441_493_515,
-  },
-  {
-    id: 'qwen3_5_0_8b',
-    name: 'Qwen3.5 0.8B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 2_046_527_848,
-  },
-  {
-    id: 'qwen3_5_2b',
-    name: 'Qwen3.5 2B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 4_817_344_861,
-  },
-  {
-    id: 'qwen3_5_4b',
-    name: 'Qwen3.5 4B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 6_177_585_629,
-  },
-  {
-    id: 'qwen3_0_6b',
-    name: 'Qwen3 0.6B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 1_823_248_798,
-  },
-  {
-    id: 'llama3_2_1b',
-    name: 'Llama 3.2 1B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 3_023_821_212,
-  },
-  {
-    id: 'ternary_bonsai_1_7b',
-    name: 'Ternary Bonsai 1.7B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 2_367_579_370,
-  },
-  {
-    id: 'phi_tiny_moe',
-    name: 'Phi Tiny MoE (HNPU)',
-    url: 'https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 6_100_212_369,
-  },
-  {
-    id: 'gemma3n_e4b',
-    name: 'Gemma 3n E4B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 10_929_816_419,
-  },
-  {
-    id: 'gemma4_e2b',
-    name: 'Gemma 4 E2B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 10_532_159_450,
-  },
-  {
-    id: 'gemma4_e4b',
-    name: 'Gemma 4 E4B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 13_435_056_195,
-  },
-  {
-    id: 'deepseek_r1_distill_qwen_1_5b',
-    name: 'DeepSeek R1 Distill Qwen 1.5B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 6_211_227_068,
-  },
-  {
-    id: 'deepseek_r1_distill_qwen_7b',
-    name: 'DeepSeek R1 Distill Qwen 7B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 8_210_665_301,
-  },
-  {
-    id: 'nemotron_nano_8b',
-    name: 'Llama 3.1 Nemotron Nano 8B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 8_609_694_487,
-  },
-  {
-    id: 'nemoguard_content_8b',
-    name: 'NemoGuard 8B Content Safety (HNPU)',
-    url: 'https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 8_610_354_023,
-  },
-  {
-    id: 'nemoguard_topic_8b',
-    name: 'NemoGuard 8B Topic Control (HNPU)',
-    url: 'https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 8_609_694_527,
-  },
-  {
-    id: 'qwen3_vl_2b_text',
-    name: 'Qwen3-VL 2B Text (HNPU)',
-    url: 'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json',
-    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    estimatedSizeBytes: 3_220_397_297,
-  },
-  {
-    id: 'qwen3_vl',
-    name: 'Qwen3-VL 2B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json',
-    modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-    estimatedSizeBytes: 3_220_397_297,
-  },
-  {
-    id: 'internvl3_5_1b',
-    name: 'InternVL3.5 1B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/internvl3_5_1b_HNPU',
-    modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-    estimatedSizeBytes: 3_067_933_894,
-  },
-  {
-    id: 'gemma4_e2b_vlm',
-    name: 'Gemma 4 E2B Image (HNPU)',
-    url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json',
-    modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-    estimatedSizeBytes: 10_532_159_450,
-  },
-  {
-    id: 'nemotron_nano_vl_8b',
-    name: 'Llama 3.1 Nemotron Nano VL 8B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json',
-    modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-    estimatedSizeBytes: 10_057_258_051,
-  },
-  {
-    id: 'whisper_base',
-    name: 'Whisper Base (HNPU)',
-    url: 'https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    estimatedSizeBytes: 221_522_616,
-  },
-  {
-    id: 'whisper_small',
-    name: 'Whisper Small (HNPU)',
-    url: 'https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    estimatedSizeBytes: 676_713_240,
-  },
-  {
-    id: 'moonshine_tiny',
-    name: 'Moonshine Tiny (HNPU)',
-    url: 'https://huggingface.co/runanywhere/moonshine_tiny_HNPU/moonshine-tiny.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    estimatedSizeBytes: 84_569_427,
-  },
-  {
-    id: 'moonshine_base',
-    name: 'Moonshine Base (HNPU)',
-    url: 'https://huggingface.co/runanywhere/moonshine_base_HNPU/moonshine-base.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    estimatedSizeBytes: 167_310_675,
-  },
-  {
-    id: 'parakeet_tdt_0_6b_v2',
-    name: 'Parakeet TDT 0.6B v2 (HNPU)',
-    url: 'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    estimatedSizeBytes: 1_280_063_837,
-  },
-  {
-    id: 'parakeet_tdt_0_6b_v3',
-    name: 'Parakeet TDT 0.6B v3 (HNPU)',
-    url: 'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    estimatedSizeBytes: 1_317_902_802,
-  },
-  {
-    id: 'parakeet_rnnt_1_1b',
-    name: 'Parakeet RNNT 1.1B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    estimatedSizeBytes: 2_211_659_923,
-  },
-  {
-    id: 'canary_qwen_2_5b',
-    name: 'Canary Qwen 2.5B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    estimatedSizeBytes: 5_491_333_979,
-  },
-  {
-    id: 'canary_1b_flash',
-    name: 'Canary-1B-flash (HNPU)',
-    url: 'https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    estimatedSizeBytes: 1_835_592_227,
-  },
-  {
-    id: 'nemotron_asr_streaming',
-    name: 'Nemotron ASR Streaming 0.6B (HNPU)',
-    url: 'https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    estimatedSizeBytes: 1_361_283_432,
-  },
-  {
-    id: 'melotts_en',
-    name: 'MeloTTS EN (HNPU)',
-    url: 'https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    estimatedSizeBytes: 120_439_053,
-  },
-  {
-    id: 'kokoro_en',
-    name: 'Kokoro-82M EN (HNPU)',
-    url: 'https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    estimatedSizeBytes: 470_739_484,
-  },
-  {
-    id: 'kitten_nano_0_8',
-    name: 'Kitten-nano-0.8-fp32 (HNPU)',
-    url: 'https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    estimatedSizeBytes: 95_842_227,
-  },
-  {
-    id: 'kitten_mini_0_1',
-    name: 'Kitten-mini-0.1 (HNPU)',
-    url: 'https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    estimatedSizeBytes: 449_672_060,
-  },
-  {
-    id: 'kitten_mini_0_8',
-    name: 'Kitten-mini-0.8 (HNPU)',
-    url: 'https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    estimatedSizeBytes: 778_828_575,
-  },
-  {
-    id: 'kitten_micro_0_8',
-    name: 'Kitten-micro-0.8 (HNPU)',
-    url: 'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    estimatedSizeBytes: 338_682_302,
-  },
-  {
-    id: 'kitten_nano_0_2',
-    name: 'Kitten-nano-0.2 (HNPU)',
-    url: 'https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    estimatedSizeBytes: 105_235_740,
-  },
-  {
-    id: 'kitten_nano_0_1',
-    name: 'Kitten-nano-0.1 (HNPU)',
-    url: 'https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    estimatedSizeBytes: 104_733_291,
-  },
-];
+async function isNpuCatalogReady(): Promise<boolean> {
+  if (!qhexrtBackendRegistered) return false;
 
-/**
- * Register logical HNPU rows. QHexRT's native bundle resolver chooses the
- * current device arch; unsupported devices or missing HF child dirs fail
- * registration and never appear as runnable models.
- */
-async function registerNpuBundles(): Promise<void> {
-  await Promise.all(
-    NPU_BUNDLES.map((bundle) =>
-      registerModel({
-        id: bundle.id,
-        name: bundle.name,
-        url: bundle.url,
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: bundle.modality,
-        memoryRequirement: bundle.estimatedSizeBytes,
-      }).catch((error: unknown) =>
-        logDiagnostic(
-          `[App] Failed to register NPU bundle ${bundle.id}: ${String(error)}`
-        )
-      )
-    )
-  );
-  logDiagnostic(
-    `[App] QHexRT logical NPU bundles registered: ${NPU_BUNDLES.length}`
-  );
+  try {
+    const [registered, capability] = await Promise.all([
+      QHexRT.isRegistered(),
+      QHexRT.probeNpu(),
+    ]);
+    return registered && capability.qhexrtSupported;
+  } catch (error) {
+    logDiagnostic(`[App] QHexRT readiness check failed: ${String(error)}`);
+    return false;
+  }
 }
 
-export async function refreshNpuCatalog(): Promise<void> {
-  await registerNpuBundles();
-  await RunAnywhere.refreshModelRegistry();
+/** Register only the logical HNPU rows accepted by native QHexRT. */
+async function registerNpuBundles(
+  skipHfAuthModels: boolean
+): Promise<NpuSeedResult> {
+  const registeredIds = new Set<string>();
+  let registered = 0;
+  let failed = 0;
+  let skippedHfAuth = 0;
+  let skippedNative = 0;
+
+  for (const bundle of NPU_BUNDLES) {
+    if (skipHfAuthModels && bundle.requiresHfAuth) {
+      skippedHfAuth += 1;
+      continue;
+    }
+
+    try {
+      const saved = await QHexRT.registerModelForDevice(
+        toNpuRegistrationRequest(bundle),
+        bundle.supportedArches
+      );
+      if (saved) {
+        registered += 1;
+        registeredIds.add(saved.id);
+      } else {
+        skippedNative += 1;
+      }
+    } catch (error) {
+      failed += 1;
+      logDiagnostic(
+        `[App] Failed to register NPU bundle ${bundle.id}: ${String(error)}`
+      );
+    }
+  }
+
+  logDiagnostic(
+    `[App] QHexRT catalog seeded: ok=${registered} failed=${failed} ` +
+      `skippedHfAuth=${skippedHfAuth} skippedNative=${skippedNative}`
+  );
+  return {
+    registeredIds,
+    registered,
+    failed,
+    skippedHfAuth,
+    skippedNative,
+  };
+}
+
+/**
+ * Re-seed QHexRT rows after token/config changes. A generic registry refresh is
+ * only meaningful when native QHexRT is still registered on a supported device.
+ */
+export async function refreshNpuCatalog(
+  options: CatalogRegistrationOptions = {}
+): Promise<boolean> {
+  if (!(await isNpuCatalogReady())) {
+    publishNpuCatalogAcceptance([]);
+    logDiagnostic(
+      '[App] Skipping QHexRT catalog refresh - native backend/device unsupported'
+    );
+    return false;
+  }
+
+  const result = await registerNpuBundles(options.skipHfAuthModels ?? false);
+  let registryRefreshed = false;
+  try {
+    await RunAnywhere.refreshModelRegistry();
+    registryRefreshed = true;
+  } catch (error) {
+    logDiagnostic(`[App] QHexRT registry refresh failed: ${String(error)}`);
+  }
+
+  // Publish after the registry operation so retained pickers reload a completed
+  // catalog snapshot rather than observing an intermediate registration pass.
+  publishNpuCatalogAcceptance(result.registeredIds);
+  logDiagnostic(
+    `[App] QHexRT catalog refresh completed: registryRefreshed=${registryRefreshed}`
+  );
+  return registryRefreshed;
 }

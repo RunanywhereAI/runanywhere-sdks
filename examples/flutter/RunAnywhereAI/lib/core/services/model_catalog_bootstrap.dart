@@ -2,6 +2,7 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/core/services/hf_token_store.dart';
+import 'package:runanywhere_ai/core/services/qhexrt_model_catalog.dart';
 
 /// ModelCatalogBootstrap
 ///
@@ -23,7 +24,7 @@ abstract final class ModelCatalogBootstrap {
     }
     debugPrint('Registering modules with their models...');
 
-    await _applyPersistedHfToken();
+    final hasHfToken = await _applyPersistedHfToken();
 
     // --- LLM models (LlamaCpp backend) ------------------------------------
     await _registerLLM(
@@ -285,10 +286,9 @@ abstract final class ModelCatalogBootstrap {
     debugPrint('LoRA adapters registered');
 
     // --- QHexRT (Hexagon NPU) bundles ---------------------------------------
-    // Register every logical HNPU URL through the normal SDK API; native
-    // commons resolves the current Hexagon arch and skips unsupported/missing
-    // bundles by failing registration.
-    await _registerNpuBundles();
+    // Native QHexRT probes the device, chooses the exact Hexagon bundle, and
+    // returns the registered architecture-specific model ID.
+    await _registerNpuBundles(hasHfToken: hasHfToken);
 
     debugPrint('All modules and models registered');
     _modulesRegistered = true;
@@ -516,381 +516,30 @@ abstract final class ModelCatalogBootstrap {
   /// Register logical HNPU rows. QHexRT's native bundle resolver chooses the
   /// current device arch; unsupported devices or missing HF child dirs fail
   /// registration and never appear as runnable models.
-  static Future<void> _registerNpuBundles() async {
-    await Future.wait([
-      _registerLLM(
-        id: 'lfm2_5_230m',
-        name: 'LFM2.5 230M (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 886_089_241,
-      ),
-      _registerLLM(
-        id: 'lfm2_5_350m',
-        name: 'LFM2.5 350M (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 1_441_493_515,
-      ),
-      _registerLLM(
-        id: 'qwen3_5_0_8b',
-        name: 'Qwen3.5 0.8B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 2_046_527_848,
-      ),
-      _registerLLM(
-        id: 'qwen3_5_2b',
-        name: 'Qwen3.5 2B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 4_817_344_861,
-      ),
-      _registerLLM(
-        id: 'qwen3_5_4b',
-        name: 'Qwen3.5 4B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 6_177_585_629,
-      ),
-      _registerLLM(
-        id: 'qwen3_0_6b',
-        name: 'Qwen3 0.6B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 1_823_248_798,
-      ),
-      _registerLLM(
-        id: 'llama3_2_1b',
-        name: 'Llama 3.2 1B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 3_023_821_212,
-      ),
-      _registerLLM(
-        id: 'ternary_bonsai_1_7b',
-        name: 'Ternary Bonsai 1.7B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 2_367_579_370,
-      ),
-      _registerLLM(
-        id: 'phi_tiny_moe',
-        name: 'Phi Tiny MoE (HNPU)',
-        url: 'https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 6_100_212_369,
-      ),
-      _registerLLM(
-        id: 'gemma3n_e4b',
-        name: 'Gemma 3n E4B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 10_929_816_419,
-      ),
-      _registerLLM(
-        id: 'gemma4_e2b',
-        name: 'Gemma 4 E2B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 10_532_159_450,
-      ),
-      _registerLLM(
-        id: 'gemma4_e4b',
-        name: 'Gemma 4 E4B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 13_435_056_195,
-      ),
-      _registerLLM(
-        id: 'deepseek_r1_distill_qwen_1_5b',
-        name: 'DeepSeek R1 Distill Qwen 1.5B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 6_211_227_068,
-      ),
-      _registerLLM(
-        id: 'deepseek_r1_distill_qwen_7b',
-        name: 'DeepSeek R1 Distill Qwen 7B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 8_210_665_301,
-      ),
-      _registerLLM(
-        id: 'nemotron_nano_8b',
-        name: 'Llama 3.1 Nemotron Nano 8B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 8_609_694_487,
-      ),
-      _registerLLM(
-        id: 'nemoguard_content_8b',
-        name: 'NemoGuard 8B Content Safety (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 8_610_354_023,
-      ),
-      _registerLLM(
-        id: 'nemoguard_topic_8b',
-        name: 'NemoGuard 8B Topic Control (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 8_609_694_527,
-      ),
-      _registerLLM(
-        id: 'qwen3_vl_2b_text',
-        name: 'Qwen3-VL 2B Text (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        memoryRequirement: 3_220_397_297,
-      ),
-      _registerLLM(
-        id: 'qwen3_vl',
-        name: 'Qwen3-VL 2B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        memoryRequirement: 3_220_397_297,
-      ),
-      _registerLLM(
-        id: 'internvl3_5_1b',
-        name: 'InternVL3.5 1B (HNPU)',
-        url: 'https://huggingface.co/runanywhere/internvl3_5_1b_HNPU',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        memoryRequirement: 3_067_933_894,
-      ),
-      _registerLLM(
-        id: 'gemma4_e2b_vlm',
-        name: 'Gemma 4 E2B Image (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        memoryRequirement: 10_532_159_450,
-      ),
-      _registerLLM(
-        id: 'nemotron_nano_vl_8b',
-        name: 'Llama 3.1 Nemotron Nano VL 8B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        memoryRequirement: 10_057_258_051,
-      ),
-      _registerLLM(
-        id: 'whisper_base',
-        name: 'Whisper Base (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/whisper_base_HNPU/whisper-base.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-        memoryRequirement: 221_522_616,
-      ),
-      _registerLLM(
-        id: 'whisper_small',
-        name: 'Whisper Small (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/whisper_small_HNPU/whisper-small.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-        memoryRequirement: 676_713_240,
-      ),
-      _registerLLM(
-        id: 'moonshine_tiny',
-        name: 'Moonshine Tiny (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/moonshine_tiny_HNPU/moonshine-tiny.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-        memoryRequirement: 84_569_427,
-      ),
-      _registerLLM(
-        id: 'moonshine_base',
-        name: 'Moonshine Base (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/moonshine_base_HNPU/moonshine-base.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-        memoryRequirement: 167_310_675,
-      ),
-      _registerLLM(
-        id: 'parakeet_tdt_0_6b_v2',
-        name: 'Parakeet TDT 0.6B v2 (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-        memoryRequirement: 1_280_063_837,
-      ),
-      _registerLLM(
-        id: 'parakeet_tdt_0_6b_v3',
-        name: 'Parakeet TDT 0.6B v3 (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-        memoryRequirement: 1_317_902_802,
-      ),
-      _registerLLM(
-        id: 'parakeet_rnnt_1_1b',
-        name: 'Parakeet RNNT 1.1B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-        memoryRequirement: 2_211_659_923,
-      ),
-      _registerLLM(
-        id: 'canary_qwen_2_5b',
-        name: 'Canary Qwen 2.5B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-        memoryRequirement: 5_491_333_979,
-      ),
-      _registerLLM(
-        id: 'canary_1b_flash',
-        name: 'Canary-1B-flash (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-        memoryRequirement: 1_835_592_227,
-      ),
-      _registerLLM(
-        id: 'nemotron_asr_streaming',
-        name: 'Nemotron ASR Streaming 0.6B (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-        memoryRequirement: 1_361_283_432,
-      ),
-      _registerLLM(
-        id: 'melotts_en',
-        name: 'MeloTTS EN (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        memoryRequirement: 120_439_053,
-      ),
-      _registerLLM(
-        id: 'kokoro_en',
-        name: 'Kokoro-82M EN (HNPU)',
-        url: 'https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        memoryRequirement: 470_739_484,
-      ),
-      _registerLLM(
-        id: 'kitten_nano_0_8',
-        name: 'Kitten-nano-0.8-fp32 (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        memoryRequirement: 95_842_227,
-      ),
-      _registerLLM(
-        id: 'kitten_mini_0_1',
-        name: 'Kitten-mini-0.1 (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        memoryRequirement: 449_672_060,
-      ),
-      _registerLLM(
-        id: 'kitten_mini_0_8',
-        name: 'Kitten-mini-0.8 (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        memoryRequirement: 778_828_575,
-      ),
-      _registerLLM(
-        id: 'kitten_micro_0_8',
-        name: 'Kitten-micro-0.8 (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        memoryRequirement: 338_682_302,
-      ),
-      _registerLLM(
-        id: 'kitten_nano_0_2',
-        name: 'Kitten-nano-0.2 (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        memoryRequirement: 105_235_740,
-      ),
-      _registerLLM(
-        id: 'kitten_nano_0_1',
-        name: 'Kitten-nano-0.1 (HNPU)',
-        url:
-            'https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        memoryRequirement: 104_733_291,
-      ),
-    ]);
-    debugPrint('QHexRT logical NPU bundles registered: 40');
+  static Future<void> _registerNpuBundles({required bool hasHfToken}) async {
+    final result = await QHexRTModelCatalog.registerForCurrentDevice(
+      hasHfToken: hasHfToken,
+    );
+    debugPrint(
+      'QHexRT catalog registered: ok=${result.registered} '
+      'failed=${result.failed} skippedHfAuth=${result.skippedHfAuth} '
+      'skippedNative=${result.skippedNative}',
+    );
   }
 
   static Future<void> refreshNpuCatalog() async {
-    await _applyPersistedHfToken();
-    await _registerNpuBundles();
+    final hasHfToken = await _applyPersistedHfToken();
+    await _registerNpuBundles(hasHfToken: hasHfToken);
     await RunAnywhere.refreshModelRegistry();
   }
 
-  static Future<void> _applyPersistedHfToken() async {
+  static Future<bool> _applyPersistedHfToken() async {
     final token = await HfTokenStore.load();
     if (token.isEmpty) {
-      return;
+      return false;
     }
     RunAnywhere.setHfToken(token);
+    return true;
   }
 
   /// Seed the curated LoRA adapter catalog. `registerArtifact` registers the

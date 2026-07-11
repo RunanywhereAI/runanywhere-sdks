@@ -259,7 +259,9 @@ const App: React.FC = () => {
         console.log('[App] Applied persisted HuggingFace token');
       }
 
-      await registerAll(backendState);
+      await registerAll(backendState, {
+        skipHfAuthModels: !storedHfToken,
+      });
       await RunAnywhere.refreshModelRegistry();
 
       const initTime = Date.now() - startTime;

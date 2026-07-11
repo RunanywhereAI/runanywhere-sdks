@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere/runanywhere.dart' show formatFramework;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/services/qhexrt_model_catalog.dart';
 
 typedef ModelInfo = sdk.ModelInfo;
 typedef ModelCategory = sdk.ModelCategory;
@@ -81,23 +82,28 @@ enum ModelSelectionContext {
   }
 
   /// Frameworks to include. `null` means all frameworks that have matching
-  /// models. Mirrors iOS `ModelSelectionSheet.swift` `allowedFrameworks`:
-  /// the RAG pipeline requires ONNX embeddings and a llama.cpp generator.
+  /// models. Android RAG can use either the portable CPU backend or QHexRT's
+  /// native device-accepted embedding/generator rows.
   Set<LLMFramework>? get allowedFrameworks {
     switch (this) {
       case ModelSelectionContext.ragEmbedding:
-        return {sdk.InferenceFramework.INFERENCE_FRAMEWORK_ONNX};
+        return {
+          sdk.InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+          sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+        };
       case ModelSelectionContext.ragLLM:
-        return {sdk.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP};
+        return {
+          sdk.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+          sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+        };
       default:
         return null;
     }
   }
 
   /// Single shared picker predicate: category match, framework allow-list,
-  /// and (RAG embedding only) supporting-file exclusion. iOS detects
-  /// supporting files by the `-vocab` / `-tokenizer` id suffix
-  /// (ModelSelectionSheet.swift:104-111) — mirror that exactly.
+  /// and (RAG embedding only) supporting-file/reranker exclusion. The suffix
+  /// checks mirror iOS; the reranker guard mirrors the Android QHexRT picker.
   bool includes(ModelInfo model) {
     if (!relevantCategories.contains(model.category)) return false;
     final frameworks = allowedFrameworks;
@@ -105,7 +111,9 @@ enum ModelSelectionContext {
       return false;
     }
     if (this == ModelSelectionContext.ragEmbedding &&
-        (model.id.endsWith('-vocab') || model.id.endsWith('-tokenizer'))) {
+        (model.id.endsWith('-vocab') ||
+            model.id.endsWith('-tokenizer') ||
+            model.id.toLowerCase().contains('rerank'))) {
       return false;
     }
     return true;
@@ -287,8 +295,7 @@ extension ExampleModelInfoView on ModelInfo {
         ? metadata.tags.map((tag) => tag.toLowerCase()).toSet()
         : const <String>{};
     return tags.any(_privateHfTags.contains) ||
-        backendFramework == sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
-            downloadUrl.toLowerCase().contains('_hnpu');
+        privateQHexRTHfModelIds.contains(id);
   }
 
   int? get memoryRequired {
