@@ -18,7 +18,9 @@ not publishable until every required item is checked and its evidence is retaine
   token, the exact small models to install, and steps for private HNPU access.
 - [ ] Every shipped library, font, model, adapter, and native binary has a
   reviewed redistribution license and an entry in
-  [`MODEL_LICENSE_REVIEW.md`](MODEL_LICENSE_REVIEW.md) plus the archived notices inventory.
+  [`MODEL_LICENSE_REVIEW.md`](MODEL_LICENSE_REVIEW.md) plus the archived notices
+  inventory. Resolve every external approval in
+  [`THIRD_PARTY_NOTICES_AUDIT.md`](THIRD_PARTY_NOTICES_AUDIT.md).
 
 `bundleRelease` enforces the following environment variables:
 
@@ -54,6 +56,9 @@ UPLOAD_CERT_SHA256
   every relevant device configuration.
 - [ ] R8 mapping, native debug symbols, AAB SHA-256, upload certificate, dependency
   report, SBOM, and test reports are archived with the release.
+- [ ] `./scripts/audit-release-notices.sh --strict --apk <exact-release-apk>`
+  passes, and its SBOM and notice inventory match the artifacts archived for
+  this release. A mechanical pass does not replace publisher/legal approval.
 - [ ] Play pre-launch report and policy/SDK warnings are clean.
 
 ## Device acceptance
