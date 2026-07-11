@@ -161,7 +161,17 @@ export const test = base.extend<ReleaseTestFixtures, ReleaseWorkerFixtures>({
       if (RELEASE_TRACE_ENABLED) {
         await context.tracing.stop().catch(() => undefined);
       }
-      await context.close().catch(() => undefined);
+      let closeTimeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          context.close().catch(() => undefined),
+          new Promise<void>((resolveClose) => {
+            closeTimeout = setTimeout(resolveClose, 30_000);
+          }),
+        ]);
+      } finally {
+        if (closeTimeout !== undefined) clearTimeout(closeTimeout);
+      }
     }
   }, { scope: 'worker' }],
 
@@ -480,7 +490,7 @@ export async function expectSubstantiveText(
   const timeout = options.timeout ?? 10 * 60_000;
   const forbidden = options.forbidden
     ?? /\((?:no response|no transcript|waiting for speech)[^)]*\)|\b(?:failed|error|unavailable)\b/i;
-  const pending = /\((?:no response|no transcript|waiting for speech)[^)]*\)/i;
+  const pending = /\((?:no response|no transcript|waiting for speech)[^)]*\)|^\s*(?:Thinking)?(?:…|\.\.\.)\s*$/i;
   let substantiveText = '';
 
   await expect.poll(async () => {

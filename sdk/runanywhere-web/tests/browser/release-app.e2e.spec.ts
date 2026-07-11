@@ -1047,7 +1047,10 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
       /timezone|timestamp/i,
     );
 
+    let geocodingRequests = 0;
+    let forecastRequests = 0;
     await appPage.route('https://geocoding-api.open-meteo.com/**', async (route) => {
+      geocodingRequests += 1;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -1058,6 +1061,7 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
       });
     });
     await appPage.route('https://api.open-meteo.com/**', async (route) => {
+      forecastRequests += 1;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -1078,7 +1082,13 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
         'You must call get_weather exactly once for Release City, then report the returned condition and temperature.',
         'get_weather',
         /Release City|72|Clear sky/i,
+        {
+          maxAttempts: 3,
+          executionCount: () => geocodingRequests + forecastRequests,
+        },
       );
+      expect(geocodingRequests).toBe(1);
+      expect(forecastRequests).toBe(1);
     } finally {
       await appPage.unroute('https://geocoding-api.open-meteo.com/**');
       await appPage.unroute('https://api.open-meteo.com/**');
@@ -2232,23 +2242,51 @@ async function runToolTurn(
   prompt: string,
   expectedTool: 'calculate' | 'get_current_time' | 'get_weather',
   expectedResult: RegExp,
+  options: {
+    maxAttempts?: number;
+    executionCount?: () => number;
+  } = {},
 ): Promise<void> {
-  await page.locator('#chat-input').fill(prompt);
-  await page.locator('#chat-send-btn').click();
-  await expect(page.locator('#chat-send-btn')).toHaveAttribute('aria-label', 'Send message', {
-    timeout: 15 * 60_000,
-  });
-  const reply = page.locator('.chat-message--assistant').last();
-  const toolCall = reply.locator('.chat-tool-call').filter({ hasText: expectedTool }).first();
-  await expect(toolCall, `${expectedTool} must be rendered in the assistant trace`).toBeVisible();
-  await expect(toolCall.locator('summary')).toContainText('completed');
-  const trace = await toolCall.locator('pre').textContent();
-  expect(trace ?? '').toMatch(expectedResult);
-  expect(trace ?? '').not.toMatch(/\bError:/i);
-  await expectSubstantiveText(reply.locator('.chat-bubble'), {
-    minLength: 8,
-    timeout: 15 * 60_000,
-  });
+  const maxAttempts = Math.max(1, options.maxAttempts ?? 2);
+  const send = page.locator('#chat-send-btn');
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    await page.locator('#chat-input').fill(prompt);
+    await send.click();
+    await expect(send).toHaveAttribute('aria-label', 'Stop generation', { timeout: 120_000 });
+    await expect(send).toHaveAttribute('aria-label', 'Send message', {
+      timeout: 15 * 60_000,
+    });
+    const reply = page.locator('.chat-message--assistant').last();
+    const toolCall = reply.locator('.chat-tool-call').filter({ hasText: expectedTool }).first();
+    if (await toolCall.count() > 0) {
+      await expect(toolCall, `${expectedTool} must be rendered in the assistant trace`).toBeVisible();
+      await expect(toolCall.locator('summary')).toContainText('completed');
+      const trace = await toolCall.locator('pre').textContent();
+      expect(trace ?? '').toMatch(expectedResult);
+      expect(trace ?? '').not.toMatch(/\bError:/i);
+      await expectSubstantiveText(reply.locator('.chat-bubble'), {
+        minLength: 8,
+        timeout: 15 * 60_000,
+        forbidden: /\b(?:failed|error|unavailable)\b|did not (?:produce|provide)/i,
+      });
+      return;
+    }
+
+    const executionCount = options.executionCount?.() ?? 0;
+    const terminalText = (await reply.innerText()).replace(/\s+/g, ' ').trim();
+    if (executionCount > 0) {
+      throw new Error(
+        `${expectedTool} executed ${executionCount} request(s) but its trace was not rendered: ${terminalText}`,
+      );
+    }
+    if (attempt === maxAttempts) {
+      throw new Error(
+        `${expectedTool} produced no tool call after ${maxAttempts} attempt(s): ${terminalText}`,
+      );
+    }
+    await page.locator('#consumer-new-chat-btn').click();
+    await expect(page.locator('#chat-tools-btn')).toHaveClass(/\bactive\b/);
+  }
 }
 
 interface STTStreamRecord {

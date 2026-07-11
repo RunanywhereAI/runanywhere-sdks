@@ -23,6 +23,7 @@ import type { TabLifecycle } from '../app';
 import {
   ModelCategory,
   RunAnywhere,
+  ToolChoiceMode,
   ToolParameterType,
   isSDKException,
   type ToolDefinition,
@@ -637,14 +638,20 @@ async function generateWithToolCalling(
   const options = buildGenerationOptions();
   const controller = new AbortController();
   cancelGeneration = () => controller.abort();
+  const forcedToolName = explicitlyRequestedDemoTool(prompt);
 
-  const result = await RunAnywhere.generateWithTools(prompt, {}, {
+  const result = await RunAnywhere.generateWithTools(prompt, forcedToolName ? {
+    toolChoice: ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC,
+    forcedToolName,
+  } : {}, {
     signal: controller.signal,
     llmOptions: options,
   });
 
   const split = splitThinking(result.text);
-  assistantMsg.content = split.content;
+  assistantMsg.content = split.content || (result.toolCalls.length > 0
+    ? 'The tool completed, but the model did not provide a final answer.'
+    : 'The model did not produce a tool call or answer. Please try again.');
   assistantMsg.thinking = result.thinkingContent || split.thinking || undefined;
   if (result.toolCalls.length > 0) {
     assistantMsg.toolCalls = result.toolCalls.map((call) => {
@@ -661,6 +668,17 @@ async function generateWithToolCalling(
     });
   }
   renderLastMessage(messagesEl, assistantMsg);
+}
+
+const DEMO_TOOL_NAMES = ['calculate', 'get_current_time', 'get_weather'] as const;
+type DemoToolName = (typeof DEMO_TOOL_NAMES)[number];
+
+/** Honor an unambiguous, explicit tool-name request through the SDK's forced
+ * choice contract. Ordinary user language remains on automatic selection. */
+function explicitlyRequestedDemoTool(prompt: string): DemoToolName | null {
+  const requested = DEMO_TOOL_NAMES.filter((name) =>
+    new RegExp(`\\b${name}\\b`, 'i').test(prompt));
+  return requested.length === 1 ? requested[0]! : null;
 }
 
 // ---------------------------------------------------------------------------
