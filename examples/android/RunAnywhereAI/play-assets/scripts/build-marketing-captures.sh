@@ -73,12 +73,12 @@ mkdir -p "${OUTPUT_DIR}"
 render_capture \
     "${RAW_DIR}/06-qhexrt-v81-landscape.png" \
     "${OUTPUT_DIR}/06-qhexrt-v81.png" \
-    $'Private models.\nReal NPU.' \
+    $'Local models.\nReal NPU.' \
     'Qwen3.5 running locally on a Hexagon v81 NPU' \
     'Hexagon v81 acceleration' \
     'QHexRT and QNN execute the model on-device.' \
-    'Private by default' \
-    'Prompts and inference stay on your phone.' \
+    'On-device model execution' \
+    'Generation runs locally after model download.' \
     'Performance you can see' \
     'TTFT, tokens, and throughput after every answer.'
 
