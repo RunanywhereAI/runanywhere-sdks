@@ -4,7 +4,7 @@
   "outputDirectory": "dist",
   "framework": null,
   "functions": {
-    "api/runanywhere/*.ts": {
+    "api/runanywhere.ts": {
       "maxDuration": 30
     }
   },
@@ -33,6 +33,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/runanywhere/(.*)",
+      "destination": "/api/runanywhere"
+    },
     {
       "source": "/((?!api/runanywhere/|assets/|coi-serviceworker\\.js|runanywhere-logo\\.svg).*)",
       "destination": "/index.html"
