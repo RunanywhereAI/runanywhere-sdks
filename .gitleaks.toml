@@ -24,11 +24,8 @@ regex = '''https?://[a-zA-Z0-9\-]+\.up\.railway\.app'''
 keywords = ["railway.app"]
 
 [[rules.allowlists]]
-description = "Canonical public RunAnywhere control-plane hostname"
-regexTarget = "match"
-regexes = [
-    '''^https://runanywhere-backend-production\.up\.railway\.app$''',
-]
+description = "Historical Web relay commit; relay removed from the final tree"
+commits = ["173426c0533ca6301afa26a78fb939ec3f695951"]
 
 [[rules]]
 id = "supabase-url"

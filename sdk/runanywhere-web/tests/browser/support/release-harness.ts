@@ -10,16 +10,12 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 export const RELEASE_E2E_ENABLED = process.env.RA_RUN_FULL_E2E === '1';
-const HAS_RUNTIME_CREDENTIALS = Boolean(
-  process.env.RUNANYWHERE_API_KEY?.trim(),
-);
 const CONFIGURED_BASE_URL = process.env.RA_E2E_BASE_URL;
 const TARGETS_REMOTE_ORIGIN = Boolean(
   CONFIGURED_BASE_URL
   && !/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/i.test(CONFIGURED_BASE_URL),
 );
 const RELEASE_TRACE_ENABLED = process.env.RA_E2E_TRACE === '1'
-  && !HAS_RUNTIME_CREDENTIALS
   && !TARGETS_REMOTE_ORIGIN;
 
 const REPO_ROOT = resolve(__dirname, '../../../../..');
@@ -140,7 +136,6 @@ export const test = base.extend<ReleaseTestFixtures, ReleaseWorkerFixtures>({
       : 'http://localhost:5173';
     const context = await browser.newContext({
       baseURL,
-      ignoreHTTPSErrors: /^https:\/\/localtest\.me(?::|\/|$)/i.test(baseURL),
       viewport: { width: 1440, height: 1000 },
       permissions: ['microphone', 'camera', 'clipboard-read', 'clipboard-write'],
       acceptDownloads: true,
@@ -196,10 +191,8 @@ export const test = base.extend<ReleaseTestFixtures, ReleaseWorkerFixtures>({
     try {
       await use();
     } finally {
-      // A credentialed Settings test clears its field in its own `finally`,
-      // and this defense-in-depth scrub runs before any automatic screenshot.
-      // Dispatch `change` so the app's session-only settings object is also
-      // cleared; no password value is ever included in an artifact.
+      // Defense-in-depth: clear the session-only Settings password field before
+      // any automatic screenshot or trace artifact.
       await scrubPasswordInputs(page);
       const diagnostics = events.slice(eventOffset);
       const snapshot = await collectRuntimeSnapshot(page);
@@ -745,11 +738,8 @@ function safeURL(raw: string): string {
 }
 
 function redact(value: string): string {
-  let redacted = value
+  return value
     .replace(/\bBearer\s+[^\s"']+/gi, 'Bearer [REDACTED]')
     .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[REDACTED-KEY]')
     .replace(/((?:api[-_ ]?key|authorization)["']?\s*[:=]\s*["']?)[^\s,"'}]+/gi, '$1[REDACTED]');
-  const processKey = process.env.RUNANYWHERE_API_KEY?.trim();
-  if (processKey) redacted = redacted.split(processKey).join('[REDACTED-KEY]');
-  return redacted;
 }

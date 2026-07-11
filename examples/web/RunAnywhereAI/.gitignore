@@ -2,7 +2,6 @@
 .vercel-stage
 .env
 .env.*
-!.env.example
 
 # Yarn workspace state
 .yarn/cache/

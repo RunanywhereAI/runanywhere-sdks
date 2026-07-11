@@ -24,24 +24,12 @@ import {
   resetCatalogRegistrationState,
 } from './components/model-selection';
 import {
-  getStoredApiKey,
-  getStoredBaseURL,
   setAPIConfigurationApplyHandler,
   type APIConfiguration,
   type APIConfigurationApplyResult,
 } from './views/settings';
 import { formatError } from './services/format-error';
 import { appLogger } from './services/app-logger';
-import {
-  isUsableCredential,
-  normalizeProductionBaseURL,
-} from './services/network-configuration';
-import {
-  controlPlaneRelayIsEnabled,
-  FIRST_PARTY_CONTROL_PLANE_BASE_URL,
-  FIRST_PARTY_CONTROL_PLANE_RELAY_CREDENTIAL,
-  resolveSDKControlPlaneBaseURL,
-} from './services/control-plane-relay';
 
 type AppReadinessState = 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
 type SDKReadinessState = 'initializing' | 'ready' | 'unavailable';
@@ -250,8 +238,8 @@ async function waitForInteractiveShell(): Promise<AppReadinessSnapshot> {
  * Registers a service worker that injects COOP/COEP headers for browsers
  * that don't support `credentialless` COEP (Safari/WebKit).
  *
- * - On Chrome/Firefox: `crossOriginIsolated` is already true via server
- *   headers, so this is a no-op (SW registers silently for future use).
+ * - On Chrome/Firefox: `crossOriginIsolated` is already true via Vite or the
+ *   static host's response headers, so this is a no-op.
  * - On Safari/iOS: `crossOriginIsolated` is false, so the SW installs
  *   and the page reloads once to activate it.
  */
@@ -343,7 +331,9 @@ async function initializeSDK(): Promise<void> {
   // concurrency suspension race; on Web the backend packages install onto
   // core adapters, so the SDK-documented order is initialize() first.
   try {
-    const configuration = startupRuntimeConfiguration();
+    const configuration: RuntimeConfiguration = {
+      environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+    };
     await startRuntime(configuration, false);
     activeRuntimeConfiguration = configuration;
     sdkReadinessState = 'ready';
@@ -357,43 +347,6 @@ async function initializeSDK(): Promise<void> {
   }
 }
 
-/** Resolve startup credentials without ever placing the API key in storage. */
-function startupRuntimeConfiguration(): RuntimeConfiguration {
-  // Treat credentials as an inseparable pair. The API key is session-only,
-  // while Settings persists the base URL only to prefill the form. A complete
-  // in-memory Settings pair wins; the persisted URL alone can never override
-  // startup networking. Otherwise an explicit browser-safe flag selects the
-  // first-party same-origin relay using a public marker; the production API
-  // key exists only in the Vite/Vercel server environment.
-  const sessionApiKey = getStoredApiKey();
-  const sessionBaseURL = getStoredBaseURL();
-  const hasSessionConfiguration = sessionApiKey !== null && sessionBaseURL !== null;
-  const relayEnabled = controlPlaneRelayIsEnabled(
-    import.meta.env.VITE_RUNANYWHERE_RELAY_ENABLED,
-  );
-  const [apiKey, baseURL] = hasSessionConfiguration
-    ? [sessionApiKey, sessionBaseURL]
-    : relayEnabled
-      ? [
-          FIRST_PARTY_CONTROL_PLANE_RELAY_CREDENTIAL,
-          FIRST_PARTY_CONTROL_PLANE_BASE_URL,
-        ]
-      : [null, null];
-  const normalizedBaseURL = normalizeProductionBaseURL(baseURL);
-  if (
-    apiKey !== null
-    && isUsableCredential(apiKey)
-    && normalizedBaseURL !== null
-  ) {
-    return {
-      apiKey,
-      baseURL: normalizedBaseURL,
-      environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-    };
-  }
-  return { environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT };
-}
-
 /**
  * Initialize core, register both independent WASM backends, then seed and
  * hydrate the model catalog. Settings reuses this exact boot path so applying
@@ -404,22 +357,7 @@ async function startRuntime(
   configuration: RuntimeConfiguration,
   requireAllBackends: boolean,
 ): Promise<void> {
-  const relayEnabled = controlPlaneRelayIsEnabled(
-    import.meta.env.VITE_RUNANYWHERE_RELAY_ENABLED,
-  );
-  const sdkConfiguration: RuntimeConfiguration = configuration.baseURL
-    ? {
-        ...configuration,
-        baseURL: resolveSDKControlPlaneBaseURL({
-          configuredBaseURL: configuration.baseURL,
-          apiKey: configuration.apiKey,
-          pageOrigin: window.location.origin,
-          relayEnabled,
-        }),
-      }
-    : configuration;
-
-  await RunAnywhere.initialize(sdkConfiguration);
+  await RunAnywhere.initialize(configuration);
 
   const localRestored = await RunAnywhere.storage.restoreLocalStorage();
   if (localRestored) {
@@ -736,7 +674,7 @@ function showErrorView(message: string): void {
     </div>
   `;
 
-  // Initialization errors can contain server/WASM-provided text. Render the
+  // Initialization errors can contain remote/WASM-provided text. Render the
   // diagnostic as text so a failed upstream cannot inject markup into the app.
   const messageElement = document.getElementById('initialization-error-message');
   if (messageElement) messageElement.textContent = message;

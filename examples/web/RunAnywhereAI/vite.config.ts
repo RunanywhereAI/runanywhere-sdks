@@ -1,11 +1,7 @@
-import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import {
-  controlPlaneRelayIsEnabled,
-} from './src/services/control-plane-relay';
-import { viteControlPlaneRelayPlugin } from './server/vite-control-plane-relay';
 
 // __dirname is not available in ESM; derive it from import.meta.url
 const __dir = path.dirname(fileURLToPath(import.meta.url));
@@ -97,35 +93,14 @@ function copyWasmPlugin(requireCompleteArtifacts: boolean): Plugin {
   };
 }
 
-function localHTTPSOptions(): { key: Buffer; cert: Buffer } | undefined {
-  const keyPath = process.env.RA_E2E_HTTPS_KEY_PATH;
-  const certPath = process.env.RA_E2E_HTTPS_CERT_PATH;
-  if (!keyPath && !certPath) return undefined;
-  if (!keyPath || !certPath) {
-    throw new Error('Both RA_E2E_HTTPS_KEY_PATH and RA_E2E_HTTPS_CERT_PATH are required.');
-  }
-  return {
-    key: fs.readFileSync(keyPath),
-    cert: fs.readFileSync(certPath),
-  };
-}
-
 const isolationHeaders = {
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Embedder-Policy': 'credentialless',
 } as const;
 
-export default defineConfig(({ command, mode }) => {
-  const env = loadEnv(mode, __dir, '');
-  const relayEnabled = controlPlaneRelayIsEnabled(env.VITE_RUNANYWHERE_RELAY_ENABLED);
-  const serverApiKey = process.env.RUNANYWHERE_API_KEY ?? env.RUNANYWHERE_API_KEY;
-  const https = localHTTPSOptions();
-  const relayPlugin = command === 'serve' && relayEnabled
-    ? [viteControlPlaneRelayPlugin(serverApiKey)]
-    : [];
-
+export default defineConfig(({ command }) => {
   return {
-    plugins: [copyWasmPlugin(command === 'build'), ...relayPlugin],
+    plugins: [copyWasmPlugin(command === 'build')],
     build: {
       // Vite 8 otherwise advances this floor with its moving
       // `baseline-widely-available` default on each major release. Chrome 86
@@ -149,9 +124,7 @@ export default defineConfig(({ command, mode }) => {
     },
     server: {
       headers: isolationHeaders,
-      https,
       cors: false,
-      allowedHosts: ['localtest.me'],
       fs: {
         // Allow Vite to serve files from the entire workspace
         allow: [workspaceRoot],
@@ -160,9 +133,7 @@ export default defineConfig(({ command, mode }) => {
     },
     preview: {
       headers: isolationHeaders,
-      https,
       cors: false,
-      allowedHosts: ['localtest.me'],
     },
     optimizeDeps: {
       exclude: ['@runanywhere/web', '@runanywhere/web-llamacpp', '@runanywhere/web-onnx'],

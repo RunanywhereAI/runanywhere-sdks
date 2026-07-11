@@ -24,6 +24,7 @@ import {
   type OpenSheetOptions,
 } from './components/model-selection';
 import { appLogger } from './services/app-logger';
+import { ConversationsStore, type StoredConversation } from './services/conversations-store';
 
 // ---------------------------------------------------------------------------
 // Tab Lifecycle
@@ -259,10 +260,7 @@ export function buildAppShell(): void {
     </button>
     <div class="consumer-recents">
       <div class="consumer-section-title">Recent</div>
-      <button type="button" class="consumer-recent-row" id="consumer-current-chat-btn">
-        <span class="consumer-recent-row__title" id="consumer-current-chat-title">Current chat</span>
-        <span class="consumer-recent-row__meta" id="consumer-current-chat-meta">Stored locally</span>
-      </button>
+      <div class="consumer-recent-list" id="consumer-conversation-list"></div>
     </div>
     <nav class="tab-bar consumer-nav" id="consumer-nav" aria-label="Main navigation"></nav>
   `;
@@ -303,7 +301,7 @@ export function buildAppShell(): void {
   wireShellActions();
   initializePanels();
   switchTabById('chat');
-  refreshCurrentChatSummary();
+  void refreshConversationList();
 }
 
 function renderNav(): void {
@@ -362,16 +360,14 @@ function wireShellActions(): void {
     startNewChat();
     closeDrawer();
   });
-  document.getElementById('consumer-current-chat-btn')?.addEventListener('click', () => {
-    switchTabById('chat');
-    closeDrawer();
-  });
 
   window.addEventListener('runanywhere:navigate', (event) => {
     const tabId = (event as CustomEvent<{ tab: TabId }>).detail?.tab;
     if (tabId) switchTabById(tabId);
   });
-  window.addEventListener('runanywhere:conversation-updated', refreshCurrentChatSummary);
+  ConversationsStore.onChange(() => {
+    void refreshConversationList();
+  });
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && drawerOpen) closeDrawer();
   });
@@ -408,7 +404,6 @@ function setMobileDrawerAria(hidden: boolean): void {
 function startNewChat(): void {
   window.dispatchEvent(new CustomEvent('runanywhere:new-chat'));
   switchTabById('chat');
-  refreshCurrentChatSummary();
 }
 
 function switchTabById(tabId: TabId): void {
@@ -448,42 +443,95 @@ function switchTab(index: number): void {
   }
 }
 
-function refreshCurrentChatSummary(): void {
-  const titleEl = document.getElementById('consumer-current-chat-title');
-  const metaEl = document.getElementById('consumer-current-chat-meta');
-  if (!titleEl || !metaEl) return;
-
+async function refreshConversationList(): Promise<void> {
+  const list = document.getElementById('consumer-conversation-list');
+  if (!list) return;
+  let conversations: StoredConversation[];
+  let current: StoredConversation | null;
   try {
-    const saved = localStorage.getItem('runanywhere-chat-conversation');
-    if (!saved) {
-      titleEl.textContent = 'No saved chats yet';
-      metaEl.textContent = 'Start a private local conversation';
-      return;
-    }
-    const parsed: unknown = JSON.parse(saved);
-    const record = typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
-      ? parsed as Readonly<Record<string, unknown>>
-      : null;
-    const rawMessages = record && Array.isArray(record.messages) ? record.messages : [];
-    const firstUser = rawMessages.find((message): boolean => {
-      if (typeof message !== 'object' || message === null || Array.isArray(message)) return false;
-      const candidate = message as Readonly<Record<string, unknown>>;
-      return candidate.role === 'user'
-        && typeof candidate.content === 'string'
-        && candidate.content.trim().length > 0;
-    }) as Readonly<Record<string, unknown>> | undefined;
-    const firstContent = typeof firstUser?.content === 'string' ? firstUser.content.trim() : '';
-    const updatedAt = typeof record?.updatedAt === 'number' && Number.isFinite(record.updatedAt)
-      ? record.updatedAt
-      : null;
-    titleEl.textContent = firstContent.slice(0, 56) || 'Current chat';
-    metaEl.textContent = updatedAt !== null
-      ? `Saved ${new Date(updatedAt).toLocaleDateString()}`
-      : 'Stored locally';
-  } catch {
-    titleEl.textContent = 'Current chat';
-    metaEl.textContent = 'Stored locally';
+    [conversations, current] = await Promise.all([
+      ConversationsStore.getConversations(),
+      ConversationsStore.getCurrent(),
+    ]);
+  } catch (error) {
+    list.replaceChildren();
+    const unavailable = document.createElement('p');
+    unavailable.className = 'consumer-recents__empty';
+    unavailable.textContent = 'Saved chats unavailable';
+    list.appendChild(unavailable);
+    appLogger.warning('[App] Could not load saved chats:', error);
+    return;
   }
+  list.replaceChildren();
+  const currentId = current?.id ?? null;
+  if (conversations.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'consumer-recents__empty';
+    empty.textContent = 'No saved chats yet';
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const conversation of conversations) {
+    list.appendChild(buildConversationRow(conversation, conversation.id === currentId));
+  }
+}
+
+function buildConversationRow(
+  conversation: StoredConversation,
+  isCurrent: boolean,
+): HTMLElement {
+  const entry = document.createElement('div');
+  entry.className = `consumer-recent-entry${isCurrent ? ' active' : ''}`;
+
+  const openButton = document.createElement('button');
+  openButton.type = 'button';
+  openButton.className = 'consumer-recent-row';
+  openButton.setAttribute('aria-label', `Open saved chat: ${conversation.title}`);
+
+  const title = document.createElement('span');
+  title.className = 'consumer-recent-row__title';
+  title.textContent = conversation.title;
+  const meta = document.createElement('span');
+  meta.className = 'consumer-recent-row__meta';
+  const messageLabel = conversation.messages.length === 1 ? 'message' : 'messages';
+  meta.textContent = `${conversation.messages.length} ${messageLabel} · ${formatSavedDate(conversation.updatedAt)}`;
+  openButton.append(title, meta);
+  openButton.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('runanywhere:load-chat', {
+      detail: { conversationId: conversation.id },
+    }));
+    switchTabById('chat');
+    closeDrawer();
+  });
+
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'consumer-recent-delete';
+  deleteButton.setAttribute('aria-label', `Delete saved chat: ${conversation.title}`);
+  deleteButton.textContent = '\u00d7';
+  deleteButton.addEventListener('click', () => {
+    void ConversationsStore.getCurrent().then((current) => {
+      window.dispatchEvent(new CustomEvent('runanywhere:delete-chat', {
+        detail: { conversationId: conversation.id },
+      }));
+      if (current?.id === conversation.id) switchTabById('chat');
+    }).catch((error) => {
+      appLogger.warning('[App] Could not delete saved chat:', error);
+    });
+  });
+
+  entry.append(openButton, deleteButton);
+  return entry;
+}
+
+function formatSavedDate(timestamp: number): string {
+  const saved = new Date(timestamp);
+  const today = new Date();
+  if (saved.toDateString() === today.toDateString()) {
+    return saved.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+  return saved.toLocaleDateString();
 }
 
 function initAdvancedHub(el: HTMLElement): TabLifecycle {

@@ -29,23 +29,22 @@ keep each view focused on DOM state and user-flow orchestration.
   `@runanywhere/proto-ts` types for models, lifecycle, events, storage,
   modalities, environments, and errors. Use local discriminated unions only
   for browser UI state.
-- Treat settings, localStorage, files, URLs, media, model downloads, and
-  network/JSON responses as external input. Validate and narrow before calling
-  the SDK; show structured, actionable errors without exposing stack traces.
+- Treat settings, localStorage, IndexedDB, files, URLs, media, model downloads,
+  and network/JSON responses as external input. Validate and narrow before
+  calling the SDK; show structured, actionable errors without exposing stack
+  traces. Chat history is persistent, origin-scoped IndexedDB data; the current
+  Web RAG index is session-only and must not be presented as persistent. Keep
+  app-owned chat records in IndexedDB; `RunAnywhere.storage` owns model
+  artifacts and storage analysis, not arbitrary application records.
 - Never log or persist API keys/tokens. API keys entered in Settings are
-  session-only. Scrub legacy clear-text values. `.env` files stay uncommitted;
-  `VITE_*` configuration is embedded in the public bundle and must never hold
-  an API key. The first-party credential is named `RUNANYWHERE_API_KEY`, is
-  read only by Vite/Vercel server code, and must never enter source, `dist`,
-  browser diagnostics, screenshots, videos, or Playwright traces.
-- The first-party mobile control plane is reachable from Web only through the
-  fixed `/api/runanywhere/*` same-origin relay. Keep its upstream allowlisted
-  and static in Vite/Vercel; allow only the audited method/path pairs, reject
-  queries and redirects, rebuild safe headers, and never accept a
-  request-controlled proxy target. Production promotion also requires the
-  documented per-IP Vercel WAF rate limit; a serverless in-memory counter is
-  not globally reliable. Custom base URLs remain direct and must provide their
-  own browser CORS.
+  session-only and are sent directly by the browser. Persist only explicitly
+  allowlisted non-secret settings, and validate them before use. The configured
+  endpoint must explicitly support browser CORS.
+- This example is intentionally static and client-only. Do not add `api/`,
+  `server/`, serverless functions, proxies, embedded credentials, or secret
+  environment variables. A developer who needs secret-bearing control-plane
+  calls must build, authenticate, secure, rate-limit, and deploy that backend
+  outside this example, then expose an appropriate browser-facing contract.
 - UI copy and controls must be truthful. Render distinct typed idle, loading,
   ready, success, unavailable, cancelled, and error states. Never show a fake
   toggle, treat a download as inference success, or silently label a failed
@@ -68,9 +67,17 @@ npm run build
 npm run dev -- --host 127.0.0.1
 ```
 
-Production Vercel releases use `npm run release:deploy`; see
-`docs/CONTROL_PLANE_RELAY.md`. Do not deploy `dist` directly because the
-same-origin API function is outside that directory.
+Production Vercel releases use `npm run release:deploy`. No Vercel secrets,
+serverless functions, relay, or WAF configuration are required by this static
+example. The command builds all four Web SDK WASM variants, verifies `dist`,
+builds an isolated static Vercel prebuilt output, rejects unexpected functions,
+and deploys that exact output. After deployment, verify COOP/COEP headers,
+`crossOriginIsolated`, SPA routing, and all four canonical JS/WASM pairs.
+
+Keep `scripts/` limited to its two distinct workflows: `release.sh` owns static
+release verification/staging/deployment, and `sync-solutions.mjs` owns generated
+solution configuration. Extend one of those tools or use an npm command rather
+than adding another single-use wrapper.
 
 ## SDK Surfaces By View
 
@@ -100,7 +107,9 @@ The Vite dev server sets COOP/COEP headers for SharedArrayBuffer. Runtime WASM a
 | `racommons-llamacpp-webgpu.{js,wasm}` (WebGPU) | `@runanywhere/web-llamacpp` | `LlamaCPP.register({ acceleration: 'webgpu' })` — runtime capability check picks one | Chat, Vision (when WebGPU+Asyncify available) |
 | `racommons-onnx-sherpa.{js,wasm}` | `@runanywhere/web-onnx` | `ONNX.register()` | Voice, Transcribe, Speak, VAD, ONNX-backed embeddings/RAG |
 
-The legacy `packages/onnx/wasm/sherpa/sherpa-onnx.wasm` standalone bundle has been deleted. STT/TTS/VAD now run through the proto-byte adapters in `@runanywhere/web` core against the registered Sherpa vtable inside `racommons-onnx-sherpa.wasm` — there is no separate standalone speech provider path.
+STT/TTS/VAD run through the proto-byte adapters in `@runanywhere/web` core
+against the registered Sherpa vtable inside `racommons-onnx-sherpa.wasm`;
+there is no separate standalone speech provider path.
 
 Every canonical `.js` file in the table is required Emscripten runtime glue,
 not just build input. Vite may emit a hashed copy for the main-thread import;

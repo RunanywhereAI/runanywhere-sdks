@@ -77,7 +77,8 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
       <div class="docs-section">
         <h3>Indexed documents</h3>
         <p class="text-secondary">Upload <code>.txt</code>, <code>.md</code>, or <code>.json</code> files to index through the core RAG facade.
-        A native RAG provider or WASM RAG session is required.</p>
+        A native RAG provider or WASM RAG session is required. The current Web
+        RAG index is session-only and is not restored after a page reload.</p>
         <div class="docs-actions">
           <input type="file" id="docs-file" accept=".txt,.md,.json" multiple style="display:none" />
           <button class="btn btn-primary" id="docs-upload-btn">Upload</button>

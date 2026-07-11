@@ -1,24 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "npm ci",
-  "buildCommand": "npm run build:deployment",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": null,
-  "functions": {
-    "api/runanywhere.ts": {
-      "maxDuration": 30
-    }
-  },
   "headers": [
-    {
-      "source": "/api/runanywhere/:path*",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "private, no-store"
-        }
-      ]
-    },
     {
       "source": "/(.*)",
       "headers": [
@@ -35,11 +21,7 @@
   ],
   "rewrites": [
     {
-      "source": "/api/runanywhere/(.*)",
-      "destination": "/api/runanywhere"
-    },
-    {
-      "source": "/((?!api/runanywhere/|assets/|coi-serviceworker\\.js|runanywhere-logo\\.svg).*)",
+      "source": "/((?!api(?:/|$)|assets/|coi-serviceworker\\.js|runanywhere-logo\\.svg).*)",
       "destination": "/index.html"
     }
   ]

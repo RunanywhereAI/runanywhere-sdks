@@ -10,8 +10,8 @@
  *   - Optional tool calling with the same three demo tools as iOS
  *     (get_weather / get_current_time / calculate) — iOS parity:
  *     ToolSettingsView.swift:32-139 + LLMViewModel+ToolCalling.swift.
- *   - Conversation persists to localStorage — minimal mirror of iOS
- *     ConversationStore semantics (save on update, restore on mount).
+ *   - IndexedDB conversation history mirrors the iOS ConversationStore:
+ *     save on update, restore on mount, and switch between prior chats.
  *
  * The toolbar model pill + "Get Started" overlay are built by
  * `components/model-selection.ts`. They expose the DOM ids the readiness
@@ -21,10 +21,13 @@
 
 import type { TabLifecycle } from '../app';
 import {
+  ChatMessageStatus,
+  MessageRole,
   ModelCategory,
   RunAnywhere,
   ToolChoiceMode,
   ToolParameterType,
+  type ChatMessage as SDKChatMessage,
   type ToolDefinition,
   type ToolValue,
 } from '@runanywhere/web';
@@ -47,6 +50,11 @@ import {
 } from '../services/chat-attachments';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
+import {
+  ConversationsStore,
+  type StoredConversation,
+} from '../services/conversations-store';
+import { appLogger } from '../services/app-logger';
 
 interface ChatToolCallInfo {
   name: string;
@@ -76,6 +84,11 @@ interface ChatMessage {
   toolCalls?: ChatToolCallInfo[];
   /** RAG citations for document attachments. */
   sources?: ChatSourceInfo[];
+}
+
+interface ConversationGenerationContext {
+  history: SDKChatMessage[];
+  conversationId?: string;
 }
 
 interface PendingAttachment {
@@ -149,10 +162,6 @@ const CHAT_CAPABLE_MODEL_CATEGORIES: readonly ModelCategory[] = [
   ModelCategory.MODEL_CATEGORY_VISION,
 ];
 
-// Minimal localStorage-backed conversation persistence — mirrors iOS
-// ConversationStore (Core/Services/ConversationStore.swift) semantics at MVP
-// scope: one current conversation, saved on update, restored on mount.
-const CONVERSATION_STORAGE_KEY = 'runanywhere-chat-conversation';
 // iOS parity: ToolSettingsView.swift:23 persists "toolCallingEnabled".
 const TOOLS_ENABLED_STORAGE_KEY = 'runanywhere-tool-calling-enabled';
 
@@ -162,11 +171,12 @@ let isGenerating = false;
 let cancelGeneration: (() => void) | null = null;
 let toolsEnabled = false;
 let pendingAttachment: PendingAttachment | null = null;
+let conversationStorageWarningShown = false;
 
 export function initChatTab(el: HTMLElement): TabLifecycle {
   container = el;
 
-  messages = loadConversation();
+  messages = [];
   toolsEnabled = loadToolsEnabled();
 
   // Register the demo tools once at chat setup — iOS parity:
@@ -220,10 +230,11 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   // readiness probe's overlay visibility check works. The overlay is shown
   // whenever no model is loaded and hidden once a model enters the loaded
   // state.
-  container.appendChild(buildGetStartedOverlay(
+  const getStartedOverlay = buildGetStartedOverlay(
     CHAT_SHEET_OPTIONS,
     CHAT_CAPABLE_MODEL_CATEGORIES,
-  ));
+  );
+  container.appendChild(getStartedOverlay);
 
   const messagesEl = container.querySelector('#chat-messages') as HTMLElement;
   const inputEl = container.querySelector('#chat-input') as HTMLTextAreaElement;
@@ -238,6 +249,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   const talkBtn = container.querySelector('#chat-talk-btn') as HTMLButtonElement;
   const listenerScope = new AbortController();
   const listenerOptions: AddEventListenerOptions = { signal: listenerScope.signal };
+  let pendingConversationAction: (() => Promise<void>) | null = null;
+  let conversationActionVersion = 0;
+  let conversationHydrated = false;
+  let conversationHydration: Promise<void> = Promise.resolve();
 
   const refreshToolsButton = () => {
     toolsBtn.classList.toggle('active', toolsEnabled);
@@ -280,13 +295,16 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     const hasInput = inputEl.value.trim().length > 0;
     const modelLoaded = isModelLoaded();
     const hasAttachment = pendingAttachment !== null;
-    sendBtn.disabled = !isGenerating && ((!hasInput && !hasAttachment) || (!modelLoaded && !hasAttachment));
+    sendBtn.disabled = !conversationHydrated
+      || (!isGenerating && ((!hasInput && !hasAttachment) || (!modelLoaded && !hasAttachment)));
     sendBtn.innerHTML = isGenerating
       ? svgIcon('<rect x="6" y="6" width="12" height="12" rx="2"/>')
       : svgIcon('<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>');
     // Tooltip clarifies why the button is disabled. The textbox stays
     // enabled so users may compose while a model is loading.
-    if (isGenerating) {
+    if (!conversationHydrated) {
+      sendBtn.title = 'Loading saved chats';
+    } else if (isGenerating) {
       sendBtn.title = 'Stop';
     } else if (!modelLoaded && !hasAttachment) {
       sendBtn.title = 'Load a model first';
@@ -391,18 +409,84 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     refreshSendButton();
   }, listenerOptions);
   talkBtn.addEventListener('click', () => navigateTo('voice'), listenerOptions);
-  const resetChat = () => {
-    if (cancelGeneration) cancelGeneration();
-    messages = [];
+  const showConversation = (nextMessages: ChatMessage[]) => {
+    messages = nextMessages;
+    getStartedOverlay.classList.toggle(
+      'chat-model-overlay--conversation-visible',
+      conversationSuppressesModelOverlay(nextMessages),
+    );
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
     pendingAttachment = null;
-    clearConversation();
     renderMessages(messagesEl);
     refreshAttachmentPill();
     refreshSendButton();
   };
+  const reportConversationStorageError = (error: unknown) => {
+    if (!conversationStorageWarningShown) {
+      conversationStorageWarningShown = true;
+      showToast('Saved chats are unavailable in this browser session.', 'warning', 4200);
+    }
+    appLogger.warning('[Chat] Conversation storage operation failed:', error);
+  };
+  const runConversationAction = (action: () => Promise<void>) => {
+    conversationActionVersion += 1;
+    if (isGenerating) {
+      pendingConversationAction = action;
+      cancelGeneration?.();
+      return;
+    }
+    void action().catch(reportConversationStorageError);
+  };
+  const runPendingConversationAction = () => {
+    const action = pendingConversationAction;
+    pendingConversationAction = null;
+    if (action) void action().catch(reportConversationStorageError);
+  };
+  const resetChat = () => runConversationAction(async () => {
+    await ConversationsStore.startNew();
+    showConversation([]);
+  });
+  const restoreSavedChat = (event: Event) => {
+    const conversationId = (event as CustomEvent<{ conversationId?: string }>).detail?.conversationId;
+    if (!conversationId) return;
+    runConversationAction(async () => {
+      const conversation = await ConversationsStore.setCurrent(conversationId);
+      if (!conversation) {
+        showToast('That saved chat is no longer available.', 'warning', 3200);
+        return;
+      }
+      showConversation(conversation.messages.filter(isChatMessage));
+    });
+  };
+  const deleteSavedChat = (event: Event) => {
+    const conversationId = (event as CustomEvent<{ conversationId?: string }>).detail?.conversationId;
+    if (!conversationId) return;
+    void ConversationsStore.getCurrent().then((current) => {
+      if (current?.id !== conversationId) {
+        return ConversationsStore.delete(conversationId).then(() => undefined);
+      }
+      runConversationAction(async () => {
+        await ConversationsStore.delete(conversationId);
+        showConversation([]);
+      });
+      return undefined;
+    }).catch(reportConversationStorageError);
+  };
   window.addEventListener('runanywhere:new-chat', resetChat, listenerOptions);
+  window.addEventListener('runanywhere:load-chat', restoreSavedChat, listenerOptions);
+  window.addEventListener('runanywhere:delete-chat', deleteSavedChat, listenerOptions);
 
   renderMessages(messagesEl);
+  const initialConversationVersion = conversationActionVersion;
+  conversationHydration = loadConversation().then((savedMessages) => {
+    if (conversationActionVersion === initialConversationVersion) {
+      showConversation(savedMessages);
+    }
+  }).catch(reportConversationStorageError).finally(() => {
+    conversationHydrated = true;
+    refreshSendButton();
+  });
 
   // Apply the initial disabled / tooltip state so the Send button reflects
   // "Load a model first" before any user interaction.
@@ -413,6 +497,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   const unsubscribeState = onModelStateChange(() => refreshSendButton());
 
   async function onSend(): Promise<void> {
+    await conversationHydration;
     const prompt = inputEl.value.trim();
     const attachment = pendingAttachment;
     if ((!prompt && !attachment) || isGenerating) return;
@@ -437,20 +522,33 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     inputEl.style.height = 'auto';
     refreshSendButton();
 
+    const history = conversationHistoryForGeneration(messages);
     messages.push({ role: 'user', content: prompt });
     const assistantMsg: ChatMessage = { role: 'assistant', content: '' };
     messages.push(assistantMsg);
-    saveConversation();
-    renderMessages(messagesEl);
-
     isGenerating = true;
     refreshSendButton();
+    const conversation = await saveConversation();
+    const generationContext: ConversationGenerationContext = {
+      history,
+      ...(conversation ? { conversationId: conversation.id } : {}),
+    };
+    renderMessages(messagesEl);
+    if (pendingConversationAction) {
+      assistantMsg.content = 'Cancelled.';
+      await saveConversation();
+      isGenerating = false;
+      refreshSendButton();
+      renderMessages(messagesEl);
+      runPendingConversationAction();
+      return;
+    }
 
     try {
       if (toolsEnabled) {
         await generateWithToolCalling(prompt, assistantMsg, messagesEl);
       } else {
-        await generateStreaming(prompt, assistantMsg, messagesEl);
+        await generateStreaming(prompt, assistantMsg, messagesEl, generationContext);
       }
     } catch (error) {
       assistantMsg.content = formatChatError(error);
@@ -458,10 +556,11 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     } finally {
       cancelGeneration = null;
       isGenerating = false;
-      saveConversation();
+      await saveConversation();
       refreshSendButton();
       // Full re-render drops the streaming cursor and adds hover actions.
       renderMessages(messagesEl);
+      runPendingConversationAction();
     }
   }
 
@@ -497,11 +596,19 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     };
     const assistantMsg: ChatMessage = { role: 'assistant', content: '' };
     messages.push(userMessage, assistantMsg);
-    saveConversation();
-    renderMessages(host);
-
     isGenerating = true;
     refreshSendButton();
+    await saveConversation();
+    renderMessages(host);
+    if (pendingConversationAction) {
+      assistantMsg.content = 'Cancelled.';
+      await saveConversation();
+      isGenerating = false;
+      refreshSendButton();
+      renderMessages(host);
+      runPendingConversationAction();
+      return;
+    }
     try {
       const settings = getGenerationSettings();
       const onProgress = ({ content }: { content: string }) => {
@@ -528,9 +635,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     } finally {
       cancelGeneration = null;
       isGenerating = false;
-      saveConversation();
+      await saveConversation();
       refreshSendButton();
       renderMessages(host);
+      runPendingConversationAction();
     }
   }
 
@@ -556,6 +664,13 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       if (cancelGeneration) cancelGeneration();
     },
   };
+}
+
+/** Saved content stays readable even when no inference model is loaded. */
+export function conversationSuppressesModelOverlay(
+  conversationMessages: readonly unknown[],
+): boolean {
+  return conversationMessages.length > 0;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -594,11 +709,13 @@ async function generateStreaming(
   prompt: string,
   assistantMsg: ChatMessage,
   messagesEl: HTMLElement,
+  context: ConversationGenerationContext,
 ): Promise<void> {
   const options = buildGenerationOptions();
   const stream = await RunAnywhere.generateStream({
     prompt,
     ...options,
+    ...context,
   });
   cancelGeneration = stream.cancel;
 
@@ -1032,37 +1149,51 @@ function safeMathEvaluate(expression: string): number | null {
 }
 
 // ---------------------------------------------------------------------------
-// Conversation persistence (localStorage; mirrors iOS ConversationStore at
-// MVP scope — Core/Services/ConversationStore.swift)
+// IndexedDB conversation history.
 // ---------------------------------------------------------------------------
 
-function loadConversation(): ChatMessage[] {
+/**
+ * Convert completed UI turns into the public proto chat shape accepted by
+ * `RunAnywhere.generateStream({ history, conversationId })`. The current user
+ * prompt is deliberately not included; callers snapshot history before they
+ * append that prompt to the visible conversation.
+ */
+export function conversationHistoryForGeneration(
+  conversationMessages: readonly unknown[],
+): SDKChatMessage[] {
+  return conversationMessages
+    .filter(isChatMessage)
+    .filter(({ content }) => content.trim().length > 0)
+    .map((message) => ({
+      id: '',
+      role: message.role === 'user'
+        ? MessageRole.MESSAGE_ROLE_USER
+        : MessageRole.MESSAGE_ROLE_ASSISTANT,
+      content: message.content,
+      timestampUs: 0,
+      toolCalls: [],
+      status: ChatMessageStatus.CHAT_MESSAGE_STATUS_COMPLETE,
+      metadata: {},
+      attachments: [],
+    }));
+}
+
+async function loadConversation(): Promise<ChatMessage[]> {
+  const conversation = await ConversationsStore.getCurrent();
+  return conversation?.messages.filter(isChatMessage) ?? [];
+}
+
+async function saveConversation(): Promise<StoredConversation | null> {
   try {
-    const saved = localStorage.getItem(CONVERSATION_STORAGE_KEY);
-    if (!saved) return [];
-    const parsed: unknown = JSON.parse(saved);
-    if (!isJsonObject(parsed) || !Array.isArray(parsed.messages)) return [];
-    return parsed.messages.filter(isChatMessage);
-  } catch {
-    return [];
+    return await ConversationsStore.saveCurrent(messages);
+  } catch (error) {
+    if (!conversationStorageWarningShown) {
+      conversationStorageWarningShown = true;
+      showToast('This chat could not be saved to the local database.', 'warning', 4200);
+    }
+    appLogger.warning('[Chat] Conversation database write failed:', error);
+    return null;
   }
-}
-
-function saveConversation(): void {
-  try {
-    localStorage.setItem(
-      CONVERSATION_STORAGE_KEY,
-      JSON.stringify({ messages, updatedAt: Date.now() }),
-    );
-  } catch { /* storage may not be available */ }
-  window.dispatchEvent(new CustomEvent('runanywhere:conversation-updated'));
-}
-
-function clearConversation(): void {
-  try {
-    localStorage.removeItem(CONVERSATION_STORAGE_KEY);
-  } catch { /* storage may not be available */ }
-  window.dispatchEvent(new CustomEvent('runanywhere:conversation-updated'));
 }
 
 function loadToolsEnabled(): boolean {

@@ -148,26 +148,6 @@ export function getGenerationSettings(): GenerationSettings {
   };
 }
 
-/**
- * Stored API key for app launch — iOS parity:
- * `SettingsViewModel.getStoredApiKey()` (SettingsViewModel.swift:65-72).
- */
-export function getStoredApiKey(): string | null {
-  loadSettings();
-  const value = settings.apiKey.trim();
-  return value.length > 0 ? value : null;
-}
-
-/**
- * Stored base URL for app launch, normalized with an https:// prefix when no
- * scheme is present — iOS parity: `SettingsViewModel.getStoredBaseURL()`
- * (SettingsViewModel.swift:76-88).
- */
-export function getStoredBaseURL(): string | null {
-  loadSettings();
-  return normalizeProductionBaseURL(settings.baseURL);
-}
-
 export function initSettingsTab(el: HTMLElement): void {
   container = el;
   loadSettings();
@@ -211,8 +191,8 @@ export function initSettingsTab(el: HTMLElement): void {
         </p>
       </div>
 
-      <!-- API Configuration (read at startup by main.ts; iOS parity:
-           RunAnywhereAIApp.swift:113-138 runSDKInitialize) -->
+      <!-- Optional direct-browser API configuration, applied explicitly by
+           main.ts through the same runtime reinitialization path as iOS. -->
       <div class="settings-section">
         <div class="settings-section-title">API Configuration</div>
         <div class="setting-row setting-row--stacked">
@@ -222,7 +202,13 @@ export function initSettingsTab(el: HTMLElement): void {
         <div class="setting-row setting-row--stacked">
           <label class="label">Base URL</label>
           <input type="url" class="text-input w-full" id="settings-base-url" placeholder="https://api.runanywhere.ai" value="${escapeHtml(settings.baseURL)}">
-          <p class="setting-hint">The API key stays in memory for this tab only and is never saved to localStorage.</p>
+          <p class="setting-hint">
+            This client-only example sends the key directly from your browser.
+            It stays in memory for this tab only and is never saved. The
+            endpoint must support browser CORS; production proxying, secret
+            storage, authentication, and rate limiting belong in your own
+            backend.
+          </p>
           <div class="flex items-center gap-sm">
             <button type="button" class="btn btn-primary" id="settings-apply-api">Apply &amp; Reinitialize</button>
             <span class="setting-hint" id="settings-api-status" role="status" aria-live="polite"></span>
@@ -445,9 +431,8 @@ function loadSettings(): void {
       }
       if (persisted.baseURL !== undefined) settings.baseURL = persisted.baseURL;
 
-      // Canonicalize every accepted object after validation. This removes
-      // unknown fields (including the clear-text `apiKey` written by older
-      // demo builds) without ever reading them into application state.
+      // Keep the persisted object restricted to the current, validated,
+      // non-secret settings shape.
       const { apiKey: _apiKey, ...canonical } = settings;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(canonical));
     }

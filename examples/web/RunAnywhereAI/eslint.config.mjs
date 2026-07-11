@@ -8,7 +8,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['src/**/*.ts', 'server/**/*.ts', 'api/**/*.ts'],
+    files: ['src/**/*.ts'],
     languageOptions: {
       parserOptions: {
         project: './tsconfig.json',

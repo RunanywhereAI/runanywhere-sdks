@@ -33,15 +33,8 @@ import {
   withExpectedNetworkFailure,
 } from './support/release-harness';
 
-const FIRST_PARTY_RELAY_CREDENTIAL = 'runanywhere-first-party-relay';
-const FIRST_PARTY_CONTROL_PLANE_BASE_URL =
-  'https://runanywhere-backend-production.up.railway.app';
-const SERVER_API_KEY_CONFIGURED = Boolean(process.env.RUNANYWHERE_API_KEY?.trim());
-const SETTINGS_API_KEY = FIRST_PARTY_RELAY_CREDENTIAL;
-const SETTINGS_BASE_URL = process.env.VITE_RUNANYWHERE_BASE_URL?.trim()
-  || FIRST_PARTY_CONTROL_PLANE_BASE_URL;
 const EXPECTED_ORIGIN = new URL(
-  process.env.RA_E2E_BASE_URL ?? 'https://localtest.me:43173',
+  process.env.RA_E2E_BASE_URL ?? 'http://127.0.0.1:43173',
 ).origin;
 const RELEASE_LOCAL_DIRECTORY = 'runanywhere-release-e2e';
 const RELEASE_LOCAL_PERMISSION_KEY = 'runanywhere-release-e2e-permission';
@@ -56,30 +49,6 @@ const CANONICAL_RUNTIME_ASSETS = [
   'racommons-onnx-sherpa.js',
   'racommons-onnx-sherpa.wasm',
 ] as const;
-
-interface ProductionRuntimeProbe {
-  authenticated: boolean;
-  deviceRegistered: boolean;
-  hasSubjectId: boolean;
-  initialized: boolean;
-  servicesReady: boolean;
-  environmentAvailable: boolean;
-  shellState: string | undefined;
-  backend: string | undefined;
-  modelUI: string | undefined;
-}
-
-const EXPECTED_PRODUCTION_RUNTIME: ProductionRuntimeProbe = {
-  authenticated: true,
-  deviceRegistered: true,
-  hasSubjectId: true,
-  initialized: true,
-  servicesReady: true,
-  environmentAvailable: true,
-  shellState: 'interactive',
-  backend: 'registered',
-  modelUI: 'true',
-};
 
 const ALL_TABS = [
   'chat',
@@ -325,133 +294,7 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     await expect(appPage.locator('#settings-analytics-hint')).not.toBeEmpty();
   });
 
-  test('04 — applies the first-party relay and reinitializes every backend', async ({ appPage }) => {
-    expect(
-      SERVER_API_KEY_CONFIGURED,
-      'RUNANYWHERE_API_KEY must be set server-side for the relay release gate',
-    ).toBe(true);
-    expect(
-      SETTINGS_BASE_URL.length > 0,
-      'the public first-party base URL must be available for the relay release gate',
-    ).toBe(true);
-
-    await navigateTo(appPage, 'settings');
-    const keyInput = appPage.locator('#settings-api-key');
-    try {
-      await keyInput.fill(SETTINGS_API_KEY);
-      await appPage.locator('#settings-base-url').fill(SETTINGS_BASE_URL);
-      await appPage.locator('#settings-apply-api').click();
-      let terminalStatus: CredentialSafeStatusProbe | null = null;
-      await expect.poll(async () => {
-        terminalStatus = await credentialSafeStatusProbe(appPage, SETTINGS_API_KEY);
-        return terminalStatus.success || terminalStatus.restored;
-      }, {
-        message: 'Settings must report a credential-free successful production reinitialization',
-        timeout: 8 * 60_000,
-        intervals: [500, 1_000, 2_000],
-      }).toBe(true);
-      expect(terminalStatus).toEqual({
-        success: true,
-        restored: false,
-        forcedFailure: false,
-        credentialFree: true,
-      });
-      await expect(appPage.locator('#settings-analytics-state')).toHaveText('Enabled');
-      await expect(appPage.locator('#settings-analytics-hint')).toContainText(
-        'Production Environment environment',
-      );
-
-      await expectProductionRuntimeReady(
-        appPage,
-        'production credentials must initialize services, authenticate, and register this browser device',
-      );
-
-      const keyPersisted = await appPage.evaluate((credential) => (
-        Array.from({ length: localStorage.length }, (_, index) => {
-          const key = localStorage.key(index);
-          return key ? localStorage.getItem(key) ?? '' : '';
-        }).some((value) => value.includes(credential))
-      ), SETTINGS_API_KEY);
-      expect(keyPersisted, 'the public relay marker must remain session-only').toBe(false);
-    } finally {
-      // The harness also scrubs password inputs before artifacts, but clear it
-      // here so the app's in-memory Settings state is reset on both pass/fail.
-      if (!appPage.isClosed()) {
-        await keyInput.fill('').catch(() => undefined);
-        await keyInput.blur().catch(() => undefined);
-      }
-    }
-    await expect(keyInput).toHaveValue('');
-  });
-
-  test('04b — restores the proven production runtime after a failed reinitialization', async ({
-    appPage,
-  }) => {
-    expect(
-      SERVER_API_KEY_CONFIGURED,
-      'RUNANYWHERE_API_KEY must be set server-side for the rollback release gate',
-    ).toBe(true);
-    expect(
-      SETTINGS_BASE_URL.length > 0,
-      'the public first-party base URL must be available for the rollback release gate',
-    ).toBe(true);
-
-    await expectProductionRuntimeReady(
-      appPage,
-      'the successful credentialed checkpoint must be ready before rollback testing',
-    );
-    await navigateTo(appPage, 'settings');
-
-    const keyInput = appPage.locator('#settings-api-key');
-    try {
-      await keyInput.fill(SETTINGS_API_KEY);
-      await appPage.locator('#settings-base-url').fill(SETTINGS_BASE_URL);
-      await installOneShotIdentityFailure(appPage);
-      await appPage.locator('#settings-apply-api').click();
-
-      let terminalStatus: CredentialSafeStatusProbe | null = null;
-      await expect.poll(async () => {
-        terminalStatus = await credentialSafeStatusProbe(appPage, SETTINGS_API_KEY);
-        return terminalStatus.success || terminalStatus.restored;
-      }, {
-        message: 'Settings must report credential-free recovery of the previous runtime',
-        timeout: 8 * 60_000,
-        intervals: [500, 1_000, 2_000],
-      }).toBe(true);
-      expect(terminalStatus).toEqual({
-        success: false,
-        restored: true,
-        forcedFailure: true,
-        credentialFree: true,
-      });
-      await expect(appPage.locator('#settings-apply-api')).toBeEnabled();
-      await expect(appPage.locator('#settings-apply-api')).toHaveText('Apply & Reinitialize');
-
-      await expectProductionRuntimeReady(
-        appPage,
-        'rollback must restore initialized backends, services, and the previous production identity',
-      );
-      await expect(appPage.locator('#accel-badge')).toHaveCount(1);
-      await expect(appPage.locator('#chat-toolbar-model')).toBeAttached();
-
-      const keyPersisted = await appPage.evaluate((credential) => (
-        Array.from({ length: localStorage.length }, (_, index) => {
-          const key = localStorage.key(index);
-          return key ? localStorage.getItem(key) ?? '' : '';
-        }).some((value) => value.includes(credential))
-      ), SETTINGS_API_KEY);
-      expect(keyPersisted, 'rollback must not persist the public relay marker').toBe(false);
-    } finally {
-      await removeOneShotIdentityFailure(appPage);
-      if (!appPage.isClosed()) {
-        await keyInput.fill('').catch(() => undefined);
-        await keyInput.blur().catch(() => undefined);
-      }
-    }
-    await expect(keyInput).toHaveValue('');
-  });
-
-  test('05 — verifies About/docs wiring and the responsive mobile drawer', async ({ appPage }, testInfo) => {
+  test('04 — verifies About/docs wiring and the responsive mobile drawer', async ({ appPage }, testInfo) => {
     await navigateTo(appPage, 'settings');
     const versionRow = appPage.locator('#tab-settings .setting-row').filter({
       hasText: 'SDK Version',
@@ -554,14 +397,13 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     }
   });
 
-  test('05b — renders a fatal boot error and recovers through the visible Retry control', async ({
+  test('04b — renders a fatal boot error and recovers through the visible Retry control', async ({
     releaseSession,
   }) => {
     const browser = releaseSession.context.browser();
     expect(browser, 'the release context must retain its owning browser').not.toBeNull();
     const retryContext = await browser!.newContext({
       baseURL: EXPECTED_ORIGIN,
-      ignoreHTTPSErrors: EXPECTED_ORIGIN === 'https://localtest.me:43173',
       viewport: { width: 1440, height: 1000 },
     });
     await retryContext.addInitScript(() => {
@@ -861,8 +703,11 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
       minLength: 24,
       timeout: 60_000,
     });
-    await expect(appPage.locator('#consumer-current-chat-title')).toContainText('local inference');
-    await appPage.locator('#consumer-current-chat-btn').click();
+    const savedChat = appPage.locator('#consumer-conversation-list .consumer-recent-row', {
+      hasText: 'local inference',
+    }).first();
+    await expect(savedChat).toBeVisible();
+    await savedChat.click();
     const persistedUserMessages = appPage.locator('.chat-message--user');
     await expect(persistedUserMessages).toHaveCount(3);
     await expect(persistedUserMessages.nth(1)).toContainText('Enter key sent');
@@ -870,7 +715,9 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     await appPage.locator('#consumer-drawer-new-chat-btn').click();
     await expect(appPage.locator('.chat-message--user')).toHaveCount(0);
     await expect(appPage.locator('.chat-message--assistant')).toHaveCount(0);
-    await expect(appPage.locator('#consumer-current-chat-title')).toHaveText('No saved chats yet');
+    await expect(savedChat).toBeVisible();
+    await savedChat.click();
+    await expect(persistedUserMessages).toHaveCount(3);
 
     // A reload intentionally unloads native components. This must be a cheap
     // OPFS load, not another network download.
@@ -1993,119 +1840,6 @@ async function readRuntimeLifecycle(page: Page): Promise<RuntimeLifecycleProbe> 
       accelerationBadgeCount: document.querySelectorAll('#accel-badge').length,
     };
   });
-}
-
-async function readProductionRuntime(page: Page): Promise<ProductionRuntimeProbe> {
-  return page.evaluate(() => {
-    interface ProductionIdentitySDK {
-      isAuthenticated?: boolean;
-      isDeviceRegistered?: () => boolean;
-      getUserId?: () => string | null;
-      getOrganizationId?: () => string | null;
-      isInitialized?: boolean;
-      areServicesReady?: boolean;
-      environment?: unknown;
-    }
-    const target = window as Window & {
-      __RUNANYWHERE_AI_READY__?: { state?: string };
-      __RUNANYWHERE_SDK__?: ProductionIdentitySDK;
-    };
-    const sdk = target.__RUNANYWHERE_SDK__;
-    return {
-      authenticated: sdk?.isAuthenticated === true,
-      deviceRegistered: sdk?.isDeviceRegistered?.() === true,
-      hasSubjectId: Boolean(sdk?.getUserId?.() || sdk?.getOrganizationId?.()),
-      initialized: sdk?.isInitialized === true,
-      servicesReady: sdk?.areServicesReady === true,
-      environmentAvailable: sdk?.environment != null,
-      shellState: target.__RUNANYWHERE_AI_READY__?.state,
-      backend: document.documentElement.dataset.runanywhereAiBackend,
-      modelUI: document.documentElement.dataset.runanywhereAiModelUiReady,
-    };
-  });
-}
-
-async function expectProductionRuntimeReady(page: Page, message: string): Promise<void> {
-  await expect.poll(() => readProductionRuntime(page), {
-    message,
-    timeout: 120_000,
-    intervals: [500, 1_000, 2_000],
-  }).toEqual(EXPECTED_PRODUCTION_RUNTIME);
-}
-
-interface CredentialSafeStatusProbe {
-  success: boolean;
-  restored: boolean;
-  forcedFailure: boolean;
-  credentialFree: boolean;
-}
-
-async function credentialSafeStatusProbe(
-  page: Page,
-  credential: string,
-): Promise<CredentialSafeStatusProbe> {
-  return page.locator('#settings-api-status').evaluate((node, forbiddenCredential) => {
-    const text = node.textContent?.trim() ?? '';
-    return {
-      success: (
-        text === 'Production configuration applied. All backends and the model catalog are ready.'
-        && node.classList.contains('text-success')
-      ),
-      restored: (
-        text.includes('The previous runtime was restored.')
-        && node.classList.contains('text-error')
-      ),
-      forcedFailure: text.includes('E2E forced identity verification failure.'),
-      credentialFree: !text.includes(forbiddenCredential),
-    };
-  }, credential);
-}
-
-async function installOneShotIdentityFailure(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    interface IdentitySDK {
-      isAuthenticated: boolean;
-    }
-    const target = window as Window & {
-      __RUNANYWHERE_SDK__?: IdentitySDK;
-      __RA_RELEASE_RESTORE_AUTH_PROBE__?: () => void;
-    };
-    target.__RA_RELEASE_RESTORE_AUTH_PROBE__?.();
-    const sdk = target.__RUNANYWHERE_SDK__;
-    if (!sdk) throw new Error('RunAnywhere SDK probe is unavailable');
-    const descriptor = Object.getOwnPropertyDescriptor(sdk, 'isAuthenticated');
-    if (!descriptor?.get || descriptor.configurable !== true) {
-      throw new Error('RunAnywhere authentication probe is not configurable');
-    }
-
-    let restored = false;
-    const restore = () => {
-      if (restored) return;
-      restored = true;
-      Object.defineProperty(sdk, 'isAuthenticated', descriptor);
-      delete target.__RA_RELEASE_RESTORE_AUTH_PROBE__;
-    };
-    target.__RA_RELEASE_RESTORE_AUTH_PROBE__ = restore;
-    Object.defineProperty(sdk, 'isAuthenticated', {
-      configurable: true,
-      enumerable: descriptor.enumerable,
-      get: () => {
-        restore();
-        throw new Error('E2E forced identity verification failure.');
-      },
-    });
-  });
-}
-
-async function removeOneShotIdentityFailure(page: Page): Promise<void> {
-  if (page.isClosed()) return;
-  await page.evaluate(() => {
-    const target = window as Window & {
-      __RA_RELEASE_RESTORE_AUTH_PROBE__?: () => void;
-    };
-    target.__RA_RELEASE_RESTORE_AUTH_PROBE__?.();
-    delete target.__RA_RELEASE_RESTORE_AUTH_PROBE__;
-  }).catch(() => undefined);
 }
 
 async function chooseFileVia(

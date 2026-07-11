@@ -14,12 +14,11 @@
  *   # Set RA_BROWSER_CHANNEL=chromium to use Playwright Chromium instead.
  *   npx playwright install chromium
  *   npm run test:browser
- *   RUNANYWHERE_API_KEY=... VITE_RUNANYWHERE_RELAY_ENABLED=true npm run test:browser:release
+ *   npm run test:browser:release
  *
  * Full-suite traces are opt-in (`RA_E2E_TRACE=1`) and are forcibly disabled
- * whenever the server credential is present. Playwright traces retain
- * request headers and DOM snapshots, so redacting the textual diagnostics is
- * not enough to make a credentialed trace safe.
+ * for remote deployments. Playwright traces retain request headers and DOM
+ * snapshots, so remote release artifacts remain opt-in.
  */
 import { defineConfig, devices } from '@playwright/test';
 import { resolve } from 'node:path';
@@ -29,12 +28,9 @@ const webgpuArgs = [
   '--enable-features=SharedArrayBuffer,WebGPUDeveloperFeatures',
 ];
 const runFullE2E = process.env.RA_RUN_FULL_E2E === '1';
-const hasRuntimeCredentials = Boolean(
-  process.env.RUNANYWHERE_API_KEY?.trim(),
-);
 const configuredRemoteURL = process.env.RA_E2E_BASE_URL;
 const targetsRemoteOrigin = Boolean(configuredRemoteURL && !/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/i.test(configuredRemoteURL));
-const hasSensitiveBrowserState = hasRuntimeCredentials || targetsRemoteOrigin;
+const hasSensitiveBrowserState = targetsRemoteOrigin;
 const releaseTraceEnabled = process.env.RA_E2E_TRACE === '1' && !hasSensitiveBrowserState;
 const fakeAudioPath = resolve(
   __dirname,
@@ -51,7 +47,7 @@ const enableWebGPU = runFullE2E
   || process.env.RA_ENABLE_WEBGPU_BROWSER === '1';
 const browserChannel = process.env.RA_BROWSER_CHANNEL
   ?? (process.env.RA_RUN_VLM_E2E === '1' || runFullE2E ? 'chrome' : undefined);
-const localReleaseURL = 'https://localtest.me:43173';
+const localReleaseURL = 'http://127.0.0.1:43173';
 const baseURL = configuredRemoteURL
   ?? (runFullE2E ? localReleaseURL : 'http://127.0.0.1:5173');
 const launchArgs = [
@@ -84,7 +80,6 @@ export default defineConfig({
         : 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: hasSensitiveBrowserState ? 'off' : 'retain-on-failure',
-    ignoreHTTPSErrors: runFullE2E && !configuredRemoteURL,
     channel: browserChannel,
     launchOptions: launchArgs.length > 0 ? { args: launchArgs } : undefined,
     permissions: runFullE2E
@@ -105,11 +100,10 @@ export default defineConfig({
     // The full release gate builds and previews this clone on a dedicated
     // port, never reusing a potentially stale server from another checkout.
     command: runFullE2E
-      ? 'cd ../../examples/web/RunAnywhereAI && ./scripts/preview-release-e2e.sh'
+      ? 'cd ../../examples/web/RunAnywhereAI && npm run build && npm run preview -- --host 127.0.0.1 --port 43173 --strictPort'
       : 'cd ../../examples/web/RunAnywhereAI && npm run dev -- --host 127.0.0.1 --port 5173 --strictPort',
     url: baseURL,
     reuseExistingServer: runFullE2E ? false : !process.env.CI,
-    ignoreHTTPSErrors: runFullE2E && !configuredRemoteURL,
     gracefulShutdown: runFullE2E ? { signal: 'SIGTERM', timeout: 5_000 } : undefined,
     timeout: 120_000,
   },
