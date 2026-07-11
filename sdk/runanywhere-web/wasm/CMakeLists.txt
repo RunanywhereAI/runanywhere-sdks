@@ -484,14 +484,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_model_registry_discover_downloaded"
     "_rac_discovery_result_free"
 
-    # Hardware profile/routing proto ABI. Browser/device facts remain Web-owned;
-    # commons serializes the canonical HardwareProfileResult and accelerator
-    # preference state for generated proto-ts callers.
-    "_rac_hardware_profile_get"
-    "_rac_hardware_profile_free"
-    "_rac_hardware_get_accelerators"
-    "_rac_hardware_set_accelerator_preference"
-
     # Model types
     "_rac_framework_display_name"
     "_rac_framework_supports_llm"
