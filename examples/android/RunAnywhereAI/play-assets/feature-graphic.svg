@@ -1,0 +1,36 @@
+<svg width="1024" height="500" viewBox="0 0 1024 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="background" x1="40" y1="20" x2="984" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#18181B"/>
+      <stop offset="1" stop-color="#09090B"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="256" y1="227" x2="822.851" y2="737.166" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF6900"/>
+      <stop offset="1" stop-color="#FB2C36"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(810 250) rotate(90) scale(280)">
+      <stop stop-color="#FF5B00" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#FF5B00" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1024" height="500" rx="30" fill="url(#background)"/>
+  <circle cx="810" cy="250" r="280" fill="url(#glow)"/>
+  <circle cx="810" cy="250" r="173" fill="#151518" stroke="#FF5B00" stroke-opacity="0.34" stroke-width="2"/>
+
+  <text x="64" y="190" fill="#FAFAFA" font-family="Helvetica, Arial, sans-serif" font-size="67" font-weight="700">RunAnywhere</text>
+  <text x="67" y="245" fill="#D4D4D8" font-family="Helvetica, Arial, sans-serif" font-size="27" font-weight="400">Powerful models, accelerated on-device.</text>
+
+  <g transform="translate(67 294)">
+    <rect width="176" height="48" rx="24" fill="#2B1A12" stroke="#FF5B00" stroke-opacity="0.5"/>
+    <circle cx="25" cy="24" r="7" fill="#22C58B"/>
+    <text x="43" y="31" fill="#FAFAFA" font-family="Helvetica, Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="1.4">NPU READY</text>
+  </g>
+
+  <text x="68" y="402" fill="#A1A1AA" font-family="Helvetica, Arial, sans-serif" font-size="19" font-weight="500" letter-spacing="2.1">CHAT  ·  VISION  ·  VOICE  ·  DOCUMENTS</text>
+
+  <g transform="translate(600 24) scale(0.41)">
+    <path d="M769 797L668.631 737.392C621.495 771.306 564.931 789.549 506.905 789.549H352.652C352.679 789.4 358.703 756.03 365.663 735.531C372.568 715.195 387.949 685.269 387.966 685.235H557.109C618.7 685.234 668.631 635.195 668.631 573.469V411.413C668.631 411.413 695.339 380.194 715.099 362.98C734.671 345.931 768.849 323.96 769 323.863V797Z" fill="#FF5B00"/>
+    <path d="M356.369 286.608C403.505 252.694 460.069 234.451 518.095 234.451H672.348C672.322 234.595 666.297 267.971 659.337 288.472C652.428 308.82 637.034 338.765 637.034 338.765H467.891C406.3 338.766 356.369 388.805 356.369 450.531V612.587C356.369 612.587 329.661 643.806 309.901 661.02C290.328 678.07 256.148 700.042 256 700.137V227L356.369 286.608Z" fill="#FF5B00"/>
+  </g>
+</svg>
