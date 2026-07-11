@@ -80,6 +80,7 @@ fun ChatInputBar(
     modifier: Modifier = Modifier,
     pendingAttachment: ComposerAttachment? = null,
     onClearAttachment: () -> Unit = {},
+    compact: Boolean = false,
 ) {
     val dimens = LocalDimens.current
     var menuExpanded by remember { mutableStateOf(false) }
@@ -97,15 +98,31 @@ fun ChatInputBar(
             thickness = 0.5.dp,
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
         )
-        AnimatedVisibility(
-            visible = pendingAttachment != null,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-        ) {
-            pendingAttachment?.let {
-                AttachmentStatusPill(
-                    attachment = it,
-                    onClear = onClearAttachment,
+        if (!compact) {
+            AnimatedVisibility(
+                visible = pendingAttachment != null,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                pendingAttachment?.let {
+                    AttachmentStatusPill(
+                        attachment = it,
+                        onClear = onClearAttachment,
+                        modifier = Modifier.padding(
+                            start = dimens.spacingMd,
+                            top = dimens.spacingSm,
+                            end = dimens.spacingMd,
+                        ),
+                    )
+                }
+            }
+            AnimatedVisibility(
+                visible = toolsEnabled || toolsUnavailableMessage != null,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                ToolStatusPill(
+                    unavailableMessage = toolsUnavailableMessage,
                     modifier = Modifier.padding(
                         start = dimens.spacingMd,
                         top = dimens.spacingSm,
@@ -113,20 +130,6 @@ fun ChatInputBar(
                     ),
                 )
             }
-        }
-        AnimatedVisibility(
-            visible = toolsEnabled || toolsUnavailableMessage != null,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-        ) {
-            ToolStatusPill(
-                unavailableMessage = toolsUnavailableMessage,
-                modifier = Modifier.padding(
-                    start = dimens.spacingMd,
-                    top = dimens.spacingSm,
-                    end = dimens.spacingMd,
-                ),
-            )
         }
         Row(
             modifier = Modifier
@@ -231,7 +234,7 @@ fun ChatInputBar(
                         color = MaterialTheme.colorScheme.onSurface,
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    maxLines = 5,
+                    maxLines = if (compact) 2 else 5,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         imeAction = ImeAction.Default,
@@ -276,18 +279,20 @@ fun ChatInputBar(
                 )
             }
         }
-        AnimatedVisibility(
-            visible = isStopping,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-        ) {
-            StoppingStatusPill(
-                modifier = Modifier.padding(
-                    start = dimens.spacingMd,
-                    top = dimens.spacingSm,
-                    end = dimens.spacingMd,
-                ),
-            )
+        if (!compact) {
+            AnimatedVisibility(
+                visible = isStopping,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                StoppingStatusPill(
+                    modifier = Modifier.padding(
+                        start = dimens.spacingMd,
+                        top = dimens.spacingSm,
+                        end = dimens.spacingMd,
+                    ),
+                )
+            }
         }
     }
 }

@@ -11,11 +11,15 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -36,6 +40,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.data.rag.DocumentExtractor
 import com.runanywhere.runanywhereai.state.GlobalState
@@ -55,6 +61,7 @@ private data class PendingAttachment(
     val name: String,
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel,
@@ -176,80 +183,95 @@ fun ChatScreen(
         }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .imePadding(),
-            ) {
-                AnimatedVisibility(
-                    visible = messages.isEmpty(),
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val density = LocalDensity.current
+        val imeBottom = WindowInsets.ime.getBottom(density)
+        val imeIntersectsWindow = WindowInsets.isImeVisible && imeBottom > 0
+        val visibleChatHeight = (maxHeight - with(density) { imeBottom.toDp() }).coerceAtLeast(0.dp)
+        // A short landscape viewport cannot fit status rows plus the editor above the IME.
+        // Compact only when the measured IME-safe height is below three touch targets.
+        val useCompactComposer =
+            imeIntersectsWindow && visibleChatHeight < dimens.inputBarMinHeight * 3
+
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            bottomBar = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .imePadding()
+                        .padding(bottom = if (useCompactComposer) dimens.spacingLg else 0.dp),
                 ) {
-                    PromptSuggestions(
-                        toolsEnabled = viewModel.toolsEnabled,
-                        loraActive = GlobalState.lora.isActive,
-                        onSelect = viewModel::sendPrompt,
-                        modifier = Modifier.padding(bottom = dimens.spacingSm),
-                    )
+                    if (!imeIntersectsWindow) {
+                        AnimatedVisibility(
+                            visible = messages.isEmpty(),
+                            enter = fadeIn() + expandVertically(),
+                            exit = fadeOut() + shrinkVertically(),
+                        ) {
+                            PromptSuggestions(
+                                toolsEnabled = viewModel.toolsEnabled,
+                                loraActive = GlobalState.lora.isActive,
+                                onSelect = viewModel::sendPrompt,
+                                modifier = Modifier.padding(bottom = dimens.spacingSm),
+                            )
+                        }
+                    }
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) {
+                        ChatInputBar(
+                            input = viewModel.input,
+                            onInputChange = viewModel::onInputChange,
+                            onSend = ::submitComposer,
+                            canSend = viewModel.canSend || (pendingAttachment != null && !viewModel.isBusy),
+                            isGenerating = viewModel.isGenerating,
+                            isStopping = viewModel.isStopping,
+                            onStop = viewModel::stop,
+                            toolsEnabled = viewModel.toolsEnabled,
+                            toolsUnavailableMessage = viewModel.toolsUnavailableMessage,
+                            onToggleTools = viewModel::toggleTools,
+                            onAttachDocument = { documentPicker.launch(DocumentExtractor.acceptedMimeTypes) },
+                            onAttachImage = { imagePicker.launch("image/*") },
+                            onOpenLive = onOpenVision,
+                            onOpenTalk = onOpenVoice,
+                            onOpenAdvanced = onOpenAdvanced,
+                            modifier = Modifier.widthIn(max = dimens.contentMaxWidth),
+                            pendingAttachment = pendingAttachment?.toComposerAttachment(),
+                            onClearAttachment = { pendingAttachment = null },
+                            compact = useCompactComposer,
+                        )
+                    }
                 }
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.BottomCenter,
-                ) {
-                    ChatInputBar(
-                        input = viewModel.input,
-                        onInputChange = viewModel::onInputChange,
-                        onSend = ::submitComposer,
-                        canSend = viewModel.canSend || (pendingAttachment != null && !viewModel.isBusy),
-                        isGenerating = viewModel.isGenerating,
-                        isStopping = viewModel.isStopping,
-                        onStop = viewModel::stop,
-                        toolsEnabled = viewModel.toolsEnabled,
-                        toolsUnavailableMessage = viewModel.toolsUnavailableMessage,
-                        onToggleTools = viewModel::toggleTools,
-                        onAttachDocument = { documentPicker.launch(DocumentExtractor.acceptedMimeTypes) },
-                        onAttachImage = { imagePicker.launch("image/*") },
-                        onOpenLive = onOpenVision,
-                        onOpenTalk = onOpenVoice,
-                        onOpenAdvanced = onOpenAdvanced,
-                        modifier = Modifier.widthIn(max = dimens.contentMaxWidth),
-                        pendingAttachment = pendingAttachment?.toComposerAttachment(),
-                        onClearAttachment = { pendingAttachment = null },
-                    )
-                }
-            }
-        },
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .nestedScroll(scrollConnection),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            ChatMessageList(
-                messages = messages,
-                listState = listState,
+            },
+        ) { innerPadding ->
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .widthIn(max = dimens.contentMaxWidth),
-                isGenerating = viewModel.isGenerating,
-            )
-            ScrollToBottomButton(
-                visible = !autoFollow && messages.isNotEmpty(),
-                onClick = {
-                    autoFollow = true
-                    scope.launch { listState.animateScrollToItem(messages.lastIndex, Int.MAX_VALUE) }
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = dimens.spacingMd),
-            )
+                    .padding(innerPadding)
+                    .nestedScroll(scrollConnection),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                ChatMessageList(
+                    messages = messages,
+                    listState = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .widthIn(max = dimens.contentMaxWidth),
+                    isGenerating = viewModel.isGenerating,
+                )
+                ScrollToBottomButton(
+                    visible = !autoFollow && messages.isNotEmpty(),
+                    onClick = {
+                        autoFollow = true
+                        scope.launch { listState.animateScrollToItem(messages.lastIndex, Int.MAX_VALUE) }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = dimens.spacingMd),
+                )
+            }
         }
     }
 
