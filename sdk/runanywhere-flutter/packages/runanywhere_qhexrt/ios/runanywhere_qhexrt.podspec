@@ -12,7 +12,7 @@ Pod::Spec.new do |s|
   s.summary          = 'RunAnywhere QHexRT: private Android-only Qualcomm Hexagon NPU backend'
   s.description      = <<-DESC
 Private Qualcomm Hexagon NPU (QHexRT) backend for RunAnywhere Flutter SDK.
-Android/Snapdragon (v75+) only; the iOS pod provides package registration
+Android/Snapdragon (V75/V79/V81) only; the iOS pod provides package registration
 metadata on unsupported Apple platforms.
                        DESC
   s.homepage         = 'https://runanywhere.ai'

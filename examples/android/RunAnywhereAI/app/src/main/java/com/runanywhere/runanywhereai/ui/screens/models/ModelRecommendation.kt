@@ -91,7 +91,9 @@ object ModelRecommendation {
     // Preferred HNPU picks per modality on NPU high-end devices.
     private const val NPU_ASR = "whisper_base"
     private const val NPU_TTS = "kokoro_en"
-    private const val NPU_VLM = "qwen3_vl"
+    // InternVL is validated on V75/V79/V81. qwen3_vl has no V81 bundle and is
+    // therefore absent from a correctly native-filtered V81 picker.
+    private const val NPU_VLM = "internvl3_5_1b"
     private const val NPU_EMBEDDING = "embeddinggemma_300m"
 
     fun recommend(

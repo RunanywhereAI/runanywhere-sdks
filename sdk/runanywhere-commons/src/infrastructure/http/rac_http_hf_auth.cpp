@@ -124,3 +124,7 @@ extern "C" void rac_http_hf_token_set(const char* token) {
         g_token_set = false;
     }
 }
+
+extern "C" rac_bool_t rac_http_hf_token_is_configured(void) {
+    return current_token().empty() ? RAC_FALSE : RAC_TRUE;
+}

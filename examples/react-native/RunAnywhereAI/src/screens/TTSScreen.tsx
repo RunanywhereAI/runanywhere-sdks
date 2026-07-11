@@ -29,6 +29,8 @@ import {
   isModelLoadedForCategory,
   unloadModelsForCategory,
 } from '../utils/runAnywhereLifecycle';
+import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
+import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
 
 const SURPRISE_PHRASES = [
   'The quick brown fox jumps over the lazy dog.',
@@ -38,8 +40,6 @@ const SURPRISE_PHRASES = [
   'May the force be with you.',
 ];
 
-const listModels = async (): Promise<SDKModelInfo[]> =>
-  (await RunAnywhere.listModels()).models?.models ?? [];
 const loadModelWithRequest = RunAnywhere.loadModel;
 
 // ─── Voice card ────────────────────────────────────────────────────────────
@@ -176,21 +176,19 @@ export const TTSScreen: React.FC = () => {
 
   const loadModels = useCallback(async () => {
     try {
-      const allModels = await listModels();
+      const allModels = await listVisibleCatalogModels();
       const ttsModels = allModels.filter(
         (m: SDKModelInfo) => m.category === ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
       );
       setAvailableModels(ttsModels);
-      if (!currentModel) {
-        const loaded = await RunAnywhere.modelInfoForCategory(
-          ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-        );
-        if (loaded) setCurrentModel(loaded);
-      }
+      const loaded = await RunAnywhere.modelInfoForCategory(
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+      );
+      setCurrentModel(visibleNativeNpuCatalogModelOrNull(loaded));
     } catch (err) {
       console.warn('[TTSScreen] Error loading models:', err);
     }
-  }, [currentModel]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -226,7 +224,9 @@ export const TTSScreen: React.FC = () => {
       );
       if (result.success) {
         const loaded = await RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
-        setCurrentModel(loaded ?? model);
+        setCurrentModel(
+          visibleNativeNpuCatalogModelOrNull(loaded) ?? model
+        );
       } else {
         const msg = result.errorMessage || 'Native model lifecycle returned an unsuccessful load result';
         Alert.alert('Error', `Failed to load model: ${msg}`);

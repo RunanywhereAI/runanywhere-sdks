@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.ui.components.WebSearchDisclosureDialog
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -41,8 +42,8 @@ fun ToolsScreen(viewModel: ToolsViewModel = viewModel()) {
         Section("Web & Tools") {
             ToggleRow(
                 label = "Enable web and tools",
-                description = "Allow the assistant to use registered tools for actions " +
-                    "like getting weather, time, or calculations.",
+                description = "Allow the assistant to use on-device utilities and send a query to the " +
+                    "configured web-search service when it chooses the search tool.",
                 checked = viewModel.toolCallingEnabled,
                 onCheckedChange = viewModel::setEnabled,
             )
@@ -69,6 +70,13 @@ fun ToolsScreen(viewModel: ToolsViewModel = viewModel()) {
                 }
             }
         }
+    }
+
+    if (viewModel.showWebSearchDisclosure) {
+        WebSearchDisclosureDialog(
+            onAllow = viewModel::acceptWebSearchDisclosure,
+            onDismiss = viewModel::dismissWebSearchDisclosure,
+        )
     }
 }
 

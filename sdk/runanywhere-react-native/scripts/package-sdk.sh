@@ -79,6 +79,26 @@ if [ -n "$NATIVES_FROM" ]; then
         done
     }
 
+    stage_qhexrt_skels() {
+        local assets_root="$RN_ROOT/packages/qhexrt/android/src/main/assets/runanywhere/qhexrt/skels"
+        local staged=0
+        rm -rf "$assets_root"
+        for abi in arm64-v8a; do
+            [ -d "$NATIVES_FROM/$abi" ] || continue
+            mkdir -p "$assets_root/$abi"
+            for lib in libQnnHtpV75Skel.so libQnnHtpV79Skel.so libQnnHtpV81Skel.so; do
+                if [ -f "$NATIVES_FROM/$abi/$lib" ]; then
+                    cp -f "$NATIVES_FROM/$abi/$lib" "$assets_root/$abi/"
+                    staged=$((staged + 1))
+                fi
+            done
+        done
+        if [ "$staged" -ne 3 ]; then
+            echo "ERROR: expected V75, V79, and V81 QHexRT DSP skels; staged $staged" >&2
+            exit 1
+        fi
+    }
+
     if ls "$NATIVES_FROM"/*.xcframework >/dev/null 2>&1; then
         stage_ios "$RN_ROOT/packages/core" RACommons
         stage_ios "$RN_ROOT/packages/llamacpp" RABackendLLAMACPP
@@ -101,9 +121,14 @@ if [ -n "$NATIVES_FROM" ]; then
             stage_android "$RN_ROOT/packages/qhexrt" \
                 librac_backend_qhexrt.so libc++_shared.so \
                 libQnnHtp.so libQnnHtpNetRunExtensions.so libQnnHtpPrepare.so libQnnSystem.so \
-                libQnnHtpV75CalculatorStub.so libQnnHtpV75Skel.so libQnnHtpV75Stub.so \
-                libQnnHtpV79CalculatorStub.so libQnnHtpV79Skel.so libQnnHtpV79Stub.so \
-                libQnnHtpV81CalculatorStub.so libQnnHtpV81Skel.so libQnnHtpV81Stub.so
+                libQnnHtpV75CalculatorStub.so libQnnHtpV75Stub.so \
+                libQnnHtpV79CalculatorStub.so libQnnHtpV79Stub.so \
+                libQnnHtpV81CalculatorStub.so libQnnHtpV81Stub.so
+            stage_qhexrt_skels
+            qhexrt_include="$RN_ROOT/packages/qhexrt/android/src/main/jniLibs/include"
+            rm -rf "$qhexrt_include"
+            mkdir -p "$qhexrt_include"
+            cp -R "$REPO_ROOT/engines/qhexrt/include/." "$qhexrt_include/"
         else
             SKIP_QHEXRT_PACKAGE=1
             echo "::warning::missing QHexRT private native backend in --natives-from; skipping @runanywhere/qhexrt package"

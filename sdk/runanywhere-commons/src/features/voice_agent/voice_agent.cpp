@@ -38,6 +38,7 @@
  */
 
 #include "voice_agent_internal.h"
+#include "voice_agent_internal_helpers.h"
 
 #include <atomic>
 #include <chrono>
@@ -349,6 +350,7 @@ rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle, 
     if (!handle || !prompt || !out_response) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    *out_response = nullptr;
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
@@ -360,10 +362,7 @@ rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle, 
     // this text→text helper doesn't fall back to the model's raw (rambly)
     // default. One-shot: no conversation history here (the d7 session path owns
     // multi-turn memory).
-    rac_llm_options_t llm_opts = RAC_LLM_OPTIONS_DEFAULT;
-    llm_opts.max_tokens = kVoiceAgentMaxTokens;
-    llm_opts.temperature = 0.7f;
-    llm_opts.system_prompt = kVoiceAgentSystemPrompt;
+    rac_llm_options_t llm_opts = rac::voice_agent::detail::make_voice_llm_options();
 
     rac_llm_result_t llm_result = {};
     rac_result_t result =
@@ -373,8 +372,20 @@ rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle, 
         return result;
     }
 
-    *out_response = rac_strdup(llm_result.text);
+    const auto response = rac::voice_agent::detail::split_voice_response(llm_result.text);
+    const rac_result_t response_status =
+        rac::voice_agent::detail::validate_voice_response(response);
+    if (response_status != RAC_SUCCESS) {
+        RAC_LOG_ERROR("VoiceAgent", "%s", kVoiceAgentEmptyResponseMessage);
+        rac_llm_result_free(&llm_result);
+        return response_status;
+    }
+
+    *out_response = rac_strdup(response.answer.c_str());
     rac_llm_result_free(&llm_result);
+    if (!*out_response) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
 
     return RAC_SUCCESS;
 }

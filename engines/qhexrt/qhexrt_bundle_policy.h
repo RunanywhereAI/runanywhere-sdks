@@ -25,9 +25,11 @@
 
 #include <ctype.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "rac/infrastructure/model_management/rac_bundle_policy.h"
+#include "rac/qhexrt/rac_qhexrt.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,6 +66,45 @@ static inline rac_bool_t qhexrt_is_bundle_manifest(const char* relative_path) {
     return qhexrt_is_aux_json(relative_path) ? RAC_FALSE : RAC_TRUE;
 }
 
+/** Select the current device's architecture folder for generic registration. */
+static inline rac_result_t qhexrt_resolve_bundle_variant(char* out_variant, size_t out_variant_size,
+                                                         char* out_error_message,
+                                                         size_t out_error_message_size) {
+    if (out_variant == NULL || out_variant_size == 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    out_variant[0] = '\0';
+    if (out_error_message != NULL && out_error_message_size > 0) {
+        out_error_message[0] = '\0';
+    }
+
+    rac_qhexrt_device_info_t device;
+    const rac_result_t probe_rc = rac_qhexrt_probe(&device);
+    if (probe_rc != RAC_SUCCESS) {
+        if (out_error_message != NULL && out_error_message_size > 0) {
+            (void)snprintf(out_error_message, out_error_message_size,
+                           "QHexRT NPU probe failed (%d)", probe_rc);
+        }
+        return probe_rc;
+    }
+    if (device.supported != RAC_TRUE) {
+        if (out_error_message != NULL && out_error_message_size > 0) {
+            (void)snprintf(out_error_message, out_error_message_size,
+                           "QHexRT is unavailable on Hexagon %s",
+                           rac_qhexrt_arch_name(device.hexagon_arch));
+        }
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
+
+    const char* arch_name = rac_qhexrt_arch_name(device.hexagon_arch);
+    const int written = snprintf(out_variant, out_variant_size, "%s", arch_name);
+    if (written < 0 || (size_t)written >= out_variant_size) {
+        out_variant[0] = '\0';
+        return RAC_ERROR_BUFFER_TOO_SMALL;
+    }
+    return RAC_SUCCESS;
+}
+
 /** The process-lifetime QHexRT bundle policy (function-local static). */
 static inline const rac_bundle_policy_t* qhexrt_bundle_policy(void) {
     static const rac_bundle_policy_t policy = {
@@ -73,7 +114,7 @@ static inline const rac_bundle_policy_t* qhexrt_bundle_policy(void) {
         /* .manifest_extension        = */ ".json",
         /* .manifest_leaf_names_bundle= */ RAC_TRUE,
         /* .is_bundle_manifest        = */ qhexrt_is_bundle_manifest,
-        /* .reserved_0                = */ 0,
+        /* .resolve_variant           = */ {qhexrt_resolve_bundle_variant},
         /* .reserved_1                = */ 0,
     };
     return &policy;

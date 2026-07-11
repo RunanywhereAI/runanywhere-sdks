@@ -19,6 +19,10 @@ object CloudProviderHandlers {
 
     private val client = OkHttpClient.Builder()
         .callTimeout(60, TimeUnit.SECONDS)
+        // Provider requests carry API credentials. Reject redirects rather
+        // than risk forwarding custom authentication headers to another host.
+        .followRedirects(false)
+        .followSslRedirects(false)
         .build()
 
     private val WAV = "audio/wav".toMediaType()
@@ -66,7 +70,7 @@ object CloudProviderHandlers {
         client.newCall(request).execute().use { resp ->
             val raw = resp.body.string()
             if (!resp.isSuccessful) {
-                RACLog.w("cloud provider HTTP ${resp.code}: ${raw.take(300)}")
+                RACLog.w("cloud provider request failed with HTTP ${resp.code}")
                 throw IllegalStateException("HTTP ${resp.code}")
             }
             val (text, language) = parse(JSONObject(raw))

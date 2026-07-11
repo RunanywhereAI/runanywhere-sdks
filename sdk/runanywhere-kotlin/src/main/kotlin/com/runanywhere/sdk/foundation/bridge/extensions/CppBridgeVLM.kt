@@ -65,6 +65,16 @@ private fun <M : Message<M, *>> decodeOrThrow(
     }
 }
 
+internal data class NativeVLMProcessRequest(
+    val imageProto: ByteArray,
+    val optionsProto: ByteArray,
+)
+
+internal data class NativeVLMStreamRequest(
+    val requestProto: ByteArray,
+    val listener: NativeProtoProgressListener,
+)
+
 /**
  * Mirrors Swift `Foundation/Bridge/Extensions/CppBridge+VLM.swift`. Wraps `rac_vlm_*_proto` C ABI.
  */
@@ -119,6 +129,16 @@ object CppBridgeVLM {
         }
     }
 
+    /** Cancel only the matching request-scoped JNI wrapper. */
+    internal fun cancelRequest(requestId: Long) {
+        val bytes = RunAnywhereBridge.racVlmCancelRequestLifecycleProto(requestId)
+        if (bytes != null) {
+            // Decode the canonical cancellation event for parity with the
+            // unscoped surface; publishing is owned by commons.
+            SDKEvent.ADAPTER.decode(bytes)
+        }
+    }
+
     /**
      * Check if streaming is supported by the loaded VLM component.
      *
@@ -127,7 +147,8 @@ object CppBridgeVLM {
      * the JNI thunk. Returns false when no component handle exists.
      */
     suspend fun supportsStreaming(): Boolean {
-        val h = actor.existingHandle() ?: return false
+        val h = actor.existingHandle()
+        if (h == 0L) return false
         return RunAnywhereBridge.racVlmComponentSupportsStreaming(h)
     }
 
@@ -139,22 +160,55 @@ object CppBridgeVLM {
      * thunk. Return value is a `rac_lifecycle_state_t` int.
      */
     suspend fun state(): Int {
-        val h = actor.existingHandle() ?: return RunAnywhereBridge.RAC_LIFECYCLE_IDLE
+        val h = actor.existingHandle()
+        if (h == 0L) return RunAnywhereBridge.RAC_LIFECYCLE_IDLE
         return RunAnywhereBridge.racVlmComponentGetState(h)
     }
 
     suspend fun process(
         image: RAVLMImage,
         options: RAVLMGenerationOptions,
+    ): RAVLMResult = processBlocking(image, options)
+
+    /** Blocking JNI implementation; public coroutine APIs own dispatch/cancel. */
+    internal fun processBlocking(
+        image: RAVLMImage,
+        options: RAVLMGenerationOptions,
     ): RAVLMResult =
         decodeOrThrow(
             VLMResult.ADAPTER,
             RunAnywhereBridge.racVlmProcessProto(
-                getHandle(),
+                0L,
                 VLMImage.ADAPTER.encode(image),
                 VLMGenerationOptions.ADAPTER.encode(options),
             ),
             "racVlmProcessProto",
+        )
+
+    /** Encode before cancellable admission so JNI is the next throwing boundary. */
+    internal fun prepareProcessRequest(
+        image: RAVLMImage,
+        options: RAVLMGenerationOptions,
+    ): NativeVLMProcessRequest =
+        NativeVLMProcessRequest(
+            imageProto = VLMImage.ADAPTER.encode(image),
+            optionsProto = VLMGenerationOptions.ADAPTER.encode(options),
+        )
+
+    /** Request-scoped blocking JNI implementation for cancellable public APIs. */
+    internal fun processRequestBlocking(
+        requestId: Long,
+        request: NativeVLMProcessRequest,
+    ): RAVLMResult =
+        decodeOrThrow(
+            VLMResult.ADAPTER,
+            RunAnywhereBridge.racVlmProcessRequestProto(
+                requestId,
+                0L,
+                request.imageProto,
+                request.optionsProto,
+            ),
+            "racVlmProcessRequestProto",
         )
 
     /**
@@ -173,29 +227,61 @@ object CppBridgeVLM {
         image: RAVLMImage,
         options: RAVLMGenerationOptions,
         onEvent: (VLMStreamEvent) -> Boolean,
+    ) = processStreamBlocking(image, options, onEvent)
+
+    /** Blocking JNI implementation; public coroutine APIs own dispatch/cancel. */
+    internal fun processStreamBlocking(
+        image: RAVLMImage,
+        options: RAVLMGenerationOptions,
+        onEvent: (VLMStreamEvent) -> Boolean,
     ) {
+        val request = prepareStreamRequest(image, options, onEvent)
+        val rc = RunAnywhereBridge.racVlmStreamProto(request.requestProto, request.listener)
+        throwIfStreamFailed("rac_vlm_stream_proto", rc)
+    }
+
+    /** Encode and allocate the listener before cancellable JNI admission. */
+    internal fun prepareStreamRequest(
+        image: RAVLMImage,
+        options: RAVLMGenerationOptions,
+        onEvent: (VLMStreamEvent) -> Boolean,
+    ): NativeVLMStreamRequest {
         val request =
             VLMGenerationRequest(
                 images = listOf(image),
                 options = options.copy(streaming_enabled = true),
             )
-        val rc =
-            RunAnywhereBridge.racVlmStreamProto(
-                VLMGenerationRequest.ADAPTER.encode(request),
-                NativeProtoProgressListener { bytes ->
-                    try {
-                        val event = VLMStreamEvent.ADAPTER.decode(bytes)
-                        onEvent(event) && shouldContinueNativeStream(event)
-                    } catch (e: SDKException) {
-                        throw e
-                    } catch (e: Exception) {
-                        logger.warning("Failed to decode VLM stream event: ${e.message}")
-                        true
-                    }
-                },
-            )
+        val requestBytes = VLMGenerationRequest.ADAPTER.encode(request)
+        val listener =
+            NativeProtoProgressListener { bytes ->
+                try {
+                    val event = VLMStreamEvent.ADAPTER.decode(bytes)
+                    onEvent(event) && shouldContinueNativeStream(event)
+                } catch (e: SDKException) {
+                    throw e
+                } catch (e: Exception) {
+                    logger.warning("Failed to decode VLM stream event: ${e.message}")
+                    true
+                }
+            }
+        return NativeVLMStreamRequest(requestBytes, listener)
+    }
+
+    /** Request-scoped stream JNI implementation for cancellable public APIs. */
+    internal fun processStreamRequestBlocking(
+        requestId: Long,
+        request: NativeVLMStreamRequest,
+    ) {
+        val rc = RunAnywhereBridge.racVlmStreamRequestProto(requestId, request.requestProto, request.listener)
+        throwIfStreamFailed("racVlmStreamRequestProto", rc)
+    }
+
+    private fun throwIfStreamFailed(
+        operation: String,
+        rc: Int,
+    ) {
         if (rc != 0) {
-            throw SDKException.vlm("rac_vlm_stream_proto failed: rc=$rc")
+            throw SDKException.vlm("$operation failed: rc=$rc")
         }
     }
 

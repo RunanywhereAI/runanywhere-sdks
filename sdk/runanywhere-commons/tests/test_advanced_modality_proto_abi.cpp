@@ -3,14 +3,18 @@
  * @brief Focused proto-byte ABI tests for advanced modality service boundaries.
  */
 
+#include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <exception>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <thread>
 #include <vector>
 
+#include "features/rag/rag_backend.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_model_lifecycle.h"
@@ -58,10 +62,13 @@ int fail_count = 0;
 
 struct DummyVlm {
     int cancel_count{0};
+    float last_temperature{-1.0f};
 };
 
 struct DummyEmbeddings {
     int embed_count{0};
+    size_t output_dimension{3};
+    size_t reported_dimension{0};
 };
 
 struct DummyDiffusion {
@@ -72,10 +79,30 @@ struct DummyLlm {
     int load_lora_count{0};
     int remove_lora_count{0};
     int clear_lora_count{0};
+    std::atomic<bool> cancel_requested{false};
 };
 
 std::string g_last_vlm_create_model;
 std::string g_last_vlm_create_config;
+size_t g_dummy_embedding_output_dimension = 3;
+size_t g_dummy_embedding_reported_dimension = 0;
+std::atomic<bool> g_dummy_llm_block_stream{false};
+std::atomic<bool> g_dummy_llm_stream_started{false};
+std::atomic<bool> g_dummy_llm_block_cancel{false};
+std::atomic<bool> g_dummy_llm_cancel_started{false};
+std::atomic<bool> g_dummy_llm_cancel_release{false};
+std::atomic<int> g_dummy_llm_destroy_count{0};
+std::atomic<bool> g_dummy_llm_callback_after_cancel{false};
+std::atomic<int> g_dummy_llm_post_cancel_result{RAC_ERROR_CANCELLED};
+std::atomic<int> g_dummy_llm_consumer_stop_result{RAC_ERROR_CANCELLED};
+std::atomic<bool> g_dummy_llm_callback_after_consumer_stop{false};
+std::atomic<bool> g_dummy_embeddings_block{false};
+std::atomic<bool> g_dummy_embeddings_started{false};
+std::atomic<bool> g_dummy_embeddings_release{false};
+float g_dummy_llm_last_temperature = -1.0f;
+int32_t g_dummy_llm_last_max_tokens = 0;
+rac_bool_t g_dummy_llm_last_disable_thinking = RAC_FALSE;
+std::string g_dummy_llm_stream_response;
 
 bool serialize(const google::protobuf::MessageLite& message, std::vector<uint8_t>* out) {
     out->resize(message.ByteSizeLong());
@@ -137,15 +164,19 @@ rac_result_t dummy_vlm_initialize(void*, const char*, const char*) {
     return RAC_SUCCESS;
 }
 
-rac_result_t dummy_vlm_process(void*, const rac_vlm_image_t* image, const char* prompt,
-                               const rac_vlm_options_t*, rac_vlm_result_t* out_result) {
-    if (!image || !prompt || !out_result)
+rac_result_t dummy_vlm_process(void* impl, const rac_vlm_image_t* image, const char* prompt,
+                               const rac_vlm_options_t* options, rac_vlm_result_t* out_result) {
+    if (!impl || !image || !prompt || !options || !out_result)
         return RAC_ERROR_NULL_POINTER;
+    static_cast<DummyVlm*>(impl)->last_temperature = options->temperature;
     std::string text = std::string("vlm:") + prompt;
     out_result->text = rac_strdup(text.c_str());
     out_result->prompt_tokens = 2;
+    out_result->image_tokens = 256;
     out_result->completion_tokens = 3;
     out_result->total_tokens = 5;
+    out_result->time_to_first_token_ms = 4;
+    out_result->image_encode_time_ms = 6;
     out_result->total_time_ms = 7;
     out_result->tokens_per_second = 42.0f;
     return out_result->text ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
@@ -171,28 +202,27 @@ void dummy_vlm_destroy(void* impl) {
     delete static_cast<DummyVlm*>(impl);
 }
 
-rac_result_t fill_embeddings(const char* const* texts, size_t count,
+rac_result_t fill_embeddings(const char* const* texts, size_t count, size_t dimension,
                              rac_embeddings_result_t* out_result) {
     if (!texts || !out_result)
         return RAC_ERROR_NULL_POINTER;
-    constexpr size_t kDim = 3;
     out_result->embeddings =
         static_cast<rac_embedding_vector_t*>(rac_alloc(sizeof(rac_embedding_vector_t) * count));
     if (!out_result->embeddings)
         return RAC_ERROR_OUT_OF_MEMORY;
     std::memset(out_result->embeddings, 0, sizeof(rac_embedding_vector_t) * count);
     out_result->num_embeddings = count;
-    out_result->dimension = kDim;
+    out_result->dimension = dimension;
     out_result->processing_time_ms = 4;
     out_result->total_tokens = static_cast<int32_t>(count);
     for (size_t i = 0; i < count; ++i) {
-        out_result->embeddings[i].dimension = kDim;
-        out_result->embeddings[i].data = static_cast<float*>(rac_alloc(sizeof(float) * kDim));
+        out_result->embeddings[i].dimension = dimension;
+        out_result->embeddings[i].data = static_cast<float*>(rac_alloc(sizeof(float) * dimension));
         if (!out_result->embeddings[i].data)
             return RAC_ERROR_OUT_OF_MEMORY;
-        out_result->embeddings[i].data[0] = 1.0f;
-        out_result->embeddings[i].data[1] = 0.0f;
-        out_result->embeddings[i].data[2] = 0.0f;
+        std::memset(out_result->embeddings[i].data, 0, sizeof(float) * dimension);
+        if (dimension > 0)
+            out_result->embeddings[i].data[0] = 1.0f;
     }
     return RAC_SUCCESS;
 }
@@ -200,7 +230,10 @@ rac_result_t fill_embeddings(const char* const* texts, size_t count,
 rac_result_t dummy_embeddings_create(const char*, const char*, void** out_impl) {
     if (!out_impl)
         return RAC_ERROR_NULL_POINTER;
-    *out_impl = new DummyEmbeddings();
+    auto* impl = new DummyEmbeddings();
+    impl->output_dimension = g_dummy_embedding_output_dimension;
+    impl->reported_dimension = g_dummy_embedding_reported_dimension;
+    *out_impl = impl;
     return RAC_SUCCESS;
 }
 
@@ -210,16 +243,34 @@ rac_result_t dummy_embeddings_initialize(void*, const char*) {
 
 rac_result_t dummy_embeddings_embed(void* impl, const char* text, const rac_embeddings_options_t*,
                                     rac_embeddings_result_t* out_result) {
-    static_cast<DummyEmbeddings*>(impl)->embed_count += 1;
+    auto* embeddings = static_cast<DummyEmbeddings*>(impl);
+    embeddings->embed_count += 1;
+    if (g_dummy_embeddings_block.load(std::memory_order_acquire)) {
+        g_dummy_embeddings_started.store(true, std::memory_order_release);
+        while (!g_dummy_embeddings_release.load(std::memory_order_acquire)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
     const char* texts[] = {text};
-    return fill_embeddings(texts, 1, out_result);
+    return fill_embeddings(texts, 1, embeddings->output_dimension, out_result);
 }
 
 rac_result_t dummy_embeddings_embed_batch(void* impl, const char* const* texts, size_t count,
                                           const rac_embeddings_options_t*,
                                           rac_embeddings_result_t* out_result) {
-    static_cast<DummyEmbeddings*>(impl)->embed_count += static_cast<int>(count);
-    return fill_embeddings(texts, count, out_result);
+    auto* embeddings = static_cast<DummyEmbeddings*>(impl);
+    embeddings->embed_count += static_cast<int>(count);
+    return fill_embeddings(texts, count, embeddings->output_dimension, out_result);
+}
+
+rac_result_t dummy_embeddings_get_info(void* impl, rac_embeddings_info_t* out_info) {
+    if (!impl || !out_info)
+        return RAC_ERROR_NULL_POINTER;
+    auto* embeddings = static_cast<DummyEmbeddings*>(impl);
+    *out_info = rac_embeddings_info_t{};
+    out_info->is_ready = RAC_TRUE;
+    out_info->dimension = embeddings->reported_dimension;
+    return RAC_SUCCESS;
 }
 
 void dummy_embeddings_destroy(void* impl) {
@@ -285,14 +336,53 @@ rac_result_t dummy_llm_generate(void*, const char*, const rac_llm_options_t*,
     return out_result->text ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
 }
 
-rac_result_t dummy_llm_stream(void*, const char*, const rac_llm_options_t*,
+rac_result_t dummy_llm_stream(void* impl, const char*, const rac_llm_options_t* options,
                               rac_llm_stream_callback_fn callback, void* user_data) {
     if (!callback)
         return RAC_ERROR_NULL_POINTER;
+    auto* llm = static_cast<DummyLlm*>(impl);
+    llm->cancel_requested.store(false, std::memory_order_release);
+    if (options) {
+        g_dummy_llm_last_temperature = options->temperature;
+        g_dummy_llm_last_max_tokens = options->max_tokens;
+        g_dummy_llm_last_disable_thinking = options->disable_thinking;
+    }
+    if (g_dummy_llm_block_stream.load(std::memory_order_acquire)) {
+        g_dummy_llm_stream_started.store(true, std::memory_order_release);
+        while (!llm->cancel_requested.load(std::memory_order_acquire)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        if (g_dummy_llm_callback_after_cancel.load(std::memory_order_acquire)) {
+            (void)callback("provider-late-token", user_data);
+        }
+        return static_cast<rac_result_t>(
+            g_dummy_llm_post_cancel_result.load(std::memory_order_acquire));
+    }
+    if (!g_dummy_llm_stream_response.empty()) {
+        if (callback(g_dummy_llm_stream_response.c_str(), user_data) == RAC_TRUE) {
+            return RAC_SUCCESS;
+        }
+        if (g_dummy_llm_callback_after_consumer_stop.load(std::memory_order_acquire)) {
+            (void)callback("provider-late-token", user_data);
+        }
+        return static_cast<rac_result_t>(
+            g_dummy_llm_consumer_stop_result.load(std::memory_order_acquire));
+    }
     if (callback("mock ", user_data) != RAC_TRUE)
         return RAC_ERROR_CANCELLED;
     if (callback("answer", user_data) != RAC_TRUE)
         return RAC_ERROR_CANCELLED;
+    return RAC_SUCCESS;
+}
+
+rac_result_t dummy_llm_cancel(void* impl) {
+    static_cast<DummyLlm*>(impl)->cancel_requested.store(true, std::memory_order_release);
+    if (g_dummy_llm_block_cancel.load(std::memory_order_acquire)) {
+        g_dummy_llm_cancel_started.store(true, std::memory_order_release);
+        while (!g_dummy_llm_cancel_release.load(std::memory_order_acquire)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
     return RAC_SUCCESS;
 }
 
@@ -312,6 +402,7 @@ rac_result_t dummy_lora_clear(void* impl) {
 }
 
 void dummy_llm_destroy(void* impl) {
+    g_dummy_llm_destroy_count.fetch_add(1, std::memory_order_acq_rel);
     delete static_cast<DummyLlm*>(impl);
 }
 
@@ -331,6 +422,7 @@ rac_embeddings_service_ops_t make_embedding_ops() {
     ops.initialize = dummy_embeddings_initialize;
     ops.embed = dummy_embeddings_embed;
     ops.embed_batch = dummy_embeddings_embed_batch;
+    ops.get_info = dummy_embeddings_get_info;
     ops.destroy = dummy_embeddings_destroy;
     ops.create = dummy_embeddings_create;
     return ops;
@@ -341,6 +433,7 @@ rac_llm_service_ops_t make_llm_ops(bool supports_lora) {
     ops.initialize = dummy_llm_initialize;
     ops.generate = dummy_llm_generate;
     ops.generate_stream = dummy_llm_stream;
+    ops.cancel = dummy_llm_cancel;
     ops.destroy = dummy_llm_destroy;
     ops.create = dummy_llm_create;
     if (supports_lora) {
@@ -428,6 +521,10 @@ int test_vlm_process_stream_events() {
     runanywhere::v1::VLMResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "VLM process returns VLMResult");
     CHECK(result.text() == "vlm:describe", "VLM process preserves prompt path");
+    CHECK(impl.last_temperature == 0.0f, "VLM process preserves explicit greedy temperature");
+    CHECK(result.image_tokens() == 256, "VLM process preserves image token count");
+    CHECK(result.time_to_first_token_ms() == 4, "VLM process preserves time to first token");
+    CHECK(result.image_encode_time_ms() == 6, "VLM process preserves image encode time");
     CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED),
           "VLM process emits started capability event");
     CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED),
@@ -660,6 +757,8 @@ int test_diffusion_progress_cancel_and_unsupported() {
 }
 
 int test_rag_ingest_query_mocked_path() {
+    g_dummy_embedding_output_dimension = 3;
+    g_dummy_embedding_reported_dimension = 0;
     rac_embeddings_service_ops_t embedding_ops = make_embedding_ops();
     rac_llm_service_ops_t llm_ops = make_llm_ops(/*supports_lora=*/true);
     rac_engine_vtable_t onnx = make_vtable("onnx", nullptr, &embedding_ops, nullptr);
@@ -747,6 +846,8 @@ int test_rag_ingest_query_mocked_path() {
     runanywhere::v1::RAGQueryOptions query;
     query.set_question("Where does RAG live?");
     query.set_max_tokens(32);
+    query.set_temperature(0.0f);
+    query.set_disable_thinking(true);
     std::vector<uint8_t> query_bytes;
     CHECK(serialize(query, &query_bytes), "RAGQueryOptions serializes");
     rac_proto_buffer_init(&out);
@@ -755,6 +856,9 @@ int test_rag_ingest_query_mocked_path() {
     runanywhere::v1::RAGResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "RAG query returns RAGResult");
     CHECK(result.answer() == "mock answer", "RAG query uses mocked LLM path");
+    CHECK(g_dummy_llm_last_max_tokens == 32, "RAG query preserves bounded token budget");
+    CHECK(g_dummy_llm_last_temperature == 0.0f, "RAG query preserves greedy temperature");
+    CHECK(g_dummy_llm_last_disable_thinking == RAC_TRUE, "RAG query forwards thinking suppression");
     CHECK(result.retrieved_chunks_size() >= 1, "RAG query returns retrieved chunks");
     rac_proto_buffer_free(&out);
     // Bespoke RAG query path emits the canonical query lifecycle
@@ -764,12 +868,382 @@ int test_rag_ingest_query_mocked_path() {
     CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED),
           "RAG query publishes RAG_QUERY_COMPLETED");
 
+    // A token-limited thinking phase may omit its closing tag. The RAG result
+    // must keep that private content out of answer while retaining typed
+    // thinking_content for non-UI consumers.
+    g_dummy_llm_stream_response = "Visible answer. <think>unfinished private reasoning";
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_query_proto(session, query_bytes.data(), query_bytes.size(), &out);
+    result.Clear();
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
+          "RAG truncated-thinking query returns RAGResult");
+    CHECK(result.answer() == "Visible answer.", "RAG answer strips an unclosed thinking block");
+    CHECK(result.thinking_content() == "unfinished private reasoning",
+          "RAG result retains typed truncated thinking");
+    rac_proto_buffer_free(&out);
+    g_dummy_llm_stream_response.clear();
+
+    // A RAGTokenSink returning false is itself a cancellation request. Backend
+    // providers do not agree on which status to return after their callback
+    // asks them to stop, so exercise both success and generic failure through
+    // the real RAGBackend/provider path and require the portable result.
+    rac_handle_t sink_embed_handle = nullptr;
+    rac_handle_t sink_llm_handle = nullptr;
+    CHECK(rac_embeddings_create(embedding_path_str.c_str(), &sink_embed_handle) == RAC_SUCCESS &&
+              sink_embed_handle != nullptr,
+          "RAG sink-cancel embeddings service creates");
+    CHECK(rac_llm_create(llm_path_str.c_str(), &sink_llm_handle) == RAC_SUCCESS &&
+              sink_llm_handle != nullptr,
+          "RAG sink-cancel LLM service creates");
+    if (sink_embed_handle != nullptr && sink_llm_handle != nullptr) {
+        runanywhere::rag::RAGBackendConfig sink_config;
+        sink_config.embedding_dimension = 3;
+        sink_config.top_k = 1;
+        sink_config.similarity_threshold = 0.0f;
+        sink_config.chunk_size = 256;
+        sink_config.chunk_overlap = 0;
+        runanywhere::rag::RAGBackend sink_backend(sink_config, sink_llm_handle, sink_embed_handle,
+                                                  /*owns_services=*/true);
+        sink_embed_handle = nullptr;
+        sink_llm_handle = nullptr;
+        CHECK(sink_backend.add_document(
+                  "A consumer may stop streamed RAG generation after any delivered token."),
+              "RAG sink-cancel corpus indexes");
+        g_dummy_llm_stream_response = "first-token";
+        g_dummy_llm_callback_after_consumer_stop.store(true, std::memory_order_release);
+        for (const rac_result_t provider_rc : {RAC_SUCCESS, RAC_ERROR_INFERENCE_FAILED}) {
+            g_dummy_llm_consumer_stop_result.store(provider_rc, std::memory_order_release);
+            int sink_calls = 0;
+            rac_llm_result_t sink_result{};
+            nlohmann::json sink_metadata;
+            const rac_result_t sink_rc =
+                sink_backend.query("When may a consumer stop?", nullptr, &sink_result,
+                                   sink_metadata, [&sink_calls](const std::string&) {
+                                       ++sink_calls;
+                                       return false;
+                                   });
+            CHECK(sink_calls == 1,
+                  "RAG token sink is not re-entered by a provider after consumer stop");
+            CHECK(sink_rc == RAC_ERROR_CANCELLED,
+                  provider_rc == RAC_SUCCESS
+                      ? "RAG maps provider success after sink stop to cancelled"
+                      : "RAG maps provider failure after sink stop to cancelled");
+            rac_llm_result_free(&sink_result);
+        }
+        g_dummy_llm_stream_response.clear();
+        g_dummy_llm_callback_after_consumer_stop.store(false, std::memory_order_release);
+        g_dummy_llm_consumer_stop_result.store(RAC_ERROR_CANCELLED, std::memory_order_release);
+    } else {
+        if (sink_embed_handle != nullptr)
+            rac_embeddings_destroy(sink_embed_handle);
+        if (sink_llm_handle != nullptr)
+            rac_llm_destroy(sink_llm_handle);
+    }
+
+    // Cancellation is delivered concurrently to the session-owned LLM rather
+    // than waiting for the blocking query call to return naturally.
+    g_dummy_llm_stream_started.store(false, std::memory_order_release);
+    g_dummy_llm_block_stream.store(true, std::memory_order_release);
+    std::atomic<rac_result_t> blocked_query_rc{RAC_SUCCESS};
+    std::thread blocked_query([&] {
+        rac_proto_buffer_t blocked_out;
+        rac_proto_buffer_init(&blocked_out);
+        blocked_query_rc.store(
+            rac_rag_query_proto(session, query_bytes.data(), query_bytes.size(), &blocked_out),
+            std::memory_order_release);
+        rac_proto_buffer_free(&blocked_out);
+    });
+    for (int i = 0; i < 1000 && !g_dummy_llm_stream_started.load(std::memory_order_acquire); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    CHECK(g_dummy_llm_stream_started.load(std::memory_order_acquire),
+          "RAG blocking generation starts");
+    CHECK(rac_rag_cancel_proto(session) == RAC_SUCCESS, "RAG cancel reaches the session-owned LLM");
+    blocked_query.join();
+    CHECK(blocked_query_rc.load(std::memory_order_acquire) == RAC_ERROR_CANCELLED,
+          "RAG blocking query returns cancelled");
+    g_dummy_llm_block_stream.store(false, std::memory_order_release);
+
+    // Providers disagree on callback-stop status: some return success and
+    // others return a generic inference failure. Once the request cancel latch
+    // is set, both must normalize to RAC_ERROR_CANCELLED rather than exposing
+    // a partial answer or provider-specific error.
+    g_dummy_llm_callback_after_cancel.store(true, std::memory_order_release);
+    for (const rac_result_t provider_rc : {RAC_SUCCESS, RAC_ERROR_INFERENCE_FAILED}) {
+        g_dummy_llm_post_cancel_result.store(provider_rc, std::memory_order_release);
+        g_dummy_llm_stream_started.store(false, std::memory_order_release);
+        g_dummy_llm_block_stream.store(true, std::memory_order_release);
+        std::atomic<rac_result_t> normalized_query_rc{RAC_SUCCESS};
+        std::thread normalized_query([&] {
+            rac_proto_buffer_t normalized_out;
+            rac_proto_buffer_init(&normalized_out);
+            normalized_query_rc.store(rac_rag_query_proto(session, query_bytes.data(),
+                                                          query_bytes.size(), &normalized_out),
+                                      std::memory_order_release);
+            rac_proto_buffer_free(&normalized_out);
+        });
+        for (int i = 0; i < 1000 && !g_dummy_llm_stream_started.load(std::memory_order_acquire);
+             ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        CHECK(g_dummy_llm_stream_started.load(std::memory_order_acquire),
+              "RAG provider-specific cancellation test reaches generation");
+        CHECK(rac_rag_cancel_proto(session) == RAC_SUCCESS,
+              "RAG provider-specific cancellation is accepted");
+        normalized_query.join();
+        CHECK(normalized_query_rc.load(std::memory_order_acquire) == RAC_ERROR_CANCELLED,
+              provider_rc == RAC_SUCCESS
+                  ? "RAG maps provider success after callback stop to cancelled"
+                  : "RAG maps provider inference failure after callback stop to cancelled");
+        g_dummy_llm_block_stream.store(false, std::memory_order_release);
+    }
+    g_dummy_llm_callback_after_cancel.store(false, std::memory_order_release);
+    g_dummy_llm_post_cancel_result.store(RAC_ERROR_CANCELLED, std::memory_order_release);
+
+    // Cancel before the query reaches generation. The request-owned token is
+    // already published while embedding is blocked, so query entry cannot
+    // erase the cancel; retiring this request must also leave the next query
+    // clean.
+    g_dummy_embeddings_started.store(false, std::memory_order_release);
+    g_dummy_embeddings_release.store(false, std::memory_order_release);
+    g_dummy_embeddings_block.store(true, std::memory_order_release);
+    std::atomic<rac_result_t> early_cancel_rc{RAC_SUCCESS};
+    std::thread early_query([&] {
+        rac_proto_buffer_t early_out;
+        rac_proto_buffer_init(&early_out);
+        early_cancel_rc.store(
+            rac_rag_query_proto(session, query_bytes.data(), query_bytes.size(), &early_out),
+            std::memory_order_release);
+        rac_proto_buffer_free(&early_out);
+    });
+    for (int i = 0; i < 1000 && !g_dummy_embeddings_started.load(std::memory_order_acquire); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    CHECK(g_dummy_embeddings_started.load(std::memory_order_acquire),
+          "RAG early-cancel query reaches embedding");
+    CHECK(rac_rag_cancel_proto(session) == RAC_SUCCESS,
+          "RAG cancel is accepted before generation entry");
+    g_dummy_embeddings_release.store(true, std::memory_order_release);
+    early_query.join();
+    CHECK(early_cancel_rc.load(std::memory_order_acquire) == RAC_ERROR_CANCELLED,
+          "RAG cancel before generation entry is preserved");
+    g_dummy_embeddings_block.store(false, std::memory_order_release);
+
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_query_proto(session, query_bytes.data(), query_bytes.size(), &out);
+    result.Clear();
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
+          "RAG independent query succeeds after early cancellation");
+    CHECK(result.answer() == "mock answer",
+          "RAG independent query does not inherit stale cancellation");
+    rac_proto_buffer_free(&out);
+
     rac_proto_buffer_init(&out);
     CHECK(rac_rag_clear_proto(session, &out) == RAC_SUCCESS, "RAG clear succeeds");
     rac_proto_buffer_free(&out);
-    rac_rag_session_destroy_proto(session);
+
+    rac_proto_buffer_init(&out);
+    CHECK(rac_rag_ingest_proto(session, document_bytes.data(), document_bytes.size(), &out) ==
+              RAC_SUCCESS,
+          "RAG destroy-race corpus re-ingests after clear");
+    rac_proto_buffer_free(&out);
+
+    // Destroy removes admission before cancellation and retains the backend
+    // until a concurrently admitted query/cancel pair drains. Block the first
+    // provider cancel while it owns RAGBackend's request-state mutex, then
+    // destroy from another thread. This deterministically exercises all three
+    // shared owners and verifies that stale-handle operations fail closed.
+    const int destroys_before_race = g_dummy_llm_destroy_count.load(std::memory_order_acquire);
+    g_dummy_llm_stream_started.store(false, std::memory_order_release);
+    g_dummy_llm_block_stream.store(true, std::memory_order_release);
+    g_dummy_llm_cancel_started.store(false, std::memory_order_release);
+    g_dummy_llm_cancel_release.store(false, std::memory_order_release);
+    g_dummy_llm_block_cancel.store(true, std::memory_order_release);
+
+    std::atomic<rac_result_t> destroy_race_query_rc{RAC_SUCCESS};
+    std::thread destroy_race_query([&] {
+        rac_proto_buffer_t query_out;
+        rac_proto_buffer_init(&query_out);
+        destroy_race_query_rc.store(
+            rac_rag_query_proto(session, query_bytes.data(), query_bytes.size(), &query_out),
+            std::memory_order_release);
+        rac_proto_buffer_free(&query_out);
+    });
+    for (int i = 0; i < 1000 && !g_dummy_llm_stream_started.load(std::memory_order_acquire); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    CHECK(g_dummy_llm_stream_started.load(std::memory_order_acquire),
+          "RAG destroy-race query reaches blocking generation");
+
+    std::atomic<rac_result_t> destroy_race_cancel_rc{RAC_ERROR_INTERNAL};
+    std::thread destroy_race_cancel([&] {
+        destroy_race_cancel_rc.store(rac_rag_cancel_proto(session), std::memory_order_release);
+    });
+    for (int i = 0; i < 1000 && !g_dummy_llm_cancel_started.load(std::memory_order_acquire); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    CHECK(g_dummy_llm_cancel_started.load(std::memory_order_acquire),
+          "RAG destroy-race cancel enters the provider");
+
+    std::atomic<bool> destroy_race_returned{false};
+    std::thread destroy_race_destroy([&] {
+        rac_rag_session_destroy_proto(session);
+        destroy_race_returned.store(true, std::memory_order_release);
+    });
+
+    bool admission_closed = false;
+    for (int i = 0; i < 1000 && !admission_closed; ++i) {
+        rac_proto_buffer_t stale_stats;
+        rac_proto_buffer_init(&stale_stats);
+        const rac_result_t stale_rc = rac_rag_stats_proto(session, &stale_stats);
+        admission_closed = stale_rc == RAC_ERROR_COMPONENT_NOT_READY;
+        rac_proto_buffer_free(&stale_stats);
+        if (!admission_closed) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+    CHECK(admission_closed, "RAG destroy closes stale-handle admission before drain");
+    CHECK(!destroy_race_returned.load(std::memory_order_acquire),
+          "RAG backend remains alive while admitted cancel is blocked");
+    CHECK(g_dummy_llm_destroy_count.load(std::memory_order_acquire) == destroys_before_race,
+          "RAG destroy defers service release until shared owners drain");
+
+    g_dummy_llm_cancel_release.store(true, std::memory_order_release);
+    destroy_race_cancel.join();
+    destroy_race_query.join();
+    destroy_race_destroy.join();
+    CHECK(destroy_race_cancel_rc.load(std::memory_order_acquire) == RAC_SUCCESS,
+          "RAG admitted cancel completes safely across destroy");
+    CHECK(destroy_race_query_rc.load(std::memory_order_acquire) == RAC_ERROR_CANCELLED,
+          "RAG admitted query returns cancelled across destroy");
+    CHECK(destroy_race_returned.load(std::memory_order_acquire),
+          "RAG destroy returns after cancellation pulse completes");
+    CHECK(g_dummy_llm_destroy_count.load(std::memory_order_acquire) == destroys_before_race + 1,
+          "RAG services release exactly once after shared owners drain");
+    CHECK(rac_rag_cancel_proto(session) == RAC_ERROR_COMPONENT_NOT_READY,
+          "RAG stale handle cannot cancel a destroyed session");
+
+    g_dummy_llm_block_cancel.store(false, std::memory_order_release);
+    g_dummy_llm_block_stream.store(false, std::memory_order_release);
     (void)rac_plugin_unregister("onnx");
     (void)rac_plugin_unregister("llamacpp");
+    return 0;
+}
+
+// Providers such as QHexRT cannot report their output dimension until the
+// first inference. An unset RAGConfiguration.embedding_dimension must bind the
+// vector index to that real output, regardless of whether it is the common
+// 384-d path or a 768-d encoder such as EmbeddingGemma.
+int test_rag_auto_embedding_dimension(size_t output_dimension, size_t reported_dimension,
+                                      const char* suffix) {
+    g_dummy_embedding_output_dimension = output_dimension;
+    g_dummy_embedding_reported_dimension = reported_dimension;
+
+    rac_embeddings_service_ops_t embedding_ops = make_embedding_ops();
+    rac_engine_vtable_t onnx = make_vtable("onnx", nullptr, &embedding_ops, nullptr);
+    (void)rac_plugin_unregister("onnx");
+    CHECK(rac_plugin_register(&onnx) == RAC_SUCCESS,
+          (std::string("RAG auto-dimension plugin registers (") + suffix + ")").c_str());
+
+    const std::string root_name = std::string("rag-auto-") + suffix;
+    auto root = temp_root(root_name.c_str());
+    auto embedding_path = root / "mock-embeddings.onnx";
+    write_file(embedding_path, "ONNXembed");
+
+    const std::string model_id = std::string("rag.embedding.auto.") + suffix;
+    const std::string model_name = std::string("RAG Auto Embedding ") + suffix;
+    std::string embedding_path_str = embedding_path.string();
+    rac_model_info_t embedding_model{};
+    embedding_model.id = const_cast<char*>(model_id.c_str());
+    embedding_model.name = const_cast<char*>(model_name.c_str());
+    embedding_model.category = RAC_MODEL_CATEGORY_EMBEDDING;
+    embedding_model.format = RAC_MODEL_FORMAT_ONNX;
+    embedding_model.framework = RAC_FRAMEWORK_ONNX;
+    embedding_model.local_path = const_cast<char*>(embedding_path_str.c_str());
+    CHECK(rac_register_model(&embedding_model) == RAC_SUCCESS,
+          (std::string("RAG auto-dimension model registers (") + suffix + ")").c_str());
+
+    runanywhere::v1::RAGConfiguration config;
+    config.set_embedding_model_id(model_id);
+    config.set_top_k(1);
+    config.set_similarity_threshold(0.0f);
+    config.set_chunk_size(256);
+    config.set_chunk_overlap(0);
+    CHECK(!config.has_embedding_dimension(),
+          (std::string("RAG dimension remains unset (") + suffix + ")").c_str());
+    std::vector<uint8_t> config_bytes;
+    CHECK(serialize(config, &config_bytes),
+          (std::string("auto-dimension RAGConfiguration serializes (") + suffix + ")").c_str());
+
+    rac_handle_t session = nullptr;
+    const rac_result_t create_rc =
+        rac_rag_session_create_proto(config_bytes.data(), config_bytes.size(), &session);
+    CHECK(create_rc == RAC_SUCCESS && session != nullptr,
+          (std::string("auto-dimension RAG session creates (") + suffix + ")").c_str());
+    if (create_rc != RAC_SUCCESS || !session) {
+        (void)rac_plugin_unregister("onnx");
+        return 0;
+    }
+
+    runanywhere::v1::RAGDocument document;
+    document.set_id(std::string("doc-") + suffix);
+    document.set_text("The selected embedding provider determines this RAG index dimension.");
+    std::vector<uint8_t> document_bytes;
+    CHECK(serialize(document, &document_bytes),
+          (std::string("auto-dimension RAGDocument serializes (") + suffix + ")").c_str());
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t ingest_rc =
+        rac_rag_ingest_proto(session, document_bytes.data(), document_bytes.size(), &out);
+    runanywhere::v1::RAGStatistics stats;
+    CHECK(ingest_rc == RAC_SUCCESS && parse_buffer(out, &stats),
+          (std::string("RAG ingest accepts actual embedding dimension (") + suffix + ")").c_str());
+    CHECK(stats.indexed_chunks() >= 1,
+          (std::string("RAG indexes auto-dimension vector (") + suffix + ")").c_str());
+    rac_proto_buffer_free(&out);
+
+    rac_rag_session_destroy_proto(session);
+    (void)rac_plugin_unregister("onnx");
+    return 0;
+}
+
+int test_rag_reported_embedding_dimension_mismatch_fails() {
+    g_dummy_embedding_output_dimension = 768;
+    g_dummy_embedding_reported_dimension = 768;
+
+    rac_embeddings_service_ops_t embedding_ops = make_embedding_ops();
+    rac_engine_vtable_t onnx = make_vtable("onnx", nullptr, &embedding_ops, nullptr);
+    (void)rac_plugin_unregister("onnx");
+    CHECK(rac_plugin_register(&onnx) == RAC_SUCCESS, "RAG mismatch embeddings plugin registers");
+
+    auto root = temp_root("rag-dimension-mismatch");
+    auto embedding_path = root / "mock-embeddings.onnx";
+    write_file(embedding_path, "ONNXembed");
+    std::string embedding_path_str = embedding_path.string();
+    rac_model_info_t embedding_model{};
+    embedding_model.id = const_cast<char*>("rag.embedding.dimension-mismatch");
+    embedding_model.name = const_cast<char*>("RAG Dimension Mismatch");
+    embedding_model.category = RAC_MODEL_CATEGORY_EMBEDDING;
+    embedding_model.format = RAC_MODEL_FORMAT_ONNX;
+    embedding_model.framework = RAC_FRAMEWORK_ONNX;
+    embedding_model.local_path = const_cast<char*>(embedding_path_str.c_str());
+    CHECK(rac_register_model(&embedding_model) == RAC_SUCCESS,
+          "RAG mismatch embedding model registers");
+
+    runanywhere::v1::RAGConfiguration config;
+    config.set_embedding_model_id("rag.embedding.dimension-mismatch");
+    config.set_embedding_dimension(384);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(config, &bytes), "mismatched RAGConfiguration serializes");
+
+    rac_handle_t session = nullptr;
+    const rac_result_t rc = rac_rag_session_create_proto(bytes.data(), bytes.size(), &session);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT,
+          "reported embedding dimension mismatch returns INVALID_ARGUMENT");
+    CHECK(session == nullptr, "dimension mismatch does not create a RAG session");
+
+    (void)rac_plugin_unregister("onnx");
     return 0;
 }
 
@@ -1011,6 +1485,9 @@ int main() {
         test_embeddings_mocked_result();
         test_diffusion_progress_cancel_and_unsupported();
         test_rag_ingest_query_mocked_path();
+        test_rag_auto_embedding_dimension(384, 384, "384-reported");
+        test_rag_auto_embedding_dimension(768, 0, "768-runtime");
+        test_rag_reported_embedding_dimension_mismatch_fails();
         test_rag_unknown_embedding_model_id_fails();
         test_rag_missing_embedding_model_id_fails();
         test_lora_register_compat_apply_remove_clear();

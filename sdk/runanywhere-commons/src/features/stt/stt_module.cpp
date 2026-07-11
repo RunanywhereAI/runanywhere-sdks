@@ -13,17 +13,22 @@
 
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <new>
 #include <random>
 #include <string>
+#include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include "features/common/rac_component_lifecycle_internal.h"
 #include "features/rac_nonllm_lifecycle_bridge.h"
+#include "features/stt/rac_stt_stream_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -114,6 +119,238 @@ static int32_t count_words(const char* text) {
 }
 
 namespace {
+
+// Every public component entry point takes a lease from this registry before
+// dereferencing its opaque handle. Destroy closes admission, waits for leases
+// that were already admitted, then removes the entry before freeing the raw
+// component. This makes a destroy racing any public component operation safe,
+// not only the proto-stream paths coordinated by rac_stt_stream.cpp.
+struct ComponentLifetimeEntry {
+    rac_stt_component* component = nullptr;
+    size_t active_operations = 0;
+    bool accepting_operations = true;
+};
+
+std::mutex& component_lifetime_mutex() {
+    static std::mutex mutex;
+    return mutex;
+}
+
+std::condition_variable& component_lifetime_cv() {
+    static std::condition_variable cv;
+    return cv;
+}
+
+std::unordered_map<rac_handle_t, std::shared_ptr<ComponentLifetimeEntry>>&
+component_lifetime_registry() {
+    static std::unordered_map<rac_handle_t, std::shared_ptr<ComponentLifetimeEntry>> registry;
+    return registry;
+}
+
+rac::stt::ComponentAdmissionClosedTestHook& component_admission_closed_test_hook() {
+    static rac::stt::ComponentAdmissionClosedTestHook hook = nullptr;
+    return hook;
+}
+
+void*& component_admission_closed_test_user_data() {
+    static void* user_data = nullptr;
+    return user_data;
+}
+
+rac::stt::ComponentLifecycleGateTestHook& component_lifecycle_gate_test_hook() {
+    static rac::stt::ComponentLifecycleGateTestHook hook = nullptr;
+    return hook;
+}
+
+void*& component_lifecycle_gate_test_user_data() {
+    static void* user_data = nullptr;
+    return user_data;
+}
+
+struct ComponentOperationFrame {
+    rac_handle_t handle = nullptr;
+    ComponentOperationFrame* previous = nullptr;
+};
+
+thread_local ComponentOperationFrame* g_component_operation_frame = nullptr;
+
+struct ComponentTeardownFrame {
+    rac_handle_t handle = nullptr;
+    ComponentTeardownFrame* previous = nullptr;
+};
+
+thread_local ComponentTeardownFrame* g_component_teardown_frame = nullptr;
+
+bool current_thread_has_component_operation(rac_handle_t handle) {
+    for (ComponentOperationFrame* frame = g_component_operation_frame; frame != nullptr;
+         frame = frame->previous) {
+        if (frame->handle == handle) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool current_thread_owns_component_teardown(rac_handle_t handle) {
+    for (ComponentTeardownFrame* frame = g_component_teardown_frame; frame != nullptr;
+         frame = frame->previous) {
+        if (frame->handle == handle) {
+            return true;
+        }
+    }
+    return false;
+}
+
+class ComponentTeardownScope {
+   public:
+    explicit ComponentTeardownScope(rac_handle_t handle) {
+        frame_.handle = handle;
+        frame_.previous = g_component_teardown_frame;
+        g_component_teardown_frame = &frame_;
+    }
+
+    ~ComponentTeardownScope() { g_component_teardown_frame = frame_.previous; }
+
+    ComponentTeardownScope(const ComponentTeardownScope&) = delete;
+    ComponentTeardownScope& operator=(const ComponentTeardownScope&) = delete;
+
+   private:
+    ComponentTeardownFrame frame_;
+};
+
+bool register_component_lifetime(rac_handle_t handle, rac_stt_component* component) {
+    try {
+        auto entry = std::make_shared<ComponentLifetimeEntry>();
+        entry->component = component;
+        std::lock_guard<std::mutex> lock(component_lifetime_mutex());
+        component_lifetime_registry()[handle] = std::move(entry);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+class ComponentOperationLease {
+   public:
+    explicit ComponentOperationLease(rac_handle_t handle) : handle_(handle) {
+        if (!handle) {
+            return;
+        }
+        std::lock_guard<std::mutex> lock(component_lifetime_mutex());
+        const auto it = component_lifetime_registry().find(handle);
+        if (it == component_lifetime_registry().end() ||
+            (!it->second->accepting_operations && !current_thread_has_component_operation(handle) &&
+             !current_thread_owns_component_teardown(handle))) {
+            return;
+        }
+        entry_ = it->second;
+        ++entry_->active_operations;
+        frame_.handle = handle_;
+        frame_.previous = g_component_operation_frame;
+        g_component_operation_frame = &frame_;
+    }
+
+    ~ComponentOperationLease() {
+        if (!entry_) {
+            return;
+        }
+        {
+            std::lock_guard<std::mutex> lock(component_lifetime_mutex());
+            if (entry_->active_operations > 0) {
+                --entry_->active_operations;
+            }
+            g_component_operation_frame = frame_.previous;
+        }
+        component_lifetime_cv().notify_all();
+    }
+
+    explicit operator bool() const { return entry_ != nullptr; }
+    rac_stt_component* component() const { return entry_ ? entry_->component : nullptr; }
+
+    ComponentOperationLease(const ComponentOperationLease&) = delete;
+    ComponentOperationLease& operator=(const ComponentOperationLease&) = delete;
+
+   private:
+    rac_handle_t handle_ = nullptr;
+    std::shared_ptr<ComponentLifetimeEntry> entry_;
+    ComponentOperationFrame frame_;
+};
+
+std::shared_ptr<ComponentLifetimeEntry> close_component_admission(rac_handle_t handle) {
+    std::unique_lock<std::mutex> lock(component_lifetime_mutex());
+    const auto it = component_lifetime_registry().find(handle);
+    if (it == component_lifetime_registry().end() || !it->second->accepting_operations) {
+        return nullptr;
+    }
+    const std::shared_ptr<ComponentLifetimeEntry> entry = it->second;
+    entry->accepting_operations = false;
+    const auto admission_hook = component_admission_closed_test_hook();
+    void* const admission_hook_user_data = component_admission_closed_test_user_data();
+    lock.unlock();
+    if (admission_hook) {
+        admission_hook(handle, admission_hook_user_data);
+    }
+    return entry;
+}
+
+void reopen_component_admission(rac_handle_t handle,
+                                const std::shared_ptr<ComponentLifetimeEntry>& entry) {
+    std::lock_guard<std::mutex> lock(component_lifetime_mutex());
+    const auto it = component_lifetime_registry().find(handle);
+    if (it != component_lifetime_registry().end() && it->second == entry) {
+        entry->accepting_operations = true;
+    }
+}
+
+void wait_for_component_operations(const std::shared_ptr<ComponentLifetimeEntry>& entry) {
+    std::unique_lock<std::mutex> lock(component_lifetime_mutex());
+    component_lifetime_cv().wait(lock, [&] { return entry->active_operations == 0; });
+}
+
+rac_stt_component* remove_component_lifetime(rac_handle_t handle,
+                                             const std::shared_ptr<ComponentLifetimeEntry>& entry) {
+    std::lock_guard<std::mutex> lock(component_lifetime_mutex());
+    const auto it = component_lifetime_registry().find(handle);
+    if (it == component_lifetime_registry().end() || it->second != entry ||
+        entry->active_operations != 0) {
+        return nullptr;
+    }
+    rac_stt_component* component = entry->component;
+    component_lifetime_registry().erase(it);
+    return component;
+}
+
+class StreamTeardownGuard {
+   public:
+    explicit StreamTeardownGuard(rac_handle_t handle) : handle_(handle) {
+        rac::stt::ComponentLifecycleGateTestHook hook = nullptr;
+        void* hook_user_data = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(component_lifetime_mutex());
+            hook = component_lifecycle_gate_test_hook();
+            hook_user_data = component_lifecycle_gate_test_user_data();
+        }
+        if (hook) {
+            hook(handle, hook_user_data);
+        }
+        result_ = rac::stt::begin_stream_component_teardown(handle);
+    }
+
+    ~StreamTeardownGuard() {
+        if (result_ == RAC_SUCCESS) {
+            rac::stt::end_stream_component_teardown(handle_);
+        }
+    }
+
+    rac_result_t result() const { return result_; }
+
+    StreamTeardownGuard(const StreamTeardownGuard&) = delete;
+    StreamTeardownGuard& operator=(const StreamTeardownGuard&) = delete;
+
+   private:
+    rac_handle_t handle_;
+    rac_result_t result_ = RAC_ERROR_INTERNAL;
+};
 
 #if defined(RAC_HAVE_PROTOBUF)
 
@@ -381,6 +618,23 @@ void publish_stt_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
 
 }  // namespace
 
+namespace rac::stt {
+
+void set_component_admission_closed_test_hook(ComponentAdmissionClosedTestHook hook,
+                                              void* user_data) {
+    std::lock_guard<std::mutex> lock(component_lifetime_mutex());
+    component_admission_closed_test_hook() = hook;
+    component_admission_closed_test_user_data() = user_data;
+}
+
+void set_component_lifecycle_gate_test_hook(ComponentLifecycleGateTestHook hook, void* user_data) {
+    std::lock_guard<std::mutex> lock(component_lifetime_mutex());
+    component_lifecycle_gate_test_hook() = hook;
+    component_lifecycle_gate_test_user_data() = user_data;
+}
+
+}  // namespace rac::stt
+
 // =============================================================================
 // LIFECYCLE CALLBACKS
 // =============================================================================
@@ -426,19 +680,33 @@ static void stt_destroy_service(rac_handle_t service, void* user_data) {
 // =============================================================================
 
 extern "C" rac_result_t rac_stt_component_create(rac_handle_t* out_handle) {
-    return rac::features::create_lifecycle_component<rac_stt_component>(
+    const rac_result_t result = rac::features::create_lifecycle_component<rac_stt_component>(
         out_handle, RAC_RESOURCE_TYPE_STT_MODEL, "STT.Lifecycle", stt_create_service,
         stt_destroy_service, "STT.Component", "STT component created");
+    if (result == RAC_SUCCESS) {
+        auto* component = reinterpret_cast<rac_stt_component*>(*out_handle);
+        if (!register_component_lifetime(*out_handle, component)) {
+            if (component->lifecycle) {
+                rac_lifecycle_destroy(component->lifecycle);
+            }
+            delete component;
+            *out_handle = nullptr;
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+        rac::stt::register_stream_component(*out_handle);
+    }
+    return result;
 }
 
 extern "C" rac_result_t rac_stt_component_configure(rac_handle_t handle,
                                                     const rac_stt_config_t* config) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_ERROR_INVALID_HANDLE;
     if (!config)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
     std::lock_guard<std::mutex> lock(component->mtx);
 
     component->config = *config;
@@ -465,18 +733,20 @@ extern "C" rac_result_t rac_stt_component_configure(rac_handle_t handle,
 }
 
 extern "C" rac_bool_t rac_stt_component_is_loaded(rac_handle_t handle) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_FALSE;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
     return rac_lifecycle_is_loaded(component->lifecycle);
 }
 
 extern "C" const char* rac_stt_component_get_model_id(rac_handle_t handle) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return nullptr;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
     return rac_lifecycle_get_model_id(component->lifecycle);
 }
 
@@ -484,10 +754,44 @@ extern "C" void rac_stt_component_destroy(rac_handle_t handle) {
     if (!handle)
         return;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    if (current_thread_has_component_operation(handle)) {
+        RAC_LOG_WARNING("STT.Component",
+                        "STT component destroy was refused from a re-entrant component call");
+        return;
+    }
+
+    // Close component admission before taking the stream lifecycle gate. If
+    // the order is reversed, a lifecycle operation admitted in the gap can
+    // wait for the destroy-owned stream gate while destroy waits for that
+    // operation's lifetime lease.
+    const auto lifetime_entry = close_component_admission(handle);
+    if (!lifetime_entry) {
+        return;
+    }
+    wait_for_component_operations(lifetime_entry);
+
+    // Stream teardown destroys provider stream handles through the public
+    // component wrappers. Permit only those same-thread internal calls after
+    // ordinary public admission has closed.
+    ComponentTeardownScope component_teardown(handle);
+    const rac_result_t stream_result = rac::stt::begin_stream_component_teardown(handle);
+    if (stream_result != RAC_SUCCESS) {
+        reopen_component_admission(handle, lifetime_entry);
+        RAC_LOG_WARNING("STT.Component",
+                        "STT component was not destroyed from a re-entrant stream callback");
+        return;
+    }
+
+    auto* component = remove_component_lifetime(handle, lifetime_entry);
+    if (!component) {
+        rac::stt::end_stream_component_teardown(handle);
+        reopen_component_admission(handle, lifetime_entry);
+        return;
+    }
 
     if (component->lifecycle) {
         rac_lifecycle_destroy(component->lifecycle);
+        component->lifecycle = nullptr;
     }
 
     // Clear any lingering proto-stream callback
@@ -501,6 +805,7 @@ extern "C" void rac_stt_component_destroy(rac_handle_t handle) {
     // dispatch_stt_stream_event() invocation on another thread before freeing
     // the component. Mirrors rac_vlm_component_destroy / rac_llm_component_destroy.
     rac_stt_proto_quiesce();
+    rac::stt::unregister_stream_component(handle);
 
     RAC_LOG_INFO("STT.Component", "STT component destroyed");
 
@@ -513,10 +818,15 @@ extern "C" void rac_stt_component_destroy(rac_handle_t handle) {
 
 extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const char* model_path,
                                                      const char* model_id, const char* model_name) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_ERROR_INVALID_HANDLE;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
+    StreamTeardownGuard stream_teardown(handle);
+    if (stream_teardown.result() != RAC_SUCCESS) {
+        return stream_teardown.result();
+    }
     std::lock_guard<std::mutex> lock(component->mtx);
 
     // Clear any prior proto-stream callback
@@ -581,20 +891,30 @@ extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const 
 }
 
 extern "C" rac_result_t rac_stt_component_unload(rac_handle_t handle) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_ERROR_INVALID_HANDLE;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
+    StreamTeardownGuard stream_teardown(handle);
+    if (stream_teardown.result() != RAC_SUCCESS) {
+        return stream_teardown.result();
+    }
     std::lock_guard<std::mutex> lock(component->mtx);
 
     return rac_lifecycle_unload(component->lifecycle);
 }
 
 extern "C" rac_result_t rac_stt_component_cleanup(rac_handle_t handle) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_ERROR_INVALID_HANDLE;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
+    StreamTeardownGuard stream_teardown(handle);
+    if (stream_teardown.result() != RAC_SUCCESS) {
+        return stream_teardown.result();
+    }
     std::lock_guard<std::mutex> lock(component->mtx);
 
     return rac_lifecycle_reset(component->lifecycle);
@@ -608,14 +928,15 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
                                                      size_t audio_size,
                                                      const rac_stt_options_t* options,
                                                      rac_stt_result_t* out_result) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_ERROR_INVALID_HANDLE;
     if (!audio_data || audio_size == 0)
         return RAC_ERROR_INVALID_ARGUMENT;
     if (!out_result)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
 
     // Acquire lock only for state reads, release before long-running transcription
     std::string transcription_id = generate_unique_id();
@@ -764,10 +1085,11 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
 }
 
 extern "C" rac_bool_t rac_stt_component_supports_streaming(rac_handle_t handle) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_FALSE;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
     std::lock_guard<std::mutex> lock(component->mtx);
 
     rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
@@ -788,12 +1110,13 @@ extern "C" rac_result_t
 rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data, size_t audio_size,
                                     const rac_stt_options_t* options,
                                     rac_stt_stream_callback_t callback, void* user_data) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_ERROR_INVALID_HANDLE;
     if (!audio_data || audio_size == 0)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
     std::lock_guard<std::mutex> lock(component->mtx);
 
     rac_handle_t service = nullptr;
@@ -933,21 +1256,23 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
 // =============================================================================
 
 extern "C" rac_lifecycle_state_t rac_stt_component_get_state(rac_handle_t handle) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_LIFECYCLE_STATE_IDLE;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
     return rac_lifecycle_get_state(component->lifecycle);
 }
 
 extern "C" rac_result_t rac_stt_component_get_metrics(rac_handle_t handle,
                                                       rac_lifecycle_metrics_t* out_metrics) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_ERROR_INVALID_HANDLE;
     if (!out_metrics)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
     return rac_lifecycle_get_metrics(component->lifecycle, out_metrics);
 }
 
@@ -957,14 +1282,15 @@ extern "C" rac_result_t rac_stt_component_get_metrics(rac_handle_t handle,
 
 extern "C" rac_result_t rac_stt_component_get_supported_languages(rac_handle_t handle,
                                                                   char** out_json) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_ERROR_INVALID_HANDLE;
     if (!out_json)
         return RAC_ERROR_INVALID_ARGUMENT;
 
     *out_json = nullptr;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
     std::lock_guard<std::mutex> lock(component->mtx);
 
     rac_handle_t service = nullptr;
@@ -980,14 +1306,15 @@ extern "C" rac_result_t rac_stt_component_get_supported_languages(rac_handle_t h
 extern "C" rac_result_t rac_stt_component_detect_language(rac_handle_t handle,
                                                           const void* audio_data, size_t audio_size,
                                                           char** out_language) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_ERROR_INVALID_HANDLE;
     if (!audio_data || audio_size == 0 || !out_language)
         return RAC_ERROR_INVALID_ARGUMENT;
 
     *out_language = nullptr;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
 
     rac_handle_t service = nullptr;
     rac_stt_options_t local_options;
@@ -1030,7 +1357,12 @@ rac_stt_component_transcribe_proto(rac_handle_t handle, const void* audio_data, 
     return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
-    if (!handle || !audio_data || audio_size == 0) {
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_HANDLE,
+                                          "STT component handle is invalid");
+    }
+    if (!audio_data || audio_size == 0) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
                                           "STT transcribe proto requires handle and audio bytes");
     }
@@ -1094,7 +1426,11 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
     (void)user_data;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
-    if (!handle || !audio_data || audio_size == 0 || !callback) {
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    if (!audio_data || audio_size == 0 || !callback) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     if (!proto_bytes_valid(options_proto_bytes, options_proto_size)) {
@@ -1226,12 +1562,16 @@ struct PersistentStreamHandle {
 extern "C" rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
                                                         const rac_stt_options_t* options,
                                                         rac_handle_t* out_stream_handle) {
-    if (!handle || !out_stream_handle) {
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    if (!out_stream_handle) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     *out_stream_handle = nullptr;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
     std::lock_guard<std::mutex> lock(component->mtx);
 
     // Acquire (not require) so the lifecycle service refcount is held for
@@ -1275,14 +1615,15 @@ extern "C" rac_result_t
 rac_stt_component_stream_feed_audio_chunk(rac_handle_t handle, rac_handle_t stream_handle,
                                           const int16_t* samples, size_t count,
                                           rac_stt_stream_callback_t callback, void* user_data) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_ERROR_INVALID_HANDLE;
     if (!stream_handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (count > 0 && !samples)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
     std::lock_guard<std::mutex> lock(component->mtx);
 
     auto* wrapper = static_cast<PersistentStreamHandle*>(stream_handle);
@@ -1296,12 +1637,13 @@ rac_stt_component_stream_feed_audio_chunk(rac_handle_t handle, rac_handle_t stre
 
 extern "C" rac_result_t rac_stt_component_stream_destroy(rac_handle_t handle,
                                                          rac_handle_t stream_handle) {
-    if (!handle)
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease)
         return RAC_ERROR_INVALID_HANDLE;
     if (!stream_handle)
         return RAC_SUCCESS;
 
-    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    auto* component = component_lease.component();
     std::lock_guard<std::mutex> lock(component->mtx);
 
     auto* wrapper = static_cast<PersistentStreamHandle*>(stream_handle);
@@ -1679,7 +2021,10 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     };
 
     const std::string& audio = request.audio().audio_data();
-    rc = ref.ops->transcribe_stream(ref.impl, audio.data(), audio.size(), &options, bridge, &ctx);
+    // Route through the service dispatch boundary so this stream is serialized
+    // with Talk-mode and batch STT use of the same process-wide engine.
+    rac_stt_service_t service{ref.ops, ref.impl, ref.model_id};
+    rc = rac_stt_transcribe_stream(&service, audio.data(), audio.size(), &options, bridge, &ctx);
     if (rc != RAC_SUCCESS) {
         runanywhere::v1::STTStreamEvent error_event;
         error_event.set_seq(ctx.next_seq++);

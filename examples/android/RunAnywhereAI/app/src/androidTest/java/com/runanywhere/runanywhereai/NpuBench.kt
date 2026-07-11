@@ -12,17 +12,15 @@ import kotlin.math.sqrt
  * [NpuModelE2ETest]. Pure host-side logic (no SDK / QNN types) so it mirrors the
  * conversion parity rubric independently of the runtime it is checking. androidTest only - NOT product code.
  *
- * The bars come straight from the model conversion rubric:
- *   WER_MAX 0.05, greedy_tol edit 0.10, repetition_ratio 0.50, MeloTTS 44100 Hz.
+ * Shared default bars used only when a canonical field permits a default. Production reports still
+ * enumerate and reapply every field declared by the per-model suite.
  */
 object NpuRubric {
     const val WER_MAX = 0.05            // ASR word-error-rate ceiling      (forge WER_MAX)
-    const val EDIT_TOL = 0.10          // LLM greedy_tol token-edit ceiling (forge balanced edit_tol)
     const val REPEAT_MAX = 0.50        // coherence: immediate-repeat ratio (forge W8_SWEEP_REPEAT)
     const val TTS_RMS_MIN = 0.005      // TTS output must not be silence
     const val TTS_MIN_SECONDS = 0.30   // TTS must produce real audio
-    val TTS_RATES = setOf(16000, 22050, 24000, 44100, 48000)
-    const val EMBED_MARGIN = 0.05      // embedding: cos(paraphrase) must beat cos(unrelated) by this much
+    const val TTS_INTELLIGIBILITY_WER_MAX = 0.15
     const val INPAINT_FULL_COSINE_MIN = 0.999
     const val INPAINT_HOLE_COSINE_MIN = 0.99
     const val INPAINT_HOLE_RELATIVE_L2_MAX = 0.15
@@ -34,13 +32,6 @@ object NpuRubric {
     const val INPAINT_UNMASKED_WITHIN_1_MIN = 0.999
     const val INPAINT_HOLE_CHANGED_MIN = 0.05
 
-    /** Exact output sample rates baked into the published bundles (QHexRT TTS docs). */
-    fun expectedTtsRate(modelId: String): Int? = when {
-        modelId.contains("melotts", true) -> 44100
-        modelId.contains("kokoro", true) -> 24000
-        modelId.contains("kitten", true) -> 24000
-        else -> null
-    }
 }
 
 /** Metric functions that reproduce forge's parity math, token-for-token. */
@@ -64,6 +55,23 @@ object NpuMetrics {
             }
         }
         return out
+    }
+
+    /** Strip hidden reasoning before answer-keyword scoring. */
+    fun answerText(s: String): String =
+        Regex(
+            "<think\\b[^>]*>.*?(?:</think\\s*>|\\z)",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+        ).replace(s, " ").trim()
+
+    /** Exact contiguous token/phrase match; substrings such as comparison!=Paris do not pass. */
+    fun containsKeyword(text: String, keyword: String): Boolean {
+        val haystack = words(text)
+        val needle = words(keyword)
+        if (needle.isEmpty() || haystack.size < needle.size) return false
+        return (0..haystack.size - needle.size).any { start ->
+            haystack.subList(start, start + needle.size) == needle
+        }
     }
 
     /** word-level WER = Levenshtein(ref_words, hyp_words) / |ref_words|  (forge text.wer). */
@@ -409,7 +417,7 @@ class RunReport(
     }
 }
 
-/** One case from a canonical `npu_suite/v1` file (QHexRT2/testing/gen/build_suites.py). */
+/** One case from a canonical `npu_suite/v1` file (`QHexRT/device_suites/gen/build_suites.py`). */
 class SuiteCase(private val o: JSONObject) {
     private val input = o.optJSONObject("input") ?: JSONObject()
     val id: String get() = o.optString("id")
@@ -433,14 +441,22 @@ class SuiteCase(private val o: JSONObject) {
     val goldTokens: List<Int>? get() = o.optJSONArray("gold_tokens")
         ?.let { a -> (0 until a.length()).map { a.getInt(it) } }?.takeIf { it.isNotEmpty() }
     val maxNew: Int get() = o.optInt("max_new", 0)
+    val assetNames: List<String>
+        get() = listOfNotNull(
+            wavAsset,
+            imageAsset,
+            maskAsset,
+            metricImageAsset,
+            metricMaskAsset,
+            referenceImageAsset,
+        )
 }
 
 /**
  * A canonical per-model device-test suite — the SAME cases + gold + thresholds forge/goal_npu validates
- * against (`QHexRT2/testing/suites/<modelId>.json`, synced into `androidTest/assets/npu_suites/`). When a
- * suite is shipped for a model, the harness runs THESE cases with the forge metric (greedy_tol / wer /
- * audio) so "device-validated" means the same thing on both planes. Absent → the harness falls back to its
- * built-in heuristic cases.
+ * against (`QHexRT/device_suites/suites/<modelId>.json`, synced into `androidTest/assets/npu_suites/`). When a
+ * suite is shipped for a model, the harness runs THESE cases with its declared Android-executable metric.
+ * The host aggregator rejects unknown or unapplied gate fields.
  */
 class NpuSuite(
     private val o: JSONObject,
@@ -448,32 +464,56 @@ class NpuSuite(
     val sha256: String,
 ) {
     val modality: String get() = o.optString("modality")
+    val hfRevision: String get() = o.optString("hf_revision")
+    private val coverage: JSONObject get() = o.optJSONObject("coverage") ?: JSONObject()
+    val coverageScope: String get() = coverage.optString("scope")
+    val coverageReason: String get() = coverage.optString("reason")
     private val selectedProfile: JSONObject get() = o.optJSONObject("selected_profile") ?: JSONObject()
+    private val publishedBundle: JSONObject get() = o.optJSONObject("published_bundle") ?: JSONObject()
+    val publishedRevision: String get() = publishedBundle.optString("revision")
     private val gate: JSONObject get() = o.optJSONObject("gate") ?: JSONObject()
     val policySha256: String get() = selectedProfile.optString("policy_sha256")
-    val manifestSha256: String get() = selectedProfile.optString("manifest_sha256")
-    val contextSha256: String get() = selectedProfile.optString("context_sha256")
+    val manifestSha256: String
+        get() =
+            selectedProfile.optString("manifest_sha256").takeIf { it.isNotBlank() }
+                ?: artifactSha256s.entries.firstOrNull {
+                    it.key.endsWith(".json") &&
+                        !it.key.endsWith("tokenizer.json") &&
+                        !it.key.endsWith("config.json")
+                }?.value.orEmpty()
+    val contextSha256: String get() = contextSha256s.firstOrNull().orEmpty()
     val contextSha256s: List<String>
-        get() = selectedProfile.optJSONArray("context_sha256s")
-            ?.let { a -> (0 until a.length()).map { a.getString(it) } }
-            ?.takeIf { it.isNotEmpty() }
-            ?: listOfNotNull(contextSha256.takeIf { it.isNotBlank() })
+        get() {
+            val selected =
+                selectedProfile.optJSONArray("context_sha256s")
+                    ?.let { a -> (0 until a.length()).map { a.getString(it) } }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: selectedProfile.optString("context_sha256")
+                        .takeIf { it.isNotBlank() }
+                        ?.let(::listOf)
+            return selected ?: artifactSha256s.filterKeys { it.endsWith(".bin") }.values.toList()
+        }
     val artifactSha256s: Map<String, String>
         get() {
-            val values = selectedProfile.optJSONObject("artifact_sha256s") ?: return emptyMap()
             val result = linkedMapOf<String, String>()
-            val keys = values.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                result[key] = values.getString(key)
+            for (values in listOf(
+                publishedBundle.optJSONObject("artifact_sha256s"),
+                selectedProfile.optJSONObject("artifact_sha256s"),
+            )) {
+                if (values == null) continue
+                val keys = values.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    result[key] = values.getString(key)
+                }
             }
             return result
         }
     val metric: String get() = gate.optString("metric")
-    val editTol: Double get() = gate.optDouble("edit_tol", NpuRubric.EDIT_TOL)
     val werMax: Double get() = gate.optDouble("wer_max", NpuRubric.WER_MAX)
     val passFrac: Double get() = gate.optDouble("suite_pass_frac", 0.60)
     val minInputs: Int get() = gate.optInt("min_inputs", 1)
+    val minDecodeToks: Double get() = gate.optDouble("min_decode_toks", 0.0)
     val minTriples: Int get() = gate.optInt("min_triples", 1)
     val expectedDimension: Int get() = gate.optInt("expected_dimension", 0)
     val minimumPairwiseMargin: Double get() = gate.optDouble("minimum_pairwise_margin", 0.0)
@@ -482,6 +522,18 @@ class NpuSuite(
     val queryPrefix: String get() = gate.optString("query_prefix")
     val documentPrefix: String get() = gate.optString("document_prefix")
     val maxNew: Int get() = gate.optInt("max_new", 0)
+    val expectedSampleRate: Int get() = gate.optInt("expected_sample_rate", 0)
+    val intelligibilityWerMax: Double get() =
+        gate.optDouble("intelligibility_wer_max", NpuRubric.TTS_INTELLIGIBILITY_WER_MAX)
+    val rmsMin: Double get() = gate.optDouble("rms_min", NpuRubric.TTS_RMS_MIN)
+    val minSeconds: Double get() = gate.optDouble("min_seconds", NpuRubric.TTS_MIN_SECONDS)
+    val gateKeys: List<String>
+        get() {
+            val keys = mutableListOf<String>()
+            val iterator = gate.keys()
+            while (iterator.hasNext()) keys += iterator.next()
+            return keys.sorted()
+        }
     val fullCosineMin: Double get() = gate.optDouble(
         "minimum_full_cosine",
         NpuRubric.INPAINT_FULL_COSINE_MIN,
@@ -515,17 +567,34 @@ class NpuSuite(
     )
     val cases: List<SuiteCase> get() = o.optJSONArray("cases")
         ?.let { a -> (0 until a.length()).map { SuiteCase(a.getJSONObject(it)) } } ?: emptyList()
+    val inputAssetNames: List<String> get() = cases.flatMap { it.assetNames }.distinct().sorted()
 
     companion object {
         /** Load `assets/npu_suites/<modelId>.json` from the TEST apk; null if none shipped for this model. */
-        fun load(assets: android.content.res.AssetManager, modelId: String): NpuSuite? = try {
-            val raw = assets.open("npu_suites/$modelId.json").use { it.readBytes() }
-            NpuSuite(
-                o = JSONObject(String(raw, Charsets.UTF_8)),
+        fun load(assets: android.content.res.AssetManager, modelId: String): NpuSuite? {
+            val filename = "$modelId.json"
+            if (filename !in (assets.list("npu_suites")?.toSet() ?: emptySet())) return null
+            val raw = assets.open("npu_suites/$filename").use { it.readBytes() }
+            val payload = JSONObject(String(raw, Charsets.UTF_8))
+            require(payload.optString("schema") == "npu_suite/v1")
+            require(payload.optString("model_id") == modelId)
+            val expectedArch = Regex("_(v[0-9]+)$").find(modelId)?.groupValues?.get(1)
+            require(expectedArch != null && payload.optString("arch") == expectedArch)
+            require(payload.optString("hf_revision").matches(Regex("[0-9a-f]{40}")))
+            val scope = payload.optJSONObject("coverage")?.optString("scope")
+            require(scope == "acceptance" || scope == "smoke_only")
+            payload.optJSONObject("published_bundle")?.let { published ->
+                require(published.optString("revision") == payload.optString("hf_revision"))
+                require((published.optJSONObject("artifact_sha256s")?.length() ?: 0) > 0)
+            }
+            require((payload.optJSONArray("cases")?.length() ?: 0) > 0)
+            require(payload.optJSONObject("gate") != null)
+            return NpuSuite(
+                o = payload,
                 suiteId = modelId,
                 sha256 = MessageDigest.getInstance("SHA-256").digest(raw)
                     .joinToString("") { "%02x".format(it.toInt() and 0xff) },
             )
-        } catch (e: Exception) { null }
+        }
     }
 }

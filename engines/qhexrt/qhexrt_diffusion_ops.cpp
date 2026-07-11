@@ -146,10 +146,15 @@ rac_result_t qhexrt_diffusion_initialize(void*, const char*, const rac_diffusion
 rac_result_t qhexrt_diffusion_generate(void* impl, const rac_diffusion_options_t* options,
                                        rac_diffusion_result_t* out_result) {
     auto* session = as_session(impl);
-    if (session == nullptr || session->sess == nullptr)
+    if (session == nullptr)
         return RAC_ERROR_INVALID_HANDLE;
     if (options == nullptr || out_result == nullptr)
         return RAC_ERROR_NULL_POINTER;
+    // QHexRT output aliases session-owned buffers, so hold the operation lock
+    // through validation, generation, and the complete RGB-to-RGBA copy.
+    std::lock_guard<std::mutex> operation_lock(session->operation_mutex);
+    if (session->sess == nullptr)
+        return RAC_ERROR_INVALID_HANDLE;
     *out_result = {};
     if (options->mode != RAC_DIFFUSION_MODE_INPAINTING)
         return RAC_ERROR_NOT_SUPPORTED;
@@ -239,6 +244,7 @@ rac_result_t qhexrt_diffusion_get_info(void* impl, rac_diffusion_info_t* out_inf
     auto* session = as_session(impl);
     if (session == nullptr || out_info == nullptr)
         return RAC_ERROR_NULL_POINTER;
+    std::lock_guard<std::mutex> operation_lock(session->operation_mutex);
     *out_info = {};
     out_info->is_ready = session->sess != nullptr ? RAC_TRUE : RAC_FALSE;
     out_info->current_model = session->model_ref.c_str();
@@ -262,7 +268,10 @@ rac_result_t qhexrt_diffusion_cancel(void* impl) {
 
 rac_result_t qhexrt_diffusion_cleanup(void* impl) {
     auto* session = as_session(impl);
-    if (session == nullptr || session->sess == nullptr)
+    if (session == nullptr)
+        return RAC_ERROR_INVALID_HANDLE;
+    std::lock_guard<std::mutex> operation_lock(session->operation_mutex);
+    if (session->sess == nullptr)
         return RAC_ERROR_INVALID_HANDLE;
     qhx_session_reset(session->sess);
     session->cancel.store(false, std::memory_order_relaxed);

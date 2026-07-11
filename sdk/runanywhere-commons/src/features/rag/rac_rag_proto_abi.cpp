@@ -20,8 +20,10 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "rac/core/rac_core.h"
@@ -183,10 +185,12 @@ std::string resolve_rag_model_id_to_path(const std::string& model_id,
 // ---------------------------------------------------------------------------
 // Session handle
 //
-// The RAG proto ABI hands out rac_handle_t values that are in fact pointers
-// to a Session struct which owns the underlying RAGBackend (which owns the
-// LLM + Embeddings service handles). The Session is created by
-// rac_rag_session_create_proto and freed by rac_rag_session_destroy_proto.
+// The RAG proto ABI hands out opaque, monotonically increasing rac_handle_t
+// tokens. A mutex-protected registry owns each Session through shared_ptr so
+// an operation can retain its backend while destroy concurrently removes the
+// handle from admission. Destroy requests query cancellation after removal;
+// the Session and its LLM/Embeddings services are released only after every
+// already-admitted operation drops its shared owner.
 //
 // Multi-session is the deliberate contract here: each handle is a fully
 // independent Session with its own RAGBackend (its own vector store + BM25
@@ -197,14 +201,68 @@ std::string resolve_rag_model_id_to_path(const std::string& model_id,
 // ---------------------------------------------------------------------------
 struct Session {
     std::unique_ptr<RAGBackend> backend;
+    std::atomic<bool> closing{false};
     // Registry ids captured at create — telemetry attribution only (ingestion
     // events report the embedding model, query events the LLM).
     std::string embedding_model_id;
     std::string llm_model_id;
 };
 
-Session* as_session(rac_handle_t handle) {
-    return reinterpret_cast<Session*>(handle);
+struct SessionRegistry {
+    std::mutex mutex;
+    std::uintptr_t next_handle{1};
+    std::unordered_map<std::uintptr_t, std::shared_ptr<Session>> sessions;
+};
+
+SessionRegistry& session_registry() {
+    static SessionRegistry registry;
+    return registry;
+}
+
+std::uintptr_t handle_key(rac_handle_t handle) {
+    return reinterpret_cast<std::uintptr_t>(handle);
+}
+
+rac_handle_t register_session(const std::shared_ptr<Session>& session) {
+    auto& registry = session_registry();
+    std::lock_guard<std::mutex> lock(registry.mutex);
+    for (;;) {
+        const std::uintptr_t candidate = registry.next_handle++;
+        if (candidate == 0 || registry.sessions.find(candidate) != registry.sessions.end()) {
+            continue;
+        }
+        registry.sessions.emplace(candidate, session);
+        return reinterpret_cast<rac_handle_t>(candidate);
+    }
+}
+
+std::shared_ptr<Session> acquire_session(rac_handle_t handle) {
+    if (!handle) {
+        return {};
+    }
+    auto& registry = session_registry();
+    std::lock_guard<std::mutex> lock(registry.mutex);
+    const auto it = registry.sessions.find(handle_key(handle));
+    if (it == registry.sessions.end() || it->second->closing.load(std::memory_order_acquire)) {
+        return {};
+    }
+    return it->second;
+}
+
+std::shared_ptr<Session> close_session(rac_handle_t handle) {
+    if (!handle) {
+        return {};
+    }
+    auto& registry = session_registry();
+    std::lock_guard<std::mutex> lock(registry.mutex);
+    const auto it = registry.sessions.find(handle_key(handle));
+    if (it == registry.sessions.end()) {
+        return {};
+    }
+    std::shared_ptr<Session> session = it->second;
+    session->closing.store(true, std::memory_order_release);
+    registry.sessions.erase(it);
+    return session;
 }
 
 RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& proto) {
@@ -234,6 +292,12 @@ RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& p
 bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
                                 std::string* out_message) {
     const RAGBackendConfig defaults;
+
+    if (proto.has_embedding_dimension() && proto.embedding_dimension() < 1) {
+        if (out_message)
+            *out_message = "RAGConfiguration.embedding_dimension must be >= 1 when set";
+        return false;
+    }
 
     const int64_t top_k = proto.has_top_k() ? static_cast<int64_t>(proto.top_k())
                                             : static_cast<int64_t>(defaults.top_k);
@@ -421,35 +485,54 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     }
 
     try {
-        auto session = std::make_unique<Session>();
+        auto session = std::make_shared<Session>();
         session->embedding_model_id = embedding_model_id;
         session->llm_model_id = llm_model_id;
         RAGBackendConfig backend_config = build_backend_config(proto);
-        // When the caller does not pin embedding_dimension, derive it from the
-        // loaded embedding model rather than falling back to the struct default
-        // (384). This lets a non-384-dim encoder (e.g. a 768-dim model) work
-        // without the SDK/app hardcoding the value. On failure we keep the
-        // default already present in backend_config.
-        if (!proto.has_embedding_dimension()) {
-            rac_embeddings_info_t info = {};
-            if (rac_embeddings_get_info(embed_handle, &info) == RAC_SUCCESS && info.dimension > 0) {
+        // Resolve the dimension without assuming 384. Some providers know it
+        // at create time; providers such as QHexRT only know after inference,
+        // in which case zero remains the auto sentinel and RAGBackend binds the
+        // vector store to the first actual embedding output.
+        rac_embeddings_info_t info = {};
+        const rac_result_t info_rc = rac_embeddings_get_info(embed_handle, &info);
+        if (info_rc == RAC_SUCCESS && info.dimension > 0) {
+            if (proto.has_embedding_dimension() &&
+                static_cast<size_t>(proto.embedding_dimension()) != info.dimension) {
+                const std::string message =
+                    "RAGConfiguration.embedding_dimension does not match loaded model: "
+                    "configured " +
+                    std::to_string(proto.embedding_dimension()) + ", model " +
+                    std::to_string(info.dimension);
+                if (llm_handle)
+                    rac_llm_destroy(llm_handle);
+                rac_embeddings_destroy(embed_handle);
+                publish_failure(RAC_ERROR_INVALID_ARGUMENT, "rag.sessionCreate", message.c_str());
+                return RAC_ERROR_INVALID_ARGUMENT;
+            }
+            if (!proto.has_embedding_dimension()) {
                 backend_config.embedding_dimension = info.dimension;
                 LOGI("Derived embedding_dimension=%zu from embedding model '%s'", info.dimension,
                      embedding_model_id.c_str());
-            } else {
-                LOGI("embedding_dimension not provided and not derivable; using default %zu",
-                     backend_config.embedding_dimension);
             }
+        } else if (!proto.has_embedding_dimension()) {
+            LOGI(
+                "Embedding model '%s' reports dimension at inference; deferring vector-store "
+                "initialization",
+                embedding_model_id.c_str());
         }
         session->backend = std::make_unique<RAGBackend>(backend_config, llm_handle, embed_handle,
                                                         /*owns_services=*/true);
+        // Ownership transferred successfully. Any later exception (including
+        // registry allocation failure) is handled by Session/RAGBackend.
+        llm_handle = nullptr;
+        embed_handle = nullptr;
         if (!session->backend->is_initialized()) {
             publish_failure(RAC_ERROR_INITIALIZATION_FAILED, "rag.sessionCreate",
                             "RAG pipeline failed to initialize");
             // session destructor clears owned services.
             return RAC_ERROR_INITIALIZATION_FAILED;
         }
-        *out_session = reinterpret_cast<rac_handle_t>(session.release());
+        *out_session = register_session(session);
         LOGI("RAG session created");
         return RAC_SUCCESS;
     } catch (const std::exception& e) {
@@ -468,7 +551,13 @@ void rac_rag_session_destroy_proto(rac_handle_t session) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)session;
 #else
-    delete as_session(session);
+    auto owned_session = close_session(session);
+    if (owned_session && owned_session->backend) {
+        // Do not wait for in-flight callers while holding the registry lock.
+        // The shared owner keeps all backend resources alive until both this
+        // cancellation pulse and every already-admitted operation return.
+        (void)owned_session->backend->cancel_query();
+    }
 #endif
 }
 
@@ -482,7 +571,7 @@ rac_result_t rac_rag_ingest_proto(rac_handle_t session, const uint8_t* document_
     (void)document_proto_size;
     return feature_unavailable(out_stats);
 #else
-    auto* s = as_session(session);
+    const auto s = acquire_session(session);
     if (!s || !s->backend) {
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "rag.ingest", "RAG session is not loaded");
         return rac_proto_buffer_set_error(out_stats, RAC_ERROR_COMPONENT_NOT_READY,
@@ -554,7 +643,7 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     (void)query_proto_size;
     return feature_unavailable(out_result);
 #else
-    auto* s = as_session(session);
+    const auto s = acquire_session(session);
     if (!s || !s->backend) {
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "rag.query", "RAG session is not loaded");
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_COMPONENT_NOT_READY,
@@ -585,7 +674,10 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     // proto-documented disabled/default sentinels instead of a raw zero-init.
     rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
     opts.max_tokens = query_proto.max_tokens() > 0 ? query_proto.max_tokens() : 512;
-    opts.temperature = query_proto.temperature() > 0.0f ? query_proto.temperature() : 0.7f;
+    // 0.0 is the documented greedy value, not an "unset" sentinel. SDK
+    // defaults materialize 0.7 explicitly, so preserve an explicit zero all
+    // the way to the provider for deterministic production RAG answers.
+    opts.temperature = query_proto.temperature();
     opts.top_p = query_proto.top_p() > 0.0f ? query_proto.top_p() : 0.9f;
     // commons-030-A: RAGQueryOptions.top_k (idl/rag.proto:55) was silently
     // dropped; thread it through. 0 = disabled (engine default).
@@ -707,6 +799,18 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
 #endif
 }
 
+rac_result_t rac_rag_cancel_proto(rac_handle_t session) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)session;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    const auto s = acquire_session(session);
+    if (!s || !s->backend)
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    return s->backend->cancel_query();
+#endif
+}
+
 rac_result_t rac_rag_stats_proto(rac_handle_t session, rac_proto_buffer_t* out_stats) {
     if (!out_stats)
         return RAC_ERROR_NULL_POINTER;
@@ -714,7 +818,7 @@ rac_result_t rac_rag_stats_proto(rac_handle_t session, rac_proto_buffer_t* out_s
     (void)session;
     return feature_unavailable(out_stats);
 #else
-    auto* s = as_session(session);
+    const auto s = acquire_session(session);
     if (!s || !s->backend) {
         return rac_proto_buffer_set_error(out_stats, RAC_ERROR_COMPONENT_NOT_READY,
                                           "RAG session is not loaded");
@@ -730,7 +834,7 @@ rac_result_t rac_rag_clear_proto(rac_handle_t session, rac_proto_buffer_t* out_s
     (void)session;
     return feature_unavailable(out_stats);
 #else
-    auto* s = as_session(session);
+    const auto s = acquire_session(session);
     if (!s || !s->backend) {
         return rac_proto_buffer_set_error(out_stats, RAC_ERROR_COMPONENT_NOT_READY,
                                           "RAG session is not loaded");

@@ -15,6 +15,7 @@ import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
+import com.runanywhere.sdk.foundation.bridge.extensions.defaults
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
@@ -24,8 +25,10 @@ import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationResult
 import com.runanywhere.sdk.public.types.RALLMStreamEvent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.transformWhile
@@ -48,9 +51,9 @@ suspend fun RunAnywhere.generate(
 
     ensureServicesReady()
 
-    val opts = options ?: RALLMGenerationOptions()
+    val opts = options ?: RALLMGenerationOptions.defaults()
     llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
-    return CppBridgeLLM.generate(prompt, opts)
+    return CppBridgeLLM.generate(prompt, options)
 }
 
 suspend fun RunAnywhere.generate(request: RALLMGenerateRequest): RALLMGenerationResult {
@@ -81,24 +84,14 @@ fun RunAnywhere.generateStream(
         throw SDKException.notInitialized("SDK not initialized")
     }
 
-    val opts = options ?: RALLMGenerationOptions()
+    val opts = options ?: RALLMGenerationOptions.defaults()
     llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
 
-    return callbackFlow {
-        ensureServicesReady()
-        val driver =
-            launch(Dispatchers.IO) {
-                CppBridgeLLM.generateStream(prompt, opts) { event ->
-                    trySend(event)
-                    !event.is_final
-                }
-                close()
-            }
-        awaitClose {
-            driver.cancel()
-            runBlocking { CppBridgeLLM.cancelProto() }
-        }
-    }.flowOn(Dispatchers.IO)
+    return losslessLLMStreamFlow(
+        prepare = { ensureServicesReady() },
+        generate = { onEvent -> CppBridgeLLM.generateStream(prompt, options, onEvent) },
+        cancel = { CppBridgeLLM.cancelProto() },
+    )
 }
 
 fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamEvent> {
@@ -117,22 +110,47 @@ fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamE
             "maxTokens=${request.max_tokens}, systemPrompt=$systemPromptDesc, streaming=${request.streaming_enabled}",
     )
 
-    return callbackFlow {
-        ensureServicesReady()
+    return losslessLLMStreamFlow(
+        prepare = { ensureServicesReady() },
+        generate = { onEvent -> CppBridgeLLM.generateStream(request, onEvent) },
+        cancel = { CppBridgeLLM.cancelProto() },
+    )
+}
+
+/**
+ * Adapt the synchronous native LLM callback to a lossless, ordered [Flow].
+ *
+ * Native backends are allowed to invoke [generate]'s callback synchronously and
+ * much faster than a UI collector can render tokens. An unbounded channel keeps
+ * that callback non-blocking without dropping events. Delivery failure can now
+ * only mean that the collector closed or cancelled the flow; returning `false`
+ * immediately tells native generation to stop instead of silently discarding
+ * the remainder of the stream.
+ */
+internal fun losslessLLMStreamFlow(
+    prepare: suspend () -> Unit,
+    generate: suspend (onEvent: (RALLMStreamEvent) -> Boolean) -> Unit,
+    cancel: suspend () -> Unit,
+): Flow<RALLMStreamEvent> =
+    callbackFlow {
+        prepare()
         val driver =
             launch(Dispatchers.IO) {
-                CppBridgeLLM.generateStream(request) { event ->
-                    trySend(event)
-                    !event.is_final
+                try {
+                    generate { event ->
+                        val delivered = trySend(event).isSuccess
+                        delivered && !event.is_final
+                    }
+                } finally {
+                    close()
                 }
-                close()
             }
         awaitClose {
             driver.cancel()
-            runBlocking { CppBridgeLLM.cancelProto() }
+            runBlocking { cancel() }
         }
-    }.flowOn(Dispatchers.IO)
-}
+    }.buffer(Channel.UNLIMITED)
+        .flowOn(Dispatchers.IO)
 
 suspend fun RunAnywhere.cancelGeneration() {
     if (!isInitialized) return
@@ -144,6 +162,11 @@ suspend fun RunAnywhere.cancelGeneration() {
 }
 
 // MARK: - Stream Aggregation
+
+internal data class LLMStreamModelIdentity(
+    val modelID: String,
+    val framework: String,
+)
 
 /**
  * Build a canonical [RALLMGenerationResult] from a [Flow] of [RALLMStreamEvent]s
@@ -168,11 +191,40 @@ suspend fun RunAnywhere.aggregateStream(
     prompt: String,
     events: Flow<RALLMStreamEvent>,
     onToken: (suspend (String) -> Unit)? = null,
+): RALLMGenerationResult =
+    aggregateLLMStream(
+        prompt = prompt,
+        events = events,
+        onToken = onToken,
+        resolveModelIdentity = {
+            val snapshot =
+                currentModel(
+                    CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE),
+                )
+            LLMStreamModelIdentity(
+                modelID = if (snapshot.found) snapshot.model_id else "",
+                framework =
+                    if (snapshot.found) {
+                        snapshot.framework.analyticsKey
+                    } else {
+                        InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN.analyticsKey
+                    },
+            )
+        },
+    )
+
+/** Internal, injectable aggregation core used by the public API and unit tests. */
+internal suspend fun aggregateLLMStream(
+    prompt: String,
+    events: Flow<RALLMStreamEvent>,
+    onToken: (suspend (String) -> Unit)?,
+    resolveModelIdentity: suspend () -> LLMStreamModelIdentity,
+    nowMillis: () -> Long = System::currentTimeMillis,
 ): RALLMGenerationResult {
-    var fullResponse = ""
+    val fullResponse = StringBuilder()
     var tokenCount = 0
     var firstTokenTimeMs: Long? = null
-    val startTimeMs = System.currentTimeMillis()
+    val startTimeMs = nowMillis()
     var finishReason = ""
     var terminalError = ""
     var finalEvent: RALLMStreamEvent? = null
@@ -183,10 +235,10 @@ suspend fun RunAnywhere.aggregateStream(
             !event.is_final
         }.collect { event ->
             if (event.token.isNotEmpty()) {
-                if (firstTokenTimeMs == null) firstTokenTimeMs = System.currentTimeMillis()
-                fullResponse += event.token
+                if (firstTokenTimeMs == null) firstTokenTimeMs = nowMillis()
+                fullResponse.append(event.token)
                 tokenCount += 1
-                onToken?.invoke(fullResponse)
+                onToken?.invoke(fullResponse.toString())
             }
             if (event.is_final) {
                 finalEvent = event
@@ -195,20 +247,9 @@ suspend fun RunAnywhere.aggregateStream(
             }
         }
 
-    val totalLatencyMs = (System.currentTimeMillis() - startTimeMs).toDouble()
+    val totalLatencyMs = (nowMillis() - startTimeMs).toDouble()
     val ttftMs = firstTokenTimeMs?.let { (it - startTimeMs).toDouble() }
-
-    val snapshot =
-        currentModel(
-            CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE),
-        )
-    val modelID = if (snapshot.found) snapshot.model_id else ""
-    val framework =
-        if (snapshot.found) {
-            snapshot.framework.analyticsKey
-        } else {
-            InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN.analyticsKey
-        }
+    val modelIdentity = resolveModelIdentity()
 
     // Prefer the backend's terminal aggregate result (text + metrics) when the
     // final event carries one, matching the Web SDK; otherwise fall back to the
@@ -217,15 +258,15 @@ suspend fun RunAnywhere.aggregateStream(
     val inputTokens = final?.prompt_tokens ?: maxOf(1, prompt.length / 4)
     val tokensGenerated = final?.completion_tokens ?: tokenCount
     return RALLMGenerationResult(
-        text = final?.text ?: fullResponse,
+        text = final?.text ?: fullResponse.toString(),
         thinking_content = final?.thinking_content,
         input_tokens = inputTokens,
         tokens_generated = tokensGenerated,
         response_tokens = tokensGenerated,
         total_tokens = final?.total_tokens ?: (inputTokens + tokensGenerated),
-        model_used = modelID,
+        model_used = modelIdentity.modelID,
         generation_time_ms = final?.total_time_ms?.toDouble() ?: totalLatencyMs,
-        framework = framework,
+        framework = modelIdentity.framework,
         prompt_eval_time_ms = final?.prompt_eval_time_ms ?: 0L,
         decode_time_ms = final?.decode_time_ms ?: 0L,
         tokens_per_second =

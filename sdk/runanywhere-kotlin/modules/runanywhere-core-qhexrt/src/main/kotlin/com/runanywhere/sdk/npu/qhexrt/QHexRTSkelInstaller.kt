@@ -34,7 +34,8 @@ internal object QHexRTSkelInstaller {
             val context = AndroidPlatformContext.applicationContext
             val assetDir = "$ASSET_ROOT/$ABI_ARM64"
             val skelNames =
-                context.assets.list(assetDir)
+                context.assets
+                    .list(assetDir)
                     ?.filter { it.startsWith("libQnnHtpV") && it.endsWith("Skel.so") }
                     .orEmpty()
                     .sorted()

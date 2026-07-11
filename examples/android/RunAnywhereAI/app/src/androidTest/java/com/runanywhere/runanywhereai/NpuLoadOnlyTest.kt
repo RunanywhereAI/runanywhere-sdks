@@ -17,7 +17,8 @@ import java.io.File
 
 /**
  * Local-iteration only (a SEPARATE class from [NpuModelE2ETest] so `-e class NpuModelE2ETest` with no
- * `#method` — the standard run_npu_e2e.sh invocation — still runs exactly one test): load an ALREADY
+ * `#method` — the standard QHexRT/device_suites/run_android_e2e.sh invocation — still runs exactly one
+ * test): load an ALREADY
  * registered/downloaded model_id directly and synthesize, skipping register()/downloadModel() entirely.
  * Used to test a manifest hand-staged into the model's on-device directory via adb (e.g. a new capability
  * not yet published to HF), without a normal registerModel() call re-downloading over the hand-staged files.

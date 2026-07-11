@@ -29,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +49,8 @@ import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
+import com.runanywhere.runanywhereai.ui.permissions.PermissionRecoveryCard
+import com.runanywhere.runanywhereai.ui.permissions.openRunAnywhereAppSettings
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -65,12 +68,20 @@ fun VadScreen() {
     val modelVm: ModelSelectionViewModel =
         viewModel(factory = ModelSelectionViewModel.Factory(ModelSelectionContext.VAD))
     var showSheet by remember { mutableStateOf(false) }
+    var permissionDenied by remember { mutableStateOf(false) }
+
+    DisposableEffect(vadVm) {
+        onDispose { vadVm.stop() }
+    }
 
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) vadVm.toggle() }
+    ) { granted ->
+        permissionDenied = !granted
+        if (granted) vadVm.toggle()
+    }
 
     fun onListen() {
         if (model == null) return
@@ -120,6 +131,12 @@ fun VadScreen() {
 
         vadVm.error?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        if (permissionDenied) {
+            PermissionRecoveryCard(
+                message = "Microphone access was denied. Enable it in Android settings to detect speech.",
+                onOpenSettings = context::openRunAnywhereAppSettings,
+            )
         }
     }
 

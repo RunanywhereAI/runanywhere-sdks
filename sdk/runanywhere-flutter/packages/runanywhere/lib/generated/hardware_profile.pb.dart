@@ -637,7 +637,8 @@ class NpuCapability extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearHexagonArch() => $_clearField(3);
 
-  /// True iff hexagon_arch is in the QHexRT-supported set (v75+ today).
+  /// True iff hexagon_arch is in the device-validated QHexRT-supported set
+  /// (v75, v79, or v81 today).
   @$pb.TagNumber(4)
   $core.bool get qhexrtSupported => $_getBF(3);
   @$pb.TagNumber(4)
@@ -647,7 +648,7 @@ class NpuCapability extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearQhexrtSupported() => $_clearField(4);
 
-  /// rac_hexagon_arch_name(): "v68" ... "v81", "unknown". Materialized so
+  /// rac_qhexrt_arch_name(): "v68" ... "v81", "unknown". Materialized so
   /// SDKs never re-derive the display name from the enum.
   @$pb.TagNumber(5)
   $core.String get archName => $_getSZ(4);
@@ -721,7 +722,7 @@ class HardwareApi {
           request,
           HardwareAcceleratorPreferenceResult());
 
-  /// Pre-flight Hexagon NPU capability (rac_npu_probe_proto).
+  /// Pre-flight Hexagon NPU capability (rac_qhexrt_probe_proto).
   $async.Future<NpuCapability> probeNpu(
           $pb.ClientContext? ctx, NpuProbeRequest request) =>
       _client.invoke<NpuCapability>(

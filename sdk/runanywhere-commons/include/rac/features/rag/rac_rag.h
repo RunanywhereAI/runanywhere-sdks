@@ -9,7 +9,8 @@
  *     The register/unregister entry points wire the RAG plugin into the
  *     registry; SDK callers do not invoke them directly.
  *   - `rac_rag_session_create_proto` / `rac_rag_session_destroy_proto` /
- *     `rac_rag_ingest_proto` / `rac_rag_query_proto` / `rac_rag_clear_proto` /
+ *     `rac_rag_ingest_proto` / `rac_rag_query_proto` / `rac_rag_cancel_proto` /
+ *     `rac_rag_clear_proto` /
  *     `rac_rag_stats_proto`: `SDK-facing default` over
  *     runanywhere.v1.RAGConfiguration / RAGDocument / RAGQueryOptions /
  *     RAGResult / RAGStatistics bytes. The session handle is carried as
@@ -55,8 +56,8 @@ RAC_API rac_result_t rac_backend_rag_unregister(void);
 /**
  * @brief Create a RAG session from serialized runanywhere.v1.RAGConfiguration bytes.
  *
- * The returned handle is an internal RAG pipeline carried as rac_handle_t for
- * uniform frontend FFI. Destroy it with rac_rag_session_destroy_proto().
+ * The returned handle is an opaque RAG-session token carried as rac_handle_t
+ * for uniform frontend FFI. Destroy it with rac_rag_session_destroy_proto().
  */
 RAC_API rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
                                                   size_t config_proto_size,
@@ -64,6 +65,11 @@ RAC_API rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_by
 
 /**
  * @brief Destroy a RAG session created by rac_rag_session_create_proto().
+ *
+ * The handle stops admitting new operations before active query cancellation
+ * is requested. Resources remain valid until already-admitted operations have
+ * returned, so this function is safe to call concurrently with all other RAG
+ * session operations.
  */
 RAC_API void rac_rag_session_destroy_proto(rac_handle_t session);
 
@@ -85,6 +91,15 @@ RAC_API rac_result_t rac_rag_ingest_proto(rac_handle_t session, const uint8_t* d
  */
 RAC_API rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_proto_bytes,
                                          size_t query_proto_size, rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Request cancellation of the query currently running on a RAG session.
+ *
+ * Safe to call from a thread other than the one blocked in
+ * rac_rag_query_proto(). It forwards to the session-owned LLM and latches a
+ * graph-level flag checked between retrieval and generation phases.
+ */
+RAC_API rac_result_t rac_rag_cancel_proto(rac_handle_t session);
 
 /**
  * @brief Clear a RAG session and return serialized runanywhere.v1.RAGStatistics.

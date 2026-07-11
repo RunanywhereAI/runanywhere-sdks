@@ -4,7 +4,7 @@ module.exports = {
       android: {
         sourceDir: './android',
         packageImportPath: 'import com.margelo.nitro.runanywhere.qhexrt.RunAnywhereQHexRTPackage;',
-        packageInstance: 'new RunAnywhereQHexRTPackage()',
+        packageInstance: 'new RunAnywhereQHexRTPackage(getApplicationContext())',
       },
       ios: {},
     },

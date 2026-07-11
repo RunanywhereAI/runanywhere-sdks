@@ -34,7 +34,9 @@ junitVersion = "1.3.0"
 espressoCore = "3.7.0"
 
 # Proto3
-wire = "6.4.0"
+# The app supplies dependencies for the local SDK AARs, which have no POM.
+# Keep this aligned with sdk/runanywhere-kotlin and the 5.5.1-generated bindings.
+wire = "5.5.1"
 
 # Networking
 okhttp = "5.4.0"

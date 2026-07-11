@@ -22,6 +22,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +47,10 @@ fun TtsScreen() {
     val voiceVm: ModelSelectionViewModel =
         viewModel(factory = ModelSelectionViewModel.Factory(ModelSelectionContext.TTS))
     var showSheet by remember { mutableStateOf(false) }
+
+    DisposableEffect(ttsVm) {
+        onDispose { ttsVm.stop() }
+    }
 
     val voice = voiceVm.state.models.firstOrNull { it.id == voiceVm.state.currentModelId }
     val isSystemVoice = voice != null &&
@@ -87,7 +92,7 @@ fun TtsScreen() {
 
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
             OutlinedButton(
-                onClick = { ttsVm.generate(voice) },
+                onClick = ttsVm::generate,
                 enabled = canGenerate,
                 modifier = Modifier.weight(1f),
             ) {
@@ -102,7 +107,7 @@ fun TtsScreen() {
                 )
             }
             Button(
-                onClick = { if (ttsVm.isSpeaking) ttsVm.stop() else ttsVm.speak(voice) },
+                onClick = { if (ttsVm.isSpeaking) ttsVm.stop() else ttsVm.speak() },
                 enabled = ttsVm.isSpeaking || canSpeak,
                 modifier = Modifier.weight(1f),
             ) {

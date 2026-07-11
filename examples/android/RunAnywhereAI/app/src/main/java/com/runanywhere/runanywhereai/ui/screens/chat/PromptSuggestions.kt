@@ -36,7 +36,7 @@ private val generalSuggestions = listOf(
 )
 
 private val toolSuggestions = listOf(
-    PromptSuggestion("Weather plan", "Check the weather for my city and suggest what to wear today.", RACIcons.Outline.Cloud),
+    PromptSuggestion("Trip plan", "Help me make a practical packing list for a weekend city trip.", RACIcons.Outline.Stack),
     PromptSuggestion("Time check", "What time is it in London, Tokyo, and San Francisco?", RACIcons.Outline.Clock),
     PromptSuggestion("Device status", "Check my battery level and tell me if I should charge before leaving.", RACIcons.Outline.Battery),
     PromptSuggestion("Quick math", "Calculate 15% of 240, then show the shortcut.", RACIcons.Outline.Calculator),

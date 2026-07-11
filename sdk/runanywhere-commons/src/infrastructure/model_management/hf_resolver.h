@@ -69,25 +69,23 @@ bool is_hf_ref(const std::string& ref);
 bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext);
 
 /**
- * True when @p ref is a logical HNPU-style repo/manifest ref that needs the
- * current device arch inserted before folder-bundle resolution. Already
- * arch-pinned refs (`.../v81/...`), concrete /resolve/ URLs, and normal
- * explicit file refs return false.
+ * True when @p ref is a logical repository/manifest bundle ref that can have
+ * an engine-selected variant folder inserted. Already-pinned folders,
+ * concrete /resolve/ URLs, and ordinary explicit file refs return false.
  */
-bool is_logical_arch_folder_ref(const std::string& ref, const char* manifest_leaf_ext);
+bool is_logical_variant_folder_ref(const std::string& ref, const char* manifest_leaf_ext);
 
 /**
- * Rewrite a logical per-device folder-bundle ref into an arch-pinned folder ref.
- * Used by QHexRT/HNPU registration before folder resolution:
+ * Rewrite a logical bundle ref with one validated engine-selected folder:
  *
- *   hf.co/org/repo                  + v81 -> hf.co/org/repo/v81
- *   hf.co/org/repo/model.json       + v81 -> hf.co/org/repo/v81/model.json
- *   hf.co/org/repo?manifest=m.json  + v81 -> hf.co/org/repo/v81/m.json
+ *   hf.co/org/repo            + v81 -> hf.co/org/repo/v81
+ *   hf.co/org/repo/model.json + v81 -> hf.co/org/repo/v81/model.json
  *
- * Already arch-pinned refs (`.../v81/...`) and non-HF refs return false.
+ * Returns false for unsafe variant segments, already-pinned refs, and non-HF
+ * references.
  */
-bool make_arch_folder_ref(const std::string& ref, const std::string& arch,
-                          const char* manifest_leaf_ext, std::string* out_ref);
+bool make_variant_folder_ref(const std::string& ref, const std::string& variant,
+                             const char* manifest_leaf_ext, std::string* out_ref);
 
 /**
  * Normalize an explicit-file HF ref (org/repo/path/file or an hf-hosted

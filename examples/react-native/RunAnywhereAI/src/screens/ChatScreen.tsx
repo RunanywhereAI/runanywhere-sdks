@@ -75,10 +75,9 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import { logDiagnostic } from '../utils/diagnostics';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
+import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
 
 // Canonical SDK methods (Swift parity).
-const listModels = async (): Promise<SDKModelInfo[]> =>
-  (await RunAnywhere.listModels()).models?.models ?? [];
 const loadModelWithRequest = RunAnywhere.loadModel;
 
 // Generate unique ID
@@ -230,7 +229,7 @@ export const ChatScreen: React.FC = () => {
    */
   const loadAvailableModels = async () => {
     try {
-      const allModels = await listModels();
+      const allModels = await listVisibleCatalogModels();
       const llmModels = allModels.filter(
         (m: SDKModelInfo) =>
           m.category === ModelCategory.MODEL_CATEGORY_LANGUAGE

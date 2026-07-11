@@ -10,10 +10,11 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.data.settings.AppSettings
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
-import com.runanywhere.runanywhereai.state.GlobalState
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
+import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
 import com.runanywhere.sdk.public.extensions.cleanTempFiles
 import com.runanywhere.sdk.public.extensions.clearCache
 import com.runanywhere.sdk.public.extensions.deleteModel
@@ -44,6 +45,9 @@ class SettingsViewModel : ViewModel() {
     var storage by mutableStateOf(StorageUiState())
         private set
 
+    var hfTokenDraft by mutableStateOf(SettingsRepository.settings.hfToken)
+        private set
+
     init {
         refreshStorage()
     }
@@ -54,17 +58,35 @@ class SettingsViewModel : ViewModel() {
     fun setStreaming(value: Boolean) = SettingsRepository.setStreaming(value)
     fun setDisableThinking(value: Boolean) = SettingsRepository.setDisableThinking(value)
 
-    fun setHfToken(value: String) {
-        SettingsRepository.setHfToken(value)
+    fun editHfToken(value: String) {
+        hfTokenDraft = value
+        storage = storage.copy(hfTokenMessage = null, hfTokenMessageIsError = false)
     }
 
     fun commitHfToken() {
+        if (storage.hfTokenBusy) return
+        val candidate = hfTokenDraft.trim()
         viewModelScope.launch {
-            val clearing = settings.hfToken.isBlank()
+            val clearing = candidate.isBlank()
             storage = storage.copy(hfTokenBusy = true, hfTokenMessage = null, hfTokenMessageIsError = false)
+            val persistenceFailure = SettingsRepository.setHfToken(candidate).exceptionOrNull()
+            if (persistenceFailure != null) {
+                RACLog.e("Hugging Face token secure-storage update failed", persistenceFailure)
+                storage = storage.copy(
+                    hfTokenBusy = false,
+                    hfTokenMessage = if (clearing) {
+                        "Could not securely clear Hugging Face token"
+                    } else {
+                        "Could not securely save Hugging Face token"
+                    },
+                    hfTokenMessageIsError = true,
+                )
+                return@launch
+            }
+            hfTokenDraft = candidate
             try {
                 // Empty clears the token (public no-auth behavior); never logged.
-                RunAnywhere.setHfToken(settings.hfToken.ifBlank { "" })
+                RunAnywhere.setHfToken(candidate)
                 ModelBootstrap.refreshNpuCatalog()
                 storage = storage.copy(
                     hfTokenBusy = false,
@@ -79,14 +101,10 @@ class SettingsViewModel : ViewModel() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                RACLog.e("Hugging Face token update failed", e)
+                RACLog.e("Hugging Face token was saved but could not be applied", e)
                 storage = storage.copy(
                     hfTokenBusy = false,
-                    hfTokenMessage = if (clearing) {
-                        "Could not clear Hugging Face token"
-                    } else {
-                        "Could not save Hugging Face token"
-                    },
+                    hfTokenMessage = "Token saved securely. Reopen the app to apply it.",
                     hfTokenMessageIsError = true,
                 )
             }
@@ -94,7 +112,7 @@ class SettingsViewModel : ViewModel() {
     }
 
     fun clearHfToken() {
-        SettingsRepository.setHfToken("")
+        hfTokenDraft = ""
         commitHfToken()
     }
 
@@ -106,7 +124,8 @@ class SettingsViewModel : ViewModel() {
                 ).info
             }.getOrNull()
             val models = runCatching {
-                RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty().filter { it.isDownloadedOnDisk }
+                RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
+                    .filter { it.isDownloadedOnDisk && !it.isBuiltIn }
             }.getOrDefault(emptyList())
             storage = storage.copy(
                 freeBytes = info?.device?.free_bytes ?: 0,
@@ -123,7 +142,7 @@ class SettingsViewModel : ViewModel() {
             storage = storage.copy(busyId = model.id, message = null)
             try {
                 RunAnywhere.deleteModel(model.id)
-                if (GlobalState.model.loaded?.id == model.id) GlobalState.model.clear()
+                RuntimeModelSelection.clearModelEverywhere(model.id)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

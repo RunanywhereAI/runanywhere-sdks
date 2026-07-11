@@ -4,10 +4,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.runanywhere.sdk.public.types.RAModelInfo
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 
 object GlobalState {
     val model = ModelState()
     val lora = LoraState()
+
+    private val bootstrapComplete = MutableStateFlow(false)
 
     var ready: Boolean by mutableStateOf(false)
         private set
@@ -18,6 +22,12 @@ object GlobalState {
     fun markReady() {
         initError = null
         ready = true
+        bootstrapComplete.value = true
+    }
+
+    /** Suspend until SDK setup and model-catalog seeding have both completed. */
+    suspend fun awaitBootstrapComplete() {
+        bootstrapComplete.first { it }
     }
 
     fun markInitFailed(message: String) {

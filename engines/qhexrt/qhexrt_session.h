@@ -13,18 +13,56 @@
 #define RUNANYWHERE_QHEXRT_SESSION_H
 
 #include <atomic>
+#include <mutex>
 #include <string>
 
 #include "qhexrt/qhexrt_c.h"
 
 namespace qhexrt_engine {
 
-// One model + session per service instance. Sessions are NOT thread-safe, so a
-// single Session must not be driven concurrently — the SDK owns one per handle.
+// A request-scoped cancellation latch. `cancel_active()` never writes a
+// process-wide boolean: it records only the currently announced request id.
+// A cancel that races reset/setup is therefore preserved, while the next
+// independent request receives a higher id and cannot inherit stale state.
+struct RequestCancellation {
+    std::atomic<uint64_t> next_id{0};
+    std::atomic<uint64_t> active_id{0};
+    std::atomic<uint64_t> cancelled_id{0};
+
+    uint64_t begin() {
+        const uint64_t id = next_id.fetch_add(1, std::memory_order_acq_rel) + 1;
+        active_id.store(id, std::memory_order_release);
+        return id;
+    }
+
+    void finish(uint64_t id) {
+        uint64_t expected = id;
+        (void)active_id.compare_exchange_strong(expected, 0, std::memory_order_acq_rel);
+    }
+
+    void cancel_active() {
+        const uint64_t id = active_id.load(std::memory_order_acquire);
+        if (id != 0) {
+            cancelled_id.store(id, std::memory_order_release);
+        }
+    }
+
+    bool is_cancelled(uint64_t id) const {
+        return id != 0 && cancelled_id.load(std::memory_order_acquire) == id;
+    }
+};
+
+// One model + session per service instance. QHexRT sessions are NOT thread-safe.
+// Every operation that reads or mutates `sess` must hold operation_mutex for the
+// complete operation, including copying session-owned output. Cancellation is
+// deliberately independent and remains an atomic, lock-free signal.
 struct Session {
+    std::mutex operation_mutex;
     qhx_model* model = nullptr;
     qhx_session* sess = nullptr;
     std::atomic<bool> cancel{false};
+    RequestCancellation llm_requests;
+    RequestCancellation vlm_requests;
     std::string model_ref;
     std::string scratch_dir;
 };

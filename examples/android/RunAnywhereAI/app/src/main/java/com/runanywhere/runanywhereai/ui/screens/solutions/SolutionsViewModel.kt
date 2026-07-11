@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.ui.screens.solutions
 
+import ai.runanywhere.proto.v1.ModelListRequest
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -8,7 +9,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.SolutionHandle
+import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.solutions
+import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -23,9 +26,38 @@ class SolutionsViewModel : ViewModel() {
 
     var isRunning by mutableStateOf(false)
         private set
+    private var resolvedSolutions by mutableStateOf(AndroidSolutionsConfig.resolve(emptyList()))
 
-    fun runSolution(name: String, yaml: String) {
+    val missingVoiceModels: List<String> get() = resolvedSolutions.voice.missingModels
+    val missingRagModels: List<String> get() = resolvedSolutions.rag.missingModels
+    var isCheckingModels by mutableStateOf(true)
+        private set
+
+    val voiceReady: Boolean get() = resolvedSolutions.voice.isReady
+    val ragReady: Boolean get() = resolvedSolutions.rag.isReady
+
+    init {
+        refreshRequirements()
+    }
+
+    fun refreshRequirements() {
+        viewModelScope.launch {
+            isCheckingModels = true
+            val models = runCatching {
+                RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
+            }.getOrDefault(emptyList<RAModelInfo>())
+            resolvedSolutions = AndroidSolutionsConfig.resolve(models)
+            isCheckingModels = false
+        }
+    }
+
+    fun runVoiceSolution() = runSolution("Voice Agent", resolvedSolutions.voice)
+
+    fun runRagSolution() = runSolution("RAG", resolvedSolutions.rag)
+
+    private fun runSolution(name: String, solution: ResolvedAndroidSolution) {
         if (isRunning) return
+        val yaml = solution.yaml?.takeIf { solution.isReady } ?: return
         isRunning = true
         log.add("→ $name: creating solution from YAML…")
         viewModelScope.launch {

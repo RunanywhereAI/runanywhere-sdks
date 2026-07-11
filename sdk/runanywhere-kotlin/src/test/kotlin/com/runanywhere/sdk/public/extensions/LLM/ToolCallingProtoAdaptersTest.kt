@@ -5,6 +5,8 @@ import ai.runanywhere.proto.v1.ToolCall
 import ai.runanywhere.proto.v1.ToolCallFormatName
 import ai.runanywhere.proto.v1.ToolCallingOptions
 import ai.runanywhere.proto.v1.ToolCallingResult
+import ai.runanywhere.proto.v1.ToolChoiceMode
+import ai.runanywhere.proto.v1.ToolDefinition
 import ai.runanywhere.proto.v1.ToolResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -50,6 +52,43 @@ class ToolCallingProtoAdaptersTest {
         assertEquals(64, options.max_tokens)
         assertEquals(0.1f, options.temperature)
         assertEquals("default", options.format_hint)
+    }
+
+    @Test
+    fun `run loop request preserves greedy forced tool policy across Kotlin bridge`() {
+        val search = ToolDefinition(name = "search_web", description = "Search current information")
+        val request =
+            makeToolCallingRunLoopRequest(
+                prompt = "Use search_web for the current requirement.",
+                options =
+                    ToolCallingOptions(
+                        tools = listOf(search),
+                        max_iterations = 2,
+                        max_tokens = 96,
+                        temperature = 0f,
+                        disable_thinking = true,
+                        tool_choice = ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC,
+                        forced_tool_name = "search_web",
+                    ),
+                llmOptions =
+                    LLMGenerationOptions(
+                        max_tokens = 512,
+                        temperature = 0.7f,
+                        top_p = 1f,
+                        disable_thinking = false,
+                    ),
+                tools = listOf(search),
+                validateCalls = null,
+            )
+
+        assertEquals(96, request.max_tokens)
+        assertEquals(0f, request.temperature)
+        assertEquals(1f, request.top_p)
+        assertTrue(request.disable_thinking)
+        assertEquals(ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC, request.tool_choice)
+        assertEquals("search_web", request.forced_tool_name)
+        assertEquals(listOf("search_web"), request.tools.map { it.name })
+        assertEquals(null, request.validate_calls)
     }
 
     @Test

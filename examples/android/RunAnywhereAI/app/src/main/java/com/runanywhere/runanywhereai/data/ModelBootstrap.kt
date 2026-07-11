@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.data
 
-import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.hybrid.Cloud
 import com.runanywhere.sdk.public.RunAnywhere
@@ -14,9 +13,19 @@ import kotlin.coroutines.cancellation.CancellationException
 // before RunAnywhere.initialize().
 object ModelBootstrap {
 
+    private val npuCatalogState = NpuCatalogState()
+
+    /** QHexRT rows accepted by the native device-aware catalog facade this run. */
+    internal val registeredNpuModelIds: Set<String>
+        get() = npuCatalogState.snapshots.value.registeredModelIds
+
+    /** Emits after every completed native catalog seed/refresh. */
+    internal val npuCatalogSnapshots
+        get() = npuCatalogState.snapshots
+
     suspend fun setupModels() {
         registerRemoteBackends()
-        seedCatalog(skipHfAuthModels = SettingsRepository.settings.hfToken.isBlank())
+        seedCatalog()
         seedLora()
         RunAnywhere.refreshModelRegistry()
     }
@@ -32,48 +41,19 @@ object ModelBootstrap {
     // Re-registered on every launch, mirroring iOS ModelCatalogBootstrap: the commons registry
     // merges on re-save, preserving runtime fields (is_downloaded, per-file local paths,
     // checksums), so catalog metadata fixes reach existing installs without losing downloads.
-    private suspend fun seedCatalog(skipHfAuthModels: Boolean) {
-        var ok = 0
-        var fail = 0
-        var skipped = 0
-        for (model in ModelCatalog.models + ModelCatalog.npuModels()) {
-            if (skipHfAuthModels && model.requiresHfAuth) {
-                skipped++
-                continue
-            }
-            try {
-                model.register()
-                ok++
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                fail++
-                RACLog.e("catalog: ${model.id} failed", e)
-            }
-        }
-        RACLog.i("catalog seeded: ok=$ok failed=$fail skippedHfAuth=$skipped")
+    private suspend fun seedCatalog() {
+        val regular = registerCatalogRows(ModelCatalog.models, "catalog")
+        val npu = registerCatalogRows(ModelCatalog.npuCatalog, "npu catalog")
+        npuCatalogState.publish(npu.registeredIds)
+        RACLog.i(
+            "catalog seeded: ok=${regular.registered + npu.registered} " +
+                "failed=${regular.failed + npu.failed} " +
+                "skippedNative=${regular.skippedNative + npu.skippedNative}",
+        )
     }
 
     suspend fun refreshNpuCatalog() {
-        var ok = 0
-        var fail = 0
-        var skipped = 0
-        val skipHfAuthModels = SettingsRepository.settings.hfToken.isBlank()
-        for (model in ModelCatalog.npuModels()) {
-            if (skipHfAuthModels && model.requiresHfAuth) {
-                skipped++
-                continue
-            }
-            try {
-                model.register()
-                ok++
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                fail++
-                RACLog.e("npu catalog: ${model.id} failed", e)
-            }
-        }
+        val npu = registerCatalogRows(ModelCatalog.npuCatalog, "npu catalog")
         val registryRefreshed = try {
             RunAnywhere.refreshModelRegistry()
             true
@@ -83,9 +63,45 @@ object ModelBootstrap {
             RACLog.e("npu catalog registry refresh failed", e)
             false
         }
+        // Publish after the registry operation so retained pickers always read
+        // the completed refresh, never an intermediate catalog snapshot.
+        npuCatalogState.publish(npu.registeredIds)
         RACLog.i(
-            "npu catalog refreshed: ok=$ok failed=$fail skippedHfAuth=$skipped " +
+            "npu catalog refreshed: ok=${npu.registered} failed=${npu.failed} " +
+                "skippedNative=${npu.skippedNative} " +
                 "registryRefreshed=$registryRefreshed",
+        )
+    }
+
+    private suspend fun registerCatalogRows(
+        models: List<CatalogModel>,
+        logLabel: String,
+    ): CatalogSeedResult {
+        var registered = 0
+        var failed = 0
+        var skippedNative = 0
+        val registeredIds = mutableSetOf<String>()
+        for (model in models) {
+            try {
+                val saved = model.register()
+                if (saved == null) {
+                    skippedNative++
+                } else {
+                    registered++
+                    registeredIds += saved.id
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failed++
+                RACLog.e("$logLabel: ${model.id} failed", e)
+            }
+        }
+        return CatalogSeedResult(
+            registered = registered,
+            failed = failed,
+            skippedNative = skippedNative,
+            registeredIds = registeredIds,
         )
     }
 
@@ -101,3 +117,10 @@ object ModelBootstrap {
         }
     }
 }
+
+private data class CatalogSeedResult(
+    val registered: Int,
+    val failed: Int,
+    val skippedNative: Int,
+    val registeredIds: Set<String>,
+)

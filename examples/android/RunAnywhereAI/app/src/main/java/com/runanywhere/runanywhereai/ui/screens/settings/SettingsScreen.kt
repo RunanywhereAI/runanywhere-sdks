@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -24,16 +25,23 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.BuildConfig
+import com.runanywhere.runanywhereai.state.GlobalState
+import com.runanywhere.runanywhereai.ui.screens.chat.ChatGenerationBudgetPolicy
 import com.runanywhere.runanywhereai.ui.screens.models.formatModelSize
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
@@ -51,6 +59,12 @@ fun SettingsScreen(
     val dimens = LocalDimens.current
     val settings = viewModel.settings
     val storage = viewModel.storage
+    val loadedChatModel = GlobalState.model.loaded
+    val chatBudget = ChatGenerationBudgetPolicy.resolve(
+        requestedMaxTokens = settings.maxTokens,
+        modelContextTokens = loadedChatModel?.context_length ?: 0,
+    )
+    var deletingModel by remember { mutableStateOf<com.runanywhere.sdk.public.types.RAModelInfo?>(null) }
 
     Column(
         modifier = Modifier
@@ -74,8 +88,8 @@ fun SettingsScreen(
 
         Section("App") {
             SettingsLinkRow(
-                label = "Manage models",
-                description = "Download, switch, and remove local models",
+                label = "Choose chat model",
+                description = "Download or switch the model used by Ask",
                 icon = RACIcons.Outline.Cpu,
                 onClick = onOpenModels,
             )
@@ -103,6 +117,7 @@ fun SettingsScreen(
                 valueRange = 256f..4096f,
                 steps = 14,
                 onValueChange = { viewModel.setMaxTokens(it.roundToInt()) },
+                description = chatBudget.explanation(loadedChatModel?.name),
             )
             Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
                 Text("System prompt", style = MaterialTheme.typography.bodyLarge)
@@ -131,15 +146,47 @@ fun SettingsScreen(
 
         Section("Storage") {
             Text(
-                text = "Models ${formatModelSize(storage.modelsBytes)}  ·  ${formatModelSize(storage.freeBytes)} free",
+                text = "Models ${formatModelSize(storage.modelsBytes).ifBlank { "0 B" }} · " +
+                    "${formatModelSize(storage.freeBytes)} free",
                 style = RACTextStyles.Metric,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                "Downloaded models are managed from the Models sheet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            when {
+                storage.isLoading -> CircularProgressIndicator(
+                    modifier = Modifier.size(dimens.iconSm),
+                    strokeWidth = 2.dp,
+                )
+                storage.downloaded.isEmpty() -> Text(
+                    "No downloaded models yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                else -> storage.downloaded.sortedBy { it.name.lowercase() }.forEach { model ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(model.name.ifBlank { model.id }, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                listOfNotNull(
+                                    model.framework.name.removePrefix("INFERENCE_FRAMEWORK_").takeIf { it.isNotBlank() },
+                                    model.download_size_bytes.takeIf { it > 0 }?.let(::formatModelSize),
+                                ).joinToString(" · "),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(
+                            onClick = { deletingModel = model },
+                            enabled = storage.busyId == null,
+                        ) {
+                            Text(if (storage.busyId == model.id) "Deleting…" else "Delete")
+                        }
+                    }
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
                 TextButton(onClick = viewModel::clearCache) { Text("Clear cache") }
                 TextButton(onClick = viewModel::cleanTempFiles) { Text("Clean temp files") }
@@ -153,16 +200,20 @@ fun SettingsScreen(
             Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
                 Text("Hugging Face token", style = MaterialTheme.typography.bodyLarge)
                 OutlinedTextField(
-                    value = settings.hfToken,
-                    onValueChange = viewModel::setHfToken,
+                    value = viewModel.hfTokenDraft,
+                    onValueChange = viewModel::editHfToken,
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("hf_…") },
                     supportingText = {
                         Text("Stored securely and used only for private Hugging Face repos, including HNPU/QHexRT bundles")
                     },
                     singleLine = true,
+                    enabled = !storage.hfTokenBusy,
                     visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                    ),
                     keyboardActions = KeyboardActions(onDone = { viewModel.commitHfToken() }),
                 )
                 Row(
@@ -200,6 +251,17 @@ fun SettingsScreen(
             InfoRow("SDK version", viewModel.sdkVersion)
             InfoRow("App version", BuildConfig.VERSION_NAME)
             val uriHandler = LocalUriHandler.current
+            if (BuildConfig.PRIVACY_POLICY_URL.isNotBlank()) {
+                Text(
+                    text = "Privacy policy",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { uriHandler.openUri(BuildConfig.PRIVACY_POLICY_URL) }
+                        .padding(vertical = dimens.spacingXs),
+                )
+            }
             Text(
                 text = "Documentation",
                 style = MaterialTheme.typography.bodyLarge,
@@ -219,6 +281,23 @@ fun SettingsScreen(
                     .padding(vertical = dimens.spacingXs),
             )
         }
+    }
+
+    deletingModel?.let { model ->
+        AlertDialog(
+            onDismissRequest = { deletingModel = null },
+            title = { Text("Delete downloaded model?") },
+            text = { Text("Remove ${model.name.ifBlank { model.id }} and its files from this device?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deletingModel = null
+                        viewModel.deleteModel(model)
+                    },
+                ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { deletingModel = null }) { Text("Cancel") } },
+        )
     }
 }
 
@@ -254,6 +333,7 @@ private fun SliderRow(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
     onValueChange: (Float) -> Unit,
+    description: String? = null,
 ) {
     Column {
         Row(
@@ -264,6 +344,13 @@ private fun SliderRow(
             Text(valueText, style = RACTextStyles.Metric, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Slider(value = value, onValueChange = onValueChange, valueRange = valueRange, steps = steps)
+        description?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

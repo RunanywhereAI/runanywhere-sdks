@@ -139,7 +139,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
         emit_device_registration_failed(RAC_ERROR_INVALID_STATE, "Failed to get device ID");
         return RAC_ERROR_INVALID_STATE;
     }
-    RAC_LOG_INFO(LOG_CAT, "Device ID for registration: %s", device_id);
+    RAC_LOG_DEBUG(LOG_CAT, "Device identifier resolved for registration");
 
     // Step 3: Get device info
     rac_device_registration_info_t device_info = {};
@@ -179,8 +179,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
         return RAC_ERROR_INVALID_STATE;
     }
     RAC_LOG_DEBUG(LOG_CAT, "Registration endpoint: %s", endpoint);
-    RAC_LOG_DEBUG(LOG_CAT, "Registration JSON payload (first 200 chars): %.200s",
-                  json_ptr ? json_ptr : "(null)");
+    RAC_LOG_DEBUG(LOG_CAT, "Registration payload prepared (%zu bytes)", json_len);
 
     // Step 7: Determine if auth is required (staging/production require auth)
     rac_bool_t requires_auth = (env != RAC_ENV_DEVELOPMENT) ? RAC_TRUE : RAC_FALSE;

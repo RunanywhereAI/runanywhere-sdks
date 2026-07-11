@@ -51,15 +51,20 @@ private fun checkRc(rc: Int, operation: String) {
     }
 }
 
-private fun RALLMGenerationOptions?.toGenerateRequest(
+internal fun RALLMGenerationOptions?.toGenerateRequest(
     prompt: String,
     streaming: Boolean,
 ): RALLMGenerateRequest {
-    val options = this ?: RALLMGenerationOptions()
+    val options = this ?: RALLMGenerationOptions.defaults()
     val requestOptions =
         options.copy(
             max_tokens = options.max_tokens.takeIf { it > 0 } ?: 100,
-            temperature = options.temperature.takeIf { it > 0.0f } ?: 0.8f,
+            // A canonical options message has presence at the request level, so
+            // temperature=0 is an explicit, documented request for greedy
+            // decoding. Apply 0.8 only when the entire options object is absent
+            // (via defaults() above); rewriting an explicit zero makes greedy
+            // generation impossible through this overload.
+            temperature = options.temperature.coerceIn(0.0f, 2.0f),
             top_p = options.top_p.takeIf { it > 0.0f } ?: 1.0f,
             repetition_penalty = options.repetition_penalty.takeIf { it > 0.0f } ?: 1.0f,
             streaming_enabled = streaming || options.streaming_enabled,

@@ -49,6 +49,8 @@ void test_host_matching(std::vector<TestResult>& results) {
 void test_bearer_composition(std::vector<TestResult>& results) {
     // Explicit token set.
     rac_http_hf_token_set("  hf_test_token  ");
+    results.push_back(expect("configured token visible as boolean",
+                             rac_http_hf_token_is_configured() == RAC_TRUE));
     results.push_back(expect(
         "bearer attached on HF host",
         rac::http::hf_bearer_for_url("https://huggingface.co/org/repo/resolve/main/f.bin",
@@ -65,6 +67,8 @@ void test_bearer_composition(std::vector<TestResult>& results) {
 
     // Explicit empty set() clears (and disables the env fallback).
     rac_http_hf_token_set("");
+    results.push_back(expect("cleared token reports unconfigured",
+                             rac_http_hf_token_is_configured() == RAC_FALSE));
     results.push_back(expect("cleared token adds nothing",
                              rac::http::hf_bearer_for_url("https://huggingface.co/f", false)
                                  .empty()));

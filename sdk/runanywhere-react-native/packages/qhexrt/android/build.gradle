@@ -74,6 +74,23 @@ afterEvaluate {
 
 // Native libraries directory (bundled - QHexRT is private, never downloaded)
 def jniLibsDir = file("src/main/jniLibs")
+def qhexrtJniLibsDir = file("src/main/jniLibs/arm64-v8a")
+def qhexrtSkelAssetsDir = file("src/main/assets/runanywhere/qhexrt/skels/arm64-v8a")
+
+def misplacedSkels = fileTree(qhexrtJniLibsDir) {
+    include "libQnnHtpV*Skel.so"
+}.files
+if (!misplacedSkels.isEmpty()) {
+    throw new GradleException(
+        "[RunAnywhereQHexRT] DSP Skel.so files must be staged under ${qhexrtSkelAssetsDir}, " +
+        "not ${qhexrtJniLibsDir}: ${misplacedSkels.collect { it.name }.sort().join(', ')}"
+    )
+}
+if (!qhexrtSkelAssetsDir.isDirectory() ||
+        fileTree(qhexrtSkelAssetsDir) { include "libQnnHtpV*Skel.so" }.files.isEmpty()) {
+    logger.warn("[RunAnywhereQHexRT] ${qhexrtSkelAssetsDir} has no DSP skels; " +
+        "stage private QHexRT natives before running NPU inference")
+}
 
 def androidNdkHomeForRuntime() {
     def explicitNdk = System.getenv("ANDROID_NDK_HOME") ?: System.getenv("NDK_HOME")
@@ -83,7 +100,7 @@ def androidNdkHomeForRuntime() {
     def androidSdk = System.getenv("ANDROID_HOME") ?:
         System.getenv("ANDROID_SDK_ROOT") ?:
         "${System.getProperty('user.home')}/Library/Android/sdk"
-    def ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.0.12077973"
+    def ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.3.13750724"
     return file("${androidSdk}/ndk/${ndkVersion}")
 }
 
@@ -111,6 +128,7 @@ def syncAndroidNdkRuntimeLibs(File outputDir) {
 
 android {
     namespace "com.margelo.nitro.runanywhere.qhexrt"
+    ndkVersion rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.3.13750724"
 
     compileSdkVersion getExtOrIntegerDefault('compileSdkVersion')
 

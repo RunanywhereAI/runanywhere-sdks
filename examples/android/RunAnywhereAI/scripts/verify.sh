@@ -32,6 +32,6 @@ if [ "${REFRESH_NATIVE:-0}" = "1" ]; then
 fi
 
 log "Building Android debug APK"
-./gradlew :app:assembleDebug
+./gradlew --dependency-verification strict :app:assembleDebug
 
 log "Android verification complete"

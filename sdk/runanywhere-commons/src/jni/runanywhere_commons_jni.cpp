@@ -37,6 +37,7 @@
 #include <jni.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -57,6 +58,9 @@
 #endif
 
 // Include runanywhere-commons C API headers
+#include "request_cancellation_relay.h"
+
+#include "../features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "../infrastructure/http/rac_http_internal.h"
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_core.h"
@@ -160,6 +164,14 @@ static jobject g_platform_adapter = nullptr;
 // already holding the lock — `LOGw(...)` in the writer routes through
 // jni_log_callback which now also takes this mutex.
 static std::recursive_mutex g_adapter_mutex;
+
+// Kotlin's VLM and RAG APIs wrap synchronous JNI inference in cancellable
+// coroutines. These relays close the instruction window between the Kotlin
+// lease becoming RUNNING and the backend publishing its own active request.
+// Existing JNI/C ABI entry points remain unchanged; only the Kotlin-private
+// request-scoped JNI siblings below use this state.
+static rac::jni::RequestCancellationRelay g_vlm_request_relay;
+static rac::jni::RequestCancellationRelay g_rag_request_relay;
 
 // Method IDs for platform adapter callbacks (cached)
 static jmethodID g_method_log = nullptr;
@@ -789,6 +801,26 @@ static jbyteArray makeFeatureUnavailableResult(JNIEnv* env, const char* operatio
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
     return makeProtoCallResult(env, RAC_ERROR_FEATURE_NOT_AVAILABLE, &result, operation);
+}
+
+// Retry-only counterpart to rac_vlm_cancel_lifecycle_proto. It deliberately
+// emits no SDK event: a request-scoped JNI cancel emits the public logical
+// cancellation once, then uses this helper only to bridge the backend's short
+// active-request publication window.
+static rac_result_t cancelVlmLifecycleSilently() {
+    rac::vlm::LifecycleVlmRef ref;
+    rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    rac::vlm::request_lifecycle_vlm_cancel(&ref);
+    if (ref.ops != nullptr && ref.ops->cancel != nullptr) {
+        rc = ref.ops->cancel(ref.impl);
+    } else {
+        rc = RAC_SUCCESS;
+    }
+    rac::vlm::release_lifecycle_vlm(&ref);
+    return rc;
 }
 
 // commons-156: a NewStringUTF / NewByteArray failure inside a callback that C++
@@ -5176,6 +5208,36 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmProcessProto(
     return makeProtoCallResult(env, rc, &result, "racVlmProcessProto");
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmProcessRequestProto(
+    JNIEnv* env, jclass clazz, jlong requestId, jlong handle, jbyteArray imageProto,
+    jbyteArray optionsProto) {
+    (void)clazz;
+    if (requestId <= 0L)
+        return nullptr;
+    const uint64_t request_id = static_cast<uint64_t>(requestId);
+    const auto start = g_vlm_request_relay.start(request_id);
+    if (start != rac::jni::RequestCancellationRelay::StartResult::kRun) {
+        rac_proto_buffer_t result = {};
+        rac_proto_buffer_init(&result);
+        const rac_result_t rc = start == rac::jni::RequestCancellationRelay::StartResult::kCancelled
+                                    ? RAC_ERROR_CANCELLED
+                                    : RAC_ERROR_INVALID_STATE;
+        return makeProtoCallResult(env, rc, &result, "racVlmProcessRequestProto");
+    }
+    rac::jni::RequestCompletionGuard completion(&g_vlm_request_relay, request_id);
+
+    JByteArrayView image(env, imageProto);
+    JByteArrayView options(env, optionsProto);
+    if (!image.ok || !options.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vlm_process_proto(handleFromJLong(handle), image.u8(), image.size(),
+                                            options.u8(), options.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racVlmProcessRequestProto");
+}
+
 JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmStreamProto(
     JNIEnv* env, jclass clazz, jbyteArray requestProto, jobject listener) {
     (void)clazz;
@@ -5194,6 +5256,65 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     if (globalListener != nullptr)
         env->DeleteGlobalRef(globalListener);
     return static_cast<jint>(rc);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmStreamRequestProto(
+    JNIEnv* env, jclass clazz, jlong requestId, jbyteArray requestProto, jobject listener) {
+    (void)clazz;
+    if (requestId <= 0L)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    const uint64_t request_id = static_cast<uint64_t>(requestId);
+    const auto start = g_vlm_request_relay.start(request_id);
+    if (start != rac::jni::RequestCancellationRelay::StartResult::kRun) {
+        return start == rac::jni::RequestCancellationRelay::StartResult::kCancelled
+                   ? RAC_ERROR_CANCELLED
+                   : RAC_ERROR_INVALID_STATE;
+    }
+    rac::jni::RequestCompletionGuard completion(&g_vlm_request_relay, request_id);
+
+    JByteArrayView request(env, requestProto);
+    if (!request.ok)
+        return RAC_ERROR_NULL_POINTER;
+    jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
+    ProtoListenerUserData ctx{.listener = globalListener, .operation = "racVlmStreamRequestProto"};
+    rac_result_t rc = rac_vlm_stream_proto(
+        request.u8(), request.size(), globalListener != nullptr ? proto_bool_callback : nullptr,
+        globalListener != nullptr ? &ctx : nullptr);
+    if (globalListener != nullptr)
+        env->DeleteGlobalRef(globalListener);
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmCancelRequestLifecycleProto(
+    JNIEnv* env, jclass clazz, jlong requestId) {
+    (void)clazz;
+    if (requestId <= 0L)
+        return nullptr;
+    const uint64_t request_id = static_cast<uint64_t>(requestId);
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t logical_rc = RAC_SUCCESS;
+    const auto cancel_result = g_vlm_request_relay.request_cancel(
+        request_id, [&] { logical_rc = rac_vlm_cancel_lifecycle_proto(&result); });
+    if (cancel_result == rac::jni::RequestCancellationRelay::CancelResult::kInvalid ||
+        cancel_result == rac::jni::RequestCancellationRelay::CancelResult::kCompleted) {
+        rac_proto_buffer_free(&result);
+        return nullptr;
+    }
+    if (cancel_result == rac::jni::RequestCancellationRelay::CancelResult::kActive) {
+        auto retry_interval = std::chrono::milliseconds(1);
+        constexpr auto kMaxRetryInterval = std::chrono::milliseconds(16);
+        while (g_vlm_request_relay.wait_until_retry_or_complete(request_id, retry_interval)) {
+            if (!g_vlm_request_relay.pulse_if_active(request_id,
+                                                     [] { cancelVlmLifecycleSilently(); })) {
+                break;
+            }
+            retry_interval = std::min(retry_interval * 2, kMaxRetryInterval);
+        }
+    }
+    return makeProtoCallResult(env, logical_rc, &result, "racVlmCancelRequestLifecycleProto");
 }
 
 JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmCancelProto(
@@ -5387,6 +5508,97 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagQueryProto(JNIEnv
     rac_proto_buffer_init(&result);
     rac_result_t rc = queryRag(handleFromJLong(handle), query.u8(), query.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racRagQueryProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagQueryRequestProto(
+    JNIEnv* env, jclass clazz, jlong requestId, jlong handle, jbyteArray queryProto) {
+    (void)clazz;
+    if (requestId <= 0L)
+        return nullptr;
+    const uint64_t request_id = static_cast<uint64_t>(requestId);
+    const auto start = g_rag_request_relay.start(request_id);
+    if (start != rac::jni::RequestCancellationRelay::StartResult::kRun) {
+        rac_proto_buffer_t result = {};
+        rac_proto_buffer_init(&result);
+        const rac_result_t rc = start == rac::jni::RequestCancellationRelay::StartResult::kCancelled
+                                    ? RAC_ERROR_CANCELLED
+                                    : RAC_ERROR_INVALID_STATE;
+        return makeProtoCallResult(env, rc, &result, "racRagQueryRequestProto");
+    }
+    rac::jni::RequestCompletionGuard completion(&g_rag_request_relay, request_id);
+
+    JByteArrayView query(env, queryProto);
+    if (handle == 0L || !query.ok)
+        return nullptr;
+    using Fn = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t, rac_proto_buffer_t*);
+    Fn queryRag = optionalNativeSymbol<Fn>("rac_rag_query_proto");
+    if (queryRag == nullptr)
+        return makeFeatureUnavailableResult(env, "racRagQueryRequestProto");
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = queryRag(handleFromJLong(handle), query.u8(), query.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racRagQueryRequestProto");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagCancelProto(JNIEnv* env,
+                                                                           jclass clazz,
+                                                                           jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L)
+        return static_cast<jint>(RAC_ERROR_INVALID_HANDLE);
+    using Fn = rac_result_t (*)(rac_handle_t);
+    Fn cancelRag = optionalNativeSymbol<Fn>("rac_rag_cancel_proto");
+    if (cancelRag == nullptr) {
+        LOGe("racRagCancelProto: rac_rag_cancel_proto symbol unavailable");
+        return static_cast<jint>(RAC_ERROR_FEATURE_NOT_AVAILABLE);
+    }
+    const rac_result_t rc = cancelRag(handleFromJLong(handle));
+    LOGi("racRagCancelProto: handle=%p rc=%d", handleFromJLong(handle), static_cast<int>(rc));
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagCancelRequestProto(JNIEnv* env,
+                                                                                  jclass clazz,
+                                                                                  jlong requestId,
+                                                                                  jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (requestId <= 0L || handle == 0L)
+        return static_cast<jint>(RAC_ERROR_INVALID_HANDLE);
+    using Fn = rac_result_t (*)(rac_handle_t);
+    Fn cancelRag = optionalNativeSymbol<Fn>("rac_rag_cancel_proto");
+    if (cancelRag == nullptr)
+        return static_cast<jint>(RAC_ERROR_FEATURE_NOT_AVAILABLE);
+
+    const uint64_t request_id = static_cast<uint64_t>(requestId);
+    rac_result_t logical_rc = RAC_SUCCESS;
+    const auto cancel_result = g_rag_request_relay.request_cancel(
+        request_id, [&] { logical_rc = cancelRag(handleFromJLong(handle)); });
+    if (cancel_result == rac::jni::RequestCancellationRelay::CancelResult::kInvalid) {
+        return static_cast<jint>(RAC_ERROR_INVALID_STATE);
+    }
+    if (cancel_result == rac::jni::RequestCancellationRelay::CancelResult::kCompleted) {
+        return static_cast<jint>(RAC_SUCCESS);
+    }
+    if (cancel_result == rac::jni::RequestCancellationRelay::CancelResult::kActive) {
+        auto retry_interval = std::chrono::milliseconds(1);
+        constexpr auto kMaxRetryInterval = std::chrono::milliseconds(16);
+        while (g_rag_request_relay.wait_until_retry_or_complete(request_id, retry_interval)) {
+            if (!g_rag_request_relay.pulse_if_active(
+                    request_id, [&] { (void)cancelRag(handleFromJLong(handle)); })) {
+                break;
+            }
+            retry_interval = std::min(retry_interval * 2, kMaxRetryInterval);
+        }
+    }
+    LOGi("racRagCancelRequestProto: request=%llu handle=%p rc=%d",
+         static_cast<unsigned long long>(request_id), handleFromJLong(handle),
+         static_cast<int>(logical_rc));
+    return static_cast<jint>(logical_rc);
 }
 
 JNIEXPORT jbyteArray JNICALL

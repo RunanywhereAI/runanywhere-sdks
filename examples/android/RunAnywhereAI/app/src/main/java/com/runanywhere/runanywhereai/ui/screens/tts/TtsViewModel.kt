@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.speak
@@ -56,8 +58,8 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
         speed = value
     }
 
-    fun generate(voice: RAModelInfo?) {
-        if (voice == null || text.isBlank() || isGenerating || isSpeaking || isSystem(voice)) return
+    fun generate() {
+        if (text.isBlank() || isGenerating || isSpeaking) return
         val content = text.trim()
         error = null
         metrics = null
@@ -65,6 +67,8 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
         job = viewModelScope.launch {
             val start = System.currentTimeMillis()
             try {
+                val voice = RuntimeModelSelection.requireCurrent(ModelSelectionContext.TTS).model
+                check(!isSystem(voice)) { "Choose a downloadable voice to generate audio." }
                 val output = RunAnywhere.synthesize(content, options())
                 val elapsed = System.currentTimeMillis() - start
                 metrics = TtsMetrics(
@@ -85,14 +89,15 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun speak(voice: RAModelInfo?) {
-        if (voice == null || text.isBlank() || isSpeaking || isGenerating) return
+    fun speak() {
+        if (text.isBlank() || isSpeaking || isGenerating) return
         val content = text.trim()
         error = null
         isSpeaking = true
         job = viewModelScope.launch {
             val start = System.currentTimeMillis()
             try {
+                RuntimeModelSelection.requireCurrent(ModelSelectionContext.TTS)
                 val result = RunAnywhere.speak(content, options())
                 val elapsed = System.currentTimeMillis() - start
                 metrics = TtsMetrics(
@@ -128,11 +133,11 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
 
     private companion object {
         val SAMPLES = listOf(
-            "On-device AI means your data never leaves your phone.",
+            "AI inference runs locally, and prompts stay on this device by default.",
             "The quick brown fox jumps over the lazy dog.",
             "In a hole in the ground there lived a hobbit.",
             "The future is already here — it's just not evenly distributed.",
-            "Hello! I'm running entirely offline, right here on your device.",
+            "Hello! This voice is running locally, right here on your device.",
             "She sells seashells by the seashore.",
         )
     }

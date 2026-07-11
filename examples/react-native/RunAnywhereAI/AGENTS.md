@@ -138,12 +138,12 @@ Mirrors iOS Swift app design tokens exactly:
 
 ### Android
 
-- **Min SDK**: 24, **Target/Compile SDK**: 36, **NDK**: 27.0.12077973, **Kotlin**: 2.1.20, **Gradle**: 9.0.0
+- **Min SDK**: 24, **Target/Compile SDK**: 36, **NDK**: 27.3.13750724, **Kotlin**: 2.1.20, **Gradle**: 9.0.0
 - **ABI filter**: `arm64-v8a` only
 - **`syncSdkNativeLibs` Gradle task**: copies `.so` files from `sdk/runanywhere-react-native/` into `node_modules/@runanywhere/*/android/` before each build (runs before `preBuild`)
 - **16KB page alignment**: enabled for Android 15+ compatibility (`useLegacyPackaging=false`, `ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON`)
 - **`packagingOptions.pickFirsts`**: resolves 12+ duplicate `.so` conflicts across SDK packages
-- QHexRT/QNN: `libcdsprpc.so` declared as optional native library in AndroidManifest
+- QHexRT/QNN: the QHexRT package declares FastRPC libraries and installs DSP skels from assets
 
 ### Monorepo / Metro
 

@@ -40,6 +40,8 @@ import {
   type STTPartialResult,
 } from '@runanywhere/proto-ts/stt_options';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
+import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
+import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
 
 const CAPTURE_SAMPLE_RATE = 16000;
 const CAPTURE_BYTES_PER_MS = (CAPTURE_SAMPLE_RATE * 2) / 1000;
@@ -86,8 +88,6 @@ async function transcribePcmChunks(pcmChunks: Uint8Array[]) {
   });
 }
 
-const listModels = async (): Promise<SDKModelInfo[]> =>
-  (await RunAnywhere.listModels()).models?.models ?? [];
 const loadModelWithRequest = RunAnywhere.loadModel;
 
 export const STTScreen: React.FC = () => {
@@ -152,19 +152,19 @@ export const STTScreen: React.FC = () => {
 
   const loadModels = useCallback(async () => {
     try {
-      const allModels = await listModels();
+      const allModels = await listVisibleCatalogModels();
       const sttModels = allModels.filter(
         (m: SDKModelInfo) => m.category === ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
       );
       setAvailableModels(sttModels);
-      if (!currentModel) {
-        const loaded = await RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
-        if (loaded) setCurrentModel(loaded);
-      }
+      const loaded = await RunAnywhere.modelInfoForCategory(
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+      );
+      setCurrentModel(visibleNativeNpuCatalogModelOrNull(loaded));
     } catch (error) {
       console.warn('[STTScreen] Error loading models:', error);
     }
-  }, [currentModel]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => { loadModels(); }, [loadModels])
@@ -196,7 +196,9 @@ export const STTScreen: React.FC = () => {
         const isLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
         if (isLoaded) {
           const loaded = await RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
-          setCurrentModel(loaded ?? model);
+          setCurrentModel(
+            visibleNativeNpuCatalogModelOrNull(loaded) ?? model
+          );
         }
       } else {
         const error = result.errorMessage || 'Native model lifecycle returned an unsuccessful load result';

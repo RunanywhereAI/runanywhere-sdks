@@ -30,6 +30,7 @@
 
 #include "vector_store_usearch.h"
 
+#include <atomic>
 #include <functional>
 #include <nlohmann/json.hpp>
 #include <string>
@@ -61,7 +62,9 @@ struct RAGGraphInputs {
     std::string system_prompt;
     std::string prompt_template;
 
-    size_t embedding_dimension = 384;
+    // Zero is unresolved/invalid at query time. RAGBackend resolves auto
+    // dimensions from the selected embedding model before invoking the graph.
+    size_t embedding_dimension = 0;
     size_t top_k = 10;
     // 0.0 = no absolute cosine floor; top_k + fusion/rerank select. A positive
     // floor drops real all-MiniLM matches (see vector_store search()).
@@ -80,6 +83,10 @@ struct RAGGraphInputs {
     // Scoped retrieval: only chunks whose document_id starts with this prefix
     // are eligible. Empty = whole index.
     std::string scope_prefix;
+
+    // Borrowed from RAGBackend. Checked between phases and by the streaming
+    // token callback in addition to the provider's native cancel hook.
+    const std::atomic<bool>* cancel_requested = nullptr;
 };
 
 /**

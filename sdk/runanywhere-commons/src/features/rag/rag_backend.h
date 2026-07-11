@@ -14,6 +14,7 @@
 #include "rag_chunker.h"
 #include "vector_store_usearch.h"
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -36,10 +37,12 @@ struct RAGBackendConfig {
     // caller passes a partial RAGConfiguration (proto zeros), so every platform
     // SDK ends up with the same chunk/retrieval behavior. Keep these in sync
     // with the IDL.
-    // Fallback only: when the caller omits embedding_dimension, the RAG proto
-    // ABI derives it from the loaded embedding model (rac_embeddings_get_info)
-    // at session create. 384 applies only if that derivation fails.
-    size_t embedding_dimension = 384;
+    // Zero means "auto". The proto ABI first asks the loaded embedding service
+    // for its dimension; providers that cannot report it until inference (for
+    // example QHexRT) leave this unresolved and RAG binds the vector store to
+    // the first actual embedding output. A caller-supplied non-zero dimension
+    // remains an explicit contract and is validated against model output.
+    size_t embedding_dimension = 0;
     size_t top_k = 5;
     // 0.0 (accept-everything) — MiniLM-class cosine similarities rarely exceed
     // ~0.5, and chunking lowers per-chunk similarity, so any positive floor
@@ -123,11 +126,19 @@ class RAGBackend {
                        std::function<bool(const std::string&)> on_token = nullptr,
                        const QueryOverrides* overrides = nullptr);
 
+    /** Request cancellation without taking the corpus mutex. */
+    rac_result_t cancel_query();
+
     void clear();
     nlohmann::json get_statistics() const;
     size_t document_count() const;
 
    private:
+    // Must be called with mutex_ held. Initializes the vector store on the
+    // first real embedding when the provider could not report its dimension at
+    // session creation, or validates an explicit/previously resolved value.
+    bool ensure_embedding_dimension_locked(size_t actual_dimension);
+
     std::vector<float> embed_text(const std::string& text) const;
     std::vector<std::vector<float>> embed_texts_batch(const std::vector<std::string>& texts) const;
 
@@ -151,6 +162,12 @@ class RAGBackend {
 
     bool initialized_ = false;
     mutable std::mutex mutex_;
+    // Each query owns a fresh cancellation token. Publishing/removing the
+    // shared token under a dedicated mutex avoids both failure modes of the
+    // old process-wide bool: an early cancel cannot be cleared by query entry,
+    // and a completed query cannot poison its successor.
+    mutable std::mutex query_state_mutex_;
+    std::shared_ptr<std::atomic<bool>> active_query_cancel_;
     size_t next_chunk_id_ = 0;
 
     // Content-addressed dedup: sha256 of the normalized document text for every

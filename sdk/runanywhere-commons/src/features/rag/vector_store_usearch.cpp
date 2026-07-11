@@ -29,6 +29,7 @@ using f16_native_t = uint16_t;  // Use binary16 representation
 
 #include <fstream>
 #include <optional>
+#include <stdexcept>
 #include <usearch/index_dense.hpp>
 
 #include "rac/core/rac_logger.h"
@@ -49,6 +50,10 @@ using namespace unum::usearch;
 class VectorStoreUSearch::Impl {
    public:
     explicit Impl(const VectorStoreConfig& config) : config_(config) {
+        if (config.dimension == 0) {
+            throw std::invalid_argument("Vector store embedding dimension must be greater than 0");
+        }
+
         // Configure USearch index
         index_dense_config_t usearch_config;
         usearch_config.connectivity = config.connectivity;

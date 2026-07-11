@@ -1,5 +1,6 @@
 import { Colors } from '../theme/colors';
 import { RunAnywhere } from '@runanywhere/core';
+import { QHexRT } from '@runanywhere/qhexrt';
 import type { IconName } from '../theme/system/icons';
 import {
   InferenceFramework,
@@ -163,7 +164,7 @@ export const modelRequiresHfAuth = (model: ModelInfo): boolean => {
     tags.some((tag) => privateHfTags.has(tag)) ||
     (getPrimaryFramework(model) ===
       InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
-      (model.downloadUrl ?? '').toLowerCase().includes('_hnpu'))
+      QHexRT.modelRequiresHfAuth(model.id))
   );
 };
 

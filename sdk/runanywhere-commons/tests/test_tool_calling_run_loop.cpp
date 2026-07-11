@@ -62,6 +62,17 @@ std::mutex g_responses_mutex;
 std::vector<std::string> g_responses;
 int g_generate_calls = 0;
 
+struct GenerationCapture {
+    std::string prompt;
+    int32_t max_tokens = 0;
+    float temperature = 0.0f;
+    float top_p = 0.0f;
+    bool disable_thinking = false;
+    std::vector<std::string> stop_sequences;
+};
+
+std::vector<GenerationCapture> g_generation_captures;
+
 char* dup_cstr(const char* value) {
     const size_t len = std::strlen(value);
     char* out = static_cast<char*>(std::malloc(len + 1));
@@ -84,7 +95,7 @@ rac_result_t mock_initialize(void*, const char*) {
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_generate(void*, const char*, const rac_llm_options_t*,
+rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t* options,
                            rac_llm_result_t* out_result) {
     if (!out_result)
         return RAC_ERROR_NULL_POINTER;
@@ -92,12 +103,36 @@ rac_result_t mock_generate(void*, const char*, const rac_llm_options_t*,
     {
         std::lock_guard<std::mutex> lg(g_responses_mutex);
         g_generate_calls++;
+        GenerationCapture capture;
+        capture.prompt = prompt ? prompt : "";
+        if (options) {
+            capture.max_tokens = options->max_tokens;
+            capture.temperature = options->temperature;
+            capture.top_p = options->top_p;
+            capture.disable_thinking = options->disable_thinking != RAC_FALSE;
+            for (size_t i = 0; i < options->num_stop_sequences; ++i) {
+                const char* stop = options->stop_sequences ? options->stop_sequences[i] : nullptr;
+                if (stop && stop[0] != '\0') {
+                    capture.stop_sequences.emplace_back(stop);
+                }
+            }
+        }
         if (g_responses.empty()) {
             response = "empty-response";
         } else {
             response = g_responses.front();
             g_responses.erase(g_responses.begin());
         }
+        // Model the backend contract: a matched caller stop is not returned in
+        // raw.text. The tool parser must still accept the complete payload.
+        for (const auto& stop : capture.stop_sequences) {
+            const size_t pos = response.find(stop);
+            if (pos != std::string::npos) {
+                response.resize(pos);
+                break;
+            }
+        }
+        g_generation_captures.push_back(std::move(capture));
     }
     out_result->text = dup_cstr(response.c_str());
     if (!out_result->text)
@@ -158,11 +193,17 @@ void set_responses(std::vector<std::string> responses) {
     std::lock_guard<std::mutex> lg(g_responses_mutex);
     g_responses = std::move(responses);
     g_generate_calls = 0;
+    g_generation_captures.clear();
 }
 
 int generate_calls() {
     std::lock_guard<std::mutex> lg(g_responses_mutex);
     return g_generate_calls;
+}
+
+std::vector<GenerationCapture> generation_captures() {
+    std::lock_guard<std::mutex> lg(g_responses_mutex);
+    return g_generation_captures;
 }
 
 runanywhere::v1::ModelInfo build_llm_model() {
@@ -233,6 +274,30 @@ runanywhere::v1::ToolDefinition make_weather_tool() {
     param->set_name("location");
     param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
     param->set_description("City name");
+    param->set_required(true);
+    return tool;
+}
+
+runanywhere::v1::ToolDefinition make_calculate_tool() {
+    runanywhere::v1::ToolDefinition tool;
+    tool.set_name("calculate");
+    tool.set_description("Evaluates a math expression");
+    auto* param = tool.add_parameters();
+    param->set_name("expression");
+    param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
+    param->set_description("Expression such as 45 * 12");
+    param->set_required(true);
+    return tool;
+}
+
+runanywhere::v1::ToolDefinition make_search_web_tool() {
+    runanywhere::v1::ToolDefinition tool;
+    tool.set_name("search_web");
+    tool.set_description("Searches the web for current information and source links");
+    auto* param = tool.add_parameters();
+    param->set_name("query");
+    param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
+    param->set_description("A concise web search query");
     param->set_required(true);
     return tool;
 }
@@ -389,6 +454,412 @@ int test_one_tool_call_then_final_text() {
     return 0;
 }
 
+int test_forced_tool_name_only_is_narrowed_and_independently_budgeted() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<think>route only; do not expose this</think><tool_call>{"tool":"calculate","arguments":{"expression":"45 * 12"}}</tool_call>ignored trailing text)",
+        "The result is 540.",
+    });
+
+    auto request = make_request("Use calculate to multiply 45 by 12.");
+    request.clear_tools();
+    *request.add_tools() = make_calculate_tool();
+    request.set_max_tokens(96);
+    request.set_temperature(0.7f);
+    request.set_top_p(0.9f);
+    request.set_disable_thinking(false);
+    request.set_forced_tool_name("calculate");
+    auto* unrelated = request.add_tools();
+    unrelated->set_name("unrelated_tool");
+    unrelated->set_description("Must not be advertised");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    {
+        std::lock_guard<std::mutex> lg(exec.mu);
+        exec.result_jsons.emplace_back(R"({"result":"540"})");
+    }
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "forced-name-only run_loop returns RAC_SUCCESS");
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(result.tool_calls_size() == 1, "completed decision records one tool call");
+    CHECK(result.tool_results_size() == 1, "completed decision records one tool result");
+    CHECK(result.text().find("540") != std::string::npos,
+          "follow-up produces a visible final answer");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 2, "forced name generated decision plus synthesis");
+    if (captures.size() == 2) {
+        CHECK(captures[0].max_tokens == 192, "forced decision safety-capped at 192 tokens");
+        CHECK(captures[0].temperature == 0.0f, "forced decision uses greedy temperature");
+        CHECK(captures[0].top_p == 1.0f, "forced decision disables nucleus truncation");
+        CHECK(captures[0].disable_thinking, "forced decision disables thinking");
+        CHECK(captures[0].stop_sequences == std::vector<std::string>{"</tool_call>"},
+              "forced decision stops at completed default tool call");
+        CHECK(captures[0].prompt.rfind("/no_think\n", 0) == 0,
+              "forced decision carries no-think directive");
+        CHECK(captures[0].prompt.find("calculate") != std::string::npos,
+              "forced decision advertises selected tool");
+        CHECK(captures[0].prompt.find("expression") != std::string::npos,
+              "forced decision carries exact required argument");
+        CHECK(captures[0].prompt.find("get_weather") == std::string::npos,
+              "forced decision omits unrelated generic weather example");
+        CHECK(captures[0].prompt.find("unrelated_tool") == std::string::npos,
+              "forced decision omits unrelated schema");
+        CHECK(captures[0].prompt.find("## EXAMPLES") == std::string::npos,
+              "forced decision omits generic examples");
+        CHECK(captures[0].prompt.find("Math/calculation question") == std::string::npos,
+              "forced decision omits unrelated generic rules");
+        CHECK(captures[0].prompt.size() < 800, "forced decision prompt stays compact");
+
+        CHECK(captures[1].max_tokens == 96, "synthesis retains final-answer token budget");
+        CHECK(captures[1].temperature == 0.7f, "synthesis retains caller sampling temperature");
+        CHECK(captures[1].top_p == 0.9f, "synthesis retains caller top-p");
+        CHECK(!captures[1].disable_thinking, "synthesis retains caller thinking policy");
+        CHECK(captures[1].stop_sequences.empty(), "synthesis does not inherit decision stop");
+        CHECK(captures[1].prompt.rfind("/no_think\n", 0) != 0,
+              "synthesis does not inherit decision-only directive");
+    }
+    CHECK(exec.invocation_count == 1, "forced executor invoked exactly once");
+    if (!exec.received_calls.empty()) {
+        CHECK(exec.received_calls[0].name() == "calculate", "executor receives calculate call");
+        CHECK(exec.received_calls[0].arguments_json().find("45 * 12") != std::string::npos,
+              "executor receives complete expression argument");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+int test_none_vetoes_forced_tool_name() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"No tool call is needed."});
+
+    auto request = make_request("Answer directly without tools.");
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    request.set_forced_tool_name("get_weather");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "NONE plus forced name returns a normal text result");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(result.is_complete(), "NONE plus forced name completes");
+    CHECK(result.error_code() == 0, "NONE plus forced name has no policy error for plain text");
+    CHECK(exec.invocation_count == 0, "NONE veto prevents executor invocation");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 1, "NONE plus forced name generates once");
+    if (captures.size() == 1) {
+        CHECK(captures[0].prompt == request.prompt(), "NONE veto suppresses every tool schema");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+int test_none_blocks_hallucinated_call_when_validation_disabled() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+    });
+
+    auto request = make_request("Answer directly without tools.");
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    request.set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "NONE policy failure is returned in ToolCallingResult");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(!result.is_complete(), "hallucinated NONE call is not successful");
+    CHECK(result.error_code() == RAC_ERROR_VALIDATION_FAILED,
+          "hallucinated NONE call surfaces validation failure");
+    CHECK(result.error_message() == "Tool calls are disabled by tool_choice=NONE",
+          "hallucinated NONE call surfaces deterministic policy message");
+    CHECK(exec.invocation_count == 0, "NONE blocks executor when validate_calls=false");
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+int test_forced_target_blocks_wrong_call_when_validation_disabled() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+    });
+
+    auto request = make_request("Use calculate only.");
+    *request.add_tools() = make_calculate_tool();
+    request.set_forced_tool_name("calculate");
+    request.set_validate_calls(false);
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "forced-target policy failure is returned in ToolCallingResult");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(!result.is_complete(), "wrong forced-target call is not successful");
+    CHECK(result.error_code() == RAC_ERROR_VALIDATION_FAILED,
+          "wrong forced-target call surfaces validation failure");
+    CHECK(result.error_message() == "Tool call must use tool_choice=SPECIFIC target: calculate",
+          "wrong forced-target call surfaces deterministic policy message");
+    CHECK(exec.invocation_count == 0,
+          "forced target blocks wrong executor when validate_calls=false");
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+int test_specific_target_must_be_nonempty_and_present() {
+    if (!load_mock_llm())
+        return 1;
+
+    const auto run_invalid_request = [](runanywhere::v1::ToolCallingSessionCreateRequest request,
+                                        const std::string& expected_message, const char* label) {
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(),
+                                                                executor_callback, &exec, &out);
+        CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, label);
+
+        CHECK(out.status == RAC_ERROR_INVALID_ARGUMENT,
+              "invalid SPECIFIC request buffer carries INVALID_ARGUMENT");
+        CHECK(out.error_message && expected_message == out.error_message,
+              "invalid SPECIFIC request buffer carries deterministic message");
+        CHECK(exec.invocation_count == 0, "invalid SPECIFIC request never invokes executor");
+        rac_proto_buffer_free(&out);
+    };
+
+    auto empty_target = make_request("Use a specific tool.");
+    empty_target.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    run_invalid_request(empty_target, "tool_choice=SPECIFIC requires a non-empty forced_tool_name",
+                        "SPECIFIC without target is rejected");
+
+    auto missing_target = make_request("Use the missing tool.");
+    missing_target.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    missing_target.set_forced_tool_name("missing_tool");
+    run_invalid_request(missing_target,
+                        "tool_choice=SPECIFIC target is not present in request.tools: missing_tool",
+                        "SPECIFIC target absent from tools is rejected");
+    CHECK(generate_calls() == 0, "invalid SPECIFIC requests fail before generation");
+
+    cleanup_environment();
+    return 0;
+}
+
+int test_specific_and_required_reject_initial_no_call() {
+    if (!load_mock_llm())
+        return 1;
+
+    const auto run_required_choice = [](runanywhere::v1::ToolChoiceMode mode,
+                                        const std::string& expected_message, const char* label) {
+        set_responses({"I decided not to call a tool."});
+        auto request = make_request("A tool call is mandatory.", /*max_iterations=*/1);
+        request.set_tool_choice(mode);
+        if (mode == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC) {
+            request.set_forced_tool_name("get_weather");
+        }
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(),
+                                                                executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, label);
+
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(!result.is_complete(), "required no-call response is not successful");
+        CHECK(result.error_code() == RAC_ERROR_VALIDATION_FAILED,
+              "required no-call response carries validation failure");
+        CHECK(result.error_message() == expected_message,
+              "required no-call response carries deterministic policy message");
+        CHECK(exec.invocation_count == 0, "required no-call response never invokes executor");
+        rac_proto_buffer_free(&out);
+    };
+
+    run_required_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC,
+                        "tool_choice=SPECIFIC requires a tool call",
+                        "SPECIFIC no-call returns a result-level policy failure");
+    run_required_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED,
+                        "tool_choice=REQUIRED requires a tool call",
+                        "REQUIRED no-call returns a result-level policy failure");
+
+    cleanup_environment();
+    return 0;
+}
+
+int test_search_web_synthesis_is_current_compact_and_attributed() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"search_web","arguments":{"query":"current Google Play target API requirement for new mobile apps"}}</tool_call>)",
+        "For new mobile apps and updates, the currently effective requirement is API 35.",
+    });
+
+    auto request = make_request(
+        "Use search_web to find the current Google Play target API requirement for a new mobile "
+        "app. Include a source URL.");
+    request.clear_tools();
+    *request.add_tools() = make_search_web_tool();
+    request.set_max_tokens(96);
+    request.set_disable_thinking(true);
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    request.set_forced_tool_name("search_web");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    {
+        std::lock_guard<std::mutex> lg(exec.mu);
+        exec.result_jsons.emplace_back(R"({
+          "query":"current Google Play target API requirement for new mobile apps",
+          "source_url":"https://developer.android.com/google/play/requirements/target-sdk",
+          "summary":"From August 31, 2024, existing mobile apps need API 34 for availability.",
+          "related_results":[
+            {"title":"2025 requirement","text":"From August 31, 2025, new mobile apps and updates must target API 35.","url":"https://developer.android.com/google/play/requirements/target-sdk#mobile-2025"},
+            {"title":"2026 announcement","text":"From August 31, 2026, new mobile apps and updates must target API 36.","url":"https://developer.android.com/google/play/requirements/target-sdk#mobile-2026"},
+            {"title":"discard me","text":"Must not crowd synthesis.","url":"https://example.com/discard"}
+          ]
+        })");
+    }
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "search_web run_loop returns RAC_SUCCESS");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(result.text().find("API 35") != std::string::npos,
+          "search synthesis keeps the currently effective answer");
+    CHECK(result.text().find("API 34") == std::string::npos,
+          "search synthesis does not surface the old-scope requirement");
+    CHECK(result.text().find(
+              "Source: https://developer.android.com/google/play/requirements/target-sdk") !=
+              std::string::npos,
+          "native result boundary appends the primary source URL verbatim");
+    CHECK(generate_calls() == 2, "search request keeps decision and synthesis separate");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 2, "search request captured decision plus synthesis");
+    if (captures.size() == 2) {
+        CHECK(captures[0].max_tokens == 192,
+              "search decision keeps independent 192-token safety ceiling");
+        CHECK(captures[1].max_tokens == 96,
+              "search synthesis keeps independent concise answer budget");
+        CHECK(captures[1].disable_thinking, "search synthesis disables thinking");
+        CHECK(captures[1].prompt.find("Current UTC date:") != std::string::npos,
+              "search synthesis receives the current UTC date");
+        CHECK(captures[1].prompt.find("policy effective on the current date") != std::string::npos,
+              "search synthesis resolves dated evidence against the current policy");
+        CHECK(captures[1].prompt.find("source_url verbatim") != std::string::npos,
+              "search synthesis requires verbatim source attribution");
+        CHECK(captures[1].prompt.find("API 34") != std::string::npos &&
+                  captures[1].prompt.find("API 35") != std::string::npos &&
+                  captures[1].prompt.find("API 36") != std::string::npos,
+              "search synthesis retains conflicting dated evidence needed for resolution");
+        CHECK(captures[1].prompt.find("discard me") == std::string::npos,
+              "search synthesis drops excess related evidence");
+        CHECK(captures[1].prompt.size() < 2600,
+              "search synthesis prompt stays bounded for a 1K model context");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+int test_tool_name_mentions_do_not_force_execution() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"I will explain calculate without calling it."});
+
+    auto request = make_request("Do not call calculate. Explain what calculate does.");
+    *request.add_tools() = make_calculate_tool();
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "negated tool-name mention returns success");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(result.tool_calls_size() == 0, "negated mention records no tool call");
+    CHECK(result.tool_results_size() == 0, "negated mention records no tool result");
+    CHECK(exec.invocation_count == 0, "negated mention never invokes executor");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 1, "negated mention uses one AUTO generation");
+    if (captures.size() == 1) {
+        CHECK(captures[0].max_tokens == 64, "AUTO generation keeps caller token budget");
+        CHECK(captures[0].temperature == 0.5f, "AUTO generation keeps caller temperature");
+        CHECK(captures[0].prompt.find("get_weather") != std::string::npos,
+              "AUTO prompt keeps all registered tools");
+        CHECK(captures[0].prompt.find("calculate") != std::string::npos,
+              "AUTO prompt keeps mentioned tool without forcing it");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
 int test_max_iterations_capped() {
     if (!load_mock_llm())
         return 1;
@@ -491,6 +962,14 @@ int main() {
         test_null_arguments_return_null_pointer();
         test_no_tool_call_completes_immediately();
         test_one_tool_call_then_final_text();
+        test_forced_tool_name_only_is_narrowed_and_independently_budgeted();
+        test_none_vetoes_forced_tool_name();
+        test_none_blocks_hallucinated_call_when_validation_disabled();
+        test_forced_target_blocks_wrong_call_when_validation_disabled();
+        test_specific_target_must_be_nonempty_and_present();
+        test_specific_and_required_reject_initial_no_call();
+        test_search_web_synthesis_is_current_compact_and_attributed();
+        test_tool_name_mentions_do_not_force_execution();
         test_max_iterations_capped();
         test_validation_failure_short_circuits();
         if (g_registry) {

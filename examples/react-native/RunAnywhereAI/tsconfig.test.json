@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "isolatedModules": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["jest", "node"]
+  },
+  "include": ["src/services/NpuModelCatalog.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules", "ios", "android"]
+}

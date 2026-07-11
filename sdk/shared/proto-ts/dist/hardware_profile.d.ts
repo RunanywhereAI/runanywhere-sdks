@@ -38,10 +38,10 @@ export declare function accelerationPreferenceToJSON(object: AccelerationPrefere
  * Native device probes (chip detection, neural engine queries, GPU
  * discovery, memory/cores) remain platform-adapter owned. C++ caches and
  * serves the normalized HardwareProfile/AcceleratorInfo messages.
- * Pre-flight Qualcomm Hexagon NPU probe. Mirrors the C ABI struct
- * rac_npu_info_t (rac/infrastructure/device/rac_npu_capability.h); served
- * over the proto-buffer ABI by rac_npu_probe_proto(). Enum values equal the
- * Hexagon HTP version number to stay in lock-step with rac_hexagon_arch_t.
+ * Pre-flight Qualcomm Hexagon NPU probe. Mirrors QHexRT's engine-owned C ABI
+ * (`rac/qhexrt/rac_qhexrt.h`) and is serialized by
+ * rac_qhexrt_probe_proto(). Enum values equal the Hexagon HTP version number
+ * to stay in lock-step with rac_qhexrt_hexagon_arch_t.
  */
 export declare enum HexagonArch {
     HEXAGON_ARCH_UNKNOWN = 0,
@@ -109,10 +109,13 @@ export interface NpuCapability {
     /** /sys/devices/soc0/soc_id value; -1 when unavailable. */
     socId: number;
     hexagonArch: HexagonArch;
-    /** True iff hexagon_arch is in the QHexRT-supported set (v75+ today). */
+    /**
+     * True iff hexagon_arch is in the device-validated QHexRT-supported set
+     * (v75, v79, or v81 today).
+     */
     qhexrtSupported: boolean;
     /**
-     * rac_hexagon_arch_name(): "v68" ... "v81", "unknown". Materialized so
+     * rac_qhexrt_arch_name(): "v68" ... "v81", "unknown". Materialized so
      * SDKs never re-derive the display name from the enum.
      */
     archName: string;

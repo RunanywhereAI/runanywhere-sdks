@@ -72,16 +72,11 @@ typedef struct {
  *
  * `timeout_ms == 0` means "no timeout".
  *
- * `follow_redirects` is currently ADVISORY ONLY. Every registered
- * platform transport (URLSession on Apple, OkHttp on Android, fetch /
- * XHR on Web, dart:io on Flutter) auto-follows 3xx redirects up to its
- * default cap regardless of this field. `RAC_FALSE` is reserved for a
- * future ABI change that wires per-transport no-redirect support
- * (URLSessionTaskDelegate.willPerformHTTPRedirection,
- * OkHttpClient.Builder.followRedirects(false), manual XHR Location
- * chasing). Callers MUST NOT depend on `RAC_FALSE` to inspect 3xx
- * responses today — set the field for forward-compatibility, but
- * branch on `redirected_url`/HTTP status to detect redirection.
+ * `follow_redirects` is mandatory transport policy. Platform adapters
+ * must return the original 3xx response when it is `RAC_FALSE`; this is
+ * required for credential-bearing requests so headers and request bodies
+ * cannot be replayed to another origin. `RAC_TRUE` enables the platform
+ * transport's bounded redirect handling.
  */
 typedef struct {
     const char* method;
@@ -94,7 +89,7 @@ typedef struct {
     size_t body_len;
 
     int32_t timeout_ms;
-    rac_bool_t follow_redirects;  // advisory only — see field docs above
+    rac_bool_t follow_redirects;
 
     const char* expected_checksum_hex;
 } rac_http_request_t;
@@ -114,11 +109,8 @@ typedef struct {
  *
  * `redirected_url` is non-NULL only when the platform transport
  * actually followed one or more 3xx hops; it is the final absolute URL
- * after hops (owned by the response struct). Because every transport
- * currently auto-follows redirects (see `follow_redirects` field doc on
- * `rac_http_request_t`), this is the canonical signal for "the wire URL
- * differs from the requested URL", regardless of how `follow_redirects`
- * was set.
+ * after hops (owned by the response struct). It remains NULL when redirects
+ * are disabled and the original 3xx response is returned to the caller.
  *
  * `elapsed_ms` is total wall-clock time from connect to last byte.
  */
@@ -325,6 +317,15 @@ RAC_API rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_k
  * value.
  */
 RAC_API void rac_http_hf_token_set(const char* token);
+
+/**
+ * @brief Returns whether a non-empty Hugging Face token is currently active.
+ *
+ * This uses the same explicit-token / `HF_TOKEN` fallback resolution as the
+ * request dispatcher. It lets native catalog policy skip known private repos
+ * before any network request without exposing the token itself.
+ */
+RAC_API rac_bool_t rac_http_hf_token_is_configured(void);
 
 // =============================================================================
 // RESULT CODES

@@ -120,7 +120,7 @@ private fun EmptyChatHero(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = "Ask anything — everything runs privately on your device.",
+                text = "Ask anything — AI runs locally on your device by default.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.widthIn(max = 280.dp),
@@ -264,7 +264,10 @@ private fun DocumentAttachmentPreview(attachment: ChatAttachment) {
 }
 
 @Composable
-private fun AssistantMessage(message: ChatMessage, isStreamingTail: Boolean = false) {
+private fun AssistantMessage(
+    message: ChatMessage,
+    isStreamingTail: Boolean = false,
+) {
     val dimens = LocalDimens.current
     var showToolSheet by remember { mutableStateOf(false) }
     val isWaiting = message.text.isEmpty() && message.thinking == null && message.tool == null && message.stats == null

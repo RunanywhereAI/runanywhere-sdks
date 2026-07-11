@@ -98,28 +98,42 @@ void fill_inputs(qhx_inputs* in, const char* prompt, const rac_llm_options_t* o)
     }
 }
 
+void fill_generate_options(qhx_generate_options* out, const rac_llm_options_t* options) {
+    qhx_generate_options_default(out);
+    // QHexRT owns chat templating, so forward the semantic hard switch through
+    // the additive, size-versioned request options API. Keeping this policy out
+    // of qhx_inputs preserves the original stable C struct layout for legacy
+    // callers while supported models (currently Qwen3.5) receive the hard
+    // non-thinking assistant prefill.
+    if (options != nullptr && options->disable_thinking != RAC_FALSE) {
+        out->disable_thinking = 1;
+    }
+}
+
 // Bridge QHexRT's chunk callback (utf8/len, return 0 to cancel) onto the rac
 // stream callback (NUL-terminated token, RAC_TRUE to continue).
 struct StreamCtx {
     rac_llm_stream_callback_fn cb;
     void* user;
     Session* session;
+    uint64_t request_id;
     bool cancelled = false;
     std::string buf;  // reused per chunk to NUL-terminate
 };
 
 int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, int is_final) {
     auto* c = static_cast<StreamCtx*>(user);
+    if (c != nullptr && c->session != nullptr &&
+        c->session->llm_requests.is_cancelled(c->request_id)) {
+        c->cancelled = true;
+        return 0;
+    }
     // Terminal call carries no text (the QHexRT C ABI always sends
     // (NULL, 0, is_final=1)); its qhx_output stats are not forwarded either —
     // the rac stream callback ABI has no completion-stats channel (same as
     // llamacpp), so streaming consumers compute timing app-side.
     if (c == nullptr || is_final != 0 || utf8 == nullptr) {
         return 1;  // nothing to forward on the terminal call
-    }
-    if (c->session != nullptr && c->session->cancel.load(std::memory_order_relaxed)) {
-        c->cancelled = true;
-        return 0;  // barge-in
     }
     if (c->cb == nullptr) {
         return 1;
@@ -134,17 +148,44 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
 
 struct StopCtx {
     Session* session;
+    uint64_t request_id;
 };
+
+int should_cancel_trampoline(void* user) {
+    auto* c = static_cast<StopCtx*>(user);
+    return c != nullptr && c->session != nullptr &&
+                   c->session->llm_requests.is_cancelled(c->request_id)
+               ? 1
+               : 0;
+}
 
 int stop_trampoline(void* user, const char* /*utf8*/, int /*len*/, int /*token_id*/,
                     int /*is_final*/) {
     auto* c = static_cast<StopCtx*>(user);
     if (c != nullptr && c->session != nullptr &&
-        c->session->cancel.load(std::memory_order_relaxed)) {
+        c->session->llm_requests.is_cancelled(c->request_id)) {
         return 0;
     }
     return 1;
 }
+
+class LlmRequestScope {
+   public:
+    explicit LlmRequestScope(Session* session)
+        : session_(session), id_(session != nullptr ? session->llm_requests.begin() : 0) {}
+    ~LlmRequestScope() {
+        if (session_ != nullptr) session_->llm_requests.finish(id_);
+    }
+
+    uint64_t id() const { return id_; }
+    bool cancelled() const {
+        return session_ != nullptr && session_->llm_requests.is_cancelled(id_);
+    }
+
+   private:
+    Session* session_;
+    uint64_t id_;
+};
 
 void fill_result(rac_llm_result_t* out, const qhx_output& o) {
     out->text = rac_strdup(o.text != nullptr ? o.text : "");
@@ -183,23 +224,37 @@ rac_result_t qhexrt_llm_initialize(void* /*impl*/, const char* /*model_path*/) {
 rac_result_t qhexrt_llm_generate(void* impl, const char* prompt, const rac_llm_options_t* options,
                                  rac_llm_result_t* out_result) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr || out_result == nullptr) {
+    if (c == nullptr || out_result == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
+        LlmRequestScope request(c);
         qhx_session_reset(c->sess);  // public SDK generate calls are independent requests
-        c->cancel.store(false, std::memory_order_relaxed);
+        if (request.cancelled()) {
+            return RAC_ERROR_CANCELLED;
+        }
         qhx_inputs in;
         fill_inputs(&in, prompt, options);
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
-        StopCtx stop_ctx{c};
+        qhx_generate_options generate_options;
+        fill_generate_options(&generate_options, options);
+        StopCtx stop_ctx{c, request.id()};
+        generate_options.should_cancel = should_cancel_trampoline;
+        generate_options.should_cancel_user = &stop_ctx;
         qhx_output out{};
-        qhx_status st = qhx_generate(c->sess, &in, &cfg, stop_trampoline, &stop_ctx, &out);
+        qhx_status st = qhx_generate_ex(c->sess, &in, &cfg, &generate_options, stop_trampoline,
+                                        &stop_ctx, &out);
+        if (request.cancelled()) {
+            RAC_LOG_INFO(LOG_CAT, "LLM request %llu cancelled during batch generation",
+                         static_cast<unsigned long long>(request.id()));
+            return RAC_ERROR_CANCELLED;
+        }
         if (st != 0) {
-            if (c->cancel.load(std::memory_order_relaxed)) {
-                return RAC_ERROR_CANCELLED;
-            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
@@ -214,23 +269,38 @@ rac_result_t qhexrt_llm_generate_stream(void* impl, const char* prompt,
                                         const rac_llm_options_t* options,
                                         rac_llm_stream_callback_fn callback, void* user_data) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr) {
+    if (c == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
+        LlmRequestScope request(c);
         qhx_session_reset(c->sess);  // public SDK stream calls are independent requests
-        c->cancel.store(false, std::memory_order_relaxed);
+        if (request.cancelled()) {
+            return RAC_ERROR_CANCELLED;
+        }
         qhx_inputs in;
         fill_inputs(&in, prompt, options);
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
-        StreamCtx ctx{callback, user_data, c, false, std::string()};
+        qhx_generate_options generate_options;
+        fill_generate_options(&generate_options, options);
+        StopCtx stop_ctx{c, request.id()};
+        generate_options.should_cancel = should_cancel_trampoline;
+        generate_options.should_cancel_user = &stop_ctx;
+        StreamCtx ctx{callback, user_data, c, request.id(), false, std::string()};
         qhx_output out{};
-        qhx_status st = qhx_generate(c->sess, &in, &cfg, stream_trampoline, &ctx, &out);
+        qhx_status st = qhx_generate_ex(c->sess, &in, &cfg, &generate_options, stream_trampoline,
+                                        &ctx, &out);
+        if (ctx.cancelled || request.cancelled()) {
+            RAC_LOG_INFO(LOG_CAT, "LLM request %llu cancelled during streaming generation",
+                         static_cast<unsigned long long>(request.id()));
+            return RAC_ERROR_CANCELLED;
+        }
         if (st != 0) {
-            if (ctx.cancelled || c->cancel.load(std::memory_order_relaxed)) {
-                return RAC_ERROR_CANCELLED;
-            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(stream) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
@@ -245,7 +315,12 @@ rac_result_t qhexrt_llm_get_info(void* impl, rac_llm_info_t* out_info) {
         return RAC_ERROR_NULL_POINTER;
     }
     auto* c = as_session(impl);
-    out_info->is_ready = (c != nullptr && c->sess != nullptr) ? RAC_TRUE : RAC_FALSE;
+    rac_bool_t is_ready = RAC_FALSE;
+    if (c != nullptr) {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        is_ready = c->sess != nullptr ? RAC_TRUE : RAC_FALSE;
+    }
+    out_info->is_ready = is_ready;
     out_info->current_model = nullptr;
     out_info->context_length = 0;
     out_info->supports_streaming = RAC_TRUE;
@@ -255,7 +330,14 @@ rac_result_t qhexrt_llm_get_info(void* impl, rac_llm_info_t* out_info) {
 rac_result_t qhexrt_llm_cancel(void* impl) {
     auto* c = as_session(impl);
     if (c != nullptr) {
-        c->cancel.store(true, std::memory_order_relaxed);
+        const uint64_t request_id = c->llm_requests.active_id.load(std::memory_order_acquire);
+        c->llm_requests.cancel_active();
+        // The size-versioned should_cancel probe carries this exact SDK request
+        // id into QHexRT setup and every execution boundary. Do not issue a
+        // second unkeyed qhx_session_cancel() here: a delayed dispatch could
+        // otherwise land on a successor after this request has finished.
+        RAC_LOG_INFO(LOG_CAT, "LLM cancel routed to request %llu",
+                     static_cast<unsigned long long>(request_id));
     }
     return RAC_SUCCESS;
 }
@@ -263,7 +345,11 @@ rac_result_t qhexrt_llm_cancel(void* impl) {
 // Drop KV / counters; keeps the service (model + session) alive.
 rac_result_t qhexrt_llm_cleanup(void* impl) {
     auto* c = as_session(impl);
-    if (c != nullptr && c->sess != nullptr) {
+    if (c == nullptr) {
+        return RAC_SUCCESS;
+    }
+    std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+    if (c->sess != nullptr) {
         qhx_session_reset(c->sess);
     }
     return RAC_SUCCESS;

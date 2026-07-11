@@ -17,6 +17,7 @@ on:
     branches: [main, dev, "feat/v2-architecture", "siddhesh/sdk-audit-fixes-v2"]
   push:
     branches: [main, dev, "feat/v2-architecture", "siddhesh/sdk-audit-fixes-v2"]
+  workflow_dispatch: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -57,6 +58,10 @@ jobs:
         run: bash scripts/validation/gates/check_flutter_centralization.sh
       - name: Gradle / Kotlin centralization
         run: bash scripts/validation/gates/check_gradle_centralization.sh
+      - name: QHexRT prebuilt and Android build contract tests
+        run: |
+          python3 scripts/build/test_validate_qhexrt_prebuilt.py
+          python3 scripts/build/test_build_core_android_guards.py
 
   # =============================================================================
   # Native core builds (one job per CMake preset family)
@@ -296,9 +301,15 @@ jobs:
         run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
       - name: Build Android JNI libs
         run: ./scripts/build/build-core-android.sh
-      - name: gradle assembleDebug
+      - name: Kotlin SDK unit tests + debug assembly
         working-directory: sdk/runanywhere-kotlin
-        run: ./gradlew assembleDebug
+        run: ./gradlew testDebugUnitTest assembleDebug --no-daemon --max-workers=2
+      - name: Stage debug SDK AARs for the Android example
+        working-directory: examples/android/RunAnywhereAI
+        run: ./scripts/stage-sdk-aars.sh debug
+      - name: Android example unit tests + debug assembly
+        working-directory: examples/android/RunAnywhereAI
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon --max-workers=2
       - name: ktlintCheck + detekt (lint lane)
         continue-on-error: true
         working-directory: sdk/runanywhere-kotlin
@@ -348,6 +359,8 @@ jobs:
       # commands below run inside the standalone RN workspace.
       - name: Yarn install (repo root lockfile gate)
         run: yarn install --immutable
+      - name: Jest unit tests (React Native example)
+        run: yarn workspace runanywhere-ai-example test --runInBand --config jest.config.js
       # sdk/runanywhere-react-native is ALSO a standalone Yarn project with its
       # own pinned yarn.lock (fb060a368) and workspaces declaration.
       # `yarn workspace <name> run <script>` re-detects the project from the
@@ -428,3 +441,9 @@ jobs:
       - name: RAC_API export drift check (strict)
         continue-on-error: true
         run: bash scripts/validation/commons/check_rac_api_exports.sh --strict
+      - name: HF-auth public API packaging parity
+        run: |
+          declaration='RAC_API rac_bool_t rac_http_hf_token_is_configured(void);'
+          grep -Fq "$declaration" sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_client.h
+          grep -Fxq '_rac_http_hf_token_is_configured' sdk/runanywhere-commons/exports/RACommons.exports
+          grep -Fq "$declaration" sdk/runanywhere-swift/Sources/RunAnywhere/CRACommons/include/rac_http_client.h

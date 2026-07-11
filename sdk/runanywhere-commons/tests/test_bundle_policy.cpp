@@ -101,6 +101,8 @@ void test_qhexrt_policy_shape(std::vector<TestResult>& results) {
     results.push_back(expect("qhexrt policy: manifest-leaf refs enabled",
                              policy->manifest_leaf_names_bundle == RAC_TRUE &&
                                  std::string(policy->manifest_extension) == ".json"));
+    results.push_back(expect("qhexrt policy: device variant resolver installed",
+                             policy->resolve_variant != nullptr));
     results.push_back(expect("qhexrt policy: registers cleanly",
                              rac_bundle_policy_register(policy) == RAC_SUCCESS &&
                                  rac_bundle_policy_find(RAC_FRAMEWORK_QHEXRT) == policy));

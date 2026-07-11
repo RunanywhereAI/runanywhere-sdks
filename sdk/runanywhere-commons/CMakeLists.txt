@@ -832,12 +832,13 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/telemetry/telemetry_types.cpp
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
+    # Compatibility NPU probe ABI retained for existing commons consumers.
+    src/infrastructure/device/rac_npu_capability.cpp
     src/infrastructure/device/rac_device_manager.cpp
     # Persistent device-id resolution chain
     # (Keychain -> identifierForVendor -> generate UUID) collapsed from each
     # platform SDK into a single C entry point.
     src/infrastructure/device/device_identity.cpp
-    src/infrastructure/device/rac_npu_capability.cpp
     src/infrastructure/extraction/rac_extraction.cpp
     # DAG streaming runtime. The primitives
     # under include/rac/graph/ (CancelToken / StreamEdge / RingBuffer /

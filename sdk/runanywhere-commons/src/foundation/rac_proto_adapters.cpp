@@ -418,8 +418,10 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
     *out = defaults;
     if (in.max_tokens() > 0)
         out->max_tokens = in.max_tokens();
-    if (in.temperature() > 0.0f)
-        out->temperature = in.temperature();
+    // VLMGenerationOptions is an explicit per-request value. Zero is the
+    // documented greedy-decoding sentinel, not an absent scalar; callers that
+    // want the sampled default construct VLMGenerationOptions.defaults().
+    out->temperature = in.temperature();
     if (in.top_p() > 0.0f)
         out->top_p = in.top_p();
     out->streaming_enabled = in.streaming_enabled() ? RAC_TRUE : RAC_FALSE;
@@ -579,8 +581,11 @@ bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMR
     if (in->text)
         out->set_text(in->text);
     out->set_prompt_tokens(in->prompt_tokens);
+    out->set_image_tokens(in->image_tokens);
     out->set_completion_tokens(in->completion_tokens);
     out->set_total_tokens(in->total_tokens);
+    out->set_time_to_first_token_ms(in->time_to_first_token_ms);
+    out->set_image_encode_time_ms(in->image_encode_time_ms);
     out->set_processing_time_ms(in->total_time_ms);
     out->set_tokens_per_second(in->tokens_per_second);
     return true;

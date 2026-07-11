@@ -220,7 +220,11 @@ public object HTTPClientAdapter {
                     headerValues = headerValues,
                     body = body,
                     timeoutMs = DEFAULT_TIMEOUT_MS,
-                    followRedirects = true,
+                    // Control-plane requests carry the API key and may also
+                    // contain device-registration metadata/build tokens.
+                    // Fail on redirects so no custom credential or payload is
+                    // replayed to a different origin.
+                    followRedirects = false,
                     onConflictField = DEV_DEVICE_REGISTER_UPSERT_FIELD,
                 )
             } else {
@@ -231,7 +235,7 @@ public object HTTPClientAdapter {
                     headerValues = headerValues,
                     body = body,
                     timeoutMs = DEFAULT_TIMEOUT_MS,
-                    followRedirects = true,
+                    followRedirects = false,
                 )
             }
         return interpretResult(result, method = method, url = url)

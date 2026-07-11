@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.voice
 
 import ai.runanywhere.proto.v1.PipelineState
+import ai.runanywhere.proto.v1.TokenKind
 import ai.runanywhere.proto.v1.VoiceEvent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -8,12 +9,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.cleanupVoiceAgent
 import com.runanywhere.sdk.public.extensions.initializeVoiceAgentWithLoadedModels
 import com.runanywhere.sdk.public.extensions.streamVoiceAgent
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -30,6 +34,7 @@ class VoiceViewModel : ViewModel() {
         private set
 
     private var job: Job? = null
+    private var cleanupJob: Job? = null
     private var assistantTurnIndex: Int? = null
 
     fun toggle() {
@@ -42,9 +47,20 @@ class VoiceViewModel : ViewModel() {
     private fun startConversation() {
         job?.cancel()
         error = null
+        val pendingCleanup = cleanupJob
         job = viewModelScope.launch {
             try {
+                // A previous Talk collector may still be returning from a
+                // blocking native turn. Never reinitialize its handle until
+                // capture has stopped and cleanup has completed.
+                pendingCleanup?.join()
                 state = VoiceState.STARTING
+                // The voice agent binds all component handles at initialization.
+                // Query each process-wide lifecycle immediately beforehand.
+                RuntimeModelSelection.requireCurrent(ModelSelectionContext.STT)
+                RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
+                RuntimeModelSelection.requireCurrent(ModelSelectionContext.TTS)
+                RuntimeModelSelection.queryCurrent(ModelSelectionContext.VAD)
                 RunAnywhere.initializeVoiceAgentWithLoadedModels()
                 state = VoiceState.LISTENING
                 RunAnywhere.streamVoiceAgent().collect(::handleEvent)
@@ -59,11 +75,17 @@ class VoiceViewModel : ViewModel() {
     }
 
     fun stop() {
-        job?.cancel()
+        val session = job
+        session?.cancel()
         job = null
         assistantTurnIndex = null
         state = VoiceState.IDLE
-        viewModelScope.launch {
+        val previousCleanup = cleanupJob
+        cleanupJob = viewModelScope.launch(Dispatchers.IO) {
+            // streamVoiceAgent completes only after its mic driver has
+            // cancelAndJoined, so cleanup cannot race an active feed call.
+            session?.join()
+            previousCleanup?.join()
             runCatching { RunAnywhere.cleanupVoiceAgent() }
                 .onFailure { RACLog.w("voice agent cleanup failed: ${it.message}") }
         }
@@ -92,7 +114,7 @@ class VoiceViewModel : ViewModel() {
             ensureAssistantTurn()
         }
         event.assistant_token?.let { token ->
-            if (token.text.isNotEmpty()) {
+            if (token.text.isNotEmpty() && token.kind.isDisplayableVoiceAnswer()) {
                 state = VoiceState.THINKING
                 appendAssistantToken(token.text)
             }
@@ -146,3 +168,6 @@ class VoiceViewModel : ViewModel() {
         stop()
     }
 }
+
+internal fun TokenKind.isDisplayableVoiceAnswer(): Boolean =
+    this == TokenKind.TOKEN_KIND_ANSWER || this == TokenKind.TOKEN_KIND_UNSPECIFIED

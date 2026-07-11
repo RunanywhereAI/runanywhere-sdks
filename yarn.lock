@@ -2819,9 +2819,12 @@ __metadata:
   resolution: "@runanywhere/qhexrt@workspace:sdk/runanywhere-react-native/packages/qhexrt"
   dependencies:
     "@runanywhere/proto-ts": "workspace:*"
+    "@types/jest": ^29.5.12
     eslint: ^9.39.4
+    jest: ^29.7.0
     nitrogen: ^0.34.1
     react-native-nitro-modules: ^0.33.9
+    ts-jest: ^29.1.2
     typescript: ^5.9.3
   peerDependencies:
     "@runanywhere/core": ">=0.19.15"
@@ -9087,6 +9090,7 @@ __metadata:
     "@runanywhere/onnx": "workspace:*"
     "@runanywhere/proto-ts": "workspace:*"
     "@runanywhere/qhexrt": "workspace:*"
+    "@types/jest": ^29.5.12
     "@types/react": ~19.2.14
     "@types/react-native-vector-icons": ^6.4.18
     "@typescript-eslint/eslint-plugin": ^8.59.3
@@ -9096,6 +9100,7 @@ __metadata:
     eslint-plugin-jest: ^29.15.2
     eslint-plugin-prettier: ^5.0.1
     eslint-plugin-unused-imports: ^4.3.0
+    jest: ^29.7.0
     knip: ^5.76.0
     lucide-react-native: ^1.21.0
     patch-package: ^8.0.1
@@ -9117,6 +9122,7 @@ __metadata:
     react-native-vector-icons: ^10.3.0
     react-native-vision-camera: ^4.7.3
     react-native-worklets: ^0.9.2
+    ts-jest: ^29.1.2
     typescript: ^5.9.3
     zustand: ^5.0.13
   languageName: unknown

@@ -137,10 +137,14 @@ rac_result_t qhexrt_stt_initialize(void* /*impl*/, const char* /*model_path*/) {
 rac_result_t qhexrt_stt_transcribe(void* impl, const void* audio_data, size_t audio_size,
                                    const rac_stt_options_t* options, rac_stt_result_t* out_result) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr || out_result == nullptr) {
+    if (c == nullptr || out_result == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
         qhx_session_reset(c->sess);  // public SDK transcribe calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
@@ -171,10 +175,14 @@ rac_result_t qhexrt_stt_transcribe_stream(void* impl, const void* audio_data, si
                                           const rac_stt_options_t* options,
                                           rac_stt_stream_callback_t callback, void* user_data) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr) {
+    if (c == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
         qhx_session_reset(c->sess);  // public SDK stream calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
@@ -205,7 +213,12 @@ rac_result_t qhexrt_stt_get_info(void* impl, rac_stt_info_t* out_info) {
         return RAC_ERROR_NULL_POINTER;
     }
     auto* c = as_session(impl);
-    out_info->is_ready = (c != nullptr && c->sess != nullptr) ? RAC_TRUE : RAC_FALSE;
+    rac_bool_t is_ready = RAC_FALSE;
+    if (c != nullptr) {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        is_ready = c->sess != nullptr ? RAC_TRUE : RAC_FALSE;
+    }
+    out_info->is_ready = is_ready;
     out_info->current_model = nullptr;
     out_info->supports_streaming = RAC_TRUE;
     return RAC_SUCCESS;
@@ -213,7 +226,11 @@ rac_result_t qhexrt_stt_get_info(void* impl, rac_stt_info_t* out_info) {
 
 rac_result_t qhexrt_stt_cleanup(void* impl) {
     auto* c = as_session(impl);
-    if (c != nullptr && c->sess != nullptr) {
+    if (c == nullptr) {
+        return RAC_SUCCESS;
+    }
+    std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+    if (c->sess != nullptr) {
         qhx_session_reset(c->sess);
     }
     return RAC_SUCCESS;

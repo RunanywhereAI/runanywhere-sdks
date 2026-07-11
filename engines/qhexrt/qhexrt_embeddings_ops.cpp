@@ -123,10 +123,14 @@ rac_result_t qhexrt_embeddings_embed(void* impl, const char* text,
                                     const rac_embeddings_options_t* /*options*/,
                                     rac_embeddings_result_t* out_result) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr || out_result == nullptr) {
+    if (c == nullptr || out_result == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
         *out_result = rac_embeddings_result_t{};
         auto* vec = static_cast<rac_embedding_vector_t*>(malloc(sizeof(rac_embedding_vector_t)));
         if (vec == nullptr) {
@@ -155,13 +159,19 @@ rac_result_t qhexrt_embeddings_embed_batch(void* impl, const char* const* texts,
                                           const rac_embeddings_options_t* /*options*/,
                                           rac_embeddings_result_t* out_result) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr || out_result == nullptr || texts == nullptr) {
+    if (c == nullptr || out_result == nullptr || texts == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     if (num_texts == 0) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     try {
+        // Keep the whole batch atomic with respect to other operations on this
+        // QHexRT session; embed_one deliberately does not acquire recursively.
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
         *out_result = rac_embeddings_result_t{};
         auto* vecs =
             static_cast<rac_embedding_vector_t*>(calloc(num_texts, sizeof(rac_embedding_vector_t)));
@@ -203,7 +213,10 @@ rac_result_t qhexrt_embeddings_get_info(void* impl, rac_embeddings_info_t* out_i
     }
     auto* c = as_session(impl);
     *out_info = rac_embeddings_info_t{};
-    out_info->is_ready = (c != nullptr && c->sess != nullptr) ? RAC_TRUE : RAC_FALSE;
+    if (c != nullptr) {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        out_info->is_ready = c->sess != nullptr ? RAC_TRUE : RAC_FALSE;
+    }
     out_info->current_model = nullptr;
     out_info->dimension = 0;  // resolved per-model at embed time (from qhx_output.n_embedding)
     return RAC_SUCCESS;
@@ -211,7 +224,11 @@ rac_result_t qhexrt_embeddings_get_info(void* impl, rac_embeddings_info_t* out_i
 
 rac_result_t qhexrt_embeddings_cleanup(void* impl) {
     auto* c = as_session(impl);
-    if (c != nullptr && c->sess != nullptr) {
+    if (c == nullptr) {
+        return RAC_SUCCESS;
+    }
+    std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+    if (c->sess != nullptr) {
         qhx_session_reset(c->sess);
     }
     return RAC_SUCCESS;

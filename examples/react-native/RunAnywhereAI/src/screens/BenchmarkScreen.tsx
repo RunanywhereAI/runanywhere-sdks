@@ -45,6 +45,8 @@ import {
   getFrameworkSystemIcon,
   getPrimaryFramework,
 } from '../utils/modelDisplay';
+import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
+import { isVisibleForNativeNpuCatalog } from '../services/NpuModelCatalog';
 
 const HISTORY_STORAGE_KEY = 'benchmark.runs';
 
@@ -289,8 +291,7 @@ export const BenchmarkScreen: React.FC = () => {
     setError(null);
     try {
       await RunAnywhere.refreshModelRegistry();
-      const listResult = await RunAnywhere.listModels();
-      const allModels = listResult.models?.models ?? [];
+      const allModels = await listVisibleCatalogModels();
       const grouped: Record<BenchmarkCategory, SDKModelInfo[]> = { LLM: [], STT: [], TTS: [] };
       for (const category of ALL_CATEGORIES) {
         grouped[category] = allModels.filter(
@@ -363,8 +364,10 @@ export const BenchmarkScreen: React.FC = () => {
     const items: WorkItem[] = [];
     for (const category of ALL_CATEGORIES) {
       if (!selectedCategories.has(category)) continue;
-      const models = modelsByCategory[category].filter((model) =>
-        selectedModelIds.has(model.id)
+      const models = modelsByCategory[category].filter(
+        (model) =>
+          selectedModelIds.has(model.id) &&
+          isVisibleForNativeNpuCatalog(model)
       );
       for (const model of models) {
         for (const scenario of scenariosForCategory(category)) {

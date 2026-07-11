@@ -381,7 +381,9 @@ static rac_result_t assignment_default_http_get(const char* endpoint, rac_bool_t
     request.headers = headers.empty() ? nullptr : headers.data();
     request.header_count = headers.size();
     request.timeout_ms = rac_env_default_http_timeout_ms(rac_state_get_environment());
-    request.follow_redirects = RAC_TRUE;
+    // Assignment fetches carry apikey and bearer credentials. The configured
+    // control-plane origin must answer directly; redirects fail closed.
+    request.follow_redirects = RAC_FALSE;
 
     rac_http_response_t response = {};
     rc = rac_http_request_send(client, &request, &response);

@@ -25,6 +25,7 @@
 #ifndef RAC_INFRASTRUCTURE_MODEL_MANAGEMENT_RAC_BUNDLE_POLICY_H
 #define RAC_INFRASTRUCTURE_MODEL_MANAGEMENT_RAC_BUNDLE_POLICY_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "rac/core/rac_types.h"
@@ -41,6 +42,19 @@ extern "C" {
  * remote resolution; filename-only — no file contents are available).
  */
 typedef rac_bool_t (*rac_bundle_manifest_predicate_fn)(const char* relative_path);
+
+/**
+ * Resolves the device/runtime-specific variant folder for a logical bundle
+ * reference. For example, an engine may return "v81" so commons can rewrite
+ * `hf.co/org/repo` to `hf.co/org/repo/v81` before listing the folder.
+ *
+ * The callback owns variant selection; commons only validates and inserts the
+ * returned single path segment. On failure it may write a human-readable,
+ * NUL-terminated message to @p out_error_message.
+ */
+typedef rac_result_t (*rac_bundle_variant_resolver_fn)(char* out_variant, size_t out_variant_size,
+                                                       char* out_error_message,
+                                                       size_t out_error_message_size);
 
 typedef struct rac_bundle_policy {
     /** = sizeof(rac_bundle_policy_t); registration rejects a mismatch. */
@@ -69,7 +83,17 @@ typedef struct rac_bundle_policy {
     /** Manifest predicate; NULL falls back to matching manifest_extension only. */
     rac_bundle_manifest_predicate_fn is_bundle_manifest;
 
-    uint64_t reserved_0; /**< Must be 0. */
+    /**
+     * Optional engine-owned resolver for logical repository/manifest refs.
+     *
+     * This occupies the original reserved_0 ABI slot. The uint64_t alias
+     * keeps the structure size/alignment stable on 32- and 64-bit targets for
+     * policies compiled against the initial bundle-policy layout.
+     */
+    union {
+        rac_bundle_variant_resolver_fn resolve_variant;
+        uint64_t reserved_0;
+    };
     uint64_t reserved_1; /**< Must be 0. */
 } rac_bundle_policy_t;
 

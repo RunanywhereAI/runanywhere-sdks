@@ -393,17 +393,17 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
         rac::llm::LifecycleLlmRef llm_ref{};
         const bool have_lifecycle_llm = rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
 
+        rac_llm_options_t llm_opts = rac::voice_agent::detail::make_voice_llm_options();
         rac_llm_result_t llm = {};
         const auto t_llm = std::chrono::steady_clock::now();
         if (have_lifecycle_llm) {
             rac_llm_service_t llm_service{llm_ref.ops, llm_ref.impl, llm_ref.model_id};
-            rc = rac_llm_generate(&llm_service, stt.text, nullptr, &llm);
+            rc = rac_llm_generate(&llm_service, stt.text, &llm_opts, &llm);
         } else {
-            rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
+            rc = rac_llm_component_generate(handle->llm_handle, stt.text, &llm_opts, &llm);
         }
         llm_ms = ms_since(t_llm);
         turn_tokens = llm.completion_tokens;
-        turn_response_chars = llm.text ? static_cast<int32_t>(std::strlen(llm.text)) : 0;
         if (have_lifecycle_llm) {
             if (llm_ref.model_id != nullptr)
                 turn_model_id = llm_ref.model_id;
@@ -426,9 +426,32 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
             error_message = "LLM generation failed";
             goto cleanup_and_return;
         }
+        const rac::voice_agent::detail::VoiceResponseParts response =
+            rac::voice_agent::detail::split_voice_response(llm.text);
+        turn_response_chars = static_cast<int32_t>(response.answer.size());
+        const rac_result_t response_status =
+            rac::voice_agent::detail::validate_voice_response(response);
+        if (response_status != RAC_SUCCESS) {
+            rac_llm_result_free(&llm);
+            if (have_lifecycle_llm) {
+                rac::llm::release_lifecycle_llm(&llm_ref);
+            }
+            rac_stt_result_free(&stt);
+            if (have_lifecycle_stt) {
+                rac::lifecycle::release_lifecycle_stt(&stt_ref);
+            }
+            pending_emits.emplace_back([handle, response_status]() {
+                emit_component_failure(handle, "llm", response_status,
+                                       kVoiceAgentEmptyResponseMessage);
+            });
+            error_code = response_status;
+            error_message = kVoiceAgentEmptyResponseMessage;
+            rc = response_status;
+            goto cleanup_and_return;
+        }
         {
             const std::string stt_text(stt.text);
-            const std::string llm_text(llm.text ? llm.text : "");
+            const std::string llm_text(response.answer);
             pending_emits.emplace_back([handle, stt_text, llm_text]() {
                 emit_turn_lifecycle(
                     handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED,
@@ -444,9 +467,10 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
         const auto t_tts = std::chrono::steady_clock::now();
         if (have_lifecycle_tts) {
             rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
-            rc = rac_tts_synthesize(&tts_service, llm.text, nullptr, &tts);
+            rc = rac_tts_synthesize(&tts_service, response.answer.c_str(), nullptr, &tts);
         } else {
-            rc = rac_tts_component_synthesize(handle->tts_handle, llm.text, nullptr, &tts);
+            rc = rac_tts_component_synthesize(handle->tts_handle, response.answer.c_str(), nullptr,
+                                              &tts);
         }
         tts_ms = ms_since(t_tts);
         if (rc != RAC_SUCCESS) {
@@ -503,8 +527,11 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
 
         result.set_speech_detected(true);
         result.set_transcription(stt.text);
-        if (llm.text) {
-            result.set_assistant_response(llm.text);
+        if (!response.answer.empty()) {
+            result.set_assistant_response(response.answer);
+        }
+        if (!response.thinking.empty()) {
+            result.set_thinking_content(response.thinking);
         }
         if (wav_data && wav_size > 0) {
             result.set_synthesized_audio(wav_data, wav_size);
@@ -513,7 +540,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
 
         {
             const std::string stt_text(stt.text);
-            const std::string llm_text(llm.text ? llm.text : "");
+            const std::string llm_text(response.answer);
             pending_emits.emplace_back([handle, stt_text, llm_text]() {
                 emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED,
                                     stt_text.c_str(), llm_text.c_str());
@@ -545,12 +572,11 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
 
 cleanup_and_return:
     flush_emits();
-    publish_voice_turn_metrics(stt_ms, llm_ms, tts_ms, ms_since(turn_start), turn_tokens,
-                               /*session_id=*/nullptr,
-                               turn_model_id.empty() ? nullptr : turn_model_id.c_str(),
-                               turn_framework.empty() ? nullptr : turn_framework.c_str(),
-                               turn_transcript_chars, turn_response_chars, error_code,
-                               error_message.c_str());
+    publish_voice_turn_metrics(
+        stt_ms, llm_ms, tts_ms, ms_since(turn_start), turn_tokens,
+        /*session_id=*/nullptr, turn_model_id.empty() ? nullptr : turn_model_id.c_str(),
+        turn_framework.empty() ? nullptr : turn_framework.c_str(), turn_transcript_chars,
+        turn_response_chars, error_code, error_message.c_str());
     return rac_proto_buffer_set_error(out_result, error_code, error_message.c_str());
 #endif
 }

@@ -4,11 +4,14 @@
  */
 
 #include <cmath>
+#include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "rac/core/rac_error.h"
@@ -246,6 +249,12 @@ struct MockLlm {
     bool initialized{false};
 };
 
+std::string g_mock_llm_response = "assistant mock";
+std::string g_last_tts_input;
+std::atomic<int> g_stt_active_calls{0};
+std::atomic<int> g_stt_max_active_calls{0};
+std::atomic<int> g_stt_delay_ms{0};
+
 rac_result_t mock_stt_create(const char*, const char*, void** out_impl) {
     *out_impl = new MockStt();
     return RAC_SUCCESS;
@@ -260,10 +269,20 @@ rac_result_t mock_stt_transcribe(void* impl, const void* audio_data, size_t audi
                                  const rac_stt_options_t*, rac_stt_result_t* out_result) {
     if (!impl || !audio_data || audio_size == 0 || !out_result)
         return RAC_ERROR_INVALID_ARGUMENT;
+    const int active = g_stt_active_calls.fetch_add(1) + 1;
+    int observed = g_stt_max_active_calls.load();
+    while (active > observed &&
+           !g_stt_max_active_calls.compare_exchange_weak(observed, active)) {
+    }
+    const int delay_ms = g_stt_delay_ms.load();
+    if (delay_ms > 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+    }
     out_result->text = dup_cstr("hello mock");
     out_result->detected_language = dup_cstr("en");
     out_result->confidence = 0.87f;
     out_result->processing_time_ms = 12;
+    g_stt_active_calls.fetch_sub(1);
     return out_result->text ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
 }
 
@@ -299,6 +318,7 @@ rac_result_t mock_tts_synthesize(void* impl, const char* text, const rac_tts_opt
                                  rac_tts_result_t* out_result) {
     if (!impl || !text || !out_result)
         return RAC_ERROR_INVALID_ARGUMENT;
+    g_last_tts_input = text;
     constexpr float samples[] = {0.0f, 0.25f, -0.25f, 0.0f};
     out_result->audio_size = sizeof(samples);
     out_result->audio_data = std::malloc(out_result->audio_size);
@@ -394,7 +414,7 @@ rac_result_t mock_llm_generate(void*, const char* prompt, const rac_llm_options_
                                rac_llm_result_t* out_result) {
     if (!prompt || !out_result)
         return RAC_ERROR_INVALID_ARGUMENT;
-    out_result->text = dup_cstr("assistant mock");
+    out_result->text = dup_cstr(g_mock_llm_response.c_str());
     out_result->prompt_tokens = 2;
     out_result->completion_tokens = 2;
     out_result->total_tokens = 4;
@@ -471,6 +491,44 @@ void install_mock_plugin() {
     (void)rac_plugin_unregister("sherpa");
     CHECK(rac_plugin_register(&g_speech_vtable) == RAC_SUCCESS, "mock speech plugin registers");
     CHECK(rac_plugin_register(&g_llm_vtable) == RAC_SUCCESS, "mock LLM plugin registers");
+}
+
+int test_stt_service_serializes_shared_engine() {
+    MockStt impl;
+    rac_stt_service_t service{&g_stt_ops, &impl, "shared-whisper"};
+    const int16_t audio[] = {0, 1, 2, 3};
+    std::atomic<int> ready{0};
+    std::atomic<bool> go{false};
+    std::atomic<int> successful_calls{0};
+    g_stt_active_calls = 0;
+    g_stt_max_active_calls = 0;
+    g_stt_delay_ms = 40;
+
+    auto transcribe = [&]() {
+        ready.fetch_add(1);
+        while (!go.load()) {
+            std::this_thread::yield();
+        }
+        rac_stt_result_t result{};
+        if (rac_stt_transcribe(&service, audio, sizeof(audio), nullptr, &result) == RAC_SUCCESS) {
+            successful_calls.fetch_add(1);
+        }
+        rac_stt_result_free(&result);
+    };
+    std::thread first(transcribe);
+    std::thread second(transcribe);
+    while (ready.load() != 2) {
+        std::this_thread::yield();
+    }
+    go = true;
+    first.join();
+    second.join();
+    g_stt_delay_ms = 0;
+
+    CHECK(successful_calls.load() == 2, "concurrent STT service calls succeed");
+    CHECK(g_stt_max_active_calls.load() == 1,
+          "STT service serializes Talk and Transcription access to one engine");
+    return 0;
 }
 
 bool poll_sdk_until_failure() {
@@ -760,12 +818,17 @@ int test_voice_agent_proto_sequence_and_component_failure() {
     CHECK(states.ready(), "voice component states report ready");
     rac_proto_buffer_free(&out);
 
+    g_mock_llm_response = "<think>private plan</think>\nassistant mock";
+    g_last_tts_input.clear();
     rac_proto_buffer_init(&out);
     rc = rac_voice_agent_process_voice_turn_proto(agent, audio, sizeof(audio), &out);
     runanywhere::v1::VoiceAgentResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "VoiceAgentResult parses");
     CHECK(result.transcription() == "hello mock", "voice turn transcription matches");
     CHECK(result.assistant_response() == "assistant mock", "voice turn response matches");
+    CHECK(result.thinking_content() == "private plan",
+          "voice turn retains reasoning as separate metadata");
+    CHECK(g_last_tts_input == "assistant mock", "voice turn sends only clean answer text to TTS");
     CHECK(result.has_final_state() && result.final_state().ready(),
           "voice turn final state is ready");
     CHECK(saw_turn_kind(capture, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_STARTED),
@@ -775,6 +838,7 @@ int test_voice_agent_proto_sequence_and_component_failure() {
     CHECK(saw_turn_kind(capture, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED),
           "voice turn emits completed event");
     rac_proto_buffer_free(&out);
+    g_mock_llm_response = "assistant mock";
     rac_voice_agent_destroy(agent);
     return 0;
 }
@@ -817,6 +881,8 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
         }
     };
 
+    g_mock_llm_response = "<think>private plan</think>\nassistant mock";
+    g_last_tts_input.clear();
     rac_result_t rc = rac_voice_agent_process_turn_proto(agent, request_bytes.data(),
                                                          request_bytes.size(), cb, &capture);
     CHECK(rc == RAC_SUCCESS, "D-7 process_turn_proto returns success");
@@ -828,6 +894,8 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
     int vad_speech_end_count = 0;
     bool saw_user_said = false;
     bool saw_assistant_token = false;
+    bool saw_thought_token = false;
+    bool saw_clean_answer_token = false;
     bool saw_audio = false;
     bool envelope_valid = true;
     for (const auto& event : capture.events) {
@@ -853,6 +921,13 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
         }
         if (event.has_assistant_token() && event.assistant_token().is_final()) {
             saw_assistant_token = true;
+            saw_clean_answer_token =
+                event.assistant_token().kind() == runanywhere::v1::TOKEN_KIND_ANSWER &&
+                event.assistant_token().text() == "assistant mock";
+        }
+        if (event.has_assistant_token() &&
+            event.assistant_token().kind() == runanywhere::v1::TOKEN_KIND_THOUGHT) {
+            saw_thought_token = event.assistant_token().text() == "private plan";
         }
         if (event.has_audio() && event.audio().is_final()) {
             saw_audio = true;
@@ -873,8 +948,12 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
           "D-7 SPEECH_ENDED count matches SPEECH_STARTED count");
     CHECK(saw_user_said, "D-7 emits userSaid");
     CHECK(saw_assistant_token, "D-7 emits assistant_token");
+    CHECK(saw_thought_token, "D-7 emits reasoning only as a typed thought token");
+    CHECK(saw_clean_answer_token, "D-7 emits a tag-free typed answer token");
+    CHECK(g_last_tts_input == "assistant mock", "D-7 sends only clean answer text to TTS");
     CHECK(saw_audio, "D-7 emits audio frame with is_final");
 
+    g_mock_llm_response = "assistant mock";
     rac_voice_agent_destroy(agent);
     return 0;
 }
@@ -958,6 +1037,7 @@ int main() {
         test_tts_generated_service_contract();
         test_vad_generated_service_contract();
         install_mock_plugin();
+        test_stt_service_serializes_shared_engine();
         test_parse_failure_and_missing_component();
         test_mocked_stt();
         test_mocked_tts();

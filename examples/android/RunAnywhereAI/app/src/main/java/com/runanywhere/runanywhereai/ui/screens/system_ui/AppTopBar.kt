@@ -19,6 +19,7 @@ import com.runanywhere.runanywhereai.ui.navigation.Solutions
 import com.runanywhere.runanywhereai.ui.navigation.Stt
 import com.runanywhere.runanywhereai.ui.navigation.Tools
 import com.runanywhere.runanywhereai.ui.navigation.Tts
+import com.runanywhere.runanywhereai.ui.navigation.Vad
 import com.runanywhere.runanywhereai.ui.navigation.Vision
 import com.runanywhere.runanywhereai.ui.navigation.Voice
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatTopBar
@@ -66,6 +67,7 @@ fun AppTopBar(
         destination.hasRoute<Tools>() -> StandardTopBar("Web & tools", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Tts>() -> StandardTopBar("Read aloud", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Stt>() -> StandardTopBar("Transcription", showMenu, onMenu, canNavigateBack, onNavigateBack)
+        destination.hasRoute<Vad>() -> StandardTopBar("Voice activity", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Vision>() -> StandardTopBar("Images & live", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Documents>() -> StandardTopBar("Documents", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Solutions>() -> StandardTopBar("Solutions", showMenu, onMenu, canNavigateBack, onNavigateBack)

@@ -8,12 +8,16 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.ui.screens.stt.AudioRecorder
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.pcm16ToFloat32
 import com.runanywhere.sdk.public.extensions.resetVAD
 import com.runanywhere.sdk.public.extensions.streamVAD
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -57,14 +61,20 @@ class VadViewModel : ViewModel() {
         audioLevel = 0f
         startDetectionStream()
         isListening = true
-        recorder.start { chunk, level ->
-            // SDK expects Float32 PCM; framing is handled natively.
-            audio?.trySend(RunAnywhere.pcm16ToFloat32(chunk))
-            audioLevel = level
+        try {
+            recorder.start { chunk, level ->
+                // SDK expects Float32 PCM; framing is handled natively.
+                audio?.trySend(RunAnywhere.pcm16ToFloat32(chunk))
+                audioLevel = level
+            }
+        } catch (e: Exception) {
+            RACLog.e("microphone start failed", e)
+            error = e.message ?: "Could not start the microphone"
+            stop()
         }
     }
 
-    private fun stop() {
+    fun stop() {
         isListening = false
         recorder.stop()
         stopDetectionStream()
@@ -80,25 +90,36 @@ class VadViewModel : ViewModel() {
     // Per-chunk failures never throw — they arrive as an error-marked result
     // and the flow completes, so a still-listening session is shut down here.
     private fun startDetectionStream() {
-        val channel = Channel<ByteArray>(Channel.UNLIMITED)
+        val channel = Channel<ByteArray>(
+            capacity = AUDIO_CHANNEL_CAPACITY,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
         audio = channel
         detectionJob = viewModelScope.launch {
-            var wasSpeechActive = false
-            RunAnywhere.streamVAD(channel.receiveAsFlow()).collect { result ->
-                val message = result.error_message
-                if (!message.isNullOrEmpty()) {
-                    RACLog.e("vad stream error: $message")
-                    error = message
-                    return@collect
+            try {
+                RuntimeModelSelection.requireCurrent(ModelSelectionContext.VAD)
+                var wasSpeechActive = false
+                RunAnywhere.streamVAD(channel.receiveAsFlow()).collect { result ->
+                    val message = result.error_message
+                    if (!message.isNullOrEmpty()) {
+                        RACLog.e("vad stream error: $message")
+                        error = message
+                        return@collect
+                    }
+                    isSpeechDetected = result.is_speech
+                    if (result.is_speech && !wasSpeechActive) {
+                        addLogEntry(VadActivity.SPEECH_STARTED)
+                        wasSpeechActive = true
+                    } else if (!result.is_speech && wasSpeechActive) {
+                        addLogEntry(VadActivity.SPEECH_ENDED)
+                        wasSpeechActive = false
+                    }
                 }
-                isSpeechDetected = result.is_speech
-                if (result.is_speech && !wasSpeechActive) {
-                    addLogEntry(VadActivity.SPEECH_STARTED)
-                    wasSpeechActive = true
-                } else if (!result.is_speech && wasSpeechActive) {
-                    addLogEntry(VadActivity.SPEECH_ENDED)
-                    wasSpeechActive = false
-                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RACLog.e("vad stream failed", e)
+                error = e.message ?: "Voice activity detection failed"
             }
             if (isListening) stop()
         }
@@ -124,5 +145,6 @@ class VadViewModel : ViewModel() {
 
     private companion object {
         const val MAX_LOG_ENTRIES = 50
+        const val AUDIO_CHANNEL_CAPACITY = 8
     }
 }

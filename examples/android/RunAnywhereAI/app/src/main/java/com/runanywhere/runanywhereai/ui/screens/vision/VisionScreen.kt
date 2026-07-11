@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -35,6 +37,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +56,8 @@ import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
+import com.runanywhere.runanywhereai.ui.permissions.PermissionRecoveryCard
+import com.runanywhere.runanywhereai.ui.permissions.openRunAnywhereAppSettings
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -61,17 +66,19 @@ import com.runanywhere.sdk.public.types.RAModelInfo
 import java.util.Locale
 
 @Composable
-fun VisionScreen() {
+fun VisionScreen(openLiveCamera: Boolean = false) {
     val dimens = LocalDimens.current
     val context = LocalContext.current
     val visionVm: VisionViewModel = viewModel()
     val modelVm: ModelSelectionViewModel =
         viewModel(factory = ModelSelectionViewModel.Factory(ModelSelectionContext.VLM))
     var showSheet by remember { mutableStateOf(false) }
+    var cameraPermissionDenied by remember { mutableStateOf(false) }
+    val resultRequester = remember { BringIntoViewRequester() }
 
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
 
-    var liveMode by remember { mutableStateOf(false) }
+    var liveMode by remember(openLiveCamera) { mutableStateOf(openLiveCamera) }
 
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { visionVm.onImagePicked(decodeBitmap(context, it)) }
@@ -83,12 +90,20 @@ fun VisionScreen() {
     // grant mandatory for the system-camera capture intent too.
     val captureWithGrant = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) cameraLauncher.launch(null) }
+    ) { granted ->
+        cameraPermissionDenied = !granted
+        if (granted) cameraLauncher.launch(null)
+    }
 
     fun onCapture() {
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
-        if (granted) cameraLauncher.launch(null) else captureWithGrant.launch(Manifest.permission.CAMERA)
+        if (granted) {
+            cameraPermissionDenied = false
+            cameraLauncher.launch(null)
+        } else {
+            captureWithGrant.launch(Manifest.permission.CAMERA)
+        }
     }
 
     val canDescribe = model != null && visionVm.image != null && !visionVm.isGenerating
@@ -110,11 +125,20 @@ fun VisionScreen() {
             )
         }
 
-        ModelCard(model = model, onClick = { showSheet = true })
+        ModelCard(
+            model = model,
+            enabled = !visionVm.isGenerating,
+            onClick = { showSheet = true },
+        )
 
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
             FilterChip(selected = !liveMode, onClick = { liveMode = false }, label = { Text("Photo") })
-            FilterChip(selected = liveMode, onClick = { liveMode = true }, label = { Text("Live camera") })
+            FilterChip(
+                selected = liveMode,
+                onClick = { liveMode = true },
+                enabled = !visionVm.isGenerating,
+                label = { Text("Live camera") },
+            )
         }
 
         if (liveMode) {
@@ -175,23 +199,44 @@ fun VisionScreen() {
             }
         }
 
-        if (visionVm.description.isNotBlank()) {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shape = RoundedCornerShape(dimens.radiusLg),
-                modifier = Modifier.fillMaxWidth(),
+        val hasTerminalContent = !visionVm.isGenerating && (
+            visionVm.description.isNotBlank() || visionVm.metrics != null || visionVm.error != null
+        )
+        if (hasTerminalContent) {
+            LaunchedEffect(visionVm.description, visionVm.metrics, visionVm.error) {
+                resultRequester.bringIntoView()
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewRequester(resultRequester),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
             ) {
-                MarkdownText(
-                    markdown = visionVm.description,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(dimens.spacingLg),
-                )
+                if (visionVm.description.isNotBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        shape = RoundedCornerShape(dimens.radiusLg),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        MarkdownText(
+                            markdown = visionVm.description,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(dimens.spacingLg),
+                        )
+                    }
+                }
+                visionVm.metrics?.let { StatsCard(it) }
+                visionVm.error?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
             }
         }
-        visionVm.metrics?.let { StatsCard(it) }
-
-        visionVm.error?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        if (cameraPermissionDenied && !liveMode) {
+            PermissionRecoveryCard(
+                message = "Camera access was denied. Enable it in Android settings to capture photos.",
+                onOpenSettings = context::openRunAnywhereAppSettings,
+            )
         }
     }
 
@@ -237,7 +282,7 @@ private fun ImagePreview(bitmap: Bitmap?) {
 }
 
 @Composable
-private fun ModelCard(model: RAModelInfo?, onClick: () -> Unit) {
+private fun ModelCard(model: RAModelInfo?, enabled: Boolean, onClick: () -> Unit) {
     val dimens = LocalDimens.current
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -246,7 +291,7 @@ private fun ModelCard(model: RAModelInfo?, onClick: () -> Unit) {
     ) {
         Row(
             modifier = Modifier
-                .clickable(onClick = onClick)
+                .clickable(enabled = enabled, onClick = onClick)
                 .padding(dimens.spacingLg),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
