@@ -5,6 +5,8 @@ import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.VLMImageFormat
 import ai.runanywhere.proto.v1.VLMStreamEventKind
+import ai.runanywhere.proto.v1.ChatMessage as ProtoChatMessage
+import ai.runanywhere.proto.v1.MessageRole
 import android.app.Application
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -51,6 +53,8 @@ import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
+import com.runanywhere.sdk.public.types.RALLMGenerateRequest
+import com.runanywhere.sdk.foundation.bridge.extensions.toRALLMGenerateRequest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -124,11 +128,60 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         SettingsRepository.setToolCallingEnabled(!toolsEnabled)
     }
 
+    // gets existing ui messages before adding the current prompt
+    private fun buildHistory(): List<ProtoChatMessage> {
+        val history = mutableListOf<ProtoChatMessage>()
+
+        for (message in messages) {
+            if (message.text.isBlank()) continue
+
+            val role = if (message.isUser) {
+                MessageRole.MESSAGE_ROLE_USER
+            } else {
+                MessageRole.MESSAGE_ROLE_ASSISTANT
+            }
+
+            history += ProtoChatMessage(
+                role = role,
+                content = message.text,
+            )
+        }
+       return history
+    }
+
+    private fun ensureConversationId(): String {
+        val existingId = conversationId
+        if (existingId != null) {
+            return existingId
+        }
+
+        val newId = UUID.randomUUID().toString()
+        conversationId = newId
+        createdAt = System.currentTimeMillis()
+        return newId
+    }
+
+    private fun buildRequest(prompt: String,
+    previousMessages: List<ProtoChatMessage>, ): RALLMGenerateRequest {
+        val options = generationOptions()
+
+        val baseRequest = options.toRALLMGenerateRequest(prompt)
+
+        return baseRequest.copy(conversation_id = ensureConversationId(), history = previousMessages)
+    }
+
     fun send() {
         if (!canSend) return
         val prompt = input.trim()
+
+        //store the history of previous completed turns before adding the current prompt
+        val chatHistory = buildHistory()
+        val request = buildRequest(prompt, chatHistory)
+
         input = ""
-        messages += ChatMessage(prompt, isUser = true)
+
+
+        messages += ChatMessage(text = prompt, isUser = true)
         val replyIndex = messages.size
         messages += ChatMessage("", isUser = false)
         isGenerating = true
@@ -140,8 +193,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 when {
                     toolsEnabled && RunAnywhere.getRegisteredTools().isNotEmpty() ->
                         generateWithTools(prompt, replyIndex)
-                    SettingsRepository.settings.streaming -> streamReply(prompt, replyIndex)
-                    else -> generateReply(prompt, replyIndex)
+                    SettingsRepository.settings.streaming -> streamReply(request, replyIndex)
+                    else -> generateReply(request, replyIndex)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -360,8 +413,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         ragPipelineKey = key
     }
 
-    private suspend fun generateReply(prompt: String, index: Int) {
-        val result = RunAnywhere.generate(prompt, generationOptions())
+    private suspend fun generateReply(request: RALLMGenerateRequest, index: Int) {
+        val result = RunAnywhere.generate(request)
         if (!result.error_message.isNullOrBlank()) {
             messages[index] = messages[index].copy(text = "Error: ${result.error_message}")
             return
@@ -390,11 +443,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    private suspend fun streamReply(prompt: String, index: Int) {
+    private suspend fun streamReply(request: RALLMGenerateRequest, index: Int) {
         val options = generationOptions()
-        val events = RunAnywhere.generateStream(prompt, options)
+        val events = RunAnywhere.generateStream(request)
         val result =
-            RunAnywhere.aggregateStream(prompt, events) { accumulated ->
+            RunAnywhere.aggregateStream(request.prompt, events) { accumulated ->
                 messages[index] = messages[index].copy(text = accumulated)
             }
 
