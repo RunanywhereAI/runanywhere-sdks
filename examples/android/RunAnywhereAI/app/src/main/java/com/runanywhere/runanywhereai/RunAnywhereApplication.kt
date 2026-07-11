@@ -10,6 +10,7 @@ import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.tools.BuiltInTools
 import com.runanywhere.runanywhereai.util.RACLog
+import com.runanywhere.runanywhereai.util.RACLogTelemetry
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.hybrid.AndroidDeviceStateProvider
@@ -34,6 +35,7 @@ class RunAnywhereApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        RACLogTelemetry.install()
         GlobalState.warmUp()
         ConversationRepository.initialize(applicationContext)
         SettingsRepository.initialize(applicationContext)
@@ -102,6 +104,7 @@ class RunAnywhereApplication : Application() {
             // Unconfigured local builds retain the SDK development fallback.
             environment = environment,
         )
+        RACLogTelemetry.markSDKInitialized()
         // Production env disables SDK console logging entirely; without this
         // debug builds emit zero SDK logs to logcat, which makes on-device
         // issues (voice/STT/VLM) undiagnosable.
