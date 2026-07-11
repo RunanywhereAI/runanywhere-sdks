@@ -933,12 +933,19 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
       loadTimeout: 12 * 60_000,
     });
 
+    // Test 03 deliberately persists the minimum 500-token budget and test 11
+    // verifies it survives a hard reload. Give this reasoning checkpoint a
+    // bounded but sufficient budget, then restore the persisted test value.
+    await setGenerationTokenBudget(appPage, 2_000);
     await setThinkingMode(appPage, true);
     await navigateTo(appPage, 'chat');
-    await runThinkingEnabledTurn(
+    const thinkingAnswer = await runThinkingEnabledTurn(
       appPage,
       'Reason carefully about which is larger, 17 multiplied by 23 or 19 multiplied by 20, then give the final comparison.',
     );
+    expect(thinkingAnswer).toMatch(/\b391\b/);
+    expect(thinkingAnswer).toMatch(/\b380\b/);
+    expect(thinkingAnswer).toMatch(/(?:larger|greater|>)/i);
 
     await setThinkingMode(appPage, false);
     await navigateTo(appPage, 'chat');
@@ -1011,6 +1018,7 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     expect(structured.containsJson).toBe(true);
     expect(structured.rawLength).toBeGreaterThan(0);
     expect(structured.parsed).toEqual({ project: 'RunAnywhere', count: 7 });
+    await setGenerationTokenBudget(appPage, 500);
   });
 
   test('14 — executes calculator, time, and deterministic weather tools in chat', async ({ appPage }) => {
@@ -2226,55 +2234,49 @@ async function setThinkingMode(page: Page, enabled: boolean): Promise<void> {
   }
 }
 
-const THINKING_ONLY_TERMINAL = /^\s*Thinking(?:…|\.\.\.)\s*$/i;
+async function setGenerationTokenBudget(page: Page, target: number): Promise<void> {
+  if (!Number.isInteger(target) || target < 500 || target > 20_000 || target % 500 !== 0) {
+    throw new Error(`Invalid generation token budget: ${target}`);
+  }
 
-/**
- * Qwen can occasionally exhaust a turn after emitting valid reasoning but
- * before producing its final-answer segment. Retry only that exact stochastic
- * terminal state; every structural, runtime, and model-state failure remains
- * an immediate release-gate failure.
- */
+  await navigateTo(page, 'settings');
+  const value = page.locator('#settings-tokens-val');
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const current = Number(await value.textContent());
+    if (current === target) break;
+    await page.locator(
+      current < target ? '#settings-tokens-plus' : '#settings-tokens-minus',
+    ).click();
+  }
+  await expect(value).toHaveText(String(target));
+}
+
 async function runThinkingEnabledTurn(
   page: Page,
   prompt: string,
-  maxAttempts = 3,
-): Promise<void> {
-  const attempts = Math.max(1, maxAttempts);
+): Promise<string> {
   const send = page.locator('#chat-send-btn');
+  await page.locator('#consumer-new-chat-btn').click();
+  await page.locator('#chat-input').fill(prompt);
+  await send.click();
+  await expect(send).toHaveAttribute('aria-label', 'Stop generation', { timeout: 120_000 });
+  await expect(send).toHaveAttribute('aria-label', 'Send message', {
+    timeout: 12 * 60_000,
+  });
 
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    await page.locator('#consumer-new-chat-btn').click();
-    await page.locator('#chat-input').fill(prompt);
-    await send.click();
-    await expect(send).toHaveAttribute('aria-label', 'Stop generation', { timeout: 120_000 });
-    await expect(send).toHaveAttribute('aria-label', 'Send message', {
-      timeout: 12 * 60_000,
-    });
-
-    const reply = page.locator('.chat-message--assistant').last();
-    await expect(reply).toBeVisible();
-    await expectSubstantiveText(reply.locator('.chat-thinking-content'), {
-      minLength: 12,
-      timeout: 30_000,
-      forbidden: /\b(?:failed|error|unavailable)\b/i,
-    });
-
-    const finalText = (await reply.locator('.chat-bubble').textContent() ?? '').trim();
-    if (THINKING_ONLY_TERMINAL.test(finalText)) {
-      if (attempt === attempts) {
-        throw new Error(
-          `Qwen returned substantive thinking without a final answer on ${attempts} attempts`,
-        );
-      }
-      continue;
-    }
-
-    await expectSubstantiveText(reply.locator('.chat-bubble'), {
-      minLength: 8,
-      timeout: 30_000,
-    });
-    return;
-  }
+  const reply = page.locator('.chat-message--assistant').last();
+  await expect(reply).toBeVisible();
+  await expectSubstantiveText(reply.locator('.chat-thinking-content'), {
+    minLength: 12,
+    timeout: 30_000,
+    forbidden: /\b(?:failed|error|unavailable)\b/i,
+  });
+  await expectSubstantiveText(reply.locator('.chat-bubble'), {
+    minLength: 8,
+    timeout: 30_000,
+    forbidden: /response limit|without producing a final answer|no final answer|cancelled/i,
+  });
+  return (await reply.locator('.chat-bubble').textContent() ?? '').trim();
 }
 
 async function runToolTurn(

@@ -616,11 +616,21 @@ async function generateStreaming(
   }
 
   const result = await stream.result;
-  // Prefer the structured thinkingContent from the final result when the
-  // backend separates it (same field iOS reads: result.thinkingContent).
-  if (result.thinkingContent) {
-    assistantMsg.thinking = result.thinkingContent;
-    assistantMsg.content = splitThinking(result.text || raw).content;
+  // Reconcile the terminal snapshot even when the model never leaves its
+  // reasoning phase. Keep hidden reasoning separate from the answer and make
+  // an exhausted/empty terminal state explicit instead of leaving the live
+  // "Thinking…" placeholder on screen indefinitely.
+  const terminal = splitThinking(result.text || raw);
+  assistantMsg.thinking = result.thinkingContent?.trim()
+    || terminal.thinking
+    || assistantMsg.thinking;
+  assistantMsg.content = terminal.content;
+  if (!assistantMsg.content) {
+    assistantMsg.content = result.finishReason === 'cancelled'
+      ? 'Cancelled.'
+      : result.finishReason === 'length'
+        ? 'The response limit was reached before a final answer. Increase Max tokens in Settings or turn off thinking, then try again.'
+        : 'The model finished without producing a final answer. Try again or turn off thinking.';
   }
   renderLastMessage(messagesEl, assistantMsg);
 }
@@ -1298,9 +1308,11 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
     : '';
   const body = msg.content
     ? renderMarkdownLite(msg.content) + cursor
-    : (thinking
-      ? `<span class="chat-bubble-typing">Thinking&hellip;</span>${cursor}`
-      : cursor || '<span class="chat-bubble-typing">&hellip;</span>');
+    : (streaming
+      ? (thinking
+        ? `<span class="chat-bubble-typing">Thinking&hellip;</span>${cursor}`
+        : cursor || '<span class="chat-bubble-typing">&hellip;</span>')
+      : '<span class="chat-bubble-typing">No final answer was generated.</span>');
 
   return `${thinkingSection}${toolSection}<div class="chat-bubble">${attachmentSection}${body}${sourcesSection}</div>`;
 }
