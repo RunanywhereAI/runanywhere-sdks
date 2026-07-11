@@ -12,6 +12,8 @@
 # libs are built + staged, and the SDK plugin .so are built + staged into jniLibs.
 # `--build` (below) builds/stages the local AARs directly, then builds and installs
 # the app and androidTest APKs.
+# Production TTS intelligibility gates additionally require the pinned evaluator:
+#   python3 -m pip install -r scripts/requirements-npu-e2e.txt
 #
 # Usage:
 #   scripts/run_npu_e2e.sh [flags] [modelId ...]
