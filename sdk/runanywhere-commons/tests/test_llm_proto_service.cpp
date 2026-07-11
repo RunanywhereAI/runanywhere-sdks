@@ -111,6 +111,14 @@ rac_result_t mock_generate_stream(void* impl, const char* prompt, const rac_llm_
     if (!impl || !prompt || !callback)
         return RAC_ERROR_NULL_POINTER;
     auto* mock = static_cast<MockLlm*>(impl);
+    if (std::strstr(prompt, "hidden-thinking-stream") != nullptr) {
+        for (const char* token : {"<think>alpha", "beta", "gamma"}) {
+            if (callback(token, user_data) != RAC_TRUE) {
+                return RAC_ERROR_STREAM_CANCELLED;
+            }
+        }
+        return RAC_SUCCESS;
+    }
     if (std::strstr(prompt, "thinking-stream") != nullptr) {
         if (callback("<think>plan</think>done", user_data) != RAC_TRUE) {
             return RAC_ERROR_STREAM_CANCELLED;
@@ -434,6 +442,47 @@ int test_stream_thinking_envelope(rac_model_registry_handle_t registry) {
     return 0;
 }
 
+int test_hidden_thinking_counts_toward_length(rac_model_registry_handle_t registry) {
+    CHECK(load_mock_model(registry), "mock lifecycle LLM loads for hidden thinking stream");
+
+    runanywhere::v1::LLMGenerateRequest request;
+    request.set_prompt("hidden-thinking-stream");
+    request.set_max_tokens(3);
+    request.set_emit_thoughts(false);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "hidden thinking stream request serializes");
+
+    CapturedStream capture;
+    const rac_result_t rc =
+        rac_llm_generate_stream_proto(bytes.data(), bytes.size(), stream_callback, &capture);
+    CHECK(rc == RAC_SUCCESS, "hidden thinking stream generation succeeds");
+
+    int non_terminal_events = 0;
+    bool saw_terminal = false;
+    for (const auto& event_bytes : capture.events) {
+        runanywhere::v1::LLMStreamEvent event;
+        CHECK(event.ParseFromArray(event_bytes.data(), static_cast<int>(event_bytes.size())),
+              "hidden thinking stream event parses");
+        if (!event.is_final()) {
+            ++non_terminal_events;
+            continue;
+        }
+        saw_terminal = true;
+        CHECK(event.finish_reason() == "length",
+              "hidden thinking exhaustion reports length finish reason");
+        CHECK(event.has_result(), "hidden thinking terminal carries result");
+        CHECK(event.result().text().empty(), "hidden thinking terminal has no answer text");
+        CHECK(event.result().thinking_content() == "alphabetagamma",
+              "hidden thinking terminal preserves reasoning content");
+        CHECK(event.result().completion_tokens() == 3,
+              "hidden thinking terminal counts suppressed completion segments");
+    }
+    CHECK(non_terminal_events == 0, "hidden thinking emits no thought events");
+    CHECK(saw_terminal, "hidden thinking stream emits terminal result");
+    cleanup_environment();
+    return 0;
+}
+
 int test_structured_generate_proto(rac_model_registry_handle_t registry) {
     CHECK(load_mock_model(registry), "mock lifecycle LLM loads for structured generate");
 
@@ -576,6 +625,7 @@ int main() {
         test_empty_generation_skips_structured_validation(registry);
         test_stream_terminal_once(registry);
         test_stream_thinking_envelope(registry);
+        test_hidden_thinking_counts_toward_length(registry);
         test_structured_generate_proto(registry);
         test_structured_stream_proto(registry);
         test_cancel_stream(registry);

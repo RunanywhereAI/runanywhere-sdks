@@ -1834,14 +1834,18 @@ void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, Toke
 
     if (kind == runanywhere::v1::TOKEN_KIND_THOUGHT) {
         ctx->thinking_text += token;
-        if (!ctx->emit_thoughts) {
-            return;
-        }
     } else {
         ctx->response_text += token;
     }
 
+    // Completion accounting includes generated reasoning even when thought
+    // events are intentionally hidden from the consumer. Otherwise a stream
+    // that exhausts max_tokens inside <think> is misreported as a natural
+    // "stop" and its terminal result undercounts completion tokens.
     ctx->token_count += 1;
+    if (kind == runanywhere::v1::TOKEN_KIND_THOUGHT && !ctx->emit_thoughts) {
+        return;
+    }
     if (!ctx->first_token_sent) {
         ctx->first_token_sent = true;
         ctx->first_token_ms = now_ms();
