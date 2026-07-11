@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.tools.WebSearchTool
 import com.runanywhere.sdk.public.extensions.LLM.string
 import kotlinx.coroutines.runBlocking
@@ -32,6 +33,7 @@ class WebSearchToolE2ETest {
             "RUNANYWHERE_WEB_SEARCH_URL is required for the production web-search E2E",
             BuildConfig.WEB_SEARCH_URL.isNotBlank(),
         )
+        GlobalState.awaitBootstrapComplete()
         val result = WebSearchTool.search("Qualcomm Hexagon v81")
         assertFalse(result.containsKey("error"))
         val resultCount = result["result_count"]?.string?.toIntOrNull() ?: 0

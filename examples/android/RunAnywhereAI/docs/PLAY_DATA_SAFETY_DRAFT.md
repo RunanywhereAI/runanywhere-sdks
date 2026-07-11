@@ -26,7 +26,7 @@ whether each data type is collected ephemerally before submitting.
 | App info and performance | App/SDK version, model/framework IDs, latency, available-memory and token/count metrics, errors | Analytics, diagnostics, app functionality | Collected automatically in configured production builds |
 | Device info | Device/OS details, app package/name/version/build, locale/timezone, CPU architecture and chip, form factor, total and available memory, neural-acceleration availability, CPU/GPU/NPU core details, and battery/power details | App functionality, SDK registration, analytics | Collected automatically in configured production builds |
 | Other user-generated content (until redaction is proven) | Raw SDK `error_message` text, which can include user/generated content, URLs, paths, transcript fragments, or provider responses | Diagnostics, app functionality | The current telemetry JSON path sends raw error strings without a universal proven content-redaction boundary; do not claim content is excluded unless the final candidate sanitizes and tests every path |
-| In-app search history | Search query generated from the user's prompt | App functionality | Sent directly to DuckDuckGo when no proxy is configured or collected by the RunAnywhere search proxy/provider when configured; the tested signed APK uses direct DuckDuckGo, while the Play AAB gate requires a real proxy. Do not describe as ephemeral until recipient retention is verified |
+| In-app search history | Search query generated from the user's prompt | App functionality | Developer builds can send directly to DuckDuckGo when no proxy is configured. The current device-tested APK still has a blank proxy URL and uses DuckDuckGo; it is not the final Play candidate. The Play build must send the query to the RunAnywhere proxy and Brave Search. Do not describe it as ephemeral until Brave and infrastructure retention are verified |
 
 Mark each row as linked or not linked based on the production backend's ability
 to associate it with an identifiable user, organization, app credential, or
@@ -42,7 +42,7 @@ a separate diagnostics-consent screen or preference.
 | Hugging Face | Authentication token, requested model repository/files, network metadata | Private model download |
 | GitHub/model hosts | Requested public model files, network metadata | Public model download |
 | Sarvam, OpenAI, OpenRouter, or user-configured HTTPS cloud STT host | Audio, language/model/request metadata, provider API key | User configures and selects Hybrid (Beta); the router can then choose the online provider based on network, battery, confidence, and ranking |
-| DuckDuckGo, or RunAnywhere search proxy and [production search provider] | Web-search query and ordinary network metadata | User enables tool calling and the model invokes `search_web`; the query may be derived from the user's prompt. A blank proxy URL sends it directly to DuckDuckGo, including in the tested signed release APK |
+| RunAnywhere search proxy and Brave Search (required final Play build); DuckDuckGo (current unconfigured device-tested APK/developer builds) | Web-search query, persistent RunAnywhere device UUID to the proxy, and ordinary network metadata | User enables tool calling and the model invokes `search_web`; the query may be derived from the user's prompt. The proxy HMAC-pseudonymizes the device UUID before limiter storage and forwards only the query/provider request metadata to Brave |
 | System clipboard or user-selected app | Benchmark text selected by the user | User copies or shares a benchmark report |
 
 Determine in Play Console whether each flow is a disclosed transfer, collection,
@@ -66,8 +66,9 @@ exports/shares a benchmark, or the user opens an external service.
 - Publish the final privacy policy at the exact in-app and Play Console URL.
 - Record backend retention/deletion behavior and implement/test the deletion SOP
   before selecting the deletion-request badge.
-- Name the production search provider, document its query retention/deletion behavior,
-  and verify the provider credential exists only behind the HTTPS proxy, never in the APK.
+- Verify Brave's selected plan and query retention/deletion behavior, Railway/proxy
+  log retention, and that the provider/HMAC credentials exist only behind the HTTPS
+  proxy, never in the APK. Exercise the installation, organization, and global caps.
 - Obtain publisher/privacy review of whether automatic pre-UI production collection
   requires an in-flow prominent disclosure and affirmative consent under Play's User
   Data policy. The current Settings link alone is not an in-flow disclosure.

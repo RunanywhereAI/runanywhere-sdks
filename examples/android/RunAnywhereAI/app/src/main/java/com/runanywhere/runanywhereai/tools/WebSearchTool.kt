@@ -3,6 +3,7 @@ package com.runanywhere.runanywhereai.tools
 import ai.runanywhere.proto.v1.ToolParameter
 import ai.runanywhere.proto.v1.ToolParameterType
 import com.runanywhere.runanywhereai.BuildConfig
+import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.RAToolValue
 import com.runanywhere.sdk.public.extensions.LLM.array
 import com.runanywhere.sdk.public.extensions.LLM.`object`
@@ -28,12 +29,15 @@ import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-/** Keyless web search tool mirroring the iOS SDK's DuckDuckGo helper. */
+/** Proxy-backed web search with a developer-only DuckDuckGo fallback. */
 internal object WebSearchTool {
     private const val MAX_RESULTS = 5
     private const val MAX_RESPONSE_BYTES = 1_000_000
+    private const val MAX_QUERY_CHARS = 400
+    private const val MAX_QUERY_WORDS = 50
     private val userAgent = "Mozilla/5.0 RunAnywhere/${BuildConfig.VERSION_NAME}"
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
@@ -74,6 +78,14 @@ internal object WebSearchTool {
     ): Map<String, RAToolValue> {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return errorPayload("Missing search query")
+        val wordCount = trimmed.split(Regex("\\s+")).size
+        if (
+            trimmed.length > MAX_QUERY_CHARS ||
+            wordCount > MAX_QUERY_WORDS ||
+            trimmed.any { Character.getType(it) == Character.CONTROL.toInt() }
+        ) {
+            return errorPayload("Search query is too long or contains unsupported characters")
+        }
 
         if (backendUrl.isNotBlank()) {
             return runCatching {
@@ -139,23 +151,35 @@ internal object WebSearchTool {
     }
 
     private suspend fun fetchBackend(endpoint: String, query: String): String {
+        val request = buildBackendRequest(
+            endpoint = endpoint,
+            query = query,
+            apiKey = BuildConfig.RUNANYWHERE_API_KEY,
+            deviceId = RunAnywhere.deviceId,
+        )
+        return fetch(request)
+    }
+
+    internal fun buildBackendRequest(
+        endpoint: String,
+        query: String,
+        apiKey: String,
+        deviceId: String,
+    ): Request {
+        require(apiKey.isNotBlank()) { "Web search backend authentication is not configured" }
+        val canonicalDeviceId = UUID.fromString(deviceId).toString()
         val payload = buildJsonObject {
             put("query", query)
             put("count", MAX_RESULTS)
         }.toString()
-        val request = Request.Builder()
+        return Request.Builder()
             .url(endpoint)
             .header("User-Agent", userAgent)
             .header("Accept", "application/json")
-            .apply {
-                BuildConfig.RUNANYWHERE_API_KEY.takeIf { it.isNotBlank() }?.let { apiKey ->
-                    header("Authorization", "Bearer $apiKey")
-                    header("apikey", apiKey)
-                }
-            }
+            .header("X-RunAnywhere-Device-ID", canonicalDeviceId)
+            .header("Authorization", "Bearer $apiKey")
             .post(payload.toRequestBody(jsonMediaType))
             .build()
-        return fetch(request)
     }
 
     private suspend fun fetch(request: Request): String = withContext(Dispatchers.IO) {

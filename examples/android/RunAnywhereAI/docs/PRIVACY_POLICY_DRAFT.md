@@ -66,11 +66,16 @@ periods here: [retention periods and deletion/anonymization process].
 - Tool calling is disabled by default. If the user enables it and the model
   invokes the built-in web-search tool, the generated search query and ordinary
   network metadata are sent either directly to DuckDuckGo when no proxy URL is
-  configured or to [RunAnywhere search-proxy operator/country] and [production
-  search provider] when a proxy is configured. The query may be derived from the
-  user's prompt. The tested signed APK has no proxy URL and contacts DuckDuckGo
-  directly; the Play AAB gate requires a real HTTPS proxy. Name the production
-  provider and link all applicable privacy terms before release.
+  configured in a developer build or to [RunAnywhere search-proxy operator/country]
+  and Brave Search in the Play build. The query may be derived from the user's
+  prompt. The Play build also sends its persistent RunAnywhere device UUID to the
+  proxy for abuse controls. The proxy does not persist the raw UUID; it uses an
+  HMAC-derived limiter key and stores limiter counts/windows. Authentication also
+  updates API-key usage metadata, and the request is associated in memory with the
+  key's organization while it is processed. The raw UUID is not forwarded to Brave.
+  The current device-tested APK still has a blank proxy URL and contacts DuckDuckGo;
+  it is not the final Play candidate. Verify the proxy-configured signed build and
+  link the applicable Brave and infrastructure privacy/retention terms before release.
 - A user can copy benchmark text to the system clipboard or share it with another
   app. The clipboard, selected app, and operating system handle that exported text
   under their own privacy and retention behavior.
@@ -78,7 +83,7 @@ periods here: [retention periods and deletion/anonymization process].
   selected website or app and is governed by that service's privacy terms.
 
 List the current subprocessors and links here: [RunAnywhere backend/search proxy],
-[production search provider], Hugging Face, GitHub, and each cloud speech provider
+Brave Search, Hugging Face, GitHub, and each cloud speech provider
 offered in the released build.
 
 ## Permissions

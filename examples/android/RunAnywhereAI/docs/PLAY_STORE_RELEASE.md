@@ -6,8 +6,11 @@ not publishable until every required item is checked and its evidence is retaine
 ## Required publisher inputs
 
 - [ ] Production HTTPS SDK base URL and a public, restricted mobile credential.
-- [ ] HTTPS web-search proxy with a server-side provider credential, rate limits,
-  abuse controls, retention terms, and a tested real-result response contract.
+- [ ] HTTPS web-search proxy with server-side Brave/HMAC credentials, an explicit
+  release-key allowlist, installation/organization/global limits, alerting,
+  retention terms, and a tested real-result response contract. A client-supplied
+  device UUID and extractable APK key do not replace Play Integrity or equivalent
+  attestation for a larger public rollout.
 - [ ] Final public HTTPS privacy-policy URL and completed policy placeholders.
 - [ ] Play App Signing enrollment plus upload keystore, alias, passwords, and
   expected upload-certificate SHA-256.

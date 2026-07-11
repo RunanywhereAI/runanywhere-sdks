@@ -5,8 +5,10 @@ import com.runanywhere.sdk.public.extensions.LLM.array
 import com.runanywhere.sdk.public.extensions.LLM.string
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import okio.Buffer
 
 class WebSearchToolTest {
     @Test
@@ -102,6 +104,27 @@ class WebSearchToolTest {
     }
 
     @Test
+    fun `queries outside the proxy contract fail before network access`() = runBlocking {
+        listOf(
+            "x".repeat(401),
+            List(51) { "word" }.joinToString(" "),
+            "private\nquery",
+        ).forEach { invalidQuery ->
+            var requests = 0
+            val result = WebSearchTool.search(
+                query = invalidQuery,
+                backendUrl = "https://search.runanywhere.example/api/v1/web-search",
+                backendFetcher = { _, _ ->
+                    requests++
+                    error("must not contact backend")
+                },
+            )
+            assertTrue(result.containsKey("error"))
+            assertEquals(0, requests)
+        }
+    }
+
+    @Test
     fun `backend endpoint must be credential-free HTTPS`() {
         assertEquals(
             "https://search.runanywhere.example/v1/search",
@@ -114,5 +137,52 @@ class WebSearchToolTest {
         ).forEach { endpoint ->
             assertTrue(runCatching { WebSearchTool.parseWebSearchEndpoint(endpoint) }.isFailure)
         }
+    }
+
+    @Test
+    fun `backend request uses bearer auth and persistent device identity only`() {
+        val request = WebSearchTool.buildBackendRequest(
+            endpoint = "https://search.runanywhere.example/api/v1/web-search",
+            query = "Qualcomm Hexagon v81",
+            apiKey = "test-api-key",
+            deviceId = "123e4567-e89b-12d3-a456-426614174000",
+        )
+
+        assertEquals("Bearer test-api-key", request.header("Authorization"))
+        assertEquals(
+            "123e4567-e89b-12d3-a456-426614174000",
+            request.header("X-RunAnywhere-Device-ID"),
+        )
+        assertNull(request.header("apikey"))
+        assertEquals("POST", request.method)
+        assertEquals("/api/v1/web-search", request.url.encodedPath)
+        assertEquals("application/json; charset=utf-8", request.body?.contentType().toString())
+        val body = Buffer().also { request.body?.writeTo(it) }.readUtf8()
+        assertEquals("""{"query":"Qualcomm Hexagon v81","count":5}""", body)
+    }
+
+    @Test
+    fun `backend request fails closed without auth or valid device identity`() {
+        val endpoint = "https://search.runanywhere.example/api/v1/web-search"
+        assertTrue(
+            runCatching {
+                WebSearchTool.buildBackendRequest(
+                    endpoint,
+                    "query",
+                    "",
+                    "123e4567-e89b-12d3-a456-426614174000",
+                )
+            }.isFailure,
+        )
+        assertTrue(
+            runCatching {
+                WebSearchTool.buildBackendRequest(
+                    endpoint,
+                    "query",
+                    "test-api-key",
+                    "not-a-uuid",
+                )
+            }.isFailure,
+        )
     }
 }
