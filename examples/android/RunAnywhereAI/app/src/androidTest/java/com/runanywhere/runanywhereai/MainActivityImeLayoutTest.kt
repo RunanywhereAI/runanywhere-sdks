@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.WindowInsets
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertNotNull
@@ -24,43 +25,72 @@ class MainActivityImeLayoutTest {
     @Test
     fun landscapeComposerAndSendStayAboveIme() {
         instrumentation.uiAutomation.setRotation(UiAutomation.ROTATION_FREEZE_90)
-        val activity = instrumentation.startActivitySync(
+        val scenario = ActivityScenario.launch<MainActivity>(
             Intent(instrumentation.targetContext, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             },
-        ) as MainActivity
+        )
         try {
-            waitFor("landscape orientation") {
-                activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val currentActivity = AtomicReference<MainActivity?>()
+            waitFor("resumed landscape activity") {
+                scenario.onActivity { candidate ->
+                    if (candidate.resources.configuration.orientation ==
+                        Configuration.ORIENTATION_LANDSCAPE
+                    ) {
+                        currentActivity.set(candidate)
+                    }
+                }
+                currentActivity.get() != null
+            }
+            val activity = currentActivity.get()!!
+            waitFor("focused activity window") {
+                !activity.isFinishing &&
+                    !activity.isDestroyed &&
+                    activity.window.decorView.isAttachedToWindow &&
+                    activity.hasWindowFocus()
             }
 
-            tap(waitForNode("Enable web and tools"))
+            val toolsToggle = waitForNode(
+                activity,
+                "Enable web and tools",
+                "Disable web and tools",
+                "Web and tools unavailable for current model",
+            )
+            if (toolsToggle.contentDescription?.toString() == "Enable web and tools") {
+                tap(toolsToggle)
+            }
             waitForNode(
+                activity,
                 "Disable web and tools",
                 "Web and tools unavailable for current model",
             )
 
-            tap(waitForNode("Message input"))
+            tap(waitForNode(activity, "Message input"))
             waitFor("visible IME") { windowAndImeHeight(activity).imeHeight > 0 }
+            val safeLayout = AtomicReference<LayoutSnapshot?>()
             waitFor("IME-safe composer layout") {
                 val window = windowAndImeHeight(activity)
-                val visibleBottom = window.bottomOnScreen - window.imeHeight
-                val root = instrumentation.uiAutomation.rootInActiveWindow
+                val root = activeRoot(activity)
                 val input = findNode(root, "Message input")
                 val send = findNode(root, "Send message")
                 if (input == null || send == null) {
                     false
+                } else if (!input.refresh() || !send.refresh()) {
+                    false
                 } else {
                     val inputBounds = Rect().also(input::getBoundsInScreen)
                     val sendBounds = Rect().also(send::getBoundsInScreen)
-                    inputBounds.bottom <= visibleBottom + 1 && sendBounds.bottom <= visibleBottom + 1
+                    val snapshot = LayoutSnapshot(window, inputBounds, sendBounds)
+                    safeLayout.set(snapshot)
+                    snapshot.isImeSafe
                 }
             }
 
-            val window = windowAndImeHeight(activity)
+            val layout = safeLayout.get()!!
+            val window = layout.window
             val visibleBottom = window.bottomOnScreen - window.imeHeight
-            val inputBounds = Rect().also(waitForNode("Message input")::getBoundsInScreen)
-            val sendBounds = Rect().also(waitForNode("Send message")::getBoundsInScreen)
+            val inputBounds = layout.inputBounds
+            val sendBounds = layout.sendBounds
             Log.i(
                 "ImeLayoutTest",
                 "windowBottom=${window.bottomOnScreen} imeHeight=${window.imeHeight} " +
@@ -76,16 +106,18 @@ class MainActivityImeLayoutTest {
                 sendBounds.bottom <= visibleBottom + 1,
             )
         } finally {
-            instrumentation.runOnMainSync(activity::finish)
-            instrumentation.waitForIdleSync()
+            scenario.close()
             instrumentation.uiAutomation.setRotation(UiAutomation.ROTATION_UNFREEZE)
         }
     }
 
-    private fun waitForNode(vararg descriptions: String): AccessibilityNodeInfo {
+    private fun waitForNode(
+        activity: MainActivity,
+        vararg descriptions: String,
+    ): AccessibilityNodeInfo {
         val found = AtomicReference<AccessibilityNodeInfo?>()
         waitFor("node ${descriptions.joinToString()}") {
-            findNode(instrumentation.uiAutomation.rootInActiveWindow, descriptions)
+            findNode(activeRoot(activity), descriptions)
                 ?.also(found::set) != null
         }
         val node = found.get()
@@ -139,24 +171,41 @@ class MainActivityImeLayoutTest {
     private fun windowAndImeHeight(activity: MainActivity): WindowImeMetrics {
         val result = AtomicReference<WindowImeMetrics>()
         instrumentation.runOnMainSync {
-            val decorView = activity.window.decorView
-            val location = IntArray(2)
-            decorView.getLocationOnScreen(location)
+            val metrics = activity.windowManager.currentWindowMetrics
             result.set(
                 WindowImeMetrics(
-                    bottomOnScreen = location[1] + decorView.height,
-                    imeHeight = decorView.rootWindowInsets
-                        ?.getInsets(WindowInsets.Type.ime())
-                        ?.bottom
-                        ?: 0,
+                    bottomOnScreen = metrics.bounds.bottom,
+                    imeHeight = metrics.windowInsets
+                        .getInsets(WindowInsets.Type.ime())
+                        .bottom,
                 ),
             )
         }
         return result.get()
     }
 
+    private fun activeRoot(activity: MainActivity): AccessibilityNodeInfo? {
+        if (!activity.hasWindowFocus()) return null
+        val root = instrumentation.uiAutomation.rootInActiveWindow ?: return null
+        if (!root.refresh()) return null
+        return root.takeIf { it.packageName == instrumentation.targetContext.packageName }
+    }
+
     private data class WindowImeMetrics(
         val bottomOnScreen: Int,
         val imeHeight: Int,
     )
+
+    private data class LayoutSnapshot(
+        val window: WindowImeMetrics,
+        val inputBounds: Rect,
+        val sendBounds: Rect,
+    ) {
+        val isImeSafe: Boolean
+            get() {
+                val visibleBottom = window.bottomOnScreen - window.imeHeight
+                return inputBounds.bottom <= visibleBottom + 1 &&
+                    sendBounds.bottom <= visibleBottom + 1
+            }
+    }
 }
