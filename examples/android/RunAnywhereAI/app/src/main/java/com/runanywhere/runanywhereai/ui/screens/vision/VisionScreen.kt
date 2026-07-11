@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -35,6 +37,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,6 +74,7 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
         viewModel(factory = ModelSelectionViewModel.Factory(ModelSelectionContext.VLM))
     var showSheet by remember { mutableStateOf(false) }
     var cameraPermissionDenied by remember { mutableStateOf(false) }
+    val resultRequester = remember { BringIntoViewRequester() }
 
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
 
@@ -195,23 +199,38 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
             }
         }
 
-        if (visionVm.description.isNotBlank()) {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shape = RoundedCornerShape(dimens.radiusLg),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                MarkdownText(
-                    markdown = visionVm.description,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(dimens.spacingLg),
-                )
+        val hasTerminalContent = !visionVm.isGenerating && (
+            visionVm.description.isNotBlank() || visionVm.metrics != null || visionVm.error != null
+        )
+        if (hasTerminalContent) {
+            LaunchedEffect(visionVm.description, visionVm.metrics, visionVm.error) {
+                resultRequester.bringIntoView()
             }
-        }
-        visionVm.metrics?.let { StatsCard(it) }
 
-        visionVm.error?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewRequester(resultRequester),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
+            ) {
+                if (visionVm.description.isNotBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        shape = RoundedCornerShape(dimens.radiusLg),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        MarkdownText(
+                            markdown = visionVm.description,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(dimens.spacingLg),
+                        )
+                    }
+                }
+                visionVm.metrics?.let { StatsCard(it) }
+                visionVm.error?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
         }
         if (cameraPermissionDenied && !liveMode) {
             PermissionRecoveryCard(

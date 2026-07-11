@@ -96,7 +96,7 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
                     // whole-response rather than token-by-token.
                     RunAnywhere.processImage(vlmImage, options)
                 }
-                description = result.text
+                description = result.toDisplayText()
                 metrics = result.toUiMetrics()
             } catch (e: CancellationException) {
                 throw e
@@ -137,3 +137,5 @@ internal fun VLMResult.toUiMetrics(): VlmMetrics =
         imageEncodeMs = image_encode_time_ms,
         ttftMs = time_to_first_token_ms,
     )
+
+internal fun VLMResult.toDisplayText(): String = text.ifBlank { "I could not read that image." }

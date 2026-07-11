@@ -21,4 +21,12 @@ class VisionMetricsTest {
         assertEquals(315L, metrics.imageEncodeMs)
         assertEquals(640L, metrics.ttftMs)
     }
+
+    @Test
+    fun `shows a useful fallback when the engine returns blank text`() {
+        assertEquals(
+            "I could not read that image.",
+            VLMResult(text = "  \n").toDisplayText(),
+        )
+    }
 }
