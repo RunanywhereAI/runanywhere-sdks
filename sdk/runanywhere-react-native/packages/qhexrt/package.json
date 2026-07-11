@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/qhexrt",
-  "version": "0.19.13",
+  "version": "0.19.15",
   "description": "QHexRT backend for RunAnywhere React Native SDK - Qualcomm Hexagon NPU on-device LLM/VLM/STT/TTS (Android arm64 only)",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -49,7 +49,7 @@
     "@runanywhere/proto-ts": "workspace:*"
   },
   "peerDependencies": {
-    "@runanywhere/core": ">=0.19.13",
+    "@runanywhere/core": ">=0.19.15",
     "react": ">=19.0.0",
     "react-native": ">=0.83.1",
     "react-native-nitro-modules": "^0.33.9"

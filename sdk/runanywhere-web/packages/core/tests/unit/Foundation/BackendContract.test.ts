@@ -15,7 +15,14 @@ describe('redactResourceURL', () => {
       .toBe('/assets/backend.js');
   });
 
+  it('removes credentials from protocol-relative resource URLs', () => {
+    expect(
+      redactResourceURL('//user:secret@example.com/models/backend.js?token=private#fragment'),
+    ).toBe('//example.com/models/backend.js');
+  });
+
   it('does not log data URL payloads', () => {
     expect(redactResourceURL('data:text/javascript,secret')).toBe('data:[redacted]');
+    expect(redactResourceURL('DATA:text/javascript,secret')).toBe('data:[redacted]');
   });
 });

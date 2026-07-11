@@ -126,11 +126,42 @@ export function setVoiceAgentHandle(
   _provider = createVoiceAgentHandleProvider({ handle, module });
 }
 
+function evictUnavailableCrossWasmProvider(): void {
+  const provider = _provider;
+  if (provider?.providerKind !== 'cross-wasm' || supportsCrossWasmVoiceAgent()) return;
+
+  _provider = null;
+  try {
+    void Promise.resolve(provider.cleanupVoiceAgent()).catch((error: unknown) => {
+      logger.warning(
+        `Stale cross-WASM voice-agent cleanup failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    });
+  } catch (error) {
+    logger.warning(
+      `Stale cross-WASM voice-agent cleanup threw: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
 function activeProvider(): VoiceAgentProvider | null {
+  evictUnavailableCrossWasmProvider();
   if (!_provider && supportsCrossWasmVoiceAgent()) {
     _provider = new CrossWasmVoiceAgentProvider();
   }
   return _provider;
+}
+
+/** Release facade-owned provider state before backend WASM teardown. */
+export async function resetVoiceAgentFacadeState(): Promise<void> {
+  const provider = _provider;
+  _provider = null;
+  if (!provider) return;
+  await Promise.resolve(provider.cleanupVoiceAgent());
 }
 
 export function getVoiceAgentAvailability(): VoiceAgentAvailability {
@@ -1224,6 +1255,7 @@ export const __testing__ = {
   createCrossWasmVoiceAgentProvider: (): VoiceAgentProvider => (
     new CrossWasmVoiceAgentProvider()
   ),
+  resetFacadeState: resetVoiceAgentFacadeState,
 };
 
 /**

@@ -1,4 +1,5 @@
 .vercel
+.vercel-stage
 .env
 .env.*
 !.env.example

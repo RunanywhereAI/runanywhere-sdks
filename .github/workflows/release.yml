@@ -13,6 +13,10 @@ name: Release
 #
 # Pre-flight (engineer runs locally before tagging):
 #   scripts/release/sync-versions.sh 1.2.3
+#   build the five Swift XCFramework archives
+#   set Package.swift useLocalNatives = false
+#   sync and commit the real remote-binary checksums
+#   run all release gates, then commit the tag-ready manifest
 #   git add -u && git commit -m "chore: release 1.2.3"
 #   git tag v1.2.3
 #   git push origin main v1.2.3
@@ -59,6 +63,14 @@ jobs:
           if [ "$PROJECT_VERSION" != "$V" ]; then
             echo "::error::PROJECT_VERSION in VERSIONS is '$PROJECT_VERSION' but releasing '$V'."
             echo "::error::Run scripts/release/sync-versions.sh $V before tagging."
+            exit 1
+          fi
+      - name: Verify release-train version coherence
+        run: bash scripts/validation/gates/check_release_version_coherence.sh
+      - name: Verify tagged SwiftPM manifest uses release binaries
+        run: |
+          if ! grep -Eq '^let useLocalNatives = false([[:space:]]|$)' Package.swift; then
+            echo "::error::Package.swift must commit useLocalNatives = false with fresh XCFramework checksums before tagging."
             exit 1
           fi
 
@@ -768,6 +780,15 @@ jobs:
           fi
           (cd release-flat && ls -la > MANIFEST.txt)
           cat release-flat/MANIFEST.txt
+      - name: Assemble aggregate Android release assets
+        # React Native and Flutter remote-mode builds consume one cross-ABI
+        # archive per native component. The matrix above deliberately builds
+        # isolated per-ABI archives, so combine those verified inputs here,
+        # immediately before publishing the single v<version> Release.
+        run: |
+          bash scripts/release/assemble-android-release-assets.sh \
+            release-flat \
+            "${{ needs.validate.outputs.version }}"
       - name: Assert release manifest contains every required client-SDK family
         # Hard gate: every release MUST ship at least one AAR (Kotlin), one
         # Web .tgz, one RN .tgz, the iOS XCFramework zips, the Android per-ABI
@@ -791,12 +812,37 @@ jobs:
           }
           assert_present "iOS XCFramework zip"      "RACommons-ios-v*.zip"
           assert_present "Android per-ABI zip"      "RACommons-android-*-v*.zip"
+          assert_present "Android aggregate manifest" "ANDROID-ASSETS-MANIFEST.txt"
           assert_present "Web WASM tar"             "RACommons-web-v*.tar.gz"
           assert_present "rcli macOS tarball"       "rcli-macos-arm64-v*.tar.gz"
           assert_present "rcli Linux tarball"       "rcli-linux-x86_64-v*.tar.gz"
           assert_present "Kotlin SDK AAR"           "*.aar"
           # Kotlin JVM JAR
           assert_present "Kotlin SDK JAR"           "*.jar"
+          VERSION="${{ needs.validate.outputs.version }}"
+          if ! grep -Fxq "version=${VERSION}" release-flat/ANDROID-ASSETS-MANIFEST.txt || \
+             ! grep -Fxq "abis=arm64-v8a armeabi-v7a x86_64" release-flat/ANDROID-ASSETS-MANIFEST.txt; then
+            echo "::error::Android aggregate manifest has the wrong version or ABI set"
+            fail=1
+          fi
+          for asset in \
+            "RACommons-android-v${VERSION}.zip" \
+            "RABackendLlamaCPP-android-v${VERSION}.zip" \
+            "RABackendONNX-android-v${VERSION}.zip"; do
+            assert_present "Android aggregate asset" "${asset}"
+            assert_present "Android aggregate checksum" "${asset}.sha256"
+            expected="$(awk 'NR == 1 { print $1 }' "release-flat/${asset}.sha256")"
+            actual="$(sha256sum "release-flat/${asset}" | awk '{ print $1 }')"
+            if [ -z "${expected}" ] || [ "${expected}" != "${actual}" ]; then
+              echo "::error::Checksum assertion failed for ${asset}"
+              fail=1
+            fi
+            if ! grep -Eq "^asset=${asset} sha256=${actual} so_count=[1-9][0-9]*$" \
+              release-flat/ANDROID-ASSETS-MANIFEST.txt; then
+              echo "::error::Android aggregate manifest entry is missing or invalid for ${asset}"
+              fail=1
+            fi
+          done
           # Web tarballs cover proto-ts + core + llamacpp + onnx (4 .tgz min).
           web_tgz=$(ls release-flat/*.tgz 2>/dev/null | wc -l | tr -d ' ')
           if [ "${web_tgz}" -lt 1 ]; then

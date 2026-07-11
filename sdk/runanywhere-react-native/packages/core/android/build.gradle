@@ -85,7 +85,7 @@ def getExtOrIntegerDefault(name) {
 // Version Constants (MUST match Swift Package.swift and iOS Podspec)
 // RACommons ONLY - no backend binaries
 // =============================================================================
-def commonsVersion = "0.1.4"
+def commonsVersion = "0.19.15"
 
 // =============================================================================
 // Binary Source - RACommons from runanywhere-sdks
@@ -332,7 +332,7 @@ task downloadNativeLibs {
                 logger.lifecycle("[RunAnywhereCore] Attempting to download missing ABIs from GitHub releases...")
                 // Try to download and extract only missing ABIs (don't delete existing bundled libs)
                 try {
-                    def commonsUrl = "https://github.com/${githubOrg}/${commonsRepo}/releases/download/commons-v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
+                    def commonsUrl = "https://github.com/${githubOrg}/${commonsRepo}/releases/download/v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
                     def tempZip = file("${downloadedLibsDir}/RACommons-supplement.zip")
                     downloadedLibsDir.mkdirs()
                     new URL(commonsUrl).withInputStream { input ->
@@ -380,7 +380,7 @@ task downloadNativeLibs {
         // =============================================================================
         // Download RACommons from runanywhere-sdks
         // =============================================================================
-        def commonsUrl = "https://github.com/${githubOrg}/${commonsRepo}/releases/download/commons-v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
+        def commonsUrl = "https://github.com/${githubOrg}/${commonsRepo}/releases/download/v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
         def commonsZip = file("${downloadedLibsDir}/RACommons.zip")
 
         logger.lifecycle("\n📦 Downloading RACommons...")

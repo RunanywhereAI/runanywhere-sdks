@@ -9,7 +9,7 @@
 #   ./run-tests-web.sh --full           # Print instructions for full manual suite
 #
 # Prerequisites:
-#   - Node.js 18+
+#   - Node.js 20.19+ or 22.12+ (Vite 8 requirement)
 #   - npm
 #   - Built WASM binaries (run sdk/runanywhere-web/scripts/build-web.sh first)
 #
@@ -101,13 +101,17 @@ print_header "runanywhere Web SDK Tests"
 print_step "Checking prerequisites..."
 
 if ! command -v node &> /dev/null; then
-    print_error "Node.js not found. Install Node.js 18+."
+    print_error "Node.js not found. Install Node.js 20.19+ or 22.12+."
     exit 1
 fi
 
-NODE_VERSION=$(node --version | sed 's/v//' | cut -d. -f1)
-if [ "$NODE_VERSION" -lt 18 ]; then
-    print_error "Node.js 18+ required (found: $(node --version))"
+NODE_VERSION=$(node --version | sed 's/^v//')
+NODE_MAJOR=$(echo "${NODE_VERSION}" | cut -d. -f1)
+NODE_MINOR=$(echo "${NODE_VERSION}" | cut -d. -f2)
+if ! { { [ "${NODE_MAJOR}" -eq 20 ] && [ "${NODE_MINOR}" -ge 19 ]; } ||
+       { [ "${NODE_MAJOR}" -eq 22 ] && [ "${NODE_MINOR}" -ge 12 ]; } ||
+       [ "${NODE_MAJOR}" -gt 22 ]; }; then
+    print_error "Node.js 20.19+ or 22.12+ required (found: $(node --version))"
     exit 1
 fi
 print_ok "Found Node.js $(node --version)"

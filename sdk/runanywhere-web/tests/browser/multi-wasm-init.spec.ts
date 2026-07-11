@@ -121,9 +121,11 @@ test.describe('Multi-WASM SDK initialization', () => {
       (err) => !err.includes('NO_COLOR')
         && !err.includes('Failed to load resource')
         // Credential-less local initialization intentionally defers the
-        // assignment fetch. The SDK surfaces that as an expected warning;
-        // backend registration itself is asserted above.
-        && !err.includes('model assignment base URL is not configured'),
+        // registration and assignment fetches. Commons logs both missing-
+        // configuration diagnostics at ERROR; backend registration itself
+        // is asserted above.
+        && !err.includes('model assignment base URL is not configured')
+        && !err.includes('Device registration requires a matching base URL and API key'),
     );
     expect(fatalErrors, `unexpected console errors:\n${fatalErrors.join('\n')}`).toHaveLength(0);
     expect(pageErrors, `page errors:\n${pageErrors.join('\n')}`).toHaveLength(0);

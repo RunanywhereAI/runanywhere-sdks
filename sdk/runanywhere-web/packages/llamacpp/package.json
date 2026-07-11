@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/web-llamacpp",
-  "version": "0.19.14",
+  "version": "0.19.15",
   "description": "RunAnywhere Web SDK - LlamaCpp backend for on-device LLM/VLM inference",
   "type": "module",
   "main": "./dist/index.js",
@@ -63,10 +63,10 @@
     "node": ">=18.0.0"
   },
   "peerDependencies": {
-    "@runanywhere/web": ">=0.19.14 <1"
+    "@runanywhere/web": ">=0.19.15 <1"
   },
   "dependencies": {
-    "@runanywhere/proto-ts": "^0.19.14"
+    "@runanywhere/proto-ts": "^0.19.15"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

@@ -96,25 +96,25 @@ Add the packages you need to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  runanywhere: ^0.19.13
-  runanywhere_llamacpp: ^0.19.13
+  runanywhere: ^0.19.15
+  runanywhere_llamacpp: ^0.19.15
 ```
 
 **Core + ONNX (STT/TTS/VAD):**
 
 ```yaml
 dependencies:
-  runanywhere: ^0.19.13
-  runanywhere_onnx: ^0.19.13
+  runanywhere: ^0.19.15
+  runanywhere_onnx: ^0.19.15
 ```
 
 **All Backends (LLM + STT + TTS + VAD):**
 
 ```yaml
 dependencies:
-  runanywhere: ^0.19.13
-  runanywhere_llamacpp: ^0.19.13
-  runanywhere_onnx: ^0.19.13
+  runanywhere: ^0.19.15
+  runanywhere_llamacpp: ^0.19.15
+  runanywhere_onnx: ^0.19.15
 ```
 
 Then run:

@@ -102,4 +102,36 @@ describe('SDKLogger secret safety', () => {
       detail: 'access_token=[REDACTED]',
     });
   });
+
+  test('recursively sanitizes strings and sensitive keys inside metadata arrays', () => {
+    const entries: LogEntry[] = [];
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const destination: LogDestination = {
+      identifier: 'sdk-logger-array-security-test',
+      isAvailable: true,
+      write: (entry) => entries.push(entry),
+      flush: () => undefined,
+    };
+    LoggingManager.shared.addDestination(destination);
+    try {
+      new SDKLogger('SecurityTest').error('nested metadata', {
+        attempts: [
+          'Authorization: Bearer top-level-array-secret',
+          [{ detail: 'token=nested-array-secret', apiKey: 'key-secret' }],
+        ],
+      });
+    } finally {
+      LoggingManager.shared.removeDestination(destination);
+      consoleError.mockRestore();
+    }
+
+    expect(entries[0]?.metadata).toEqual({
+      attempts: [
+        'Authorization: [REDACTED]',
+        [{ detail: 'token=[REDACTED]', apiKey: '[REDACTED]' }],
+      ],
+    });
+    expect(JSON.stringify(entries[0])).not.toContain('array-secret');
+    expect(JSON.stringify(entries[0])).not.toContain('key-secret');
+  });
 });

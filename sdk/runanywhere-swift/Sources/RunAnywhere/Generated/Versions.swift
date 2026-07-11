@@ -23,7 +23,7 @@
 /// Centralized version constants for the Swift SDK. Do not hand-edit;
 /// run scripts/release/sync-versions.sh to refresh.
 public enum RAVersions {
-    public static let sdkVersion = "0.19.13"
+    public static let sdkVersion = "0.19.15"
     // T5.4: swift-tools-version stays at 5.9 — the 6.0 attempt enabled Swift 6
     // strict concurrency and surfaced pre-existing source-level issues
     // (mutable static globals, closure-captured locals in audio + URLSession

@@ -341,6 +341,42 @@ describe('server control-plane relay', () => {
     expect(JSON.stringify(await unavailable.json())).not.toContain('sensitive network detail');
   });
 
+  it('aborts the upstream at 25 seconds and retains time to return a 504', async () => {
+    vi.useFakeTimers();
+    try {
+      let upstreamSignal: AbortSignal | null = null;
+      const fetchImplementation: RelayFetch = async (_input, init) => {
+        upstreamSignal = init?.signal ?? null;
+        return await new Promise<Response>((_resolve, reject) => {
+          upstreamSignal?.addEventListener(
+            'abort',
+            () => reject(new Error('aborted upstream request')),
+            { once: true },
+          );
+        });
+      };
+
+      const pendingResponse = handleControlPlaneRelay(relayRequest(MODEL_ASSIGNMENTS_PATH, {
+        method: 'GET',
+        headers: { Authorization: 'Bearer access-token' },
+      }), { apiKey: TEST_SERVER_CREDENTIAL, fetchImplementation });
+
+      expect(upstreamSignal).not.toBeNull();
+      const observedSignal = upstreamSignal as AbortSignal | null;
+      if (observedSignal === null) throw new Error('The relay did not pass an upstream signal.');
+      await vi.advanceTimersByTimeAsync(24_999);
+      expect(observedSignal.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+
+      const response = await pendingResponse;
+      expect(observedSignal.aborted).toBe(true);
+      expect(response.status).toBe(504);
+      expect(await errorCode(response)).toBe('upstream_timeout');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not expose an upstream error body or unsafe response headers', async () => {
     const response = await handleControlPlaneRelay(relayRequest(REFRESH_PATH, {
       body: { device_id: 'device', refresh_token: 'token' },

@@ -13,6 +13,7 @@
 #   scripts/release/sync-versions.sh v0.20.0      # 'v' prefix is stripped
 #
 # What it touches:
+#   AGENTS.md                                               (documented current version)
 #   sdk/runanywhere-commons/VERSION                        (single line)
 #   sdk/runanywhere-commons/VERSIONS                       (PROJECT_VERSION line)
 #   Package.swift                                          (sdkVersion line)
@@ -24,12 +25,15 @@
 #   sdk/runanywhere-web/packages/*/package.json            (each package version)
 #   sdk/runanywhere-web/.../Version.ts                     (web SDK_VERSION constant)
 #   sdk/runanywhere-react-native/package.json              (root)
-#   sdk/runanywhere-react-native/packages/*/package.json   (each package + proto-ts dep)
+#   sdk/runanywhere-react-native/packages/*/package.json   (each package + first-party deps)
+#   sdk/runanywhere-react-native/lerna.json                (fixed package train version)
 #   sdk/runanywhere-react-native/.../SDKConstants.ts       (RN version constant)
+#   sdk/runanywhere-react-native/packages/core/android/build.gradle (commonsVersion)
 #   sdk/runanywhere-react-native/packages/*/android/build.gradle (def coreVersion)
-#   sdk/runanywhere-flutter/packages/*/pubspec.yaml        (each version: line)
-#   sdk/runanywhere-flutter/.../sdk_constants.dart         (Flutter version constant)
+#   sdk/runanywhere-flutter/packages/*/pubspec.yaml        (each version + core dep)
+#   sdk/runanywhere-flutter package/plugin/native metadata (Dart, Gradle, Swift, Kotlin)
 #   dependencies/versions.json                             (@runanywhere/proto-ts pin — first-party suite version)
+#   SDK AGENTS/architecture/install docs                   (release-facing version examples)
 #
 # Does NOT touch (intentional, documented SoT for distinct domains):
 #   - sdk/runanywhere-swift/.../SDKConstants.swift — its `version` constant now
@@ -69,6 +73,8 @@ if ! [[ "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+CURRENT_VERSION="$(tr -d '[:space:]' < "${REPO_ROOT}/sdk/runanywhere-commons/VERSION")"
+CURRENT_VERSION_REGEX="${CURRENT_VERSION//./\\.}"
 
 bump_line() {
     # Replaces a line matching $pattern with $replacement, in $file.
@@ -76,6 +82,11 @@ bump_line() {
     local file="$1" pattern="$2" replacement="$3"
     if [ ! -f "$file" ]; then
         echo "ERROR: target path missing (sync-versions configuration is stale): $file" >&2
+        return 1
+    fi
+    if ! grep -Eq "${pattern}" "$file"; then
+        echo "ERROR: version pattern not found (sync-versions configuration is stale): $file" >&2
+        echo "       pattern: $pattern" >&2
         return 1
     fi
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -96,7 +107,7 @@ bump_pubspec_version() {
     bump_line "$file" '^version: .+' "version: ${NEW_VERSION}"
 }
 
-# Flutter sub-packages (llamacpp/onnx/qhexrt) depend on the core `runanywhere`
+# Flutter sub-packages (llamacpp/mlx/onnx/qhexrt) depend on the core `runanywhere`
 # package via a caret constraint like `runanywhere: ^0.19.13`. When we bump
 # the suite, that constraint must track the FULL NEW_VERSION (patch included)
 # because backend packages ship native binaries that lockstep with the core
@@ -118,9 +129,31 @@ bump_pubspec_runanywhere_dep() {
 # advance to `^${NEW_VERSION}` in the same commit.
 bump_npm_proto_ts_dep() {
     local file="$1"
+    grep -Eq '"@runanywhere/proto-ts": "\^[0-9]' "$file" || return 0
     bump_line "$file" \
-        '"@runanywhere/proto-ts": "\^[0-9]+\.[0-9]+\.[0-9]+"' \
+        '"@runanywhere/proto-ts": "\^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"' \
         "\"@runanywhere/proto-ts\": \"^${NEW_VERSION}\""
+}
+
+# RN backend packages are released in lockstep with @runanywhere/core. Keep
+# their peer floor on the same full suite version so a newer native backend
+# cannot resolve an older core with a different C ABI.
+bump_npm_core_dep() {
+    local file="$1"
+    grep -Eq '"@runanywhere/core": ">=[0-9]' "$file" || return 0
+    bump_line "$file" \
+        '"@runanywhere/core": ">=[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"' \
+        "\"@runanywhere/core\": \">=${NEW_VERSION}\""
+}
+
+# Web backend packages publish against the same core build. Preserve the open
+# upper bound while advancing the minimum to this train's exact version.
+bump_npm_web_core_dep() {
+    local file="$1"
+    grep -Eq '"@runanywhere/web": ">=[0-9]' "$file" || return 0
+    bump_line "$file" \
+        '"@runanywhere/web": ">=[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)? <1"' \
+        "\"@runanywhere/web\": \">=${NEW_VERSION} <1\""
 }
 
 # Update the first-party `@runanywhere/proto-ts` pin inside
@@ -131,7 +164,7 @@ bump_npm_proto_ts_dep() {
 bump_versions_json_proto_ts_pin() {
     local file="$1"
     bump_line "$file" \
-        '"@runanywhere/proto-ts": "\^[0-9]+\.[0-9]+\.[0-9]+"' \
+        '"@runanywhere/proto-ts": "\^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"' \
         "\"@runanywhere/proto-ts\": \"^${NEW_VERSION}\""
 }
 
@@ -141,16 +174,32 @@ bump_versions_json_proto_ts_pin() {
 # will try to fetch a release tag that doesn't exist (or fetch the wrong one).
 bump_rn_backend_core_version() {
     local file="$1"
+    if grep -Eq 'def coreVersion = "[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"' "$file"; then
+        bump_line "$file" \
+            'def coreVersion = "[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"' \
+            "def coreVersion = \"${NEW_VERSION}\""
+    else
+        bump_line "$file" \
+            '(def coreVersion = .*:[[:space:]]*)"[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"' \
+            "\\1\"${NEW_VERSION}\""
+    fi
+}
+
+bump_gradle_version() {
+    local file="$1"
     bump_line "$file" \
-        'def coreVersion = "[0-9]+\.[0-9]+\.[0-9]+"' \
-        "def coreVersion = \"${NEW_VERSION}\""
+        "^version '[0-9]+\\.[0-9]+\\.[0-9]+([.-][A-Za-z0-9.-]+)?'" \
+        "version '${NEW_VERSION}'"
 }
 
 echo ">> Syncing versions to ${NEW_VERSION}"
 echo ">> Repo root: ${REPO_ROOT}"
 echo ""
 
-# 1. commons VERSION + VERSIONS
+# 1. Contributor guidance + commons VERSION + VERSIONS
+bump_line "${REPO_ROOT}/AGENTS.md" \
+    '(\*\*Current version\*\*: `)[^`]+(` \(canonical source: `sdk/runanywhere-commons/VERSION`\))' \
+    "\\1${NEW_VERSION}\\2"
 echo ">> commons:"
 echo "$NEW_VERSION" > "${REPO_ROOT}/sdk/runanywhere-commons/VERSION"
 echo "  bumped: sdk/runanywhere-commons/VERSION"
@@ -162,6 +211,9 @@ echo ""
 echo ">> Swift SDK:"
 bump_line "${REPO_ROOT}/Package.swift" \
     'let sdkVersion = "[^"]+"' "let sdkVersion = \"${NEW_VERSION}\""
+bump_line "${REPO_ROOT}/Package.swift" \
+    '(\.package\(url: "https://github\.com/RunanywhereAI/runanywhere-sdks", from: ")[^"]+("\))' \
+    "\\1${NEW_VERSION}\\2"
 # Swift SDK VERSION file (read by release tooling)
 SWIFT_VERSION_FILE="${REPO_ROOT}/sdk/runanywhere-swift/VERSION"
 if [ -f "$SWIFT_VERSION_FILE" ]; then
@@ -227,6 +279,7 @@ for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-web/packages/onnx/package.json"; do
     bump_json_version "$pkg"
     bump_npm_proto_ts_dep "$pkg"
+    bump_npm_web_core_dep "$pkg"
 done
 # Web SDK public `RunAnywhere.version` surface — keeps the TS constant in
 # sync with the commons VERSION file and the package.json versions above.
@@ -241,20 +294,33 @@ for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-react-native/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/package.json" \
+    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/mlx/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/package.json"; do
     bump_json_version "$pkg"
     bump_npm_proto_ts_dep "$pkg"
+    bump_npm_core_dep "$pkg"
 done
+bump_line "${REPO_ROOT}/sdk/runanywhere-react-native/lerna.json" \
+    '^  "version": "[^"]+"' \
+    "  \"version\": \"${NEW_VERSION}\""
 # React Native public `RunAnywhere.version` surface — keeps the TS constant
 # (consumed by Public/RunAnywhere.ts during initialize) aligned with commons.
 bump_line "${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/src/Foundation/Constants/SDKConstants.ts" \
     "version: '[^']+'" \
     "version: '${NEW_VERSION}'"
+bump_line "${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/src/QHexRTProvider.ts" \
+    "static readonly version = '[^']+'" \
+    "static readonly version = '${NEW_VERSION}'"
+
+# RN core downloads the release-train RACommons archive directly.
+bump_line "${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/android/build.gradle" \
+    'def commonsVersion = "[^"]+"' \
+    "def commonsVersion = \"${NEW_VERSION}\""
 
 # RN backend Android build.gradle `coreVersion` — each backend package
 # derives its native-asset download URL from this constant
-# (`core-v${coreVersion}` GitHub Release tag), so it must track the SDK suite
+# (`v${coreVersion}` GitHub Release tag), so it must track the SDK suite
 # version. Leaving it stale causes assemble tasks to fetch wrong/missing
 # artifacts on release builds. See pass3-syn-078.
 for gradle_file in \
@@ -269,6 +335,7 @@ echo ">> Flutter SDK:"
 for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_mlx/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml"; do
     bump_pubspec_version "$pkg"
@@ -278,6 +345,7 @@ done
 # dependency floor to match the bumped suite version.
 for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_mlx/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml"; do
     bump_pubspec_runanywhere_dep "$pkg"
@@ -286,19 +354,48 @@ done
 # Flutter public `RunAnywhere.version` surface — Dart constant consumed by
 # `RunAnywhere.version` getter and by the native init payload.
 bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
-    "static const String version = '[^']+'" \
-    "static const String version = '${NEW_VERSION}'"
+    "static const String _fallbackVersion = '[^']+'" \
+    "static const String _fallbackVersion = '${NEW_VERSION}'"
+
+# Flutter package versions and native download metadata are all release-train
+# values, not independent backend versions.
+for gradle_file in \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/build.gradle" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/build.gradle" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/android/build.gradle" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/build.gradle"; do
+    bump_gradle_version "$gradle_file"
+done
+bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/binary_config.gradle" \
+    'commonsVersion = "[^"]+"' \
+    "commonsVersion = \"${NEW_VERSION}\""
+bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/binary_config.gradle" \
+    'coreVersion = "[^"]+"' \
+    "coreVersion = \"${NEW_VERSION}\""
+for binary_config in \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/binary_config.gradle" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/android/binary_config.gradle"; do
+    bump_line "$binary_config" \
+        'coreVersion = "[^"]+"' \
+        "coreVersion = \"${NEW_VERSION}\""
+done
+bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt" \
+    'private const val SDK_VERSION = "[^"]+"' \
+    "private const val SDK_VERSION = \"${NEW_VERSION}\""
+bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt" \
+    'private const val COMMONS_VERSION = "[^"]+"' \
+    "private const val COMMONS_VERSION = \"${NEW_VERSION}\""
+bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/ios/Classes/RunAnywherePlugin.swift" \
+    'result\("[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"\)' \
+    "result(\"${NEW_VERSION}\")"
 
 # Flutter QHexRT carries native metadata outside pubspec.yaml.
 bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/lib/qhexrt.dart" \
     "static const String version = '[^']+'" \
     "static const String version = '${NEW_VERSION}'"
-bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/build.gradle" \
-    "version '[^']+'" \
-    "version '${NEW_VERSION}'"
 bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/kotlin/ai/runanywhere/sdk/qhexrt/QhexrtPlugin.kt" \
     'private const val BACKEND_VERSION = "[^"]+"' \
-    "        private const val BACKEND_VERSION = \"${NEW_VERSION}\""
+    "private const val BACKEND_VERSION = \"${NEW_VERSION}\""
 
 # Flutter iOS podspecs — must be bumped in lockstep with pubspec.yaml.
 # Unlike RN podspecs (which derive s.version from package.json at eval time),
@@ -313,12 +410,41 @@ for podspec in \
         "s.version          = '${NEW_VERSION}'"
 done
 
+# Release-facing current-version statements and installation examples. Replace
+# only the previous canonical suite version so unrelated tool/native versions
+# and historical changelogs remain untouched.
+echo ""
+echo ">> Release-facing documentation:"
+for release_doc in \
+    "${REPO_ROOT}/sdk/runanywhere-react-native/AGENTS.md" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/AGENTS.md" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/README.md" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/README.md" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/README.md" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/README.md" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/docs/ARCHITECTURE.md" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/docs/Documentation.md" \
+    "${REPO_ROOT}/sdk/runanywhere-swift/ARCHITECTURE.md" \
+    "${REPO_ROOT}/sdk/runanywhere-swift/Sources/LlamaCPPRuntime/README.md" \
+    "${REPO_ROOT}/sdk/runanywhere-swift/Sources/ONNXRuntime/README.md" \
+    "${REPO_ROOT}/sdk/runanywhere-kotlin/README.md"; do
+    bump_line "$release_doc" "$CURRENT_VERSION_REGEX" "$NEW_VERSION"
+done
+
 echo ""
 echo ">> Done. Verify with:"
 echo "    git diff -- sdk/ Package.swift"
+echo "    corepack yarn install --mode=skip-build"
+echo "    (cd sdk/runanywhere-react-native && corepack yarn install --mode=skip-build)"
+echo "    regenerate sdk/runanywhere-web/yarn.lock with Yarn Classic"
+echo "    bash scripts/validation/gates/check_release_version_coherence.sh"
 echo ""
-echo ">> Then commit, tag, and push:"
+echo ">> Then prepare and validate every release artifact before tagging:"
+echo "    - build the native archives"
+echo "    - set Package.swift useLocalNatives = false"
+echo "    - sync and commit the real XCFramework checksums"
+echo "    - rerun the release gates"
+echo ""
+echo ">> Commit the reviewed release-preparation changes:"
 echo "    git add -u"
 echo "    git commit -m \"chore: release ${NEW_VERSION}\""
-echo "    git tag v${NEW_VERSION}"
-echo "    git push origin main v${NEW_VERSION}"

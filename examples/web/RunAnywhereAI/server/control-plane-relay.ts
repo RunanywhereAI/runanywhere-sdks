@@ -11,7 +11,9 @@ const MODEL_ASSIGNMENTS_PATH = '/api/v1/model-assignments/for-sdk';
 
 const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
 const MAX_RESPONSE_BODY_BYTES = 2 * 1024 * 1024;
-const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
+// Leave enough of the Vercel function's 30-second budget to construct and
+// flush the relay's structured 504 response after an upstream timeout.
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 25_000;
 const MAX_AUTHORIZATION_LENGTH = 4096;
 const MAX_SDK_VERSION_LENGTH = 64;
 const MAX_RETRY_AFTER_LENGTH = 128;

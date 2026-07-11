@@ -25,8 +25,8 @@ ext {
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
-    commonsVersion = "0.1.6"
-    coreVersion = "0.1.6"
+    commonsVersion = "0.19.15"
+    coreVersion = "0.19.15"
 
     // =============================================================================
     // Remote binary URLs
@@ -37,7 +37,7 @@ ext {
     commonsBaseUrl = "https://github.com/${commonsGitHubOrg}/${commonsRepo}/releases/download"
 
     // Android native libraries packages
-    commonsAndroidUrl = "${commonsBaseUrl}/commons-v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
+    commonsAndroidUrl = "${commonsBaseUrl}/v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
 
     // Helper method to check if we should download
     shouldDownloadAndroidLibs = { ->

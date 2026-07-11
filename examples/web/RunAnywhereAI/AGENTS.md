@@ -55,12 +55,22 @@ keep each view focused on DOM state and user-flow orchestration.
 
 Run from `examples/web/RunAnywhereAI/`.
 
+Vite 8 requires Node `20.19+` or `22.12+`; the example mirrors that constraint
+in its `engines` field. Production output is pinned to Chrome 86 syntax
+compatibility in `vite.config.ts` so a Vite major upgrade cannot silently raise
+the Web SDK's documented browser floor. This build target does not polyfill
+missing browser APIs; WebGPU remains optional and falls back to the CPU backend.
+
 ```bash
 npm run lint
 npm run typecheck
 npm run build
 npm run dev -- --host 127.0.0.1
 ```
+
+Production Vercel releases use `npm run release:deploy`; see
+`docs/CONTROL_PLANE_RELAY.md`. Do not deploy `dist` directly because the
+same-origin API function is outside that directory.
 
 ## SDK Surfaces By View
 

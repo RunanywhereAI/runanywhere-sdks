@@ -160,7 +160,23 @@ export function setRAGSessionHandle(
   advancePipelineState(null);
 }
 
+function evictUnavailableCrossWasmProvider(): void {
+  const provider = _provider;
+  if (provider?.providerKind !== 'cross-wasm' || supportsCrossWasmRAG()) return;
+
+  _provider = null;
+  advancePipelineState(null);
+  void provider.ragDestroyPipeline().catch((error: unknown) => {
+    logger.warning(
+      `Stale cross-WASM RAG cleanup failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  });
+}
+
 function activeProvider(): RAGProvider | null {
+  evictUnavailableCrossWasmProvider();
   return _provider;
 }
 

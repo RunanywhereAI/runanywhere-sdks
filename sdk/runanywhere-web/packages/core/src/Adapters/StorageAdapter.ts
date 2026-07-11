@@ -23,7 +23,6 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import {
   RAC_ERROR_DELETE_FAILED,
-  RAC_ERROR_FILE_NOT_FOUND,
   RAC_ERROR_INVALID_ARGUMENT,
   RAC_ERROR_MODEL_NOT_LOADED,
   RAC_OK,
@@ -70,15 +69,23 @@ export interface StorageModule extends ProtoWasmModule {
 }
 
 interface StorageAnalyzerLifecycle {
+  readonly isDisposed: boolean;
   refreshStorageState(): void;
   refreshLoadedModelState(): void;
-  prepareDelete(request: ProtoStorageDeleteRequest): void;
+  prepareDelete(request: ProtoStorageDeleteRequest): Promise<void>;
+  finishDelete(): void;
 }
 
-let defaultModule: StorageModule | null = null;
-let defaultAnalyzerHandle = 0;
-let defaultRegistryHandle = 0;
-let defaultAnalyzerLifecycle: StorageAnalyzerLifecycle | null = null;
+interface StorageAnalyzerBinding {
+  readonly module: StorageModule;
+  readonly analyzerHandle: number;
+  readonly registryHandle: number;
+  readonly lifecycle: StorageAnalyzerLifecycle | null;
+  deleteTail: Promise<void>;
+  closing: boolean;
+}
+
+let defaultBinding: StorageAnalyzerBinding | null = null;
 
 export class StorageAdapter {
   static setDefaultHandles(
@@ -87,39 +94,79 @@ export class StorageAdapter {
     registryHandle = 0,
     lifecycle: StorageAnalyzerLifecycle | null = null,
   ): void {
-    defaultModule = module;
-    defaultAnalyzerHandle = analyzerHandle;
-    defaultRegistryHandle = registryHandle;
-    defaultAnalyzerLifecycle = lifecycle;
+    if (defaultBinding) defaultBinding.closing = true;
+    defaultBinding = {
+      module,
+      analyzerHandle,
+      registryHandle,
+      lifecycle,
+      deleteTail: Promise.resolve(),
+      closing: false,
+    };
   }
 
   static clearDefaultHandles(module?: StorageModule, analyzerHandle?: number): void {
-    if (module && defaultModule !== module) return;
-    if (analyzerHandle && defaultAnalyzerHandle !== analyzerHandle) return;
-    defaultModule = null;
-    defaultAnalyzerHandle = 0;
-    defaultRegistryHandle = 0;
-    defaultAnalyzerLifecycle = null;
+    const binding = defaultBinding;
+    if (!binding) return;
+    if (module && binding.module !== module) return;
+    if (analyzerHandle && binding.analyzerHandle !== analyzerHandle) return;
+    binding.closing = true;
+    defaultBinding = null;
+  }
+
+  /**
+   * Close the current delete admission gate and wait for every operation that
+   * entered before shutdown. This must run before the analyzer handle or its
+   * WASM module is destroyed; callers that retained an adapter from this
+   * lifetime are rejected after the gate closes instead of reaching stale C
+   * function pointers.
+   */
+  static async prepareForShutdown(module?: StorageModule): Promise<void> {
+    const binding = defaultBinding;
+    if (!binding || (module && binding.module !== module)) return;
+    binding.closing = true;
+    await binding.deleteTail;
   }
 
   static tryDefault(): StorageAdapter | null {
-    if (!defaultModule || !defaultAnalyzerHandle) return null;
-    return new StorageAdapter(defaultModule, defaultAnalyzerHandle, defaultRegistryHandle);
+    const binding = defaultBinding;
+    if (!binding || !binding.analyzerHandle || binding.closing) return null;
+    const adapter = new StorageAdapter(
+      binding.module,
+      binding.analyzerHandle,
+      binding.registryHandle,
+    );
+    adapter.binding = binding;
+    return adapter;
   }
+
+  private binding: StorageAnalyzerBinding;
 
   constructor(
     private readonly module: StorageModule,
     private readonly analyzerHandle: number,
     private readonly registryHandle = 0,
-  ) {}
+  ) {
+    this.binding = {
+      module,
+      analyzerHandle,
+      registryHandle,
+      lifecycle: null,
+      deleteTail: Promise.resolve(),
+      closing: false,
+    };
+  }
 
   supportsProtoStorage(): boolean {
-    return this.missingExports().length === 0 && this.analyzerHandle !== 0;
+    return !this.binding.closing
+      && !this.binding.lifecycle?.isDisposed
+      && this.missingExports().length === 0
+      && this.analyzerHandle !== 0;
   }
 
   info(request: ProtoStorageInfoRequest): ProtoStorageInfoResult | null {
     if (!this.ensureExports('info', ['_rac_storage_analyzer_info_proto'])) return null;
-    defaultAnalyzerLifecycle?.refreshStorageState();
+    this.binding.lifecycle?.refreshStorageState();
     return this.bridge().withEncodedRequest(
       request,
       StorageInfoRequest,
@@ -143,7 +190,7 @@ export class StorageAdapter {
     if (!this.ensureExports('availability', ['_rac_storage_analyzer_availability_proto'])) {
       return null;
     }
-    defaultAnalyzerLifecycle?.refreshStorageState();
+    this.binding.lifecycle?.refreshStorageState();
     return this.bridge().withEncodedRequest(
       request,
       StorageAvailabilityRequest,
@@ -165,7 +212,7 @@ export class StorageAdapter {
     if (!this.ensureExports('deletePlan', ['_rac_storage_analyzer_delete_plan_proto'])) {
       return null;
     }
-    defaultAnalyzerLifecycle?.refreshStorageState();
+    this.binding.lifecycle?.refreshStorageState();
     return this.bridge().withEncodedRequest(
       request,
       StorageDeletePlanRequest,
@@ -183,28 +230,53 @@ export class StorageAdapter {
     );
   }
 
-  delete(request: ProtoStorageDeleteRequest): ProtoStorageDeleteResult | null {
-    if (!this.ensureExports('delete', ['_rac_storage_analyzer_delete_proto'])) return null;
-    defaultAnalyzerLifecycle?.prepareDelete(request);
-    const result = this.bridge().withEncodedRequest(
-      request,
-      StorageDeleteRequest,
-      StorageDeleteResult,
-      (requestPtr, requestSize, outResult) => (
-        this.module._rac_storage_analyzer_delete_proto!(
-          this.analyzerHandle,
-          this.getRegistryHandle(),
-          requestPtr,
-          requestSize,
-          outResult,
-        )
-      ),
-      'rac_storage_analyzer_delete_proto',
-    );
-    if (result && request.clearRegistryPaths && !request.dryRun) {
-      this.synchronizeClearedRegistryPaths(result.deletedModelIds);
+  async delete(request: ProtoStorageDeleteRequest): Promise<ProtoStorageDeleteResult | null> {
+    const binding = this.binding;
+    if (binding.closing || binding.lifecycle?.isDisposed) {
+      throw new Error('Storage delete cancelled because the SDK runtime is shutting down.');
     }
-    return result;
+    if (!this.ensureExports('delete', ['_rac_storage_analyzer_delete_proto'])) return null;
+    const predecessor = binding.deleteTail;
+    let release!: () => void;
+    binding.deleteTail = new Promise<void>((resolve) => { release = resolve; });
+    await predecessor;
+    const lifecycle = binding.lifecycle;
+    try {
+      if (lifecycle?.isDisposed) {
+        throw new Error('Storage delete cancelled because its analyzer was disposed.');
+      }
+      await lifecycle?.prepareDelete(request);
+      if (lifecycle?.isDisposed) {
+        throw new Error('Storage delete cancelled because its analyzer was disposed.');
+      }
+      // OPFS removal yields to the event loop. A caller may load the model
+      // again while that persistent operation is pending, so refresh the
+      // synchronous callback cache at the final no-yield boundary before
+      // native validates loaded state and touches any module's MEMFS.
+      lifecycle?.refreshLoadedModelState();
+      const result = this.bridge().withEncodedRequest(
+        request,
+        StorageDeleteRequest,
+        StorageDeleteResult,
+        (requestPtr, requestSize, outResult) => (
+          this.module._rac_storage_analyzer_delete_proto!(
+            this.analyzerHandle,
+            this.getRegistryHandle(),
+            requestPtr,
+            requestSize,
+            outResult,
+          )
+        ),
+        'rac_storage_analyzer_delete_proto',
+      );
+      if (result && request.clearRegistryPaths && !request.dryRun) {
+        this.synchronizeClearedRegistryPaths(result.deletedModelIds);
+      }
+      return result;
+    } finally {
+      lifecycle?.finishDelete();
+      release();
+    }
   }
 
   private getRegistryHandle(): number {
@@ -245,6 +317,10 @@ export class StorageAdapter {
   }
 
   private ensureExports(operation: string, required: Array<keyof StorageModule>): boolean {
+    if (this.binding.closing || this.binding.lifecycle?.isDisposed) {
+      logger.warning(`${operation}: storage analyzer belongs to a closed SDK runtime`);
+      return false;
+    }
     if (!this.analyzerHandle) {
       logger.warning(`${operation}: storage analyzer handle is null`);
       return false;
@@ -456,8 +532,9 @@ function finiteStorageBytes(value: number | undefined): number {
 
 /**
  * Owns the JavaScript function-table entries and native analyzer handle for
- * one commons WASM lifetime. Native callbacks stay synchronous; async browser
- * quota and OPFS work is cached/scheduled outside the C call boundary.
+ * one commons WASM lifetime. Native callbacks stay synchronous; destructive
+ * persistent work is awaited by the public async facade before native commits
+ * the matching MEMFS and registry changes.
  */
 export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
   private callbacksPtr = 0;
@@ -474,6 +551,10 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
   private readonly modelStorageRoots = new Map<string, StoragePathMetadata>();
   /** Exact model and known multi-file child paths for synchronous callbacks. */
   private readonly pathMetadata = new Map<string, StoragePathMetadata>();
+  private readonly modelStoragePathsById = new Map<string, string>();
+  private readonly preparedPersistentDeletes = new Set<string>();
+  private readonly persistentDeleteFailures = new Set<string>();
+  private disposed = false;
 
   private constructor(private readonly module: BrowserStorageAnalyzerModule) {
     this.callbackLayout = this.readCallbackLayout();
@@ -492,7 +573,12 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
     return this.analyzerHandle;
   }
 
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
+
   cleanup(): void {
+    this.disposed = true;
     StorageAdapter.clearDefaultHandles(this.module, this.analyzerHandle);
     if (this.analyzerHandle !== 0) {
       try {
@@ -522,6 +608,9 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
     this.unloadFailures.clear();
     this.modelStorageRoots.clear();
     this.pathMetadata.clear();
+    this.modelStoragePathsById.clear();
+    this.preparedPersistentDeletes.clear();
+    this.persistentDeleteFailures.clear();
   }
 
   refreshStorageState(): void {
@@ -555,30 +644,77 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
     }
   }
 
-  prepareDelete(request: ProtoStorageDeleteRequest): void {
+  async prepareDelete(request: ProtoStorageDeleteRequest): Promise<void> {
     this.unloadFailures.clear();
+    this.preparedPersistentDeletes.clear();
+    this.persistentDeleteFailures.clear();
     this.refreshStorageState();
-    if (!request.unloadIfLoaded || request.dryRun) return;
+    if (request.dryRun) return;
     if (!request.deleteFiles && !request.clearRegistryPaths) return;
     if (request.deleteFiles && !request.allowPlatformDelete) return;
     if (request.requirePlanMatch && !request.plan) return;
 
-    for (const modelId of this.requestedDeleteModelIds(request)) {
-      if (!this.loadedModelIds.has(modelId)) continue;
-      for (const [module, loadedIds] of this.loadedModelIdsByModule) {
-        if (!loadedIds.has(modelId)) continue;
-        try {
-          const result = ModelLifecycleAdapter.fromModule(module).unload({
-            modelId,
-            unloadAll: false,
-          });
-          if (!result?.success) this.unloadFailures.add(modelId);
-        } catch {
-          this.unloadFailures.add(modelId);
+    // Match native's plan-candidate semantics before performing any browser
+    // side effect. Native stores candidates in an unordered_map, so duplicate
+    // ids are last-wins; using Array.find() here would make JS pre-delete a
+    // different path than native later validates.
+    const targets = this.validatedDeleteTargets(request);
+
+    if (request.unloadIfLoaded) {
+      for (const modelId of targets.keys()) {
+        if (!this.loadedModelIds.has(modelId)) continue;
+        for (const [module, loadedIds] of this.loadedModelIdsByModule) {
+          if (!loadedIds.has(modelId)) continue;
+          try {
+            const result = ModelLifecycleAdapter.fromModule(module).unload({
+              modelId,
+              unloadAll: false,
+            });
+            if (!result?.success) this.unloadFailures.add(modelId);
+          } catch {
+            this.unloadFailures.add(modelId);
+          }
         }
       }
+      this.refreshLoadedModelState();
     }
-    this.refreshLoadedModelState();
+
+    if (!request.deleteFiles) return;
+    for (const [modelId, path] of targets) {
+      if (this.loadedModelIds.has(modelId) || this.unloadFailures.has(modelId)) continue;
+      if (!isSafeModelStoragePath(path)) continue;
+      try {
+        await OPFSBridge.removePath(path);
+        this.preparedPersistentDeletes.add(path);
+      } catch {
+        this.persistentDeleteFailures.add(path);
+      }
+    }
+  }
+
+  private validatedDeleteTargets(
+    request: ProtoStorageDeleteRequest,
+  ): ReadonlyMap<string, string> {
+    const planCandidates = new Map<string, { localPath: string }>();
+    for (const candidate of request.plan?.candidates ?? []) {
+      if (candidate.modelId) planCandidates.set(candidate.modelId, candidate);
+    }
+
+    const targets = new Map<string, string>();
+    for (const modelId of this.requestedDeleteModelIds(request)) {
+      const path = this.modelStoragePathsById.get(modelId);
+      if (!path) continue;
+      const plannedCandidate = planCandidates.get(modelId);
+      if (request.requirePlanMatch && !plannedCandidate) continue;
+      if (plannedCandidate?.localPath && plannedCandidate.localPath !== path) continue;
+      targets.set(modelId, path);
+    }
+    return targets;
+  }
+
+  finishDelete(): void {
+    this.preparedPersistentDeletes.clear();
+    this.persistentDeleteFailures.clear();
   }
 
   private requestedDeleteModelIds(request: ProtoStorageDeleteRequest): ReadonlySet<string> {
@@ -745,19 +881,16 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
   private deletePath(pathPtr: number, recursive: boolean): number {
     const path = this.readPath(pathPtr);
     if (!path || !isSafeModelStoragePath(path)) return RAC_ERROR_INVALID_ARGUMENT;
+    if (this.persistentDeleteFailures.has(path)) return RAC_ERROR_DELETE_FAILED;
+    if (!this.preparedPersistentDeletes.has(path)) return RAC_ERROR_DELETE_FAILED;
     try {
-      let hadFilesystem = false;
       for (const module of this.registeredModules()) {
         const fs = fsFor(module);
         if (!fs) continue;
-        hadFilesystem = true;
         if (!deletePathFromFS(fs, path, recursive)) return RAC_ERROR_DELETE_FAILED;
       }
-      if (!hadFilesystem) return RAC_ERROR_FILE_NOT_FOUND;
       this.removeMetadataPath(path);
-      void OPFSBridge.scheduleRemovePath(path)
-        .then(() => this.refreshQuotaEstimate())
-        .catch(() => undefined);
+      void this.refreshQuotaEstimate();
       return RAC_OK;
     } catch {
       return RAC_ERROR_DELETE_FAILED;
@@ -804,6 +937,7 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
   private refreshRegistryMetadata(): void {
     this.modelStorageRoots.clear();
     this.pathMetadata.clear();
+    this.modelStoragePathsById.clear();
     let models: readonly ModelInfo[] = [];
     try {
       models = ModelRegistryAdapter.tryDefault()?.list()?.models ?? [];
@@ -821,6 +955,7 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
       );
       const size = Math.max(finiteStorageBytes(model.downloadSizeBytes), descriptorBytes);
       const rootMetadata: StoragePathMetadata = { size, isDirectory };
+      this.modelStoragePathsById.set(model.id, localPath);
       this.modelStorageRoots.set(localPath, rootMetadata);
       this.pathMetadata.set(localPath, rootMetadata);
 
@@ -864,6 +999,11 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
   }
 
   private removeMetadataPath(path: string): void {
+    for (const [modelId, modelPath] of Array.from(this.modelStoragePathsById.entries())) {
+      if (modelPath === path || modelPath.startsWith(`${path.replace(/\/$/, '')}/`)) {
+        this.modelStoragePathsById.delete(modelId);
+      }
+    }
     for (const modelPath of Array.from(this.modelStorageRoots.keys())) {
       if (modelPath === path || modelPath.startsWith(`${path.replace(/\/$/, '')}/`)) {
         this.modelStorageRoots.delete(modelPath);

@@ -323,7 +323,7 @@ function renderModelList(): void {
 /** iOS parity: StorageViewModel.swift:86-103 `deleteModel(_:)`. */
 async function deleteModel(modelId: string): Promise<void> {
   try {
-    const result = RunAnywhere.deleteModel(modelId);
+    const result = await RunAnywhere.deleteModel(modelId);
     if (!result.success) {
       showToast(result.errorMessage || 'Failed to delete model', 'warning');
       return;

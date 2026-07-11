@@ -61,52 +61,6 @@ class MemoryStorage implements Storage {
   entries(): Array<[string, string]> { return Array.from(this.values.entries()); }
 }
 
-interface RecordedRequest {
-  method: string;
-  url: string;
-  async: boolean;
-  headers: Map<string, string>;
-  body: string | null;
-}
-
-class XHRStub {
-  static statusCode = 201;
-  static rejectTimeout = true;
-  static requests: RecordedRequest[] = [];
-
-  status = 0;
-  private request: RecordedRequest = {
-    method: '',
-    url: '',
-    async: true,
-    headers: new Map(),
-    body: null,
-  };
-
-  set timeout(value: number) {
-    if (value > 0 && XHRStub.rejectTimeout) {
-      throw new DOMException('sync timeout unavailable', 'InvalidAccessError');
-    }
-  }
-  get timeout(): number { return 0; }
-
-  open(method: string, url: string, async = true): void {
-    this.request.method = method;
-    this.request.url = url;
-    this.request.async = async;
-  }
-
-  setRequestHeader(name: string, value: string): void {
-    this.request.headers.set(name.toLowerCase(), value);
-  }
-
-  send(body: string | null): void {
-    this.request.body = body;
-    this.status = XHRStub.statusCode;
-    XHRStub.requests.push(this.request);
-  }
-}
-
 interface FakeModuleHandle {
   module: DeviceRegistrationModule;
   callbacksPtr: number;
@@ -269,12 +223,11 @@ function callback(handle: FakeModuleHandle, offset: number): Trampoline {
 
 describe('DeviceRegistrationAdapter', () => {
   let storage: MemoryStorage;
+  let fetchStub: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     storage = new MemoryStorage();
-    XHRStub.statusCode = 201;
-    XHRStub.rejectTimeout = true;
-    XHRStub.requests = [];
+    fetchStub = vi.fn(async () => ({ ok: true, status: 201 }) as Response);
     vi.stubGlobal('localStorage', storage);
     vi.stubGlobal('navigator', {
       userAgent: 'Test Browser',
@@ -288,7 +241,7 @@ describe('DeviceRegistrationAdapter', () => {
     vi.stubGlobal('performance', {
       memory: { usedJSHeapSize: 1_000, jsHeapSizeLimit: 2_000 },
     });
-    vi.stubGlobal('XMLHttpRequest', XHRStub);
+    vi.stubGlobal('fetch', fetchStub);
   });
 
   afterEach(() => {
@@ -365,7 +318,7 @@ describe('DeviceRegistrationAdapter', () => {
     switchedAdapter.cleanup();
   });
 
-  it('posts production registration with auth and survives Window timeout rejection', () => {
+  it('posts production registration asynchronously with auth and a bounded timeout', async () => {
     const handle = createFakeModule();
     const adapter = DeviceRegistrationAdapter.install(handle.module, {
       baseURL: 'https://relay.test/control',
@@ -377,20 +330,35 @@ describe('DeviceRegistrationAdapter', () => {
     const bodyPtr = handle.allocateString('{"device_id":"web-device-id"}');
     const responsePtr = handle.allocateString(' '.repeat(RESPONSE.size));
 
-    const result = callback(handle, CALLBACK.httpPost)(endpointPtr, bodyPtr, 1, responsePtr, 0);
+    const firstResult = callback(handle, CALLBACK.httpPost)(endpointPtr, bodyPtr, 1, responsePtr, 0);
 
+    expect(firstResult).toBe(-100);
+    expect(await DeviceRegistrationAdapter.waitForPendingRegistration(handle.module)).toBe(true);
+    const retryBodyPtr = handle.allocateString(
+      '{"device_id":"web-device-id","last_seen_at_ms":2}',
+    );
+    const result = callback(handle, CALLBACK.httpPost)(
+      endpointPtr,
+      retryBodyPtr,
+      1,
+      responsePtr,
+      0,
+    );
     expect(result).toBe(0);
     expect(handle.readI32(responsePtr + RESPONSE.result)).toBe(0);
     expect(handle.readI32(responsePtr + RESPONSE.statusCode)).toBe(201);
-    expect(XHRStub.requests).toHaveLength(1);
-    expect(XHRStub.requests[0].url).toBe('https://relay.test/control/api/v1/devices/register');
-    expect(XHRStub.requests[0].async).toBe(false);
-    expect(XHRStub.requests[0].headers.get('apikey')).toBe('test-api-key');
-    expect(XHRStub.requests[0].headers.get('authorization')).toBe('Bearer test-access-token');
+    expect(fetchStub).toHaveBeenCalledOnce();
+    expect(fetchStub.mock.calls[0][0]).toBe('https://relay.test/control/api/v1/devices/register');
+    const request = fetchStub.mock.calls[0][1] as RequestInit;
+    const headers = new Headers(request.headers);
+    expect(request.method).toBe('POST');
+    expect(request.body).toBe('{"device_id":"web-device-id"}');
+    expect(headers.get('apikey')).toBe('test-api-key');
+    expect(headers.get('authorization')).toBe('Bearer test-access-token');
     adapter.cleanup();
   });
 
-  it('distinguishes HTTP rejection, development upsert, and placeholder no-op', () => {
+  it('distinguishes HTTP rejection, development upsert, and missing configuration', async () => {
     const prod = createFakeModule();
     const prodAdapter = DeviceRegistrationAdapter.install(prod.module, {
       baseURL: 'https://relay.test',
@@ -401,14 +369,16 @@ describe('DeviceRegistrationAdapter', () => {
     const prodEndpoint = prod.allocateString('/api/v1/devices/register');
     const prodBody = prod.allocateString('{}');
     const prodResponse = prod.allocateString(' '.repeat(RESPONSE.size));
-    XHRStub.statusCode = 403;
+    fetchStub.mockResolvedValueOnce({ ok: false, status: 403 } as Response);
+    expect(callback(prod, CALLBACK.httpPost)(prodEndpoint, prodBody, 1, prodResponse, 0)).toBe(-100);
+    await DeviceRegistrationAdapter.waitForPendingRegistration(prod.module);
     expect(callback(prod, CALLBACK.httpPost)(prodEndpoint, prodBody, 1, prodResponse, 0)).toBe(-157);
     const errorPtr = prod.readI32(prodResponse + RESPONSE.errorMessage);
     expect(prod.readString(errorPtr)).toBe('Device registration request was rejected.');
     prodAdapter.cleanup();
 
-    XHRStub.statusCode = 204;
-    XHRStub.requests = [];
+    fetchStub.mockClear();
+    fetchStub.mockResolvedValueOnce({ ok: true, status: 204 } as Response);
     const dev = createFakeModule({ devConfigAvailable: true });
     const devAdapter = DeviceRegistrationAdapter.install(dev.module, {
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
@@ -417,13 +387,16 @@ describe('DeviceRegistrationAdapter', () => {
     const devEndpoint = dev.allocateString('/rest/v1/sdk_devices');
     const devBody = dev.allocateString('{}');
     const devResponse = dev.allocateString(' '.repeat(RESPONSE.size));
+    expect(callback(dev, CALLBACK.httpPost)(devEndpoint, devBody, 0, devResponse, 0)).toBe(-100);
+    await DeviceRegistrationAdapter.waitForPendingRegistration(dev.module);
     expect(callback(dev, CALLBACK.httpPost)(devEndpoint, devBody, 0, devResponse, 0)).toBe(0);
-    expect(XHRStub.requests[0].url).toContain('?on_conflict=device_id');
-    expect(XHRStub.requests[0].headers.get('authorization')).toBe('Bearer test-development-key');
-    expect(XHRStub.requests[0].headers.get('prefer')).toContain('merge-duplicates');
+    expect(fetchStub.mock.calls[0][0]).toContain('?on_conflict=device_id');
+    const devHeaders = new Headers((fetchStub.mock.calls[0][1] as RequestInit).headers);
+    expect(devHeaders.get('authorization')).toBe('Bearer test-development-key');
+    expect(devHeaders.get('prefer')).toContain('merge-duplicates');
     devAdapter.cleanup();
 
-    XHRStub.requests = [];
+    fetchStub.mockClear();
     const noConfig = createFakeModule();
     const noConfigAdapter = DeviceRegistrationAdapter.install(noConfig.module, {
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
@@ -438,10 +411,60 @@ describe('DeviceRegistrationAdapter', () => {
       0,
       noConfigResponse,
       0,
-    )).toBe(0);
-    expect(noConfig.readI32(noConfigResponse + RESPONSE.statusCode)).toBe(204);
-    expect(XHRStub.requests).toHaveLength(0);
+    )).toBe(-103);
+    expect(noConfig.readI32(noConfigResponse + RESPONSE.result)).toBe(-103);
+    expect(noConfig.readI32(noConfigResponse + RESPONSE.statusCode)).toBe(0);
+    expect(fetchStub).not.toHaveBeenCalled();
     noConfigAdapter.cleanup();
+  });
+
+  it('never combines a partial override with the embedded credential pair', () => {
+    for (const configuration of [
+      { baseURL: 'https://attacker.invalid' },
+      { apiKey: 'configured-key-without-origin' },
+    ]) {
+      const handle = createFakeModule({ devConfigAvailable: true });
+      const adapter = DeviceRegistrationAdapter.install(handle.module, {
+        ...configuration,
+        environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+        sdkVersion: '0.19.13',
+      });
+      const endpoint = handle.allocateString('/rest/v1/sdk_devices');
+      const body = handle.allocateString('{}');
+      const response = handle.allocateString(' '.repeat(RESPONSE.size));
+
+      expect(callback(handle, CALLBACK.httpPost)(endpoint, body, 0, response, 0)).toBe(-103);
+      expect(fetchStub).not.toHaveBeenCalled();
+      adapter.cleanup();
+    }
+  });
+
+  it('turns an aborted registration fetch into a timeout failure', async () => {
+    fetchStub.mockImplementationOnce((_url: string, init: RequestInit) => (
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          reject(new DOMException('aborted', 'AbortError'));
+        }, { once: true });
+      })
+    ));
+    const handle = createFakeModule();
+    const adapter = DeviceRegistrationAdapter.install(handle.module, {
+      baseURL: 'https://relay.test',
+      apiKey: 'test-api-key',
+      environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+      sdkVersion: '0.19.13',
+      requestTimeoutMs: 1,
+    });
+    const endpoint = handle.allocateString('/api/v1/devices/register');
+    const body = handle.allocateString('{}');
+    const response = handle.allocateString(' '.repeat(RESPONSE.size));
+
+    expect(callback(handle, CALLBACK.httpPost)(endpoint, body, 1, response, 0)).toBe(-100);
+    await DeviceRegistrationAdapter.waitForPendingRegistration(handle.module);
+    expect(callback(handle, CALLBACK.httpPost)(endpoint, body, 1, response, 0)).toBe(-151);
+    const errorPtr = handle.readI32(response + RESPONSE.errorMessage);
+    expect(handle.readString(errorPtr)).toBe('Device registration request timed out.');
+    adapter.cleanup();
   });
 
   it('clears native callbacks before releasing function pointers and memory', () => {

@@ -250,17 +250,18 @@ function sanitizeMetadata(
   for (const [key, value] of Object.entries(metadata)) {
     if (shouldRedact(key)) {
       sanitized[key] = '[REDACTED]';
-    } else if (typeof value === 'string') {
-      sanitized[key] = sanitizeLogMessage(value);
-    } else if (Array.isArray(value)) {
-      sanitized[key] = value.map((entry) =>
-        typeof entry === 'string' ? sanitizeLogMessage(entry) : entry
-      );
-    } else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      sanitized[key] = sanitizeMetadata(value as Record<string, unknown>) ?? {};
     } else {
-      sanitized[key] = value;
+      sanitized[key] = sanitizeMetadataValue(value);
     }
   }
   return sanitized;
+}
+
+function sanitizeMetadataValue(value: unknown): unknown {
+  if (typeof value === 'string') return sanitizeLogMessage(value);
+  if (Array.isArray(value)) return value.map((entry) => sanitizeMetadataValue(entry));
+  if (value !== null && typeof value === 'object') {
+    return sanitizeMetadata(value as Record<string, unknown>) ?? {};
+  }
+  return value;
 }

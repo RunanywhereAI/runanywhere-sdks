@@ -13,18 +13,19 @@ export type BackendRegistrationState =
  * and fragments so logging cannot disclose those values.
  */
 export function redactResourceURL(value: string): string {
-  if (value.startsWith('data:')) return 'data:[redacted]';
+  if (/^data:/i.test(value)) return 'data:[redacted]';
 
   try {
-    const parsed = new URL(value);
+    const protocolRelative = value.startsWith('//');
+    const parsed = new URL(protocolRelative ? `https:${value}` : value);
     parsed.username = '';
     parsed.password = '';
     parsed.search = '';
     parsed.hash = '';
-    return parsed.href;
+    return protocolRelative ? parsed.href.replace(/^https:/, '') : parsed.href;
   } catch {
-    // Relative paths are not accepted by URL without a base. They cannot
-    // contain URL userinfo, but may still carry signed query parameters.
+    // Ordinary relative paths are not accepted by URL without a base, but may
+    // still carry signed query parameters.
     return value.replace(/[?#].*$/, '');
   }
 }

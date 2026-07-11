@@ -14,6 +14,9 @@
 /** Success — `rac_result_t` zero return. */
 export const RAC_OK = 0 as const;
 
+/** `RAC_ERROR_NOT_INITIALIZED` — an operation must be completed or retried later. */
+export const RAC_ERROR_NOT_INITIALIZED = -100 as const;
+
 /** `RAC_ERROR_INVALID_CONFIGURATION` — required runtime configuration is unusable. */
 export const RAC_ERROR_INVALID_CONFIGURATION = -103 as const;
 

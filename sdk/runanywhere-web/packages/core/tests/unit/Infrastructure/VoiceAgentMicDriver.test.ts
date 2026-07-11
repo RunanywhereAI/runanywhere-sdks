@@ -6,7 +6,9 @@ const mocks = vi.hoisted(() => ({
     emit: (chunk: Float32Array) => void;
     clearCount: number;
     capturing: boolean;
+    stopCount: number;
   }>,
+  captureStart: null as Promise<void> | null,
   playback: {
     play: vi.fn(),
     stop: vi.fn(),
@@ -22,6 +24,7 @@ vi.mock('../../../src/Infrastructure/AudioCapture', () => ({
       emit: (chunk: Float32Array): void => this.chunkCallback?.(chunk),
       clearCount: 0,
       capturing: false,
+      stopCount: 0,
     };
 
     constructor() {
@@ -32,10 +35,14 @@ vi.mock('../../../src/Infrastructure/AudioCapture', () => ({
 
     async start(onChunk?: (chunk: Float32Array) => void): Promise<void> {
       this.chunkCallback = onChunk;
+      if (mocks.captureStart) await mocks.captureStart;
       this.state.capturing = true;
     }
 
-    stop(): void { this.state.capturing = false; }
+    stop(): void {
+      this.state.stopCount += 1;
+      this.state.capturing = false;
+    }
     clearBuffer(): void { this.state.clearCount += 1; }
   },
 }));
@@ -99,6 +106,7 @@ async function flush(): Promise<void> {
 describe('VoiceAgentMicDriver', () => {
   beforeEach(() => {
     mocks.captures.length = 0;
+    mocks.captureStart = null;
     mocks.playback.play.mockReset();
     mocks.playback.stop.mockReset();
     mocks.playback.dispose.mockReset();
@@ -144,5 +152,23 @@ describe('VoiceAgentMicDriver', () => {
 
     expect(onTurn).not.toHaveBeenCalled();
     expect(mocks.playback.play).not.toHaveBeenCalled();
+  });
+
+  it('closes capture when microphone permission resolves after stop', async () => {
+    const permission = deferred<void>();
+    mocks.captureStart = permission.promise;
+    const phases: string[] = [];
+    const driver = new VoiceAgentMicDriver();
+
+    const starting = driver.start({ onPhase: (phase) => phases.push(phase) });
+    await flush();
+    const capture = mocks.captures.at(-1)!;
+    driver.stop();
+    permission.resolve();
+    await starting;
+
+    expect(capture.stopCount).toBe(2);
+    expect(capture.capturing).toBe(false);
+    expect(phases).not.toContain('listening');
   });
 });

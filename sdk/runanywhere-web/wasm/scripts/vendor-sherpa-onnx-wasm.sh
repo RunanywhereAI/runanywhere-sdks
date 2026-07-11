@@ -27,7 +27,10 @@ ORT_ARCHIVE="${ORT_DIR}/lib/libonnxruntime.a"
 ORT_HEADER="${ORT_DIR}/include/onnxruntime_c_api.h"
 ORT_PROVENANCE_FILE="${ORT_DIR}/.rac-wasm-provenance"
 ORT_VENDOR_SCRIPT="${SCRIPT_DIR}/vendor-onnxruntime-wasm.sh"
-RECIPE_SCHEMA="3"
+# These schemas belong to different provenance producers. Never use the
+# Sherpa schema to validate ORT just because the records are checked together.
+SHERPA_RECIPE_SCHEMA="3"
+ORT_RECIPE_SCHEMA="5"
 PATCH_DIR="${WASM_DIR}/patches"
 SHERPA_PATCH="${PATCH_DIR}/sherpa-onnx-c-api-try-catch.patch"
 SOURCE_REVISION=""
@@ -114,7 +117,7 @@ provenance_matches() {
     provenance_has "${PROVENANCE_FILE}" "onnxruntime_version=${ONNX_VERSION_WEB}" &&
     provenance_has "${PROVENANCE_FILE}" "emscripten_version=${EMSCRIPTEN_VERSION}" &&
     provenance_has "${PROVENANCE_FILE}" "threads=on" &&
-    provenance_has "${PROVENANCE_FILE}" "recipe_schema=${RECIPE_SCHEMA}" &&
+    provenance_has "${PROVENANCE_FILE}" "recipe_schema=${SHERPA_RECIPE_SCHEMA}" &&
     provenance_has "${PROVENANCE_FILE}" "script_sha256=${SCRIPT_SHA256}" &&
     provenance_has "${PROVENANCE_FILE}" "patch_sha256=${PATCH_SHA256}" &&
     provenance_has_pattern "${PROVENANCE_FILE}" '^source_revision=[0-9a-f]{40,64}$' &&
@@ -130,7 +133,7 @@ ort_provenance_matches() {
     provenance_has "${ORT_PROVENANCE_FILE}" "emscripten_version=${EMSCRIPTEN_VERSION}" &&
     provenance_has "${ORT_PROVENANCE_FILE}" "build_config=Release" &&
     provenance_has "${ORT_PROVENANCE_FILE}" "threads=on" &&
-    provenance_has "${ORT_PROVENANCE_FILE}" "recipe_schema=${RECIPE_SCHEMA}" &&
+    provenance_has "${ORT_PROVENANCE_FILE}" "recipe_schema=${ORT_RECIPE_SCHEMA}" &&
     provenance_has "${ORT_PROVENANCE_FILE}" "script_sha256=${ORT_SCRIPT_SHA256}" &&
     provenance_has "${ORT_PROVENANCE_FILE}" "patch_sha256=${ORT_PATCH_SHA256}" &&
     provenance_has_pattern "${ORT_PROVENANCE_FILE}" '^source_revision=[0-9a-f]{40,64}$' &&
@@ -144,7 +147,7 @@ build_provenance_matches() {
     provenance_has "${BUILD_PROVENANCE_FILE}" "onnxruntime_version=${ONNX_VERSION_WEB}" &&
     provenance_has "${BUILD_PROVENANCE_FILE}" "emscripten_version=${EMSCRIPTEN_VERSION}" &&
     provenance_has "${BUILD_PROVENANCE_FILE}" "threads=on" &&
-    provenance_has "${BUILD_PROVENANCE_FILE}" "recipe_schema=${RECIPE_SCHEMA}" &&
+    provenance_has "${BUILD_PROVENANCE_FILE}" "recipe_schema=${SHERPA_RECIPE_SCHEMA}" &&
     provenance_has "${BUILD_PROVENANCE_FILE}" "script_sha256=${SCRIPT_SHA256}" &&
     provenance_has "${BUILD_PROVENANCE_FILE}" "patch_sha256=${PATCH_SHA256}" &&
     provenance_has_pattern "${BUILD_PROVENANCE_FILE}" '^source_revision=[0-9a-f]{40,64}$' &&
@@ -166,7 +169,7 @@ write_provenance() {
     echo "onnxruntime_version=${ONNX_VERSION_WEB}"
     echo "emscripten_version=${EMSCRIPTEN_VERSION}"
     echo "threads=on"
-    echo "recipe_schema=${RECIPE_SCHEMA}"
+    echo "recipe_schema=${SHERPA_RECIPE_SCHEMA}"
     echo "script_sha256=${SCRIPT_SHA256}"
     echo "patch_sha256=${PATCH_SHA256}"
     echo "source_revision=${SOURCE_REVISION}"
@@ -241,6 +244,15 @@ ensure_source_checkout() {
 
 # Read-only probe for CI/release scripts that need to check whether a rebuild
 # is required without deleting or downloading anything.
+if [ "${RAC_WASM_ORT_PROVENANCE_CHECK_ONLY:-0}" = "1" ]; then
+  if ort_provenance_matches; then
+    echo "Sherpa dependency ONNX Runtime WASM provenance: current"
+    exit 0
+  fi
+  echo "Sherpa dependency ONNX Runtime WASM provenance: stale or missing"
+  exit 2
+fi
+
 if [ "${RAC_WASM_PROVENANCE_CHECK_ONLY:-0}" = "1" ]; then
   if provenance_matches && ort_provenance_matches; then
     echo "Sherpa-ONNX WASM provenance: current"

@@ -8,21 +8,24 @@ const mocks = vi.hoisted(() => ({
   cancelGeneration: vi.fn(),
   detectVoiceAuto: vi.fn(),
   vadLifecycleAvailable: false,
+  sttAvailable: true,
+  ttsAvailable: true,
+  llmAvailable: true,
 }));
 
 vi.mock('../../../../src/Public/Extensions/RunAnywhere+STT', () => ({
-  STT: { supportsLifecycleProtoSTT: () => true },
+  STT: { supportsLifecycleProtoSTT: () => mocks.sttAvailable },
   transcribe: mocks.transcribe,
 }));
 
 vi.mock('../../../../src/Public/Extensions/RunAnywhere+TTS', () => ({
-  TTS: { supportsLifecycleProtoTTS: () => true },
+  TTS: { supportsLifecycleProtoTTS: () => mocks.ttsAvailable },
   synthesize: mocks.synthesize,
 }));
 
 vi.mock('../../../../src/Public/Extensions/RunAnywhere+TextGeneration', () => ({
   TextGeneration: {
-    supportsProtoLLM: () => true,
+    supportsProtoLLM: () => mocks.llmAvailable,
     generate: mocks.generate,
     cancelGeneration: mocks.cancelGeneration,
   },
@@ -46,7 +49,10 @@ vi.mock('../../../../src/Public/Extensions/RunAnywhere+ModelLifecycle', () => ({
   },
 }));
 
-import { __testing__ } from '../../../../src/Public/Extensions/RunAnywhere+VoiceAgent';
+import {
+  __testing__,
+  getVoiceAgentAvailability,
+} from '../../../../src/Public/Extensions/RunAnywhere+VoiceAgent';
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve!: (value: T) => void;
@@ -71,7 +77,8 @@ const speech = {
 };
 
 describe('CrossWasmVoiceAgentProvider', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await __testing__.resetFacadeState();
     mocks.transcribe.mockReset().mockResolvedValue(transcript);
     mocks.synthesize.mockReset().mockResolvedValue(speech);
     mocks.generate.mockReset()
@@ -79,6 +86,9 @@ describe('CrossWasmVoiceAgentProvider', () => {
       .mockResolvedValueOnce({ text: 'Second answer.', finishReason: 'stop' });
     mocks.cancelGeneration.mockReset();
     mocks.vadLifecycleAvailable = false;
+    mocks.sttAvailable = true;
+    mocks.ttsAvailable = true;
+    mocks.llmAvailable = true;
     mocks.detectVoiceAuto.mockReset().mockResolvedValue({
       isSpeech: true,
       confidence: 0.99,
@@ -159,6 +169,21 @@ describe('CrossWasmVoiceAgentProvider', () => {
 
     await expect(oldTurn).rejects.toThrow(/session stopped or restarted/);
     expect(mocks.generate).not.toHaveBeenCalled();
+    expect(mocks.cancelGeneration).toHaveBeenCalledOnce();
+  });
+
+  it('evicts the cached cross-WASM provider when a required backend disappears', () => {
+    expect(getVoiceAgentAvailability()).toMatchObject({
+      available: true,
+      source: 'cross-wasm',
+    });
+
+    mocks.sttAvailable = false;
+
+    expect(getVoiceAgentAvailability()).toMatchObject({
+      available: false,
+      source: 'unavailable',
+    });
     expect(mocks.cancelGeneration).toHaveBeenCalledOnce();
   });
 });

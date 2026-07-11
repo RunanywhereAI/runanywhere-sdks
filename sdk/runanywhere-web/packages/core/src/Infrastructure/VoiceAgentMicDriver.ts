@@ -100,7 +100,7 @@ export class VoiceAgentMicDriver {
       autoPlayTts: autoPlayTts ?? true,
       continuousMode: continuousMode ?? true,
     };
-    this.sessionEpoch += 1;
+    const epoch = ++this.sessionEpoch;
     this.stopped = false;
     this.processing = false;
     this.noiseFloor = this.options.speechThreshold;
@@ -109,6 +109,16 @@ export class VoiceAgentMicDriver {
       (chunk) => this.onChunk(chunk),
       (level) => this.callbacks.onLevel?.(level),
     );
+    if (this.stopped || epoch !== this.sessionEpoch) {
+      // Permission may have resolved after stop() or a newer start(). The
+      // capture invalidates stale starts itself. Only stop again when no newer
+      // session owns the capture.
+      if (this.stopped) {
+        this.capture.stop();
+        this.capture.clearBuffer();
+      }
+      return;
+    }
     this.callbacks.onPhase?.('listening');
     logger.info('Voice-agent mic capture started');
   }

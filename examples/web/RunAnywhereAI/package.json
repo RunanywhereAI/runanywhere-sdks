@@ -7,11 +7,21 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:deployment": "VITE_RUNANYWHERE_RELAY_ENABLED=true vite build",
     "preview": "vite preview",
     "lint": "eslint src server api --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "release:vendor": "npm --prefix ../../../sdk/runanywhere-web run vendor:wasm:speech",
+    "release:wasm": "npm run release:vendor && npm --prefix ../../../sdk/runanywhere-web run build:wasm:all",
+    "release:verify": "node scripts/verify-release-output.mjs dist",
+    "release:build": "npm run release:wasm && npm run build:deployment && npm run release:verify",
+    "release:stage": "npm run release:verify && node scripts/stage-prebuilt.mjs",
+    "release:deploy": "bash scripts/deploy-prebuilt.sh",
     "sync-solutions": "node scripts/sync-solutions.mjs"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
   },
   "devDependencies": {
     "@bufbuild/protobuf": "^2.12.1",

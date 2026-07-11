@@ -208,27 +208,27 @@
 "@rollup/rollup-darwin-arm64@4.62.2":
   version "4.62.2"
 
-"@runanywhere/proto-ts@^0.19.14", "@runanywhere/proto-ts@file:../shared/proto-ts":
-  version "0.19.14"
+"@runanywhere/proto-ts@^0.19.15", "@runanywhere/proto-ts@file:../shared/proto-ts":
+  version "0.19.15"
   resolved "file:../shared/proto-ts"
   dependencies:
     "@bufbuild/protobuf" "^2.12.1"
 
 "@runanywhere/web-llamacpp@file:packages/llamacpp":
-  version "0.19.14"
+  version "0.19.15"
   resolved "file:packages/llamacpp"
   dependencies:
-    "@runanywhere/proto-ts" "^0.19.14"
+    "@runanywhere/proto-ts" "^0.19.15"
 
 "@runanywhere/web-onnx@file:packages/onnx":
-  version "0.19.14"
+  version "0.19.15"
   resolved "file:packages/onnx"
 
-"@runanywhere/web@>=0.19.14 <1", "@runanywhere/web@file:packages/core":
-  version "0.19.14"
+"@runanywhere/web@>=0.19.15 <1", "@runanywhere/web@file:packages/core":
+  version "0.19.15"
   resolved "file:packages/core"
   dependencies:
-    "@runanywhere/proto-ts" "^0.19.14"
+    "@runanywhere/proto-ts" "^0.19.15"
     long "^5.3.2"
     protobufjs "^7.5.8"
 

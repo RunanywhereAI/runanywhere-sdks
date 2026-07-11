@@ -61,7 +61,10 @@ import {
   ragDestroyPipeline,
   resetRAGFacadeState,
 } from './Extensions/RunAnywhere+RAG.js';
-import { VoiceAgent as VoiceAgentCapability } from './Extensions/RunAnywhere+VoiceAgent.js';
+import {
+  VoiceAgent as VoiceAgentCapability,
+  resetVoiceAgentFacadeState,
+} from './Extensions/RunAnywhere+VoiceAgent.js';
 import { Downloads as DownloadsCapability } from './Extensions/RunAnywhere+Downloads.js';
 import { SDKEvents as SDKEventsCapability } from './Extensions/RunAnywhere+SDKEvents.js';
 import { ModelRegistry as ModelRegistryCapability } from './Extensions/RunAnywhere+ModelRegistry.js';
@@ -89,6 +92,7 @@ import {
 import { flatFacade } from './Extensions/RunAnywhere+FlatFacade.js';
 import { StorageAdapter } from '../Adapters/StorageAdapter.js';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter.js';
+import { DeviceRegistrationAdapter } from '../Adapters/DeviceRegistrationAdapter.js';
 import { SDK_PLATFORM, SDK_VERSION } from '../Foundation/Version.js';
 import {
   clearRunanywhereModule,
@@ -146,6 +150,10 @@ let _hasCompletedServicesInit = false;
 // retries HTTP-only on the next API call without re-running Phase 2.
 let _hasCompletedHTTPSetup = false;
 let _servicesInitPromise: Promise<void> | null = null;
+// Invalidates asynchronous work that belongs to an SDK lifetime which has
+// already been shut down. JavaScript fetches can settle after teardown even
+// when their AbortSignal fires, so state commits must also be generation-safe.
+let _lifecycleGeneration = 0;
 
 interface SdkInitModule extends EmscriptenRunanywhereModule {
   _rac_sdk_init_phase1_proto?(
@@ -175,6 +183,7 @@ interface SdkInitModule extends EmscriptenRunanywhereModule {
   _rac_auth_get_user_id?(): number;
   _rac_auth_get_organization_id?(): number;
   _rac_state_is_device_registered?(): number;
+  _rac_device_manager_register_if_needed?(environment: number, buildTokenPtr: number): number;
 }
 
 /** Generate (and cache) a stable device ID, matching Swift's UUID-style. */
@@ -278,6 +287,45 @@ function invokeSdkResultProto(
     (outResult) => fn(outResult),
     functionName,
   );
+}
+
+async function completePendingDeviceRegistration(
+  module: SdkInitModule,
+  environment: SDKEnvironment,
+  buildToken: string,
+  lifecycleGeneration: number,
+): Promise<void> {
+  if (!(await DeviceRegistrationAdapter.waitForPendingRegistration(module))) return;
+  if (lifecycleGeneration !== _lifecycleGeneration) return;
+  const register = module._rac_device_manager_register_if_needed;
+  if (typeof register !== 'function') {
+    logger.warning(
+      'WASM module cannot finalize asynchronous device registration; rebuild the Web artifact.',
+    );
+    return;
+  }
+
+  const token = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+    ? buildToken.trim()
+    : '';
+  let tokenPtr = 0;
+  try {
+    if (token) {
+      const size = module.lengthBytesUTF8(token) + 1;
+      tokenPtr = module._malloc(size);
+      if (!tokenPtr) {
+        logger.warning('Device registration build-token allocation failed.');
+        return;
+      }
+      module.stringToUTF8(token, tokenPtr, size);
+    }
+    const result = register.call(module, mapSdkInitEnvironment(environment), tokenPtr);
+    if (result !== 0) {
+      logger.warning(`Device registration remained deferred (code ${result}).`);
+    }
+  } finally {
+    if (tokenPtr) module._free(tokenPtr);
+  }
 }
 
 function normalizeMetadataString(value: string | null | undefined): string | null {
@@ -1049,7 +1097,8 @@ export const RunAnywhere = {
     if (_hasCompletedServicesInit) return;
     if (_servicesInitPromise) return _servicesInitPromise;
 
-    _servicesInitPromise = (async () => {
+    const lifecycleGeneration = _lifecycleGeneration;
+    const servicesInitPromise = Promise.resolve().then(async () => {
       try {
         const module = tryRunanywhereModule() as SdkInitModule | null;
         if (!module) {
@@ -1080,6 +1129,13 @@ export const RunAnywhere = {
             'rac_sdk_init_phase2_proto',
           );
           throwIfSdkInitFailed(result, 'SDK Phase 2');
+          await completePendingDeviceRegistration(
+            module,
+            environment,
+            _initOptions?.buildToken ?? '',
+            lifecycleGeneration,
+          );
+          if (lifecycleGeneration !== _lifecycleGeneration) return;
           httpConfigured = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
           const linkedModelsCount = result?.linkedModelsCount ?? 0;
           if (linkedModelsCount > 0) {
@@ -1091,6 +1147,7 @@ export const RunAnywhere = {
           );
         }
 
+        if (lifecycleGeneration !== _lifecycleGeneration) return;
         _hasCompletedServicesInit = true;
         _hasCompletedHTTPSetup = httpConfigured;
         if (httpConfigured) {
@@ -1099,15 +1156,21 @@ export const RunAnywhere = {
           logger.debug('Services initialization complete (Phase 2, HTTP/auth deferred — will retry on next online call)');
         }
       } catch (err) {
+        // A shutdown owns the stale lifetime's outcome. Do not let a late
+        // rejection clear or fail a newer lifecycle's services promise.
+        if (lifecycleGeneration !== _lifecycleGeneration) return;
         // Clear the promise on failure so a subsequent retry can re-enter.
-        _servicesInitPromise = null;
+        if (_servicesInitPromise === servicesInitPromise) {
+          _servicesInitPromise = null;
+        }
         throw err;
       }
       // Success path: leave _servicesInitPromise set so any late concurrent
       // caller that reads it after _hasCompletedServicesInit flips true still
       // gets a resolved promise rather than re-entering the init logic.
-    })();
-    return _servicesInitPromise;
+    });
+    _servicesInitPromise = servicesInitPromise;
+    return servicesInitPromise;
   },
 
   /**
@@ -1864,7 +1927,23 @@ export const RunAnywhere = {
   // =========================================================================
 
   async shutdown(): Promise<void> {
+    // Invalidate Phase 2 before its fetch can settle and before teardown starts.
+    // The generation check prevents this lifetime from mutating flags after a
+    // subsequent initialize has begun.
+    _lifecycleGeneration += 1;
     logger.info('Shutting down RunAnywhere Web SDK...');
+
+    // Stop admitting destructive storage work and drain every delete accepted
+    // by this runtime before destroying its analyzer callbacks or WASM module.
+    await StorageAdapter.prepareForShutdown();
+
+    // Voice-agent providers may own native handles, stream subscribers, and
+    // cross-WASM conversation state. Release them before their backend modules.
+    try {
+      await resetVoiceAgentFacadeState();
+    } catch (err) {
+      logger.warning(`Voice-agent teardown failed during SDK shutdown: ${String(err)}`);
+    }
 
     // RAG owns provider state outside the WASM adapter registry (including
     // the cross-WASM in-memory vector index). Destroy it while backend modules

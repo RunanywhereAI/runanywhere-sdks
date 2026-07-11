@@ -12,7 +12,7 @@ ext {
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
-    coreVersion = "0.19.13"
+    coreVersion = "0.19.15"
 
     // =============================================================================
     // Remote binary URLs
@@ -23,7 +23,7 @@ ext {
     binariesBaseUrl = "https://github.com/${binariesGitHubOrg}/${binariesRepo}/releases/download"
 
     // Android native libraries package
-    llamacppAndroidUrl = "${binariesBaseUrl}/core-v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip"
+    llamacppAndroidUrl = "${binariesBaseUrl}/v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip"
 
     // Helper method to check if local libs exist.
     // The engines CMake may emit either `librac_backend_llamacpp.so` (always)

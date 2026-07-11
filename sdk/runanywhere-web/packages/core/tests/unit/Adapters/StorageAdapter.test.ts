@@ -1,14 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ModelArtifactType,
+  ModelCategory,
   ModelInfo as ModelInfoMessage,
 } from '@runanywhere/proto-ts/model_types';
+import {
+  StorageDeleteRequest,
+  StorageDeleteResult,
+  StorageInfoRequest,
+} from '@runanywhere/proto-ts/storage_types';
 import {
   BrowserStorageAnalyzerAdapter,
   StorageAdapter,
   type BrowserStorageAnalyzerModule,
 } from '../../../src/Adapters/StorageAdapter';
-import { OPFSBridge } from '../../../src/Infrastructure/OPFSBridge';
+import { ModelLifecycleAdapter } from '../../../src/Adapters/ModelLifecycleAdapter';
 import { ModelRegistryAdapter } from '../../../src/Adapters/ModelRegistryAdapter';
 
 type Trampoline = (...args: number[]) => number | bigint | void;
@@ -97,6 +103,7 @@ interface FakeModuleHandle {
   readonly callbacksPtr: number;
   allocateString(value: string): number;
   readI32(ptr: number): number;
+  setNativeDeletePath(path: string): void;
 }
 
 function createFakeModule(fs: MemoryFS): FakeModuleHandle {
@@ -110,6 +117,7 @@ function createFakeModule(fs: MemoryFS): FakeModuleHandle {
   let nextPtr = 512;
   let nextTrampoline = 10_000;
   let callbacksPtr = 0;
+  let nativeDeletePath = '';
 
   const allocate = (size: number): number => {
     const ptr = nextPtr;
@@ -127,6 +135,18 @@ function createFakeModule(fs: MemoryFS): FakeModuleHandle {
     let end = ptr;
     while (end < heap.length && heap[end] !== 0) end += 1;
     return decoder.decode(heap.subarray(ptr, end));
+  };
+  const writeDeleteResult = (
+    outResultPtr: number,
+    result: ReturnType<typeof StorageDeleteResult.fromPartial>,
+  ): void => {
+    const bytes = StorageDeleteResult.encode(result).finish();
+    const dataPtr = allocate(Math.max(bytes.length, 1));
+    heap.set(bytes, dataPtr);
+    view.setInt32(outResultPtr, dataPtr, true);
+    view.setInt32(outResultPtr + 4, bytes.length, true);
+    view.setInt32(outResultPtr + 8, 0, true);
+    view.setInt32(outResultPtr + 12, 0, true);
   };
 
   const moduleShape: Partial<BrowserStorageAnalyzerModule> = {
@@ -170,6 +190,57 @@ function createFakeModule(fs: MemoryFS): FakeModuleHandle {
     },
     _rac_get_model_registry: () => 333,
 
+    _rac_proto_buffer_init(bufferPtr: number): void {
+      for (let offset = 0; offset < 16; offset += 4) {
+        view.setInt32(bufferPtr + offset, 0, true);
+      }
+    },
+    _rac_proto_buffer_free: () => undefined,
+    _rac_wasm_sizeof_proto_buffer: () => 16,
+    _rac_wasm_offsetof_proto_buffer_data: () => 0,
+    _rac_wasm_offsetof_proto_buffer_size: () => 4,
+    _rac_wasm_offsetof_proto_buffer_status: () => 8,
+    _rac_wasm_offsetof_proto_buffer_error_message: () => 12,
+    _rac_storage_analyzer_delete_proto(
+      _handle: number,
+      _registryHandle: number,
+      requestPtr: number,
+      requestSize: number,
+      outResultPtr: number,
+    ): number {
+      lifecycle.push('native-delete');
+      const request = StorageDeleteRequest.decode(heap.slice(requestPtr, requestPtr + requestSize));
+      const deletedModelIds: string[] = [];
+      const failedModelIds: string[] = [];
+      for (const modelId of request.modelIds) {
+        const loadedPointer = view.getInt32(callbacksPtr + CALLBACKS.isModelLoaded, true);
+        const loadedCallback = trampolines.get(loadedPointer);
+        const modelIdPtr = allocateString(modelId);
+        const outIsLoadedPtr = allocate(4);
+        view.setInt32(outIsLoadedPtr, 0, true);
+        const loadedResult = Number(loadedCallback?.(modelIdPtr, outIsLoadedPtr, 0) ?? -1);
+        if (loadedResult !== 0 || view.getInt32(outIsLoadedPtr, true) !== 0) {
+          failedModelIds.push(modelId);
+          continue;
+        }
+        const deletePointer = view.getInt32(callbacksPtr + CALLBACKS.deletePath, true);
+        const deleteCallback = trampolines.get(deletePointer);
+        const pathPtr = allocateString(nativeDeletePath);
+        lifecycle.push('memfs-delete');
+        const result = Number(deleteCallback?.(pathPtr, 1, 0) ?? -1);
+        if (result === 0) deletedModelIds.push(modelId);
+        else failedModelIds.push(modelId);
+      }
+      writeDeleteResult(outResultPtr, StorageDeleteResult.fromPartial({
+        success: failedModelIds.length === 0,
+        deletedModelIds,
+        failedModelIds,
+        filesDeleted: deletedModelIds.length > 0,
+        registryUpdated: deletedModelIds.length > 0,
+      }));
+      return 0;
+    },
+
     _rac_wasm_sizeof_storage_callbacks: () => CALLBACKS.size,
     _rac_wasm_offsetof_storage_callbacks_calculate_dir_size: () => CALLBACKS.calculateDirSize,
     _rac_wasm_offsetof_storage_callbacks_get_file_size: () => CALLBACKS.getFileSize,
@@ -190,6 +261,7 @@ function createFakeModule(fs: MemoryFS): FakeModuleHandle {
     get callbacksPtr() { return callbacksPtr; },
     allocateString,
     readI32: (ptr: number) => view.getInt32(ptr, true),
+    setNativeDeletePath: (path: string) => { nativeDeletePath = path; },
   };
 }
 
@@ -270,22 +342,303 @@ describe('BrowserStorageAnalyzerAdapter', () => {
     adapter.cleanup();
   });
 
-  it('deletes MEMFS synchronously and suppresses hydration until recursive OPFS removal', async () => {
+  it('awaits recursive OPFS removal before committing the MEMFS deletion', async () => {
     const fs = new MemoryFS();
     const modelPath = populateModelTree(fs, 'vad-delete');
     const handle = createFakeModule(fs);
+    vi.spyOn(ModelRegistryAdapter, 'tryDefault').mockReturnValue({
+      list: () => ({
+        models: [ModelInfoMessage.fromPartial({
+          id: 'vad-delete',
+          name: 'VAD delete',
+          localPath: modelPath,
+          isDownloaded: true,
+          downloadSizeBytes: 18,
+          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+        })],
+      }),
+    } as unknown as ModelRegistryAdapter);
     const adapter = await BrowserStorageAnalyzerAdapter.install(handle.module);
     const pathPtr = handle.allocateString(modelPath);
 
+    await adapter.prepareDelete(StorageDeleteRequest.fromPartial({
+      modelIds: ['vad-delete'],
+      deleteFiles: true,
+      clearRegistryPaths: true,
+      unloadIfLoaded: true,
+      allowPlatformDelete: true,
+    }));
+    expect(removeEntry).toHaveBeenCalledWith('vad-delete', { recursive: true });
     expect(callback(handle, CALLBACKS.deletePath)(pathPtr, 1, 0)).toBe(0);
     expect(fs.analyzePath(modelPath).exists).toBe(false);
-    expect(await OPFSBridge.exists(`${modelPath}/model.onnx`)).toBe(false);
-    await vi.waitFor(() => {
-      expect(removeEntry).toHaveBeenCalledWith('vad-delete', { recursive: true });
-    });
+    adapter.finishDelete();
 
     const unsafePtr = handle.allocateString('/tmp/not-a-model');
     expect(callback(handle, CALLBACKS.deletePath)(unsafePtr, 1, 0)).toBe(-259);
+    adapter.cleanup();
+  });
+
+  it('leaves MEMFS intact and reports failure when persistent removal is denied', async () => {
+    const fs = new MemoryFS();
+    const modelPath = populateModelTree(fs, 'vad-denied');
+    removeEntry.mockRejectedValueOnce(new DOMException('denied', 'NotAllowedError'));
+    const handle = createFakeModule(fs);
+    vi.spyOn(ModelRegistryAdapter, 'tryDefault').mockReturnValue({
+      list: () => ({
+        models: [ModelInfoMessage.fromPartial({
+          id: 'vad-denied',
+          name: 'VAD denied',
+          localPath: modelPath,
+          isDownloaded: true,
+          downloadSizeBytes: 18,
+          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+        })],
+      }),
+    } as unknown as ModelRegistryAdapter);
+    const adapter = await BrowserStorageAnalyzerAdapter.install(handle.module);
+    const pathPtr = handle.allocateString(modelPath);
+
+    await adapter.prepareDelete(StorageDeleteRequest.fromPartial({
+      modelIds: ['vad-denied'],
+      deleteFiles: true,
+      clearRegistryPaths: true,
+      unloadIfLoaded: true,
+      allowPlatformDelete: true,
+    }));
+
+    expect(callback(handle, CALLBACKS.deletePath)(pathPtr, 1, 0)).toBe(-187);
+    expect(fs.analyzePath(modelPath).exists).toBe(true);
+    adapter.finishDelete();
+    adapter.cleanup();
+  });
+
+  it('drains a pending delete before shutdown destroys its analyzer', async () => {
+    let resolveRemoval!: () => void;
+    removeEntry.mockImplementationOnce(() => new Promise<void>((resolve) => {
+      resolveRemoval = resolve;
+    }));
+    const fs = new MemoryFS();
+    const modelPath = populateModelTree(fs, 'vad-shutdown');
+    const handle = createFakeModule(fs);
+    handle.setNativeDeletePath(modelPath);
+    vi.spyOn(ModelRegistryAdapter, 'tryDefault').mockReturnValue({
+      list: () => ({
+        models: [ModelInfoMessage.fromPartial({
+          id: 'vad-shutdown',
+          name: 'VAD shutdown',
+          localPath: modelPath,
+          isDownloaded: true,
+          downloadSizeBytes: 18,
+          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+        })],
+      }),
+      updateDownloadStatus: () => true,
+    } as unknown as ModelRegistryAdapter);
+    const browserAdapter = await BrowserStorageAnalyzerAdapter.install(handle.module);
+    const storage = StorageAdapter.tryDefault();
+    expect(storage).not.toBeNull();
+
+    const deletion = storage!.delete(StorageDeleteRequest.fromPartial({
+      modelIds: ['vad-shutdown'],
+      deleteFiles: true,
+      clearRegistryPaths: true,
+      unloadIfLoaded: true,
+      allowPlatformDelete: true,
+    }));
+    await vi.waitFor(() => expect(removeEntry).toHaveBeenCalledOnce());
+
+    let shutdownSettled = false;
+    const shutdown = StorageAdapter.prepareForShutdown(handle.module).then(() => {
+      shutdownSettled = true;
+      browserAdapter.cleanup();
+    });
+    await Promise.resolve();
+    expect(shutdownSettled).toBe(false);
+    expect(handle.lifecycle).not.toContain('destroy:777');
+
+    resolveRemoval();
+    const result = await deletion;
+    await shutdown;
+
+    expect(result?.success).toBe(true);
+    expect(handle.lifecycle.indexOf('native-delete')).toBeGreaterThanOrEqual(0);
+    expect(handle.lifecycle.indexOf('destroy:777')).toBeGreaterThan(
+      handle.lifecycle.indexOf('native-delete'),
+    );
+    const staleInfo = vi.fn(() => 0);
+    handle.module._rac_storage_analyzer_info_proto = staleInfo;
+    expect(storage!.supportsProtoStorage()).toBe(false);
+    expect(storage!.info(StorageInfoRequest.fromPartial({}))).toBeNull();
+    expect(staleInfo).not.toHaveBeenCalled();
+    await expect(storage!.delete(StorageDeleteRequest.fromPartial({
+      modelIds: ['vad-shutdown'],
+      deleteFiles: true,
+      allowPlatformDelete: true,
+    }))).rejects.toThrow('shutting down');
+
+    const nextHandle = createFakeModule(new MemoryFS());
+    const nextAdapter = await BrowserStorageAnalyzerAdapter.install(nextHandle.module);
+    expect(StorageAdapter.tryDefault()).not.toBeNull();
+    nextAdapter.cleanup();
+  });
+
+  it('rechecks loaded state after OPFS yields before touching MEMFS', async () => {
+    let resolveRemoval!: () => void;
+    removeEntry.mockImplementationOnce(() => new Promise<void>((resolve) => {
+      resolveRemoval = resolve;
+    }));
+    let loaded = false;
+    const unload = vi.fn(() => ({ success: true }));
+    vi.spyOn(ModelLifecycleAdapter, 'fromModule').mockReturnValue({
+      supportsProtoLifecycle: () => true,
+      currentModel: ({ category }: { category: ModelCategory }) => (
+        loaded && category === ModelCategory.MODEL_CATEGORY_LANGUAGE
+          ? { found: true, modelId: 'vad-reloaded' }
+          : { found: false, modelId: '' }
+      ),
+      unload,
+    } as unknown as ModelLifecycleAdapter);
+    const fs = new MemoryFS();
+    const modelPath = populateModelTree(fs, 'vad-reloaded');
+    const handle = createFakeModule(fs);
+    handle.setNativeDeletePath(modelPath);
+    vi.spyOn(ModelRegistryAdapter, 'tryDefault').mockReturnValue({
+      list: () => ({
+        models: [ModelInfoMessage.fromPartial({
+          id: 'vad-reloaded',
+          name: 'VAD reloaded',
+          localPath: modelPath,
+          isDownloaded: true,
+          downloadSizeBytes: 18,
+          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+        })],
+      }),
+    } as unknown as ModelRegistryAdapter);
+    const browserAdapter = await BrowserStorageAnalyzerAdapter.install(handle.module);
+    const storage = StorageAdapter.tryDefault();
+    expect(storage).not.toBeNull();
+
+    const deletion = storage!.delete(StorageDeleteRequest.fromPartial({
+      modelIds: ['vad-reloaded'],
+      deleteFiles: true,
+      clearRegistryPaths: true,
+      unloadIfLoaded: true,
+      allowPlatformDelete: true,
+    }));
+    await vi.waitFor(() => expect(removeEntry).toHaveBeenCalledOnce());
+
+    // Simulate another task loading the model while removeEntry() owns the
+    // browser event loop. Native must see this fresh state and refuse MEMFS
+    // deletion rather than relying on prepareDelete's earlier snapshot.
+    loaded = true;
+    resolveRemoval();
+    const result = await deletion;
+
+    expect(result?.success).toBe(false);
+    expect(result?.failedModelIds).toContain('vad-reloaded');
+    expect(handle.lifecycle).not.toContain('memfs-delete');
+    expect(fs.analyzePath(modelPath).exists).toBe(true);
+    expect(unload).not.toHaveBeenCalled();
+    browserAdapter.cleanup();
+  });
+
+  it('does not unload or pre-delete bytes for a stale attached delete plan', async () => {
+    const fs = new MemoryFS();
+    const modelPath = populateModelTree(fs, 'vad-stale-plan');
+    const handle = createFakeModule(fs);
+    const unload = vi.fn(() => ({ success: true }));
+    vi.spyOn(ModelLifecycleAdapter, 'fromModule').mockReturnValue({
+      supportsProtoLifecycle: () => true,
+      currentModel: ({ category }: { category: ModelCategory }) => (
+        category === ModelCategory.MODEL_CATEGORY_LANGUAGE
+          ? { found: true, modelId: 'vad-stale-plan' }
+          : { found: false, modelId: '' }
+      ),
+      unload,
+    } as unknown as ModelLifecycleAdapter);
+    vi.spyOn(ModelRegistryAdapter, 'tryDefault').mockReturnValue({
+      list: () => ({
+        models: [ModelInfoMessage.fromPartial({
+          id: 'vad-stale-plan',
+          name: 'VAD stale plan',
+          localPath: modelPath,
+          isDownloaded: true,
+          downloadSizeBytes: 18,
+          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+        })],
+      }),
+    } as unknown as ModelRegistryAdapter);
+    const adapter = await BrowserStorageAnalyzerAdapter.install(handle.module);
+
+    await adapter.prepareDelete(StorageDeleteRequest.fromPartial({
+      modelIds: ['vad-stale-plan'],
+      deleteFiles: true,
+      clearRegistryPaths: true,
+      unloadIfLoaded: true,
+      allowPlatformDelete: true,
+      requirePlanMatch: true,
+      plan: {
+        candidates: [{
+          modelId: 'vad-stale-plan',
+          localPath: `${modelPath}-old`,
+        }],
+      },
+    }));
+
+    expect(removeEntry).not.toHaveBeenCalled();
+    expect(unload).not.toHaveBeenCalled();
+    expect(fs.analyzePath(modelPath).exists).toBe(true);
+    adapter.finishDelete();
+    adapter.cleanup();
+  });
+
+  it('uses the native last-wins rule for duplicate plan candidates', async () => {
+    const fs = new MemoryFS();
+    const modelPath = populateModelTree(fs, 'vad-duplicate-plan');
+    const handle = createFakeModule(fs);
+    const unload = vi.fn(() => ({ success: true }));
+    vi.spyOn(ModelLifecycleAdapter, 'fromModule').mockReturnValue({
+      supportsProtoLifecycle: () => true,
+      currentModel: ({ category }: { category: ModelCategory }) => (
+        category === ModelCategory.MODEL_CATEGORY_LANGUAGE
+          ? { found: true, modelId: 'vad-duplicate-plan' }
+          : { found: false, modelId: '' }
+      ),
+      unload,
+    } as unknown as ModelLifecycleAdapter);
+    vi.spyOn(ModelRegistryAdapter, 'tryDefault').mockReturnValue({
+      list: () => ({
+        models: [ModelInfoMessage.fromPartial({
+          id: 'vad-duplicate-plan',
+          name: 'VAD duplicate plan',
+          localPath: modelPath,
+          isDownloaded: true,
+          downloadSizeBytes: 18,
+          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+        })],
+      }),
+    } as unknown as ModelRegistryAdapter);
+    const adapter = await BrowserStorageAnalyzerAdapter.install(handle.module);
+
+    await adapter.prepareDelete(StorageDeleteRequest.fromPartial({
+      modelIds: ['vad-duplicate-plan'],
+      deleteFiles: true,
+      clearRegistryPaths: true,
+      unloadIfLoaded: true,
+      allowPlatformDelete: true,
+      requirePlanMatch: true,
+      plan: {
+        candidates: [
+          { modelId: 'vad-duplicate-plan', localPath: modelPath },
+          { modelId: 'vad-duplicate-plan', localPath: `${modelPath}-stale` },
+        ],
+      },
+    }));
+
+    expect(removeEntry).not.toHaveBeenCalled();
+    expect(unload).not.toHaveBeenCalled();
+    expect(fs.analyzePath(modelPath).exists).toBe(true);
+    adapter.finishDelete();
     adapter.cleanup();
   });
 

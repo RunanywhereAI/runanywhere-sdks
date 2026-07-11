@@ -237,9 +237,8 @@ function renderView(): void {
 
       <div class="docs-section">
         <h3>Conversation</h3>
-        <p class="text-secondary">Speak naturally — the agent listens, thinks,
-        and replies out loud, entirely on your device. Nothing leaves the
-        browser.</p>
+        <p class="text-secondary">Speak naturally — after setup, voice capture
+        and AI inference run in this browser.</p>
         <div class="toolbar-actions">
           <button
             class="btn btn-primary"
@@ -309,7 +308,7 @@ function renderSetupCard(allReady: boolean): string {
     : `<button class="btn btn-primary btn-lg" id="voice-setup-btn" ${settingUpPipeline ? 'disabled' : ''}>
          ${settingUpPipeline ? 'Setting up…' : 'Set up Voice AI'}
        </button>
-       <div class="voice-setup__note">Downloads &amp; loads all components. Runs fully offline afterward.</div>`;
+       <div class="voice-setup__note">Downloads &amp; loads all components. Voice inference runs offline afterward.</div>`;
 
   return `
     <div class="voice-setup">

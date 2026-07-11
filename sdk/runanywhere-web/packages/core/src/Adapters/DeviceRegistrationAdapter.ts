@@ -13,6 +13,7 @@ import {
   RAC_ERROR_INVALID_CONFIGURATION,
   RAC_ERROR_INVALID_ARGUMENT,
   RAC_ERROR_NETWORK_ERROR,
+  RAC_ERROR_NOT_INITIALIZED,
   RAC_OK,
 } from '../Foundation/RACErrors.js';
 import { SDKLogger } from '../Foundation/SDKLogger.js';
@@ -163,6 +164,18 @@ interface DeviceProfile {
   coreCount: number;
 }
 
+interface ResolvedControlPlaneConfiguration {
+  baseURL: string;
+  apiKey: string;
+}
+
+interface PreparedHTTPRequest {
+  key: string;
+  result: number;
+  statusCode: number;
+  errorMessage: string | null;
+}
+
 function requiredLayoutHelper(
   helper: (() => number) | undefined,
   name: string,
@@ -171,24 +184,6 @@ function requiredLayoutHelper(
     throw new Error(`WASM module missing ${name}; rebuild the core Web artifact.`);
   }
   return helper();
-}
-
-function isInvalidAccessError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'InvalidAccessError';
-}
-
-/**
- * Synchronous XHR on Window forbids a non-zero timeout. Worker XHR accepts it,
- * so preserve the native timeout where possible and suppress only the precise
- * standards-mandated exception on Window.
- */
-function applySynchronousTimeout(xhr: XMLHttpRequest, timeoutMs: number): void {
-  if (timeoutMs <= 0) return;
-  try {
-    xhr.timeout = timeoutMs;
-  } catch (error) {
-    if (!isInvalidAccessError(error)) throw error;
-  }
 }
 
 function resolveControlPlaneURL(baseURL: string, endpoint: string): string | null {
@@ -275,6 +270,11 @@ function setI64(module: DeviceRegistrationModule, ptr: number, value: number): v
 }
 
 export class DeviceRegistrationAdapter {
+  private static readonly installedAdapters = new WeakMap<
+    DeviceRegistrationModule,
+    DeviceRegistrationAdapter
+  >();
+
   private callbackPointers: CallbackPointers | null = null;
   private callbacksPtr = 0;
   private deviceInfoStrings: number[] = [];
@@ -285,6 +285,11 @@ export class DeviceRegistrationAdapter {
   private readonly configuredBaseURL: string;
   private readonly configuredApiKey: string;
   private readonly requestTimeoutMs: number;
+  private pendingRequest: Promise<void> | null = null;
+  private preparedRequest: PreparedHTTPRequest | null = null;
+  private nativeRetryRequired = false;
+  private activeRequestController: AbortController | null = null;
+  private disposed = false;
 
   private constructor(
     private readonly module: DeviceRegistrationModule,
@@ -293,7 +298,7 @@ export class DeviceRegistrationAdapter {
     this.configuredBaseURL = configuration.baseURL?.trim() ?? '';
     this.configuredApiKey = configuration.apiKey?.trim() ?? '';
     this.requestTimeoutMs = Math.max(
-      0,
+      1,
       Math.trunc(configuration.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
     );
     this.callbackLayout = this.readCallbackLayout();
@@ -307,10 +312,36 @@ export class DeviceRegistrationAdapter {
   ): DeviceRegistrationAdapter {
     const adapter = new DeviceRegistrationAdapter(module, configuration);
     adapter.register();
+    DeviceRegistrationAdapter.installedAdapters.set(module, adapter);
     return adapter;
   }
 
+  /**
+   * Wait for a browser registration request that the synchronous native
+   * callback started on the event loop. The caller must then invoke
+   * `rac_device_manager_register_if_needed` once more so native state is only
+   * committed after the bounded fetch has actually completed.
+   */
+  static async waitForPendingRegistration(
+    module: DeviceRegistrationModule,
+  ): Promise<boolean> {
+    const adapter = DeviceRegistrationAdapter.installedAdapters.get(module);
+    if (!adapter || !adapter.nativeRetryRequired || adapter.disposed) return false;
+    const pending = adapter.pendingRequest;
+    if (pending) await pending;
+    return adapter.nativeRetryRequired && !adapter.disposed;
+  }
+
   cleanup(): void {
+    this.disposed = true;
+    this.activeRequestController?.abort();
+    this.activeRequestController = null;
+    this.pendingRequest = null;
+    this.preparedRequest = null;
+    this.nativeRetryRequired = false;
+    if (DeviceRegistrationAdapter.installedAdapters.get(this.module) === this) {
+      DeviceRegistrationAdapter.installedAdapters.delete(this.module);
+    }
     try {
       this.module._rac_device_manager_clear_callbacks?.();
     } catch {
@@ -510,14 +541,17 @@ export class DeviceRegistrationAdapter {
       const endpoint = this.module.UTF8ToString(endpointPtr);
       const jsonBody = this.module.UTF8ToString(jsonBodyPtr);
       const isDevelopmentRegistration = endpoint.startsWith('/rest/v1/');
-      const baseURL = this.currentBaseURL();
-      const resolvedURL = resolveControlPlaneURL(baseURL, endpoint);
-      const apiKey = this.currentApiKey();
-      if (isDevelopmentRegistration && !this.hasUsableDevelopmentConfiguration()) {
-        this.module.setValue(outResponsePtr + this.responseLayout.result, RAC_OK, 'i32');
-        this.module.setValue(outResponsePtr + this.responseLayout.statusCode, 204, 'i32');
-        return RAC_OK;
+      const controlPlane = this.currentControlPlaneConfiguration();
+      if (!controlPlane) {
+        return this.writeHTTPFailure(
+          outResponsePtr,
+          RAC_ERROR_INVALID_CONFIGURATION,
+          0,
+          'Device registration requires a matching base URL and API key.',
+        );
       }
+      const { baseURL, apiKey } = controlPlane;
+      const resolvedURL = resolveControlPlaneURL(baseURL, endpoint);
       if (!resolvedURL) {
         return this.writeHTTPFailure(
           outResponsePtr,
@@ -544,34 +578,53 @@ export class DeviceRegistrationAdapter {
       const url = isDevelopmentRegistration
         ? `${resolvedURL}?on_conflict=device_id`
         : resolvedURL;
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', url, false);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('Accept', 'application/json');
-      xhr.setRequestHeader('X-SDK-Client', 'RunAnywhereSDK');
-      xhr.setRequestHeader('X-SDK-Version', this.configuration.sdkVersion);
-      xhr.setRequestHeader('X-Platform', 'web');
-      if (apiKey) xhr.setRequestHeader('apikey', apiKey);
-      if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
-      if (isDevelopmentRegistration) {
-        xhr.setRequestHeader('Prefer', 'resolution=merge-duplicates,return=representation');
-      }
-      applySynchronousTimeout(xhr, this.requestTimeoutMs);
-      xhr.send(jsonBody);
-
-      const statusCode = xhr.status | 0;
-      const accepted = (statusCode >= 200 && statusCode < 300) || statusCode === 409;
-      if (!accepted) {
-        return this.writeHTTPFailure(
-          outResponsePtr,
-          RAC_ERROR_HTTP_ERROR,
-          statusCode,
-          'Device registration request was rejected.',
+      // Native reconstructs the registration payload for the retry and refreshes
+      // volatile fields such as last_seen_at_ms. Correlate the prepared response
+      // with the only operation this callback serves (route + auth mode), rather
+      // than requiring byte-identical JSON across the two native invocations.
+      const requestKey = `${requiresAuth}:${url}`;
+      if (this.preparedRequest?.key === requestKey) {
+        const prepared = this.preparedRequest;
+        this.preparedRequest = null;
+        this.nativeRetryRequired = false;
+        if (prepared.result !== RAC_OK) {
+          return this.writeHTTPFailure(
+            outResponsePtr,
+            prepared.result,
+            prepared.statusCode,
+            prepared.errorMessage ?? 'Device registration request failed.',
+          );
+        }
+        this.module.setValue(outResponsePtr + this.responseLayout.result, RAC_OK, 'i32');
+        this.module.setValue(
+          outResponsePtr + this.responseLayout.statusCode,
+          prepared.statusCode,
+          'i32',
         );
+        return RAC_OK;
       }
-      this.module.setValue(outResponsePtr + this.responseLayout.result, RAC_OK, 'i32');
-      this.module.setValue(outResponsePtr + this.responseLayout.statusCode, statusCode, 'i32');
-      return RAC_OK;
+
+      if (!this.pendingRequest) {
+        this.nativeRetryRequired = true;
+        const pending = this.prepareHTTPRequest({
+          key: requestKey,
+          url,
+          jsonBody,
+          apiKey,
+          accessToken,
+          isDevelopmentRegistration,
+        });
+        this.pendingRequest = pending;
+        void pending.finally(() => {
+          if (this.pendingRequest === pending) this.pendingRequest = null;
+        });
+      }
+      return this.writeHTTPFailure(
+        outResponsePtr,
+        RAC_ERROR_NOT_INITIALIZED,
+        0,
+        'Device registration request is pending.',
+      );
     } catch {
       return this.writeHTTPFailure(
         outResponsePtr,
@@ -596,26 +649,80 @@ export class DeviceRegistrationAdapter {
     return result;
   }
 
-  private currentBaseURL(): string {
-    if (this.configuredBaseURL) return this.configuredBaseURL;
-    return this.readNativeString(this.module._rac_wasm_dev_config_get_supabase_url);
-  }
-
-  private currentApiKey(): string {
-    if (this.configuredApiKey) return this.configuredApiKey;
-    return this.readNativeString(this.module._rac_wasm_dev_config_get_supabase_key);
-  }
-
   private currentAccessToken(): string {
     return this.readNativeString(this.module._rac_auth_get_access_token);
   }
 
-  private hasUsableDevelopmentConfiguration(): boolean {
-    if (this.configuredBaseURL && this.configuredApiKey) return true;
+  /** Resolve URL + credential atomically so embedded secrets never cross origins. */
+  private currentControlPlaneConfiguration(): ResolvedControlPlaneConfiguration | null {
+    if (this.configuredBaseURL || this.configuredApiKey) {
+      return this.configuredBaseURL && this.configuredApiKey
+        ? { baseURL: this.configuredBaseURL, apiKey: this.configuredApiKey }
+        : null;
+    }
     try {
-      return this.module._rac_wasm_dev_config_is_available?.() === 1;
+      if (this.module._rac_wasm_dev_config_is_available?.() !== 1) return null;
+      const baseURL = this.readNativeString(this.module._rac_wasm_dev_config_get_supabase_url);
+      const apiKey = this.readNativeString(this.module._rac_wasm_dev_config_get_supabase_key);
+      return baseURL && apiKey ? { baseURL, apiKey } : null;
     } catch {
-      return false;
+      return null;
+    }
+  }
+
+  private async prepareHTTPRequest(options: {
+    key: string;
+    url: string;
+    jsonBody: string;
+    apiKey: string;
+    accessToken: string;
+    isDevelopmentRegistration: boolean;
+  }): Promise<void> {
+    const controller = new AbortController();
+    this.activeRequestController = controller;
+    const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
+    try {
+      const headers = new Headers({
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-SDK-Client': 'RunAnywhereSDK',
+        'X-SDK-Version': this.configuration.sdkVersion,
+        'X-Platform': 'web',
+      });
+      if (options.apiKey) headers.set('apikey', options.apiKey);
+      if (options.accessToken) headers.set('Authorization', `Bearer ${options.accessToken}`);
+      if (options.isDevelopmentRegistration) {
+        headers.set('Prefer', 'resolution=merge-duplicates,return=representation');
+      }
+      const response = await fetch(options.url, {
+        method: 'POST',
+        headers,
+        body: options.jsonBody,
+        signal: controller.signal,
+      });
+      const accepted = response.ok || response.status === 409;
+      if (!this.disposed) {
+        this.preparedRequest = {
+          key: options.key,
+          result: accepted ? RAC_OK : RAC_ERROR_HTTP_ERROR,
+          statusCode: response.status | 0,
+          errorMessage: accepted ? null : 'Device registration request was rejected.',
+        };
+      }
+    } catch {
+      if (!this.disposed) {
+        this.preparedRequest = {
+          key: options.key,
+          result: RAC_ERROR_NETWORK_ERROR,
+          statusCode: 0,
+          errorMessage: controller.signal.aborted
+            ? 'Device registration request timed out.'
+            : 'Device registration request failed.',
+        };
+      }
+    } finally {
+      clearTimeout(timeout);
+      if (this.activeRequestController === controller) this.activeRequestController = null;
     }
   }
 

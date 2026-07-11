@@ -486,6 +486,7 @@ export interface EmscriptenRunanywhereModule {
   _rac_auth_get_user_id?(): number;
   _rac_auth_get_organization_id?(): number;
   _rac_state_is_device_registered?(): number;
+  _rac_device_manager_register_if_needed?(environment: number, buildTokenPtr: number): number;
 
   // -----------------------------------------------------------------------------
   // Solutions runtime — `rac/solutions/rac_solution.h`

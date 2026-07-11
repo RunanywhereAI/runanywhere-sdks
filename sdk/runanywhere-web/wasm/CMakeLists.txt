@@ -968,6 +968,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_state_get_device_id"
     "_rac_state_set_device_registered"
     "_rac_state_is_device_registered"
+    "_rac_device_manager_register_if_needed"
 
     # Telemetry
     "_rac_telemetry_manager_create"

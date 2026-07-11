@@ -48,6 +48,11 @@ export class AudioCapture {
   private _isCapturing = false;
   private _currentLevel = 0;
   private _pcmChunks: Float32Array[] = [];
+  /**
+   * Invalidates an in-flight getUserMedia request when capture is stopped or
+   * restarted before the permission prompt settles.
+   */
+  private lifecycleGeneration = 0;
 
   private readonly config: Required<AudioCaptureConfig>;
   private chunkCallback: AudioChunkCallback | null = null;
@@ -97,6 +102,7 @@ export class AudioCapture {
       return;
     }
 
+    const generation = ++this.lifecycleGeneration;
     this.chunkCallback = onChunk ?? null;
     this.levelCallback = onLevel ?? null;
     this._pcmChunks = [];
@@ -104,9 +110,10 @@ export class AudioCapture {
 
     logger.info(`Starting audio capture (${this.config.sampleRate}Hz, chunk=${this.config.chunkSize})`);
 
+    let acquiredStream: MediaStream | null = null;
     try {
       // Request microphone access
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+      acquiredStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: { ideal: this.config.sampleRate },
           channelCount: { exact: this.config.channels },
@@ -115,6 +122,15 @@ export class AudioCapture {
           autoGainControl: true,
         },
       });
+
+      // stop() or a newer start() won while the permission prompt was open.
+      // Release the just-granted stream without installing it on this capture.
+      if (generation !== this.lifecycleGeneration) {
+        acquiredStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      this.mediaStream = acquiredStream;
+      acquiredStream = null;
 
       // Create AudioContext at target sample rate
       this.audioContext = new AudioContext({
@@ -162,7 +178,11 @@ export class AudioCapture {
 
       logger.info('Audio capture started');
     } catch (error) {
-      this.cleanupResources();
+      acquiredStream?.getTracks().forEach((track) => track.stop());
+      // A stale request must not tear down resources owned by a newer start.
+      if (generation === this.lifecycleGeneration) {
+        this.cleanupResources();
+      }
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to start audio capture: ${message}`);
       throw new Error(`Microphone access failed: ${message}`);
@@ -173,8 +193,8 @@ export class AudioCapture {
    * Stop capturing audio and release resources.
    */
   stop(): void {
-    if (!this._isCapturing) return;
-
+    // Invalidate a pending getUserMedia request even before _isCapturing flips.
+    this.lifecycleGeneration += 1;
     this._isCapturing = false;
     this._currentLevel = 0;
     this.chunkCallback = null;

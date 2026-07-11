@@ -195,6 +195,16 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
 
     // Step 9: Handle response
     if (result != RAC_SUCCESS || response.result != RAC_SUCCESS) {
+        const rac_result_t response_result =
+            result != RAC_SUCCESS ? result : response.result;
+        if (response_result == RAC_ERROR_NOT_INITIALIZED) {
+            // Browser callbacks start a bounded fetch on the event loop and
+            // return this sentinel. The Web facade awaits it and invokes this
+            // operation once more with the prepared response; do not emit a
+            // false registration-failed event while that request is pending.
+            RAC_LOG_DEBUG(LOG_CAT, "Device registration request pending platform completion");
+            return response_result;
+        }
         std::string error_msg = "Device registration failed";
         if (response.error_message) {
             error_msg = error_msg + ": " + response.error_message;
@@ -203,7 +213,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
         emit_device_registration_failed(result != RAC_SUCCESS ? result : response.result,
                                         response.error_message ? response.error_message
                                                                : "HTTP request failed");
-        return result != RAC_SUCCESS ? result : response.result;
+        return response_result;
     }
 
     // Step 10: Mark as registered

@@ -180,6 +180,26 @@ describe('CrossWasmRAGProvider', () => {
       configuration: null,
     });
   });
+
+  it('evicts a cached cross-WASM pipeline when a required backend disappears', async () => {
+    const { supportsLLM } = installBackendSpies();
+    await ragCreatePipeline(createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+    }));
+    const created = RAG.pipelineState();
+
+    supportsLLM.mockReturnValue(false);
+
+    expect(RAG.availability()).toMatchObject({
+      available: false,
+      source: 'unavailable',
+    });
+    expect(RAG.pipelineState()).toEqual({
+      generation: created.generation + 1,
+      configuration: null,
+    });
+  });
 });
 
 function installBackendSpies() {
@@ -187,7 +207,7 @@ function installBackendSpies() {
     supportsProtoEmbeddings: () => true,
     supportsLifecycleProtoEmbeddings: () => true,
   } as unknown as EmbeddingsProtoAdapter);
-  vi.spyOn(TextGeneration, 'supportsProtoLLM').mockReturnValue(true);
+  const supportsLLM = vi.spyOn(TextGeneration, 'supportsProtoLLM').mockReturnValue(true);
   vi.spyOn(ModelRegistry, 'getModel').mockReturnValue(null);
   vi.spyOn(WebModelLifecycle, 'currentModel').mockReturnValue(null);
   const loadModel = vi.spyOn(WebModelLifecycle, 'loadModelAsync').mockImplementation(
@@ -204,7 +224,7 @@ function installBackendSpies() {
       resolvedArtifacts: [],
     }),
   );
-  return { loadModel };
+  return { loadModel, supportsLLM };
 }
 
 function vector(values: number[], text: string, inputIndex: number): EmbeddingVector {

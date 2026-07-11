@@ -314,6 +314,22 @@ export class OPFSBridge {
    * it cannot await FileSystemDirectoryHandle.removeEntry().
    */
   static scheduleRemovePath(path: string): Promise<void> {
+    return OPFSBridge.queueRemovePath(path, true);
+  }
+
+  /**
+   * Remove a persistent path transactionally. Unlike the legacy scheduled
+   * callback path, rejection clears the temporary tombstone because callers
+   * have not yet committed the matching MEMFS or registry deletion.
+   */
+  static async removePath(path: string): Promise<void> {
+    await OPFSBridge.queueRemovePath(path, false);
+  }
+
+  private static queueRemovePath(
+    path: string,
+    retainSuppressionOnFailure: boolean,
+  ): Promise<void> {
     const segments = pathToOPFSSegments(path);
     if (!segments) return Promise.resolve();
     // Capture both the root handle and its logical identity. Resolving the
@@ -338,14 +354,19 @@ export class OPFSBridge {
       },
       (error: unknown) => {
         logger.warning(
-          `Scheduled OPFS deletion failed for '${path}': ${
+          `${retainSuppressionOnFailure ? 'Scheduled' : 'Transactional'} OPFS deletion failed for '${path}': ${
             error instanceof Error ? error.message : String(error)
           }`,
         );
         if (OPFSBridge.pendingRemovals.get(scopedKey) === removal) {
           OPFSBridge.pendingRemovals.delete(scopedKey);
-          // Keep the tombstone on failure so a stale file in this same root
-          // cannot be hydrated back into the registry.
+          if (!retainSuppressionOnFailure) {
+            OPFSBridge.suppressedPaths.delete(scopedKey);
+          }
+          // Scheduled callback deletions retain the tombstone on failure so a
+          // stale file cannot be hydrated after the synchronous side already
+          // committed. Transactional callers clear it because nothing else
+          // has been committed yet.
         }
       },
     );

@@ -122,8 +122,8 @@ export function createStorageNamespace(browser: BrowserStorageControls) {
       return result;
     },
 
-    delete(request: StorageDeleteRequest): StorageDeleteResult {
-      const result = requireNativeStorage('storage.delete').delete(request);
+    async delete(request: StorageDeleteRequest): Promise<StorageDeleteResult> {
+      const result = await requireNativeStorage('storage.delete').delete(request);
       if (!result) {
         throw SDKException.backendNotAvailable('storage.delete', 'Native storage analyzer returned no result.');
       }
@@ -137,7 +137,7 @@ export function createStorageNamespace(browser: BrowserStorageControls) {
      * Convenience over `delete` with the canonical flag set — mirrors Swift
      * `RunAnywhere.deleteModel(_:)`.
      */
-    deleteModel(modelId: string): StorageDeleteResult {
+    deleteModel(modelId: string): Promise<StorageDeleteResult> {
       return this.delete(
         StorageDeleteRequestMessage.fromPartial({
           modelIds: [modelId],

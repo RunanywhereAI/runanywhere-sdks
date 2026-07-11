@@ -25,7 +25,6 @@ import {
   RunAnywhere,
   ToolChoiceMode,
   ToolParameterType,
-  isSDKException,
   type ToolDefinition,
   type ToolValue,
 } from '@runanywhere/web';
@@ -1193,7 +1192,10 @@ function renderMessages(host: HTMLElement): void {
       <div class="chat-empty-state">
         <div class="empty-logo">${svgIcon('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M5 3l.8 2.2L8 6l-2.2.8L5 9l-.8-2.2L2 6l2.2-.8L5 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/>')}</div>
         <h3>${greeting()}</h3>
-        <p>Ask anything — everything runs privately on this device.</p>
+        <p>
+          AI inference runs on this device. Setup, model downloads, and
+          enabled web tools may contact the services identified by the app.
+        </p>
         <div class="suggestion-chips">
           ${STARTER_PROMPTS.map((starter) => `
             <button type="button" class="suggestion-chip" data-prompt="${escapeHtml(starter.prompt)}">
@@ -1337,9 +1339,6 @@ function renderMarkdownLite(text: string): string {
   return html.replace(/\uE000(\d+)\uE000/g, (_match, i: string) => codeBlocks[Number(i)]);
 }
 
-function formatChatError(error: unknown): string {
-  if (isSDKException(error)) {
-    return `Error: ${error.message}`;
-  }
+export function formatChatError(error: unknown): string {
   return `Error: ${formatError(error)}`;
 }

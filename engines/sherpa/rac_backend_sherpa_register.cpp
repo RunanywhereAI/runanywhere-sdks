@@ -10,6 +10,7 @@
 #include "rac_tts_sherpa.h"
 #include "rac_vad_sherpa.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -210,13 +211,24 @@ static rac_result_t sherpa_stt_vtable_transcribe_stream(void* impl, const void* 
     const int sample_rate = (options && options->sample_rate > 0) ? options->sample_rate : 16000;
 
     // Offline Whisper recognizers do not emit incremental callbacks from a
-    // single decode. Produce genuine cumulative partials by decoding bounded
-    // prefixes in short-lived streams, then run the canonical full utterance
-    // below for the final result. This keeps the public streaming contract
-    // truthful without retaining extra recognizer state between calls.
-    const size_t partial_stride = static_cast<size_t>(sample_rate) * 3;
+    // single decode. Produce cumulative partials from a bounded number of
+    // prefixes, then run the canonical full utterance below for the final
+    // result. Spacing longer inputs evenly keeps the number of complete
+    // re-decodes constant instead of growing quadratically with duration.
+    constexpr size_t kMaxSyntheticPartialDecodes = 4;
+    const size_t minimum_partial_stride = static_cast<size_t>(sample_rate) * 3;
+    const size_t partial_interval_count = kMaxSyntheticPartialDecodes + 1;
+    const size_t evenly_spaced_stride =
+        float_samples.size() / partial_interval_count +
+        (float_samples.size() % partial_interval_count != 0 ? 1 : 0);
+    const size_t partial_stride = std::max(minimum_partial_stride, evenly_spaced_stride);
     std::string last_partial;
-    for (size_t prefix = partial_stride; prefix < float_samples.size(); prefix += partial_stride) {
+    for (size_t partial_index = 1; partial_index <= kMaxSyntheticPartialDecodes;
+         ++partial_index) {
+        const size_t prefix = partial_stride * partial_index;
+        if (prefix >= float_samples.size()) {
+            break;
+        }
         rac_handle_t partial_stream = nullptr;
         if (rac_stt_sherpa_create_stream(impl, &partial_stream) != RAC_SUCCESS) {
             break;

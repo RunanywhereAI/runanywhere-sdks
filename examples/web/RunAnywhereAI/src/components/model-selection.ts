@@ -227,8 +227,9 @@ export function buildGetStartedOverlay(
       </div>
       <h3 class="chat-model-overlay-title">Welcome</h3>
       <p class="chat-model-overlay-description">
-        Choose your AI model and start chatting. Everything runs privately
-        in your browser &mdash; nothing leaves this device.
+        Choose your AI model and start chatting. AI inference runs in your
+        browser. Setup and model downloads contact RunAnywhere services, and
+        enabled web tools contact their named providers.
       </p>
       <button type="button" id="chat-get-started-btn" class="btn btn-primary btn-lg">
         Choose a Model
@@ -238,7 +239,7 @@ export function buildGetStartedOverlay(
           <rect x="3" y="11" width="18" height="11" rx="2"/>
           <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
-        <span>100% private &middot; Runs on your device</span>
+        <span>On-device AI inference</span>
       </div>
     </div>
   `;

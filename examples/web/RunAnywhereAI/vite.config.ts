@@ -126,6 +126,13 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     plugins: [copyWasmPlugin(command === 'build'), ...relayPlugin],
+    build: {
+      // Vite 8 otherwise advances this floor with its moving
+      // `baseline-widely-available` default on each major release. Chrome 86
+      // remains the Web SDK's documented production minimum; WebGPU stays an
+      // optional capability with a CPU fallback on browsers that lack it.
+      target: 'chrome86',
+    },
     resolve: {
     alias: [
       // Ensure all packages resolve to the same source modules during development.

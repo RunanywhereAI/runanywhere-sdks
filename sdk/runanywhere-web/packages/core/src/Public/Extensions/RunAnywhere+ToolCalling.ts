@@ -759,18 +759,24 @@ export const ToolCalling = {
     module.HEAPU32[(handlePtr >>> 2) + 1] = 0;
 
     let sessionHandle = 0n;
+    let cancelDispatched = false;
     // pass2-syn-007: wire AbortSignal into _rac_tool_calling_session_cancel_proto.
     // Asyncify yields to the browser event loop while an awaited native call
     // is in flight. Once commons has published the session handle, abort can
     // therefore latch cancellation during a later step continuation;
     // backend compute may use its own workers internally.
     const onAbort = () => {
+      if (sessionHandle === 0n) {
+        sessionHandle = readWasmUint64(module.HEAPU32, handlePtr);
+      }
       if (
         sessionHandle !== 0n &&
+        !cancelDispatched &&
         typeof module._rac_tool_calling_session_cancel_proto === 'function'
       ) {
         try {
           module._rac_tool_calling_session_cancel_proto(sessionHandle);
+          cancelDispatched = true;
         } catch (err) {
           logger.warning(
             `session_cancel_proto failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -822,6 +828,11 @@ export const ToolCalling = {
       // handle was published, fan that cancel through to commons now.
       if (extra.signal?.aborted) {
         onAbort();
+        throw SDKException.fromCode(
+          -ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED,
+          'Tool-calling generation cancelled',
+          'AbortSignal fired while the initial tool-calling generation was in flight',
+        );
       }
 
       // Pump the event queue. Commons fires either:
