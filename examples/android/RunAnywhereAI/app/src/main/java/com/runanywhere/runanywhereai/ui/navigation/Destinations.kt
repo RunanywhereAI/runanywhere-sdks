@@ -35,7 +35,7 @@ data object Stt
 data object Vad
 
 @Serializable
-data object Vision
+data class Vision(val openLiveCamera: Boolean = false)
 
 @Serializable
 data object Documents
@@ -83,7 +83,7 @@ enum class ConsumerDestination(
         ConsumerNavGroup.ASSISTANT,
     ),
     LIVE(
-        Vision,
+        Vision(),
         "Images & live",
         "Ask about photos or camera",
         RACIcons.Outline.Eye,
@@ -120,10 +120,10 @@ fun NavDestination?.isSelected(route: Any): Boolean =
 fun NavDestination?.isConsumerTopLevel(): Boolean =
     ConsumerDestination.entries.any { isSelected(it.route) }
 
-fun NavHostController.navigateTopLevel(route: Any) {
+fun NavHostController.navigateTopLevel(route: Any, restoreState: Boolean = true) {
     navigate(route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
-        restoreState = true
+        this.restoreState = restoreState
     }
 }

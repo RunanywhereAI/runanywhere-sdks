@@ -57,13 +57,30 @@ endif()
 
 set(QHEXRT_SOURCES
     rac_plugin_entry_qhexrt.cpp
-    rac_backend_qhexrt_register.cpp)
+    rac_backend_qhexrt_register.cpp
+    qhexrt_device_capability.cpp
+    qhexrt_model_catalog.cpp)
 set(QHEXRT_LINK_LIBS "")
 set(QHEXRT_COMPILE_DEFS RAC_QHEXRT_BUILDING)
 set(QHEXRT_INCLUDE_DIRS
     ${RAC_COMMONS_ROOT_DIR}/include
     ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/..)  # engines/ — for engines/common/rac_engine_unavailable.h
+
+# QHexRT exposes existing generated messages only as serialized byte buffers.
+# The C++ generated/runtime dependencies stay private to the engine build.
+if(RAC_PROTOBUF_RUNTIME_ENABLED)
+    list(APPEND QHEXRT_INCLUDE_DIRS
+        ${RAC_COMMONS_ROOT_DIR}/src/generated/proto)
+    list(APPEND QHEXRT_COMPILE_DEFS RAC_QHEXRT_HAVE_PROTOBUF=1)
+    if(TARGET protobuf::libprotobuf)
+        list(APPEND QHEXRT_LINK_LIBS protobuf::libprotobuf)
+    elseif(Protobuf_LIBRARIES)
+        list(APPEND QHEXRT_LINK_LIBS ${Protobuf_LIBRARIES})
+        list(APPEND QHEXRT_INCLUDE_DIRS ${Protobuf_INCLUDE_DIRS})
+    endif()
+endif()
 
 # Discover the prebuilt archive + private header. All three must be present to
 # claim the engine available; a partial tree falls back to the stub. Explicit
@@ -143,7 +160,7 @@ endif()
 #
 # Standalone JNI carrier the Kotlin runanywhere-core-qhexrt module loads. Owns
 # JNI_OnLoad; nativeRegister calls rac_backend_qhexrt_register(); nativeProbeNpu
-# calls rac_npu_probe() (resolved at runtime from librac_commons.so). Builds in
+# calls the engine-owned rac_qhexrt_probe_proto(). Builds in
 # both stub and linked modes; in stub mode register reports BACKEND_UNAVAILABLE.
 # =============================================================================
 if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED AND RAC_BUILD_JNI)
@@ -168,7 +185,10 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED AND RAC_BUILD_JNI)
         ${_QHEXRT_NDK_SYSROOT_INCLUDE}
         ${_QHEXRT_NDK_SYSROOT_INCLUDE}/android
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${RAC_COMMONS_ROOT_DIR}/include)
+    target_compile_definitions(rac_backend_qhexrt_jni PRIVATE
+        RAC_QHEXRT_VERSION="${RAC_VERSION}")
     target_link_libraries(rac_backend_qhexrt_jni PRIVATE rac_backend_qhexrt log)
     target_compile_options(rac_backend_qhexrt_jni PRIVATE
         -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)

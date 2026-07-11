@@ -31,6 +31,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +51,9 @@ import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
+import com.runanywhere.runanywhereai.ui.permissions.PermissionRecoveryCard
+import com.runanywhere.runanywhereai.ui.permissions.openRunAnywhereAppSettings
+import com.runanywhere.runanywhereai.ui.HybridBetaCopy
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -67,6 +71,11 @@ fun SttScreen() {
         viewModel(factory = ModelSelectionViewModel.Factory(ModelSelectionContext.STT))
     var showSheet by remember { mutableStateOf(false) }
     var showProviderPicker by remember { mutableStateOf(false) }
+    var permissionDenied by remember { mutableStateOf(false) }
+
+    DisposableEffect(sttVm) {
+        onDispose { sttVm.cancel() }
+    }
 
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
     val busy = sttVm.isRecording || sttVm.isTranscribing
@@ -74,13 +83,16 @@ fun SttScreen() {
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) sttVm.toggle(modelVm.state.currentModelId) }
+    ) { granted ->
+        permissionDenied = !granted
+        if (granted) sttVm.toggle()
+    }
 
     fun onRecord() {
         if (model == null) return
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
-        if (granted) sttVm.toggle(modelVm.state.currentModelId) else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        if (granted) sttVm.toggle() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     Column(
@@ -136,6 +148,12 @@ fun SttScreen() {
         sttVm.error?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
+        if (permissionDenied) {
+            PermissionRecoveryCard(
+                message = "Microphone access was denied. Enable it in Android settings to transcribe audio.",
+                onOpenSettings = context::openRunAnywhereAppSettings,
+            )
+        }
     }
 
     if (showSheet) {
@@ -186,7 +204,7 @@ private fun CloudProviderPicker(
             )
             if (options.isEmpty()) {
                 Text(
-                    "Add a provider from Advanced > Cloud providers before using hybrid transcription.",
+                    HybridBetaCopy.CLOUD_PROVIDER_PICKER_EMPTY,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = dimens.spacingSm),
@@ -246,7 +264,7 @@ private fun Header(mode: SttMode) {
             text = when (mode) {
                 SttMode.BATCH -> "Tap record, speak, then tap again to transcribe — all on-device."
                 SttMode.LIVE -> "Live mode transcribes each phrase as you pause. Tap to start."
-                SttMode.HYBRID -> "Hybrid runs on-device first and falls back to the cloud when unsure."
+                SttMode.HYBRID -> HybridBetaCopy.MODE_EXPLANATION
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -279,7 +297,7 @@ private fun ModeSelector(mode: SttMode, enabled: Boolean, onSelect: (SttMode) ->
                         text = when (option) {
                             SttMode.BATCH -> "Batch"
                             SttMode.LIVE -> "Live"
-                            SttMode.HYBRID -> "Hybrid"
+                            SttMode.HYBRID -> HybridBetaCopy.LABEL
                         },
                         style = MaterialTheme.typography.labelLarge,
                         color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,

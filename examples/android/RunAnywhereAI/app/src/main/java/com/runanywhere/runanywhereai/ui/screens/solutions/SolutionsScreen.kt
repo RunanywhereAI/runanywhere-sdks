@@ -15,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -46,17 +47,54 @@ fun SolutionsScreen(viewModel: SolutionsViewModel = viewModel()) {
             RunButton(
                 label = "Voice Agent",
                 icon = RACIcons.Outline.Microphone,
-                enabled = !viewModel.isRunning,
+                enabled = !viewModel.isRunning && viewModel.voiceReady,
                 modifier = Modifier.weight(1f),
-                onClick = { viewModel.runSolution("Voice Agent", SolutionsYaml.VOICE_AGENT) },
+                onClick = viewModel::runVoiceSolution,
             )
             RunButton(
                 label = "RAG",
                 icon = RACIcons.Outline.FileText,
-                enabled = !viewModel.isRunning,
+                enabled = !viewModel.isRunning && viewModel.ragReady,
                 modifier = Modifier.weight(1f),
-                onClick = { viewModel.runSolution("RAG", SolutionsYaml.RAG) },
+                onClick = viewModel::runRagSolution,
             )
+        }
+
+        if (viewModel.isCheckingModels || !viewModel.voiceReady || !viewModel.ragReady) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(dimens.radiusLg),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(dimens.spacingMd),
+                    verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+                ) {
+                    if (viewModel.isCheckingModels) {
+                        Text("Checking downloaded models…")
+                    } else {
+                        Text("Download the required models before running a solution.")
+                        if (!viewModel.voiceReady) {
+                            Text(
+                                "Voice Agent: ${viewModel.missingVoiceModels.joinToString()}",
+                                style = RACTextStyles.CodeSmall,
+                            )
+                        }
+                        if (!viewModel.ragReady) {
+                            Text(
+                                "RAG: ${viewModel.missingRagModels.joinToString()}",
+                                style = RACTextStyles.CodeSmall,
+                            )
+                        }
+                    }
+                    TextButton(
+                        onClick = viewModel::refreshRequirements,
+                        enabled = !viewModel.isCheckingModels,
+                    ) {
+                        Text(if (viewModel.isCheckingModels) "Checking…" else "Refresh")
+                    }
+                }
+            }
         }
 
         LogCard(lines = viewModel.log, modifier = Modifier.weight(1f))

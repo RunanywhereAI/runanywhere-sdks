@@ -11,12 +11,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -69,8 +67,10 @@ fun ChatInputBar(
     onSend: () -> Unit,
     canSend: Boolean,
     isGenerating: Boolean,
+    isStopping: Boolean,
     onStop: () -> Unit,
     toolsEnabled: Boolean,
+    toolsUnavailableMessage: String?,
     onToggleTools: () -> Unit,
     onAttachDocument: () -> Unit,
     onAttachImage: () -> Unit,
@@ -115,11 +115,12 @@ fun ChatInputBar(
             }
         }
         AnimatedVisibility(
-            visible = toolsEnabled,
+            visible = toolsEnabled || toolsUnavailableMessage != null,
             enter = fadeIn() + expandVertically(),
             exit = fadeOut() + shrinkVertically(),
         ) {
             ToolStatusPill(
+                unavailableMessage = toolsUnavailableMessage,
                 modifier = Modifier.padding(
                     start = dimens.spacingMd,
                     top = dimens.spacingSm,
@@ -195,7 +196,11 @@ fun ChatInputBar(
             ) {
                 Icon(
                     imageVector = RACIcons.Outline.Cloud,
-                    contentDescription = if (toolsEnabled) "Disable web and tools" else "Enable web and tools",
+                    contentDescription = when {
+                        toolsEnabled -> "Disable web and tools"
+                        toolsUnavailableMessage != null -> "Web and tools unavailable for current model"
+                        else -> "Enable web and tools"
+                    },
                     modifier = Modifier.size(dimens.iconMd),
                 )
             }
@@ -271,6 +276,36 @@ fun ChatInputBar(
                 )
             }
         }
+        AnimatedVisibility(
+            visible = isStopping,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+        ) {
+            StoppingStatusPill(
+                modifier = Modifier.padding(
+                    start = dimens.spacingMd,
+                    top = dimens.spacingSm,
+                    end = dimens.spacingMd,
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StoppingStatusPill(modifier: Modifier = Modifier) {
+    val dimens = LocalDimens.current
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(dimens.radiusFull),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        Text(
+            text = "Stopping the previous response… You can keep typing.",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
+        )
     }
 }
 
@@ -322,31 +357,54 @@ private fun AttachmentStatusPill(
 }
 
 @Composable
-private fun ToolStatusPill(modifier: Modifier = Modifier) {
+private fun ToolStatusPill(
+    unavailableMessage: String?,
+    modifier: Modifier = Modifier,
+) {
     val dimens = LocalDimens.current
+    val unavailable = unavailableMessage != null
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(dimens.radiusFull),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-        contentColor = MaterialTheme.colorScheme.primary,
+        shape = RoundedCornerShape(if (unavailable) dimens.radiusLg else dimens.radiusFull),
+        color = if (unavailable) {
+            MaterialTheme.colorScheme.errorContainer
+        } else {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        },
+        contentColor = if (unavailable) {
+            MaterialTheme.colorScheme.onErrorContainer
+        } else {
+            MaterialTheme.colorScheme.primary
+        },
     ) {
         Row(
             modifier = Modifier.padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(RACIcons.Outline.Cloud, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
-            Text(
-                text = "Web & tools on",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
+            Icon(
+                imageVector = if (unavailable) RACIcons.Outline.AlertTriangle else RACIcons.Outline.Cloud,
+                contentDescription = null,
+                modifier = Modifier.size(dimens.iconSm),
             )
-            Spacer(Modifier.width(dimens.spacingXs))
-            Text(
-                text = "Trace appears in replies",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (unavailable) "Web & tools unavailable" else "Web & tools on",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = unavailableMessage ?: "Trace appears in replies",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (unavailable) {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = if (unavailable) 2 else 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

@@ -4,16 +4,21 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.generate
-import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.coroutines.cancellation.CancellationException
 
 object ConversationRepository {
     const val DEFAULT_TITLE = "New chat"
 
     private var store: ConversationStore? = null
+    private var attachmentDir: File? = null
 
     var summaries by mutableStateOf<List<ConversationSummary>>(emptyList())
         private set
@@ -25,6 +30,7 @@ object ConversationRepository {
     fun initialize(context: Context) {
         if (store == null) {
             store = ConversationStore(File(context.filesDir, "conversations"))
+            attachmentDir = File(context.filesDir, "conversation_attachments").also { it.mkdirs() }
         }
     }
 
@@ -54,8 +60,22 @@ object ConversationRepository {
     }
 
     suspend fun delete(id: String) {
+        val conversation = store?.load(id)
         store?.delete(id)
+        conversation?.messages
+            ?.mapNotNull { it.attachment?.localPath }
+            ?.distinct()
+            ?.forEach(::deletePrivateAttachment)
         refresh()
+    }
+
+    private fun deletePrivateAttachment(path: String) {
+        val root = attachmentDir ?: return
+        runCatching {
+            val canonicalRoot = root.canonicalFile
+            val candidate = File(path).canonicalFile
+            if (candidate.parentFile == canonicalRoot) candidate.delete()
+        }.onFailure { RACLog.w("attachment cleanup failed") }
     }
 
     // Mirrors iOS ConversationStore.searchConversations (title + message text,
@@ -87,9 +107,11 @@ object ConversationRepository {
      */
     suspend fun generateSmartTitleIfNeeded(id: String) {
         val conversation = store?.load(id) ?: return
-        val firstUserText = conversation.messages.firstOrNull { it.isUser }?.text
-        val fallback = firstUserText?.let(::fallbackTitle) ?: DEFAULT_TITLE
-        if (conversation.title != DEFAULT_TITLE && conversation.title != fallback) return
+        if (!SmartTitlePolicy.canAttempt(conversation)) return
+
+        // Claim before touching the model. The claim deliberately survives every
+        // failure path, including a blank thinking-only response or cancellation.
+        store?.save(conversation.copy(smartTitleAttempted = true))
 
         val conversationText = conversation.messages
             .take(TITLE_CONTEXT_MESSAGES)
@@ -97,25 +119,28 @@ object ConversationRepository {
                 "${if (message.isUser) "User" else "Assistant"}: ${message.text.take(TITLE_CONTEXT_CHARS)}"
             }
 
-        val title = runCatching {
-            RunAnywhere.generate(
-                prompt = "Create a descriptive, readable title for this conversation:\n\n$conversationText\n\nTitle:",
-                options = RALLMGenerationOptions(
-                    max_tokens = TITLE_MAX_TOKENS,
-                    temperature = TITLE_TEMPERATURE,
-                    system_prompt = TITLE_INSTRUCTIONS,
-                ),
-            ).takeIf { it.error_message.isNullOrBlank() }?.text
-        }.onFailure { RACLog.w("smart title generation failed: ${it.message}") }
-            .getOrNull()
-            ?.trim()
-            ?.replace("\"", "")
-            ?.take(TITLE_MAX_LENGTH)
+        val rawTitle = try {
+            RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
+            withContext(Dispatchers.Default) {
+                RunAnywhere.generate(
+                    prompt = "Create a descriptive, readable title for this conversation:\n\n$conversationText\n\nTitle:",
+                    options = SmartTitlePolicy.generationOptions(TITLE_INSTRUCTIONS),
+                )
+            }.takeIf { it.error_message.isNullOrBlank() }?.text
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            RACLog.w("smart title generation failed: ${e.message}")
+            null
+        }
+        val title = rawTitle?.let(SmartTitlePolicy::normalizedTitle)
         if (title.isNullOrBlank()) return
 
         // Re-load before writing so a reply persisted meanwhile is not clobbered.
         val current = store?.load(id) ?: return
-        store?.save(current.copy(title = title))
+        // A manual rename that landed during inference always wins.
+        if (!SmartTitlePolicy.titleCanBeReplaced(current)) return
+        store?.save(current.copy(title = title, smartTitleAttempted = true))
         refresh()
     }
 
@@ -131,11 +156,9 @@ object ConversationRepository {
         }
     }
 
-    private const val TITLE_MAX_LENGTH = 50
+    private const val TITLE_MAX_LENGTH = SmartTitlePolicy.MAX_LENGTH
     private const val TITLE_CONTEXT_MESSAGES = 4
     private const val TITLE_CONTEXT_CHARS = 200
-    private const val TITLE_MAX_TOKENS = 32
-    private const val TITLE_TEMPERATURE = 0.7f
     private const val MATCH_CONTEXT_CHARS = 30
     private val TITLE_INSTRUCTIONS = """
         You are an expert at creating descriptive, readable chat titles.

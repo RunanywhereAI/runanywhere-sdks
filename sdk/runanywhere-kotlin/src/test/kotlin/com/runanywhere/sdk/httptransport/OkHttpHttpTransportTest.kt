@@ -256,6 +256,37 @@ class OkHttpHttpTransportTest {
     }
 
     @Test
+    fun executeRequest_noRedirect_returnsOriginalResponseAndProtectsDestination() {
+        val destination = StubServer(listOf(okResponse())).also { it.start() }
+        val redirect = StubServer(
+            listOf(
+                StubResponse(
+                    statusLine = "HTTP/1.1 307 Temporary Redirect",
+                    headers = listOf("Location" to urlFor(destination)),
+                    body = ByteArray(0),
+                ),
+            ),
+        ).also { it.start() }
+        try {
+            val response = OkHttpHttpTransport.executeRequest(
+                method = "POST",
+                url = urlFor(redirect),
+                headersFlat = arrayOf("apikey", "mobile-public-key"),
+                bodyBytes = "device-registration".toByteArray(StandardCharsets.UTF_8),
+                timeoutMs = 5_000L,
+                followRedirects = false,
+            )
+
+            assertEquals(307, response.statusCode)
+            assertEquals(1, redirect.received.size)
+            assertTrue("redirect destination must not receive credentials or body", destination.received.isEmpty())
+        } finally {
+            redirect.stop()
+            destination.stop()
+        }
+    }
+
+    @Test
     fun executeResumeRequest_attachesRangeHeader() {
         // The streaming/resume path delivers the body through a native JNI
         // callback that is absent in a pure-JVM test, so the call ultimately

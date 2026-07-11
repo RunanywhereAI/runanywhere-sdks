@@ -24,6 +24,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "RunAnywhere-AI"
+rootProject.name = "RunAnywhere"
 include(":app")
- 

@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/hardware_profile.pb.dart';
+import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere_qhexrt/native/qhexrt_bindings.dart';
 
@@ -15,7 +16,7 @@ export 'package:runanywhere/generated/hardware_profile.pbenum.dart'
     show HexagonArch;
 
 /// QHexRT NPU module — runs prebuilt QNN context binaries on Snapdragon
-/// v75+ NPUs. Android/Snapdragon only; on unsupported parts it stays
+/// V75/V79/V81 NPUs. Android/Snapdragon only; on unsupported parts it stays
 /// unavailable.
 class QHexRT {
   QHexRT._();
@@ -37,7 +38,7 @@ class QHexRT {
   ///
   /// Returns the generated `runanywhere.v1.NpuCapability` proto message
   /// (socModel, socId, hexagonArch, qhexrtSupported, archName) decoded from
-  /// commons' `rac_npu_probe_proto()`. On unsupported devices or probe
+  /// QHexRT's `rac_qhexrt_probe_proto()`. On unsupported devices or probe
   /// failure it returns the unknown fallback (socId -1, archName "unknown").
   static NpuCapability probeNpu() {
     if (!isAvailable) return _unknownCapability();
@@ -47,6 +48,42 @@ class QHexRT {
       _logger.error('NPU probe failed: $e');
       return _unknownCapability();
     }
+  }
+
+  /// Whether [arch] is in QHexRT's native device-validated support set.
+  /// No architecture set is duplicated in Dart.
+  static bool isArchitectureSupported(HexagonArch arch) {
+    if (!isAvailable) return false;
+    return (_bindings ??= QhexrtBindings()).isArchitectureSupported(arch);
+  }
+
+  /// Match one model definition's generated architecture values in native
+  /// QHexRT code.
+  static bool modelSupportsArchitecture(
+    Iterable<HexagonArch> supportedArches,
+    HexagonArch arch,
+  ) {
+    if (!isAvailable) return false;
+    return (_bindings ??= QhexrtBindings()).modelSupportsArchitecture(
+      supportedArches,
+      arch,
+    );
+  }
+
+  /// Register [request] only when the current device matches
+  /// [supportedArches]. URLs and presentation metadata stay in the app;
+  /// QHexRT owns probing/selection and composes commons' shared model
+  /// registration and download pipeline. A null value is a normal ineligible
+  /// model/device outcome.
+  static Future<ModelInfo?> registerModelForDevice({
+    required RegisterModelFromUrlRequest request,
+    required Iterable<HexagonArch> supportedArches,
+  }) async {
+    if (!isAvailable) return null;
+    return (_bindings ??= QhexrtBindings()).registerModelForDevice(
+      request,
+      supportedArches,
+    );
   }
 
   /// Register the QHexRT backend with the C++ plugin registry. Safe to call
@@ -67,7 +104,8 @@ class QHexRT {
       if (result == RacResultCode.errorBackendUnavailable ||
           result == RacResultCode.errorCapabilityUnsupported) {
         _logger.error(
-            'QHexRT unavailable; a Hexagon v75+ NPU is required.');
+          'QHexRT unavailable; a supported Hexagon V75/V79/V81 NPU is required.',
+        );
         return;
       }
       if (result != RacResultCode.success &&

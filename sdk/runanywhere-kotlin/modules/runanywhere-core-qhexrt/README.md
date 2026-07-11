@@ -1,11 +1,11 @@
 # runanywhere-core-qhexrt
 
 Private QHexRT backend for the RunAnywhere Kotlin SDK. Runs prebuilt QNN context
-binaries on Qualcomm Snapdragon Hexagon NPUs (v75+), serving LLM, VLM, STT and
+binaries on Qualcomm Snapdragon Hexagon V75/V79/V81 NPUs, serving LLM, VLM, STT and
 TTS through the standard SDK APIs.
 
-Android only, `arm64-v8a` only. On parts older than v75, the backend declines to
-register and the SDK falls back to CPU engines.
+Android only, `arm64-v8a` only. The device-validated set is V75, V79, and V81;
+all other parts are declined and the SDK can fall back to CPU engines.
 
 ## Bundled native libraries
 
@@ -32,12 +32,28 @@ into `src/main/jniLibs/arm64-v8a/`.
 import com.runanywhere.sdk.npu.qhexrt.QHexRT
 
 val npu = QHexRT.probeNpu()
-if (npu.supported) {
+if (npu.qhexrt_supported) {
     QHexRT.register()
 } else {
-    // arch = npu.arch (e.g. "v73"); warn and use CPU engines
+    // arch = npu.arch_name (e.g. "v73"); warn and use CPU engines
 }
+
+val request = RegisterModelFromUrlRequest(
+    id = "my-hnpu-model",
+    name = "My HNPU Model",
+    url = "https://huggingface.co/your-org/your-model_HNPU/model.json",
+    framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+)
+val model = QHexRT.registerModelForDevice(
+    request,
+    setOf(HexagonArch.HEXAGON_ARCH_V79, HexagonArch.HEXAGON_ARCH_V81),
+)
 ```
+
+The app owns the request's URL and presentation metadata. QHexRT owns the
+architecture match and composes the shared native registry, Hugging Face
+resolver, download, extraction, validation, and local-path workflow. `null`
+means the definition is not eligible on the current device.
 
 Once registered, inference flows through the regular SDK APIs; the C++ plugin
 router selects QHexRT for QNN-context models by priority.

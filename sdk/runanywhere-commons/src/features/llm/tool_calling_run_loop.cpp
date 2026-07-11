@@ -24,12 +24,15 @@
  */
 
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
@@ -46,6 +49,12 @@ namespace {
 
 constexpr const char* kTag = "ToolCallingRunLoop";
 constexpr uint32_t kDefaultMaxIterations = 5;
+// Keep the forced decision independent from the concise final-answer budget.
+// Normal calls stop at their closing marker; 192 leaves thinking-capable edge
+// models enough runway to reach the call while still bounding malformed output.
+constexpr int32_t kForcedToolDecisionMaxTokens = 192;
+constexpr const char* kDefaultToolCallEnd = "</tool_call>";
+constexpr const char* kLfm2ToolCallEnd = "<|tool_call_end|>";
 
 // per-loop cancellation state. Allocated on the heap, owned by
 // a per-process registry keyed by an opaque handle published to the host via
@@ -95,6 +104,75 @@ std::shared_ptr<LoopCancelState> lookup_loop_state(uint64_t handle) {
 
 #if defined(RAC_HAVE_PROTOBUF)
 
+struct WebSearchAttribution {
+    std::string summary;
+    std::string source_url;
+};
+
+WebSearchAttribution web_search_attribution(const runanywhere::v1::ToolCallingResult& result) {
+    for (int index = result.tool_results_size() - 1; index >= 0; --index) {
+        const auto& tool_result = result.tool_results(index);
+        if (tool_result.name() != "search_web" || tool_result.result_json().empty()) {
+            continue;
+        }
+        const nlohmann::json payload =
+            nlohmann::json::parse(tool_result.result_json(), nullptr, false);
+        if (payload.is_discarded() || !payload.is_object()) {
+            return {};
+        }
+        WebSearchAttribution attribution;
+        const auto summary = payload.find("summary");
+        if (summary != payload.end() && summary->is_string()) {
+            attribution.summary = summary->get<std::string>();
+        }
+        const auto source = payload.find("source_url");
+        if (source != payload.end() && source->is_string()) {
+            attribution.source_url = source->get<std::string>();
+        }
+        return attribution;
+    }
+    return {};
+}
+
+bool is_safe_http_source_url(const std::string& value) {
+    const bool valid_scheme = value.rfind("https://", 0) == 0 || value.rfind("http://", 0) == 0;
+    if (!valid_scheme) {
+        return false;
+    }
+    for (const unsigned char c : value) {
+        if (std::isspace(c) || std::iscntrl(c)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Source attribution is a data-integrity property, not a best-effort language
+// model behavior. Preserve a useful summary when a small model emits only
+// hidden reasoning, and append the executor-provided URL when synthesis omits
+// it. This runs after thinking separation, so private reasoning never becomes
+// visible merely because the source safety net fired.
+void ensure_web_search_attribution(runanywhere::v1::ToolCallingResult* result) {
+    if (!result) {
+        return;
+    }
+    const WebSearchAttribution attribution = web_search_attribution(*result);
+    if (result->text().empty() && !attribution.summary.empty()) {
+        result->set_text(attribution.summary);
+    }
+    if (!is_safe_http_source_url(attribution.source_url) ||
+        result->text().find(attribution.source_url) != std::string::npos) {
+        return;
+    }
+    std::string attributed = result->text();
+    if (!attributed.empty()) {
+        attributed += "\n";
+    }
+    attributed += "Source: ";
+    attributed += attribution.source_url;
+    result->set_text(std::move(attributed));
+}
+
 int64_t now_ms() {
     using namespace std::chrono;
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
@@ -121,6 +199,73 @@ struct LoopContext {
     // the parse/validate/format_prompt helpers.
     runanywhere::v1::ToolCallingOptions tool_options;
 };
+
+std::string normalize_tool_intent_text(const std::string& value) {
+    std::string normalized;
+    normalized.reserve(value.size());
+    bool pending_space = false;
+    for (const unsigned char c : value) {
+        if (std::isalnum(c)) {
+            if (pending_space && !normalized.empty()) {
+                normalized.push_back(' ');
+            }
+            normalized.push_back(static_cast<char>(std::tolower(c)));
+            pending_space = false;
+        } else {
+            pending_space = !normalized.empty();
+        }
+    }
+    return normalized;
+}
+
+bool contains_normalized_phrase(const std::string& normalized_text,
+                                const std::string& normalized_phrase) {
+    if (normalized_phrase.empty()) {
+        return false;
+    }
+    return (" " + normalized_text + " ").find(" " + normalized_phrase + " ") != std::string::npos;
+}
+
+// If the user explicitly names exactly one registered tool (underscores and
+// spaces are treated alike), make that a SPECIFIC choice. This is portable
+// prompt routing, so it belongs in commons rather than one example app. It
+// also lets the formatter advertise only that schema, materially reducing
+// prefill on small-context edge models. Ambiguous prompts remain AUTO.
+void infer_explicit_tool_choice(LoopContext* ctx) {
+    if (!ctx) {
+        return;
+    }
+    if (!ctx->forced_tool_name.empty()) {
+        // NONE is an explicit veto and wins over a contradictory forced name.
+        // Otherwise a forced name is, by definition, a SPECIFIC choice.
+        if (!ctx->has_tool_choice || ctx->tool_choice != runanywhere::v1::TOOL_CHOICE_MODE_NONE) {
+            ctx->has_tool_choice = true;
+            ctx->tool_choice = runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
+        }
+        return;
+    }
+    if (ctx->has_tool_choice) {
+        return;
+    }
+
+    const std::string normalized_prompt = normalize_tool_intent_text(ctx->user_prompt);
+    std::string matched_tool;
+    for (const auto& tool : ctx->tool_options.tools()) {
+        if (!contains_normalized_phrase(normalized_prompt,
+                                        normalize_tool_intent_text(tool.name()))) {
+            continue;
+        }
+        if (!matched_tool.empty()) {
+            return;
+        }
+        matched_tool = tool.name();
+    }
+    if (!matched_tool.empty()) {
+        ctx->has_tool_choice = true;
+        ctx->tool_choice = runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
+        ctx->forced_tool_name = std::move(matched_tool);
+    }
+}
 
 runanywhere::v1::ToolCallingOptions build_options_snapshot(const LoopContext& ctx) {
     runanywhere::v1::ToolCallingOptions options = ctx.tool_options;
@@ -382,6 +527,7 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
     for (const auto& tool : request.tools()) {
         *ctx.tool_options.add_tools() = tool;
     }
+    infer_explicit_tool_choice(&ctx);
 
     runanywhere::v1::ToolCallingResult final_result;
     std::string current_prompt = format_prompt_proto(ctx, /*tool_results=*/{});
@@ -402,12 +548,40 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
 
         std::string response;
         rac_result_t rc = RAC_SUCCESS;
+        // SPECIFIC/forced choice turns are pure routing, not answer synthesis.
+        // Make that first turn greedy and no-thinking, and cap only that turn;
+        // the follow-up retains the caller's independent max-token budget for
+        // a concise natural answer. This also protects hosts that forget to set
+        // disable_thinking on a thinking-capable tool model.
+        const bool forced_decision = iteration == 1 && ctx.has_tool_choice &&
+                                     ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
+        auto step_generation = ctx.generation;
+        if (forced_decision) {
+            // Decision and synthesis are separate phases. Do not inherit the
+            // caller's concise final-answer limit here: Qwen can spend close
+            // to 100 tokens interpreting an expression before emitting its
+            // structured call. The closing-marker stop remains the normal
+            // termination path; 192 is only the malformed/no-call ceiling.
+            step_generation.max_tokens = kForcedToolDecisionMaxTokens;
+            step_generation.temperature = 0.0f;
+            step_generation.top_p = 1.0f;
+            step_generation.disable_thinking = true;
+            // Stop as soon as the structured call is complete. Parsers accept
+            // a complete JSON/Pythonic payload without the closing marker, so
+            // backends that omit the matched stop text remain valid. The 192
+            // token ceiling is only a safety bound for models that never emit
+            // the marker; normal calls finish much earlier.
+            step_generation.stop_sequence =
+                rac_tool_call_format_from_name(ctx.format_hint.c_str()) == RAC_TOOL_FORMAT_LFM2
+                    ? kLfm2ToolCallEnd
+                    : kDefaultToolCallEnd;
+        }
         rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
             &cancel_state->active_ref_mu, &cancel_state->active_ref,
             &cancel_state->cancel_requested};
-        if (!rac::llm::tool_calling::run_generate_once(
-                ctx.generation, cancel_binding, current_prompt, &response, &rc,
-                &loop_telemetry.agg)) {
+        if (!rac::llm::tool_calling::run_generate_once(step_generation, cancel_binding,
+                                                       current_prompt, &response, &rc,
+                                                       &loop_telemetry.agg)) {
             // distinguish cancel from other generate
             // failures, mirroring run_generate_loop in tool_calling_session.cpp.
             // A cancel that latched before/during generate surfaces as
@@ -427,6 +601,11 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
             rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
             return report_rc;
         }
+        // Preserve the thinking-tag lookup cached by run_generate_once without
+        // leaking the decision-only sampling/token overrides into synthesis.
+        ctx.generation.thinking_tags_resolved = step_generation.thinking_tags_resolved;
+        ctx.generation.thinking_open_tag = std::move(step_generation.thinking_open_tag);
+        ctx.generation.thinking_close_tag = std::move(step_generation.thinking_close_tag);
 
         std::string clean_text;
         runanywhere::v1::ToolCall parsed_call;
@@ -537,6 +716,7 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
 
     rac::llm::tool_calling::set_display_text_and_thinking(&final_result, final_text,
                                                           ctx.generation);
+    ensure_web_search_attribution(&final_result);
     final_result.set_is_complete(is_complete);
     final_result.set_iterations_used(static_cast<int32_t>(iteration));
 

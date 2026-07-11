@@ -218,7 +218,9 @@ rac_result_t post_auth_json(rac_environment_t env, const char* endpoint, const c
     request.body_bytes = reinterpret_cast<const uint8_t*>(request_json);
     request.body_len = request_len;
     request.timeout_ms = rac_env_default_http_timeout_ms(env);
-    request.follow_redirects = RAC_TRUE;
+    // Auth/refresh requests carry API credentials and may carry refresh
+    // tokens in the JSON body. Never replay either across a redirect.
+    request.follow_redirects = RAC_FALSE;
 
     rc = rac_http_request_send(client, &request, &response);
     rac_http_client_destroy(client);

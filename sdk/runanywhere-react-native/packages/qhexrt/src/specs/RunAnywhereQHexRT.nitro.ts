@@ -1,12 +1,13 @@
 /**
  * RunAnywhereQHexRT Nitrogen Spec
  *
- * QHexRT (Qualcomm Hexagon NPU) backend registration + NPU capability probe.
+ * QHexRT (Qualcomm Hexagon NPU) backend registration, capability probe, and
+ * device-aware catalog adapter.
  *
  * Public lifecycle, generation, VLM, STT, and TTS APIs live in
  * @runanywhere/core and route through commons proto/lifecycle bridges. This
- * backend package only registers the native provider and exposes a pre-flight
- * NPU probe so the app can warn unsupported devices before loading a model.
+ * backend package registers the native provider and transports capability and
+ * catalog calls into the engine-owned QHexRT policy facade.
  *
  * NOTE: After editing this file, run `yarn qhexrt:nitrogen` (nitro-codegen) to
  * regenerate the bridge code under `nitrogen/generated/`. Those files are
@@ -50,11 +51,27 @@ export interface RunAnywhereQHexRT
 
   /**
    * Pre-flight probe of the device's Qualcomm Hexagon NPU capability.
-   * Calls rac_npu_probe_proto() in commons; does NOT load QNN or the engine.
+   * Calls rac_qhexrt_probe_proto() in the QHexRT engine; does NOT load QNN.
    * @returns serialized `runanywhere.v1.NpuCapability` proto bytes — decode
    *   with `NpuCapability.decode()` from
    *   `@runanywhere/proto-ts/hardware_profile`. An empty buffer means the
    *   probe is unavailable on this device/build.
    */
   probeNpuProto(): Promise<ArrayBuffer>;
+
+  /** True when `arch` is in QHexRT's native device-validated support set. */
+  isArchitectureSupported(arch: number): boolean;
+
+  /** Match one model definition's architecture values in native QHexRT. */
+  modelSupportsArchitecture(supportedArches: number[], arch: number): boolean;
+
+  /**
+   * Register a serialized `RegisterModelFromUrlRequest` only when the current
+   * device matches `supportedArches`. Returns serialized `ModelInfo`, or an
+   * empty buffer for the normal ineligible-device/model outcome.
+   */
+  registerModelForDeviceProto(
+    requestBytes: ArrayBuffer,
+    supportedArches: number[]
+  ): Promise<ArrayBuffer>;
 }

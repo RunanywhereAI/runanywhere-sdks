@@ -24,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +46,8 @@ import com.runanywhere.runanywhereai.ui.screens.models.ModelRecommendation
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
+import com.runanywhere.runanywhereai.ui.permissions.PermissionRecoveryCard
+import com.runanywhere.runanywhereai.ui.permissions.openRunAnywhereAppSettings
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.util.readableWidth
@@ -66,7 +69,15 @@ fun VoiceScreen() {
         viewModel(key = "voice-vad", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.VAD))
     var sheet by remember { mutableStateOf<ModelSelectionViewModel?>(null) }
     var isPreparing by remember { mutableStateOf(false) }
+    var permissionDenied by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+
+    // Navigation retains this ViewModel in the saved back-stack entry, so
+    // onCleared is not a screen-exit signal. Stop Talk explicitly to cancel
+    // AudioRecord and its native feed loop before another speech screen runs.
+    DisposableEffect(voiceVm) {
+        onDispose { voiceVm.stop() }
+    }
 
     val device = remember { runCatching { DeviceInfo.current() }.getOrNull() }
 
@@ -112,7 +123,10 @@ fun VoiceScreen() {
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) voiceVm.toggle() }
+    ) { granted ->
+        permissionDenied = !granted
+        if (granted) voiceVm.toggle()
+    }
 
     fun onMic() {
         // While STARTING (composing the agent) ignore taps so an impatient
@@ -125,7 +139,11 @@ fun VoiceScreen() {
         if (!ready) return
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
-        if (granted) voiceVm.toggle() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        if (granted) {
+            voiceVm.toggle()
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     LaunchedEffect(voiceVm.turns.size) {
@@ -185,7 +203,12 @@ fun VoiceScreen() {
                 textAlign = TextAlign.Center,
             )
         }
-
+        if (permissionDenied) {
+            PermissionRecoveryCard(
+                message = "Microphone access was denied. Enable it in Android settings to use Talk.",
+                onOpenSettings = context::openRunAnywhereAppSettings,
+            )
+        }
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,

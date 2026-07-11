@@ -11,6 +11,7 @@ import {
   isNativeQHexRTModuleAvailable,
 } from './native/NativeRunAnywhereQHexRT';
 import { SDKLogger } from '@runanywhere/core/internal';
+import type { HexagonArch } from '@runanywhere/proto-ts/hardware_profile';
 
 // SDKLogger instance for this module
 const log = new SDKLogger('NPU.QHexRTProvider');
@@ -133,5 +134,32 @@ export class QHexRTProvider {
       log.warning(`QHexRT NPU probe failed: ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
+  }
+
+  static isArchitectureSupported(arch: HexagonArch): boolean {
+    if (!isNativeQHexRTModuleAvailable()) return false;
+    return getNativeQHexRTModule().isArchitectureSupported(arch);
+  }
+
+  static modelSupportsArchitecture(
+    supportedArches: number[],
+    arch: HexagonArch
+  ): boolean {
+    if (!isNativeQHexRTModuleAvailable()) return false;
+    return getNativeQHexRTModule().modelSupportsArchitecture(
+      supportedArches,
+      arch
+    );
+  }
+
+  static async registerModelForDeviceRaw(
+    requestBytes: ArrayBuffer,
+    supportedArches: number[]
+  ): Promise<ArrayBuffer | null> {
+    if (!isNativeQHexRTModuleAvailable()) return null;
+    return getNativeQHexRTModule().registerModelForDeviceProto(
+      requestBytes,
+      supportedArches
+    );
   }
 }

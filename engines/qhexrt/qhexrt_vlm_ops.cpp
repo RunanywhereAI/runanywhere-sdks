@@ -82,6 +82,7 @@ struct StreamCtx {
     rac_vlm_stream_callback_fn cb;
     void* user;
     Session* session;
+    uint64_t request_id;
     bool cancelled = false;
     std::string buf;
 };
@@ -91,7 +92,7 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
     if (c == nullptr || is_final != 0 || utf8 == nullptr) {
         return 1;
     }
-    if (c->session != nullptr && c->session->cancel.load(std::memory_order_relaxed)) {
+    if (c->session != nullptr && c->session->vlm_requests.is_cancelled(c->request_id)) {
         c->cancelled = true;
         return 0;
     }
@@ -108,17 +109,36 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
 
 struct StopCtx {
     Session* session;
+    uint64_t request_id;
 };
 
 int stop_trampoline(void* user, const char* /*utf8*/, int /*len*/, int /*token_id*/,
                     int /*is_final*/) {
     auto* c = static_cast<StopCtx*>(user);
     if (c != nullptr && c->session != nullptr &&
-        c->session->cancel.load(std::memory_order_relaxed)) {
+        c->session->vlm_requests.is_cancelled(c->request_id)) {
         return 0;
     }
     return 1;
 }
+
+class VlmRequestScope {
+   public:
+    explicit VlmRequestScope(Session* session)
+        : session_(session), id_(session != nullptr ? session->vlm_requests.begin() : 0) {}
+    ~VlmRequestScope() {
+        if (session_ != nullptr) session_->vlm_requests.finish(id_);
+    }
+
+    uint64_t id() const { return id_; }
+    bool cancelled() const {
+        return session_ != nullptr && session_->vlm_requests.is_cancelled(id_);
+    }
+
+   private:
+    Session* session_;
+    uint64_t id_;
+};
 
 // ───────────────────────────────── vtable ops ───────────────────────────────
 
@@ -147,25 +167,32 @@ rac_result_t qhexrt_vlm_initialize(void* /*impl*/, const char* /*model_path*/,
 rac_result_t qhexrt_vlm_process(void* impl, const rac_vlm_image_t* image, const char* prompt,
                                 const rac_vlm_options_t* options, rac_vlm_result_t* out_result) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr || out_result == nullptr) {
+    if (c == nullptr || out_result == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
+        VlmRequestScope request(c);
         qhx_session_reset(c->sess);  // public SDK process calls are independent requests
-        c->cancel.store(false, std::memory_order_relaxed);
+        if (request.cancelled()) {
+            return RAC_ERROR_CANCELLED;
+        }
         qhx_inputs in;
         if (!fill_inputs(&in, image, prompt, options)) {
             return RAC_ERROR_NOT_SUPPORTED;
         }
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
-        StopCtx stop_ctx{c};
+        StopCtx stop_ctx{c, request.id()};
         qhx_output out{};
         qhx_status st = qhx_generate(c->sess, &in, &cfg, stop_trampoline, &stop_ctx, &out);
+        if (request.cancelled()) {
+            return RAC_ERROR_CANCELLED;
+        }
         if (st != 0) {
-            if (c->cancel.load(std::memory_order_relaxed)) {
-                return RAC_ERROR_CANCELLED;
-            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(vlm) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
@@ -180,25 +207,32 @@ rac_result_t qhexrt_vlm_process_stream(void* impl, const rac_vlm_image_t* image,
                                        const rac_vlm_options_t* options,
                                        rac_vlm_stream_callback_fn callback, void* user_data) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr) {
+    if (c == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
+        VlmRequestScope request(c);
         qhx_session_reset(c->sess);  // public SDK stream calls are independent requests
-        c->cancel.store(false, std::memory_order_relaxed);
+        if (request.cancelled()) {
+            return RAC_ERROR_CANCELLED;
+        }
         qhx_inputs in;
         if (!fill_inputs(&in, image, prompt, options)) {
             return RAC_ERROR_NOT_SUPPORTED;
         }
         qhx_gen_cfg cfg;
         fill_cfg(&cfg, options);
-        StreamCtx ctx{callback, user_data, c, false, std::string()};
+        StreamCtx ctx{callback, user_data, c, request.id(), false, std::string()};
         qhx_output out{};
         qhx_status st = qhx_generate(c->sess, &in, &cfg, stream_trampoline, &ctx, &out);
+        if (ctx.cancelled || request.cancelled()) {
+            return RAC_ERROR_CANCELLED;
+        }
         if (st != 0) {
-            if (ctx.cancelled || c->cancel.load(std::memory_order_relaxed)) {
-                return RAC_ERROR_CANCELLED;
-            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(vlm stream) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
@@ -213,7 +247,12 @@ rac_result_t qhexrt_vlm_get_info(void* impl, rac_vlm_info_t* out_info) {
         return RAC_ERROR_NULL_POINTER;
     }
     auto* c = as_session(impl);
-    out_info->is_ready = (c != nullptr && c->sess != nullptr) ? RAC_TRUE : RAC_FALSE;
+    rac_bool_t is_ready = RAC_FALSE;
+    if (c != nullptr) {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        is_ready = c->sess != nullptr ? RAC_TRUE : RAC_FALSE;
+    }
+    out_info->is_ready = is_ready;
     out_info->current_model = nullptr;
     out_info->context_length = 0;
     out_info->supports_streaming = RAC_TRUE;
@@ -225,14 +264,18 @@ rac_result_t qhexrt_vlm_get_info(void* impl, rac_vlm_info_t* out_info) {
 rac_result_t qhexrt_vlm_cancel(void* impl) {
     auto* c = as_session(impl);
     if (c != nullptr) {
-        c->cancel.store(true, std::memory_order_relaxed);
+        c->vlm_requests.cancel_active();
     }
     return RAC_SUCCESS;
 }
 
 rac_result_t qhexrt_vlm_cleanup(void* impl) {
     auto* c = as_session(impl);
-    if (c != nullptr && c->sess != nullptr) {
+    if (c == nullptr) {
+        return RAC_SUCCESS;
+    }
+    std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+    if (c->sess != nullptr) {
         qhx_session_reset(c->sess);
     }
     return RAC_SUCCESS;

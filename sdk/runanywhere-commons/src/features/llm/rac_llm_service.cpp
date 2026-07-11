@@ -172,7 +172,9 @@ rac_result_t rac_llm_cancel(rac_handle_t handle) {
         return RAC_SUCCESS;  // No-op if not supported
     }
 
-    return service->ops->cancel(service->impl);
+    const rac_result_t rc = service->ops->cancel(service->impl);
+    RAC_LOG_INFO(LOG_CAT, "rac_llm_cancel: impl=%p rc=%d", service->impl, static_cast<int>(rc));
+    return rc;
 }
 
 rac_result_t rac_llm_cleanup(rac_handle_t handle) {

@@ -1301,6 +1301,9 @@ object RunAnywhereBridge {
     /** Run a query and return serialized RAGResult proto bytes. Null on error. */
     @JvmStatic external fun racRagQueryProto(handle: Long, queryProto: ByteArray): ByteArray?
 
+    /** Request cancellation of the active query on this RAG session. */
+    @JvmStatic external fun racRagCancelProto(handle: Long): Int
+
     /** Clear all ingested documents and return serialized RAGStatistics bytes. */
     @JvmStatic external fun racRagClearProto(handle: Long): ByteArray?
 

@@ -15,6 +15,7 @@ import com.runanywhere.sdk.foundation.bridge.CppBridge.shutdown
 import com.runanywhere.sdk.foundation.bridge.CppBridge.shutdownSuspending
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEnvironment
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
@@ -183,6 +184,10 @@ object CppBridge {
      */
     private fun initializeTelemetryManager(environment: SDKEnvironment) {
         try {
+            if (!CppBridgeEnvironment.shouldSendTelemetry(environment)) {
+                logger.debug("Telemetry disabled for $environment")
+                return
+            }
             // getDeviceIdCallback() may lazily initialize the persistent UUID
             val deviceId = CppBridgeDevice.getDeviceIdCallback()
 

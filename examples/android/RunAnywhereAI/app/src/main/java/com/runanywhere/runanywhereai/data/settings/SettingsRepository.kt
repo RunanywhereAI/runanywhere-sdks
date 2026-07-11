@@ -5,8 +5,8 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import com.runanywhere.runanywhereai.data.security.securePreferences
+import com.runanywhere.runanywhereai.util.RACLog
 
 object SettingsRepository {
     private const val PREFS = "app_settings"
@@ -28,13 +28,16 @@ object SettingsRepository {
     fun initialize(context: Context) {
         if (prefs != null) return
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val secure = runCatching { createSecurePreferences(context.applicationContext) }.getOrNull()
-        securePrefs = secure
-        val hfToken = secure?.getString(KEY_HF_TOKEN, "").orEmpty()
-            .ifBlank { p.getString(KEY_HF_TOKEN, "").orEmpty() }
-        if (secure != null && hfToken.isNotBlank()) {
-            secure.edit().putString(KEY_HF_TOKEN, hfToken).apply()
-            p.edit().remove(KEY_HF_TOKEN).apply()
+        val secure = runCatching { securePreferences(context, SECURE_PREFS) }
+            .onFailure { RACLog.w("Secure settings unavailable; credentials cannot be loaded or saved") }
+            .getOrNull()
+        val hfToken = if (secure == null) {
+            ""
+        } else {
+            runCatching { secure.getString(KEY_HF_TOKEN, "").orEmpty() }
+                .onSuccess { securePrefs = secure }
+                .onFailure { RACLog.w("Secure settings could not be read; credentials are unavailable") }
+                .getOrDefault("")
         }
         prefs = p
         settings = AppSettings(
@@ -78,25 +81,36 @@ object SettingsRepository {
         prefs?.edit()?.putBoolean(KEY_TOOL_CALLING, value)?.apply()
     }
 
-    fun setHfToken(value: String) {
-        settings = settings.copy(hfToken = value)
-        (securePrefs ?: prefs)?.edit()?.putString(KEY_HF_TOKEN, value)?.apply()
-        if (securePrefs != null) {
-            prefs?.edit()?.remove(KEY_HF_TOKEN)?.apply()
+    /**
+     * Durably replaces the Hugging Face token in encrypted storage.
+     *
+     * The observable settings state changes only after the synchronous commit
+     * succeeds, so callers can report a storage failure without exposing an
+     * unsaved credential as active configuration.
+     */
+    fun setHfToken(value: String): Result<Unit> {
+        val secure = securePrefs
+            ?: return Result.failure(IllegalStateException("Secure credential storage is unavailable"))
+        val normalized = value.trim()
+        val committed = runCatching {
+            val editor = secure.edit()
+            if (normalized.isBlank()) {
+                editor.remove(KEY_HF_TOKEN)
+            } else {
+                editor.putString(KEY_HF_TOKEN, normalized)
+            }
+            editor.commit()
+        }.getOrElse {
+            return Result.failure(IllegalStateException("Could not write secure credential storage", it))
         }
+        if (!committed) {
+            return Result.failure(IllegalStateException("Could not commit secure credential storage"))
+        }
+        settings = settings.copy(hfToken = normalized)
+        return Result.success(Unit)
     }
 
-    private fun createSecurePreferences(context: Context): SharedPreferences {
-        val masterKey = MasterKey
-            .Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        return EncryptedSharedPreferences.create(
-            context,
-            SECURE_PREFS,
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
+    private inline fun pSafeEdit(block: SharedPreferences.Editor.() -> Unit) {
+        prefs?.edit()?.apply(block)?.apply()
     }
 }

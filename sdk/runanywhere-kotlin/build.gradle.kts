@@ -170,6 +170,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    packaging {
+        // Preserve symbols in the published AAR so the consuming app can
+        // strip its APK/AAB while AGP emits a Play native-symbol archive.
+        jniLibs.keepDebugSymbols += "**/*.so"
+    }
+
     publishing {
         singleVariant("release") {
             withSourcesJar()

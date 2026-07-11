@@ -93,13 +93,17 @@ rac_result_t qhexrt_tts_initialize(void* /*impl*/) { return RAC_SUCCESS; }
 rac_result_t qhexrt_tts_synthesize(void* impl, const char* text, const rac_tts_options_t* /*options*/,
                                    rac_tts_result_t* out_result) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr || out_result == nullptr) {
+    if (c == nullptr || out_result == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     if (text == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
     try {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
         qhx_session_reset(c->sess);  // public SDK synthesize calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in{};
@@ -134,13 +138,17 @@ rac_result_t qhexrt_tts_synthesize_stream(void* impl, const char* text,
                                           const rac_tts_options_t* /*options*/,
                                           rac_tts_stream_callback_t callback, void* user_data) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr) {
+    if (c == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     if (text == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
     try {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
         qhx_session_reset(c->sess);  // public SDK stream calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in{};
@@ -186,7 +194,12 @@ rac_result_t qhexrt_tts_get_info(void* impl, rac_tts_info_t* out_info) {
         return RAC_ERROR_NULL_POINTER;
     }
     auto* c = as_session(impl);
-    out_info->is_ready = (c != nullptr && c->sess != nullptr) ? RAC_TRUE : RAC_FALSE;
+    rac_bool_t is_ready = RAC_FALSE;
+    if (c != nullptr) {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        is_ready = c->sess != nullptr ? RAC_TRUE : RAC_FALSE;
+    }
+    out_info->is_ready = is_ready;
     out_info->is_synthesizing = RAC_FALSE;
     out_info->available_voices = nullptr;
     out_info->num_voices = 0;
@@ -195,7 +208,11 @@ rac_result_t qhexrt_tts_get_info(void* impl, rac_tts_info_t* out_info) {
 
 rac_result_t qhexrt_tts_cleanup(void* impl) {
     auto* c = as_session(impl);
-    if (c != nullptr && c->sess != nullptr) {
+    if (c == nullptr) {
+        return RAC_SUCCESS;
+    }
+    std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+    if (c->sess != nullptr) {
         qhx_session_reset(c->sess);
     }
     return RAC_SUCCESS;

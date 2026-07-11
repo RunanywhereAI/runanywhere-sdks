@@ -2141,8 +2141,11 @@ __metadata:
   resolution: "@runanywhere/qhexrt@workspace:packages/qhexrt"
   dependencies:
     "@runanywhere/proto-ts": "workspace:*"
+    "@types/jest": ^29.5.12
+    jest: ^29.7.0
     nitrogen: ^0.34.1
     react-native-nitro-modules: ^0.33.9
+    ts-jest: ^29.1.2
     typescript: ^5.9.3
   peerDependencies:
     "@runanywhere/core": ">=0.19.13"

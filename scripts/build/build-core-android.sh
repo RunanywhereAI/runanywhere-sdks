@@ -35,6 +35,7 @@ RN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/a
 RN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/src/main/jniLibs"
 RN_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/android/src/main/jniLibs"
 RN_CORE_INCLUDE_DEST="${RN_CORE_JNI_DEST}/include"
+RN_QHEXRT_INCLUDE_DEST="${RN_QHEXRT_JNI_DEST}/include"
 
 # Flutter destinations.
 FLUTTER_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/src/main/jniLibs"
@@ -43,6 +44,7 @@ FLUTTER_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere
 FLUTTER_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/jniLibs"
 
 COMMONS_INCLUDE_SRC="${REPO_ROOT}/sdk/runanywhere-commons/include"
+QHEXRT_INCLUDE_SRC="${REPO_ROOT}/engines/qhexrt/include"
 SHERPA_ANDROID_JNI_SRC="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-android/jniLibs"
 
 if [ -z "${ANDROID_NDK_HOME:-}" ]; then
@@ -133,6 +135,13 @@ mkdir -p \
 rm -rf "${RN_CORE_INCLUDE_DEST}"
 mkdir -p "${RN_CORE_INCLUDE_DEST}"
 cp -R "${COMMONS_INCLUDE_SRC}/." "${RN_CORE_INCLUDE_DEST}/"
+
+# The RN QHexRT Nitro bridge compiles against the engine-owned public ABI.
+# Stage it with the private backend package rather than leaking QHexRT policy
+# headers into the generic @runanywhere/core include bundle.
+rm -rf "${RN_QHEXRT_INCLUDE_DEST}"
+mkdir -p "${RN_QHEXRT_INCLUDE_DEST}"
+cp -R "${QHEXRT_INCLUDE_SRC}/." "${RN_QHEXRT_INCLUDE_DEST}/"
 
 # Helper: copy `${1}` to every remaining argument, skipping the source silently
 # if it does not exist. Used to make engine-specific staging tolerant of

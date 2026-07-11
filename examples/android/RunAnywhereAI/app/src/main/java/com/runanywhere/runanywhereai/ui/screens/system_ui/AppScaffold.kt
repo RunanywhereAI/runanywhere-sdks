@@ -32,6 +32,7 @@ import com.runanywhere.runanywhereai.ui.navigation.Settings
 import com.runanywhere.runanywhereai.ui.navigation.Vision
 import com.runanywhere.runanywhereai.ui.navigation.Voice
 import com.runanywhere.runanywhereai.ui.navigation.isConsumerTopLevel
+import com.runanywhere.runanywhereai.ui.navigation.isSelected
 import com.runanywhere.runanywhereai.ui.navigation.navigateTopLevel
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatDetailsSheet
 import com.runanywhere.runanywhereai.ui.screens.chat.ConversationHistorySheet
@@ -69,9 +70,10 @@ fun AppScaffold() {
 
     val isExpanded = isExpandedScreen()
     val showNav = destination != null
+    val previousDestination = navController.previousBackStackEntry?.destination
     val canNavigateBack = destination != null &&
-        !destination.isConsumerTopLevel() &&
-        navController.previousBackStackEntry != null
+        previousDestination != null &&
+        (!destination.isConsumerTopLevel() || !previousDestination.isSelected(Chat))
     val startNewChat = {
         chatViewModel.clearChat()
         navController.navigateTopLevel(Chat)
@@ -107,7 +109,14 @@ fun AppScaffold() {
                     navController = navController,
                     chatViewModel = chatViewModel,
                     onOpenModels = { showModelSheet = true },
-                    onOpenVision = { navController.navigateTopLevel(Vision) },
+                    // This is an explicit request for live mode. Do not restore a
+                    // previously saved photo-mode Vision destination over its argument.
+                    onOpenVision = {
+                        navController.navigateTopLevel(
+                            Vision(openLiveCamera = true),
+                            restoreState = false,
+                        )
+                    },
                     onOpenVoice = { navController.navigateTopLevel(Voice) },
                     onOpenAdvanced = { navController.navigateTopLevel(More) },
                     modifier = Modifier
@@ -125,7 +134,7 @@ fun AppScaffold() {
                             destination = destination,
                             onNewChat = startNewChat,
                             onHistory = { showHistorySheet = true },
-                            onSettings = { navController.navigateTopLevel(Settings) },
+                            onNavigate = { navController.navigateTopLevel(it) },
                             permanent = true,
                         )
                     },
@@ -142,7 +151,7 @@ fun AppScaffold() {
                             destination = destination,
                             onNewChat = startNewChat,
                             onHistory = { showHistorySheet = true },
-                            onSettings = { navController.navigateTopLevel(Settings) },
+                            onNavigate = { navController.navigateTopLevel(it) },
                             onDismiss = { afterClose ->
                                 scope.launch {
                                     drawerState.close()

@@ -96,6 +96,7 @@ fun ChatScreen(
     }
 
     fun sendPendingAttachment(attachment: PendingAttachment) {
+        if (viewModel.isBusy) return
         when (attachment.kind) {
             PendingAttachmentKind.IMAGE -> {
                 val imageModel = imageModelVm.readySelectedModel()
@@ -112,7 +113,7 @@ fun ChatScreen(
                         }
                     }
                     pendingAttachment = null
-                    viewModel.sendImage(attachment.uri, loadedModelName = imageModel.name)
+                    viewModel.sendImage(attachment.uri, loadedModel = imageModel)
                 }
             }
             PendingAttachmentKind.DOCUMENT -> {
@@ -138,7 +139,7 @@ fun ChatScreen(
         val attachment = pendingAttachment
         if (attachment == null) {
             viewModel.send()
-        } else if (!viewModel.isGenerating) {
+        } else if (!viewModel.isBusy) {
             sendPendingAttachment(attachment)
         }
     }
@@ -204,10 +205,12 @@ fun ChatScreen(
                         input = viewModel.input,
                         onInputChange = viewModel::onInputChange,
                         onSend = ::submitComposer,
-                        canSend = viewModel.canSend || (pendingAttachment != null && !viewModel.isGenerating),
+                        canSend = viewModel.canSend || (pendingAttachment != null && !viewModel.isBusy),
                         isGenerating = viewModel.isGenerating,
+                        isStopping = viewModel.isStopping,
                         onStop = viewModel::stop,
                         toolsEnabled = viewModel.toolsEnabled,
+                        toolsUnavailableMessage = viewModel.toolsUnavailableMessage,
                         onToggleTools = viewModel::toggleTools,
                         onAttachDocument = { documentPicker.launch(DocumentExtractor.acceptedMimeTypes) },
                         onAttachImage = { imagePicker.launch("image/*") },

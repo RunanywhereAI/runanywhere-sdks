@@ -25,9 +25,18 @@ class AudioRecorder {
             ENCODING,
             maxOf(minBuffer, CHUNK_BYTES * 2),
         )
+        if (rec.state != AudioRecord.STATE_INITIALIZED) {
+            rec.release()
+            throw IllegalStateException("Microphone failed to initialize")
+        }
+        try {
+            rec.startRecording()
+        } catch (t: Throwable) {
+            rec.release()
+            throw t
+        }
         record = rec
         recording = true
-        rec.startRecording()
         worker = Thread {
             val buffer = ByteArray(CHUNK_BYTES)
             while (recording) {
@@ -38,12 +47,14 @@ class AudioRecorder {
     }
 
     fun stop() {
-        if (!recording) return
         recording = false
-        worker?.join(250)
+        // Stop AudioRecord first so a blocking read wakes before we join the
+        // worker. Joining before stop could leave the retained screen's mic
+        // thread alive while another speech surface opened the device.
+        record?.let { runCatching { it.stop() } }
+        worker?.join(500)
         worker = null
         record?.run {
-            runCatching { stop() }
             release()
         }
         record = null

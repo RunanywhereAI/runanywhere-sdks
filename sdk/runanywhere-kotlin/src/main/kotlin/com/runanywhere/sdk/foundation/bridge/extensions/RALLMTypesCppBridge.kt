@@ -57,7 +57,10 @@ fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerate
     val requestOptions =
         copy(
             max_tokens = max_tokens.takeIf { it > 0 } ?: 100,
-            temperature = temperature.takeIf { it > 0.0f } ?: 0.8f,
+            // This extension is invoked on an explicit options value. Zero is
+            // the documented greedy-decoding sentinel, not an absent value;
+            // callers that want the sampled default use defaults().
+            temperature = temperature.coerceIn(0.0f, 2.0f),
             top_p = top_p.takeIf { it > 0.0f } ?: 1.0f,
             repetition_penalty = repetition_penalty.takeIf { it > 0.0f } ?: 1.0f,
         )

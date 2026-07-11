@@ -45,6 +45,9 @@ struct MockStt {
     bool initialized{false};
 };
 
+int g_fallback_transcribe_count = 0;
+size_t g_fallback_last_audio_size = 0;
+
 template <typename T>
 bool serialize(const T& message, std::vector<uint8_t>* out) {
     out->resize(message.ByteSizeLong());
@@ -67,6 +70,8 @@ rac_result_t mock_stt_stream(void* impl, const void* audio_data, size_t audio_si
     if (!impl || !audio_data || audio_size == 0 || !callback) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    ++g_fallback_transcribe_count;
+    g_fallback_last_audio_size = audio_size;
     callback("draft", RAC_FALSE, user_data);
     callback("final text", RAC_TRUE, user_data);
     return RAC_SUCCESS;
@@ -160,6 +165,85 @@ int test_stt_stream_events() {
     }
 
     rac_stt_component_destroy(stt);
+    return 0;
+}
+
+int test_stt_one_shot_fallback_endpoint_and_final_flush() {
+    install_mock_stt_plugin();
+    (void)rac_plugin_unregister("cpp-persistent-stream-stt");
+    g_fallback_transcribe_count = 0;
+    g_fallback_last_audio_size = 0;
+
+    rac_handle_t stt = nullptr;
+    CHECK(rac_stt_component_create(&stt) == RAC_SUCCESS, "fallback STT component creates");
+    CHECK(rac_stt_component_load_model(stt, "fallback-stt", "fallback-stt", "Fallback STT") ==
+              RAC_SUCCESS,
+          "fallback STT model loads");
+
+    std::vector<runanywhere::v1::STTStreamEvent> events;
+    auto callback = [](const uint8_t* data, size_t size, void* user_data) {
+        auto* out = static_cast<std::vector<runanywhere::v1::STTStreamEvent>*>(user_data);
+        runanywhere::v1::STTStreamEvent event;
+        if (event.ParseFromArray(data, static_cast<int>(size))) {
+            out->push_back(event);
+        }
+    };
+    CHECK(rac_stt_set_stream_proto_callback(stt, callback, &events) == RAC_SUCCESS,
+          "fallback stream callback registers");
+
+    runanywhere::v1::STTOptions options;
+    options.set_language(runanywhere::v1::STT_LANGUAGE_EN);
+    std::vector<uint8_t> options_bytes;
+    CHECK(serialize(options, &options_bytes), "fallback STTOptions serializes");
+
+    uint64_t session_id = 0;
+    CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
+                                     &session_id) == RAC_SUCCESS,
+          "fallback stream session starts");
+    std::vector<int16_t> speech(1600, 12000);  // 100 ms at 16 kHz
+    for (int i = 0; i < 3; ++i) {
+        CHECK(rac_stt_stream_feed_audio_proto(
+                  session_id, reinterpret_cast<const uint8_t*>(speech.data()),
+                  speech.size() * sizeof(int16_t)) == RAC_SUCCESS,
+              "sub-window fallback feed succeeds");
+    }
+    CHECK(g_fallback_transcribe_count == 0,
+          "one-shot fallback does not infer on individual 100 ms chunks");
+    CHECK(rac_stt_stream_stop_proto(session_id) == RAC_SUCCESS,
+          "fallback stream stop final-flushes buffered speech");
+    CHECK(g_fallback_transcribe_count == 1,
+          "fallback stop runs exactly one transcription for the utterance");
+    CHECK(g_fallback_last_audio_size >= speech.size() * sizeof(int16_t) * 3,
+          "fallback final flush contains the accumulated speech window");
+
+    g_fallback_transcribe_count = 0;
+    events.clear();
+    CHECK(rac_stt_stream_start_proto(stt, options_bytes.data(), options_bytes.size(),
+                                     &session_id) == RAC_SUCCESS,
+          "fallback endpoint session starts");
+    for (int i = 0; i < 3; ++i) {
+        (void)rac_stt_stream_feed_audio_proto(
+            session_id, reinterpret_cast<const uint8_t*>(speech.data()),
+            speech.size() * sizeof(int16_t));
+    }
+    std::vector<int16_t> silence(1600, 0);
+    for (int i = 0; i < 8; ++i) {
+        (void)rac_stt_stream_feed_audio_proto(
+            session_id, reinterpret_cast<const uint8_t*>(silence.data()),
+            silence.size() * sizeof(int16_t));
+    }
+    CHECK(g_fallback_transcribe_count == 1,
+          "one-shot fallback infers once after the speech endpoint");
+    CHECK(!events.empty() && events.back().kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL,
+          "fallback endpoint emits a final transcript event");
+    CHECK(rac_stt_stream_stop_proto(session_id) == RAC_SUCCESS,
+          "endpointed fallback session stops cleanly");
+    CHECK(g_fallback_transcribe_count == 1,
+          "fallback stop does not duplicate an already-final utterance");
+
+    (void)rac_stt_unset_stream_proto_callback(stt);
+    rac_stt_component_destroy(stt);
+    (void)rac_plugin_unregister("cpp-stream-event-stt");
     return 0;
 }
 
@@ -400,6 +484,7 @@ int main() {
 #else
     try {
         test_stt_stream_events();
+        test_stt_one_shot_fallback_endpoint_and_final_flush();
         test_stt_persistent_stream_handle();
         test_vad_activity_stream_event();
         if (fail_count != 0) {

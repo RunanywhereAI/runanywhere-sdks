@@ -104,6 +104,10 @@ if [ -n "$NATIVES_FROM" ]; then
                 libQnnHtpV75CalculatorStub.so libQnnHtpV75Skel.so libQnnHtpV75Stub.so \
                 libQnnHtpV79CalculatorStub.so libQnnHtpV79Skel.so libQnnHtpV79Stub.so \
                 libQnnHtpV81CalculatorStub.so libQnnHtpV81Skel.so libQnnHtpV81Stub.so
+            qhexrt_include="$RN_ROOT/packages/qhexrt/android/src/main/jniLibs/include"
+            rm -rf "$qhexrt_include"
+            mkdir -p "$qhexrt_include"
+            cp -R "$REPO_ROOT/engines/qhexrt/include/." "$qhexrt_include/"
         else
             SKIP_QHEXRT_PACKAGE=1
             echo "::warning::missing QHexRT private native backend in --natives-from; skipping @runanywhere/qhexrt package"

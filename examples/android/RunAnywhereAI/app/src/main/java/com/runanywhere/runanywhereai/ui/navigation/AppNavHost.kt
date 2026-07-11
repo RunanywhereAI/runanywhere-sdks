@@ -79,7 +79,9 @@ fun AppNavHost(
         composable<Tts> { TtsScreen() }
         composable<Stt> { SttScreen() }
         composable<Vad> { VadScreen() }
-        composable<Vision> { VisionScreen() }
+        composable<Vision> { entry ->
+            VisionScreen(openLiveCamera = entry.toRoute<Vision>().openLiveCamera)
+        }
         composable<Documents> { RagScreen() }
         composable<Solutions> { SolutionsScreen() }
         composable<CloudProviders> { CloudProvidersScreen() }

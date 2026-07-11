@@ -12,17 +12,15 @@ import kotlin.math.sqrt
  * [NpuModelE2ETest]. Pure host-side logic (no SDK / QNN types) so it mirrors the
  * conversion parity rubric independently of the runtime it is checking. androidTest only - NOT product code.
  *
- * The bars come straight from the model conversion rubric:
- *   WER_MAX 0.05, greedy_tol edit 0.10, repetition_ratio 0.50, MeloTTS 44100 Hz.
+ * Shared default bars used only when a canonical field permits a default. Production reports still
+ * enumerate and reapply every field declared by the per-model suite.
  */
 object NpuRubric {
     const val WER_MAX = 0.05            // ASR word-error-rate ceiling      (forge WER_MAX)
-    const val EDIT_TOL = 0.10          // LLM greedy_tol token-edit ceiling (forge balanced edit_tol)
     const val REPEAT_MAX = 0.50        // coherence: immediate-repeat ratio (forge W8_SWEEP_REPEAT)
     const val TTS_RMS_MIN = 0.005      // TTS output must not be silence
     const val TTS_MIN_SECONDS = 0.30   // TTS must produce real audio
-    val TTS_RATES = setOf(16000, 22050, 24000, 44100, 48000)
-    const val EMBED_MARGIN = 0.05      // embedding: cos(paraphrase) must beat cos(unrelated) by this much
+    const val TTS_INTELLIGIBILITY_WER_MAX = 0.15
     const val INPAINT_FULL_COSINE_MIN = 0.999
     const val INPAINT_HOLE_COSINE_MIN = 0.99
     const val INPAINT_HOLE_RELATIVE_L2_MAX = 0.15
@@ -34,13 +32,6 @@ object NpuRubric {
     const val INPAINT_UNMASKED_WITHIN_1_MIN = 0.999
     const val INPAINT_HOLE_CHANGED_MIN = 0.05
 
-    /** Exact output sample rates baked into the published bundles (QHexRT TTS docs). */
-    fun expectedTtsRate(modelId: String): Int? = when {
-        modelId.contains("melotts", true) -> 44100
-        modelId.contains("kokoro", true) -> 24000
-        modelId.contains("kitten", true) -> 24000
-        else -> null
-    }
 }
 
 /** Metric functions that reproduce forge's parity math, token-for-token. */
@@ -438,9 +429,8 @@ class SuiteCase(private val o: JSONObject) {
 /**
  * A canonical per-model device-test suite — the SAME cases + gold + thresholds forge/goal_npu validates
  * against (`QHexRT2/testing/suites/<modelId>.json`, synced into `androidTest/assets/npu_suites/`). When a
- * suite is shipped for a model, the harness runs THESE cases with the forge metric (greedy_tol / wer /
- * audio) so "device-validated" means the same thing on both planes. Absent → the harness falls back to its
- * built-in heuristic cases.
+ * suite is shipped for a model, the harness runs THESE cases with its declared Android-executable metric.
+ * The host aggregator rejects unknown or unapplied gate fields.
  */
 class NpuSuite(
     private val o: JSONObject,
@@ -470,10 +460,10 @@ class NpuSuite(
             return result
         }
     val metric: String get() = gate.optString("metric")
-    val editTol: Double get() = gate.optDouble("edit_tol", NpuRubric.EDIT_TOL)
     val werMax: Double get() = gate.optDouble("wer_max", NpuRubric.WER_MAX)
     val passFrac: Double get() = gate.optDouble("suite_pass_frac", 0.60)
     val minInputs: Int get() = gate.optInt("min_inputs", 1)
+    val minDecodeToks: Double get() = gate.optDouble("min_decode_toks", 0.0)
     val minTriples: Int get() = gate.optInt("min_triples", 1)
     val expectedDimension: Int get() = gate.optInt("expected_dimension", 0)
     val minimumPairwiseMargin: Double get() = gate.optDouble("minimum_pairwise_margin", 0.0)
@@ -482,6 +472,18 @@ class NpuSuite(
     val queryPrefix: String get() = gate.optString("query_prefix")
     val documentPrefix: String get() = gate.optString("document_prefix")
     val maxNew: Int get() = gate.optInt("max_new", 0)
+    val expectedSampleRate: Int get() = gate.optInt("expected_sample_rate", 0)
+    val intelligibilityWerMax: Double get() =
+        gate.optDouble("intelligibility_wer_max", NpuRubric.TTS_INTELLIGIBILITY_WER_MAX)
+    val rmsMin: Double get() = gate.optDouble("rms_min", NpuRubric.TTS_RMS_MIN)
+    val minSeconds: Double get() = gate.optDouble("min_seconds", NpuRubric.TTS_MIN_SECONDS)
+    val gateKeys: List<String>
+        get() {
+            val keys = mutableListOf<String>()
+            val iterator = gate.keys()
+            while (iterator.hasNext()) keys += iterator.next()
+            return keys.sorted()
+        }
     val fullCosineMin: Double get() = gate.optDouble(
         "minimum_full_cosine",
         NpuRubric.INPAINT_FULL_COSINE_MIN,
@@ -520,8 +522,13 @@ class NpuSuite(
         /** Load `assets/npu_suites/<modelId>.json` from the TEST apk; null if none shipped for this model. */
         fun load(assets: android.content.res.AssetManager, modelId: String): NpuSuite? = try {
             val raw = assets.open("npu_suites/$modelId.json").use { it.readBytes() }
+            val payload = JSONObject(String(raw, Charsets.UTF_8))
+            require(payload.optString("schema") == "npu_suite/v1")
+            require(payload.optString("model_id") == modelId)
+            require((payload.optJSONArray("cases")?.length() ?: 0) > 0)
+            require(payload.optJSONObject("gate") != null)
             NpuSuite(
-                o = JSONObject(String(raw, Charsets.UTF_8)),
+                o = payload,
                 suiteId = modelId,
                 sha256 = MessageDigest.getInstance("SHA-256").digest(raw)
                     .joinToString("") { "%02x".format(it.toInt() and 0xff) },

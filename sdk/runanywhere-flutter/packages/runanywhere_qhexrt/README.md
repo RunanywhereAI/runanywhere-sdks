@@ -1,12 +1,11 @@
 # runanywhere_qhexrt
 
 Private QHexRT backend for the RunAnywhere Flutter SDK — runs prebuilt QNN
-context binaries on Qualcomm Snapdragon Hexagon NPUs (v75+), serving
+context binaries on Qualcomm Snapdragon Hexagon NPUs (V75/V79/V81), serving
 LLM, VLM, STT and TTS through the standard SDK APIs.
 
-Android only, `arm64-v8a` only. On parts older than v75, the backend
-declines to register and inference stays disabled (NPU-only — no CPU fallback
-in this package).
+Android only, `arm64-v8a` only. Other architectures are declined and inference
+stays disabled (NPU-only — no CPU fallback in this package).
 
 ## Usage
 
@@ -20,11 +19,27 @@ final npu = QHexRT.probeNpu();      // pre-flight, no QNN load
 if (npu.qhexrtSupported) {          // generated runanywhere.v1.NpuCapability
   await QHexRT.register();          // registers the QHexRT engine
 }
+
+final model = await QHexRT.registerModelForDevice(
+  request: RegisterModelFromUrlRequest(
+    id: 'my-hnpu-model',
+    name: 'My HNPU Model',
+    url: 'https://huggingface.co/your-org/your-model_HNPU/model.json',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+  ),
+  supportedArches: const [
+    HexagonArch.HEXAGON_ARCH_V79,
+    HexagonArch.HEXAGON_ARCH_V81,
+  ],
+);
 ```
 
 `probeNpu()` returns the generated `runanywhere.v1.NpuCapability` proto
 message (`socModel`, `socId`, `hexagonArch`, `qhexrtSupported`, `archName`),
-decoded from commons' `rac_npu_probe_proto()` — no hand-mirrored types.
+decoded from QHexRT's `rac_qhexrt_probe_proto()` — no hand-mirrored types.
+The app owns URLs and presentation metadata. QHexRT owns chip selection and
+composes commons' registry, Hugging Face resolver, download, extraction,
+validation, and local-path workflow. A null model is a normal device mismatch.
 
 ## Native libraries
 

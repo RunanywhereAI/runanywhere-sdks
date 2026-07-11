@@ -1,0 +1,340 @@
+package com.runanywhere.runanywhereai.tools
+
+import ai.runanywhere.proto.v1.ToolParameter
+import ai.runanywhere.proto.v1.ToolParameterType
+import com.runanywhere.runanywhereai.BuildConfig
+import com.runanywhere.sdk.public.extensions.LLM.RAToolValue
+import com.runanywhere.sdk.public.extensions.LLM.array
+import com.runanywhere.sdk.public.extensions.LLM.`object`
+import com.runanywhere.sdk.public.extensions.LLM.string
+import com.runanywhere.sdk.public.types.RAToolDefinition
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.ByteArrayOutputStream
+import java.net.URI
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.TimeUnit
+
+/** Keyless web search tool mirroring the iOS SDK's DuckDuckGo helper. */
+internal object WebSearchTool {
+    private const val MAX_RESULTS = 5
+    private const val MAX_RESPONSE_BYTES = 1_000_000
+    private val userAgent = "Mozilla/5.0 RunAnywhere/${BuildConfig.VERSION_NAME}"
+    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+
+    private val json = Json { ignoreUnknownKeys = true }
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(20, TimeUnit.SECONDS)
+        // Search queries may only be sent to the two fixed HTTPS origins below.
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .build()
+
+    val definition = RAToolDefinition(
+        name = "search_web",
+        description = "Searches the web for current information and returns source links.",
+        parameters = listOf(
+            ToolParameter(
+                name = "query",
+                type = ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+                description = "A concise web search query.",
+                required = true,
+            ),
+        ),
+        category = "Web",
+    )
+
+    suspend fun execute(args: Map<String, RAToolValue>): Map<String, RAToolValue> =
+        search(args["query"]?.string.orEmpty())
+
+    internal suspend fun search(
+        query: String,
+        backendUrl: String = BuildConfig.WEB_SEARCH_URL,
+        backendFetcher: suspend (String, String) -> String = { endpoint, value ->
+            fetchBackend(endpoint, value)
+        },
+        publicFetcher: suspend (String) -> String = { fetch(it) },
+    ): Map<String, RAToolValue> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return errorPayload("Missing search query")
+
+        if (backendUrl.isNotBlank()) {
+            return runCatching {
+                val endpoint = parseWebSearchEndpoint(backendUrl)
+                val results = parseBackendResults(backendFetcher(endpoint, trimmed)).take(MAX_RESULTS)
+                check(results.isNotEmpty()) { "Search service returned no results" }
+                resultPayload(trimmed, results)
+            }.getOrElse {
+                errorPayload("Web search is temporarily unavailable")
+            }
+        }
+
+        // Developer builds can run without backend credentials. This is not the
+        // Play release path: the release gate requires the configured proxy so a
+        // confidential provider key never has to be embedded in the APK.
+        val liteResults = runCatching {
+            parseLiteResults(publicFetcher(buildLiteSearchUrl(trimmed))).take(MAX_RESULTS)
+        }.getOrDefault(emptyList())
+        if (liteResults.isNotEmpty()) return resultPayload(trimmed, liteResults)
+
+        return runCatching {
+            parseInstantAnswer(trimmed, publicFetcher(buildInstantAnswerUrl(trimmed)))
+        }.getOrElse {
+            errorPayload("Web search is temporarily unavailable")
+        }
+    }
+
+    internal fun parseWebSearchEndpoint(endpoint: String): String {
+        val uri = runCatching { URI(endpoint.trim()) }.getOrNull()
+            ?: throw IllegalArgumentException("Web search is not configured for this build")
+        require(
+            uri.scheme.equals("https", ignoreCase = true) &&
+                !uri.host.isNullOrBlank() &&
+                uri.userInfo == null,
+        ) { "Web search is not configured for this build" }
+        return uri.toString()
+    }
+
+    internal fun buildLiteSearchUrl(query: String): String =
+        "https://lite.duckduckgo.com/lite/".toHttpUrl().newBuilder()
+            .addQueryParameter("q", query)
+            .build()
+            .toString()
+
+    private fun buildInstantAnswerUrl(query: String): String =
+        "https://api.duckduckgo.com/".toHttpUrl().newBuilder()
+            .addQueryParameter("q", query)
+            .addQueryParameter("format", "json")
+            .addQueryParameter("no_redirect", "1")
+            .addQueryParameter("no_html", "1")
+            .addQueryParameter("skip_disambig", "1")
+            .build()
+            .toString()
+
+    private suspend fun fetch(url: String): String {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", userAgent)
+            .header("Accept", "text/html,application/json")
+            .get()
+            .build()
+        return fetch(request)
+    }
+
+    private suspend fun fetchBackend(endpoint: String, query: String): String {
+        val payload = buildJsonObject {
+            put("query", query)
+            put("count", MAX_RESULTS)
+        }.toString()
+        val request = Request.Builder()
+            .url(endpoint)
+            .header("User-Agent", userAgent)
+            .header("Accept", "application/json")
+            .apply {
+                BuildConfig.RUNANYWHERE_API_KEY.takeIf { it.isNotBlank() }?.let { apiKey ->
+                    header("Authorization", "Bearer $apiKey")
+                    header("apikey", apiKey)
+                }
+            }
+            .post(payload.toRequestBody(jsonMediaType))
+            .build()
+        return fetch(request)
+    }
+
+    private suspend fun fetch(request: Request): String = withContext(Dispatchers.IO) {
+        client.newCall(request).execute().use { response ->
+            check(response.isSuccessful) { "Search HTTP ${response.code}" }
+            val body = response.body
+            val declaredLength = body.contentLength()
+            check(declaredLength < 0 || declaredLength <= MAX_RESPONSE_BYTES) { "Search response is too large" }
+            val input = body.byteStream()
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(8 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                check(output.size() + count <= MAX_RESPONSE_BYTES) { "Search response is too large" }
+                output.write(buffer, 0, count)
+            }
+            output.toString(StandardCharsets.UTF_8.name())
+        }
+    }
+
+    internal data class SearchResult(
+        val title: String,
+        val url: String,
+        val snippet: String,
+    )
+
+    internal fun parseLiteResults(html: String): List<SearchResult> {
+        val linkPattern = Regex(
+            """<a(?=[^>]*class=['\"][^'\"]*result-link[^'\"]*['\"])(?=[^>]*href=['\"]([^'\"]+)['\"])[^>]*>(.*?)</a>""",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+        )
+        val snippetPattern = Regex(
+            """<td[^>]*class=['\"][^'\"]*result-snippet[^'\"]*['\"][^>]*>\s*([\s\S]*?)\s*</td>""",
+            RegexOption.IGNORE_CASE,
+        )
+        return linkPattern.findAll(html).mapNotNull { match ->
+            val url = resolveResultUrl(decodeHtml(match.groupValues[1]))
+            val title = cleanHtml(match.groupValues[2])
+            if (title.isBlank() || url.isBlank()) return@mapNotNull null
+            val tailStart = match.range.last + 1
+            val tail = html.substring(tailStart, minOf(html.length, tailStart + 1_500))
+            val snippet = snippetPattern.find(tail)?.groupValues?.getOrNull(1)?.let(::cleanHtml)
+                ?.takeIf { it.isNotBlank() }
+                ?: title
+            SearchResult(title = title, url = url, snippet = snippet)
+        }.toList()
+    }
+
+    internal fun parseBackendResults(rawJson: String): List<SearchResult> {
+        val root = json.parseToJsonElement(rawJson).jsonObject
+        val results = (root["results"] as? JsonArray)
+            ?: ((root["web"] as? JsonObject)?.get("results") as? JsonArray)
+            ?: return emptyList()
+        return results.mapNotNull { element ->
+            val obj = element as? JsonObject ?: return@mapNotNull null
+            val title = obj.string("title")
+            val url = safeHttpUrl(obj.string("url"))
+            val snippet = obj.string("snippet").ifBlank { obj.string("description") }
+            if (title.isBlank() || url.isBlank()) null
+            else SearchResult(title, url, snippet.ifBlank { title })
+        }
+    }
+
+    internal fun parseInstantAnswer(query: String, rawJson: String): Map<String, RAToolValue> {
+        val root = json.parseToJsonElement(rawJson).jsonObject
+        val related = flattenRelated(root["RelatedTopics"]).take(MAX_RESULTS)
+        val heading = root.string("Heading")
+        val directAnswer = root.string("AbstractText")
+            .ifBlank { root.string("Answer") }
+        if (directAnswer.isBlank() && related.isEmpty()) {
+            return errorPayload("Web search is temporarily unavailable")
+        }
+        val summary = directAnswer.ifBlank { related.first().snippet }
+        val source = root.string("AbstractURL").ifBlank { buildSearchResultsUrl(query) }
+        return linkedMapOf(
+            "query" to RAToolValue.string(query),
+            "result_count" to RAToolValue.string((related.size + if (directAnswer.isBlank()) 0 else 1).toString()),
+            "heading" to RAToolValue.string(heading.ifBlank { query }),
+            "summary" to RAToolValue.string(summary),
+            "source_url" to RAToolValue.string(source),
+        ).apply {
+            if (related.isNotEmpty()) {
+                put("related_results", RAToolValue.array(related.map(::toolResultValue)))
+            }
+        }
+    }
+
+    private fun flattenRelated(element: JsonElement?): List<SearchResult> {
+        val array = element as? JsonArray ?: return emptyList()
+        return array.flatMap { item ->
+            val obj = item as? JsonObject ?: return@flatMap emptyList()
+            val nested = obj["Topics"]
+            if (nested is JsonArray) {
+                flattenRelated(nested)
+            } else {
+                val text = obj.string("Text")
+                val url = safeHttpUrl(obj.string("FirstURL"))
+                if (text.isBlank() || url.isBlank()) emptyList()
+                else listOf(SearchResult(text.substringBefore(" - "), url, text))
+            }
+        }
+    }
+
+    private fun resultPayload(query: String, results: List<SearchResult>): Map<String, RAToolValue> {
+        val first = results.first()
+        return linkedMapOf(
+            "query" to RAToolValue.string(query),
+            "result_count" to RAToolValue.string(results.size.toString()),
+            "heading" to RAToolValue.string(first.title),
+            "summary" to RAToolValue.string(first.snippet),
+            "source_url" to RAToolValue.string(first.url),
+            "related_results" to RAToolValue.array(results.drop(1).map(::toolResultValue)),
+        )
+    }
+
+    private fun toolResultValue(result: SearchResult): RAToolValue = RAToolValue.`object`(
+        mapOf(
+            "title" to RAToolValue.string(result.title),
+            "text" to RAToolValue.string(result.snippet),
+            "url" to RAToolValue.string(result.url),
+        ),
+    )
+
+    private fun errorPayload(message: String): Map<String, RAToolValue> =
+        mapOf("error" to RAToolValue.string(message))
+
+    private fun buildSearchResultsUrl(query: String): String =
+        "https://duckduckgo.com/".toHttpUrl().newBuilder()
+            .addQueryParameter("q", query)
+            .build()
+            .toString()
+
+    private fun resolveResultUrl(href: String): String {
+        val marker = "uddg="
+        val encoded = href.substringAfter(marker, "").substringBefore('&')
+        val decoded = if (encoded.isNotBlank()) {
+            runCatching { URLDecoder.decode(encoded, StandardCharsets.UTF_8.name()) }.getOrDefault(encoded)
+        } else if (href.startsWith("//")) {
+            "https:$href"
+        } else {
+            href
+        }
+        return safeHttpUrl(decoded)
+    }
+
+    private fun safeHttpUrl(value: String): String = runCatching {
+        val uri = URI(value.trim())
+        if ((uri.scheme.equals("https", true) || uri.scheme.equals("http", true)) && !uri.host.isNullOrBlank()) {
+            uri.toString()
+        } else {
+            ""
+        }
+    }.getOrDefault("")
+
+    private fun cleanHtml(value: String): String = decodeHtml(value.replace(Regex("<[^>]+>"), " "))
+        .replace(Regex("\\s+"), " ")
+        .trim()
+
+    private fun decodeHtml(value: String): String {
+        var decoded = value
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&#x27;", "'")
+            .replace("&#39;", "'")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&nbsp;", " ")
+        decoded = Regex("&#x([0-9a-fA-F]+);").replace(decoded) { match ->
+            match.groupValues[1].toIntOrNull(16)?.let(::codePointString) ?: match.value
+        }
+        return Regex("&#([0-9]+);").replace(decoded) { match ->
+            match.groupValues[1].toIntOrNull()?.let(::codePointString) ?: match.value
+        }
+    }
+
+    private fun codePointString(codePoint: Int): String =
+        runCatching { String(Character.toChars(codePoint)) }.getOrDefault("")
+
+    private fun JsonObject.string(key: String): String =
+        this[key]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+}

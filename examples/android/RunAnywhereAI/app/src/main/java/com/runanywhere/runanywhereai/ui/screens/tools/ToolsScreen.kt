@@ -41,8 +41,8 @@ fun ToolsScreen(viewModel: ToolsViewModel = viewModel()) {
         Section("Web & Tools") {
             ToggleRow(
                 label = "Enable web and tools",
-                description = "Allow the assistant to use registered tools for actions " +
-                    "like getting weather, time, or calculations.",
+                description = "Allow the assistant to use on-device utilities and send a query to the " +
+                    "configured web-search service when it chooses the search tool.",
                 checked = viewModel.toolCallingEnabled,
                 onCheckedChange = viewModel::setEnabled,
             )

@@ -178,8 +178,8 @@ void d7_emit_user_said(rac_voice_agent_handle_t handle, const char* text, const 
 }
 
 void d7_emit_assistant_token(rac_voice_agent_handle_t handle, const char* text, bool is_final,
-                             const std::string& session_id, const std::string& turn_id,
-                             const std::string& request_id,
+                             runanywhere::v1::TokenKind kind, const std::string& session_id,
+                             const std::string& turn_id, const std::string& request_id,
                              rac_voice_agent_turn_event_callback_fn cb, void* user_data) {
     runanywhere::v1::VoiceEvent event;
     event.set_category(runanywhere::v1::EVENT_CATEGORY_LLM);
@@ -189,7 +189,7 @@ void d7_emit_assistant_token(rac_voice_agent_handle_t handle, const char* text, 
     if (text)
         t->set_text(text);
     t->set_is_final(is_final);
-    t->set_kind(runanywhere::v1::TOKEN_KIND_ANSWER);
+    t->set_kind(kind);
     d7_emit_voice_event(handle, &event, session_id, turn_id, request_id, cb, user_data);
 }
 
@@ -299,9 +299,9 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         ~TurnMetricsGuard() {
             if (!armed)
                 return;
-            const double e2e_ms = std::chrono::duration<double, std::milli>(
-                                      std::chrono::steady_clock::now() - start)
-                                      .count();
+            const double e2e_ms =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+                    .count();
             rac::voice_agent::detail::publish_voice_turn_metrics(
                 stt_ms, llm_ms, tts_ms, e2e_ms, tokens,
                 session_id.empty() ? nullptr : session_id.c_str(),
@@ -442,10 +442,7 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         history_ptrs.push_back(turn.user_text.c_str());
         history_ptrs.push_back(turn.assistant_text.c_str());
     }
-    rac_llm_options_t llm_opts = RAC_LLM_OPTIONS_DEFAULT;
-    llm_opts.max_tokens = kVoiceAgentMaxTokens;
-    llm_opts.temperature = 0.7f;
-    llm_opts.system_prompt = kVoiceAgentSystemPrompt;
+    rac_llm_options_t llm_opts = make_voice_llm_options();
     if (!history_ptrs.empty()) {
         llm_opts.history = history_ptrs.data();
         llm_opts.n_history = static_cast<int32_t>(history_ptrs.size());
@@ -477,15 +474,33 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         emit_component_failure(handle, "llm", rc, "LLM generation failed");
         return rc;
     }
-    turn_metrics.response_chars = llm.text ? static_cast<int32_t>(std::strlen(llm.text)) : 0;
+    const VoiceResponseParts response = split_voice_response(llm.text);
+    turn_metrics.response_chars = static_cast<int32_t>(response.answer.size());
+    const rac_result_t response_status = validate_voice_response(response);
+    if (response_status != RAC_SUCCESS) {
+        rac_stt_result_free(&stt);
+        rac_llm_result_free(&llm);
+        if (have_lifecycle_llm) {
+            rac::llm::release_lifecycle_llm(&llm_ref);
+        }
+        if (have_lifecycle_stt) {
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        }
+        turn_metrics.error_code = response_status;
+        turn_metrics.error_message = kVoiceAgentEmptyResponseMessage;
+        d7_emit_error(handle, response_status, "llm", kVoiceAgentEmptyResponseMessage, session_id,
+                      turn_id, request_id, event_callback, user_data);
+        emit_component_failure(handle, "llm", response_status, kVoiceAgentEmptyResponseMessage);
+        return response_status;
+    }
 
     // Remember this turn so the next one has context. The typed turn is
     // flattened into rac_llm_options_t.history as alternating user,assistant.
     // Bound to the same flattened-entry budget so the prompt stays within the
     // context window.
     if (stt.text != nullptr && stt.text[0] != '\0') {
-        handle->conversation_history.push_back(VoiceConversationTurn{
-            .user_text = stt.text, .assistant_text = llm.text ? llm.text : ""});
+        handle->conversation_history.push_back(
+            VoiceConversationTurn{.user_text = stt.text, .assistant_text = response.answer});
         const size_t max_turns = kVoiceAgentMaxHistoryEntries / 2;
         if (handle->conversation_history.size() > max_turns) {
             const size_t excess = handle->conversation_history.size() - max_turns;
@@ -495,8 +510,14 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         }
     }
 
-    d7_emit_assistant_token(handle, llm.text, true, session_id, turn_id, request_id, event_callback,
-                            user_data);
+    if (!response.thinking.empty()) {
+        d7_emit_assistant_token(handle, response.thinking.c_str(), false,
+                                runanywhere::v1::TOKEN_KIND_THOUGHT, session_id, turn_id,
+                                request_id, event_callback, user_data);
+    }
+    d7_emit_assistant_token(handle, response.answer.c_str(), true,
+                            runanywhere::v1::TOKEN_KIND_ANSWER, session_id, turn_id, request_id,
+                            event_callback, user_data);
 
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_GENERATING_RESPONSE,
                   runanywhere::v1::PIPELINE_STATE_PLAYING_TTS, session_id, turn_id, request_id,
@@ -508,9 +529,10 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
     const auto t_tts = std::chrono::steady_clock::now();
     if (have_lifecycle_tts) {
         rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
-        rc = rac_tts_synthesize(&tts_service, llm.text, nullptr, &tts);
+        rc = rac_tts_synthesize(&tts_service, response.answer.c_str(), nullptr, &tts);
     } else {
-        rc = rac_tts_component_synthesize(handle->tts_handle, llm.text, nullptr, &tts);
+        rc = rac_tts_component_synthesize(handle->tts_handle, response.answer.c_str(), nullptr,
+                                          &tts);
     }
     turn_metrics.tts_ms =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t_tts).count();
@@ -546,16 +568,19 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
     if (out_result) {
         out_result->set_speech_detected(turn_has_speech);
         out_result->set_transcription(stt.text);
-        if (llm.text) {
-            out_result->set_assistant_response(llm.text);
+        if (!response.answer.empty()) {
+            out_result->set_assistant_response(response.answer);
+        }
+        if (!response.thinking.empty()) {
+            out_result->set_thinking_content(response.thinking);
         }
         if (tts.audio_data && tts.audio_size > 0) {
             void* wav_data = nullptr;
             size_t wav_size = 0;
-            if (rac_audio_float32_to_wav(
-                    tts.audio_data, tts.audio_size,
-                    tts.sample_rate > 0 ? tts.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE, &wav_data,
-                    &wav_size) == RAC_SUCCESS &&
+            if (rac_audio_float32_to_wav(tts.audio_data, tts.audio_size,
+                                         tts.sample_rate > 0 ? tts.sample_rate
+                                                             : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                                         &wav_data, &wav_size) == RAC_SUCCESS &&
                 wav_data && wav_size > 0) {
                 out_result->set_synthesized_audio(wav_data, wav_size);
                 std::free(wav_data);
@@ -576,7 +601,7 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
                   runanywhere::v1::PIPELINE_STATE_IDLE, session_id, turn_id, request_id,
                   event_callback, user_data);
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED, stt.text,
-                        llm.text);
+                        response.answer.c_str());
 
     rac_stt_result_free(&stt);
     rac_llm_result_free(&llm);
@@ -648,9 +673,9 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
 
     // The VAD -> STT -> LLM -> TTS pipeline + event emission is shared with
     // the streaming feed-audio ingress path (rac_voice_agent_feed_audio_proto).
-    const std::string language_code =
-        request.session_config().has_language_code() ? request.session_config().language_code()
-                                                     : std::string();
+    const std::string language_code = request.session_config().has_language_code()
+                                          ? request.session_config().language_code()
+                                          : std::string();
     return rac::voice_agent::detail::d7_process_utterance(
         handle, request.audio_data(), session_id, turn_id, request_id, language_code,
         event_callback, user_data, /*out_result=*/nullptr);

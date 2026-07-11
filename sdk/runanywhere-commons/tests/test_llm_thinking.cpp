@@ -132,6 +132,20 @@ int test_extract_malformed_keeps_text() {
     return 0;
 }
 
+int test_extract_trailing_unclosed_thinking() {
+    const char* response = nullptr;
+    size_t resp_len = 0;
+    const char* thinking = nullptr;
+    size_t think_len = 0;
+    rac_result_t rc = rac_llm_extract_thinking(
+        "visible answer <think>unfinished private reasoning", &response, &resp_len, &thinking,
+        &think_len);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_STR(response, "visible answer");
+    ASSERT_EQ_STR(thinking, "unfinished private reasoning");
+    return 0;
+}
+
 int test_strip_multiple_blocks() {
     const char* stripped = nullptr;
     size_t slen = 0;
@@ -218,6 +232,7 @@ int main() {
     RUN(test_strip_thinking_long_tag);
     RUN(test_strip_trailing_unclosed_long_tag);
     RUN(test_extract_malformed_keeps_text);
+    RUN(test_extract_trailing_unclosed_thinking);
     RUN(test_strip_multiple_blocks);
     RUN(test_strip_trailing_unclosed);
     RUN(test_split_tokens_no_thinking);

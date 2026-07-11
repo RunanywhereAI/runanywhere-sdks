@@ -118,6 +118,7 @@ android {
         }
         jniLibs {
             excludes += "**/libonnxruntime_qnn.so"
+            keepDebugSymbols += "**/*.so"
         }
     }
 

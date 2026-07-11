@@ -1,32 +1,32 @@
 package com.runanywhere.runanywhereai.data
 
-import ai.runanywhere.proto.v1.ArchiveArtifact
 import ai.runanywhere.proto.v1.ArchiveStructure
 import ai.runanywhere.proto.v1.ArchiveType
-import ai.runanywhere.proto.v1.ExpectedModelFiles
+import ai.runanywhere.proto.v1.HexagonArch
 import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFileRole
 import ai.runanywhere.proto.v1.ModelInfo
-import ai.runanywhere.proto.v1.ModelInfoMetadata
 import ai.runanywhere.proto.v1.ModelSource
-import ai.runanywhere.proto.v1.MultiFileArtifact
-import ai.runanywhere.proto.v1.SingleFileArtifact
+import ai.runanywhere.proto.v1.RegisterModelFromUrlRequest
+import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.registerModel
 
-private const val HNPU_TAG = "hnpu"
-private const val PRIVATE_TAG = "private"
-private const val HF_AUTH_TAG = "requires-hf-auth"
+private val QHEXRT = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
+private const val HNPU_DESCRIPTION = "Qualcomm Hexagon NPU model bundle."
+private const val PRIVATE_HNPU_DESCRIPTION =
+    "Private HNPU bundle. Add a Hugging Face token in Settings before downloading."
+
+/** Catalog rows whose Hugging Face repository currently requires authentication. */
+internal val PRIVATE_HF_MODEL_IDS: Set<String> = setOf("kokoro_en")
 
 internal sealed interface CatalogModel {
     val id: String
     val requiresHfAuth: Boolean
-        get() = false
-    fun toModelInfo(): ModelInfo
-    suspend fun register()
+        get() = id in PRIVATE_HF_MODEL_IDS
+    suspend fun register(): ModelInfo?
 }
 
 internal data class ModelFile(val url: String, val filename: String)
@@ -38,24 +38,37 @@ internal data class SingleFileModel(
     val framework: InferenceFramework,
     val category: ModelCategory,
     val memoryBytes: Long,
+    val contextLength: Int? = null,
     val supportsLora: Boolean = false,
     val supportsThinking: Boolean = false,
+    val supportedNpuArches: Set<HexagonArch> = emptySet(),
 ) : CatalogModel {
-    override val requiresHfAuth: Boolean
-        get() = framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
-            url.contains("_HNPU", ignoreCase = true)
-
-    private fun catalogMetadata(): ModelInfoMetadata? {
-        if (!requiresHfAuth) return null
-        return ModelInfoMetadata(
-            description = "Private HNPU bundle. Add a Hugging Face token in Settings before downloading.",
-            author = "RunAnywhere",
-            tags = listOf(PRIVATE_TAG, HF_AUTH_TAG, HNPU_TAG),
+    internal fun toQHexRTRegistrationRequest(): RegisterModelFromUrlRequest {
+        require(framework == QHEXRT) { "Only QHexRT catalog rows use device-aware registration" }
+        return RegisterModelFromUrlRequest(
+            id = id,
+            name = name,
+            url = url,
+            framework = framework,
+            category = category,
+            source = ModelSource.MODEL_SOURCE_REMOTE,
+            memory_required_bytes = memoryBytes,
+            download_size_bytes = memoryBytes,
+            context_length = contextLength,
+            supports_thinking = supportsThinking,
+            supports_lora = supportsLora,
+            description = if (requiresHfAuth) PRIVATE_HNPU_DESCRIPTION else HNPU_DESCRIPTION,
         )
     }
 
-    override suspend fun register() {
-        RunAnywhere.registerModel(
+    override suspend fun register(): ModelInfo? {
+        if (framework == QHEXRT) {
+            return QHexRT.registerModelForDevice(
+                request = toQHexRTRegistrationRequest(),
+                supportedArches = supportedNpuArches,
+            )
+        }
+        return RunAnywhere.registerModel(
             id = id,
             name = name,
             url = url,
@@ -67,21 +80,6 @@ internal data class SingleFileModel(
             supportsLora = supportsLora,
         )
     }
-
-    override fun toModelInfo() = ModelInfo(
-        id = id,
-        name = name,
-        download_url = url,
-        framework = framework,
-        category = category,
-        memory_required_bytes = memoryBytes,
-        download_size_bytes = memoryBytes,
-        supports_lora = supportsLora,
-        supports_thinking = supportsThinking,
-        description = catalogMetadata()?.description.orEmpty(),
-        metadata = catalogMetadata(),
-        single_file = SingleFileArtifact(),
-    )
 }
 
 internal data class ArchiveModel(
@@ -94,7 +92,7 @@ internal data class ArchiveModel(
     val archiveType: ArchiveType,
     val structure: ArchiveStructure,
 ) : CatalogModel {
-    override suspend fun register() {
+    override suspend fun register(): ModelInfo =
         RunAnywhere.registerModel(
             archiveUrl = url,
             structure = structure,
@@ -107,25 +105,6 @@ internal data class ArchiveModel(
             supportsThinking = false,
             supportsLora = false,
         )
-    }
-
-    override fun toModelInfo() = ModelInfo(
-        id = id,
-        name = name,
-        download_url = url,
-        framework = framework,
-        category = category,
-        memory_required_bytes = memoryBytes,
-        download_size_bytes = memoryBytes,
-        artifact_type = when (archiveType) {
-            ArchiveType.ARCHIVE_TYPE_TAR_GZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
-            ArchiveType.ARCHIVE_TYPE_ZIP -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE
-            ArchiveType.ARCHIVE_TYPE_TAR_BZ2 -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE
-            ArchiveType.ARCHIVE_TYPE_TAR_XZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE
-            else -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE
-        },
-        archive = ArchiveArtifact(type = archiveType, structure = structure),
-    )
 }
 
 internal data class MultiFileModel(
@@ -136,7 +115,7 @@ internal data class MultiFileModel(
     val memoryBytes: Long,
     val files: List<ModelFile>,
 ) : CatalogModel {
-    override suspend fun register() {
+    override suspend fun register(): ModelInfo =
         RunAnywhere.registerModel(
             multiFile = descriptors(),
             id = id,
@@ -148,22 +127,6 @@ internal data class MultiFileModel(
             supportsThinking = false,
             source = ModelSource.MODEL_SOURCE_REMOTE,
         )
-    }
-
-    override fun toModelInfo(): ModelInfo {
-        val descriptors = descriptors()
-        // expected_files must mirror multi_file or the download falls back to the single-URL branch.
-        return ModelInfo(
-            id = id,
-            name = name,
-            framework = framework,
-            category = category,
-            memory_required_bytes = memoryBytes,
-            download_size_bytes = memoryBytes,
-            multi_file = MultiFileArtifact(files = descriptors),
-            expected_files = ExpectedModelFiles(files = descriptors),
-        )
-    }
 
     private fun descriptors(): List<ModelFileDescriptor> =
         files.mapIndexed { idx, file ->

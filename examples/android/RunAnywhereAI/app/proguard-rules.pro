@@ -1,4 +1,4 @@
-# ProGuard / R8 rules for RunAnywhere AI.
+# ProGuard / R8 rules for RunAnywhere.
 # Scoped to what this app actually uses — the SDK + Wire protos (JNI/reflection),
 # reflectively-created ViewModels, and kotlinx.serialization. Library consumer
 # rules (Compose, OkHttp, kotlinx.serialization, AndroidX) cover the rest.
@@ -65,3 +65,54 @@
 #  - errorprone annotations from Tink (androidx.security.crypto), compile-only
 -dontwarn com.gemalto.jp2.**
 -dontwarn com.google.errorprone.annotations.**
+# Required only when the exact minified release APK is instrumented for device
+# acceptance. AndroidJUnitRunner calls this class before any test method runs.
+-keep class androidx.tracing.Trace { *; }
+
+# AndroidX Test's TestDirCalculator calls kotlin.LazyKt.lazy(Function0), whose
+# implementation lives on the LazyKt multifile facade's superclass. Keeping
+# only the facade lets R8 merge the hierarchy, rename lazy(), and strengthen
+# its return type; releaseAndroidTest's -applymapping cannot rewrite that
+# inherited-method call consistently. Keep this tiny facade hierarchy intact.
+-keep class kotlin.LazyKt** { *; }
+
+# Release instrumentation calls these coroutine entry-point facades directly
+# (runBlocking/launch/withContext and withTimeout). The release app can inline
+# and remove them otherwise, leaving the separately packaged test APK with
+# unresolved calls after -applymapping. Keep only the two referenced families.
+-keep class kotlinx.coroutines.BuildersKt** { *; }
+-keep class kotlinx.coroutines.TimeoutKt** { *; }
+
+# The release NPU/Web acceptance tests are compiled into a separate APK. Their
+# generated Kotlin bytecode calls this small, statically-audited API closure
+# directly; keep the facade families intact so target R8 cannot merge/remove an
+# owner that releaseAndroidTest must resolve at runtime.
+-keep class com.runanywhere.runanywhereai.data.ModelCatalog { *; }
+-keep class com.runanywhere.runanywhereai.data.SingleFileModel { *; }
+-keep class com.runanywhere.runanywhereai.state.GlobalState { *; }
+-keep class com.runanywhere.runanywhereai.tools.WebSearchTool { *; }
+-keep class kotlin.Unit { *; }
+-keep class kotlin.Result** { *; }
+-keep class kotlin.ResultKt { *; }
+-keep class kotlin.TuplesKt { *; }
+-keep class kotlin.comparisons.ComparisonsKt** { *; }
+-keep class kotlin.coroutines.intrinsics.IntrinsicsKt** { *; }
+-keep class kotlin.coroutines.jvm.internal.Boxing { *; }
+-keep class kotlin.coroutines.jvm.internal.SpillingKt { *; }
+-keep class kotlin.io.ByteStreamsKt** { *; }
+-keep class kotlin.io.CloseableKt { *; }
+-keep class kotlin.jvm.internal.Intrinsics** { *; }
+-keep class kotlin.jvm.internal.Ref$DoubleRef { *; }
+-keep class kotlin.jvm.internal.Ref$IntRef { *; }
+-keep class kotlin.jvm.internal.Ref$LongRef { *; }
+-keep class kotlin.Pair { *; }
+-keep class kotlin.ranges.IntRange { *; }
+-keep class kotlin.ranges.RangesKt** { *; }
+-keep class kotlin.text.MatchResult** { *; }
+-keep class kotlin.text.StringsKt** { *; }
+-keep class kotlin.collections.ArraysKt** { *; }
+-keep class kotlin.collections.CollectionsKt** { *; }
+-keep class kotlin.collections.MapsKt** { *; }
+-keep class kotlin.io.FilesKt** { *; }
+-keep class kotlin.sequences.SequencesKt** { *; }
+-keep class kotlin.text.Regex** { *; }

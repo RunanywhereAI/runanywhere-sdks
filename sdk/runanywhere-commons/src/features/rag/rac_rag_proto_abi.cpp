@@ -235,6 +235,12 @@ bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
                                 std::string* out_message) {
     const RAGBackendConfig defaults;
 
+    if (proto.has_embedding_dimension() && proto.embedding_dimension() < 1) {
+        if (out_message)
+            *out_message = "RAGConfiguration.embedding_dimension must be >= 1 when set";
+        return false;
+    }
+
     const int64_t top_k = proto.has_top_k() ? static_cast<int64_t>(proto.top_k())
                                             : static_cast<int64_t>(defaults.top_k);
     if (top_k < 1) {
@@ -425,21 +431,36 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
         session->embedding_model_id = embedding_model_id;
         session->llm_model_id = llm_model_id;
         RAGBackendConfig backend_config = build_backend_config(proto);
-        // When the caller does not pin embedding_dimension, derive it from the
-        // loaded embedding model rather than falling back to the struct default
-        // (384). This lets a non-384-dim encoder (e.g. a 768-dim model) work
-        // without the SDK/app hardcoding the value. On failure we keep the
-        // default already present in backend_config.
-        if (!proto.has_embedding_dimension()) {
-            rac_embeddings_info_t info = {};
-            if (rac_embeddings_get_info(embed_handle, &info) == RAC_SUCCESS && info.dimension > 0) {
+        // Resolve the dimension without assuming 384. Some providers know it
+        // at create time; providers such as QHexRT only know after inference,
+        // in which case zero remains the auto sentinel and RAGBackend binds the
+        // vector store to the first actual embedding output.
+        rac_embeddings_info_t info = {};
+        const rac_result_t info_rc = rac_embeddings_get_info(embed_handle, &info);
+        if (info_rc == RAC_SUCCESS && info.dimension > 0) {
+            if (proto.has_embedding_dimension() &&
+                static_cast<size_t>(proto.embedding_dimension()) != info.dimension) {
+                const std::string message =
+                    "RAGConfiguration.embedding_dimension does not match loaded model: "
+                    "configured " +
+                    std::to_string(proto.embedding_dimension()) + ", model " +
+                    std::to_string(info.dimension);
+                if (llm_handle)
+                    rac_llm_destroy(llm_handle);
+                rac_embeddings_destroy(embed_handle);
+                publish_failure(RAC_ERROR_INVALID_ARGUMENT, "rag.sessionCreate", message.c_str());
+                return RAC_ERROR_INVALID_ARGUMENT;
+            }
+            if (!proto.has_embedding_dimension()) {
                 backend_config.embedding_dimension = info.dimension;
                 LOGI("Derived embedding_dimension=%zu from embedding model '%s'", info.dimension,
                      embedding_model_id.c_str());
-            } else {
-                LOGI("embedding_dimension not provided and not derivable; using default %zu",
-                     backend_config.embedding_dimension);
             }
+        } else if (!proto.has_embedding_dimension()) {
+            LOGI(
+                "Embedding model '%s' reports dimension at inference; deferring vector-store "
+                "initialization",
+                embedding_model_id.c_str());
         }
         session->backend = std::make_unique<RAGBackend>(backend_config, llm_handle, embed_handle,
                                                         /*owns_services=*/true);
@@ -585,7 +606,10 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     // proto-documented disabled/default sentinels instead of a raw zero-init.
     rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
     opts.max_tokens = query_proto.max_tokens() > 0 ? query_proto.max_tokens() : 512;
-    opts.temperature = query_proto.temperature() > 0.0f ? query_proto.temperature() : 0.7f;
+    // 0.0 is the documented greedy value, not an "unset" sentinel. SDK
+    // defaults materialize 0.7 explicitly, so preserve an explicit zero all
+    // the way to the provider for deterministic production RAG answers.
+    opts.temperature = query_proto.temperature();
     opts.top_p = query_proto.top_p() > 0.0f ? query_proto.top_p() : 0.9f;
     // commons-030-A: RAGQueryOptions.top_k (idl/rag.proto:55) was silently
     // dropped; thread it through. 0 = disabled (engine default).
@@ -703,6 +727,20 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
                                                : s->llm_model_id.c_str(),
                        query_proto.top_k(), retrieval_ms, s->embedding_model_id.c_str());
     rac_llm_result_free(&llm_result);
+    return rc;
+#endif
+}
+
+rac_result_t rac_rag_cancel_proto(rac_handle_t session) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)session;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    auto* s = as_session(session);
+    if (!s || !s->backend)
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    const rac_result_t rc = s->backend->cancel_query();
+    LOGI("rag.cancel session=%p rc=%d", session, static_cast<int>(rc));
     return rc;
 #endif
 }

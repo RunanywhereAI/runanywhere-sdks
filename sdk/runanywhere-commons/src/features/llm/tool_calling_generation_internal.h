@@ -25,6 +25,9 @@ struct GenerationState {
     float temperature = 0.0f;
     float top_p = 0.0f;
     std::string system_prompt;
+    // Optional per-step stop marker. The synchronous generate call only
+    // borrows this string, so it is safe to expose through rac_llm_options_t.
+    std::string stop_sequence;
     bool disable_thinking = false;
     bool thinking_tags_resolved = false;
     std::string thinking_open_tag;
@@ -202,11 +205,18 @@ inline bool run_generate_once(GenerationState& generation,
     if (generation.max_tokens > 0) {
         options.max_tokens = generation.max_tokens;
     }
-    if (generation.temperature > 0.0f) {
-        options.temperature = generation.temperature;
-    }
+    // 0.0 is an explicit greedy setting, not an "unset" sentinel. The old
+    // >0 guard silently retained RAC_LLM_OPTIONS_DEFAULT.temperature (0.8),
+    // making a caller-requested deterministic tool decision stochastic.
+    options.temperature = generation.temperature;
     if (generation.top_p > 0.0f) {
         options.top_p = generation.top_p;
+    }
+    const char* stop_sequences[2] = {nullptr, nullptr};
+    if (!generation.stop_sequence.empty()) {
+        stop_sequences[0] = generation.stop_sequence.c_str();
+        options.stop_sequences = stop_sequences;
+        options.num_stop_sequences = 1;
     }
     options.streaming_enabled = RAC_FALSE;
     options.system_prompt =

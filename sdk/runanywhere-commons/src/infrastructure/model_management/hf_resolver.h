@@ -69,27 +69,6 @@ bool is_hf_ref(const std::string& ref);
 bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext);
 
 /**
- * True when @p ref is a logical HNPU-style repo/manifest ref that needs the
- * current device arch inserted before folder-bundle resolution. Already
- * arch-pinned refs (`.../v81/...`), concrete /resolve/ URLs, and normal
- * explicit file refs return false.
- */
-bool is_logical_arch_folder_ref(const std::string& ref, const char* manifest_leaf_ext);
-
-/**
- * Rewrite a logical per-device folder-bundle ref into an arch-pinned folder ref.
- * Used by QHexRT/HNPU registration before folder resolution:
- *
- *   hf.co/org/repo                  + v81 -> hf.co/org/repo/v81
- *   hf.co/org/repo/model.json       + v81 -> hf.co/org/repo/v81/model.json
- *   hf.co/org/repo?manifest=m.json  + v81 -> hf.co/org/repo/v81/m.json
- *
- * Already arch-pinned refs (`.../v81/...`) and non-HF refs return false.
- */
-bool make_arch_folder_ref(const std::string& ref, const std::string& arch,
-                          const char* manifest_leaf_ext, std::string* out_ref);
-
-/**
  * Normalize an explicit-file HF ref (org/repo/path/file or an hf-hosted
  * /resolve/ URL) to a direct https download URL. Returns "" when @p ref is a
  * repo-level reference that needs full resolution instead.

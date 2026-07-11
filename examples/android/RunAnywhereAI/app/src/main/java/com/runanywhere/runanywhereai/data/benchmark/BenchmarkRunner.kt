@@ -2,7 +2,6 @@ package com.runanywhere.runanywhereai.data.benchmark
 
 import ai.runanywhere.proto.v1.AudioFormat
 import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.LLMStreamFinalResult
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelListRequest
 import ai.runanywhere.proto.v1.ModelUnloadRequest
@@ -11,10 +10,13 @@ import ai.runanywhere.proto.v1.VLMImageFormat
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Build
+import com.runanywhere.runanywhereai.ui.screens.models.LlmModelChangeInterlock
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
-import com.runanywhere.sdk.public.extensions.generateStream
+import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.processImage
@@ -63,15 +65,19 @@ class BenchmarkRunner(private val context: Context) {
                 }
             }
         }
+        check(work.isNotEmpty()) {
+            "No downloaded models match the selected benchmark categories. Download a model first."
+        }
         work.forEachIndexed { index, w ->
             onProgress(BenchmarkProgress(index + 1, work.size, w.category, w.scenario, w.model.name))
             val outcome = runCatching {
-                when (w.category) {
+                val metrics = when (w.category) {
                     BenchmarkCategory.LLM -> llmRun(w.model, w.maxTokens)
                     BenchmarkCategory.STT -> sttRun(w.model, w.scenario)
                     BenchmarkCategory.TTS -> ttsRun(w.model, w.scenario)
                     BenchmarkCategory.VLM -> vlmRun(w.model)
                 }
+                metrics.requireSuccessfulOutput(w.category)
             }
             onResult(
                 outcome.fold(
@@ -104,46 +110,41 @@ class BenchmarkRunner(private val context: Context) {
         val loadMs = load(model, ModelCategory.MODEL_CATEGORY_LANGUAGE)
         try {
             val warmupMs = measureMs {
-                withTimeoutOrNull(WARMUP_TIMEOUT) {
-                    RunAnywhere.generateStream("Hello", RALLMGenerationOptions(max_tokens = 5, temperature = 0f))
-                        .collect { }
+                val warmup = withTimeoutOrNull(WARMUP_TIMEOUT) {
+                    withContext(Dispatchers.Default) {
+                        RunAnywhere.generate(
+                            "Hello",
+                            RALLMGenerationOptions(max_tokens = 5, temperature = 0f),
+                        )
+                    }
+                } ?: throw IllegalStateException("LLM benchmark warmup timed out")
+                check(warmup.error_message.isNullOrBlank()) {
+                    warmup.error_message ?: "LLM benchmark warmup failed"
+                }
+                check(warmup.tokens_generated > 0) {
+                    "LLM benchmark warmup produced zero output tokens"
                 }
             }
-            var tokens = 0
-            var firstTokenNs: Long? = null
-            var final: LLMStreamFinalResult? = null
             val start = System.nanoTime()
-            withTimeoutOrNull(BENCH_TIMEOUT) {
-                RunAnywhere.generateStream(
-                    LLM_PROMPT,
-                    RALLMGenerationOptions(max_tokens = maxTokens, temperature = 0f, system_prompt = LLM_SYSTEM_PROMPT),
-                ).collect { event ->
-                    if (event.is_final) {
-                        final = event.result
-                        return@collect
-                    }
-                    if (event.token.isNotEmpty()) {
-                        if (firstTokenNs == null) firstTokenNs = System.nanoTime()
-                        tokens++
-                    }
+            val measured = withTimeoutOrNull(BENCH_TIMEOUT) {
+                withContext(Dispatchers.Default) {
+                    RunAnywhere.generate(
+                        LLM_PROMPT,
+                        RALLMGenerationOptions(
+                            max_tokens = maxTokens,
+                            temperature = 0f,
+                            system_prompt = LLM_SYSTEM_PROMPT,
+                        ),
+                    )
                 }
-            }
+            } ?: throw IllegalStateException("LLM benchmark timed out")
             val e2eMs = (System.nanoTime() - start) / 1_000_000.0
-            val r = final
-            val outTokens = r?.completion_tokens?.takeIf { it > 0 } ?: tokens
             val memAfter = SyntheticInput.availableMemoryBytes(context)
-            return BenchmarkMetrics(
+            return llmBenchmarkMetrics(
+                result = measured,
                 loadTimeMs = loadMs,
                 warmupTimeMs = warmupMs,
-                endToEndLatencyMs = r?.total_time_ms?.toDouble()?.takeIf { it > 0 } ?: e2eMs,
-                tokensPerSecond = r?.tokens_per_second?.toDouble()?.takeIf { it > 0 }
-                    ?: (outTokens * 1000.0 / e2eMs).takeIf { e2eMs > 0 && outTokens > 0 },
-                ttftMs = r?.time_to_first_token_ms?.toDouble()?.takeIf { it > 0 }
-                    ?: firstTokenNs?.let { (it - start) / 1_000_000.0 },
-                inputTokens = r?.prompt_tokens,
-                outputTokens = outTokens,
-                promptEvalMs = r?.prompt_eval_time_ms?.toDouble()?.takeIf { it > 0 },
-                decodeMs = r?.decode_time_ms?.toDouble()?.takeIf { it > 0 },
+                measuredEndToEndMs = e2eMs,
                 memoryDeltaBytes = memBefore - memAfter,
             )
         } finally {
@@ -255,9 +256,13 @@ class BenchmarkRunner(private val context: Context) {
     }
 
     private suspend fun load(model: RAModelInfo, category: ModelCategory): Double {
+        if (category == ModelCategory.MODEL_CATEGORY_LANGUAGE) {
+            LlmModelChangeInterlock.awaitReadyForModelChange()
+        }
         val start = System.nanoTime()
         val res = RunAnywhere.loadModel(RAModelLoadRequest(model_id = model.id, category = category))
         if (!res.success) throw IllegalStateException(res.error_message.ifBlank { "Model load failed" })
+        RuntimeModelSelection.queryCurrent(selectionContext(category), listOf(model))
         return (System.nanoTime() - start) / 1_000_000.0
     }
 
@@ -265,9 +270,23 @@ class BenchmarkRunner(private val context: Context) {
     // is still released when the benchmark job is cancelled mid-scenario.
     private suspend fun unload(category: ModelCategory, settleMs: Long = 0L) {
         withContext(NonCancellable) {
+            if (category == ModelCategory.MODEL_CATEGORY_LANGUAGE) {
+                LlmModelChangeInterlock.awaitReadyForModelChange()
+            }
             RunAnywhere.unloadModel(ModelUnloadRequest(category = category))
+            RuntimeModelSelection.queryCurrent(selectionContext(category))
             if (settleMs > 0) delay(settleMs)
         }
+    }
+
+    private fun selectionContext(category: ModelCategory): ModelSelectionContext = when (category) {
+        ModelCategory.MODEL_CATEGORY_LANGUAGE -> ModelSelectionContext.LLM
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> ModelSelectionContext.STT
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> ModelSelectionContext.TTS
+        ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        ModelCategory.MODEL_CATEGORY_VISION,
+        -> ModelSelectionContext.VLM
+        else -> error("Unsupported benchmark lifecycle category: $category")
     }
 
     private suspend fun modelsFor(category: BenchmarkCategory): List<RAModelInfo> {

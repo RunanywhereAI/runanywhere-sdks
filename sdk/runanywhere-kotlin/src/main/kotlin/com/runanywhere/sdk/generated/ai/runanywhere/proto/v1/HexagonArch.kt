@@ -26,10 +26,10 @@ import kotlin.Suppress
  * Native device probes (chip detection, neural engine queries, GPU
  * discovery, memory/cores) remain platform-adapter owned. C++ caches and
  * serves the normalized HardwareProfile/AcceleratorInfo messages.
- * Pre-flight Qualcomm Hexagon NPU probe. Mirrors the C ABI struct
- * rac_npu_info_t (rac/infrastructure/device/rac_npu_capability.h); served
- * over the proto-buffer ABI by rac_npu_probe_proto(). Enum values equal the
- * Hexagon HTP version number to stay in lock-step with rac_hexagon_arch_t.
+ * Pre-flight Qualcomm Hexagon NPU probe. Mirrors QHexRT's engine-owned C ABI
+ * (`rac/qhexrt/rac_qhexrt.h`) and is serialized by
+ * rac_qhexrt_probe_proto(). Enum values equal the Hexagon HTP version number
+ * to stay in lock-step with rac_qhexrt_hexagon_arch_t.
  */
 public enum class HexagonArch(
   override val `value`: Int,

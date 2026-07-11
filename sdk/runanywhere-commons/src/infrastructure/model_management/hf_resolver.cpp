@@ -61,38 +61,6 @@ bool has_extension(const std::string& path, const char* ext) {
     return lowercase_copy(path).ends_with(lowercase_copy(ext));
 }
 
-bool is_arch_segment(const std::string& segment) {
-    if (segment.size() < 2 || segment[0] != 'v') {
-        return false;
-    }
-    return std::ranges::all_of(segment.begin() + 1, segment.end(),
-                               [](unsigned char c) { return std::isdigit(c) != 0; });
-}
-
-bool path_starts_with_arch(const std::string& path) {
-    const size_t slash = path.find('/');
-    const std::string first = slash == std::string::npos ? path : path.substr(0, slash);
-    return is_arch_segment(first);
-}
-
-std::string query_value(const std::string& query, const std::string& key) {
-    size_t start = 0;
-    while (start <= query.size()) {
-        const size_t end = query.find('&', start);
-        const std::string part =
-            query.substr(start, end == std::string::npos ? std::string::npos : end - start);
-        const size_t eq = part.find('=');
-        if (eq != std::string::npos && part.substr(0, eq) == key) {
-            return part.substr(eq + 1);
-        }
-        if (end == std::string::npos) {
-            break;
-        }
-        start = end + 1;
-    }
-    return {};
-}
-
 // Strip a recognized HF prefix; returns "" when none matches.
 std::string strip_prefix(const std::string& ref) {
     for (const char* prefix : kRefPrefixes) {
@@ -273,85 +241,6 @@ bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext) {
         return true;
     }
     return has_extension(leaf, manifest_leaf_ext);
-}
-
-namespace {
-
-bool logical_arch_folder_parts(const std::string& ref, const char* manifest_leaf_ext,
-                               ParsedRef* parsed_out, std::string* manifest_out) {
-    std::string rest = strip_prefix(ref);
-    if (rest.empty() || rest.find("/resolve/") != std::string::npos ||
-        rest.find("/blob/") != std::string::npos) {
-        return false;
-    }
-
-    std::string query;
-    const size_t query_pos = rest.find('?');
-    if (query_pos != std::string::npos) {
-        query = rest.substr(query_pos + 1);
-        rest = rest.substr(0, query_pos);
-    }
-
-    ParsedRef parsed;
-    if (!parse_ref("hf.co/" + rest, &parsed)) {
-        return false;
-    }
-
-    std::string manifest = query_value(query, "manifest");
-    if (!parsed.file_path.empty()) {
-        const std::string path = trim_trailing_slashes(parsed.file_path);
-        if (path.empty() || path_starts_with_arch(path)) {
-            return false;
-        }
-        if (path.find('/') != std::string::npos || !has_extension(path, manifest_leaf_ext)) {
-            return false;
-        }
-        if (!manifest.empty() && manifest != path) {
-            return false;
-        } else if (manifest.empty()) {
-            manifest = path;
-        }
-    }
-
-    if (!manifest.empty()) {
-        manifest = trim_trailing_slashes(manifest);
-        if (manifest.find('/') != std::string::npos || !has_extension(manifest, manifest_leaf_ext)) {
-            return false;
-        }
-    }
-
-    if (parsed_out != nullptr) {
-        *parsed_out = parsed;
-    }
-    if (manifest_out != nullptr) {
-        *manifest_out = manifest;
-    }
-    return true;
-}
-
-}  // namespace
-
-bool is_logical_arch_folder_ref(const std::string& ref, const char* manifest_leaf_ext) {
-    return logical_arch_folder_parts(ref, manifest_leaf_ext, nullptr, nullptr);
-}
-
-bool make_arch_folder_ref(const std::string& ref, const std::string& arch,
-                          const char* manifest_leaf_ext, std::string* out_ref) {
-    if (out_ref == nullptr || arch.empty() || arch == "unknown" || !is_arch_segment(arch)) {
-        return false;
-    }
-
-    ParsedRef parsed;
-    std::string manifest;
-    if (!logical_arch_folder_parts(ref, manifest_leaf_ext, &parsed, &manifest)) {
-        return false;
-    }
-
-    *out_ref = "https://huggingface.co/" + parsed.org + "/" + parsed.repo + "/" + arch;
-    if (!manifest.empty()) {
-        *out_ref += "/" + manifest;
-    }
-    return true;
 }
 
 std::string normalize_explicit_file_ref(const std::string& ref) {
@@ -554,6 +443,32 @@ bool is_repo_housekeeping(const std::string& path) {
     return false;
 }
 
+bool is_downloadable_executable_code(const std::string& path) {
+    const std::string name = lowercase_copy(basename_of(path));
+    for (const char* extension : {
+             ".so",
+             ".dex",
+             ".jar",
+             ".apk",
+             ".aab",
+             ".class",
+             ".wasm",
+             ".dylib",
+             ".dll",
+             ".exe",
+             ".elf",
+             ".o",
+             ".a",
+         }) {
+        if (name.ends_with(extension)) {
+            return true;
+        }
+    }
+    // Reject versioned ELF shared objects such as libexample.so.1 as well.
+    const size_t so = name.rfind(".so.");
+    return so != std::string::npos && so + 4 < name.size();
+}
+
 }  // namespace
 
 rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
@@ -605,6 +520,10 @@ rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
             continue;
         }
         file.path = full_path.substr(prefix.size());
+        if (is_downloadable_executable_code(file.path)) {
+            *error = "refusing Hugging Face bundle containing executable code: " + file.path;
+            return RAC_ERROR_VALIDATION_FAILED;
+        }
         file.basename_lower = lowercase_copy(basename_of(file.path));
         bundle.push_back(std::move(file));
     }
@@ -613,8 +532,8 @@ rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
         return RAC_ERROR_NOT_FOUND;
     }
     std::ranges::sort(bundle, {}, &TreeFile::path);
-    const bool bundle_has_top_level_config =
-        std::ranges::any_of(bundle, [](const TreeFile& file) { return file.path == "config.json"; });
+    const bool bundle_has_top_level_config = std::ranges::any_of(
+        bundle, [](const TreeFile& file) { return file.path == "config.json"; });
 
     // Pick the primary: the manifest named by the ref, else the
     // alphabetically-first file the framework's bundle policy recognizes as a

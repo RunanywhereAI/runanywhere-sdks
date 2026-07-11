@@ -311,6 +311,7 @@ object OkHttpHttpTransport {
      *                    (matches the shape of `rac_http_header_kv_t[]`).
      * @param bodyBytes   Request body bytes, or null for GET/HEAD.
      * @param timeoutMs   Call timeout in ms (0 = use the shared client defaults).
+     * @param followRedirects Whether OkHttp may follow HTTP/HTTPS redirects.
      * @return [HttpResponse]. On transport failure `statusCode == 0` and
      *         [HttpResponse.errorMessage] is non-null.
      */
@@ -321,10 +322,11 @@ object OkHttpHttpTransport {
         headersFlat: Array<String>,
         bodyBytes: ByteArray?,
         timeoutMs: Long,
+        followRedirects: Boolean = true,
     ): HttpResponse {
         return try {
             val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte = 0L)
-            val clientForCall = resolveClient(timeoutMs)
+            val clientForCall = resolveClient(timeoutMs, followRedirects)
 
             clientForCall.newCall(request).execute().use { resp ->
                 val headerPairs = flattenHeaders(resp.headers)
@@ -369,6 +371,7 @@ object OkHttpHttpTransport {
         timeoutMs: Long,
         nativeCallback: Long,
         nativeUserData: Long,
+        followRedirects: Boolean = true,
     ): StreamResponse {
         return streamInternal(
             method = method,
@@ -379,6 +382,7 @@ object OkHttpHttpTransport {
             nativeCallback = nativeCallback,
             nativeUserData = nativeUserData,
             resumeFromByte = 0L,
+            followRedirects = followRedirects,
         )
     }
 
@@ -405,6 +409,7 @@ object OkHttpHttpTransport {
         resumeFromByte: Long,
         nativeCallback: Long,
         nativeUserData: Long,
+        followRedirects: Boolean = true,
     ): StreamResponse {
         return streamInternal(
             method = method,
@@ -415,6 +420,7 @@ object OkHttpHttpTransport {
             nativeCallback = nativeCallback,
             nativeUserData = nativeUserData,
             resumeFromByte = resumeFromByte,
+            followRedirects = followRedirects,
         )
     }
 
@@ -446,6 +452,7 @@ object OkHttpHttpTransport {
         nativeCallback: Long,
         nativeUserData: Long,
         resumeFromByte: Long,
+        followRedirects: Boolean,
     ): StreamResponse {
         val streamId = streamIdCounter.incrementAndGet()
         // Pre-register the slot BEFORE building the Call so a cancelAllStreams()
@@ -461,7 +468,7 @@ object OkHttpHttpTransport {
             // 24-hour read timeout (multi-GB GGUFs over slow links can take
             // hours); the buffered client's 60s read / 600s call timeouts
             // would abort them mid-transfer.
-            val clientForCall = resolveStreamingClient(timeoutMs)
+            val clientForCall = resolveStreamingClient(timeoutMs, followRedirects)
 
             val call = clientForCall.newCall(request)
             // Publish the Call into the slot. If cancelAllStreams() landed
@@ -633,16 +640,15 @@ object OkHttpHttpTransport {
         return builder.build()
     }
 
-    private fun resolveClient(timeoutMs: Long): OkHttpClient {
+    private fun resolveClient(timeoutMs: Long, followRedirects: Boolean): OkHttpClient {
         val base = clientRef.get() ?: defaultClient
-        return if (timeoutMs > 0) {
-            base
-                .newBuilder()
-                .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
-                .build()
-        } else {
-            base
-        }
+        return base.newBuilder()
+            .followRedirects(followRedirects)
+            .followSslRedirects(followRedirects)
+            .apply {
+                if (timeoutMs > 0) callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+            }
+            .build()
     }
 
     /**
@@ -651,16 +657,15 @@ object OkHttpHttpTransport {
      * on as a `callTimeout` — that matches the request_send semantics and
      * still lets the read timeout cap individual stalled reads at 24h.
      */
-    private fun resolveStreamingClient(timeoutMs: Long): OkHttpClient {
+    private fun resolveStreamingClient(timeoutMs: Long, followRedirects: Boolean): OkHttpClient {
         val base = streamingClient
-        return if (timeoutMs > 0) {
-            base
-                .newBuilder()
-                .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
-                .build()
-        } else {
-            base
-        }
+        return base.newBuilder()
+            .followRedirects(followRedirects)
+            .followSslRedirects(followRedirects)
+            .apply {
+                if (timeoutMs > 0) callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+            }
+            .build()
     }
 
     private fun flattenHeaders(headers: Headers): Array<String> {

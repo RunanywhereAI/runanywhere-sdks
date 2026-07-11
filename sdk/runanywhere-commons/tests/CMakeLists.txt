@@ -244,6 +244,20 @@ rac_link_archive_deps(test_llm_thinking)
 target_compile_features(test_llm_thinking PRIVATE cxx_std_17)
 add_test(NAME llm_thinking_tests COMMAND test_llm_thinking)
 
+# --- Voice-agent response policy tests ----------------------
+# Host-only coverage for the deterministic no-thinking generation policy,
+# reasoning removal, speakable-text sanitization, and the blank-answer gate
+# that prevents an invalid TTS invocation.
+add_executable(test_voice_agent_response_policy test_voice_agent_response_policy.cpp)
+target_include_directories(test_voice_agent_response_policy PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_voice_agent_response_policy PRIVATE rac_commons)
+rac_link_archive_deps(test_voice_agent_response_policy)
+target_compile_features(test_voice_agent_response_policy PRIVATE cxx_std_17)
+add_test(NAME voice_agent_response_policy_tests COMMAND test_voice_agent_response_policy)
+
 # --- Rac_tool_call_* C ABI test ----------------------
 # Behavioral tests for the single-source-of-truth tool-calling API shared by
 # Swift, Kotlin, Flutter, Web, and React Native SDKs. Covers parse (default +

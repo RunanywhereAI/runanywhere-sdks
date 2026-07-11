@@ -324,11 +324,19 @@ void session_close(Session* s) {
     if (s == nullptr) {
         return;
     }
-    if (s->sess != nullptr) {
-        qhx_session_free(s->sess);
-    }
-    if (s->model != nullptr) {
-        qhx_model_free(s->model);
+    {
+        // Wait for an in-flight generate/reset/copy operation before releasing
+        // session-owned buffers. Lifecycle ownership prevents new operations
+        // once destroy begins; this mutex closes the remaining execution race.
+        std::lock_guard<std::mutex> operation_lock(s->operation_mutex);
+        if (s->sess != nullptr) {
+            qhx_session_free(s->sess);
+            s->sess = nullptr;
+        }
+        if (s->model != nullptr) {
+            qhx_model_free(s->model);
+            s->model = nullptr;
+        }
     }
     delete s;
     runtime_release();

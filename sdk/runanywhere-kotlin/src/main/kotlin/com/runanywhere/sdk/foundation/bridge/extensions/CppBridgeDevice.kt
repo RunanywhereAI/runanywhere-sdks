@@ -161,7 +161,7 @@ object CppBridgeDevice {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Device manager callbacks registered. Device ID: ${deviceId ?: "unknown"}",
+                    "Device manager callbacks registered",
                 )
             } else {
                 CppBridgePlatformAdapter.logCallback(
@@ -457,7 +457,7 @@ object CppBridgeDevice {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.WARN,
             TAG,
-            "racDeviceGetOrCreatePersistentId failed; using transient UUID: $fallback",
+            "racDeviceGetOrCreatePersistentId failed; using a transient in-memory identifier",
         )
     }
 

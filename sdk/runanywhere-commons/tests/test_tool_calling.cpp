@@ -218,6 +218,46 @@ int test_build_followup_prompt_keep_tools() {
 }
 
 // ---------------------------------------------------------------------------
+// 6c. search_web follow-up stays current, grounded, compact, and attributed
+// ---------------------------------------------------------------------------
+int test_build_search_web_followup_prompt() {
+    const char* evidence = R"({
+      "query":"current Google Play target API requirement",
+      "source_url":"https://developer.android.com/google/play/requirements/target-sdk",
+      "summary":"From August 31, 2024, existing mobile apps need API 34 for availability.",
+      "heading":"Target API level requirements",
+      "related_results":[
+        {"title":"2025 mobile requirement","text":"From August 31, 2025, new mobile apps and updates must target API 35.","url":"https://developer.android.com/google/play/requirements/target-sdk#mobile-2025"},
+        {"title":"2026 announced requirement","text":"From August 31, 2026, new mobile apps and updates must target API 36.","url":"https://developer.android.com/google/play/requirements/target-sdk#mobile-2026"},
+        {"title":"discarded noisy result","text":"This third related result must not crowd the small-model context.","url":"https://example.com/discard-me"}
+      ]
+    })";
+
+    char* prompt = nullptr;
+    const rac_result_t rc = rac_tool_call_build_followup_prompt(
+        "Find the current Google Play target API requirement for a new mobile app and include a "
+        "source URL.",
+        /*tools_prompt=*/nullptr, "search_web", evidence,
+        /*keep_tools_available=*/RAC_FALSE, &prompt);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_TRUE(prompt != nullptr);
+    ASSERT_SUBSTR(prompt, "Current UTC date:");
+    ASSERT_SUBSTR(prompt, "policy effective on the current date");
+    ASSERT_SUBSTR(prompt, "past transitions, future announcements");
+    ASSERT_SUBSTR(prompt, "not from model memory");
+    ASSERT_SUBSTR(prompt, "`Source: <URL>` using source_url verbatim");
+    ASSERT_SUBSTR(prompt, "API 34");
+    ASSERT_SUBSTR(prompt, "API 35");
+    ASSERT_SUBSTR(prompt, "API 36");
+    ASSERT_SUBSTR(prompt,
+                  "https://developer.android.com/google/play/requirements/target-sdk");
+    ASSERT_TRUE(std::strstr(prompt, "discarded noisy result") == nullptr);
+    ASSERT_TRUE(std::strlen(prompt) < 2600);
+    rac_free(prompt);
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
 // 7. normalize_json: unquoted keys become quoted
 // ---------------------------------------------------------------------------
 int test_normalize_json_unquoted_keys() {
@@ -548,6 +588,8 @@ int main(int argc, char** argv) {
         {.name = "build_initial_prompt_e2e", .fn = test_build_initial_prompt_end_to_end},
         {.name = "build_followup_prompt_no_tools", .fn = test_build_followup_prompt_no_tools},
         {.name = "build_followup_prompt_keep_tools", .fn = test_build_followup_prompt_keep_tools},
+        {.name = "build_search_web_followup_prompt",
+         .fn = test_build_search_web_followup_prompt},
         {.name = "normalize_json_unquoted_keys", .fn = test_normalize_json_unquoted_keys},
         {.name = "free_functions_idempotent", .fn = test_free_functions_idempotent},
         {.name = "format_name_round_trip", .fn = test_format_name_round_trip},

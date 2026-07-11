@@ -68,91 +68,25 @@ const char* kTree = R"JSON([
 void test_is_folder_ref(std::vector<TestResult>& results) {
     results.push_back(expect("folder ref: subdir without extension",
                              hf::is_folder_ref("hf.co/org/repo/v81", nullptr)));
-    results.push_back(expect("folder ref: trailing slash",
-                             hf::is_folder_ref("hf.co/org/repo/v81/", nullptr)));
+    results.push_back(
+        expect("folder ref: trailing slash", hf::is_folder_ref("hf.co/org/repo/v81/", nullptr)));
     results.push_back(expect("folder ref: manifest leaf only with policy extension",
                              !hf::is_folder_ref("hf.co/org/repo/v79/m.json", nullptr) &&
                                  hf::is_folder_ref("hf.co/org/repo/v79/m.json", ".json")));
-    results.push_back(expect("not folder ref: repo-level ref",
-                             !hf::is_folder_ref("hf.co/org/repo", ".json")));
+    results.push_back(
+        expect("not folder ref: repo-level ref", !hf::is_folder_ref("hf.co/org/repo", ".json")));
     results.push_back(expect("not folder ref: explicit file with extension",
                              !hf::is_folder_ref("hf.co/org/repo/path/file.gguf", nullptr)));
-    results.push_back(expect(
-        "not folder ref: /resolve/ URL",
-        !hf::is_folder_ref("https://huggingface.co/org/repo/resolve/main/v81", ".json")));
-}
-
-void test_arch_folder_ref(std::vector<TestResult>& results) {
-    std::string out;
-    results.push_back(expect("logical arch ref: parent repo",
-                             hf::is_logical_arch_folder_ref("hf.co/org/repo", ".json")));
-    results.push_back(expect("logical arch ref: root manifest",
-                             hf::is_logical_arch_folder_ref("hf.co/org/repo/lfm.json", ".json")));
-    results.push_back(expect("logical arch ref: query manifest",
-                             hf::is_logical_arch_folder_ref("hf.co/org/repo?manifest=vlm.json",
-                                                            ".json")));
-    results.push_back(expect(
-        "logical arch ref: arch-pinned ref stays normal folder",
-        !hf::is_logical_arch_folder_ref("hf.co/org/repo/v81/lfm.json", ".json")));
-    results.push_back(expect(
-        "logical arch ref: resolve URL stays explicit file",
-        !hf::is_logical_arch_folder_ref(
-            "https://huggingface.co/org/repo/resolve/main/v81/lfm.json", ".json")));
-    results.push_back(expect(
-        "logical arch ref: conflicting manifest names rejected",
-        !hf::is_logical_arch_folder_ref("hf.co/org/repo/foo.json?manifest=bar.json",
-                                        ".json")));
-    results.push_back(expect(
-        "arch ref: parent repo",
-        hf::make_arch_folder_ref("hf.co/org/repo", "v81", ".json", &out) &&
-            out == "https://huggingface.co/org/repo/v81",
-        out));
-    results.push_back(expect(
-        "arch ref: root manifest leaf",
-        hf::make_arch_folder_ref("https://huggingface.co/org/repo/lfm.json", "v81", ".json",
-                                 &out) &&
-            out == "https://huggingface.co/org/repo/v81/lfm.json",
-        out));
-    results.push_back(expect(
-        "arch ref: query manifest",
-        hf::make_arch_folder_ref("hf.co/org/repo?manifest=vlm.json", "v79", ".json", &out) &&
-            out == "https://huggingface.co/org/repo/v79/vlm.json",
-        out));
-    results.push_back(expect("arch ref: parent repo without manifest extension",
-                             hf::make_arch_folder_ref("hf.co/org/repo", "v81", nullptr, &out) &&
-                                 out == "https://huggingface.co/org/repo/v81",
-                             out));
-    results.push_back(expect(
-        "arch ref: manifest leaf requires extension policy",
-        !hf::make_arch_folder_ref("hf.co/org/repo/lfm.json", "v81", nullptr, &out)));
-    results.push_back(expect(
-        "arch ref: nested manifest path rejected",
-        !hf::make_arch_folder_ref("hf.co/org/repo/manifests/lfm.json", "v81", ".json", &out)));
-    results.push_back(expect(
-        "arch ref: nested query manifest rejected",
-        !hf::make_arch_folder_ref("hf.co/org/repo?manifest=manifests/lfm.json", "v81",
-                                  ".json", &out)));
-    results.push_back(expect(
-        "arch ref: old explicit arch stays untouched",
-        !hf::make_arch_folder_ref("hf.co/org/repo/v81/lfm.json", "v79", ".json", &out)));
-    results.push_back(expect(
-        "arch ref: resolve URL untouched",
-        !hf::make_arch_folder_ref("https://huggingface.co/org/repo/resolve/main/v81/lfm.json",
-                                  "v79", ".json", &out)));
-    results.push_back(expect(
-        "arch ref: conflicting manifest names rejected",
-        !hf::make_arch_folder_ref("hf.co/org/repo/foo.json?manifest=bar.json", "v81",
-                                  ".json", &out)));
-    results.push_back(expect(
-        "arch ref: unknown arch rejected",
-        !hf::make_arch_folder_ref("hf.co/org/repo/lfm.json", "unknown", ".json", &out)));
+    results.push_back(
+        expect("not folder ref: /resolve/ URL",
+               !hf::is_folder_ref("https://huggingface.co/org/repo/resolve/main/v81", ".json")));
 }
 
 void test_subdir_resolution(std::vector<TestResult>& results) {
     hf::ResolvedModel resolved;
     std::string error;
-    const rac_result_t rc = hf::resolve_folder_from_tree_json(
-        kTree, "org", "repo", "v79", "", test_is_manifest, &resolved, &error);
+    const rac_result_t rc = hf::resolve_folder_from_tree_json(kTree, "org", "repo", "v79", "",
+                                                              test_is_manifest, &resolved, &error);
     results.push_back(expect("v79 resolves", rc == RAC_SUCCESS, error));
     if (rc != RAC_SUCCESS) {
         return;
@@ -161,9 +95,9 @@ void test_subdir_resolution(std::vector<TestResult>& results) {
     // host_weights/w1.bin + root config.json; notes.md excluded.
     results.push_back(expect("v79 file count", resolved.files.size() == 5,
                              "got " + std::to_string(resolved.files.size())));
-    results.push_back(expect("v79 primary is the manifest, ordered first",
-                             !resolved.files.empty() &&
-                                 resolved.files[0].filename == "whisper-small.json"));
+    results.push_back(
+        expect("v79 primary is the manifest, ordered first",
+               !resolved.files.empty() && resolved.files[0].filename == "whisper-small.json"));
     bool nested_ok = false;
     bool config_last = !resolved.files.empty() && resolved.files.back().filename == "config.json";
     bool md_excluded = true;
@@ -178,9 +112,9 @@ void test_subdir_resolution(std::vector<TestResult>& results) {
     results.push_back(expect("v79 nested path kept relative + full URL", nested_ok));
     results.push_back(expect("v79 root config.json appended last", config_last));
     results.push_back(expect("v79 markdown excluded", md_excluded));
-    results.push_back(
-        expect("v79 sizes summed", resolved.total_size_bytes == 1000 + 2000 + 3000 + 400 + 42,
-               "got " + std::to_string(resolved.total_size_bytes)));
+    results.push_back(expect("v79 sizes summed",
+                             resolved.total_size_bytes == 1000 + 2000 + 3000 + 400 + 42,
+                             "got " + std::to_string(resolved.total_size_bytes)));
     bool sha_ok = false;
     for (const hf::ResolvedFile& f : resolved.files) {
         if (f.filename == "encoder.bin") {
@@ -198,9 +132,9 @@ void test_multi_manifest(std::vector<TestResult>& results) {
     rac_result_t rc = hf::resolve_folder_from_tree_json(kTree, "org", "repo", "v81", "",
                                                         test_is_manifest, &by_default, &error);
     results.push_back(expect("v81 default manifest resolves", rc == RAC_SUCCESS, error));
-    results.push_back(expect("v81 default manifest is alphabetical first",
-                             !by_default.files.empty() &&
-                                 by_default.files[0].filename == "lfm-2048.json"));
+    results.push_back(
+        expect("v81 default manifest is alphabetical first",
+               !by_default.files.empty() && by_default.files[0].filename == "lfm-2048.json"));
 
     // Explicit manifest ref pins the primary.
     hf::ResolvedModel pinned;
@@ -253,11 +187,22 @@ void test_errors(std::vector<TestResult>& results) {
       {"type":"file","path":"v79/enc.bin","size":10},
       {"type":"file","path":"v79/tokenizer.json","size":10}
     ])JSON";
-    rc = hf::resolve_folder_from_tree_json(no_manifest, "org", "repo", "v79", "",
-                                           test_is_manifest, &resolved, &error);
+    rc = hf::resolve_folder_from_tree_json(no_manifest, "org", "repo", "v79", "", test_is_manifest,
+                                           &resolved, &error);
     results.push_back(expect("aux-only jsons: no manifest fails with hint",
                              rc == RAC_ERROR_NOT_FOUND &&
                                  error.find("name the manifest explicitly") != std::string::npos,
+                             error));
+
+    const char* executable_bundle = R"JSON([
+      {"type":"file","path":"v79/model.json","size":10},
+      {"type":"file","path":"v79/libQnnHrtOpPkg.so","size":20}
+    ])JSON";
+    rc = hf::resolve_folder_from_tree_json(executable_bundle, "org", "repo", "v79", "",
+                                           test_is_manifest, &resolved, &error);
+    results.push_back(expect("downloadable executable code is rejected",
+                             rc == RAC_ERROR_VALIDATION_FAILED &&
+                                 error.find("libQnnHrtOpPkg.so") != std::string::npos,
                              error));
 }
 
@@ -266,7 +211,6 @@ void test_errors(std::vector<TestResult>& results) {
 int main() {
     std::vector<TestResult> results;
     test_is_folder_ref(results);
-    test_arch_folder_ref(results);
     test_subdir_resolution(results);
     test_multi_manifest(results);
     test_no_policy(results);

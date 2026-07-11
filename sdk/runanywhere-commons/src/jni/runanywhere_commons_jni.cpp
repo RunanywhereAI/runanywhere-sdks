@@ -5389,6 +5389,25 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagQueryProto(JNIEnv
     return makeProtoCallResult(env, rc, &result, "racRagQueryProto");
 }
 
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagCancelProto(JNIEnv* env,
+                                                                           jclass clazz,
+                                                                           jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L)
+        return static_cast<jint>(RAC_ERROR_INVALID_HANDLE);
+    using Fn = rac_result_t (*)(rac_handle_t);
+    Fn cancelRag = optionalNativeSymbol<Fn>("rac_rag_cancel_proto");
+    if (cancelRag == nullptr) {
+        LOGe("racRagCancelProto: rac_rag_cancel_proto symbol unavailable");
+        return static_cast<jint>(RAC_ERROR_FEATURE_NOT_AVAILABLE);
+    }
+    const rac_result_t rc = cancelRag(handleFromJLong(handle));
+    LOGi("racRagCancelProto: handle=%p rc=%d", handleFromJLong(handle), static_cast<int>(rc));
+    return static_cast<jint>(rc);
+}
+
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagClearProto(JNIEnv* env, jclass clazz,
                                                                           jlong handle) {

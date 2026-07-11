@@ -149,6 +149,16 @@ echo "arch   : $ARCH   report: $OUT"
 
 if [ $BUILD -eq 1 ]; then
   echo "=== staging AARs + building app + androidTest APKs ==="
+  if [ -z "${ANDROID_HOME:-}" ]; then
+    if [ -n "${ANDROID_SDK_ROOT:-}" ]; then
+      export ANDROID_HOME="$ANDROID_SDK_ROOT"
+    elif [ -d "$HOME/Library/Android/sdk" ]; then
+      export ANDROID_HOME="$HOME/Library/Android/sdk"
+    else
+      echo "ANDROID_HOME is required for --build" >&2
+      exit 2
+    fi
+  fi
   (cd "$APP_ROOT" && bash scripts/stage-sdk-aars.sh)
   (cd "$APP_ROOT" && ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest)
   APK="$APP_ROOT/app/build/outputs/apk/debug/app-debug.apk"
@@ -243,7 +253,9 @@ def sha256(path):
 
 artifacts = []
 for relative in (
+    "app/build/outputs/apk/release/app-release.apk",
     "app/build/outputs/apk/debug/app-debug.apk",
+    "app/build/outputs/apk/androidTest/release/app-release-androidTest.apk",
     "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
     "libs/runanywhere-sdk.aar",
     "libs/runanywhere-qhexrt.aar",
@@ -258,21 +270,34 @@ for relative in (
             "sha256": sha256(path),
         })
 artifact_hashes = {item["path"]: item["sha256"] for item in artifacts}
+
+
+def matching_artifact(installed_sha, candidates):
+    if not installed_sha:
+        return None
+    return next((path for path in candidates if artifact_hashes.get(path) == installed_sha), None)
+
+
+app_artifact = matching_artifact(installed_app_sha, (
+    "app/build/outputs/apk/release/app-release.apk",
+    "app/build/outputs/apk/debug/app-debug.apk",
+))
+test_artifact = matching_artifact(installed_test_sha, (
+    "app/build/outputs/apk/androidTest/release/app-release-androidTest.apk",
+    "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
+))
 installed_packages = [
     {
         "package": app_package,
         "sha256": installed_app_sha or None,
-        "local_artifact": "app/build/outputs/apk/debug/app-debug.apk",
-        "matches_local": installed_app_sha == artifact_hashes.get("app/build/outputs/apk/debug/app-debug.apk")
-        if installed_app_sha else None,
+        "local_artifact": app_artifact,
+        "matches_local": app_artifact is not None if installed_app_sha else None,
     },
     {
         "package": test_package,
         "sha256": installed_test_sha or None,
-        "local_artifact": "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
-        "matches_local": installed_test_sha == artifact_hashes.get(
-            "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
-        ) if installed_test_sha else None,
+        "local_artifact": test_artifact,
+        "matches_local": test_artifact is not None if installed_test_sha else None,
     },
 ]
 payload = {

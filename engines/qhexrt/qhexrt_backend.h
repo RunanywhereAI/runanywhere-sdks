@@ -37,7 +37,7 @@
  * No C++ types or exceptions cross that boundary; every error is a qhx_status.
  */
 
-#include "rac/core/rac_error.h"
+#include "rac/qhexrt/rac_qhexrt.h"
 
 #ifdef __cplusplus
 extern "C" {

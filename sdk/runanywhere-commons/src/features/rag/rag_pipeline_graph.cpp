@@ -77,7 +77,8 @@ std::vector<std::string> generate_query_variants(rac_handle_t llm_handle, const 
 
     rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
     opts.temperature = 0.0f;
-    opts.max_tokens = 200;
+    opts.max_tokens = static_cast<int32_t>(std::min<size_t>(96, count * 24 + 24));
+    opts.disable_thinking = RAC_TRUE;
     opts.system_prompt = nullptr;
 
     rac_llm_result_t r = {};
@@ -144,12 +145,18 @@ std::string format_prompt(const std::string& query, const std::string& context,
 struct LLMStreamCtx {
     std::string* accumulated_answer;
     const RAGTokenSink* on_token;
+    const std::atomic<bool>* cancel_requested;
 };
 
 rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
     auto* ctx = static_cast<LLMStreamCtx*>(user_data);
     if (!token || !ctx)
         return RAC_TRUE;
+
+    if (ctx->cancel_requested &&
+        ctx->cancel_requested->load(std::memory_order_acquire)) {
+        return RAC_FALSE;
+    }
 
     const std::string s(token);
     ctx->accumulated_answer->append(s);
@@ -178,6 +185,13 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
         return RAC_ERROR_INVALID_STATE;
     }
 
+    const auto cancelled = [&inputs]() {
+        return inputs.cancel_requested &&
+               inputs.cancel_requested->load(std::memory_order_acquire);
+    };
+    if (cancelled())
+        return RAC_ERROR_CANCELLED;
+
     const std::string question = inputs.question;
     const rac_handle_t embeddings_handle = inputs.embeddings_service;
     const rac_handle_t llm_handle = inputs.llm_service;
@@ -200,6 +214,8 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
     queries.push_back(question);
     if (inputs.enable_multi_query) {
         auto variants = generate_query_variants(llm_handle, question, inputs.multi_query_count);
+        if (cancelled())
+            return RAC_ERROR_CANCELLED;
         LOGI("RAG multi-query: %zu variants", variants.size());
         for (auto& v : variants)
             queries.push_back(std::move(v));
@@ -216,8 +232,12 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
         std::vector<std::vector<std::string>> rankings;
         bool embedded_any = false;
         for (size_t qi = 0; qi < queries.size(); ++qi) {
+            if (cancelled())
+                return RAC_ERROR_CANCELLED;
             const std::string& q = queries[qi];
             const std::vector<float> emb = embed_one(embeddings_handle, q);
+            if (cancelled())
+                return RAC_ERROR_CANCELLED;
             if (emb.size() != embed_dim) {
                 // The original query MUST embed; variants may be skipped.
                 if (qi == 0) {
@@ -265,6 +285,8 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
 
         if (inputs.rerank) {
             rerank_llm_pointwise(llm_handle, question, llm_options, results);
+            if (cancelled())
+                return RAC_ERROR_CANCELLED;
         }
     } catch (const std::exception& e) {
         LOGE("RAG retrieve failed: %s", e.what());
@@ -285,7 +307,9 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
          out_result.assembled_context.size(), out_result.sources.size());
 
     if (!prompt.empty()) {
-        LLMStreamCtx ctx{&out_result.answer, &on_token};
+        if (cancelled())
+            return RAC_ERROR_CANCELLED;
+        LLMStreamCtx ctx{&out_result.answer, &on_token, inputs.cancel_requested};
         status = rac_llm_generate_stream(llm_handle, prompt.c_str(), &llm_options,
                                          llm_stream_trampoline, &ctx);
         if (status != RAC_SUCCESS) {

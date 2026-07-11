@@ -1679,7 +1679,10 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     };
 
     const std::string& audio = request.audio().audio_data();
-    rc = ref.ops->transcribe_stream(ref.impl, audio.data(), audio.size(), &options, bridge, &ctx);
+    // Route through the service dispatch boundary so this stream is serialized
+    // with Talk-mode and batch STT use of the same process-wide engine.
+    rac_stt_service_t service{ref.ops, ref.impl, ref.model_id};
+    rc = rac_stt_transcribe_stream(&service, audio.data(), audio.size(), &options, bridge, &ctx);
     if (rc != RAC_SUCCESS) {
         runanywhere::v1::STTStreamEvent error_event;
         error_event.set_seq(ctx.next_seq++);

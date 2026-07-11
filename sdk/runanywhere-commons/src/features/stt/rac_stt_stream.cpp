@@ -28,6 +28,8 @@
 #include "rac/features/stt/rac_stt_stream.h"
 
 #include <atomic>
+#include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -79,6 +81,15 @@ struct StreamSession {
     // transcribe_stream path.
     rac_handle_t backend_stream_handle = nullptr;
     bool backend_stream_unsupported = false;
+    // Fallback endpointing for engines (QHexRT/Whisper) that expose only
+    // one-shot transcription. Feeding each 100 ms mic chunk as a fresh
+    // inference produces empty text and an unbounded queue; keep a bounded
+    // utterance here and invoke the backend only at an endpoint/final flush.
+    std::vector<uint8_t> fallback_frame_accum;
+    std::vector<uint8_t> fallback_utterance;
+    bool fallback_in_speech = false;
+    int fallback_speech_ms = 0;
+    int fallback_silence_ms = 0;
     // Session aggregates for the ONE telemetry summary emitted at stop —
     // per-chunk events are PUBLIC-only so a live session does not produce a
     // telemetry row (and an HTTP flush) per chunk.
@@ -103,6 +114,113 @@ g_slots() {
 std::unordered_map<uint64_t, StreamSession>& g_sessions() {
     static std::unordered_map<uint64_t, StreamSession> m;
     return m;
+}
+
+constexpr int kFallbackFrameMs = 100;
+constexpr int kFallbackSampleRate = 16000;
+constexpr size_t kFallbackFrameBytes =
+    static_cast<size_t>(kFallbackSampleRate * kFallbackFrameMs / 1000) * sizeof(int16_t);
+constexpr size_t kFallbackPreRollBytes = kFallbackFrameBytes * 3;
+constexpr int kFallbackMinSpeechMs = 300;
+constexpr int kFallbackEndSilenceMs = 800;
+constexpr int kFallbackMaxUtteranceMs = 15000;
+constexpr float kFallbackSpeechRms = 0.01f;
+
+float fallback_frame_rms(const uint8_t* bytes, size_t size) {
+    const size_t count = size / sizeof(int16_t);
+    if (!bytes || count == 0)
+        return 0.0f;
+    const auto* samples = reinterpret_cast<const int16_t*>(bytes);
+    double sum = 0.0;
+    for (size_t i = 0; i < count; ++i) {
+        const double sample = static_cast<double>(samples[i]);
+        sum += sample * sample;
+    }
+    return static_cast<float>(std::sqrt(sum / static_cast<double>(count)) / 32767.0);
+}
+
+void reset_fallback_utterance(StreamSession& session) {
+    session.fallback_utterance.clear();
+    session.fallback_in_speech = false;
+    session.fallback_speech_ms = 0;
+    session.fallback_silence_ms = 0;
+}
+
+bool feed_fallback_utterance(StreamSession& session, const uint8_t* audio_bytes,
+                             size_t audio_size, bool is_final, std::string* out_audio) {
+    if (audio_bytes && audio_size > 0) {
+        session.fallback_frame_accum.insert(session.fallback_frame_accum.end(), audio_bytes,
+                                            audio_bytes + audio_size);
+    }
+
+    while (session.fallback_frame_accum.size() >= kFallbackFrameBytes) {
+        const uint8_t* frame = session.fallback_frame_accum.data();
+        const bool is_speech = fallback_frame_rms(frame, kFallbackFrameBytes) >= kFallbackSpeechRms;
+
+        session.fallback_utterance.insert(session.fallback_utterance.end(), frame,
+                                          frame + kFallbackFrameBytes);
+        session.fallback_frame_accum.erase(session.fallback_frame_accum.begin(),
+                                           session.fallback_frame_accum.begin() +
+                                               static_cast<std::ptrdiff_t>(kFallbackFrameBytes));
+
+        if (!session.fallback_in_speech) {
+            if (session.fallback_utterance.size() > kFallbackPreRollBytes) {
+                const size_t excess = session.fallback_utterance.size() - kFallbackPreRollBytes;
+                session.fallback_utterance.erase(
+                    session.fallback_utterance.begin(),
+                    session.fallback_utterance.begin() + static_cast<std::ptrdiff_t>(excess));
+            }
+            if (is_speech) {
+                session.fallback_in_speech = true;
+                session.fallback_speech_ms = kFallbackFrameMs;
+                session.fallback_silence_ms = 0;
+            }
+            continue;
+        }
+
+        if (is_speech) {
+            session.fallback_speech_ms += kFallbackFrameMs;
+            session.fallback_silence_ms = 0;
+        } else {
+            session.fallback_silence_ms += kFallbackFrameMs;
+        }
+
+        const int utterance_ms = static_cast<int>(
+            session.fallback_utterance.size() * 1000 /
+            (static_cast<size_t>(kFallbackSampleRate) * sizeof(int16_t)));
+        if (session.fallback_silence_ms >= kFallbackEndSilenceMs ||
+            utterance_ms >= kFallbackMaxUtteranceMs) {
+            if (session.fallback_speech_ms >= kFallbackMinSpeechMs) {
+                out_audio->assign(reinterpret_cast<const char*>(session.fallback_utterance.data()),
+                                  session.fallback_utterance.size());
+                reset_fallback_utterance(session);
+                // Do not retain mic frames captured behind an expensive
+                // one-shot inference; they are stale by the time it returns.
+                session.fallback_frame_accum.clear();
+                return true;
+            }
+            reset_fallback_utterance(session);
+        }
+    }
+
+    if (is_final) {
+        if (!session.fallback_frame_accum.empty()) {
+            session.fallback_utterance.insert(session.fallback_utterance.end(),
+                                              session.fallback_frame_accum.begin(),
+                                              session.fallback_frame_accum.end());
+            session.fallback_frame_accum.clear();
+        }
+        if (session.fallback_in_speech &&
+            session.fallback_speech_ms >= kFallbackMinSpeechMs &&
+            !session.fallback_utterance.empty()) {
+            out_audio->assign(reinterpret_cast<const char*>(session.fallback_utterance.data()),
+                              session.fallback_utterance.size());
+            reset_fallback_utterance(session);
+            return true;
+        }
+        reset_fallback_utterance(session);
+    }
+    return false;
 }
 
 // One allocator instance per TU keeps an independent id sequence; next() skips
@@ -194,6 +312,63 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
                                const runanywhere::v1::STTOutput* final_output,
                                const char* error_message, int error_code, uint64_t session_id = 0);
 }  // namespace rac::stt
+
+namespace {
+
+rac_result_t transcribe_fallback_utterance(rac_handle_t component_handle, uint64_t session_id,
+                                            const std::string& audio,
+                                            const rac_stt_options_t& options) {
+    if (!component_handle || audio.empty()) {
+        return RAC_SUCCESS;
+    }
+
+    struct BridgeCtx {
+        rac_handle_t handle;
+        runanywhere::v1::STTLanguage language;
+        uint64_t session_id;
+    } ctx{.handle = component_handle,
+          .language = stt_language_from_code(options.language),
+          .session_id = session_id};
+
+    auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
+        auto* c = static_cast<BridgeCtx*>(opaque);
+        runanywhere::v1::STTPartialResult partial;
+        if (partial_text) {
+            partial.set_text(partial_text);
+        }
+        partial.set_is_final(is_final == RAC_TRUE);
+        partial.set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
+        partial.set_language(c->language);
+
+        if (is_final == RAC_TRUE) {
+            runanywhere::v1::STTOutput final_output;
+            if (partial_text) {
+                final_output.set_text(partial_text);
+            }
+            final_output.set_language(c->language);
+            rac::stt::dispatch_stt_stream_event(
+                c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial, &final_output,
+                /*error_message=*/nullptr, /*error_code=*/0, c->session_id);
+        } else {
+            rac::stt::dispatch_stt_stream_event(
+                c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL, &partial,
+                /*final_output=*/nullptr, /*error_message=*/nullptr, /*error_code=*/0,
+                c->session_id);
+        }
+    };
+
+    const rac_result_t rc = rac_stt_component_transcribe_stream(
+        component_handle, audio.data(), audio.size(), &options, bridge, &ctx);
+    if (rc != RAC_SUCCESS) {
+        rac::stt::dispatch_stt_stream_event(
+            component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+            /*partial=*/nullptr, /*final_output=*/nullptr, "STT streaming utterance failed", rc,
+            session_id);
+    }
+    return rc;
+}
+
+}  // namespace
 #endif
 
 extern "C" {
@@ -528,62 +703,23 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         }
     }
 
-    // Legacy fallback: backend doesn't expose per-session streams. Forward
-    // the chunk through the existing transcribe_stream path; Sherpa will
-    // pay the per-chunk init cost here (pre-fix behavior) for
-    // backends that haven't migrated yet.
-
-    // Bridge struct: forwards per-chunk transcribe_stream callbacks to the
-    // proto-byte dispatch. We capture the language code by value so the
-    // STTPartialResult / STTOutput payloads receive a stable language enum.
-    struct BridgeCtx {
-        rac_handle_t handle;
-        runanywhere::v1::STTLanguage language;
-        size_t audio_size;
-        uint64_t session_id;
-    } ctx{.handle = component_handle,
-          .language = stt_language_from_code(options.language),
-          .audio_size = audio_size,
-          .session_id = session_id};
-
-    auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
-        auto* c = static_cast<BridgeCtx*>(opaque);
-        runanywhere::v1::STTPartialResult partial;
-        if (partial_text) {
-            partial.set_text(partial_text);
+    // One-shot fallback: buffer cheap 100 ms feeds in commons and invoke the
+    // expensive recognizer only after speech + trailing silence closes an
+    // utterance. This keeps unsupported QHexRT/Whisper sessions genuinely
+    // usable as Live STT without per-frame inference or queue growth.
+    std::string utterance;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it == g_sessions().end() ||
+            it->second.is_cancelled.load(std::memory_order_relaxed)) {
+            return RAC_ERROR_INVALID_ARGUMENT;
         }
-        partial.set_is_final(is_final == RAC_TRUE);
-        partial.set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
-        partial.set_language(c->language);
-
-        if (is_final == RAC_TRUE) {
-            runanywhere::v1::STTOutput final_output;
-            if (partial_text) {
-                final_output.set_text(partial_text);
-            }
-            final_output.set_language(c->language);
-            rac::stt::dispatch_stt_stream_event(
-                c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial, &final_output,
-                /*error_message=*/nullptr,
-                /*error_code=*/0, c->session_id);
-        } else {
-            rac::stt::dispatch_stt_stream_event(
-                c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL, &partial,
-                /*final_output=*/nullptr,
-                /*error_message=*/nullptr,
-                /*error_code=*/0, c->session_id);
+        if (!feed_fallback_utterance(it->second, audio_bytes, audio_size, false, &utterance)) {
+            return RAC_SUCCESS;
         }
-    };
-
-    rac_result_t rc = rac_stt_component_transcribe_stream(component_handle, audio_bytes, audio_size,
-                                                          &options, bridge, &ctx);
-    if (rc != RAC_SUCCESS) {
-        rac::stt::dispatch_stt_stream_event(
-            component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
-            /*partial=*/nullptr,
-            /*final_output=*/nullptr, "STT streaming chunk failed", rc, session_id);
     }
-    return rc;
+    return transcribe_fallback_utterance(component_handle, session_id, utterance, options);
 #endif
 }
 
@@ -599,24 +735,61 @@ rac_result_t rac_stt_stream_stop_proto(uint64_t session_id) {
     std::string request_id;
     std::string language;
     int32_t sample_rate = 0;
+    rac_audio_format_enum_t audio_format = RAC_AUDIO_FORMAT_PCM;
+    bool detect_language = false;
+    bool enable_punctuation = true;
+    bool enable_diarization = false;
+    int32_t max_speakers = 0;
+    bool enable_timestamps = true;
     int64_t started_at_ms = 0;
     uint64_t chunks_fed = 0;
     uint64_t audio_bytes = 0;
+    std::string final_utterance;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
         if (it == g_sessions().end())
             return RAC_ERROR_INVALID_ARGUMENT;
+        // Reject any racing feed while final-flush inference runs, but keep
+        // the session in the map until callback dispatch has copied its
+        // request id.
+        it->second.is_cancelled.store(true, std::memory_order_relaxed);
         component_handle = it->second.handle;
         backend_stream_handle = it->second.backend_stream_handle;
         it->second.backend_stream_handle = nullptr;
         request_id = it->second.request_id;
         language = it->second.language;
         sample_rate = it->second.sample_rate;
+        audio_format = it->second.audio_format;
+        detect_language = it->second.detect_language;
+        enable_punctuation = it->second.enable_punctuation;
+        enable_diarization = it->second.enable_diarization;
+        max_speakers = it->second.max_speakers;
+        enable_timestamps = it->second.enable_timestamps;
         started_at_ms = it->second.started_at_ms;
         chunks_fed = it->second.chunks_fed;
         audio_bytes = it->second.audio_bytes;
-        g_sessions().erase(it);
+        if (it->second.backend_stream_unsupported) {
+            (void)feed_fallback_utterance(it->second, nullptr, 0, true, &final_utterance);
+        }
+    }
+    rac_result_t flush_rc = RAC_SUCCESS;
+    if (!final_utterance.empty()) {
+        rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+        options.language = language.empty() ? nullptr : language.c_str();
+        options.detect_language = detect_language ? RAC_TRUE : RAC_FALSE;
+        options.enable_punctuation = enable_punctuation ? RAC_TRUE : RAC_FALSE;
+        options.enable_diarization = enable_diarization ? RAC_TRUE : RAC_FALSE;
+        options.max_speakers = max_speakers;
+        options.enable_timestamps = enable_timestamps ? RAC_TRUE : RAC_FALSE;
+        options.sample_rate = sample_rate;
+        options.audio_format = audio_format;
+        flush_rc = transcribe_fallback_utterance(component_handle, session_id, final_utterance,
+                                                 options);
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        g_sessions().erase(session_id);
     }
     if (component_handle && backend_stream_handle) {
         (void)rac_stt_component_stream_destroy(component_handle, backend_stream_handle);
@@ -655,7 +828,7 @@ rac_result_t rac_stt_stream_stop_proto(uint64_t session_id) {
                                           request_id.c_str());
     }
 #endif
-    return RAC_SUCCESS;
+    return flush_rc;
 }
 
 rac_result_t rac_stt_stream_cancel_proto(uint64_t session_id) {

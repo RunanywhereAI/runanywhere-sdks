@@ -48,7 +48,7 @@ struct SearchResult {
  * @brief Vector store configuration
  */
 struct VectorStoreConfig {
-    size_t dimension = 384;        // Embedding dimension
+    size_t dimension = 0;          // Required embedding dimension
     size_t max_elements = 100000;  // Max capacity
     size_t connectivity = 16;      // HNSW connectivity (M)
     size_t expansion_add = 40;     // Construction search depth

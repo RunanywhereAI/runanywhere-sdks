@@ -10,7 +10,7 @@ import io.flutter.plugin.common.MethodChannel.Result
 /**
  * RunAnywhere QHexRT Flutter plugin (Android). Loads the private QHexRT engine
  * shell into the process so the Dart FFI bindings can resolve its symbols. The
- * backend is Snapdragon v75+ only; on other devices the load fails softly and
+ * backend is Snapdragon V75/V79/V81 only; on other devices the load fails softly and
  * the Dart layer reports the NPU as unsupported.
  */
 class QhexrtPlugin : FlutterPlugin, MethodCallHandler {

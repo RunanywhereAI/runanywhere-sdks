@@ -7,7 +7,8 @@
  * Self-contained JNI bridge for the private QHexRT (Qualcomm Hexagon NPU)
  * backend module. The native library (librac_backend_qhexrt_jni.so) exposes:
  * - rac_backend_qhexrt_register() / rac_backend_qhexrt_unregister()
- * - rac_npu_probe_proto() (pre-flight Hexagon arch detection)
+ * - rac_qhexrt_probe_proto() (pre-flight Hexagon arch detection)
+ * - QHexRT-owned architecture matching and device-aware model registration
  */
 
 package com.runanywhere.sdk.npu.qhexrt
@@ -80,10 +81,33 @@ internal object QHexRTBridge {
      * `runanywhere.v1.NpuCapability` proto bytes (decode with the generated
      * Wire adapter); empty on failure, which decodes to the all-default
      * (unknown/unsupported) capability. Works on any device (no QNN load),
-     * including parts older than v75.
+     * including parts outside the validated V75/V79/V81 set.
      */
     @JvmStatic
     external fun nativeProbeNpuProto(): ByteArray
+
+    /** True when [arch] is in QHexRT's native device-validated support set. */
+    @JvmStatic
+    external fun nativeArchIsSupported(arch: Int): Boolean
+
+    /** Match a model's declared architectures against [arch] in native code. */
+    @JvmStatic
+    external fun nativeModelSupportsArch(
+        supportedArches: IntArray,
+        arch: Int,
+    ): Boolean
+
+    /**
+     * Register one serialized `RegisterModelFromUrlRequest` only when the
+     * current device matches [supportedArches]. A null result is the normal
+     * native "not eligible on this device" outcome; native validation and
+     * registry errors are raised by JNI.
+     */
+    @JvmStatic
+    external fun nativeRegisterModelForDeviceProto(
+        requestBytes: ByteArray,
+        supportedArches: IntArray,
+    ): ByteArray?
 
     /** QHexRT module version string (RAC_QHEXRT_VERSION baked into the JNI lib). */
     @JvmStatic

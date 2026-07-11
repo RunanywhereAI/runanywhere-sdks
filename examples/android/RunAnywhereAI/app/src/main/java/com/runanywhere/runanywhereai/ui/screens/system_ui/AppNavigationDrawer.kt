@@ -25,7 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.NavDestination
-import com.runanywhere.runanywhereai.ui.navigation.Settings
+import com.runanywhere.runanywhereai.ui.navigation.ConsumerDestination
+import com.runanywhere.runanywhereai.ui.navigation.ConsumerNavGroup
 import com.runanywhere.runanywhereai.ui.navigation.isSelected
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -35,7 +36,7 @@ fun AppNavigationDrawer(
     destination: NavDestination?,
     onNewChat: () -> Unit,
     onHistory: () -> Unit,
-    onSettings: () -> Unit,
+    onNavigate: (Any) -> Unit,
     onDismiss: (afterClose: () -> Unit) -> Unit = { afterClose -> afterClose() },
     permanent: Boolean = true,
 ) {
@@ -53,7 +54,7 @@ fun AppNavigationDrawer(
                 destination = destination,
                 onNewChat = onNewChat,
                 onHistory = onHistory,
-                onSettings = onSettings,
+                onNavigate = onNavigate,
                 onDismiss = onDismiss,
             )
         }
@@ -66,7 +67,7 @@ fun AppNavigationDrawer(
                 destination = destination,
                 onNewChat = onNewChat,
                 onHistory = onHistory,
-                onSettings = onSettings,
+                onNavigate = onNavigate,
                 onDismiss = onDismiss,
             )
         }
@@ -78,7 +79,7 @@ private fun DrawerContent(
     destination: NavDestination?,
     onNewChat: () -> Unit,
     onHistory: () -> Unit,
-    onSettings: () -> Unit,
+    onNavigate: (Any) -> Unit,
     onDismiss: (afterClose: () -> Unit) -> Unit,
 ) {
     val dimens = LocalDimens.current
@@ -107,16 +108,30 @@ private fun DrawerContent(
                 onDismiss(onHistory)
             },
         )
-        Spacer(Modifier.height(dimens.spacingSm))
-        DrawerActionItem(
-            label = "Settings",
-            description = "Models, tools, privacy, and downloads",
-            icon = if (destination.isSelected(Settings)) RACIcons.Filled.Settings else RACIcons.Outline.Settings,
-            selected = destination.isSelected(Settings),
-            onClick = {
-                onDismiss(onSettings)
-            },
-        )
+        ConsumerNavGroup.entries.forEach { group ->
+            val entries = ConsumerDestination.entries.filter {
+                it.group == group && it != ConsumerDestination.CHAT
+            }
+            if (entries.isNotEmpty()) {
+                Spacer(Modifier.height(dimens.spacingSm))
+                Text(
+                    text = group.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = dimens.spacingLg, vertical = dimens.spacingXs),
+                )
+                entries.forEach { entry ->
+                    val selected = destination.isSelected(entry.route)
+                    DrawerActionItem(
+                        label = entry.label,
+                        description = entry.description,
+                        icon = if (selected) entry.selectedIcon else entry.icon,
+                        selected = selected,
+                        onClick = { onDismiss { onNavigate(entry.route) } },
+                    )
+                }
+            }
+        }
     }
 }
 

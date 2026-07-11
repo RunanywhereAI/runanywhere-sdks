@@ -85,9 +85,11 @@ RAGBackend::RAGBackend(const RAGBackendConfig& config, rac_handle_t llm_service,
       llm_service_(llm_service),
       embeddings_service_(embeddings_service),
       owns_services_(owns_services) {
-    VectorStoreConfig store_config;
-    store_config.dimension = config.embedding_dimension;
-    vector_store_ = std::make_unique<VectorStoreUSearch>(store_config);
+    if (config.embedding_dimension > 0) {
+        VectorStoreConfig store_config;
+        store_config.dimension = config.embedding_dimension;
+        vector_store_ = std::make_unique<VectorStoreUSearch>(store_config);
+    }
 
     bm25_index_ = std::make_unique<BM25Index>();
 
@@ -97,9 +99,14 @@ RAGBackend::RAGBackend(const RAGBackendConfig& config, rac_handle_t llm_service,
     chunker_ = std::make_unique<DocumentChunker>(chunker_config);
 
     initialized_ = (embeddings_service_ != nullptr);
-    LOGI("RAG pipeline initialized: dim=%zu, chunk_size=%zu, has_llm=%d, has_embed=%d",
-         config.embedding_dimension, config.chunk_size, llm_service_ != nullptr,
-         embeddings_service_ != nullptr);
+    if (config.embedding_dimension > 0) {
+        LOGI("RAG pipeline initialized: dim=%zu, chunk_size=%zu, has_llm=%d, has_embed=%d",
+             config.embedding_dimension, config.chunk_size, llm_service_ != nullptr,
+             embeddings_service_ != nullptr);
+    } else {
+        LOGI("RAG pipeline initialized: dim=auto, chunk_size=%zu, has_llm=%d, has_embed=%d",
+             config.chunk_size, llm_service_ != nullptr, embeddings_service_ != nullptr);
+    }
 }
 
 RAGBackend::~RAGBackend() {
@@ -119,6 +126,41 @@ RAGBackend::~RAGBackend() {
 // =============================================================================
 // Embedding helper — calls through embeddings service vtable
 // =============================================================================
+
+bool RAGBackend::ensure_embedding_dimension_locked(size_t actual_dimension) {
+    if (actual_dimension == 0) {
+        LOGE("Embedding provider returned an empty vector; cannot resolve RAG dimension");
+        return false;
+    }
+
+    if (config_.embedding_dimension > 0 && config_.embedding_dimension != actual_dimension) {
+        LOGE("Embedding dimension mismatch: model produced %zu, pipeline expects %zu",
+             actual_dimension, config_.embedding_dimension);
+        return false;
+    }
+
+    if (config_.embedding_dimension == 0) {
+        VectorStoreConfig store_config;
+        store_config.dimension = actual_dimension;
+        try {
+            auto vector_store = std::make_unique<VectorStoreUSearch>(store_config);
+            vector_store_ = std::move(vector_store);
+            config_.embedding_dimension = actual_dimension;
+            LOGI("Resolved RAG embedding dimension from model output: %zu", actual_dimension);
+        } catch (const std::exception& e) {
+            LOGE("Failed to initialize vector store for embedding dimension %zu: %s",
+                 actual_dimension, e.what());
+            return false;
+        }
+    }
+
+    if (!vector_store_) {
+        LOGE("RAG vector store is unavailable after resolving embedding dimension %zu",
+             actual_dimension);
+        return false;
+    }
+    return true;
+}
 
 std::vector<float> RAGBackend::embed_text(const std::string& text) const {
     if (!embeddings_service_)
@@ -175,8 +217,6 @@ RAGBackend::embed_texts_batch(const std::vector<std::string>& texts) const {
 // =============================================================================
 
 bool RAGBackend::add_document(const std::string& text, const nlohmann::json& metadata) {
-    size_t embedding_dimension;
-
     // Content-addressed dedup: skip re-chunk + re-embed when this exact input
     // (normalized) was already ingested into this index.
     const std::string content_hash = sha256_hex(normalize_for_hash(text));
@@ -195,7 +235,6 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
         // same content short-circuits instead of double-embedding and appending
         // duplicate chunks. Erased again on any failure path below.
         ingested_content_hashes_.insert(content_hash);
-        embedding_dimension = config_.embedding_dimension;
     }
 
     auto chunks = chunker_->chunk_document(text);
@@ -228,6 +267,17 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
+
+    // Some embedding providers cannot report a dimension before their first
+    // inference. Bind an auto-dimension pipeline to the first real output;
+    // explicit dimensions and subsequent outputs are validated here before
+    // any chunk reaches the index.
+    const size_t actual_dimension = embeddings.empty() ? 0 : embeddings.front().size();
+    if (!ensure_embedding_dimension_locked(actual_dimension)) {
+        ingested_content_hashes_.erase(content_hash);
+        return false;
+    }
+    const size_t embedding_dimension = config_.embedding_dimension;
 
     // Truncate the source preview at a UTF-8 character boundary, not a raw
     // byte offset: a mid-sequence cut emits invalid UTF-8, which strict proto
@@ -298,6 +348,10 @@ std::vector<SearchResult> RAGBackend::search(const std::string& query_text, size
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        if (!vector_store_ || config_.embedding_dimension == 0) {
+            LOGE("Cannot search before the embedding dimension is resolved by document ingest");
+            return {};
+        }
         embedding_dimension = config_.embedding_dimension;
         similarity_threshold = config_.similarity_threshold;
     }
@@ -455,12 +509,34 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
                                rac_llm_result_t* out_result, nlohmann::json& out_metadata,
                                std::function<bool(const std::string&)> on_token,
                                const QueryOverrides* overrides) {
+    auto request_cancel = std::make_shared<std::atomic<bool>>(false);
+    {
+        std::lock_guard<std::mutex> state_lock(query_state_mutex_);
+        if (active_query_cancel_) {
+            LOGE("A RAG query is already active for this session");
+            return RAC_ERROR_INVALID_STATE;
+        }
+        active_query_cancel_ = request_cancel;
+    }
+    // Every return path retires exactly this request token. A later query gets
+    // a distinct false token rather than resetting shared cancellation state.
+    std::unique_ptr<void, std::function<void(void*)>> request_scope(
+        reinterpret_cast<void*>(1), [this, request_cancel](void*) {
+            std::lock_guard<std::mutex> state_lock(query_state_mutex_);
+            if (active_query_cancel_.get() == request_cancel.get()) {
+                active_query_cancel_.reset();
+            }
+        });
     RAGGraphInputs g_in;
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (!initialized_ || !llm_service_) {
             LOGE("Pipeline not initialized or LLM service not available");
+            return RAC_ERROR_INVALID_STATE;
+        }
+        if (!vector_store_ || config_.embedding_dimension == 0) {
+            LOGE("RAG query requires at least one successfully embedded document");
             return RAC_ERROR_INVALID_STATE;
         }
         g_in.llm_service = llm_service_;
@@ -496,6 +572,7 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
     g_in.question = question;
     g_in.llm_options = options ? *options : RAC_LLM_OPTIONS_DEFAULT;
     g_in.system_prompt = kSystemPrompt;
+    g_in.cancel_requested = request_cancel.get();
 
     auto t_start = std::chrono::high_resolution_clock::now();
     RAGGraphResult g_out;
@@ -542,6 +619,25 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
     }
     out_metadata["sources"] = sources;
     return RAC_SUCCESS;
+}
+
+rac_result_t RAGBackend::cancel_query() {
+    std::lock_guard<std::mutex> state_lock(query_state_mutex_);
+    if (!active_query_cancel_) {
+        // Idempotent idle cancellation must not affect a future query or its
+        // provider session.
+        LOGI("Cancel requested while no RAG query is active");
+        return RAC_SUCCESS;
+    }
+    active_query_cancel_->store(true, std::memory_order_release);
+    // Do not acquire mutex_: the query thread may be blocked inside the
+    // provider while this call is delivered from a different thread. Keep the
+    // small request-state lock through provider cancel so this request cannot
+    // retire and publish a successor between selecting the token and issuing
+    // its native cancel.
+    const rac_result_t rc = llm_service_ ? rac_llm_cancel(llm_service_) : RAC_SUCCESS;
+    LOGI("Active RAG query cancellation routed to LLM service (rc=%d)", static_cast<int>(rc));
+    return rc;
 }
 
 // =============================================================================

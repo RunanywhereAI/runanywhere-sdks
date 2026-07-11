@@ -28,8 +28,18 @@ inline constexpr const char* kVoiceAgentSystemPrompt =
     "spoken sentences. Be direct, warm, and conversational. Do not use markdown, "
     "bullet points, code blocks, or emoji. If you are unsure or lack the "
     "information, say so briefly instead of guessing.";
-/// Spoken replies should be short — cap generation length.
-inline constexpr int32_t kVoiceAgentMaxTokens = 200;
+/// Spoken replies should be short. Ninety-six tokens is enough for the one or
+/// two sentences requested above without leaving a long hidden-reasoning
+/// runway on thinking-capable models.
+inline constexpr int32_t kVoiceAgentMaxTokens = 96;
+/// Greedy decoding keeps a spoken turn stable and avoids sampling a verbose
+/// continuation. A positive seed is also supplied for backends that still
+/// construct a sampler when temperature is zero.
+inline constexpr float kVoiceAgentTemperature = 0.0f;
+inline constexpr int32_t kVoiceAgentTopK = 1;
+inline constexpr int64_t kVoiceAgentSeed = 1;
+inline constexpr const char* kVoiceAgentEmptyResponseMessage =
+    "LLM generated no speakable response";
 /// Retained flattened history entries (user+assistant), i.e. the most recent
 /// N/2 turns.
 inline constexpr size_t kVoiceAgentMaxHistoryEntries = 20;

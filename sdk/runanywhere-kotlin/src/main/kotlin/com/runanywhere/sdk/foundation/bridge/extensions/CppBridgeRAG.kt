@@ -64,6 +64,16 @@ object CppBridgeRAG {
             "racRagQueryProto",
         )
 
+    /** Lock-free counterpart to the blocking query call. */
+    fun cancelQuery() {
+        val handle = sessionHandle
+        if (handle == 0L) return
+        val rc = RunAnywhereBridge.racRagCancelProto(handle)
+        if (rc != RunAnywhereBridge.RAC_SUCCESS && rc != RunAnywhereBridge.RAC_ERROR_CANCELLED) {
+            throw SDKException.operation("racRagCancelProto failed: $rc")
+        }
+    }
+
     fun clear(): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,

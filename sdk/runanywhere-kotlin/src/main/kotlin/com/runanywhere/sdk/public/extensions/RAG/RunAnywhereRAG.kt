@@ -27,6 +27,7 @@ import com.runanywhere.sdk.public.types.RAModelLoadResult
 import com.runanywhere.sdk.public.types.RARAGConfiguration
 import com.runanywhere.sdk.public.types.RARAGDocument
 import com.runanywhere.sdk.public.types.RARAGStatistics
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
@@ -216,13 +217,37 @@ suspend fun RunAnywhere.ragQuery(
         (options ?: RAGQueryOptions.defaults(question)).let {
             if (it.question.isEmpty()) it.copy(question = question) else it
         }
-    return withContext(Dispatchers.IO) {
-        CppBridgeRAG.query(queryOptions)
-    }
+    return runCancellableNativeRagQuery(
+        query = { CppBridgeRAG.query(queryOptions) },
+        cancel = CppBridgeRAG::cancelQuery,
+    )
 }
 
 suspend fun RunAnywhere.ragQuery(options: RAGQueryOptions): RAGResult =
     ragQuery(options.question, options)
+
+/** Immediately request cancellation of the active native RAG query. */
+suspend fun RunAnywhere.ragCancelQuery() {
+    // Do not dispatch this lock-free ABI call to Dispatchers.IO. The blocking
+    // query itself runs there, so a saturated pool could queue its own cancel
+    // behind the work it needs to interrupt.
+    CppBridgeRAG.cancelQuery()
+}
+
+/**
+ * Makes coroutine cancellation interrupt the synchronous JNI query rather
+ * than waiting for the provider to exhaust its output budget first.
+ */
+internal suspend fun <T> runCancellableNativeRagQuery(
+    dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    query: () -> T,
+    cancel: () -> Unit,
+): T =
+    runCancellableNativeUnaryRequest(
+        dispatcher = dispatcher,
+        request = query,
+        cancel = cancel,
+    )
 
 suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RARAGDocument>) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")

@@ -13,6 +13,9 @@ data class StoredConversation(
     // Mirrors iOS Conversation.modelName (ConversationStore.swift:296): the model
     // that produced the latest reply, restored as a preselection when reopening.
     val modelName: String? = null,
+    // Claimed before hidden title inference starts, so failures/cancellation do
+    // not silently repeat model work on every subsequent save or app launch.
+    val smartTitleAttempted: Boolean = false,
 )
 
 @Serializable

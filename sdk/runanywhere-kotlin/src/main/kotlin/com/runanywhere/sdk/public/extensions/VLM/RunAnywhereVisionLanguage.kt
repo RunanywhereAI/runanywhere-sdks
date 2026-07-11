@@ -74,7 +74,11 @@ suspend fun RunAnywhere.processImage(
         "Processing image with prompt: ${options.prompt.take(50)}${if (options.prompt.length > 50) "..." else ""}",
     )
 
-    val result = CppBridgeVLM.process(image, options)
+    val result =
+        runCancellableNativeUnaryRequest(
+            request = { CppBridgeVLM.processBlocking(image, options) },
+            cancel = CppBridgeVLM::cancel,
+        )
 
     vlmLogger.info(
         "VLM processing complete: ${result.completion_tokens} tokens in ${result.processing_time_ms}ms " +

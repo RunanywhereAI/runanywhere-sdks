@@ -101,6 +101,7 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs.keepDebugSymbols += "**/*.so"
     }
 
     sourceSets {
@@ -127,8 +128,10 @@ dependencies {
     api(findProject(":runanywhere-kotlin") ?: project(":"))
     implementation(libs.kotlinx.coroutines.core)
 
-    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.junit)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }
 
 // Stage the 16 KB-aligned NDK libc++ alongside the bundled QHexRT .so files.

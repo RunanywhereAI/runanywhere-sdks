@@ -171,7 +171,9 @@ rac_result_t configure_request(EasyHandle& handle, const rac_http_request_t* req
 
     CURL* curl = handle.curl;
     curl_easy_setopt(curl, CURLOPT_URL, req->url);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(
+        curl, CURLOPT_FOLLOWLOCATION,
+        req->follow_redirects != RAC_FALSE ? 1L : 0L);
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, kMaxRedirects);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, kConnectTimeoutMs);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);  // required for multi-threaded use

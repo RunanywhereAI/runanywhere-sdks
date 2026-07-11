@@ -1,7 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.vision
 
 import ai.runanywhere.proto.v1.VLMImageFormat
-import ai.runanywhere.proto.v1.VLMStreamEventKind
+import ai.runanywhere.proto.v1.VLMResult
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
@@ -9,11 +9,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
-import com.runanywhere.sdk.public.extensions.processImageStream
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,7 +37,7 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
 
     var image by mutableStateOf<Bitmap?>(null)
         private set
-    var prompt by mutableStateOf("Describe this image in detail.")
+    var prompt by mutableStateOf(DEFAULT_VISION_PROMPT)
         private set
     var description by mutableStateOf("")
         private set
@@ -47,21 +49,27 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
         private set
 
     private var job: Job? = null
+    private var answerMode = VisionAnswerMode.DETAILED_DESCRIPTION
 
     fun onImagePicked(bitmap: Bitmap?) {
         if (bitmap == null) return
+        if (isGenerating) stop()
         image = bitmap
         description = ""
+        metrics = null
         error = null
     }
 
     fun onPromptChange(value: String) {
         prompt = value
+        answerMode = VisionAnswerMode.FOCUSED_QUESTION
     }
 
     fun describe() {
         val bitmap = image ?: return
-        if (isGenerating || prompt.isBlank()) return
+        val requestPrompt = prompt.trim()
+        val requestMode = answerMode
+        if (isGenerating || requestPrompt.isBlank()) return
         description = ""
         metrics = null
         error = null
@@ -74,28 +82,22 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
                     file_path = file.absolutePath,
                     format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
                 )
-                val options = RAVLMGenerationOptions(prompt = prompt.trim(), max_tokens = 300, temperature = 0.7f)
-                // Typed VLM stream: TOKEN events carry text; the terminal
-                // COMPLETED event carries the engine-measured VLMResult, so
-                // metrics come from the SDK instead of wall-clock math.
-                RunAnywhere.processImageStream(vlmImage, options).collect { event ->
-                    when (event.kind) {
-                        VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN ->
-                            if (event.token.isNotEmpty()) description += event.token
-                        VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED -> {
-                            val result = event.result ?: return@collect
-                            if (result.text.isNotBlank()) description = result.text
-                            metrics = VlmMetrics(
-                                tokens = result.completion_tokens,
-                                tokensPerSecond = result.tokens_per_second.toDouble(),
-                                processingMs = result.processing_time_ms,
-                                imageEncodeMs = result.image_encode_time_ms,
-                                ttftMs = result.time_to_first_token_ms,
-                            )
-                        }
-                        else -> {}
-                    }
+                val result = withContext(Dispatchers.Default) {
+                    val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.VLM)
+                    val options = VisionGenerationPolicy.options(
+                        prompt = requestPrompt,
+                        model = activeModel.model,
+                        mode = requestMode,
+                        userLimit = SettingsRepository.settings.maxTokens,
+                    )
+                    // This screen presents one complete analysis card, so use the
+                    // canonical result path. It returns the final caption and native
+                    // metrics uniformly even when a backend's stream granularity is
+                    // whole-response rather than token-by-token.
+                    RunAnywhere.processImage(vlmImage, options)
                 }
+                description = result.text
+                metrics = result.toUiMetrics()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -111,7 +113,9 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
     fun stop() {
         job?.cancel()
         viewModelScope.launch { runCatching { RunAnywhere.cancelVLMGeneration() } }
-        isGenerating = false
+        // Keep the busy guard raised until the native call actually unwinds in
+        // the job's finally block. Clearing it here lets a second request race
+        // the still-running lifecycle component and fail with INVALID_STATE.
     }
 
     override fun onCleared() {
@@ -124,3 +128,12 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
         return file
     }
 }
+
+internal fun VLMResult.toUiMetrics(): VlmMetrics =
+    VlmMetrics(
+        tokens = completion_tokens,
+        tokensPerSecond = tokens_per_second.toDouble(),
+        processingMs = processing_time_ms,
+        imageEncodeMs = image_encode_time_ms,
+        ttftMs = time_to_first_token_ms,
+    )

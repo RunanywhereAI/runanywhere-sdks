@@ -8,6 +8,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
+import com.runanywhere.runanywhereai.ui.HybridBetaCopy
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.hybrid.HybridCascade
 import com.runanywhere.sdk.hybrid.HybridFilter
@@ -24,6 +27,8 @@ import com.runanywhere.sdk.public.extensions.transcribeStream
 import com.runanywhere.sdk.public.types.RASTTOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -88,9 +93,9 @@ class SttViewModel : ViewModel() {
     // STTViewModel.
     private var liveAudio: Channel<ByteArray>? = null
     private var liveJob: Job? = null
+    private var operationJob: Job? = null
+    private var operationEpoch = 0
     private var committed = ""
-    private var offlineModelId: String? = null
-
     private var router: HybridSTTRouter? = null
     private var routerOfflineId: String? = null
     private var routerOnlineId: String? = null
@@ -127,40 +132,61 @@ class SttViewModel : ViewModel() {
         if (current != null) viewModelScope.launch(Dispatchers.IO) { runCatching { current.close() } }
     }
 
-    fun toggle(modelId: String?) {
-        if (isRecording) stop() else start(modelId)
+    fun toggle() {
+        if (isRecording) stop() else start()
     }
 
-    private fun start(modelId: String?) {
+    private fun start() {
         transcript = ""
         committed = ""
         metrics = null
         routing = null
         error = null
-        offlineModelId = modelId
         synchronized(buffer) { buffer.reset() }
         audioLevel = 0f
         isRecording = true
         if (mode == SttMode.LIVE) startLive()
-        recorder.start { chunk, level ->
-            // Batch/hybrid buffer locally; live feeds the SDK streaming session.
-            if (mode == SttMode.LIVE) {
-                liveAudio?.trySend(chunk)
-            } else {
-                synchronized(buffer) { buffer.write(chunk) }
+        try {
+            recorder.start { chunk, level ->
+                // Batch/hybrid buffer locally; live feeds the SDK streaming session.
+                if (mode == SttMode.LIVE) {
+                    liveAudio?.trySend(chunk)
+                } else {
+                    synchronized(buffer) { buffer.write(chunk) }
+                }
+                audioLevel = level
             }
-            audioLevel = level
+        } catch (e: Exception) {
+            RACLog.e("microphone start failed", e)
+            error = e.message ?: "Could not start the microphone"
+            cancel()
         }
     }
 
     private fun startLive() {
-        val channel = Channel<ByteArray>(Channel.UNLIMITED)
+        // A native fallback recognizer can spend seconds finalizing an
+        // utterance. Bound mic ingress so navigation/stop never leaves minutes
+        // of 100 ms chunks queued behind one blocking JNI call.
+        val channel = Channel<ByteArray>(
+            capacity = LIVE_CHANNEL_CAPACITY,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
         liveAudio = channel
         liveJob = viewModelScope.launch {
-            RunAnywhere.transcribeStream(
-                channel.receiveAsFlow(),
-                RASTTOptions(language = STTLanguage.STT_LANGUAGE_EN, enable_punctuation = true),
-            ).collect { partial -> onLivePartial(partial) }
+            try {
+                RuntimeModelSelection.requireCurrent(ModelSelectionContext.STT)
+                RunAnywhere.transcribeStream(
+                    channel.receiveAsFlow(),
+                    RASTTOptions(language = STTLanguage.STT_LANGUAGE_EN, enable_punctuation = true),
+                ).collect { partial -> onLivePartial(partial) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RACLog.e("live stt failed", e)
+                error = e.message ?: "Live transcription failed"
+                isRecording = false
+                recorder.stop()
+            }
         }
     }
 
@@ -191,6 +217,13 @@ class SttViewModel : ViewModel() {
             // its final result; the collect job ends with the stream.
             liveAudio?.close()
             liveAudio = null
+            isTranscribing = true
+            val active = liveJob
+            viewModelScope.launch {
+                active?.join()
+                if (liveJob === active) liveJob = null
+                isTranscribing = false
+            }
             return
         }
         val audio = synchronized(buffer) { val bytes = buffer.toByteArray(); buffer.reset(); bytes }
@@ -199,33 +232,43 @@ class SttViewModel : ViewModel() {
                 error = "Recording too short — hold a little longer."
             mode == SttMode.HYBRID -> {
                 isTranscribing = true
-                viewModelScope.launch {
-                    runHybrid(audio)
-                    isTranscribing = false
+                val epoch = ++operationEpoch
+                operationJob = viewModelScope.launch {
+                    try {
+                        runHybrid(audio)
+                    } finally {
+                        if (operationEpoch == epoch) {
+                            isTranscribing = false
+                            operationJob = null
+                        }
+                    }
                 }
             }
             else -> {
                 isTranscribing = true
-                viewModelScope.launch {
-                    runTranscription(audio)?.let { transcript = it }
-                    isTranscribing = false
+                val epoch = ++operationEpoch
+                operationJob = viewModelScope.launch {
+                    try {
+                        runTranscription(audio)?.let { transcript = it }
+                    } finally {
+                        if (operationEpoch == epoch) {
+                            isTranscribing = false
+                            operationJob = null
+                        }
+                    }
                 }
             }
         }
     }
 
     private suspend fun runHybrid(audio: ByteArray) {
-        val offlineId = offlineModelId
-        if (offlineId.isNullOrBlank()) {
-            error = "Select a model first."
-            return
-        }
         val onlineId = resolveOnlineProviderId()
         if (onlineId.isNullOrBlank()) {
-            error = "Add a cloud provider before using hybrid transcription."
+            error = HybridBetaCopy.CLOUD_PROVIDER_REQUIRED
             return
         }
         try {
+            val offlineId = RuntimeModelSelection.requireCurrent(ModelSelectionContext.STT).id
             val started = System.currentTimeMillis()
             val result = withContext(Dispatchers.IO) {
                 ensureRouter(offlineId, onlineId).transcribe(
@@ -236,10 +279,10 @@ class SttViewModel : ViewModel() {
             val elapsed = System.currentTimeMillis() - started
             val r = result.routing
             RACLog.i(
-                "hybrid result: text='${result.text}' lang=${result.detectedLanguage} " +
+                "hybrid result: chars=${result.text.length} lang=${result.detectedLanguage} " +
                     "chosen=${r.chosen_model_id} fallback=${r.was_fallback} conf=${r.confidence} " +
                     "primaryConf=${r.primary_confidence} attempts=${r.attempt_count} " +
-                    "primaryErr=${r.primary_error_code}/${r.primary_error_message}",
+                    "primaryErrorCode=${r.primary_error_code}",
             )
             transcript = result.text.trim()
             routing = result.routing
@@ -254,7 +297,7 @@ class SttViewModel : ViewModel() {
             throw e
         } catch (e: Exception) {
             RACLog.e("hybrid transcribe failed", e)
-            error = e.message ?: "Hybrid transcription failed"
+            error = HybridBetaCopy.TRANSCRIPTION_FAILED
         }
     }
 
@@ -300,6 +343,7 @@ class SttViewModel : ViewModel() {
     }
 
     private suspend fun runTranscription(audio: ByteArray): String? = try {
+        RuntimeModelSelection.requireCurrent(ModelSelectionContext.STT)
         val started = System.currentTimeMillis()
         val output = RunAnywhere.transcribe(
             audio,
@@ -330,16 +374,36 @@ class SttViewModel : ViewModel() {
     private fun join(a: String, b: String): String =
         listOf(a.trim(), b.trim()).filter { it.isNotEmpty() }.joinToString("\n")
 
-    override fun onCleared() {
-        liveAudio?.close()
-        liveAudio = null
-        liveJob?.cancel()
+    /** Cancel capture and discard an unfinished live utterance on navigation. */
+    fun cancel() {
+        isRecording = false
+        isTranscribing = false
         recorder.stop()
+        audioLevel = 0f
+        liveAudio?.cancel()
+        liveAudio = null
+        val active = liveJob
+        liveJob = null
+        active?.cancel()
+        operationEpoch += 1
+        operationJob?.cancel()
+        operationJob = null
+        if (active != null) {
+            // Await native stream cancellation off-main. The native per-session
+            // operation lock prevents another screen from entering the same
+            // Whisper/QHexRT session until this in-flight feed has returned.
+            viewModelScope.launch(Dispatchers.IO) { active.cancelAndJoin() }
+        }
+    }
+
+    override fun onCleared() {
+        cancel()
         router?.close()
         router = null
     }
 
     private companion object {
         const val MIN_BYTES = 16000
+        const val LIVE_CHANNEL_CAPACITY = 8
     }
 }

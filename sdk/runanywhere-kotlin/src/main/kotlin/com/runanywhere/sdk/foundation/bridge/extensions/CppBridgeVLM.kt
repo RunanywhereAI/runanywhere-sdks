@@ -146,11 +146,17 @@ object CppBridgeVLM {
     suspend fun process(
         image: RAVLMImage,
         options: RAVLMGenerationOptions,
+    ): RAVLMResult = processBlocking(image, options)
+
+    /** Blocking JNI implementation; public coroutine APIs own dispatch/cancel. */
+    internal fun processBlocking(
+        image: RAVLMImage,
+        options: RAVLMGenerationOptions,
     ): RAVLMResult =
         decodeOrThrow(
             VLMResult.ADAPTER,
             RunAnywhereBridge.racVlmProcessProto(
-                getHandle(),
+                0L,
                 VLMImage.ADAPTER.encode(image),
                 VLMGenerationOptions.ADAPTER.encode(options),
             ),
