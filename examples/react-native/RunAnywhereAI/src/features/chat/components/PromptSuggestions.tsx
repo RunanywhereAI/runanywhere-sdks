@@ -5,7 +5,7 @@
  * tool-calling prompts, otherwise casual prompts. Tapping a pill sends it.
  */
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Icon, useTheme, type IconName } from '../../../theme/system';
 
 interface Suggestion {

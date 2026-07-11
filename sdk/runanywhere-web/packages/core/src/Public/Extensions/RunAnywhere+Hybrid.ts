@@ -11,18 +11,18 @@
  * build delta this needs to run end-to-end.
  */
 
-import { HybridSttRouter } from './Hybrid/HybridSttRouter';
-import { Cloud, cloud, type CloudSTTConfig } from './Hybrid/Cloud';
+import { HybridSttRouter } from './Hybrid/HybridSttRouter.js';
+import { Cloud, cloud, type CloudSTTConfig } from './Hybrid/Cloud.js';
 import {
   registerCloudSttProvider,
   unregisterCloudSttProvider,
   type SttProviderHandler,
-} from './Hybrid/CloudSttProvider';
+} from './Hybrid/CloudSttProvider.js';
 import {
   setHybridDeviceStateProvider,
   browserDeviceStateProvider,
   type HybridDeviceStateProvider,
-} from './Hybrid/HybridDeviceState';
+} from './Hybrid/HybridDeviceState.js';
 
 export const Hybrid = {
   /** True iff the loaded WASM exports the hybrid STT router ABI (the build

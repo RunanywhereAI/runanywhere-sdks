@@ -27,14 +27,19 @@
  *   Sync XHR is deprecated on the main thread (browsers emit a console
  *   warning) but is the canonical way to block a WASM call until the
  *   browser returns a response when JSPI / ASYNCIFY are not available.
+ *   The XHR standard also forbids assigning a non-zero `timeout` to a
+ *   synchronous request owned by `Window`. We therefore attempt to preserve
+ *   the native timeout in worker environments and deliberately continue with
+ *   the browser network stack's own timeout when that assignment throws.
  *   Browsers forbid `responseType = 'arraybuffer'` for sync XHR issued
  *   from a document, so the main-thread path falls back to the older
  *   `x-user-defined` binary-text mode. In a worker context sync XHR can
  *   still use the arraybuffer path without warnings.
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
-import type { HTTPModule, HTTPHeader } from './HTTPAdapter';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { wasmUint64ToSafeNumber } from '../runtime/WasmInt64.js';
+import type { HTTPModule, HTTPHeader } from './HTTPAdapter.js';
 
 const logger = new SDKLogger('FetchHttpTransport');
 
@@ -56,8 +61,25 @@ const RAC_FALSE = 0;
  */
 const STREAM_CHUNK_SIZE = 1 * 1024 * 1024;
 
-function i64ToNumber(value: number | bigint): number {
-  return typeof value === 'bigint' ? Number(value) : value;
+/**
+ * Apply the native request timeout where the browser permits it.
+ *
+ * A synchronous XHR created on `Window` throws `InvalidAccessError` when its
+ * timeout is set. Treating that standards-mandated exception as a network
+ * failure prevented the request from ever reaching `send()`. Worker-owned
+ * synchronous XHR implementations can accept the timeout, so keep the
+ * assignment and narrowly recover only from browsers that reject it.
+ */
+function applySynchronousXHRTimeout(xhr: XMLHttpRequest, timeoutMs: number): void {
+  if (timeoutMs <= 0) return;
+  try {
+    xhr.timeout = timeoutMs;
+  } catch (error) {
+    logger.debug(
+      'Synchronous XHR timeout is unavailable in this browser context; ' +
+        `using the browser network timeout (${error instanceof Error ? error.name : 'unsupported'})`,
+    );
+  }
 }
 
 /**
@@ -163,29 +185,29 @@ export class FetchHttpTransport {
 
     this.requestSendPtr = this.m.addFunction(
       (
-        userData: number | bigint,
-        reqPtr: number | bigint,
-        outRespPtr: number | bigint,
+        userData: number,
+        reqPtr: number,
+        outRespPtr: number,
       ) => {
-        return this.runSend(Number(userData), Number(reqPtr), Number(outRespPtr));
+        return this.runSend(userData, reqPtr, outRespPtr);
       },
       'iiii',
     );
 
     this.requestStreamPtr = this.m.addFunction(
       (
-        userData: number | bigint,
-        reqPtr: number | bigint,
-        cbPtr: number | bigint,
-        cbUd: number | bigint,
-        outMetaPtr: number | bigint,
+        userData: number,
+        reqPtr: number,
+        cbPtr: number,
+        cbUd: number,
+        outMetaPtr: number,
       ) => {
         return this.runStream(
-          Number(userData),
-          Number(reqPtr),
-          Number(cbPtr),
-          Number(cbUd),
-          Number(outMetaPtr),
+          userData,
+          reqPtr,
+          cbPtr,
+          cbUd,
+          outMetaPtr,
           /*resumeFromByte=*/ 0,
         );
       },
@@ -196,20 +218,20 @@ export class FetchHttpTransport {
     // Current Emscripten builds pass the i64 resume offset to JS as BigInt.
     this.requestResumePtr = this.m.addFunction(
       (
-        userData: number | bigint,
-        reqPtr: number | bigint,
-        resumeRaw: number | bigint,
-        cbPtr: number | bigint,
-        cbUd: number | bigint,
-        outMetaPtr: number | bigint,
+        userData: number,
+        reqPtr: number,
+        resumeRaw: bigint,
+        cbPtr: number,
+        cbUd: number,
+        outMetaPtr: number,
       ) => {
-        const resumeFromByte = i64ToNumber(resumeRaw);
+        const resumeFromByte = wasmUint64ToSafeNumber(resumeRaw, 'HTTP resume offset');
         return this.runStream(
-          Number(userData),
-          Number(reqPtr),
-          Number(cbPtr),
-          Number(cbUd),
-          Number(outMetaPtr),
+          userData,
+          reqPtr,
+          cbPtr,
+          cbUd,
+          outMetaPtr,
           resumeFromByte,
         );
       },
@@ -264,9 +286,7 @@ export class FetchHttpTransport {
           /* browsers forbid setting a few reserved headers; ignore. */
         }
       }
-      if (req.timeoutMs > 0) {
-        xhr.timeout = req.timeoutMs;
-      }
+      applySynchronousXHRTimeout(xhr, req.timeoutMs);
 
       const t0 =
         typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -365,11 +385,7 @@ export class FetchHttpTransport {
           /* noop */
         }
       }
-      if (req.timeoutMs > 0) {
-        // XHR timeout is only honoured for async requests per spec; the
-        // field is still set for observability.
-        xhr.timeout = req.timeoutMs;
-      }
+      applySynchronousXHRTimeout(xhr, req.timeoutMs);
 
       const t0 =
         typeof performance !== 'undefined' && typeof performance.now === 'function'

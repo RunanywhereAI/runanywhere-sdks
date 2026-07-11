@@ -8,6 +8,7 @@
 import { SDKException } from '../../Foundation/Errors/SDKException';
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import type { PluginInfo } from '@runanywhere/proto-ts/plugin_loader';
+import { isJsonObject } from '../../services/JSONValidation';
 
 /**
  * Information about a loaded plugin.
@@ -29,6 +30,58 @@ export interface PluginLoaderCapability {
   unload(name: string): Promise<void>;
 }
 
+function invalidPluginLoaderResponse(operation: string): never {
+  throw SDKException.processingFailed(
+    `${operation} returned an invalid JSON result`
+  );
+}
+
+function parseNativeJSON(json: string, operation: string): unknown {
+  try {
+    const parsed: unknown = JSON.parse(json);
+    return parsed;
+  } catch {
+    return invalidPluginLoaderResponse(operation);
+  }
+}
+
+function decodePluginInfoValue(value: unknown, operation: string): PluginInfo {
+  if (
+    !isJsonObject(value) ||
+    typeof value.name !== 'string' ||
+    typeof value.path !== 'string'
+  ) {
+    return invalidPluginLoaderResponse(operation);
+  }
+  return { name: value.name, path: value.path };
+}
+
+/** Decode and validate the native registered-plugin name list. */
+export function decodeRegisteredPluginNamesJSON(json: string): string[] {
+  const operation = 'pluginLoader.registeredNames';
+  const parsed = parseNativeJSON(json, operation);
+  if (!Array.isArray(parsed) || !parsed.every((value) => typeof value === 'string')) {
+    return invalidPluginLoaderResponse(operation);
+  }
+  return parsed;
+}
+
+/** Decode and validate the native loaded-plugin list. */
+export function decodeLoadedPluginsJSON(json: string): PluginInfo[] {
+  const operation = 'pluginLoader.listLoaded';
+  const parsed = parseNativeJSON(json, operation);
+  if (!Array.isArray(parsed)) {
+    return invalidPluginLoaderResponse(operation);
+  }
+  return parsed.map((value) => decodePluginInfoValue(value, operation));
+}
+
+/** Decode and validate the native result of loading one plugin. */
+export function decodeLoadedPluginJSON(json: string): PluginInfo {
+  const operation = 'pluginLoader.load';
+  return decodePluginInfoValue(parseNativeJSON(json, operation), operation);
+}
+
 export const pluginLoader: PluginLoaderCapability = {
   get apiVersion(): Promise<number> {
     return requirePluginLoaderNative().pluginLoaderApiVersion();
@@ -39,24 +92,24 @@ export const pluginLoader: PluginLoaderCapability = {
   },
 
   async registeredNames(): Promise<string[]> {
-    return JSON.parse(
+    return decodeRegisteredPluginNamesJSON(
       await requirePluginLoaderNative().pluginLoaderRegisteredNames()
-    ) as string[];
+    );
   },
 
   async listLoaded(): Promise<PluginInfo[]> {
-    return JSON.parse(
+    return decodeLoadedPluginsJSON(
       await requirePluginLoaderNative().pluginLoaderListLoaded()
-    ) as PluginInfo[];
+    );
   },
 
   async load(path: string): Promise<PluginInfo> {
     if (!path.trim()) {
       throw SDKException.invalidInput('Plugin path is required');
     }
-    return JSON.parse(
+    return decodeLoadedPluginJSON(
       await requirePluginLoaderNative().pluginLoaderLoad(path)
-    ) as PluginInfo;
+    );
   },
 
   async unload(name: string): Promise<void> {

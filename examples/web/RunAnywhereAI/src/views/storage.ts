@@ -28,6 +28,7 @@ import {
 import {
   onModelStateChange,
   openSheet as openModelSheet,
+  refreshModelSelectionState,
 } from '../components/model-selection';
 import { getCatalog } from '../services/model-catalog';
 import { escapeHtml } from '../services/escape-html';
@@ -82,7 +83,8 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     </div>
   `;
 
-  container.querySelector('#storage-clear-cache-btn')!.addEventListener('click', async () => {
+  container.querySelector('#storage-clear-cache-btn')!.addEventListener('click', () => {
+    void (async () => {
     // iOS parity: StorageViewModel.swift:68-75 `clearCache()`.
     try {
       await RunAnywhere.clearCache();
@@ -90,10 +92,12 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     } catch (err) {
       showToast(`Failed to clear cache: ${formatError(err)}`, 'warning');
     }
-    refreshStorageInfo();
+      refreshStorageInfo();
+    })();
   });
 
-  container.querySelector('#storage-clean-temp-btn')!.addEventListener('click', async () => {
+  container.querySelector('#storage-clean-temp-btn')!.addEventListener('click', () => {
+    void (async () => {
     // iOS parity: StorageViewModel.swift:77-84 `cleanTempFiles()`.
     try {
       await RunAnywhere.cleanTempFiles();
@@ -101,10 +105,12 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     } catch (err) {
       showToast(`Failed to clean temporary files: ${formatError(err)}`, 'warning');
     }
-    refreshStorageInfo();
+      refreshStorageInfo();
+    })();
   });
 
-  container.querySelector('#storage-choose-dir-btn')!.addEventListener('click', async () => {
+  container.querySelector('#storage-choose-dir-btn')!.addEventListener('click', () => {
+    void (async () => {
     try {
       const ok = await RunAnywhere.storage.chooseLocalStorageDirectory();
       if (ok) {
@@ -115,13 +121,16 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     } catch (err) {
       showToast(formatError(err), 'warning');
     }
-    updateStorageLocationUI();
+      updateStorageLocationUI();
+    })();
   });
 
-  container.querySelector('#storage-reauth-btn')!.addEventListener('click', async () => {
-    const ok = await RunAnywhere.storage.requestLocalStorageAccess();
-    showToast(ok ? 'Access re-authorized' : 'Access not granted', ok ? 'success' : 'warning');
-    updateStorageLocationUI();
+  container.querySelector('#storage-reauth-btn')!.addEventListener('click', () => {
+    void (async () => {
+      const ok = await RunAnywhere.storage.requestLocalStorageAccess();
+      showToast(ok ? 'Access re-authorized' : 'Access not granted', ok ? 'success' : 'warning');
+      updateStorageLocationUI();
+    })();
   });
 
   container.querySelector('#storage-open-selection-btn')!.addEventListener('click', () => {
@@ -262,17 +271,24 @@ function renderModelList(): void {
     // tolerate — adapter may not be installed
   }
 
-  let loadedId: string | null = null;
-  try {
-    loadedId = RunAnywhere.currentModel()?.modelId || null;
-  } catch {
-    loadedId = null;
+  const loadedIds = new Set<string>();
+  const categories = new Set(catalog.map((entry) => entry.category));
+  for (const category of categories) {
+    try {
+      const current = RunAnywhere.currentModel({
+        category,
+        includeModelMetadata: false,
+      });
+      if (current?.modelId) loadedIds.add(current.modelId);
+    } catch {
+      // A backend may not support every category; keep checking the others.
+    }
   }
 
   host.innerHTML = catalog.map((entry) => {
     const registryInfo = lookupModelInfo(entry.id);
     const isDownloaded = downloadedIds.has(entry.id) || Boolean(registryInfo?.isDownloaded);
-    const isLoaded = entry.id === loadedId;
+    const isLoaded = loadedIds.has(entry.id);
     const statusLabel = isLoaded
       ? '<span class="badge badge-green">Loaded</span>'
       : isDownloaded
@@ -307,11 +323,12 @@ function renderModelList(): void {
 /** iOS parity: StorageViewModel.swift:86-103 `deleteModel(_:)`. */
 async function deleteModel(modelId: string): Promise<void> {
   try {
-    const result = RunAnywhere.deleteModel(modelId);
+    const result = await RunAnywhere.deleteModel(modelId);
     if (!result.success) {
       showToast(result.errorMessage || 'Failed to delete model', 'warning');
       return;
     }
+    refreshModelSelectionState();
     showToast(`Deleted ${modelId}`, 'success');
   } catch (err) {
     showToast(`Failed to delete model: ${formatError(err)}`, 'warning');

@@ -11,7 +11,7 @@ import {
   LogLevel,
   type LoggingConfiguration,
   type LogDestination,
-} from '../../Foundation/SDKLogger';
+} from '../../Foundation/SDKLogger.js';
 
 export { LogLevel };
 export type { LoggingConfiguration, LogDestination };

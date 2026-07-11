@@ -17,7 +17,7 @@ set -euo pipefail
 #
 # Common options:
 #   --debug      Debug build with assertions and safe heap
-#   --pthreads   Enable pthreads (default; requires Cross-Origin Isolation)
+#   --pthreads   Enable pthreads (default except WebGPU; requires Cross-Origin Isolation)
 #   --no-pthreads Disable pthreads
 #   --rag        Pull in RAG (requires --onnx)
 #   --clean      Clean the matching build directory before building
@@ -123,7 +123,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --debug          Debug build with assertions and safe heap"
-            echo "  --pthreads       Enable pthreads (default; requires Cross-Origin Isolation)"
+            echo "  --pthreads       Enable pthreads (default except WebGPU; requires Cross-Origin Isolation)"
             echo "  --no-pthreads    Disable pthreads"
             echo "  --rag            Pull in RAG (requires --onnx)"
             echo "  --clean          Clean matching build dirs before building"
@@ -153,6 +153,8 @@ fi
 
 ORT_WASM_ARCHIVE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
 SHERPA_WASM_ARCHIVE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/lib/libsherpa-onnx-c-api.a"
+ORT_WASM_PROVENANCE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm/.rac-wasm-provenance"
+SHERPA_WASM_PROVENANCE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/.rac-wasm-provenance"
 
 # ONNX target needs the ORT WASM archive. Standalone --rag (without --onnx)
 # does NOT — the RAG OBJECT library depends only on USearch + nlohmann_json
@@ -164,11 +166,43 @@ if [ "$ONNX" = "ON" ]; then
         echo "       sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
         exit 1
     fi
+    if ! grep -Fqx "threads=on" "${ORT_WASM_PROVENANCE}" 2>/dev/null; then
+        echo "ERROR: Web ONNX requires a provenance-verified pthread ONNX Runtime archive."
+        echo "       Re-vendor the matched speech runtime before linking:"
+        echo "       sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
+        exit 1
+    fi
+    if ! grep -Fqx "protobuf_namespace=google::rac_ort_protobuf" "${ORT_WASM_PROVENANCE}" 2>/dev/null; then
+        echo "ERROR: Web ONNX requires an ORT archive with its protobuf21 C++ namespace shaded."
+        echo "       Re-vendor ORT before linking it with RACommons protobuf v35:"
+        echo "       sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
+        exit 1
+    fi
+    if ! grep -Fqx "absl_em_js_symbol=rac_ort_have_offset_converter" "${ORT_WASM_PROVENANCE}" 2>/dev/null; then
+        echo "ERROR: Web ONNX requires ORT's private Abseil EM_JS helper to be shaded."
+        echo "       Re-vendor ORT before linking it with RACommons Abseil:"
+        echo "       sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
+        exit 1
+    fi
+    if ! RAC_WASM_PROVENANCE_CHECK_ONLY=1 \
+         "${SCRIPT_DIR}/vendor-onnxruntime-wasm.sh" >/dev/null; then
+        echo "ERROR: Web ONNX rejected the ORT archive: provenance or protobuf symbol audit failed."
+        echo "       Rebuild it with the canonical vendor script before linking."
+        exit 1
+    fi
 fi
 
 if [ "$ONNX_REQUESTED" = "ON" ] && [ ! -f "${SHERPA_WASM_ARCHIVE}" ]; then
     echo "ERROR: --onnx requires sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/lib/libsherpa-onnx-c-api.a"
     echo "       Build or vendor Sherpa-ONNX WASM static archives first:"
+    echo "       sdk/runanywhere-web/wasm/scripts/vendor-sherpa-onnx-wasm.sh"
+    exit 1
+fi
+
+if [ "$ONNX_REQUESTED" = "ON" ] &&
+   ! grep -Fqx "threads=on" "${SHERPA_WASM_PROVENANCE}" 2>/dev/null; then
+    echo "ERROR: --onnx requires a provenance-verified pthread Sherpa-ONNX archive."
+    echo "       Re-vendor the matched speech runtime before linking:"
     echo "       sdk/runanywhere-web/wasm/scripts/vendor-sherpa-onnx-wasm.sh"
     exit 1
 fi
@@ -203,16 +237,22 @@ build_target() {
 
     local build_dir="${WASM_DIR}/build-${label}"
 
-    # ONNX target gating: the vendored libsherpa-onnx-c-api.a was built
-    # without the wasm 'atomics' feature, so wasm-ld rejects --shared-memory
-    # when linking it into a pthreads-enabled module. Force pthreads OFF for
-    # this single target. The other targets keep whatever the caller asked
-    # for (default ON for everything else).
+    # Sherpa-ONNX always compiles its Web archives with `-pthread`; ORT and the
+    # final module must use the same shared-memory/atomics ABI. A non-threaded
+    # final module can still link some archive members but fails at runtime in
+    # Ort::Session construction with a `function signature mismatch`.
     local pthreads_for_target="${PTHREADS}"
-    if [ "$wasm_onnx" = "ON" ] && [ "$pthreads_for_target" = "ON" ]; then
-        echo "NOTE: ONNX target requires pthreads=OFF (vendored sherpa-onnx-c-api.a"
-        echo "      lacks the wasm 'atomics' feature; --shared-memory disallowed)."
+    # Emdawn WebGPU waits are asynchronous. The release WebGPU variant uses
+    # Emscripten Asyncify, which is intentionally built without pthreads so
+    # every suspension and resume stays on the browser main thread. CPU llama
+    # and ONNX retain their independently validated threading configurations.
+    if [ "$wasm_webgpu" = "ON" ]; then
         pthreads_for_target="OFF"
+    fi
+    if [ "$wasm_onnx" = "ON" ] && [ "$pthreads_for_target" != "ON" ]; then
+        echo "ERROR: The ONNX/Sherpa target requires pthreads and shared WASM memory."
+        echo "       Re-run without --no-pthreads and serve with COOP/COEP headers."
+        exit 1
     fi
 
     echo ""
@@ -234,7 +274,14 @@ build_target() {
     rm -f "${REPO_ROOT}/a.out.js" "${REPO_ROOT}/a.out.wasm" "${WASM_DIR}/a.out.js" "${WASM_DIR}/a.out.wasm"
     mkdir -p "${build_dir}"
 
-    local cmake_thread_args=()
+    # Always write the cache entries. Omitting them for --no-pthreads leaves
+    # stale `-pthread` values behind when a target build directory was first
+    # configured in threaded mode, producing a falsely-labelled shared-memory
+    # artifact.
+    local cmake_thread_args=(
+        -DCMAKE_C_FLAGS=""
+        -DCMAKE_CXX_FLAGS=""
+    )
     if [ "$pthreads_for_target" = "ON" ]; then
         # pthreads must be present on every object that is linked into the final
         # shared-memory module, not just on the final Emscripten executable target.
@@ -242,14 +289,6 @@ build_target() {
             -DCMAKE_C_FLAGS="-pthread"
             -DCMAKE_CXX_FLAGS="-pthread"
         )
-    fi
-
-    local cmake_link_args=()
-    if [ "$wasm_onnx" = "ON" ]; then
-        # Vendored ONNX Runtime WASM static archives include protobuf objects.
-        # RACommons also links generated-proto support, so allow duplicate archive
-        # members at the final wasm-ld step while resolving ONNX/Sherpa/RAG builds.
-        cmake_link_args=(-DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-multiple-definition")
     fi
 
     echo ""
@@ -271,13 +310,17 @@ build_target() {
     # to run program 'gzip -d'". Forcing the numeric form on the command
     # line guarantees the value is correct even when the commons CMakeLists
     # in-tree pre-normalization races a stale FetchContent cache.
+    # The Web example exposes RunAnywhere.solutions.run for the canonical
+    # Voice Agent and RAG YAMLs. Compile the real protobuf-backed runtime;
+    # OFF links rac_solution_stub.cpp and guarantees both visible buttons
+    # fail with RAC_ERROR_FEATURE_NOT_AVAILABLE.
     emcmake cmake \
         -B "${build_dir}" \
         -S "${REPO_ROOT}" \
         -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
         -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
         -DRAC_ENABLE_PROTOBUF=ON \
-        -DRAC_ENABLE_SOLUTIONS=OFF \
+        -DRAC_ENABLE_SOLUTIONS=ON \
         -DRAC_STATIC_PLUGINS=ON \
         -DRAC_BUILD_PLATFORM=OFF \
         -DRAC_BUILD_SHARED=OFF \
@@ -291,10 +334,10 @@ build_target() {
         -DRAC_WASM_ONNX="${wasm_onnx}" \
         -DRAC_RUNTIME_ONNXRT="${wasm_onnx}" \
         -DRAC_WASM_WEBGPU="${wasm_webgpu}" \
+        -DRAC_WASM_WEBGPU_JSPI=OFF \
         -DRAC_BACKEND_RAG="${RAG}" \
         -DRAC_WASM_RAG_STANDALONE="${RAG}" \
-        ${cmake_thread_args[@]+"${cmake_thread_args[@]}"} \
-        ${cmake_link_args[@]+"${cmake_link_args[@]}"}
+        ${cmake_thread_args[@]+"${cmake_thread_args[@]}"}
 
     echo ""
     echo ">>> Building ${target_name}..."
@@ -314,6 +357,28 @@ build_target() {
         echo "SUCCESS: ${label} build complete"
         echo "  ${out_name}.wasm: ${wasm_size}"
         echo "  ${out_name}.js:   ${js_size}"
+
+        # Never permit the historical blanket duplicate-symbol escape hatch on
+        # the mixed ORT/RACommons dependency graph. A successful strict link is
+        # the final ABI-isolation proof for protobuf and Abseil.
+        if [ "${wasm_onnx}" = "ON" ]; then
+            local link_command_file
+            link_command_file="$(
+                find "${build_dir}" -type f \
+                    -path "*/CMakeFiles/${target_name}.dir/link.txt" \
+                    -print -quit
+            )"
+            if [ -z "${link_command_file}" ] || [ ! -f "${link_command_file}" ]; then
+                echo "ERROR: unable to audit the final ONNX link command."
+                exit 1
+            fi
+            if grep -Fq -- "--allow-multiple-definition" "${link_command_file}"; then
+                echo "ERROR: ONNX link disabled duplicate-symbol enforcement."
+                echo "  link command: ${link_command_file}"
+                exit 1
+            fi
+            echo "  ONNX dependency ABI audit: strict duplicate-symbol enforcement confirmed"
+        fi
 
         # Assert the libarchive program() fallback
         # is NOT linked into this artifact. The bug surface is libarchive's

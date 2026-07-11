@@ -45,8 +45,8 @@ import {
   SDKEventStreamAdapter,
   type SDKEventHandler,
   type SDKEventUnsubscribe,
-} from '../Adapters/SDKEventStreamAdapter';
-import { SDKLogger } from './SDKLogger';
+} from '../Adapters/SDKEventStreamAdapter.js';
+import { SDKLogger } from './SDKLogger.js';
 
 const logger = new SDKLogger('EventBus');
 

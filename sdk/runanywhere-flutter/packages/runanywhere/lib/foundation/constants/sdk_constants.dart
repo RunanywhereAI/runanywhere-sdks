@@ -13,7 +13,7 @@ class SDKConstants {
   /// to the last-synced literal when the commons binary predates the export.
   static final String version = _nativeVersion ?? _fallbackVersion;
 
-  static const String _fallbackVersion = '0.19.13';
+  static const String _fallbackVersion = '0.19.15';
 
   static String? get _nativeVersion {
     final fn = RacNative.bindings.rac_sdk_get_version;

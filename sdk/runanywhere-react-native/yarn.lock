@@ -563,10 +563,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@bufbuild/protobuf@npm:^2.12.0":
-  version: 2.12.0
-  resolution: "@bufbuild/protobuf@npm:2.12.0"
-  checksum: f905c34ffbf0a05ee3fd6281a13f5daa5b43c215682d4900b23629691c1ee7fe0d96fefbbad84055ba0547ef089fb2d488a68c4e8383abf5b7dc56a9207c44ea
+"@bufbuild/protobuf@npm:^2.12.1":
+  version: 2.12.1
+  resolution: "@bufbuild/protobuf@npm:2.12.1"
+  checksum: 0205ad21c40ab92372111147fb6e7110634272db329428e557656d22e0f75bc36b47cb3ba7407cf2068d7a81f7ce7317c80a4309049545e025dd57446471d963
   languageName: node
   linkType: hard
 
@@ -2058,6 +2058,7 @@ __metadata:
     "@runanywhere/proto-ts": "workspace:*"
     "@types/jest": ^29.5.12
     "@types/react": ~19.2.14
+    eslint: ^9.39.4
     jest: ^29.7.0
     long: ^5.3.2
     nitrogen: ^0.34.1
@@ -2087,11 +2088,12 @@ __metadata:
   resolution: "@runanywhere/llamacpp@workspace:packages/llamacpp"
   dependencies:
     "@runanywhere/proto-ts": "workspace:*"
+    eslint: ^9.39.4
     nitrogen: ^0.34.1
     react-native-nitro-modules: ^0.33.9
     typescript: ^5.9.3
   peerDependencies:
-    "@runanywhere/core": ">=0.19.13"
+    "@runanywhere/core": ">=0.19.15"
     react: ">=19.0.0"
     react-native: ">=0.83.1"
     react-native-nitro-modules: ^0.33.9
@@ -2102,9 +2104,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/mlx@workspace:packages/mlx"
   dependencies:
+    eslint: ^9.39.4
     typescript: ^5.9.3
   peerDependencies:
-    "@runanywhere/core": ">=0.19.13"
+    "@runanywhere/core": ">=0.19.15"
     react: ">=19.0.0"
     react-native: ">=0.83.1"
     react-native-nitro-modules: ^0.33.9
@@ -2116,11 +2119,12 @@ __metadata:
   resolution: "@runanywhere/onnx@workspace:packages/onnx"
   dependencies:
     "@runanywhere/proto-ts": "workspace:*"
+    eslint: ^9.39.4
     nitrogen: ^0.34.1
     react-native-nitro-modules: ^0.33.9
     typescript: ^5.9.3
   peerDependencies:
-    "@runanywhere/core": ">=0.19.13"
+    "@runanywhere/core": ">=0.19.15"
     react: ">=19.0.0"
     react-native: ">=0.83.1"
     react-native-nitro-modules: ^0.33.9
@@ -2131,7 +2135,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/proto-ts@workspace:../shared/proto-ts"
   dependencies:
-    "@bufbuild/protobuf": ^2.12.0
+    "@bufbuild/protobuf": ^2.12.1
     typescript: ^5.9.3
   languageName: unknown
   linkType: soft
@@ -2141,11 +2145,12 @@ __metadata:
   resolution: "@runanywhere/qhexrt@workspace:packages/qhexrt"
   dependencies:
     "@runanywhere/proto-ts": "workspace:*"
+    eslint: ^9.39.4
     nitrogen: ^0.34.1
     react-native-nitro-modules: ^0.33.9
     typescript: ^5.9.3
   peerDependencies:
-    "@runanywhere/core": ">=0.19.13"
+    "@runanywhere/core": ">=0.19.15"
     react: ">=19.0.0"
     react-native: ">=0.83.1"
     react-native-nitro-modules: ^0.33.9

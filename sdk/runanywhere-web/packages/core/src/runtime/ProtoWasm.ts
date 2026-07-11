@@ -1,10 +1,10 @@
-import type { SDKLogger } from '../Foundation/SDKLogger';
+import type { SDKLogger } from '../Foundation/SDKLogger.js';
 import {
   RAC_OK as RAC_SUCCESS,
   RAC_ERROR_NOT_FOUND,
   RAC_ERROR_FEATURE_NOT_AVAILABLE,
   RAC_ERROR_INVALID_ARGUMENT,
-} from '../Foundation/RACErrors';
+} from '../Foundation/RACErrors.js';
 
 const OUT_PTR_SIZE = 4;
 

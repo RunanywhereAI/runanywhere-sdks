@@ -45,7 +45,8 @@ option(RAC_WASM_DEBUG       "Enable debug assertions and verbose logging" OFF)
 option(RAC_WASM_BUILD_CORE  "Build the commons-only Web SDK WASM target" OFF)
 option(RAC_WASM_LLAMACPP    "Build the llama.cpp Web SDK WASM target (LLM + VLM)" OFF)
 option(RAC_WASM_ONNX        "Build the ONNX + Sherpa Web SDK WASM target" OFF)
-option(RAC_WASM_WEBGPU      "Also emit the WebGPU variant of the llama.cpp target (requires JSPI)" OFF)
+option(RAC_WASM_WEBGPU      "Also emit the WebGPU variant of the llama.cpp target" OFF)
+option(RAC_WASM_WEBGPU_JSPI "Use experimental JSPI instead of stable Asyncify for WebGPU" OFF)
 
 # =============================================================================
 # C++ CONFIGURATION
@@ -120,8 +121,11 @@ if(RAC_WASM_LLAMACPP)
     if(RAC_WASM_WEBGPU)
         message(STATUS "WebGPU acceleration ENABLED for llama.cpp")
         set(GGML_WEBGPU ON CACHE BOOL "" FORCE)
-        # JSPI bridges async WebGPU calls from synchronous C code
-        set(GGML_WEBGPU_JSPI ON CACHE BOOL "" FORCE)
+        # Classic Asyncify is the release default. Chrome 150 can leave a
+        # WebAssembly.promising lifecycle export pending even after the native
+        # function has returned; JSPI remains available only as an explicit
+        # experimental build option.
+        set(GGML_WEBGPU_JSPI ${RAC_WASM_WEBGPU_JSPI} CACHE BOOL "" FORCE)
     else()
         set(GGML_WEBGPU OFF CACHE BOOL "" FORCE)
     endif()
@@ -144,9 +148,8 @@ if(RAC_WASM_ONNX)
 endif()
 
 # Enable C++ exception handling at compile-time for ALL targets.
-# When WebGPU is enabled, -fwasm-exceptions is required (JSPI is
-# incompatible with the older JS-based exception mechanism).
-# Otherwise, the classic -fexceptions flag works with DISABLE_EXCEPTION_CATCHING=0.
+# JSPI requires wasm-native exceptions. Classic Asyncify and non-WebGPU builds
+# use the established JS exception mechanism.
 #
 # CRITICAL BUG FIX (WASM-EXC-01): `add_compile_options()` only applies to
 # targets created AFTER it runs. The root CMakeLists.txt adds this WASM
@@ -164,7 +167,7 @@ endif()
 # that participates in the decode call chain. Subsequently-created targets
 # (e.g. the WASM executables added below) still pick up the flag via
 # `add_compile_options()`, so we keep that for forward-coverage.
-if(RAC_WASM_WEBGPU)
+if(RAC_WASM_WEBGPU AND RAC_WASM_WEBGPU_JSPI)
     set(_RAC_WASM_EXC_FLAG "-fwasm-exceptions")
 else()
     set(_RAC_WASM_EXC_FLAG "-fexceptions")
@@ -323,6 +326,45 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # vtable directly in JS. See FetchHttpTransport.ts.
     "_rac_http_transport_register_from_js"
 
+    # Device registration bridge. TypeScript supplies browser device metadata,
+    # registration-state callbacks, and the synchronous control-plane POST
+    # required by the canonical commons device manager.
+    "_rac_device_manager_set_callbacks"
+    "_rac_device_manager_clear_callbacks"
+    "_rac_wasm_sizeof_device_callbacks"
+    "_rac_wasm_offsetof_device_callbacks_get_device_info"
+    "_rac_wasm_offsetof_device_callbacks_get_device_id"
+    "_rac_wasm_offsetof_device_callbacks_is_registered"
+    "_rac_wasm_offsetof_device_callbacks_set_registered"
+    "_rac_wasm_offsetof_device_callbacks_http_post"
+    "_rac_wasm_offsetof_device_callbacks_user_data"
+    "_rac_wasm_sizeof_device_registration_info"
+    "_rac_wasm_offsetof_device_registration_info_device_id"
+    "_rac_wasm_offsetof_device_registration_info_device_model"
+    "_rac_wasm_offsetof_device_registration_info_device_name"
+    "_rac_wasm_offsetof_device_registration_info_platform"
+    "_rac_wasm_offsetof_device_registration_info_os_version"
+    "_rac_wasm_offsetof_device_registration_info_form_factor"
+    "_rac_wasm_offsetof_device_registration_info_architecture"
+    "_rac_wasm_offsetof_device_registration_info_chip_name"
+    "_rac_wasm_offsetof_device_registration_info_total_memory"
+    "_rac_wasm_offsetof_device_registration_info_available_memory"
+    "_rac_wasm_offsetof_device_registration_info_has_neural_engine"
+    "_rac_wasm_offsetof_device_registration_info_neural_engine_cores"
+    "_rac_wasm_offsetof_device_registration_info_gpu_family"
+    "_rac_wasm_offsetof_device_registration_info_battery_level"
+    "_rac_wasm_offsetof_device_registration_info_battery_state"
+    "_rac_wasm_offsetof_device_registration_info_is_low_power_mode"
+    "_rac_wasm_offsetof_device_registration_info_core_count"
+    "_rac_wasm_offsetof_device_registration_info_performance_cores"
+    "_rac_wasm_offsetof_device_registration_info_efficiency_cores"
+    "_rac_wasm_offsetof_device_registration_info_device_fingerprint"
+    "_rac_wasm_sizeof_device_http_response"
+    "_rac_wasm_offsetof_device_http_response_result"
+    "_rac_wasm_offsetof_device_http_response_status_code"
+    "_rac_wasm_offsetof_device_http_response_response_body"
+    "_rac_wasm_offsetof_device_http_response_error_message"
+
     # Struct layout helpers used by HTTPAdapter.ts to pack/unpack
     # rac_http_request_t / rac_http_response_t / rac_http_download_request_t
     # without hard-coding offsets (safe against future field changes).
@@ -441,14 +483,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_artifact_expected_files_proto"
     "_rac_model_registry_discover_downloaded"
     "_rac_discovery_result_free"
-
-    # Hardware profile/routing proto ABI. Browser/device facts remain Web-owned;
-    # commons serializes the canonical HardwareProfileResult and accelerator
-    # preference state for generated proto-ts callers.
-    "_rac_hardware_profile_get"
-    "_rac_hardware_profile_free"
-    "_rac_hardware_get_accelerators"
-    "_rac_hardware_set_accelerator_preference"
 
     # Model types
     "_rac_framework_display_name"
@@ -696,6 +730,17 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_vad_component_get_metrics"
     "_rac_vad_component_destroy"
 
+    # Persistent VAD stream session. Web keeps one component/model alive for
+    # the full microphone iterable instead of recreating a Silero/ORT session
+    # for every audio chunk.
+    "_rac_vad_set_stream_proto_callback"
+    "_rac_vad_unset_stream_proto_callback"
+    "_rac_vad_proto_quiesce"
+    "_rac_vad_stream_start_proto"
+    "_rac_vad_stream_feed_audio_proto"
+    "_rac_vad_stream_stop_proto"
+    "_rac_vad_stream_cancel_proto"
+
     # Voice Agent
     "_rac_audio_pipeline_state_name"
     "_rac_audio_pipeline_can_activate_microphone"
@@ -756,6 +801,16 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_storage_analyzer_availability_proto"
     "_rac_storage_analyzer_delete_plan_proto"
     "_rac_storage_analyzer_delete_proto"
+    "_rac_wasm_sizeof_storage_callbacks"
+    "_rac_wasm_offsetof_storage_callbacks_calculate_dir_size"
+    "_rac_wasm_offsetof_storage_callbacks_get_file_size"
+    "_rac_wasm_offsetof_storage_callbacks_path_exists"
+    "_rac_wasm_offsetof_storage_callbacks_get_available_space"
+    "_rac_wasm_offsetof_storage_callbacks_get_total_space"
+    "_rac_wasm_offsetof_storage_callbacks_delete_path"
+    "_rac_wasm_offsetof_storage_callbacks_is_model_loaded"
+    "_rac_wasm_offsetof_storage_callbacks_unload_model"
+    "_rac_wasm_offsetof_storage_callbacks_user_data"
 
     # File manager cache/temp clears. C++-side shims (wasm_exports.cpp) build
     # the rac_file_callbacks_t against this module's MEMFS and forward to
@@ -849,6 +904,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_embeddings_embed"
     "_rac_embeddings_embed_batch"
     "_rac_embeddings_embed_batch_proto"
+    "_rac_embeddings_embed_batch_lifecycle_proto"
     "_rac_embeddings_get_info"
     "_rac_embeddings_cleanup"
     "_rac_embeddings_destroy"
@@ -909,7 +965,10 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_auth_get_user_id"
     "_rac_auth_get_organization_id"
     "_rac_auth_get_access_token"
+    "_rac_state_get_device_id"
+    "_rac_state_set_device_registered"
     "_rac_state_is_device_registered"
+    "_rac_device_manager_register_if_needed"
 
     # Telemetry
     "_rac_telemetry_manager_create"
@@ -1031,6 +1090,23 @@ set(RAC_EXPORTED_FUNCTIONS_LLAMACPP
 )
 
 set(RAC_EXPORTED_FUNCTIONS_ONNX
+    # Lifecycle-owned STT. These handle-less exports resolve the model loaded
+    # by ModelLifecycle and must only ship with the ONNX/Sherpa speech target.
+    "_rac_stt_transcribe_lifecycle_proto"
+    "_rac_stt_transcribe_stream_lifecycle_proto"
+    # Lifecycle-owned TTS. Avoid temporary component loads replacing the
+    # canonical voice in RACommons' latest-load-wins lifecycle map.
+    "_rac_tts_synthesize_lifecycle_proto"
+    "_rac_tts_synthesize_stream_lifecycle_proto"
+    "_rac_tts_stop_lifecycle_proto"
+    "_rac_tts_list_voices_lifecycle_proto"
+    # Lifecycle-owned VAD. Reuse the loaded detector and its recurrent state
+    # instead of allocating a second Sherpa/ORT session for microphone input.
+    "_rac_vad_process_lifecycle_proto"
+    "_rac_vad_configure_lifecycle_proto"
+    "_rac_vad_start_lifecycle_proto"
+    "_rac_vad_stop_lifecycle_proto"
+    "_rac_vad_reset_lifecycle_proto"
     # TTS (Piper via ONNX)
     "_rac_tts_onnx_create"
     "_rac_tts_onnx_synthesize"
@@ -1091,14 +1167,15 @@ set(RAC_EXPORTED_FUNCTIONS_RAG
 )
 
 # =============================================================================
-# WebGPU/JSPI suspending-import list (shared by webgpu llamacpp variant)
+# Experimental WebGPU/JSPI export list (release builds use Asyncify)
 # =============================================================================
 # WASM export names do NOT have the leading underscore that
 # -sEXPORTED_FUNCTIONS uses. The JSPI regex in the glue JS matches against
 # the raw export names, so we must omit the underscore here.
 
 set(RAC_JSPI_EXPORTS
-    # Module init (static constructors probe for WebGPU adapter)
+    # Static initialization may transitively enter Emdawn during module boot;
+    # keep the constructor export promising so the factory can complete it.
     "__wasm_call_ctors"
     # SDK init (rac_init may initialize GPU context)
     "rac_init"
@@ -1138,7 +1215,7 @@ set(RAC_JSPI_EXPORTS
 #   OUTPUT_NAME       -- Emscripten output base (e.g. racommons-llamacpp)
 #   OUTPUT_DIR        -- Final staging directory (post-build copy destination)
 #   EXPORT_NAME       -- -sEXPORT_NAME= module factory (e.g. createLlamaCppModule)
-#   ENABLE_WEBGPU     -- ON to add JSPI + WebGPU link flags (default OFF)
+#   ENABLE_WEBGPU     -- ON to add the selected async bridge + WebGPU flags
 # Multi-value args:
 #   LINK_LIBRARIES    -- CMake targets to PRIVATE link (rac_commons + backend archives)
 #   EXPORTED_FUNCTIONS -- Final list of _rac_* exports for this target
@@ -1195,9 +1272,20 @@ function(rac_wasm_add_target)
         "-sEXPORT_ES6=1"
         "-sEXPORT_NAME=${RWT_EXPORT_NAME}"
         "-sENVIRONMENT=web,worker"
+        # The public C ABI uses uint64_t session/subscription identifiers.
+        # Make Emscripten's JS boundary deterministic instead of relying on
+        # the toolchain default: i64 values cross the boundary as BigInt.
+        "-sWASM_BIGINT=1"
 
         # Memory
         "-sALLOW_MEMORY_GROWTH=1"
+        # Emscripten 6 can expose WebAssembly.Memory through a resizable
+        # ArrayBuffer when the browser implements toResizableBuffer(). Chrome's
+        # TextDecoder rejects views backed by that buffer, which breaks
+        # Emscripten's own UTF8ToString during backend registration. Keep the
+        # established fixed-view refresh path until the Web platform permits
+        # TextDecoder on resizable WASM memory.
+        "-sGROWABLE_ARRAYBUFFERS=0"
         "-sINITIAL_MEMORY=33554432"    # 32 MB initial
         "-sMAXIMUM_MEMORY=4294967296"  # 4 GB max (needed for large VLM models + mmproj)
         "-sSTACK_SIZE=1048576"         # 1 MB stack
@@ -1225,45 +1313,54 @@ function(rac_wasm_add_target)
         "-Wno-undefined"
     )
 
-    # Exception model. WebGPU uses wasm-native exceptions (JSPI requirement);
-    # everything else uses the classic JS-based mechanism.
-    if(RWT_ENABLE_WEBGPU)
-        # nothing — -fwasm-exceptions added below via EXTRA_LINK_FLAGS
+    # Exception model. Experimental JSPI uses wasm-native exceptions;
+    # Asyncify and non-WebGPU targets use classic JS exception catching.
+    if(RWT_ENABLE_WEBGPU AND RAC_WASM_WEBGPU_JSPI)
+        # Added below with the JSPI flags.
     else()
         list(APPEND _link_flags "-sDISABLE_EXCEPTION_CATCHING=0")
     endif()
 
     # Threading (optional)
     if(RAC_WASM_PTHREADS)
+        # ONNX/Sherpa owns RAG Solutions. A compiled RAG graph starts four
+        # operator threads plus three payload-guard threads, so every threaded
+        # release module pre-spawns eight workers. This keeps an immediate
+        # destroy/join from waiting on a Worker that cannot start until the
+        # browser event loop.
+        set(_pthread_pool_size 8)
         list(APPEND _link_flags
             "-pthread"
-            # Pre-spawn enough workers to cover the engine's max compute thread
-            # count (get_num_threads caps at 8). VLM inference runs synchronously
-            # on the main thread; if ggml's threadpool needs to spawn a worker
-            # on-demand mid-encode, the blocked main thread can never service the
-            # Worker creation → mtmd_helper_eval_chunks deadlocks. Sizing the
-            # pool to 8 means all compute threads are already live, so no
-            # on-demand spawn happens during the blocked call.
-            "-sPTHREAD_POOL_SIZE=8"
+            # Pre-spawn the target's validated pool. This prevents synchronous
+            # native calls from requesting a new Worker while the main thread
+            # is unavailable to service that request.
+            "-sPTHREAD_POOL_SIZE=${_pthread_pool_size}"
             "-sPTHREAD_POOL_SIZE_STRICT=0"
         )
         target_compile_options(${RWT_NAME} PRIVATE "-pthread")
     endif()
 
-    # WebGPU / JSPI (only for the llamacpp+webgpu variant)
+    # WebGPU async bridge (only for the llamacpp+webgpu variant)
     if(RWT_ENABLE_WEBGPU)
-        string(JOIN "\",\"" _jspi_str ${RAC_JSPI_EXPORTS})
-        list(APPEND _link_flags
-            "-sJSPI"                     # Enable JSPI for async WebGPU calls from sync C
-            # NOTE: Do NOT add -sASYNCIFY=0 here. -sJSPI internally sets ASYNCIFY=2;
-            # an explicit ASYNCIFY=0 would override and disable JSPI.
-            "-sJSPI_EXPORTS=[\"${_jspi_str}\"]"
-            # Only wrap WebGPU-async imports with WebAssembly.Suspending so
-            # sync imports (e.g. fd_write log lines emitted during model
-            # loading) keep zero JSPI overhead.
-            "-sJSPI_IMPORTS=[\"wgpuInstanceRequestAdapter\",\"wgpuAdapterRequestDevice\",\"wgpuBufferMapAsync\",\"wgpuDeviceCreateComputePipelineAsync\",\"wgpuDeviceCreateRenderPipelineAsync\",\"wgpuQueueOnSubmittedWorkDone\",\"wgpuInstanceProcessEvents\"]"
-            "-fwasm-exceptions"          # WASM-native exceptions (required by JSPI)
-        )
+        if(RAC_WASM_WEBGPU_JSPI)
+            string(JOIN "\",\"" _jspi_str ${RAC_JSPI_EXPORTS})
+            list(APPEND _link_flags
+                "-sJSPI"
+                "-sJSPI_EXPORTS=[\"${_jspi_str}\"]"
+                "-sJSPI_IMPORTS=[\"wgpuInstanceRequestAdapter\",\"wgpuAdapterRequestDevice\",\"wgpuBufferMapAsync\",\"wgpuDeviceCreateComputePipelineAsync\",\"wgpuDeviceCreateRenderPipelineAsync\",\"wgpuQueueOnSubmittedWorkDone\",\"wgpuInstanceProcessEvents\"]"
+                "-fwasm-exceptions"
+            )
+        else()
+            # Emdawn marks emwgpuWaitAny async; Asyncify instruments the
+            # transitive call graph and ccall({async:true}) returns a Promise.
+            # llama.cpp reaches the wait through a deep C++ load/inference
+            # stack. Size the saved continuation to the module's 1 MiB native
+            # stack instead of relying on Emscripten's 4 KiB default.
+            list(APPEND _link_flags
+                "-sASYNCIFY=1"
+                "-sASYNCIFY_STACK_SIZE=1048576"
+            )
+        endif()
     endif()
 
     # Debug vs release

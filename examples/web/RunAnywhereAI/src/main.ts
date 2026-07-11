@@ -2,8 +2,8 @@
  * RunAnywhere AI - Web Demo Application
  *
  * Full-featured demo matching the iOS example app.
- * 11-tab navigation: Chat, Vision, Voice, Transcribe, Speak, VAD, Docs,
- * Storage, Solutions, Bench, Settings (see `TABS` in app.ts).
+ * Twelve-panel navigation: Chat, Advanced, Storage, Settings, Voice, Vision,
+ * Documents, Transcribe, Speak, VAD, Solutions, and Benchmarks.
  */
 
 import './styles/design-system.css';
@@ -11,15 +11,25 @@ import './styles/commons.css';
 import './styles/components.css';
 import { buildAppShell } from './app';
 import {
+  environmentDescription,
+  environmentShouldSendTelemetry,
   RunAnywhere,
   modelInfoIsAvailableForUse,
   modelInfoIsDownloadedOnDisk,
 } from '@runanywhere/web';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 import { registerAll as registerModelCatalogAll } from './services/model-catalog';
-import { notifyCatalogRegistered } from './components/model-selection';
-import { getStoredApiKey, getStoredBaseURL } from './views/settings';
+import {
+  notifyCatalogRegistered,
+  resetCatalogRegistrationState,
+} from './components/model-selection';
+import {
+  setAPIConfigurationApplyHandler,
+  type APIConfiguration,
+  type APIConfigurationApplyResult,
+} from './views/settings';
 import { formatError } from './services/format-error';
+import { appLogger } from './services/app-logger';
 
 type AppReadinessState = 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
 type SDKReadinessState = 'initializing' | 'ready' | 'unavailable';
@@ -62,12 +72,24 @@ let sdkInitializationError: string | undefined;
 let backendReadinessState: BackendReadinessState = 'pending';
 let backendRegistrationError: string | undefined;
 
+interface RuntimeConfiguration {
+  environment: SDKEnvironment;
+  apiKey?: string;
+  baseURL?: string;
+}
+
+let activeRuntimeConfiguration: RuntimeConfiguration | null = null;
+let runtimeReconfigurationPromise: Promise<APIConfigurationApplyResult> | null = null;
+let unsubscribeAccelerationBadge: (() => void) | null = null;
+
+setAPIConfigurationApplyHandler(applyAPIConfiguration);
+
 function publishReadiness(state: AppReadinessState, error?: string): AppReadinessSnapshot {
   const probe = probeAppShell();
   // Inference readiness is independent of app-shell readiness: when the
   // backend WASM is missing or fails to register, the model selector is
   // intentionally disabled (catalogRegistered=false), but the rest of the
-  // demo (Voice/Documents/Settings tabs, feature-unavailable placeholders)
+  // demo (Voice/Documents/Settings tabs plus explicit unavailable states)
   // is still navigable. Treating that as "not interactive" would convert
   // the documented degraded mode into a fatal initialization error view.
   const backendDegraded = backendReadinessState === 'unavailable';
@@ -216,19 +238,19 @@ async function waitForInteractiveShell(): Promise<AppReadinessSnapshot> {
  * Registers a service worker that injects COOP/COEP headers for browsers
  * that don't support `credentialless` COEP (Safari/WebKit).
  *
- * - On Chrome/Firefox: `crossOriginIsolated` is already true via server
- *   headers, so this is a no-op (SW registers silently for future use).
+ * - On Chrome/Firefox: `crossOriginIsolated` is already true via Vite or the
+ *   static host's response headers, so this is a no-op.
  * - On Safari/iOS: `crossOriginIsolated` is false, so the SW installs
  *   and the page reloads once to activate it.
  */
 async function ensureCrossOriginIsolation(): Promise<void> {
   if (crossOriginIsolated) {
-    console.log('[COI] Already cross-origin isolated');
+    appLogger.info('[COI] Already cross-origin isolated');
     return;
   }
 
   if (!('serviceWorker' in navigator)) {
-    console.warn('[COI] Service workers not supported — SharedArrayBuffer may be unavailable');
+    appLogger.warning('[COI] Service workers not supported — SharedArrayBuffer may be unavailable');
     return;
   }
 
@@ -237,7 +259,7 @@ async function ensureCrossOriginIsolation(): Promise<void> {
   // If the SW is already active and controlling this page, COI should be
   // enabled. If we're still not isolated, something else is wrong.
   if (navigator.serviceWorker.controller) {
-    console.warn('[COI] Service worker active but page is not cross-origin isolated');
+    appLogger.warning('[COI] Service worker active but page is not cross-origin isolated');
     return;
   }
 
@@ -252,7 +274,7 @@ async function ensureCrossOriginIsolation(): Promise<void> {
       // If it's already activated by the time we check
       if (sw.state === 'activated') resolve();
     });
-    console.log('[COI] Service worker activated — reloading for cross-origin isolation');
+    appLogger.info('[COI] Service worker activated — reloading for cross-origin isolation');
     window.location.reload();
     // Halt execution — the reload will re-enter main()
     await new Promise(() => {});
@@ -295,11 +317,10 @@ async function main(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function initializeSDK(): Promise<void> {
-  // V2 Architecture: core (`@runanywhere/web`) is pure TypeScript with no WASM.
-  // Backend packages register independently — `@runanywhere/web-llamacpp`
-  // loads `racommons-llamacpp.wasm` and installs the module on every core
-  // proto-byte adapter via `setRunanywhereModule`. Until a backend has
-  // registered, inference verbs throw "backend not available".
+  // V2 Architecture: core (`@runanywhere/web`) owns the backend-neutral
+  // TypeScript facade plus the commons-only `racommons.wasm`. Backend packages
+  // register independently and load their own self-contained inference WASM;
+  // until one registers a capability, that inference verb reports unavailable.
   //
   // Mirrors iOS `initializeSDK()` (RunAnywhereAIApp.swift:84-109):
   // initialize → register backends → ModelCatalogBootstrap.registerAll() →
@@ -310,91 +331,11 @@ async function initializeSDK(): Promise<void> {
   // concurrency suspension race; on Web the backend packages install onto
   // core adapters, so the SDK-documented order is initialize() first.
   try {
-    // Credentials from Settings — iOS parity: runSDKInitialize()
-    // (RunAnywhereAIApp.swift:113-138). When a usable apiKey + baseURL pair
-    // is stored, initialize against production; otherwise development.
-    // Logging boots from the environment automatically inside initialize().
-    const apiKey = getStoredApiKey();
-    const baseURL = getStoredBaseURL();
-    if (
-      apiKey !== null
-      && baseURL !== null
-      && !looksLikePlaceholder(apiKey)
-      && isUsableHTTPURL(baseURL)
-    ) {
-      await RunAnywhere.initialize({
-        apiKey,
-        baseURL,
-        environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-      });
-    } else {
-      await RunAnywhere.initialize({
-        environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-      });
-    }
-
-    // Attempt to restore previously chosen local storage directory
-    // (web-only: File System Access API persistence).
-    const localRestored = await RunAnywhere.storage.restoreLocalStorage();
-    if (localRestored) {
-      console.log('[RunAnywhere] Local storage restored:', RunAnywhere.storage.localStorageDirectoryName);
-    }
-
-    // Register the llamacpp WASM backend. This is best-effort: if the
-    // WASM file is missing (e.g. a fresh dev cold-start before the build
-    // ran), the rest of the app shell continues to load and views show
-    // their `feature-unavailable` placeholder. Backend status is recorded
-    // on the readiness snapshot so the interactive probe can treat the
-    // disabled model picker as a degraded-but-interactive state instead
-    // of a fatal initialization failure.
-    let activeAcceleration: 'cpu' | 'webgpu' = 'cpu';
-    try {
-      const { LlamaCPP } = await import('@runanywhere/web-llamacpp');
-      await LlamaCPP.register({ acceleration: 'auto' });
-      activeAcceleration = LlamaCPP.accelerationMode;
-      backendReadinessState = 'registered';
-      backendRegistrationError = undefined;
-      console.log('[RunAnywhere] llamacpp backend registered:', activeAcceleration);
-    } catch (err) {
-      backendReadinessState = 'unavailable';
-      backendRegistrationError = formatError(err);
-      console.warn(
-        '[RunAnywhere] llamacpp backend failed to register; chat will show feature-unavailable:',
-        backendRegistrationError,
-      );
-    }
-
-    // Register the ONNX/Sherpa WASM backend (STT/TTS/VAD/Embeddings) at init
-    // alongside llamacpp — iOS parity: RunAnywhereAIApp.swift:89-90
-    // (`LlamaCPP.register` + `ONNX.register`). Same degraded, non-fatal
-    // behavior as llamacpp on failure.
-    try {
-      const { ONNX } = await import('@runanywhere/web-onnx');
-      await ONNX.register();
-      console.log('[RunAnywhere] onnx/sherpa backend registered');
-    } catch (err) {
-      console.warn(
-        '[RunAnywhere] onnx backend failed to register; STT/TTS/VAD will show feature-unavailable:',
-        formatError(err),
-        '| details:',
-        (err as { proto?: { nestedMessage?: string } })?.proto?.nestedMessage ?? '(none)',
-      );
-    }
-
-    // Register the example model catalog ONCE — iOS parity:
-    // RunAnywhereAIApp.swift:98 (`ModelCatalogBootstrap.registerAll()`).
-    const registeredCount = await registerModelCatalogAll();
-    notifyCatalogRegistered(registeredCount);
-
-    // iOS parity: RunAnywhereAIApp.swift:99 (`refreshSDKCatalogs()`).
-    await refreshSDKCatalogs();
-
-    console.log(
-      '[RunAnywhere] SDK initialized, version:', RunAnywhere.version,
-      '| storage backend:', RunAnywhere.storage.backend,
-    );
-
-    showAccelerationBadge(activeAcceleration);
+    const configuration: RuntimeConfiguration = {
+      environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+    };
+    await startRuntime(configuration, false);
+    activeRuntimeConfiguration = configuration;
     sdkReadinessState = 'ready';
     sdkInitializationError = undefined;
   } catch (err) {
@@ -407,11 +348,235 @@ async function initializeSDK(): Promise<void> {
 }
 
 /**
+ * Initialize core, register both independent WASM backends, then seed and
+ * hydrate the model catalog. Settings reuses this exact boot path so applying
+ * credentials cannot leave a partially configured runtime hidden behind a
+ * success message.
+ */
+async function startRuntime(
+  configuration: RuntimeConfiguration,
+  requireAllBackends: boolean,
+): Promise<void> {
+  await RunAnywhere.initialize(configuration);
+
+  const localRestored = await RunAnywhere.storage.restoreLocalStorage();
+  if (localRestored) {
+    appLogger.info('[RunAnywhere] Local storage restored:', RunAnywhere.storage.localStorageDirectoryName);
+  }
+
+  let activeAcceleration: 'cpu' | 'webgpu' = 'cpu';
+  const backendErrors: string[] = [];
+
+  try {
+    const { LlamaCPP } = await import('@runanywhere/web-llamacpp');
+    await LlamaCPP.register({ acceleration: 'auto' });
+    activeAcceleration = LlamaCPP.accelerationMode;
+    appLogger.info('[RunAnywhere] llamacpp backend registered:', activeAcceleration);
+  } catch (err) {
+    const message = formatError(err);
+    backendErrors.push(`llamacpp: ${message}`);
+    appLogger.warning(
+      '[RunAnywhere] llamacpp backend failed to register; chat will show feature-unavailable:',
+      err,
+    );
+  }
+
+  try {
+    const { ONNX } = await import('@runanywhere/web-onnx');
+    await ONNX.register();
+    appLogger.info('[RunAnywhere] onnx/sherpa backend registered');
+  } catch (err) {
+    const message = formatError(err);
+    backendErrors.push(`onnx/sherpa: ${message}`);
+    appLogger.warning(
+      '[RunAnywhere] onnx backend failed to register; STT/TTS/VAD will show feature-unavailable:',
+      err,
+    );
+  }
+
+  backendReadinessState = backendErrors.length === 0 ? 'registered' : 'unavailable';
+  backendRegistrationError = backendErrors.length > 0 ? backendErrors.join('; ') : undefined;
+  if (requireAllBackends && backendErrors.length > 0) {
+    throw new Error(`Backend registration failed (${backendErrors.join('; ')})`);
+  }
+
+  // Backend registration installs the active WASM transport. Complete Phase
+  // 2 against that transport explicitly; production Settings must not report
+  // success while auth/device registration are merely deferred.
+  await RunAnywhere.completeServicesInitialization();
+  if (
+    requireAllBackends
+    && configuration.environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+  ) {
+    await requireProductionIdentity();
+  }
+
+  const registeredCount = await registerModelCatalogAll();
+  notifyCatalogRegistered(registeredCount);
+  if (requireAllBackends && registeredCount === 0) {
+    throw new Error('Model catalog registration failed: no models were registered.');
+  }
+
+  // Explicitly await hydration on every runtime lifetime. The SDK also
+  // schedules best-effort hydration after each model registration; awaiting
+  // here makes Settings reconfiguration completion truthful and deterministic.
+  await RunAnywhere.hydrateModelRegistry();
+  await refreshSDKCatalogs();
+
+  appLogger.info(
+    '[RunAnywhere] SDK initialized, version:', RunAnywhere.version,
+    '| storage backend:', RunAnywhere.storage.backend,
+  );
+
+  showAccelerationBadge(activeAcceleration);
+  unsubscribeAccelerationBadge?.();
+  unsubscribeAccelerationBadge = RunAnywhere.events.on('sdk.accelerationMode', ({ mode }) => {
+    showAccelerationBadge(mode);
+  });
+}
+
+async function requireProductionIdentity(): Promise<void> {
+  const deadline = Date.now() + 60_000;
+  let latest = {
+    authenticated: false,
+    deviceRegistered: false,
+    hasUserId: false,
+    hasOrganizationId: false,
+  };
+  while (Date.now() < deadline) {
+    latest = {
+      authenticated: RunAnywhere.isAuthenticated,
+      deviceRegistered: RunAnywhere.isDeviceRegistered(),
+      hasUserId: Boolean(RunAnywhere.getUserId()),
+      hasOrganizationId: Boolean(RunAnywhere.getOrganizationId()),
+    };
+    if (
+      latest.authenticated
+      && latest.deviceRegistered
+      && (latest.hasUserId || latest.hasOrganizationId)
+    ) {
+      return;
+    }
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 500));
+  }
+  throw new Error(
+    'Production authentication or device registration did not complete '
+    + `(authenticated=${latest.authenticated}, `
+    + `deviceRegistered=${latest.deviceRegistered}, `
+    + `userIdAvailable=${latest.hasUserId}, `
+    + `organizationIdAvailable=${latest.hasOrganizationId})`,
+  );
+}
+
+/**
+ * Apply Settings credentials in-place. If the new production runtime fails,
+ * restore the previous in-memory configuration so the rest of the app remains
+ * usable; neither configuration is written to localStorage.
+ */
+function applyAPIConfiguration(
+  configuration: APIConfiguration,
+): Promise<APIConfigurationApplyResult> {
+  if (runtimeReconfigurationPromise) return runtimeReconfigurationPromise;
+
+  runtimeReconfigurationPromise = (async () => {
+    const next: RuntimeConfiguration = {
+      ...configuration,
+      environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+    };
+    const previous = activeRuntimeConfiguration;
+
+    sdkReadinessState = 'initializing';
+    backendReadinessState = 'pending';
+    backendRegistrationError = undefined;
+
+    try {
+      await teardownRuntime();
+      await startRuntime(next, true);
+      activeRuntimeConfiguration = next;
+      sdkReadinessState = 'ready';
+      sdkInitializationError = undefined;
+      return {
+        environment: environmentDescription(next.environment),
+        telemetryEnabled: environmentShouldSendTelemetry(next.environment),
+      };
+    } catch (err) {
+      const applyError = formatError(err);
+      let restored = false;
+      try {
+        await teardownRuntime();
+        const fallback = previous
+          ?? { environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT };
+        await startRuntime(fallback, false);
+        activeRuntimeConfiguration = fallback;
+        sdkReadinessState = 'ready';
+        sdkInitializationError = undefined;
+        restored = true;
+      } catch (restoreErr) {
+        sdkReadinessState = 'unavailable';
+        sdkInitializationError = formatError(restoreErr);
+      }
+
+      throw new Error(
+        restored
+          ? `Could not apply production configuration: ${applyError}. The previous runtime was restored.`
+          : `Could not apply production configuration: ${applyError}. Runtime recovery also failed.`,
+      );
+    }
+  })().finally(() => {
+    runtimeReconfigurationPromise = null;
+  });
+
+  return runtimeReconfigurationPromise;
+}
+
+/** Backends own native registrations, so release them before core shutdown. */
+async function teardownRuntime(): Promise<void> {
+  unsubscribeAccelerationBadge?.();
+  unsubscribeAccelerationBadge = null;
+  resetCatalogRegistrationState();
+
+  // The split-WASM RAG provider owns an in-memory vector index and can have
+  // an embeddings/LLM operation in flight. Drop that provider before either
+  // underlying module is unregistered.
+  try {
+    await RunAnywhere.ragDestroyPipeline();
+  } catch (err) {
+    appLogger.warning('[RunAnywhere] RAG teardown failed:', err);
+  }
+
+  // Voice orchestration can own a Sherpa VAD handle and an in-flight llama
+  // generation across the two backend modules. Release it while both modules
+  // are still registered; otherwise a later runtime lifetime could try to
+  // destroy the stale numeric handle against the newly loaded ONNX module.
+  try {
+    await RunAnywhere.cleanupVoiceAgent();
+  } catch (err) {
+    appLogger.warning('[RunAnywhere] voice-agent teardown failed:', err);
+  }
+
+  try {
+    const { ONNX } = await import('@runanywhere/web-onnx');
+    ONNX.unregister();
+  } catch (err) {
+    appLogger.warning('[RunAnywhere] ONNX teardown failed:', err);
+  }
+
+  try {
+    const { LlamaCPP } = await import('@runanywhere/web-llamacpp');
+    LlamaCPP.unregister();
+  } catch (err) {
+    appLogger.warning('[RunAnywhere] llamacpp teardown failed:', err);
+  }
+
+  await RunAnywhere.shutdown();
+}
+
+/**
  * Post-init registry refresh + logging — iOS parity: `refreshSDKCatalogs()`
  * (RunAnywhereAIApp.swift:168-193).
  */
 async function refreshSDKCatalogs(): Promise<void> {
-  console.log('[RunAnywhere] Refreshing SDK model registry...');
+  appLogger.info('[RunAnywhere] Refreshing SDK model registry...');
 
   RunAnywhere.refreshModelRegistry();
 
@@ -420,51 +585,26 @@ async function refreshSDKCatalogs(): Promise<void> {
     const models = list.models;
     const downloaded = models.filter((m) => modelInfoIsDownloadedOnDisk(m)).length;
     const available = models.filter((m) => modelInfoIsAvailableForUse(m)).length;
-    console.log(
+    appLogger.info(
       `[RunAnywhere] Model registry: registered=${models.length}, downloaded=${downloaded}, available=${available}`,
     );
   } else {
-    console.warn('[RunAnywhere] Model registry refresh incomplete: list unavailable');
+    appLogger.warning('[RunAnywhere] Model registry refresh incomplete: list unavailable');
   }
 
   try {
     const adapters = await RunAnywhere.lora.allRegistered();
-    console.log(`[RunAnywhere] LoRA registry: ${adapters.length} entries`);
+    appLogger.info(`[RunAnywhere] LoRA registry: ${adapters.length} entries`);
   } catch (err) {
-    console.warn('[RunAnywhere] LoRA catalog unavailable:', formatError(err));
+    appLogger.warning('[RunAnywhere] LoRA catalog unavailable:', err);
   }
-}
-
-/**
- * iOS parity: `looksLikePlaceholder(_:)` (RunAnywhereAIApp.swift:140-145).
- */
-function looksLikePlaceholder(value: string): boolean {
-  return /YOUR_|<your|REPLACE_ME|PLACEHOLDER/i.test(value);
-}
-
-/**
- * iOS parity: `isUsableHTTPURL(_:)` (RunAnywhereAIApp.swift:147-161).
- */
-function isUsableHTTPURL(value: string): boolean {
-  const trimmed = value.trim();
-  if (looksLikePlaceholder(trimmed)) return false;
-  let url: URL;
-  try {
-    url = new URL(trimmed);
-  } catch {
-    return false;
-  }
-  const scheme = url.protocol.replace(':', '').toLowerCase();
-  if (scheme !== 'http' && scheme !== 'https') return false;
-  const host = url.hostname;
-  if (!host || /\s/.test(host) || host.includes('<') || host.includes('>')) return false;
-  return true;
 }
 
 /**
  * Display a small floating badge indicating the active hardware acceleration.
  */
 function showAccelerationBadge(mode: string): void {
+  document.getElementById('accel-badge')?.remove();
   const badge = document.createElement('div');
   badge.id = 'accel-badge';
   const isGPU = mode === 'webgpu';
@@ -529,14 +669,19 @@ function showErrorView(message: string): void {
     <div class="error-view">
       <div class="error-icon">&#9888;&#65039;</div>
       <h2>Initialization Failed</h2>
-      <p class="text-secondary max-w-md">${message}</p>
+      <p class="text-secondary max-w-md" id="initialization-error-message"></p>
       <button class="btn btn-primary btn-lg" id="retry-btn">Retry</button>
     </div>
   `;
 
+  // Initialization errors can contain remote/WASM-provided text. Render the
+  // diagnostic as text so a failed upstream cannot inject markup into the app.
+  const messageElement = document.getElementById('initialization-error-message');
+  if (messageElement) messageElement.textContent = message;
+
   document.getElementById('retry-btn')!.addEventListener('click', () => {
     app.innerHTML = '';
-    main();
+    void main();
   });
 }
 
@@ -544,4 +689,4 @@ function showErrorView(message: string): void {
 // Start
 // ---------------------------------------------------------------------------
 
-main();
+void main();

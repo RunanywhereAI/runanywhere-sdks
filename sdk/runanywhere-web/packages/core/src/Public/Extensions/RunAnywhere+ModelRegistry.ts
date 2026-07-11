@@ -13,18 +13,18 @@ import {
   ModelRegistryAdapter,
   type ModelRegistryAvailability,
   type RefreshOptions,
-} from '../../Adapters/ModelRegistryAdapter';
+} from '../../Adapters/ModelRegistryAdapter.js';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
-} from '../../runtime/EmscriptenModule';
+} from '../../runtime/EmscriptenModule.js';
 
 interface DefaultFrameworkModule extends EmscriptenRunanywhereModule {
   /** Proto-int wrapper over rac_model_category_default_framework (wasm_exports.cpp). */
   _rac_model_category_default_framework_proto?(protoCategory: number): number;
 }
 
-export type { ModelRegistryAvailability } from '../../Adapters/ModelRegistryAdapter';
+export type { ModelRegistryAvailability } from '../../Adapters/ModelRegistryAdapter.js';
 
 function requireAdapter(): ModelRegistryAdapter {
   const adapter = ModelRegistryAdapter.tryDefault();
@@ -62,6 +62,10 @@ export const ModelRegistry = {
 
   updateModel(model: ModelInfo): boolean {
     return requireAdapter().update(model);
+  },
+
+  updateDownloadStatus(modelId: string, localPath: string | null): boolean {
+    return requireAdapter().updateDownloadStatus(modelId, localPath);
   },
 
   getModel(modelId: string): ModelInfo | null {

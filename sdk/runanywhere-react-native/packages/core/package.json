@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/core",
-  "version": "0.19.13",
+  "version": "0.19.15",
   "description": "Core SDK for RunAnywhere React Native - includes RACommons bindings, native bridges, and public API",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -35,12 +35,15 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --max-warnings 0",
+    "lint:fix": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --fix",
+    "clean": "tsc -b --clean && rm -rf lib lib-test",
     "test": "jest --config jest.config.js",
     "test:watch": "jest --config jest.config.js --watch",
     "nitrogen": "nitrogen && node scripts/fix-nitrogen-output.js",
     "prepack": "mkdir -p ios/URLSessionHttpTransport && cp -f ../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm",
-    "prepublishOnly": "npm run typecheck && node scripts/fix-nitrogen-output.js"
+    "prepublishOnly": "npm run typecheck && npm run lint && node scripts/fix-nitrogen-output.js"
   },
   "keywords": [
     "react-native",
@@ -79,6 +82,7 @@
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "@types/react": "~19.2.14",
+    "eslint": "^9.39.4",
     "jest": "^29.7.0",
     "nitrogen": "^0.34.1",
     "react-native-nitro-modules": "^0.33.9",

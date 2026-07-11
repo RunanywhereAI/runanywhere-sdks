@@ -8,10 +8,10 @@ set -euo pipefail
 # Installs and activates the Emscripten SDK (emsdk) for building
 # RACommons to WebAssembly.
 #
-# Minimum version: 5.0.0
-#   - Required for WebGPU + JSPI support (-sJSPI / ASYNCIFY=2).
-#   - Older versions (e.g. 3.1.51) lack JSPI and ship a broken
-#     wgpuInstanceWaitAny stub that crashes WebGPU inference.
+# The exact version is sourced from sdk/runanywhere-commons/VERSIONS.
+# Emscripten 5+ is required for the current WebGPU/Asyncify toolchain;
+# using the canonical pin keeps generated glue and vendored archive provenance
+# in lockstep.
 #
 # Usage:
 #   ./scripts/setup-emsdk.sh              # Install to ./emsdk/
@@ -22,7 +22,15 @@ set -euo pipefail
 #
 # =============================================================================
 
-EMSDK_VERSION="5.0.0"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WASM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${WASM_DIR}/../../.." && pwd)"
+
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/sdk/runanywhere-commons/scripts/load-versions.sh"
+: "${EMSCRIPTEN_VERSION:?EMSCRIPTEN_VERSION is missing from the canonical VERSIONS file}"
+
+EMSDK_VERSION="${EMSCRIPTEN_VERSION}"
 INSTALL_DIR="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/emsdk}"
 
 echo "======================================"

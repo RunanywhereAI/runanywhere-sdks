@@ -499,6 +499,7 @@ _rac_dev_config_is_usable_http_url
 
 # Device registration manager — the commons-side device id cache and
 # deferred registration trigger called by CppBridge+Device.swift.
+_rac_device_manager_clear_callbacks
 _rac_device_manager_clear_registration
 _rac_device_manager_get_device_id
 _rac_device_manager_is_registered

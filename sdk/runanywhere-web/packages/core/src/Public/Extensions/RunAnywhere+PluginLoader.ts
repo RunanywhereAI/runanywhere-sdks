@@ -7,11 +7,11 @@
  */
 
 import type { PluginInfo } from '@runanywhere/proto-ts/plugin_loader';
-import { SDKException } from '../../Foundation/SDKException';
+import { SDKException } from '../../Foundation/SDKException.js';
 import {
   tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
-} from '../../runtime/EmscriptenModule';
+} from '../../runtime/EmscriptenModule.js';
 
 export type { PluginInfo };
 

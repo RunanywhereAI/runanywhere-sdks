@@ -17,7 +17,7 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.19.13")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.19.15")
 //   Keep `useLocalNatives = false` so SPM downloads signed XCFrameworks from
 //   the GitHub release.
 //
@@ -45,19 +45,20 @@ import Foundation
 // useLocalNatives = false → Download XCFrameworks from GitHub releases (PRODUCTION).
 //                           For external users via SPM. No local build needed.
 //
-// Toggling: this is a hand-edited flag. Release tooling sets it to `false`
-// before tagging a release; local devs flip it back to `true` and run
-// `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` to regenerate the on-disk binaries.
+// Toggling: this is a hand-edited flag. A release-preparation commit must set
+// it to `false` and commit fresh remote-binary checksums BEFORE tagging;
+// post-tag workflow output cannot change the Package.swift stored at that tag.
+// Local devs flip it back to `true` and run the build script below.
 //
 // Historical name: this used to be called `useLocalBinaries`. The concept is
 // the same — it's been renamed to `useLocalNatives` for consistency with the
 // equivalent toggle in the other client SDKs (Kotlin, Flutter, React Native).
 // =============================================================================
-let useLocalNatives = true // Toggle: false for release (default committed to main); local devs flip to true and run ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+let useLocalNatives = true // Must be false in a tag-ready commit; true requires locally built XCFrameworks.
 
 // Version for remote XCFrameworks (used when useLocalNatives = false)
-// Updated automatically by CI/CD during releases.
-let sdkVersion = "0.19.13"
+// Updated by scripts/release/sync-versions.sh during release preparation.
+let sdkVersion = "0.19.15"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]

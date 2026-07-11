@@ -492,6 +492,19 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
           "embeddings lifecycle result preserves input text");
     rac_proto_buffer_free(&out);
 
+    runanywhere::v1::EmbeddingsRequest embeddings_empty_entry_request = embeddings_request;
+    embeddings_empty_entry_request.clear_texts();
+    embeddings_empty_entry_request.add_texts("alpha");
+    embeddings_empty_entry_request.add_texts("");
+    embeddings_empty_entry_request.add_texts("beta");
+    CHECK(serialize(embeddings_empty_entry_request, &bytes),
+          "embeddings empty-entry request serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_embeddings_embed_batch_lifecycle_proto(bytes.data(), bytes.size(), &out);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT && out.status == RAC_ERROR_INVALID_ARGUMENT,
+          "embeddings lifecycle ABI rejects empty entries without shifting indices");
+    rac_proto_buffer_free(&out);
+
     runanywhere::v1::DiffusionGenerationRequest diffusion_request;
     diffusion_request.set_request_id("diff-1");
     diffusion_request.set_model_id("lifecycle.diffusion");

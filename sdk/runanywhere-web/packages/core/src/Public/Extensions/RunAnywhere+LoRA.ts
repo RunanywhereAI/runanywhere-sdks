@@ -4,8 +4,8 @@
  * Top-level Web LoRA API backed by the generated proto-byte C ABI.
  */
 
-import { LoRAProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
-import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
+import { LoRAProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import type {
   LoRAAdapterConfig,
   LoRAApplyRequest,
@@ -28,12 +28,12 @@ import {
   type LoraAdapterImportResult,
   LoraCompatibilityResult as LoraCompatibilityResultMessage,
 } from '@runanywhere/proto-ts/lora_options';
-import { OPFSBridge } from '../../Infrastructure/OPFSBridge';
+import { OPFSBridge } from '../../Infrastructure/OPFSBridge.js';
 import {
   getAllRegisteredModules,
   getModuleForCapability,
   tryRunanywhereModule,
-} from '../../runtime/EmscriptenModule';
+} from '../../runtime/EmscriptenModule.js';
 import {
   InferenceFramework,
   ModelCategory,
@@ -44,7 +44,7 @@ import {
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
-import { ModelRegistry } from './RunAnywhere+ModelRegistry';
+import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 
 export type {
   LoRAAdapterConfig,
@@ -477,7 +477,7 @@ export async function downloadLoraAdapter(
   // Dynamic import: RunAnywhere.ts statically imports this module, so the
   // facade (which owns the canonical downloadModel plan/start/poll/OPFS
   // orchestration) is reached lazily to avoid a circular module-eval.
-  const { RunAnywhere } = await import('../RunAnywhere');
+  const { RunAnywhere } = await import('../RunAnywhere.js');
   const finalProgress = await RunAnywhere.downloadModel({
     modelId: artifact.id,
     model: artifact,

@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/onnx",
-  "version": "0.19.13",
+  "version": "0.19.15",
   "description": "ONNX Runtime backend for RunAnywhere React Native SDK - Speech-to-Text, Text-to-Speech, and VAD",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -28,8 +28,10 @@
     "*.podspec"
   ],
   "scripts": {
+    "build": "tsc -b",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.ts\"",
+    "clean": "tsc -b --clean && rm -rf lib",
+    "lint": "eslint \"src/**/*.ts\" --max-warnings 0",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "nitrogen": "nitrogen",
     "prepublishOnly": "npm run typecheck && npm run lint"
@@ -53,12 +55,13 @@
     "@runanywhere/proto-ts": "workspace:*"
   },
   "peerDependencies": {
-    "@runanywhere/core": ">=0.19.13",
+    "@runanywhere/core": ">=0.19.15",
     "react": ">=19.0.0",
     "react-native": ">=0.83.1",
     "react-native-nitro-modules": "^0.33.9"
   },
   "devDependencies": {
+    "eslint": "^9.39.4",
     "nitrogen": "^0.34.1",
     "react-native-nitro-modules": "^0.33.9",
     "typescript": "^5.9.3"

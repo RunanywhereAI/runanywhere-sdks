@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/web-root",
   "private": true,
-  "version": "0.19.13",
+  "version": "0.19.15",
   "description": "RunAnywhere Web SDK - On-device AI for the browser via RACommons WASM",
   "workspaces": [
     "../shared/proto-ts",
@@ -11,24 +11,31 @@
   ],
   "scripts": {
     "build:wasm": "cd wasm && ./scripts/build.sh",
+    "build:wasm:all": "npm run build:wasm -- --core --llamacpp --onnx && npm run build:wasm -- --webgpu",
     "build:wasm:debug": "cd wasm && ./scripts/build.sh --debug",
-    "build:wasm:clean": "cd wasm && ./scripts/build.sh --clean",
+    "build:wasm:clean": "npm run clean:wasm && npm run build:wasm:all",
     "vendor:wasm:onnxruntime": "wasm/scripts/vendor-onnxruntime-wasm.sh",
     "vendor:wasm:sherpa": "wasm/scripts/vendor-sherpa-onnx-wasm.sh",
     "vendor:wasm:speech": "npm run vendor:wasm:onnxruntime && npm run vendor:wasm:sherpa",
     "build:ts": "npm run build -w @runanywhere/proto-ts && npm run build -w packages/core && npm run build -w packages/llamacpp && npm run build -w packages/onnx",
     "build": "npm run build:ts",
     "dev": "npm run dev -w packages/core",
-    "lint": "npm run lint -w packages/core && npm run lint -w packages/llamacpp && npm run lint -w packages/onnx",
-    "typecheck": "npm run typecheck -w @runanywhere/proto-ts && npm run typecheck -w packages/core && npm run build -w packages/core && npm run typecheck -w packages/llamacpp && npm run typecheck -w packages/onnx",
+    "fix:esm-specifiers": "node scripts/ensure-node-esm-specifiers.mjs --write",
+    "check:esm-specifiers": "node scripts/ensure-node-esm-specifiers.mjs",
+    "verify:nodenext": "npm run check:esm-specifiers && npm run build:ts && tsc -p tsconfig.nodenext.json && node tests/types/nodenext-runtime.mjs",
+    "lint": "npm run lint -w packages/core && npm run lint -w packages/llamacpp && npm run lint -w packages/onnx && eslint playwright.config.ts tests/browser --max-warnings 0",
+    "typecheck": "npm run typecheck -w @runanywhere/proto-ts && npm run typecheck -w packages/core && npm run build -w packages/core && npm run typecheck -w packages/llamacpp && npm run typecheck -w packages/onnx && tsc -p tsconfig.browser.json && npm run verify:nodenext",
     "test": "npm run test -w packages/core",
     "test:browser": "playwright test",
-    "clean": "rm -rf ../shared/proto-ts/dist packages/core/dist packages/llamacpp/dist packages/onnx/dist packages/llamacpp/wasm/*.wasm packages/llamacpp/wasm/*.js packages/core/wasm wasm/build wasm/build-webgpu"
+    "test:browser:release": "RA_RUN_FULL_E2E=1 playwright test tests/browser/release-app.e2e.spec.ts",
+    "clean:wasm": "rm -rf wasm/build wasm/build-webgpu wasm/build-core wasm/build-llamacpp wasm/build-llamacpp-webgpu wasm/build-onnx packages/core/wasm packages/llamacpp/wasm packages/onnx/wasm",
+    "clean": "rm -rf ../shared/proto-ts/dist packages/core/dist packages/llamacpp/dist packages/onnx/dist && npm run clean:wasm"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "^20.19.0 || >=22.12.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0"
+    "@playwright/test": "^1.61.1",
+    "typescript": "^5.9.3"
   }
 }

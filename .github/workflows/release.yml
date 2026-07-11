@@ -13,6 +13,10 @@ name: Release
 #
 # Pre-flight (engineer runs locally before tagging):
 #   scripts/release/sync-versions.sh 1.2.3
+#   build the five Swift XCFramework archives
+#   set Package.swift useLocalNatives = false
+#   sync and commit the real remote-binary checksums
+#   run all release gates, then commit the tag-ready manifest
 #   git add -u && git commit -m "chore: release 1.2.3"
 #   git tag v1.2.3
 #   git push origin main v1.2.3
@@ -59,6 +63,14 @@ jobs:
           if [ "$PROJECT_VERSION" != "$V" ]; then
             echo "::error::PROJECT_VERSION in VERSIONS is '$PROJECT_VERSION' but releasing '$V'."
             echo "::error::Run scripts/release/sync-versions.sh $V before tagging."
+            exit 1
+          fi
+      - name: Verify release-train version coherence
+        run: bash scripts/validation/gates/check_release_version_coherence.sh
+      - name: Verify tagged SwiftPM manifest uses release binaries
+        run: |
+          if ! grep -Eq '^let useLocalNatives = false([[:space:]]|$)' Package.swift; then
+            echo "::error::Package.swift must commit useLocalNatives = false with fresh XCFramework checksums before tagging."
             exit 1
           fi
 
@@ -271,33 +283,42 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: web
-      - name: Build WASM (CPU, llama.cpp + VLM)
+      - name: Vendor ONNX Runtime and Sherpa-ONNX WASM archives
         working-directory: sdk/runanywhere-web
-        run: npm run build:wasm -- --llamacpp --vlm
-      - name: Build WASM (WebGPU, llama.cpp + VLM)
+        run: npm run vendor:wasm:speech
+      - name: Build WASM (core, CPU llama.cpp, ONNX + Sherpa)
         working-directory: sdk/runanywhere-web
-        run: npm run build:wasm -- --llamacpp --vlm --webgpu
+        run: npm run build:wasm -- --core --llamacpp --onnx
+      - name: Build WASM (WebGPU llama.cpp)
+        working-directory: sdk/runanywhere-web
+        run: npm run build:wasm -- --webgpu
       - name: Package Web/WASM outputs
-        # The new wasm/scripts/build.sh emits every WASM variant (CPU, WebGPU)
-        # under packages/llamacpp/wasm. Also include packages/core/wasm and
-        # packages/onnx/wasm if present (vendored sherpa-onnx / ONNX Runtime
-        # artifacts). Package only directories that actually exist so a
-        # missing optional variant doesn't break the release.
+        # All four artifacts are required release inputs. Emscripten 5+ embeds
+        # pthread workers in the generated glue, so only the JS/WASM pairs are
+        # portable publish requirements.
         working-directory: sdk/runanywhere-web
         run: |
           set -euo pipefail
-          mkdir -p dist
-          tar_inputs=()
-          for d in llamacpp/wasm core/wasm onnx/wasm; do
-            [ -d "packages/$d" ] && tar_inputs+=("$d")
+          required_files=(
+            packages/core/wasm/racommons.js
+            packages/core/wasm/racommons.wasm
+            packages/llamacpp/wasm/racommons-llamacpp.js
+            packages/llamacpp/wasm/racommons-llamacpp.wasm
+            packages/llamacpp/wasm/racommons-llamacpp-webgpu.js
+            packages/llamacpp/wasm/racommons-llamacpp-webgpu.wasm
+            packages/onnx/wasm/racommons-onnx-sherpa.js
+            packages/onnx/wasm/racommons-onnx-sherpa.wasm
+          )
+          for artifact in "${required_files[@]}"; do
+            if [ ! -s "$artifact" ]; then
+              echo "::error::Required Web release artifact is missing or empty: $artifact"
+              exit 1
+            fi
           done
-          if [ ${#tar_inputs[@]} -eq 0 ]; then
-            echo "::error::No WASM output directories produced by npm run build:wasm"
-            exit 1
-          fi
-          echo "Packaging: ${tar_inputs[*]}"
+
+          mkdir -p dist
           tar czf "dist/RACommons-web-v${{ needs.validate.outputs.version }}.tar.gz" \
-            -C packages "${tar_inputs[@]}"
+            -C packages core/wasm llamacpp/wasm onnx/wasm
           shasum -a 256 "dist/RACommons-web-v${{ needs.validate.outputs.version }}.tar.gz" \
             > "dist/RACommons-web-v${{ needs.validate.outputs.version }}.tar.gz.sha256"
       - name: Upload Web/WASM artifacts

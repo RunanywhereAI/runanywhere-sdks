@@ -62,7 +62,7 @@ When the correct behavior is ambiguous, check the iOS Swift implementation first
 
 Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-commons`, ~118K first-party LOC plus ~420K generated proto bindings) implements all AI business logic behind a pure C ABI (`rac_*` prefix). Five platform SDKs are thin bridges that supply platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control struct and call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings for every language.
 
-**Current version**: `0.19.13` (canonical source: `sdk/runanywhere-commons/VERSION`)
+**Current version**: `0.19.15` (canonical source: `sdk/runanywhere-commons/VERSION`)
 
 ### SDK Implementations
 | SDK | Path | Bridge Mechanism | Platforms |
@@ -495,7 +495,7 @@ All cross-platform types are defined in `idl/*.proto`. SDKs use typealiases to t
 | JVM | 17 | Gradle 8.13 | Kotlin 2.1.21 |
 | Flutter | 3.10+ | Melos | Dart 3.0+ |
 | React Native | 0.83.1 | Yarn Berry 3.6.1 | NitroModules, Hermes |
-| Web | Chrome 86+ | Vite | Emscripten 5.0+, Node 18+ |
+| Web | Chrome 86+ | Vite | Emscripten 5.0+, Node 20.19+ or 22.12+ |
 | C++ Core | N/A | CMake 3.22+ | C++20, Ninja |
 
 ---

@@ -8,22 +8,22 @@ import type {
   ModelUnloadRequest,
   ModelUnloadResult,
 } from '@runanywhere/proto-ts/model_types';
-import type { InferenceFramework } from '@runanywhere/proto-ts/model_types';
+import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 import type {
   ComponentLifecycleSnapshot,
   SDKComponent,
 } from '@runanywhere/proto-ts/sdk_events';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
-import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter';
-import { prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig';
-import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
-import { ModelRegistry } from './RunAnywhere+ModelRegistry';
-import { OPFSBridge } from '../../Infrastructure/OPFSBridge';
+import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter.js';
+import { prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig.js';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
+import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
+import { OPFSBridge } from '../../Infrastructure/OPFSBridge.js';
 import {
   frameworkOPFSDir,
   primaryFilenameFromModel,
-} from '../../Infrastructure/FrameworkOPFSPaths';
-import { getAllRegisteredModules } from '../../runtime/EmscriptenModule';
+} from '../../Infrastructure/FrameworkOPFSPaths.js';
+import { getAllRegisteredModules } from '../../runtime/EmscriptenModule.js';
 
 export type {
   CurrentModelRequest,
@@ -40,9 +40,11 @@ export type {
 } from '@runanywhere/proto-ts/sdk_events';
 export { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 
-function requireAdapter(framework?: unknown): ModelLifecycleAdapter {
+function requireAdapter(
+  framework?: InferenceFramework | null,
+): ModelLifecycleAdapter {
   const adapter = (framework !== undefined && framework !== null)
-    ? ModelLifecycleAdapter.tryDefaultForFramework(framework as never)
+    ? ModelLifecycleAdapter.tryDefaultForFramework(framework)
     : ModelLifecycleAdapter.tryDefault();
   if (!adapter) {
     throw SDKException.backendNotAvailable(
@@ -51,6 +53,94 @@ function requireAdapter(framework?: unknown): ModelLifecycleAdapter {
     );
   }
   return adapter;
+}
+
+function registeredLifecycleAdapters(): ModelLifecycleAdapter[] {
+  return getAllRegisteredModules().map((module) => (
+    ModelLifecycleAdapter.fromModule(module)
+  ));
+}
+
+/**
+ * Resolve a model-specific unload to the WASM that owns its framework.
+ *
+ * Every backend has a private `g_loaded` map. The model registry is mirrored
+ * across modules, so its framework is the durable ownership signal even after
+ * another backend becomes the legacy default. Requests without an owner
+ * signal (category-only, unknown model, or unscoped unload-all) must fan out.
+ */
+function adaptersForUnload(request: ModelUnloadRequest): ModelLifecycleAdapter[] {
+  const snapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
+  const framework = snapshot?.framework ?? request.framework;
+  if (
+    framework !== undefined
+    && framework !== null
+    && framework !== InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+  ) {
+    return [requireAdapter(framework)];
+  }
+
+  const registered = registeredLifecycleAdapters();
+  return registered.length > 0 ? registered : [requireAdapter()];
+}
+
+function aggregateUnloadResults(
+  results: readonly (ModelUnloadResult | null)[],
+): ModelUnloadResult | null {
+  const present = results.filter((result): result is ModelUnloadResult => result !== null);
+  if (present.length === 0) return null;
+  if (present.length === 1) return present[0];
+
+  const success = present.some((result) => result.success);
+  const unloadedModelIds = Array.from(new Set(
+    present.flatMap((result) => result.unloadedModelIds),
+  )).sort((left, right) => left.localeCompare(right));
+  const warnings = Array.from(new Set(
+    present.flatMap((result) => result.warnings),
+  )).sort((left, right) => left.localeCompare(right));
+  const errors = Array.from(new Set(
+    present.map((result) => result.errorMessage).filter((message) => message.length > 0),
+  )).sort((left, right) => left.localeCompare(right));
+
+  return {
+    success,
+    unloadedModelIds,
+    errorMessage: success ? '' : errors.join('; '),
+    unloadedAtUnixMs: Math.max(...present.map((result) => result.unloadedAtUnixMs)),
+    warnings,
+  };
+}
+
+function unloadAcrossAdapters(request: ModelUnloadRequest): ModelUnloadResult | null {
+  const results: Array<ModelUnloadResult | null> = [];
+  let firstError: unknown;
+  for (const adapter of adaptersForUnload(request)) {
+    try {
+      results.push(adapter.unload(request));
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  if (firstError !== undefined) throw firstError;
+  return aggregateUnloadResults(results);
+}
+
+async function unloadAcrossAdaptersAsync(
+  request: ModelUnloadRequest,
+): Promise<ModelUnloadResult | null> {
+  const results: Array<ModelUnloadResult | null> = [];
+  let firstError: unknown;
+  // Keep cleanup sequential: each Emscripten module owns independent native
+  // state, and deterministic teardown is more important than parallelism here.
+  for (const adapter of adaptersForUnload(request)) {
+    try {
+      results.push(await adapter.unloadAsync(request));
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  if (firstError !== undefined) throw firstError;
+  return aggregateUnloadResults(results);
 }
 
 async function resolveLocalPathFromOpfs(model: ModelInfo): Promise<string | null> {
@@ -155,7 +245,11 @@ export const WebModelLifecycle = {
     try {
       return await requireAdapter(modelSnapshot?.framework).loadAsync(request);
     } catch (error) {
-      const recovered = await recoverModelLoadFailure({ request, error });
+      const recovered = await recoverModelLoadFailure({
+        request,
+        model: modelSnapshot,
+        error,
+      });
       if (!recovered) throw error;
       if (modelSnapshot) {
         ModelRegistry.registerModel(modelSnapshot);
@@ -165,15 +259,15 @@ export const WebModelLifecycle = {
   },
 
   unloadModel(request: ModelUnloadRequest): ModelUnloadResult | null {
-    return requireAdapter().unload(request);
+    return unloadAcrossAdapters(request);
   },
 
   unloadModelAsync(request: ModelUnloadRequest): Promise<ModelUnloadResult | null> {
-    return requireAdapter().unloadAsync(request);
+    return unloadAcrossAdaptersAsync(request);
   },
 
   unloadAllModels(): ModelUnloadResult | null {
-    return requireAdapter().unload({ modelId: '', unloadAll: true });
+    return unloadAcrossAdapters({ modelId: '', unloadAll: true });
   },
 
   currentModel(
@@ -238,11 +332,22 @@ export const WebModelLifecycle = {
   },
 
   reset(): boolean {
-    return requireAdapter().reset();
+    const registered = registeredLifecycleAdapters();
+    const adapters = registered.length > 0 ? registered : [requireAdapter()];
+    // Catch per module and do not use Array.every directly: either could
+    // short-circuit and leave a later backend's private lifecycle map uncleared.
+    const results = adapters.map((adapter) => {
+      try {
+        return adapter.reset();
+      } catch {
+        return false;
+      }
+    });
+    return results.every((result) => result);
   },
 };
 
-function safeGetModelSnapshot(modelId: string) {
+function safeGetModelSnapshot(modelId: string): ModelInfo | null {
   try {
     return ModelRegistry.getModel(modelId);
   } catch {

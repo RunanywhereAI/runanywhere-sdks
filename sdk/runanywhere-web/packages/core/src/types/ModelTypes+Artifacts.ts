@@ -46,14 +46,14 @@ import {
   type SingleFileArtifact,
 } from '@runanywhere/proto-ts/model_types';
 import type { ThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';
-import { SDKException } from '../Foundation/SDKException';
-import { SDKLogger } from '../Foundation/SDKLogger';
-import { ProtoWasmBridge } from '../runtime/ProtoWasm';
+import { SDKException } from '../Foundation/SDKException.js';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
-} from '../runtime/EmscriptenModule';
-import { formatFramework } from '../Public/Helpers/formatFramework';
+} from '../runtime/EmscriptenModule.js';
+import { formatFramework } from '../Public/Helpers/formatFramework.js';
 
 const logger = new SDKLogger('ModelTypes');
 
@@ -87,7 +87,7 @@ function requireCapabilityModule(feature: string): CategoryCapabilityModule {
   if (!module) {
     throw SDKException.backendNotAvailable(
       feature,
-      'No WASM backend is registered. Call LlamaCPP.register() (or another backend) first.',
+      'The RACommons core module is unavailable. Call RunAnywhere.initialize() first.',
     );
   }
   return module;

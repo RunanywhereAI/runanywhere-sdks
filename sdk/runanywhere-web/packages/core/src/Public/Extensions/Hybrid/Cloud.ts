@@ -27,19 +27,19 @@
  * rac_http_client → the already-wired Web transport. No extra plumbing needed.
  */
 
-import { SDKLogger } from '../../../Foundation/SDKLogger';
-import { RAC_OK, RAC_ERROR_MODULE_ALREADY_REGISTERED } from '../../../Foundation/RACErrors';
+import { SDKLogger } from '../../../Foundation/SDKLogger.js';
+import { RAC_OK, RAC_ERROR_MODULE_ALREADY_REGISTERED } from '../../../Foundation/RACErrors.js';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
-} from '../../../runtime/EmscriptenModule';
-import type { HybridWasmModule } from './HybridWasmModule';
-import { DEFAULT_CLOUD_PROVIDER } from './HybridTypes';
+} from '../../../runtime/EmscriptenModule.js';
+import type { HybridWasmModule } from './HybridWasmModule.js';
+import { DEFAULT_CLOUD_PROVIDER } from './HybridTypes.js';
 import { CloudSttBackendConfig } from '@runanywhere/proto-ts/hybrid_router';
 import {
   registerCloudSttProvider,
   unregisterCloudSttProvider,
-} from './CloudSttProvider';
+} from './CloudSttProvider.js';
 
 const logger = new SDKLogger('Cloud');
 

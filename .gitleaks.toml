@@ -23,6 +23,10 @@ description = "Railway production/staging app URL"
 regex = '''https?://[a-zA-Z0-9\-]+\.up\.railway\.app'''
 keywords = ["railway.app"]
 
+[[rules.allowlists]]
+description = "Historical Web relay commit; relay removed from the final tree"
+commits = ["173426c0533ca6301afa26a78fb939ec3f695951"]
+
 [[rules]]
 id = "supabase-url"
 description = "Supabase project URL (non-placeholder)"

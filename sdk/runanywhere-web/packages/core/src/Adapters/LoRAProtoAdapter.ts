@@ -32,7 +32,7 @@ import {
   type LoraAdapterImportResult as ProtoLoraAdapterImportResult,
   type LoraCompatibilityResult as ProtoLoraCompatibilityResult,
 } from '@runanywhere/proto-ts/lora_options';
-import { ProtoWasmBridge } from '../runtime/ProtoWasm';
+import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
   emptyLoRAState,
@@ -40,7 +40,7 @@ import {
   missingExports,
   modalityLogger as logger,
   type ModalityProtoModule,
-} from './ProtoAdapterTypes';
+} from './ProtoAdapterTypes.js';
 
 export class LoRAProtoAdapter {
   static tryDefault(): LoRAProtoAdapter | null {

@@ -21,12 +21,12 @@
  * optimistic default (always-online, 100%, not-throttled).
  */
 
-import { SDKLogger } from '../../../Foundation/SDKLogger';
-import { RAC_OK } from '../../../Foundation/RACErrors';
+import { SDKLogger } from '../../../Foundation/SDKLogger.js';
+import { RAC_OK } from '../../../Foundation/RACErrors.js';
 import {
   getModuleForCapability,
-} from '../../../runtime/EmscriptenModule';
-import type { HybridWasmModule } from './HybridWasmModule';
+} from '../../../runtime/EmscriptenModule.js';
+import type { HybridWasmModule } from './HybridWasmModule.js';
 
 const logger = new SDKLogger('Hybrid.DeviceState');
 

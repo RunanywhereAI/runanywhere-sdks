@@ -15,7 +15,7 @@ import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
-} from '../../runtime/EmscriptenModule';
+} from '../../runtime/EmscriptenModule.js';
 
 interface FrameworkDisplayNameModule extends EmscriptenRunanywhereModule {
   /** Proto-int wrapper over rac_framework_display_name (wasm_exports.cpp). */

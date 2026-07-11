@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "sourceMap": false,
+    "types": []
+  },
+  "include": ["tests/types/nodenext-consumer.mts"],
+  "exclude": ["node_modules/.cache", "test-results", "playwright-report"]
+}

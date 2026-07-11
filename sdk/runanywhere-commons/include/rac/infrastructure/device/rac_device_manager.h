@@ -133,6 +133,16 @@ RAC_API rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks
 RAC_API rac_result_t rac_device_set_callbacks(const rac_device_callbacks_t* callbacks);
 
 /**
+ * @brief Remove the currently installed platform callbacks.
+ *
+ * Platform SDKs that install function-table trampolines must clear the native
+ * callback snapshot before releasing those trampolines. This operation is
+ * idempotent and waits for any in-flight device-manager operation to leave its
+ * critical section before returning.
+ */
+RAC_API void rac_device_manager_clear_callbacks(void);
+
+/**
  * @brief Register device with backend if not already registered
  *
  * This is the main entry point for device registration.

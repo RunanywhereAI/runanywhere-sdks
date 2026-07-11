@@ -428,14 +428,23 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
 #if defined(__EMSCRIPTEN__)
     // common_fit_params probes
     // llama_max_devices() (16 on WASM) and never returns within practical
-    // timeouts on CPU WASM. Skip fit on Emscripten; ctx sizing falls through
-    // to max_default_context_ after model load (see below).
+    // timeouts on CPU WASM. Skip fit on Emscripten and choose the default from
+    // the artifact that was actually compiled: WebGPU offloads every eligible
+    // layer, while the separately-built CPU artifact keeps all layers on CPU.
+#if defined(GGML_USE_WEBGPU)
+    RAC_LOG_INFO("LLM.LlamaCpp",
+                 "Emscripten: skipping common_fit_params (WASM device probe "
+                 "hang); using WebGPU defaults (n_gpu_layers=-1, n_ctx cap=%d)",
+                 max_default_context_);
+    model_params.n_gpu_layers = -1;
+#else
     RAC_LOG_INFO("LLM.LlamaCpp",
                  "Emscripten: skipping common_fit_params (WASM device probe "
                  "hang); using conservative CPU defaults (n_gpu_layers=0, "
                  "n_ctx cap=%d)",
                  max_default_context_);
     model_params.n_gpu_layers = 0;
+#endif
     if (ctx_params.n_ctx == 0) {
         ctx_params.n_ctx = static_cast<uint32_t>(max_default_context_);
     }

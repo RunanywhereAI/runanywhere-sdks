@@ -4,13 +4,13 @@
  * Loads `racommons-llamacpp.wasm` (CPU) or `racommons-llamacpp-webgpu.wasm` (WebGPU)
  * as a fully independent Emscripten module, registers the platform adapter,
  * runs `rac_init`, registers the unified llama.cpp backend (LLM + VLM in a
- * single call), then installs the loaded module on every core proto-byte
- * adapter through `setRunanywhereModule(...)`.
+ * single call), then installs the loaded module only in its capability-scoped
+ * core adapter slots through `registerWasmModule(...)`.
  *
  * This is intentionally MINIMAL — the heavy lifting (LLM/VLM/structured/tool
- * calling/embeddings/diffusion) flows through `@runanywhere/web` core's
- * proto-byte adapters (`LLMProtoAdapter`, `VLMProtoAdapter`, etc.) once the
- * module is installed on the singleton.
+ * calling/LoRA) flows through `@runanywhere/web` core's
+ * proto-byte adapters (`LLMProtoAdapter`, `VLMProtoAdapter`, etc.) once their
+ * capability slots are registered.
  */
 
 import {
@@ -29,7 +29,8 @@ import {
   type EmscriptenRunanywhereModule,
   type PlatformAdapterModule,
   type WasmCapability,
-} from '@runanywhere/web/internal';
+  redactResourceURL,
+} from '@runanywhere/web/backend';
 
 const logger = new SDKLogger('LlamaCppBridge');
 
@@ -209,10 +210,20 @@ export class LlamaCppBridge {
     if (this._module && this._loaded) {
       try {
         this._module._rac_shutdown?.();
-      } catch { /* ignore */ }
+      } catch (error) {
+        logger.warning(
+          `rac_shutdown threw: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
     if (this._platformAdapter) {
-      try { this._platformAdapter.cleanup(); } catch { /* ignore */ }
+      try {
+        this._platformAdapter.cleanup();
+      } catch (error) {
+        logger.warning(
+          `PlatformAdapter cleanup threw: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       this._platformAdapter = null;
     }
     // Drop this module from the capability registry — leaves the commons
@@ -232,11 +243,11 @@ export class LlamaCppBridge {
     logger.info('Loading LlamaCpp WASM module...');
     try {
       const webgpuAvailable = acceleration !== 'cpu'
-        ? await LlamaCppBridge.detectWebGPUWithJSPI()
+        ? await LlamaCppBridge.detectWebGPU()
         : false;
       if (acceleration === 'webgpu' && !webgpuAvailable) {
         logger.warning(
-          'WebGPU acceleration was requested, but this browser adapter is missing required WebGPU/JSPI/shader-f16 support. Falling back to CPU.',
+          'WebGPU acceleration was requested, but this browser adapter is missing required WebGPU/shader-f16 support. Falling back to CPU.',
         );
       }
       const useWebGPU = acceleration !== 'cpu' && webgpuAvailable;
@@ -247,7 +258,9 @@ export class LlamaCppBridge {
           ?? new URL('../../wasm/racommons-llamacpp-webgpu.js', import.meta.url).href)
         : (this.wasmUrl
           ?? new URL('../../wasm/racommons-llamacpp.js', import.meta.url).href);
-      logger.info(`Loading ${useWebGPU ? 'WebGPU' : 'CPU'} variant: ${moduleUrl}`);
+      logger.info(
+        `Loading ${useWebGPU ? 'WebGPU' : 'CPU'} variant: ${redactResourceURL(moduleUrl)}`,
+      );
 
       if (useWebGPU) this.webgpuWasmUrl = moduleUrl;
       else this.wasmUrl = moduleUrl;
@@ -306,12 +319,15 @@ export class LlamaCppBridge {
       // do NOT claim 'commons' here. That keeps `RunAnywhere.initialize()`
       // and sibling-backend lookups stable across LlamaCPP.register() +
       // ONNX.register() in either order.
+      //
+      // Do not claim embedding, RAG, or diffusion merely because their
+      // generic proto wrappers are linked into this artifact. The llama.cpp
+      // engine vtable has no embedding/diffusion provider; claiming those
+      // slots would redirect ONNX embeddings into this module after an
+      // acceleration reload, where the lifecycle model is not loaded.
       const capabilities: WasmCapability[] = [
         'llm',
         'vlm',
-        'embedding',
-        'rag',
-        'diffusion',
         'structured-output',
         'tool-calling',
         'lora',
@@ -492,10 +508,11 @@ export class LlamaCppBridge {
   }
 
   // -----------------------------------------------------------------------
-  // WebGPU Detection (CPU + JSPI gate — same logic as the previous bridge)
+  // WebGPU detection. The release artifact uses Asyncify, so browser support
+  // for the experimental WebAssembly JSPI API is deliberately not required.
   // -----------------------------------------------------------------------
 
-  private static async detectWebGPUWithJSPI(): Promise<boolean> {
+  private static async detectWebGPU(): Promise<boolean> {
     if (typeof navigator === 'undefined' || !('gpu' in navigator)) return false;
     try {
       const gpu = (navigator as Navigator & {
@@ -503,9 +520,7 @@ export class LlamaCppBridge {
       }).gpu;
       const adapter = await gpu?.requestAdapter();
       if (!adapter) return false;
-      if (!adapter.features?.has('shader-f16')) return false;
-      const wasm = WebAssembly as unknown as { promising?: unknown; Suspending?: unknown };
-      return typeof WebAssembly !== 'undefined' && 'promising' in wasm && 'Suspending' in wasm;
+      return adapter.features?.has('shader-f16') === true;
     } catch {
       return false;
     }

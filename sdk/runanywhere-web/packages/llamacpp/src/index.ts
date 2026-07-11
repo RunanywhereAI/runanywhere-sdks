@@ -6,9 +6,9 @@
  * V2 canonical: this package is a SHELL. It loads `racommons-llamacpp.wasm`
  * (or the WebGPU variant) as an independent Emscripten module, registers
  * the platform adapter + the llama.cpp + llama.cpp-VLM backends, then
- * claims the relevant capabilities (LLM/VLM/embeddings/diffusion/...) on
- * the per-capability registry so every core proto-byte adapter routes
- * through this module.
+ * claims its LLM/VLM/structured-output/tool-calling/LoRA capabilities on
+ * the per-capability registry. ONNX embeddings remain owned by the separate
+ * ONNX package across registration and acceleration-switch order.
  *
  * After `LlamaCPP.register()` resolves, the public surface in
  * `@runanywhere/web` (`RunAnywhere.generate(Stream)`,
@@ -44,5 +44,6 @@
  * @packageDocumentation
  */
 
-export { LlamaCPP, autoRegister } from './LlamaCPP';
-export type { LlamaCPPRegisterOptions } from './LlamaCPP';
+export { LlamaCPP, autoRegister } from './LlamaCPP.js';
+export type { LlamaCPPRegisterOptions } from './LlamaCPP.js';
+export type { BackendRegistrationState } from '@runanywhere/web/backend';

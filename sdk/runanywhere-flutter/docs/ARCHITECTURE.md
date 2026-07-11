@@ -412,10 +412,10 @@ lives in the bundled C++ backend library.
 
 | Component | Version |
 |-----------|---------|
-| `runanywhere` (Dart) | 0.19.13 |
-| `runanywhere_llamacpp` | 0.19.13 |
-| `runanywhere_onnx` | 0.19.13 |
-| `runanywhere_qhexrt` | 0.19.13 |
+| `runanywhere` (Dart) | 0.19.15 |
+| `runanywhere_llamacpp` | 0.19.15 |
+| `runanywhere_onnx` | 0.19.15 |
+| `runanywhere_qhexrt` | 0.19.15 |
 | `RACommons` native | 0.1.6 |
 | llama.cpp engine | b7199 |
 | ONNX Runtime | 1.23.2 |

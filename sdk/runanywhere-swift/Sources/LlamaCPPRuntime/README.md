@@ -29,7 +29,7 @@ The LlamaCPPRuntime module is included in the RunAnywhere SDK. Add it to your ta
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.19.13")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.19.15")
 ],
 targets: [
     .target(
