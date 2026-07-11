@@ -60,6 +60,7 @@ import com.runanywhere.sdk.public.extensions.ragGetStatistics
 import com.runanywhere.sdk.public.extensions.ragIngest
 import com.runanywhere.sdk.public.extensions.ragQuery
 import com.runanywhere.sdk.public.extensions.processImage
+import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAToolDefinition
@@ -228,12 +229,25 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         showWebSearchDisclosure = false
     }
 
+    private fun ensureConversationId(): String {
+        val existingId = conversationId
+        if (existingId != null) {
+            return existingId
+        }
+
+        val newId = UUID.randomUUID().toString()
+        conversationId = newId
+        createdAt = System.currentTimeMillis()
+        return newId
+    }
+
     fun send() {
         if (!canSend) return
         val request = beginGeneration() ?: return
-        val prompt = input.trim()
+        val turn = ChatRequestPolicy.snapshot(input.trim(), messages)
+        val prompt = turn.prompt
         input = ""
-        messages += ChatMessage(prompt, isUser = true)
+        messages += ChatMessage(text = prompt, isUser = true)
         val replyIndex = messages.size
         messages += ChatMessage("", isUser = false)
         activeReplyIndex = replyIndex
@@ -268,10 +282,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                     ToolCallingRoute.STANDARD_GENERATION -> {
-                        if (SettingsRepository.settings.streaming) {
-                            streamReply(request, prompt, replyIndex, activeModel)
+                        val streaming = SettingsRepository.settings.streaming
+                        val llmRequest = ChatRequestPolicy.buildRequest(
+                            turn = turn,
+                            options = generationOptions(activeModel),
+                            conversationId = ensureConversationId(),
+                            streaming = streaming,
+                        )
+                        if (streaming) {
+                            streamReply(request, llmRequest, replyIndex, activeModel)
                         } else {
-                            generateReply(request, prompt, replyIndex, activeModel)
+                            generateReply(request, llmRequest, replyIndex, activeModel)
                         }
                     }
                 }
@@ -532,15 +553,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun generateReply(
         request: ChatGenerationRequest,
-        prompt: String,
+        llmRequest: RALLMGenerateRequest,
         index: Int,
         activeModel: RuntimeModelSnapshot,
     ) {
         // The SDK one-shot bridge is synchronous JNI underneath its suspend
         // surface. Never let it occupy Android's main dispatcher.
-        val options = generationOptions(activeModel)
         val result = withContext(Dispatchers.Default) {
-            RunAnywhere.generate(prompt, options)
+            RunAnywhere.generate(llmRequest)
         }
         ensureOwns(request)
         if (!result.error_message.isNullOrBlank()) {
@@ -578,14 +598,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun streamReply(
         request: ChatGenerationRequest,
-        prompt: String,
+        llmRequest: RALLMGenerateRequest,
         index: Int,
         activeModel: RuntimeModelSnapshot,
     ) {
-        val options = generationOptions(activeModel)
-        val events = RunAnywhere.generateStream(prompt, options)
+        val events = RunAnywhere.generateStream(llmRequest)
         val result =
-            RunAnywhere.aggregateStream(prompt, events) { accumulated ->
+            RunAnywhere.aggregateStream(llmRequest.prompt, events) { accumulated ->
                 updateReply(request, index) { it.copy(text = accumulated) }
             }
 

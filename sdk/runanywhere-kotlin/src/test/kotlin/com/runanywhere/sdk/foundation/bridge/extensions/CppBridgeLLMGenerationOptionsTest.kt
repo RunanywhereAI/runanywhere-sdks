@@ -50,4 +50,18 @@ class CppBridgeLLMGenerationOptionsTest {
         assertEquals(0.0f, assertNotNull(request.options).temperature)
         assertEquals(0.0f, request.temperature)
     }
+
+    @Test
+    fun `public options conversion preserves streaming at both request levels`() {
+        listOf(false, true).forEach { streaming ->
+            val request =
+                LLMGenerationOptions(
+                    max_tokens = 64,
+                    streaming_enabled = streaming,
+                ).toRALLMGenerateRequest("test")
+
+            assertEquals(streaming, request.streaming_enabled)
+            assertEquals(streaming, assertNotNull(request.options).streaming_enabled)
+        }
+    }
 }
