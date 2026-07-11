@@ -10,7 +10,7 @@
  * Do not hand-edit — update `sdk/runanywhere-commons/VERSION` and run
  * `scripts/release/sync-versions.sh <new_version>`.
  */
-export const SDK_VERSION = '0.19.13';
+export const SDK_VERSION = '0.19.14';
 
 /** SDK display name. Mirrors Swift `SDKConstants.name` (SDKConstants.swift:17). */
 export const SDK_NAME = 'RunAnywhere SDK';
