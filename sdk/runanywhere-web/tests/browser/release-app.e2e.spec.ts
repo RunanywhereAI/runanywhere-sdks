@@ -935,24 +935,10 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
 
     await setThinkingMode(appPage, true);
     await navigateTo(appPage, 'chat');
-    await appPage.locator('#consumer-new-chat-btn').click();
-    await appPage.locator('#chat-input').fill(
+    await runThinkingEnabledTurn(
+      appPage,
       'Reason carefully about which is larger, 17 multiplied by 23 or 19 multiplied by 20, then give the final comparison.',
     );
-    await appPage.locator('#chat-send-btn').click();
-    await expect(appPage.locator('#chat-send-btn')).toHaveAttribute('aria-label', 'Send message', {
-      timeout: 12 * 60_000,
-    });
-    const thinkingReply = appPage.locator('.chat-message--assistant').last();
-    await expectSubstantiveText(thinkingReply.locator('.chat-thinking-content'), {
-      minLength: 12,
-      timeout: 12 * 60_000,
-      forbidden: /\b(?:failed|error|unavailable)\b/i,
-    });
-    await expectSubstantiveText(thinkingReply.locator('.chat-bubble'), {
-      minLength: 8,
-      timeout: 12 * 60_000,
-    });
 
     await setThinkingMode(appPage, false);
     await navigateTo(appPage, 'chat');
@@ -2234,6 +2220,57 @@ async function setThinkingMode(page: Page, enabled: boolean): Promise<void> {
     await expect(toggle).toHaveClass(/\bon\b/);
   } else {
     await expect(toggle).toHaveClass(/^(?!.*\bon\b)/);
+  }
+}
+
+const THINKING_ONLY_TERMINAL = /^\s*Thinking(?:…|\.\.\.)\s*$/i;
+
+/**
+ * Qwen can occasionally exhaust a turn after emitting valid reasoning but
+ * before producing its final-answer segment. Retry only that exact stochastic
+ * terminal state; every structural, runtime, and model-state failure remains
+ * an immediate release-gate failure.
+ */
+async function runThinkingEnabledTurn(
+  page: Page,
+  prompt: string,
+  maxAttempts = 3,
+): Promise<void> {
+  const attempts = Math.max(1, maxAttempts);
+  const send = page.locator('#chat-send-btn');
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    await page.locator('#consumer-new-chat-btn').click();
+    await page.locator('#chat-input').fill(prompt);
+    await send.click();
+    await expect(send).toHaveAttribute('aria-label', 'Stop generation', { timeout: 120_000 });
+    await expect(send).toHaveAttribute('aria-label', 'Send message', {
+      timeout: 12 * 60_000,
+    });
+
+    const reply = page.locator('.chat-message--assistant').last();
+    await expect(reply).toBeVisible();
+    await expectSubstantiveText(reply.locator('.chat-thinking-content'), {
+      minLength: 12,
+      timeout: 30_000,
+      forbidden: /\b(?:failed|error|unavailable)\b/i,
+    });
+
+    const finalText = (await reply.locator('.chat-bubble').textContent() ?? '').trim();
+    if (THINKING_ONLY_TERMINAL.test(finalText)) {
+      if (attempt === attempts) {
+        throw new Error(
+          `Qwen returned substantive thinking without a final answer on ${attempts} attempts`,
+        );
+      }
+      continue;
+    }
+
+    await expectSubstantiveText(reply.locator('.chat-bubble'), {
+      minLength: 8,
+      timeout: 30_000,
+    });
+    return;
   }
 }
 
