@@ -23,17 +23,26 @@
  * `setRunanywhereModule(...)` so the proto-byte adapters can reach it.
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
-import { ProtoErrorCode, SDKException } from '../Foundation/SDKException';
-import { PlatformAdapter, type PlatformAdapterModule } from './PlatformAdapter';
-import { HTTPAdapter } from '../Adapters/HTTPAdapter';
-import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { ProtoErrorCode, SDKException } from '../Foundation/SDKException.js';
+import { redactResourceURL } from '../Foundation/BackendContract.js';
+import { PlatformAdapter, type PlatformAdapterModule } from './PlatformAdapter.js';
+import { HTTPAdapter } from '../Adapters/HTTPAdapter.js';
+import {
+  DeviceRegistrationAdapter,
+  type DeviceRegistrationConfiguration,
+} from '../Adapters/DeviceRegistrationAdapter.js';
+import {
+  BrowserStorageAnalyzerAdapter,
+  type BrowserStorageAnalyzerModule,
+} from '../Adapters/StorageAdapter.js';
+import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter.js';
 import {
   getModuleForCapability,
   registerWasmModule,
   unregisterWasmModule,
   type EmscriptenRunanywhereModule,
-} from './EmscriptenModule';
+} from './EmscriptenModule.js';
 
 // Note: `completeNativePhase1ForModule` is reached through a lazy
 // dynamic import to avoid a circular dependency with
@@ -110,6 +119,10 @@ export class CommonsModule {
    * populates the same MEMFS/localStorage/console callbacks the backend
    * bridges use. Lifetime matches the module. */
   private _platformAdapter: PlatformAdapter | null = null;
+  /** Browser callbacks installed into commons' native device manager. */
+  private _deviceRegistrationAdapter: DeviceRegistrationAdapter | null = null;
+  /** Browser filesystem/quota callbacks and native storage-analyzer handle. */
+  private _storageAnalyzerAdapter: BrowserStorageAnalyzerAdapter | null = null;
 
   /** Override the default URL to the racommons.js glue file. */
   wasmUrl: string | null = null;
@@ -139,13 +152,13 @@ export class CommonsModule {
   // Loading
   // -----------------------------------------------------------------------
 
-  async ensureLoaded(): Promise<void> {
+  async ensureLoaded(configuration: DeviceRegistrationConfiguration): Promise<void> {
     if (this._loaded) return;
     if (this._loading) {
       await this._loading;
       return;
     }
-    this._loading = this._doLoad();
+    this._loading = this._doLoad(configuration);
     try {
       await this._loading;
     } finally {
@@ -154,15 +167,45 @@ export class CommonsModule {
   }
 
   private _teardown(): void {
-    if (this._module && this._loaded) {
+    if (this._storageAnalyzerAdapter) {
+      try {
+        this._storageAnalyzerAdapter.cleanup();
+      } catch (error) {
+        logger.warning(
+          `BrowserStorageAnalyzerAdapter cleanup threw: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+      this._storageAnalyzerAdapter = null;
+    }
+    if (this._module) {
       try {
         this._module._rac_shutdown?.();
-      } catch { /* ignore */ }
+      } catch (error) {
+        logger.warning(
+          `rac_shutdown threw: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    if (this._deviceRegistrationAdapter) {
+      try {
+        this._deviceRegistrationAdapter.cleanup();
+      } catch (error) {
+        logger.warning(
+          `DeviceRegistrationAdapter cleanup threw: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      this._deviceRegistrationAdapter = null;
     }
     if (this._platformAdapter) {
       try {
         this._platformAdapter.cleanup();
-      } catch { /* ignore */ }
+      } catch (error) {
+        logger.warning(
+          `PlatformAdapter cleanup threw: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       this._platformAdapter = null;
     }
     HTTPAdapter.clearDefaultModule();
@@ -179,7 +222,7 @@ export class CommonsModule {
     this._loading = null;
   }
 
-  private async _doLoad(): Promise<void> {
+  private async _doLoad(configuration: DeviceRegistrationConfiguration): Promise<void> {
     // If a sibling backend has already registered for 'commons', reuse it —
     // the per-capability registry returns whichever module currently owns
     // the SDK-state surface. Avoids loading the core artifact twice when an
@@ -189,6 +232,13 @@ export class CommonsModule {
     if (existing) {
       logger.info('Reusing already-installed RACommons module from sibling backend');
       this._module = existing;
+      this._deviceRegistrationAdapter = DeviceRegistrationAdapter.install(
+        existing,
+        configuration,
+      );
+      this._storageAnalyzerAdapter = await BrowserStorageAnalyzerAdapter.install(
+        existing as unknown as BrowserStorageAnalyzerModule,
+      );
       this._loaded = true;
       return;
     }
@@ -197,7 +247,7 @@ export class CommonsModule {
     try {
       const moduleUrl = this.wasmUrl
         ?? new URL('../../wasm/racommons.js', import.meta.url).href;
-      logger.info(`Loading core variant: ${moduleUrl}`);
+      logger.info(`Loading core variant: ${redactResourceURL(moduleUrl)}`);
       this.wasmUrl = moduleUrl;
 
       // Dynamic import of Emscripten glue JS (vite-friendly).
@@ -235,7 +285,7 @@ export class CommonsModule {
       await this._initRACommons();
       // Lazy import to avoid a static circular dependency with
       // `../Public/RunAnywhere`.
-      const { completeNativePhase1ForModule } = await import('../Public/RunAnywhere');
+      const { completeNativePhase1ForModule } = await import('../Public/RunAnywhere.js');
       completeNativePhase1ForModule(this._module);
 
       // Register against the 'commons' capability so the SDK facade's
@@ -249,12 +299,18 @@ export class CommonsModule {
       registerWasmModule(['commons'], this._module);
       HTTPAdapter.setDefaultModule(this._module);
       ModelRegistryAdapter.setDefaultModule(this._module);
+      this._deviceRegistrationAdapter = DeviceRegistrationAdapter.install(
+        this._module,
+        configuration,
+      );
+      this._storageAnalyzerAdapter = await BrowserStorageAnalyzerAdapter.install(
+        this._module as unknown as BrowserStorageAnalyzerModule,
+      );
 
       this._loaded = true;
       logger.info('Commons WASM module loaded successfully');
     } catch (error) {
-      this._module = null;
-      this._loaded = false;
+      this._teardown();
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to load Commons WASM: ${message}`);
       throw new SDKException(

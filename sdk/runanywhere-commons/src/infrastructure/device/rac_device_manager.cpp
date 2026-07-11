@@ -85,6 +85,14 @@ rac_result_t rac_device_set_callbacks(const rac_device_callbacks_t* callbacks) {
     return rac_device_manager_set_callbacks(callbacks);
 }
 
+void rac_device_manager_clear_callbacks(void) {
+    auto& state = get_state();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    state.callbacks = {};
+    state.callbacks_set = false;
+    RAC_LOG_INFO(LOG_CAT, "Device manager callbacks cleared");
+}
+
 rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const char* build_token) {
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);

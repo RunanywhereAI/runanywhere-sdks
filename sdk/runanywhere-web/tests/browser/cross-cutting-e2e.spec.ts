@@ -16,7 +16,7 @@
  *   - Storage           (browser backend, isLocalStorageSupported)
  *   - SDK Events        (poll + publish proto)
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { resolve } from 'node:path';
 
 const shouldRun = process.env.RA_RUN_SPEECH_E2E === '1';
@@ -83,7 +83,7 @@ declare global {
   }
 }
 
-async function bootAndRegisterONNX(page: import('@playwright/test').Page): Promise<void> {
+async function bootAndRegisterONNX(page: Page): Promise<void> {
   await page.goto('/');
   await page.waitForFunction(
     () => {

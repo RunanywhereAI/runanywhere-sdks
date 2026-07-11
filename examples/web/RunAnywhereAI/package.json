@@ -8,12 +8,19 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "lint": "eslint src server api --max-warnings 0",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "sync-solutions": "node scripts/sync-solutions.mjs"
   },
   "devDependencies": {
-    "@bufbuild/protobuf": "^2.12.0",
+    "@bufbuild/protobuf": "^2.12.1",
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^24.10.0",
+    "eslint": "^9.39.4",
     "typescript": "^5.9.3",
-    "vite": "^6.4.2"
+    "typescript-eslint": "^8.59.3",
+    "vite": "^8.1.4",
+    "vitest": "^3.2.4"
   }
 }

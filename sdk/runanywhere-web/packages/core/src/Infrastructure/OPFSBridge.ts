@@ -45,12 +45,42 @@
  *   path so OPFS sees `RunAnywhere/Models/...` directly.
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
 
 const logger = new SDKLogger('OPFSBridge');
 
 /** Synthetic prefix shared with C++ (see `rac_model_paths_set_base_dir`). */
 const OPFS_PREFIX = '/opfs';
+
+/**
+ * Persistent root selected by the host through the File System Access API.
+ * When absent, the bridge resolves the origin-private root as before. Keeping
+ * this override inside the bridge is important: every download, hydrate,
+ * model load, and delete must resolve the same synthetic `/opfs/` path tree.
+ */
+let persistentRootOverride: FileSystemDirectoryHandle | null = null;
+const persistentRootIds = new WeakMap<FileSystemDirectoryHandle, number>();
+let nextPersistentRootId = 1;
+
+function persistentRootKey(root: FileSystemDirectoryHandle | null): string {
+  if (root === null) return 'origin-private';
+  let id = persistentRootIds.get(root);
+  if (id === undefined) {
+    id = nextPersistentRootId;
+    nextPersistentRootId += 1;
+    persistentRootIds.set(root, id);
+  }
+  return `selected-${id}`;
+}
+
+function scopedPathKey(rootKey: string, path: string): string {
+  return `${rootKey}\u0000${path}`;
+}
+
+interface SuppressedPersistentPath {
+  path: string;
+  rootKey: string;
+}
 
 /** Minimal Emscripten FS surface OPFSBridge needs at runtime. */
 interface EmscriptenFS {
@@ -62,6 +92,13 @@ interface EmscriptenFS {
   analyzePath?(path: string): { exists: boolean };
   readdir?(path: string): string[];
   isDir?(mode: number): boolean;
+}
+
+/** Async directory iteration is implemented by browsers but not yet present
+ * in every TypeScript DOM lib version. Keep the compatibility shim typed. */
+interface IterableFileSystemDirectoryHandle {
+  entries?(): AsyncIterableIterator<[string, FileSystemHandle]>;
+  values?(): AsyncIterableIterator<FileSystemHandle>;
 }
 
 /** Emscripten POSIX-style file-mode bit for "is directory" (S_IFDIR). */
@@ -124,10 +161,12 @@ function toOwnedArrayBuffer(src: Uint8Array): ArrayBuffer {
 }
 
 /** True when the browser supports the Origin Private File System. */
-function isOPFSSupported(): boolean {
-  return typeof navigator !== 'undefined'
+function isOPFSSupported(
+  root: FileSystemDirectoryHandle | null = persistentRootOverride,
+): boolean {
+  return root !== null || (typeof navigator !== 'undefined'
     && 'storage' in navigator
-    && typeof navigator.storage?.getDirectory === 'function';
+    && typeof navigator.storage?.getDirectory === 'function');
 }
 
 /**
@@ -153,11 +192,12 @@ function pathToOPFSSegments(path: string): string[] | null {
 async function resolveOPFSDirectory(
   segments: string[],
   create: boolean,
+  root: FileSystemDirectoryHandle | null = persistentRootOverride,
 ): Promise<FileSystemDirectoryHandle | null> {
-  if (!isOPFSSupported()) {
+  if (!isOPFSSupported(root)) {
     return null;
   }
-  let dir = await navigator.storage.getDirectory();
+  let dir = root ?? await navigator.storage.getDirectory();
   for (const segment of segments) {
     dir = await dir.getDirectoryHandle(segment, { create });
   }
@@ -245,9 +285,125 @@ async function readBytesFromOPFSFile(handle: FileSystemFileHandle): Promise<Uint
 }
 
 export class OPFSBridge {
+  /**
+   * Paths whose synchronous MEMFS deletion has committed but whose async OPFS
+   * removal is still pending. Hydration/restore treats these as absent from
+   * the moment the native delete callback returns, preventing a stale OPFS
+   * copy from resurrecting the registry entry in the same browser lifetime.
+   */
+  private static readonly suppressedPaths = new Map<string, SuppressedPersistentPath>();
+  private static readonly pendingRemovals = new Map<string, Promise<void>>();
+
   /** Whether the browser supports the OPFS APIs OPFSBridge needs. */
   static get isSupported(): boolean {
     return isOPFSSupported();
+  }
+
+  /**
+   * Route the synthetic `/opfs/` tree through a user-selected persistent
+   * directory. Passing `null` restores the origin-private browser root.
+   * The caller owns permission checks and only installs granted handles.
+   */
+  static setPersistentRoot(handle: FileSystemDirectoryHandle | null): void {
+    persistentRootOverride = handle;
+  }
+
+  /**
+   * Commit a logical deletion immediately and remove its OPFS counterpart on
+   * the browser event loop. The storage analyzer callback is synchronous, so
+   * it cannot await FileSystemDirectoryHandle.removeEntry().
+   */
+  static scheduleRemovePath(path: string): Promise<void> {
+    const segments = pathToOPFSSegments(path);
+    if (!segments) return Promise.resolve();
+    // Capture both the root handle and its logical identity. Resolving the
+    // mutable global root later could delete the same path from a folder the
+    // user selected after this callback returned.
+    const root = persistentRootOverride;
+    const rootKey = persistentRootKey(root);
+    const scopedKey = scopedPathKey(rootKey, path);
+    OPFSBridge.suppressedPaths.set(scopedKey, { path, rootKey });
+    const previous = OPFSBridge.pendingRemovals.get(scopedKey);
+    const removal = (previous ? previous.catch(() => undefined) : Promise.resolve())
+      .then(() => OPFSBridge.removePathFromOPFS(segments, path, root));
+    OPFSBridge.pendingRemovals.set(scopedKey, removal);
+    void removal.then(
+      () => {
+        if (OPFSBridge.pendingRemovals.get(scopedKey) === removal) {
+          OPFSBridge.pendingRemovals.delete(scopedKey);
+          // Physical absence now enforces the deletion, so the temporary
+          // logical tombstone is no longer needed and cannot leak forever.
+          OPFSBridge.suppressedPaths.delete(scopedKey);
+        }
+      },
+      (error: unknown) => {
+        logger.warning(
+          `Scheduled OPFS deletion failed for '${path}': ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        if (OPFSBridge.pendingRemovals.get(scopedKey) === removal) {
+          OPFSBridge.pendingRemovals.delete(scopedKey);
+          // Keep the tombstone on failure so a stale file in this same root
+          // cannot be hydrated back into the registry.
+        }
+      },
+    );
+    return removal;
+  }
+
+  private static async removePathFromOPFS(
+    segments: string[],
+    path: string,
+    root: FileSystemDirectoryHandle | null,
+  ): Promise<void> {
+    if (!isOPFSSupported(root)) return;
+    try {
+      const dir = await resolveOPFSDirectory(segments.slice(0, -1), false, root);
+      if (!dir) return;
+      await dir.removeEntry(segments[segments.length - 1], { recursive: true });
+      logger.info(`OPFS removed '${path}'`);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotFoundError') return;
+      throw error;
+    }
+  }
+
+  private static isSuppressed(path: string): boolean {
+    const rootKey = persistentRootKey(persistentRootOverride);
+    for (const suppressed of OPFSBridge.suppressedPaths.values()) {
+      if (suppressed.rootKey !== rootKey) continue;
+      if (path === suppressed.path || path.startsWith(`${suppressed.path}/`)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Serialize a new persistent write behind any scheduled deletion that owns
+   * the same path. This prevents a late removeEntry() from deleting bytes that
+   * a user immediately re-downloaded after deletion.
+   */
+  private static async preparePathForWrite(path: string): Promise<void> {
+    const rootKey = persistentRootKey(persistentRootOverride);
+    const pending: Promise<void>[] = [];
+    for (const [key, suppressed] of OPFSBridge.suppressedPaths) {
+      if (
+        suppressed.rootKey === rootKey
+        && (path === suppressed.path || path.startsWith(`${suppressed.path}/`))
+      ) {
+        const removal = OPFSBridge.pendingRemovals.get(key);
+        if (removal) pending.push(removal);
+      }
+    }
+    await Promise.all(pending);
+    for (const [key, suppressed] of OPFSBridge.suppressedPaths) {
+      if (
+        suppressed.rootKey === rootKey
+        && (path === suppressed.path || path.startsWith(`${suppressed.path}/`))
+      ) {
+        OPFSBridge.suppressedPaths.delete(key);
+      }
+    }
   }
 
   /** Byte length of `path` in a module's MEMFS, or 0 when missing/unreadable. */
@@ -354,6 +510,9 @@ export class OPFSBridge {
     if (modules.length === 0) return;
     const segments = pathToOPFSSegments(path);
     if (!segments) return;
+    if (OPFSBridge.isSuppressed(path)) {
+      throw new Error(`Model load failed: '${path}' was deleted from browser storage`);
+    }
 
     // Fast-path: any module already has the file in MEMFS with bytes.
     const memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(modules, path);
@@ -386,6 +545,7 @@ export class OPFSBridge {
   /** True when `segments` resolves to a directory handle in OPFS. */
   static async isOPFSDirectory(segments: string[]): Promise<boolean> {
     if (!isOPFSSupported()) return false;
+    if (OPFSBridge.isSuppressed(`${OPFS_PREFIX}/${segments.join('/')}`)) return false;
     try {
       const dir = await resolveOPFSDirectory(segments, false);
       return dir != null;
@@ -404,6 +564,7 @@ export class OPFSBridge {
     dirPath: string,
   ): Promise<void> {
     if (!isOPFSSupported()) return;
+    if (OPFSBridge.isSuppressed(dirPath)) return;
     const segments = pathToOPFSSegments(dirPath);
     if (!segments) return;
     const dir = await resolveOPFSDirectory(segments, false);
@@ -421,8 +582,8 @@ export class OPFSBridge {
     dirPath: string,
     fs: EmscriptenFS,
   ): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const entries = (dir as any).entries?.() ?? null;
+    const iterable = dir as unknown as IterableFileSystemDirectoryHandle;
+    const entries = iterable.entries?.() ?? null;
     if (!entries) return;
     for await (const [name, handle] of entries) {
       const childPath = `${dirPath}/${name}`;
@@ -470,6 +631,7 @@ export class OPFSBridge {
       logger.debug(`flushFromMemfs: path '${path}' is not under '${OPFS_PREFIX}/'; skipping`);
       return 0;
     }
+    await OPFSBridge.preparePathForWrite(path);
     if (!isOPFSSupported()) {
       logger.warning(`flushFromMemfs: OPFS not supported in this browser; '${path}' will not persist`);
       return 0;
@@ -535,6 +697,7 @@ export class OPFSBridge {
   static async restoreToMemfs(module: ModuleLike, path: string): Promise<number> {
     const fs = getFS(module);
     if (!fs) return 0;
+    if (OPFSBridge.isSuppressed(path)) return 0;
 
     // Already present in MEMFS with real bytes — nothing to do.
     if (fs.analyzePath?.(path)?.exists) {
@@ -594,6 +757,7 @@ export class OPFSBridge {
    */
   static async restoreToMemfsAll(modules: ModuleLike[], path: string): Promise<number> {
     if (modules.length === 0) return 0;
+    if (OPFSBridge.isSuppressed(path)) return 0;
     const segments = pathToOPFSSegments(path);
     if (!segments || !isOPFSSupported()) return 0;
 
@@ -652,6 +816,7 @@ export class OPFSBridge {
    * paying the cost of reading bytes back.
    */
   static async exists(path: string): Promise<boolean> {
+    if (OPFSBridge.isSuppressed(path)) return false;
     const segments = pathToOPFSSegments(path);
     if (!segments || !isOPFSSupported()) return false;
     const fileName = segments[segments.length - 1];
@@ -674,6 +839,7 @@ export class OPFSBridge {
    */
   static async directoryHasArtifacts(dirSegments: string[]): Promise<boolean> {
     if (!isOPFSSupported()) return false;
+    if (OPFSBridge.isSuppressed(`${OPFS_PREFIX}/${dirSegments.join('/')}`)) return false;
     try {
       const dir = await resolveOPFSDirectory(dirSegments, false);
       if (!dir) return false;
@@ -686,8 +852,8 @@ export class OPFSBridge {
   private static async opfsDirectoryHasAnyFile(
     dir: FileSystemDirectoryHandle,
   ): Promise<boolean> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const entries = (dir as any).values?.() ?? null;
+    const iterable = dir as unknown as IterableFileSystemDirectoryHandle;
+    const entries = iterable.values?.() ?? null;
     if (!entries) return false;
     for await (const handle of entries) {
       if (!handle) continue;
@@ -708,6 +874,7 @@ export class OPFSBridge {
    */
   static async writeFileToOPFS(segments: string[], bytes: Uint8Array): Promise<void> {
     if (!isOPFSSupported()) return;
+    await OPFSBridge.preparePathForWrite(`${OPFS_PREFIX}/${segments.join('/')}`);
     const dir = await resolveOPFSDirectory(segments.slice(0, -1), true);
     if (!dir) return;
     const fileName = segments[segments.length - 1];

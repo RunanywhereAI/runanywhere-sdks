@@ -20,8 +20,8 @@ import {
   SDKError as SDKErrorCodec,
   type SDKError as ProtoSDKError,
 } from '@runanywhere/proto-ts/errors';
-import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
-import { SDKLogger } from './SDKLogger';
+import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm.js';
+import { SDKLogger } from './SDKLogger.js';
 
 /**
  * Map a signed-negative `rac_result_t` code to the matching proto-ts `ErrorCategory`.

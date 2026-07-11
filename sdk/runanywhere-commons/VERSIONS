@@ -41,8 +41,9 @@ XCODE_VERSION=26.5
 NDK_VERSION=27.3.13750724
 
 # Emscripten SDK (used by sdk/runanywhere-web/wasm/scripts/build.sh)
-# (2026-05-19 build-toolchain bump): 3.1.51 -> 5.0.6 (host).
-EMSCRIPTEN_VERSION=5.0.6
+# (2026-07-10 Web release bump): 5.0.6 -> 6.0.2. Keep the setup script and
+# WASM archive provenance markers sourced from this canonical pin.
+EMSCRIPTEN_VERSION=6.0.2
 
 # Node (Web SDK + React Native SDK builds)
 # (2026-05-19 build-toolchain bump): 20 -> 22 (LTS).
@@ -147,6 +148,12 @@ ONNX_VERSION_LINUX=1.24.4
 # Windows version (can use latest)
 ONNX_VERSION_WINDOWS=1.24.4
 
+# Web/WASM version. This is intentionally independent from the native platform
+# pins above: Sherpa-ONNX v1.13.4's upstream WASM bundle is matched to ORT
+# v1.27.1, while the shipped iOS/Android binaries remain on their validated
+# platform-specific versions.
+ONNX_VERSION_WEB=1.27.1
+
 # =============================================================================
 # Sherpa-ONNX (via runanywhere-core)
 # =============================================================================
@@ -183,11 +190,15 @@ SHERPA_ONNX_VERSION_LINUX=1.13.2
 # Windows version
 SHERPA_ONNX_VERSION_WINDOWS=1.13.2
 
+# Web/WASM matched set with ONNX_VERSION_WEB. Do not reuse Android/iOS
+# prebuilts for this target; the Web vendor scripts validate provenance.
+SHERPA_ONNX_VERSION_WEB=1.13.4
+
 # =============================================================================
 # llama.cpp (LLM inference)
 # =============================================================================
-# Latest stable upstream release.
-LLAMACPP_VERSION=b9878
+# Upstream release pin selected for the 2026-07-10 Web release cut.
+LLAMACPP_VERSION=b9957
 
 # =============================================================================
 # nlohmann/json

@@ -393,7 +393,9 @@ async function onAnalyze(): Promise<void> {
 
   // Cancel maps to the SDK's native cancel verb — iOS parity:
   // VLMViewModel.swift:244-246 (`RunAnywhere.cancelVLMGeneration()`).
+  let cancellationRequested = false;
   cancelAnalyze = () => {
+    cancellationRequested = true;
     void RunAnywhere.visionLanguage.cancelVLMGeneration();
   };
 
@@ -428,9 +430,15 @@ async function onAnalyze(): Promise<void> {
           break;
       }
     }
-    if (!lastResult) lastResult = '(empty response)';
+    if (cancellationRequested) {
+      setStatus('Cancelled.');
+    } else if (!lastResult) {
+      lastResult = '(empty response)';
+    }
   } catch (err) {
-    setStatus(`VLM inference failed: ${formatError(err)}`);
+    setStatus(cancellationRequested
+      ? 'Cancelled.'
+      : `VLM inference failed: ${formatError(err)}`);
   } finally {
     cancelAnalyze = null;
     isBusy = false;
@@ -472,4 +480,3 @@ function updateOutput(text: string): void {
   const output = container.querySelector<HTMLPreElement>('#vision-output');
   if (output) output.textContent = text;
 }
-

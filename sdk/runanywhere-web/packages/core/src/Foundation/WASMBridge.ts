@@ -1,12 +1,13 @@
 /**
  * RunAnywhere Web SDK - WASM Bridge Types
  *
- * Core is now pure TypeScript. The actual WASM bridge implementations
- * live in each backend package:
+ * Core owns the commons-only module loader. Capability-specific bridge
+ * implementations live in their backend packages:
  *   - LlamaCppBridge in @runanywhere/web-llamacpp
  *   - SherpaONNXBridge in @runanywhere/web-onnx
  *
- * This file only exports shared types used by the public API.
+ * This file exports the backend-neutral acceleration type shared by the
+ * registration contract and public runtime facade.
  */
 
 /** The hardware acceleration mode used by a backend's WASM module. */

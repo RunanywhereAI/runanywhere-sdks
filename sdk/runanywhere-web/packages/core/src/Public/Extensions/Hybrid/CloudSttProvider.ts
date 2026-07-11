@@ -12,22 +12,22 @@
  *
  * Mirrors Swift `CloudSttProvider.swift` (`Cloud.registerProvider` /
  * `Cloud.unregisterProvider`, lines 145 / 209) and Kotlin's
- * `CloudSttProvider.kt`. The Swift handler may block on network; under
- * single-threaded WASM the trampoline is invoked synchronously, so the Web
+ * `CloudSttProvider.kt`. The Swift handler may block on network; the Web C ABI
+ * invokes this JS trampoline synchronously on its calling runtime, so the
  * handler must return its `CloudSttResult` synchronously. Thrown errors are
  * encoded as `{"error_code":1,...}` and surface to the router as a transcribe
  * failure (so the cascade policy can fall back) — never as a JS exception
  * crossing the C boundary.
  */
 
-import { SDKLogger } from '../../../Foundation/SDKLogger';
+import { SDKLogger } from '../../../Foundation/SDKLogger.js';
 import {
   RAC_OK,
   RAC_ERROR_NULL_POINTER,
   RAC_ERROR_OUT_OF_MEMORY,
-} from '../../../Foundation/RACErrors';
-import { Cloud, cloudCapableModule } from './Cloud';
-import type { EmscriptenRunanywhereModule } from '../../../runtime/EmscriptenModule';
+} from '../../../Foundation/RACErrors.js';
+import { Cloud, cloudCapableModule } from './Cloud.js';
+import type { EmscriptenRunanywhereModule } from '../../../runtime/EmscriptenModule.js';
 
 const logger = new SDKLogger('Cloud.SttProvider');
 
@@ -129,6 +129,54 @@ function nonBlank(value: string | undefined): string | undefined {
   return value && value.length > 0 ? value : undefined;
 }
 
+interface CloudSttWireConfig {
+  provider?: string;
+  model?: string;
+  api_key?: string;
+  base_url?: string;
+  language_code?: string;
+}
+
+function isJsonObject(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function optionalStringField(
+  value: Readonly<Record<string, unknown>>,
+  key: string,
+): string | undefined {
+  const field = value[key];
+  return typeof field === 'string' ? field : undefined;
+}
+
+/**
+ * Runtime-decode the native registration JSON before it reaches a provider.
+ * Kept exported from this source module for focused boundary tests; it is not
+ * re-exported from the package's public entry point.
+ */
+export function parseCloudSttProviderConfig(configJson: string): CloudSttWireConfig {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(configJson);
+  } catch {
+    return {};
+  }
+  if (!isJsonObject(parsed)) return {};
+
+  const config: CloudSttWireConfig = {};
+  const provider = optionalStringField(parsed, 'provider');
+  const model = optionalStringField(parsed, 'model');
+  const apiKey = optionalStringField(parsed, 'api_key');
+  const baseUrl = optionalStringField(parsed, 'base_url');
+  const languageCode = optionalStringField(parsed, 'language_code');
+  if (provider !== undefined) config.provider = provider;
+  if (model !== undefined) config.model = model;
+  if (apiKey !== undefined) config.api_key = apiKey;
+  if (baseUrl !== undefined) config.base_url = baseUrl;
+  if (languageCode !== undefined) config.language_code = languageCode;
+  return config;
+}
+
 /**
  * Decodes the registered config into a `CloudSttRequest`, runs the handler,
  * and encodes the engine-facing result JSON. Never throws — failures are
@@ -142,19 +190,7 @@ function invokeProviderHandler(
   audio: Uint8Array,
   audioFormat: CloudAudioFormat,
 ): string {
-  /** Typed view of the registered cloud entry JSON (snake_case wire keys). */
-  let config: {
-    provider?: string;
-    model?: string;
-    api_key?: string;
-    base_url?: string;
-    language_code?: string;
-  } = {};
-  try {
-    config = JSON.parse(configJson) as typeof config;
-  } catch {
-    config = {};
-  }
+  const config = parseCloudSttProviderConfig(configJson);
 
   const request: CloudSttRequest = {
     provider: config.provider ?? '',

@@ -16,7 +16,7 @@ import {
   SolutionAdapter,
   SolutionHandle,
   type SolutionRunInput,
-} from '../../Adapters/SolutionAdapter';
+} from '../../Adapters/SolutionAdapter.js';
 
 /**
  * `RunAnywhere.solutions` capability accessor.

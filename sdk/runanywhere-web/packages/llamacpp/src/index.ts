@@ -44,5 +44,6 @@
  * @packageDocumentation
  */
 
-export { LlamaCPP, autoRegister } from './LlamaCPP';
-export type { LlamaCPPRegisterOptions } from './LlamaCPP';
+export { LlamaCPP, autoRegister } from './LlamaCPP.js';
+export type { LlamaCPPRegisterOptions } from './LlamaCPP.js';
+export type { BackendRegistrationState } from '@runanywhere/web/backend';

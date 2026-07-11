@@ -1,4 +1,4 @@
-import type { EmscriptenRunanywhereModule } from './EmscriptenModule';
+import type { EmscriptenRunanywhereModule } from './EmscriptenModule.js';
 
 export interface SpeechBackendModule extends EmscriptenRunanywhereModule {
   _rac_backend_onnx_register?: () => number;

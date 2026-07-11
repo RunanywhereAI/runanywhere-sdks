@@ -2,32 +2,20 @@
  * EmscriptenModule.ts
  *
  * Typed surface over the Emscripten-compiled
- * RACommons module so TypeScript call sites (VoiceAgentStreamAdapter,
- * future ccall wrappers) can reference `runanywhereModule`
- * without each site re-declaring the function signatures.
+ * RACommons modules so TypeScript call sites can use one validated shape
+ * without redeclaring C ABI signatures.
  *
- * Initialization pattern:
- *
- *     import { initRunanywhereModule } from '@runanywhere/web';
- *     await initRunanywhereModule(() => import('./runanywhere.wasm'));
- *     // now any RunAnywhere.* call can reach C++ via this module
- *
- * The actual WASM loader lives in each deployment harness (Vite,
- * webpack, the test runner etc.) — this file only exposes the typed
- * singleton + a setter so the core package stays pure-TS and doesn't
- * bundle its own loader.
- *
- * Matches the design intent called out in
- * `sdk/runanywhere-web/packages/core/src/Foundation/WASMBridge.ts`:
- * "Core is now pure TypeScript. The actual WASM bridge implementations
- *  live in each backend package".
+ * `CommonsModule` loads the core package's commons-only artifact. The
+ * llama.cpp and ONNX packages load their own artifacts, then register the
+ * module for only the capabilities they implement. This file owns that typed
+ * capability registry; it does not contain a concrete backend loader.
  */
 
-import { DownloadAdapter } from '../Adapters/DownloadAdapter';
-import { ModelLifecycleAdapter } from '../Adapters/ModelLifecycleAdapter';
-import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
-import { ModalityProtoAdapter } from '../Adapters/ModalityProtoAdapter';
-import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter';
+import { DownloadAdapter } from '../Adapters/DownloadAdapter.js';
+import { ModelLifecycleAdapter } from '../Adapters/ModelLifecycleAdapter.js';
+import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter.js';
+import { ModalityProtoAdapter } from '../Adapters/ModalityProtoAdapter.js';
+import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter.js';
 
 /**
  * Minimal subset of the Emscripten Module object that this SDK uses.
@@ -108,6 +96,17 @@ export interface EmscriptenRunanywhereModule {
     callbackPtr: number,
     userData: number,
   ): number;
+  _rac_stt_transcribe_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_stt_transcribe_stream_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    callbackPtr: number,
+    userData: number,
+  ): number;
 
   _rac_tts_component_list_voices_proto?(
     handle: number,
@@ -129,6 +128,19 @@ export interface EmscriptenRunanywhereModule {
     callbackPtr: number,
     userData: number,
   ): number;
+  _rac_tts_synthesize_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_tts_synthesize_stream_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    callbackPtr: number,
+    userData: number,
+  ): number;
+  _rac_tts_stop_lifecycle_proto?(outResult: number): number;
+  _rac_tts_list_voices_lifecycle_proto?(outResult: number): number;
 
   _rac_vad_component_configure_proto?(
     handle: number,
@@ -152,6 +164,19 @@ export interface EmscriptenRunanywhereModule {
     callbackPtr: number,
     userData: number,
   ): number;
+  _rac_vad_process_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_vad_configure_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_vad_start_lifecycle_proto?(outResult: number): number;
+  _rac_vad_stop_lifecycle_proto?(outResult: number): number;
+  _rac_vad_reset_lifecycle_proto?(outResult: number): number;
 
   _rac_voice_agent_initialize_proto?(
     handle: number,
@@ -361,11 +386,11 @@ export interface EmscriptenRunanywhereModule {
    *   Tears down session state. Idempotent / safe to call after final_result.
    *   Used by the TS `generateWithTools` for both normal completion and abort.
    *   `sessionHandle` is the uint64 returned by session_create (matches
-   *   `_rac_sdk_event_unsubscribe` — accepts either number or bigint depending
-   *   on whether the WASM module was linked with `-sWASM_BIGINT`).
+   *   `_rac_sdk_event_unsubscribe` — receives a bigint because every shipped
+   *   Web artifact is linked with `-sWASM_BIGINT=1`.
    */
   _rac_tool_calling_session_destroy_proto?(
-    sessionHandle: number | bigint,
+    sessionHandle: bigint,
   ): number;
   /**
    * `_rac_tool_calling_session_cancel_proto(sessionHandle)`:
@@ -373,11 +398,13 @@ export interface EmscriptenRunanywhereModule {
    *   LifecycleLlmRef to interrupt the underlying backend `ops->generate`.
    *   Distinct from `_rac_tool_calling_session_destroy_proto` — the host
    *   should still call destroy once the in-flight call has resolved. Safe
-   *   to call from any context; the WASM module is single-threaded so this
-   *   actually fires after the current async tick returns control.
+   *   to call from any context. Browser JS cannot invoke the export while a
+   *   synchronous main-runtime call is blocking, so an AbortSignal callback
+   *   actually fires after the current async tick returns control; native
+   *   inference workers may still run on the pthread pool.
    */
   _rac_tool_calling_session_cancel_proto?(
-    sessionHandle: number | bigint,
+    sessionHandle: bigint,
   ): number;
   _rac_structured_output_prepare_prompt_proto?(
     requestBytes: number,
@@ -634,6 +661,16 @@ export interface EmscriptenRunanywhereModule {
     requestSize: number,
     outResult: number,
   ): number;
+  _rac_wasm_sizeof_storage_callbacks?(): number;
+  _rac_wasm_offsetof_storage_callbacks_calculate_dir_size?(): number;
+  _rac_wasm_offsetof_storage_callbacks_get_file_size?(): number;
+  _rac_wasm_offsetof_storage_callbacks_path_exists?(): number;
+  _rac_wasm_offsetof_storage_callbacks_get_available_space?(): number;
+  _rac_wasm_offsetof_storage_callbacks_get_total_space?(): number;
+  _rac_wasm_offsetof_storage_callbacks_delete_path?(): number;
+  _rac_wasm_offsetof_storage_callbacks_is_model_loaded?(): number;
+  _rac_wasm_offsetof_storage_callbacks_unload_model?(): number;
+  _rac_wasm_offsetof_storage_callbacks_user_data?(): number;
 
   // -----------------------------------------------------------------------------
   // Download proto-byte ABI
@@ -671,8 +708,8 @@ export interface EmscriptenRunanywhereModule {
   // -----------------------------------------------------------------------------
   // SDKEvent proto-byte event stream ABI
   // -----------------------------------------------------------------------------
-  _rac_sdk_event_subscribe?(callbackPtr: number, userData: number): number | bigint;
-  _rac_sdk_event_unsubscribe?(subscriptionId: number | bigint): void;
+  _rac_sdk_event_subscribe?(callbackPtr: number, userData: number): bigint;
+  _rac_sdk_event_unsubscribe?(subscriptionId: bigint): void;
   _rac_sdk_event_publish_proto?(protoBytes: number, protoSize: number): number;
   _rac_sdk_event_poll?(outEvent: number): number;
   _rac_sdk_event_publish_failure?(
@@ -715,7 +752,7 @@ export interface EmscriptenRunanywhereModule {
    * Requires `-sEXPORTED_RUNTIME_METHODS=['addFunction','removeFunction']`
    * and `-sALLOW_TABLE_GROWTH=1` at link time.
    */
-  addFunction(fn: (...args: number[]) => number | bigint | void, signature: string): number;
+  addFunction(fn: (...args: never[]) => number | bigint | void, signature: string): number;
 
   /** Remove a previously-installed JS callback. Idempotent. */
   removeFunction(ptr: number): void;

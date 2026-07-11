@@ -3,7 +3,21 @@
   "buildCommand": "",
   "outputDirectory": "dist",
   "framework": null,
+  "functions": {
+    "api/runanywhere/*.ts": {
+      "maxDuration": 30
+    }
+  },
   "headers": [
+    {
+      "source": "/api/runanywhere/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    },
     {
       "source": "/(.*)",
       "headers": [
@@ -20,7 +34,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!assets/).*)",
+      "source": "/((?!api/runanywhere/|assets/|coi-serviceworker\\.js|runanywhere-logo\\.svg).*)",
       "destination": "/index.html"
     }
   ]

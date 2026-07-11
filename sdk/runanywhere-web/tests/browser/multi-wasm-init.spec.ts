@@ -109,7 +109,6 @@ test.describe('Multi-WASM SDK initialization', () => {
     expect(result?.error, `multi-WASM init failed: ${result?.error ?? 'none'}`).toBeUndefined();
     expect(result?.ok, 'pipeline OK').toBe(true);
 
-    // eslint-disable-next-line no-console
     console.log(
       `[multi-wasm-init] llamacpp load+register=${result?.llamacppLoadMs}ms, ` +
       `onnx load+register=${result?.onnxLoadMs}ms`,
@@ -119,7 +118,12 @@ test.describe('Multi-WASM SDK initialization', () => {
     expect(result?.onnxRegistered, 'ONNX/Sherpa backend reports registered').toBe(true);
 
     const fatalErrors = consoleErrors.filter(
-      (err) => !err.includes('NO_COLOR') && !err.includes('Failed to load resource'),
+      (err) => !err.includes('NO_COLOR')
+        && !err.includes('Failed to load resource')
+        // Credential-less local initialization intentionally defers the
+        // assignment fetch. The SDK surfaces that as an expected warning;
+        // backend registration itself is asserted above.
+        && !err.includes('model assignment base URL is not configured'),
     );
     expect(fatalErrors, `unexpected console errors:\n${fatalErrors.join('\n')}`).toHaveLength(0);
     expect(pageErrors, `page errors:\n${pageErrors.join('\n')}`).toHaveLength(0);

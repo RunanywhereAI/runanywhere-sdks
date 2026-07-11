@@ -12,8 +12,8 @@
  *   - Completion callbacks
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
-import { EventBus } from '../Foundation/EventBus';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { EventBus } from '../Foundation/EventBus.js';
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
 
 const logger = new SDKLogger('AudioPlayback');

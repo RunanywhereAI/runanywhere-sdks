@@ -51,6 +51,8 @@ interface XHRStubConfig {
   rawHeaders?: string;
   /** Whether `responseType = 'arraybuffer'` should throw (forces binary-text fallback). */
   arrayBufferUnsupported?: boolean;
+  /** Mirror Window-owned synchronous XHR rejecting a non-zero timeout. */
+  timeoutAssignmentUnsupported?: boolean;
 }
 
 class XHRStub {
@@ -70,8 +72,22 @@ class XHRStub {
   responseType: '' | 'arraybuffer' | 'text' = '';
   response: ArrayBuffer | string | null = null;
   responseText = '';
-  timeout = 0;
+  private configuredTimeout = 0;
   private headerBlob = '';
+
+  get timeout(): number {
+    return this.configuredTimeout;
+  }
+
+  set timeout(value: number) {
+    if (value > 0 && XHRStub.config.timeoutAssignmentUnsupported) {
+      throw new DOMException(
+        'Timeouts cannot be set for synchronous requests made from a document.',
+        'InvalidAccessError',
+      );
+    }
+    this.configuredTimeout = value;
+  }
 
   constructor() {
     XHRStub.lastInstance = this;
@@ -144,7 +160,9 @@ interface FakeModuleHandle {
   chunkStrategy: 'continue' | { cancelAt: number };
 }
 
-function makeFakeModule(opts: { withRegister?: boolean } = {}): FakeModuleHandle {
+function makeFakeModule(
+  opts: { withRegister?: boolean; timeoutMs?: number } = {},
+): FakeModuleHandle {
   const heap = new ArrayBuffer(1 << 24); // 16 MiB scratch heap
   const heapU8 = new Uint8Array(heap);
   const heapU32 = new Uint32Array(heap);
@@ -214,8 +232,8 @@ function makeFakeModule(opts: { withRegister?: boolean } = {}): FakeModuleHandle
     setValue(_ptr: number, _value: number, _type: string): void {
       // The transport's writeResponse uses this; we capture it loosely.
     },
-    getValue(_ptr: number, _type: string): number {
-      return 0;
+    getValue(ptr: number, _type: string): number {
+      return ptr === 28 ? (opts.timeoutMs ?? 0) : 0;
     },
     UTF8ToString(_ptr: number): string {
       return '';
@@ -232,7 +250,7 @@ function makeFakeModule(opts: { withRegister?: boolean } = {}): FakeModuleHandle
     _rac_wasm_offsetof_http_request_header_count: () => 0,
     _rac_wasm_offsetof_http_request_body_bytes: () => 0,
     _rac_wasm_offsetof_http_request_body_len: () => 0,
-    _rac_wasm_offsetof_http_request_timeout_ms: () => 0,
+    _rac_wasm_offsetof_http_request_timeout_ms: () => 28,
     _rac_wasm_offsetof_http_request_follow_redirects: () => 0,
     _rac_wasm_offsetof_http_request_expected_checksum_hex: () => 0,
     _rac_wasm_offsetof_http_response_status: () => 0,
@@ -347,6 +365,26 @@ describe('FetchHttpTransport', () => {
     expect(handle.chunkCalls[0].contentLength).toBe(XHRStub.config.body.length);
   });
 
+  it('receives the uint64 resume offset as bigint under WASM_BIGINT', () => {
+    const handle = makeFakeModule();
+    XHRStub.config.body = new Uint8Array([1, 2, 3]);
+
+    const transport = FetchHttpTransport.install(handle.module);
+    expect(transport).not.toBeNull();
+    const resumePtr = handle.registrations[0].resume;
+    const rc = handle.trampolines.get(resumePtr)!(
+      /*user*/0,
+      /*req*/0,
+      5n,
+      handle.chunkCallbackId,
+      /*cbUd*/0,
+      /*outMeta*/0,
+    );
+
+    expect(rc).toBe(0);
+    expect(XHRStub.recordedHeaders).toContainEqual({ name: 'Range', value: 'bytes=5-' });
+  });
+
   it('fans a multi-MiB body out across multiple chunk callbacks', () => {
     const handle = makeFakeModule();
     // 2.5 MiB body — STREAM_CHUNK_SIZE is 1 MiB, so this should produce
@@ -408,5 +446,34 @@ describe('FetchHttpTransport', () => {
     expect(rc).toBe(-151); // RAC_ERROR_NETWORK_ERROR
     expect(handle.chunkCalls).toHaveLength(0);
     void transport;
+  });
+
+  it('sends and streams when Window rejects a synchronous XHR timeout', () => {
+    const handle = makeFakeModule({ timeoutMs: 30_000 });
+    XHRStub.config.body = new Uint8Array([10, 20, 30]);
+    XHRStub.config.status = 200;
+    XHRStub.config.timeoutAssignmentUnsupported = true;
+
+    const transport = FetchHttpTransport.install(handle.module);
+    expect(transport).not.toBeNull();
+    const { send, stream } = handle.registrations[0];
+
+    const sendResult = handle.trampolines.get(send)!(
+      /*user*/0,
+      /*req*/0,
+      /*outResponse*/0,
+    );
+    expect(sendResult).toBe(0);
+
+    const streamResult = handle.trampolines.get(stream)!(
+      /*user*/0,
+      /*req*/0,
+      handle.chunkCallbackId,
+      /*cbUd*/0,
+      /*outMeta*/0,
+    );
+    expect(streamResult).toBe(0);
+    expect(handle.chunkCalls).toHaveLength(1);
+    expect(handle.chunkCalls[0].bytes).toEqual(XHRStub.config.body);
   });
 });

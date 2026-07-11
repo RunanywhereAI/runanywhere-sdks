@@ -138,8 +138,8 @@ interface SessionScript {
 interface FakeToolCallingModule extends EmscriptenRunanywhereModule {
   capturedCreateRequest: ProtoToolCallingSessionCreateRequest | undefined;
   capturedStepRequests: ProtoToolCallingSessionStepWithResultRequest[];
-  cancelHandles: Array<number | bigint>;
-  destroyHandles: Array<number | bigint>;
+  cancelHandles: bigint[];
+  destroyHandles: bigint[];
   liveCallbacks: Map<number, (...args: number[]) => unknown>;
   activeCallbackIds: Set<number>;
   stepCallCount: number;
@@ -285,11 +285,11 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
       }
       return script.stepRc ?? 0;
     },
-    _rac_tool_calling_session_destroy_proto(handle: number | bigint): number {
+    _rac_tool_calling_session_destroy_proto(handle: bigint): number {
       fake.destroyHandles!.push(handle);
       return 0;
     },
-    _rac_tool_calling_session_cancel_proto(handle: number | bigint): number {
+    _rac_tool_calling_session_cancel_proto(handle: bigint): number {
       fake.cancelHandles!.push(handle);
       return 0;
     },
@@ -582,7 +582,7 @@ describe('ToolCalling.generateWithTools — addFunction trampoline lifecycle', (
     expect(module.activeCallbackIds.size).toBe(0);
     // session_destroy ran during cleanup.
     expect(module.destroyHandles).toHaveLength(1);
-    expect(module.destroyHandles[0]).toBe(Number(FAKE_SESSION_HANDLE));
+    expect(module.destroyHandles[0]).toBe(FAKE_SESSION_HANDLE);
   });
 
   it('removes the callback even when the executor closure rejects through the step path', async () => {
@@ -685,7 +685,7 @@ describe('ToolCalling.generateWithTools — cancellation', () => {
     expect(module.cancelHandles.length).toBeGreaterThanOrEqual(1);
     // Cancel arg must match the published session handle (low 32 bits of
     // FAKE_SESSION_HANDLE in this harness).
-    expect(module.cancelHandles[0]).toBe(Number(FAKE_SESSION_HANDLE));
+    expect(module.cancelHandles[0]).toBe(FAKE_SESSION_HANDLE);
     // Cleanup destroys the session exactly once.
     expect(module.destroyHandles).toHaveLength(1);
   });

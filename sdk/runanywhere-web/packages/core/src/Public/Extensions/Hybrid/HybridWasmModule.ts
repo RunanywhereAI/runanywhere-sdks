@@ -84,7 +84,7 @@
  * clear `backendNotAvailable` — no faked behaviour.
  */
 
-import type { EmscriptenRunanywhereModule } from '../../../runtime/EmscriptenModule';
+import type { EmscriptenRunanywhereModule } from '../../../runtime/EmscriptenModule.js';
 
 /**
  * `rac_primitive_t` value for the TRANSCRIBE (STT) primitive. Used to pin the

@@ -27,18 +27,18 @@ import {
   type StructuredOutputValidation,
   type StructuredOutputValidationRequest,
 } from '@runanywhere/proto-ts/structured_output';
-import { SDKException } from '../../Foundation/SDKException';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
+import { SDKException } from '../../Foundation/SDKException.js';
+import { SDKLogger } from '../../Foundation/SDKLogger.js';
+import { ProtoWasmBridge } from '../../runtime/ProtoWasm.js';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
-} from '../../runtime/EmscriptenModule';
+} from '../../runtime/EmscriptenModule.js';
 import {
   TextGeneration,
   generateStructuredStream,
   type JSONSchemaDescriptor,
-} from './RunAnywhere+TextGeneration';
+} from './RunAnywhere+TextGeneration.js';
 
 export type {
   JSONSchema,

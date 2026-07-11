@@ -6,9 +6,9 @@
  */
 
 import type { DeviceInfo } from '@runanywhere/proto-ts/device_info';
-import { SDKLogger } from '../Foundation/SDKLogger';
-import { SDK_PLATFORM } from '../Foundation/Version';
-import type { AccelerationMode } from '../Foundation/WASMBridge';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { SDK_PLATFORM } from '../Foundation/Version.js';
+import type { AccelerationMode } from '../Foundation/WASMBridge.js';
 
 const logger = new SDKLogger('DeviceCapabilities');
 

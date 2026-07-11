@@ -42,7 +42,7 @@ import {
   ModelFileRole,
   ModelFormat,
 } from '@runanywhere/proto-ts/model_types';
-import { formatError } from './format-error';
+import { appLogger } from './app-logger';
 
 /**
  * Declarative description of a single catalog entry. Promoted to a full
@@ -77,7 +77,9 @@ export interface CatalogFileEntry {
 const CATALOG: readonly CatalogEntry[] = [
   // ---------- Language (LLM) ----------
   {
-    // iOS parity: ModelCatalogBootstrap.swift:29-35
+    // Preserve the cross-SDK model ID while using the model author's official
+    // instruction-tuned artifact; the historical base-model URL cannot
+    // reliably follow chat instructions.
     id: 'smollm2-360m-q8_0',
     name: 'SmolLM2 360M Q8_0',
     description: 'Small instruction-tuned LLM that runs in the WASM build.',
@@ -85,8 +87,8 @@ const CATALOG: readonly CatalogEntry[] = [
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl:
-      'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
-    downloadSizeBytes: 386_404_416,
+      'https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf',
+    downloadSizeBytes: 386_404_992,
     memoryRequiredBytes: 500_000_000,
     contextLength: 2048,
   },
@@ -101,8 +103,8 @@ const CATALOG: readonly CatalogEntry[] = [
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl:
       'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
-    downloadSizeBytes: 505_000_000,
-    memoryRequiredBytes: 600_000_000,
+    downloadSizeBytes: 650_379_104,
+    memoryRequiredBytes: 750_000_000,
     contextLength: 4096,
     supportsLora: true,
   },
@@ -116,8 +118,8 @@ const CATALOG: readonly CatalogEntry[] = [
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl:
       'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
-    downloadSizeBytes: 250_000_000,
-    memoryRequiredBytes: 250_000_000,
+    downloadSizeBytes: 229_309_376,
+    memoryRequiredBytes: 300_000_000,
     contextLength: 2048,
   },
   {
@@ -130,7 +132,7 @@ const CATALOG: readonly CatalogEntry[] = [
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl:
       'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
-    downloadSizeBytes: 477_000_000,
+    downloadSizeBytes: 396_705_472,
     memoryRequiredBytes: 500_000_000,
     contextLength: 4096,
     supportsThinking: true,
@@ -145,7 +147,7 @@ const CATALOG: readonly CatalogEntry[] = [
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl:
       'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
-    downloadSizeBytes: 2_500_000_000,
+    downloadSizeBytes: 2_497_281_312,
     memoryRequiredBytes: 3_000_000_000,
     contextLength: 4096,
     supportsThinking: true,
@@ -182,19 +184,34 @@ const CATALOG: readonly CatalogEntry[] = [
     ],
   },
   {
-    // iOS parity: ModelCatalogBootstrap.swift:136-145 (archive, tar.gz)
+    // Preserve the iOS catalog ID while using the browser-CORS-compatible
+    // RunAnywhere Hugging Face bundle. The Web artifact is represented as the
+    // two native llama.cpp inputs instead of the GitHub tarball used by iOS.
     id: 'smolvlm-500m-instruct-q8_0',
     name: 'SmolVLM 500M Instruct',
-    description: 'SmolVLM 500M vision-language model packaged as a tar.gz archive.',
+    description: 'SmolVLM 500M vision-language model with primary GGUF and mmproj sidecar.',
     category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl:
-      'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz',
-    downloadSizeBytes: 600_000_000,
-    memoryRequiredBytes: 600_000_000,
-    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+      'https://huggingface.co/runanywhere/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf',
+    downloadSizeBytes: 636_275_712,
+    memoryRequiredBytes: 720_000_000,
     contextLength: 2048,
+    files: [
+      {
+        url: 'https://huggingface.co/runanywhere/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf',
+        filename: 'SmolVLM-500M-Instruct-Q8_0.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+        sizeBytes: 436_806_912,
+      },
+      {
+        url: 'https://huggingface.co/runanywhere/SmolVLM-500M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-500M-Instruct-f16.gguf',
+        filename: 'mmproj-SmolVLM-500M-Instruct-f16.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+        sizeBytes: 199_468_800,
+      },
+    ],
   },
   {
     // iOS parity: ModelCatalogBootstrap.swift:159-171 (multi-file)
@@ -206,30 +223,29 @@ const CATALOG: readonly CatalogEntry[] = [
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl:
       'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf',
-    downloadSizeBytes: 460_000_000,
-    memoryRequiredBytes: 600_000_000,
+    downloadSizeBytes: 483_105_280,
+    memoryRequiredBytes: 650_000_000,
     contextLength: 2048,
     files: [
       {
         url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf',
         filename: 'LFM2-VL-450M-Q8_0.gguf',
         role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
-        // Approximate; iOS registers the same artifact without per-file sizes.
-        sizeBytes: 370_000_000,
+        sizeBytes: 379_215_264,
       },
       {
         url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf',
         filename: 'mmproj-LFM2-VL-450M-Q8_0.gguf',
         role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
-        // Approximate; iOS registers the same artifact without per-file sizes.
-        sizeBytes: 90_000_000,
+        sizeBytes: 103_890_016,
       },
     ],
   },
 
   // ---------- Speech Recognition (STT) ----------
   {
-    // iOS parity: ModelCatalogBootstrap.swift:175-184 — same GitHub releases host.
+    // Preserve iOS catalog parity while using RunAnywhere's browser-CORS-
+    // compatible Hugging Face mirror. Size is the exact LFS object length.
     id: 'sherpa-onnx-whisper-tiny.en',
     name: 'Sherpa Whisper Tiny (ONNX)',
     description: 'English speech-to-text via sherpa-onnx.',
@@ -237,15 +253,16 @@ const CATALOG: readonly CatalogEntry[] = [
     framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
-      'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
-    downloadSizeBytes: 74_000_000,
-    memoryRequiredBytes: 75_000_000,
+      'https://huggingface.co/runanywhere/sherpa-onnx-whisper-tiny.en/resolve/main/sherpa-onnx-whisper-tiny.en.tar.gz',
+    downloadSizeBytes: 152_777_070,
+    memoryRequiredBytes: 180_000_000,
     artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   },
 
   // ---------- Speech Synthesis (TTS) ----------
   {
-    // iOS parity: ModelCatalogBootstrap.swift:187-196 — same GitHub releases host.
+    // Preserve iOS catalog parity while using RunAnywhere's browser-CORS-
+    // compatible Hugging Face mirror. Size is the exact LFS object length.
     id: 'vits-piper-en_US-lessac-medium',
     name: 'Piper TTS (US English - Medium)',
     description: 'Piper VITS text-to-speech, medium quality.',
@@ -253,9 +270,9 @@ const CATALOG: readonly CatalogEntry[] = [
     framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
-      'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
-    downloadSizeBytes: 60_000_000,
-    memoryRequiredBytes: 65_000_000,
+      'https://huggingface.co/runanywhere/vits-piper-en_US-lessac-medium/resolve/main/vits-piper-en_US-lessac-medium.tar.gz',
+    downloadSizeBytes: 67_389_394,
+    memoryRequiredBytes: 90_000_000,
     artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   },
   {
@@ -267,15 +284,16 @@ const CATALOG: readonly CatalogEntry[] = [
     framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
-      'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
-    downloadSizeBytes: 60_000_000,
-    memoryRequiredBytes: 65_000_000,
+      'https://huggingface.co/runanywhere/vits-piper-en_GB-alba-medium/resolve/main/vits-piper-en_GB-alba-medium.tar.gz',
+    downloadSizeBytes: 67_386_227,
+    memoryRequiredBytes: 90_000_000,
     artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   },
 
   // ---------- VAD ----------
   {
-    // iOS parity: ModelCatalogBootstrap.swift:209-221
+    // Preserve iOS catalog parity while sourcing RunAnywhere's immutable,
+    // browser-CORS-compatible Hugging Face artifact.
     id: 'silero-vad',
     name: 'Silero VAD',
     description: 'Lightweight voice activity detector.',
@@ -283,7 +301,7 @@ const CATALOG: readonly CatalogEntry[] = [
     framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
-      'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
+      'https://huggingface.co/runanywhere/silero-vad-v5/resolve/main/silero_vad.onnx',
     // Actual silero_vad.onnx artifact size (verified Content-Length). Feeds the
     // post-finalize download size guard.
     downloadSizeBytes: 2_327_524,
@@ -301,20 +319,20 @@ const CATALOG: readonly CatalogEntry[] = [
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
       'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
-    downloadSizeBytes: 25_500_000,
-    memoryRequiredBytes: 25_500_000,
+    downloadSizeBytes: 90_619_114,
+    memoryRequiredBytes: 120_000_000,
     files: [
       {
         url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
         filename: 'model.onnx',
         role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
-        sizeBytes: 22_700_000,
+        sizeBytes: 90_387_606,
       },
       {
         url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
         filename: 'vocab.txt',
         role: ModelFileRole.MODEL_FILE_ROLE_VOCABULARY,
-        sizeBytes: 232_000,
+        sizeBytes: 231_508,
       },
     ],
   },
@@ -374,7 +392,7 @@ export function registerModelCatalog(): number {
   }
 
   if (registered !== CATALOG.length) {
-    console.warn(
+    appLogger.warning(
       `[model-catalog] registered ${registered} / ${CATALOG.length} entries`,
     );
   }
@@ -395,9 +413,9 @@ async function registerLoraAdapters(): Promise<void> {
     try {
       await RunAnywhere.lora.registerArtifact(adapter);
     } catch (err) {
-      console.warn(
+      appLogger.warning(
         `[model-catalog] registerLoraArtifact(${adapter.id}) failed:`,
-        formatError(err),
+        err,
       );
     }
   }
@@ -408,9 +426,9 @@ function tryRegister(entry: CatalogEntry): boolean {
     const result = registerViaFacade(entry);
     return result !== null;
   } catch (err) {
-    console.warn(
+    appLogger.warning(
       `[model-catalog] register(${entry.id}) threw:`,
-      formatError(err),
+      err,
     );
     return false;
   }

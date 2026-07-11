@@ -3,7 +3,7 @@
  *
  * Chat is the primary product surface. SDK showcase features stay available
  * behind a drawer, composer actions, and the Advanced hub so the example keeps
- * its power without presenting an 11-tab developer console on first launch.
+ * its power without presenting a twelve-panel developer console on first launch.
  */
 
 import { ModelCategory } from '@runanywhere/web';
@@ -23,6 +23,7 @@ import {
   openSheet,
   type OpenSheetOptions,
 } from './components/model-selection';
+import { appLogger } from './services/app-logger';
 
 // ---------------------------------------------------------------------------
 // Tab Lifecycle
@@ -425,7 +426,7 @@ function switchTab(index: number): void {
     try {
       tabLifecycles[previousId]?.onDeactivate?.();
     } catch (err) {
-      console.warn(`[App] Panel ${previousId} onDeactivate error:`, err);
+      appLogger.warning(`[App] Panel ${previousId} onDeactivate error:`, err);
     }
   }
 
@@ -442,7 +443,7 @@ function switchTab(index: number): void {
     try {
       tabLifecycles[activeId]?.onActivate?.();
     } catch (err) {
-      console.warn(`[App] Panel ${activeId} onActivate error:`, err);
+      appLogger.warning(`[App] Panel ${activeId} onActivate error:`, err);
     }
   }
 }
@@ -459,14 +460,25 @@ function refreshCurrentChatSummary(): void {
       metaEl.textContent = 'Start a private local conversation';
       return;
     }
-    const parsed = JSON.parse(saved) as {
-      updatedAt?: number;
-      messages?: Array<{ role?: string; content?: string }>;
-    };
-    const firstUser = parsed.messages?.find((message) => message.role === 'user' && message.content?.trim());
-    titleEl.textContent = firstUser?.content?.trim().slice(0, 56) || 'Current chat';
-    metaEl.textContent = parsed.updatedAt
-      ? `Saved ${new Date(parsed.updatedAt).toLocaleDateString()}`
+    const parsed: unknown = JSON.parse(saved);
+    const record = typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? parsed as Readonly<Record<string, unknown>>
+      : null;
+    const rawMessages = record && Array.isArray(record.messages) ? record.messages : [];
+    const firstUser = rawMessages.find((message): boolean => {
+      if (typeof message !== 'object' || message === null || Array.isArray(message)) return false;
+      const candidate = message as Readonly<Record<string, unknown>>;
+      return candidate.role === 'user'
+        && typeof candidate.content === 'string'
+        && candidate.content.trim().length > 0;
+    }) as Readonly<Record<string, unknown>> | undefined;
+    const firstContent = typeof firstUser?.content === 'string' ? firstUser.content.trim() : '';
+    const updatedAt = typeof record?.updatedAt === 'number' && Number.isFinite(record.updatedAt)
+      ? record.updatedAt
+      : null;
+    titleEl.textContent = firstContent.slice(0, 56) || 'Current chat';
+    metaEl.textContent = updatedAt !== null
+      ? `Saved ${new Date(updatedAt).toLocaleDateString()}`
       : 'Stored locally';
   } catch {
     titleEl.textContent = 'Current chat';
@@ -482,6 +494,7 @@ function initAdvancedHub(el: HTMLElement): TabLifecycle {
     subtitle: string;
   }> = [
     { tab: 'voice', icon: ICONS.mic, title: 'Talk Mode', subtitle: 'Full STT + LLM + TTS voice assistant' },
+    { tab: 'documents', icon: ICONS.file, title: 'Documents & RAG', subtitle: 'Index local documents and ask grounded questions' },
     { tab: 'transcribe', icon: ICONS.waveform, title: 'Transcribe', subtitle: 'Speech-to-text utility' },
     { tab: 'speak', icon: ICONS.speaker, title: 'Read Aloud', subtitle: 'Text-to-speech utility' },
     { tab: 'vad', icon: ICONS.waveform, title: 'Voice Activity', subtitle: 'Speech and silence diagnostics' },
@@ -502,18 +515,15 @@ function initAdvancedHub(el: HTMLElement): TabLifecycle {
       </section>
       <section class="advanced-hub__section">
         <div class="consumer-section-title">Assistant Modes</div>
-        <button type="button" class="advanced-row" data-advanced-target="voice">
-          <span class="advanced-row__icon">${icon(ICONS.mic)}</span>
-          <span><strong>Talk Mode</strong><small>Full STT + LLM + TTS voice assistant</small></span>
-        </button>
+        ${hubItems.slice(0, 2).map((item) => advancedRow(item)).join('')}
       </section>
       <section class="advanced-hub__section">
         <div class="consumer-section-title">Voice Utilities</div>
-        ${hubItems.slice(1, 4).map((item) => advancedRow(item)).join('')}
+        ${hubItems.slice(2, 5).map((item) => advancedRow(item)).join('')}
       </section>
       <section class="advanced-hub__section">
         <div class="consumer-section-title">Management</div>
-        ${hubItems.slice(4).map((item) => advancedRow(item)).join('')}
+        ${hubItems.slice(5).map((item) => advancedRow(item)).join('')}
       </section>
     </div>
   `;

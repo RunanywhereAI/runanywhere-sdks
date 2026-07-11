@@ -40,6 +40,7 @@ import {
   answerDocumentAttachment,
   answerImageAttachment,
   canAnswerImageAttachment,
+  cancelActiveDocumentAttachmentAnswer,
   cancelActiveImageAttachmentAnswer,
   validateChatAttachmentFile,
 } from '../services/chat-attachments';
@@ -81,6 +82,49 @@ interface PendingAttachment {
   file: File;
   name: string;
   description: string;
+}
+
+type JsonObject = Readonly<Record<string, unknown>>;
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOptionalString(value: JsonObject, key: string): boolean {
+  return value[key] === undefined || typeof value[key] === 'string';
+}
+
+function isChatToolCallInfo(value: unknown): value is ChatToolCallInfo {
+  return isJsonObject(value)
+    && typeof value.name === 'string'
+    && typeof value.argumentsJson === 'string'
+    && hasOptionalString(value, 'resultJson')
+    && hasOptionalString(value, 'error');
+}
+
+function isChatAttachmentInfo(value: unknown): value is ChatAttachmentInfo {
+  return isJsonObject(value)
+    && (value.kind === 'image' || value.kind === 'document')
+    && typeof value.name === 'string'
+    && hasOptionalString(value, 'detail');
+}
+
+function isChatSourceInfo(value: unknown): value is ChatSourceInfo {
+  return isJsonObject(value)
+    && typeof value.document === 'string'
+    && typeof value.text === 'string';
+}
+
+function isChatMessage(value: unknown): value is ChatMessage {
+  return isJsonObject(value)
+    && (value.role === 'user' || value.role === 'assistant')
+    && typeof value.content === 'string'
+    && (value.attachment === undefined || isChatAttachmentInfo(value.attachment))
+    && hasOptionalString(value, 'thinking')
+    && (value.toolCalls === undefined
+      || (Array.isArray(value.toolCalls) && value.toolCalls.every(isChatToolCallInfo)))
+    && (value.sources === undefined
+      || (Array.isArray(value.sources) && value.sources.every(isChatSourceInfo)));
 }
 
 // Chat's picker is scoped to LLMs — iOS parity:
@@ -461,6 +505,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         assistantMsg.thinking = answer.thinking;
         assistantMsg.sources = answer.sources;
       } else {
+        cancelGeneration = cancelActiveDocumentAttachmentAnswer;
         const answer = await answerDocumentAttachment(attachment.file, question, settings, onProgress);
         assistantMsg.content = answer.content;
         assistantMsg.thinking = answer.thinking;
@@ -468,7 +513,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       }
       renderLastMessage(host, assistantMsg);
     } catch (error) {
-      assistantMsg.content = formatChatError(error);
+      assistantMsg.content = isAbortError(error) ? 'Cancelled.' : formatChatError(error);
       renderLastMessage(host, assistantMsg);
     } finally {
       cancelGeneration = null;
@@ -497,6 +542,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       if (cancelGeneration) cancelGeneration();
     },
   };
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
 }
 
 // ---------------------------------------------------------------------------
@@ -719,10 +768,11 @@ function toolValueString(value: ToolValue | undefined): string | null {
 async function fetchWeather(location: string): Promise<Record<string, ToolValue>> {
   const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`;
   const geoResponse = await fetch(geoUrl);
-  const geo = await geoResponse.json() as {
-    results?: Array<{ latitude: number; longitude: number; name?: string }>;
-  };
-  const first = geo.results?.[0];
+  if (!geoResponse.ok) {
+    return { error: tv(`Weather location lookup failed (${geoResponse.status})`) };
+  }
+  const geoPayload: unknown = await geoResponse.json();
+  const first = parseOpenMeteoLocation(geoPayload);
   if (!first) {
     return {
       error: tv(`Could not find location: ${location}`),
@@ -735,26 +785,87 @@ async function fetchWeather(location: string): Promise<Record<string, ToolValue>
     + '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m'
     + '&temperature_unit=fahrenheit&wind_speed_unit=mph';
   const weatherResponse = await fetch(weatherUrl);
-  const weather = await weatherResponse.json() as {
-    current?: {
-      temperature_2m?: number;
-      relative_humidity_2m?: number;
-      weather_code?: number;
-      wind_speed_10m?: number;
-    };
-  };
-  const current = weather.current;
+  if (!weatherResponse.ok) {
+    return { error: tv(`Weather forecast lookup failed (${weatherResponse.status})`) };
+  }
+  const weatherPayload: unknown = await weatherResponse.json();
+  const current = parseOpenMeteoCurrentWeather(weatherPayload);
   if (!current) {
     return { error: tv('Could not parse weather data') };
   }
 
   return {
     location: tv(first.name ?? location),
-    temperature: tv(current.temperature_2m ?? 0),
+    temperature: tv(current.temperature),
     unit: tv('fahrenheit'),
-    humidity: tv(current.relative_humidity_2m ?? 0),
-    wind_speed_mph: tv(current.wind_speed_10m ?? 0),
-    condition: tv(weatherCodeToCondition(current.weather_code ?? 0)),
+    humidity: tv(current.relativeHumidity),
+    wind_speed_mph: tv(current.windSpeed),
+    condition: tv(weatherCodeToCondition(current.weatherCode)),
+  };
+}
+
+interface OpenMeteoLocation {
+  latitude: number;
+  longitude: number;
+  name?: string;
+}
+
+interface OpenMeteoCurrentWeather {
+  temperature: number;
+  relativeHumidity: number;
+  weatherCode: number;
+  windSpeed: number;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function parseOpenMeteoLocation(payload: unknown): OpenMeteoLocation | null {
+  if (!isJsonObject(payload) || !Array.isArray(payload.results)) return null;
+
+  for (const candidate of payload.results) {
+    if (
+      !isJsonObject(candidate)
+      || !isFiniteNumber(candidate.latitude)
+      || candidate.latitude < -90
+      || candidate.latitude > 90
+      || !isFiniteNumber(candidate.longitude)
+      || candidate.longitude < -180
+      || candidate.longitude > 180
+      || (candidate.name !== undefined && typeof candidate.name !== 'string')
+    ) {
+      continue;
+    }
+    return {
+      latitude: candidate.latitude,
+      longitude: candidate.longitude,
+      ...(candidate.name !== undefined ? { name: candidate.name } : {}),
+    };
+  }
+  return null;
+}
+
+function parseOpenMeteoCurrentWeather(payload: unknown): OpenMeteoCurrentWeather | null {
+  if (!isJsonObject(payload) || !isJsonObject(payload.current)) return null;
+  const current = payload.current;
+  if (
+    !isFiniteNumber(current.temperature_2m)
+    || !isFiniteNumber(current.relative_humidity_2m)
+    || current.relative_humidity_2m < 0
+    || current.relative_humidity_2m > 100
+    || !isFiniteNumber(current.weather_code)
+    || !Number.isInteger(current.weather_code)
+    || !isFiniteNumber(current.wind_speed_10m)
+    || current.wind_speed_10m < 0
+  ) {
+    return null;
+  }
+  return {
+    temperature: current.temperature_2m,
+    relativeHumidity: current.relative_humidity_2m,
+    weatherCode: current.weather_code,
+    windSpeed: current.wind_speed_10m,
   };
 }
 
@@ -888,8 +999,9 @@ function loadConversation(): ChatMessage[] {
   try {
     const saved = localStorage.getItem(CONVERSATION_STORAGE_KEY);
     if (!saved) return [];
-    const parsed = JSON.parse(saved) as { messages?: ChatMessage[] };
-    return Array.isArray(parsed.messages) ? parsed.messages : [];
+    const parsed: unknown = JSON.parse(saved);
+    if (!isJsonObject(parsed) || !Array.isArray(parsed.messages)) return [];
+    return parsed.messages.filter(isChatMessage);
   } catch {
     return [];
   }
@@ -1171,13 +1283,13 @@ function renderMarkdownLite(text: string): string {
   // Fenced code blocks (tolerates an unterminated fence while streaming).
   let html = escaped.replace(/```[^\n`]*\n?([\s\S]*?)(?:```|$)/g, (_match, code: string) => {
     codeBlocks.push(`<pre class="chat-code"><code>${code.replace(/\n$/, '')}</code></pre>`);
-    return `\u0000${codeBlocks.length - 1}\u0000`;
+    return `\uE000${codeBlocks.length - 1}\uE000`;
   });
   html = html
     .replace(/`([^`\n]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br>');
-  return html.replace(/\u0000(\d+)\u0000/g, (_match, i: string) => codeBlocks[Number(i)]);
+  return html.replace(/\uE000(\d+)\uE000/g, (_match, i: string) => codeBlocks[Number(i)]);
 }
 
 function formatChatError(error: unknown): string {

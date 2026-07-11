@@ -12,7 +12,6 @@ import type {
   ModelInfoMetadata as ProtoModelInfoMetadata,
   SDKEnvironment,
 } from '@runanywhere/proto-ts/model_types';
-import type { AccelerationPreference } from '@runanywhere/proto-ts/hardware_profile';
 import type {
   StorageInfo as ProtoStorageInfo,
   StoredModel as ProtoStoredModel,
@@ -39,14 +38,6 @@ export interface SDKInitOptions {
   appVersion?: string;
   /** Optional host app/site build number. Omit when the app does not have a real build number. */
   appBuild?: string;
-  /** Hardware acceleration preference for LLM/VLM inference. Web-only (WebGPU platform option); no Swift counterpart. */
-  acceleration?: AccelerationPreference;
-  /**
-   * Custom URL to the WebGPU-enabled racommons-webgpu.js glue file.
-   * Only used when acceleration is 'auto' or 'webgpu'.
-   * Web-only (WebGPU platform option); no Swift counterpart.
-   */
-  webgpuWasmUrl?: string;
 }
 
 export type StorageInfo = ProtoStorageInfo;

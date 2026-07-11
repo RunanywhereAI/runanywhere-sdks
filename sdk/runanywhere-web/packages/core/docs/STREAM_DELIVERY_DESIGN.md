@@ -66,8 +66,8 @@ test fakes) keep working.
   (b) the worker-thread dispatch (`runStreamWorker`,
   `registerStreamModuleFactory`).
 - `StreamWorkerFactoryRegistry.ts` exposes `setStreamWorkerFactory(fn)`.
-  Core stays pure-TS — bundler-specific `new Worker(new URL(...))`
-  construction lives in `@runanywhere/web-llamacpp` and
+  Core's worker orchestration stays bundler-neutral — backend-specific
+  `new Worker(new URL(...))` construction lives in `@runanywhere/web-llamacpp` and
   `@runanywhere/web-onnx`. When no factory is registered, every
   adapter `*Stream` method transparently falls back to the
   T3.1 main-thread `queueMicrotask` path.

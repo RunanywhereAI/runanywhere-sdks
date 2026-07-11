@@ -4,6 +4,7 @@
     "composite": false,
     "declaration": false,
     "declarationMap": false,
+    "isolatedModules": true,
     "rootDir": ".",
     "outDir": "lib-test",
     "types": ["jest", "node"]

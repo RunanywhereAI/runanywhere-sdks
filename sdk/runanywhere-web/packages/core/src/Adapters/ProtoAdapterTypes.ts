@@ -1,12 +1,12 @@
 import type { LoRAState as ProtoLoRAState } from '@runanywhere/proto-ts/lora_options';
-import { SDKException } from '../Foundation/SDKException';
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKException } from '../Foundation/SDKException.js';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
 import {
   formatRacResult,
   ProtoWasmBridge,
   type ProtoCodec,
   type ProtoWasmModule,
-} from '../runtime/ProtoWasm';
+} from '../runtime/ProtoWasm.js';
 
 /**
  * Shared module-scoped logger for the modality proto adapters. Every
@@ -54,6 +54,17 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     callbackPtr: number,
     userData: number,
   ): number;
+  _rac_stt_transcribe_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_stt_transcribe_stream_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    callbackPtr: number,
+    userData: number,
+  ): number;
 
   _rac_tts_component_list_voices_proto?(
     handle: number,
@@ -75,6 +86,19 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     callbackPtr: number,
     userData: number,
   ): number;
+  _rac_tts_synthesize_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_tts_synthesize_stream_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    callbackPtr: number,
+    userData: number,
+  ): number;
+  _rac_tts_stop_lifecycle_proto?(outResult: number): number;
+  _rac_tts_list_voices_lifecycle_proto?(outResult: number): number;
 
   _rac_vad_component_configure_proto?(
     handle: number,
@@ -98,6 +122,39 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     callbackPtr: number,
     userData: number,
   ): number;
+  _rac_vad_process_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_vad_configure_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_vad_start_lifecycle_proto?(outResult: number): number;
+  _rac_vad_stop_lifecycle_proto?(outResult: number): number;
+  _rac_vad_reset_lifecycle_proto?(outResult: number): number;
+  _rac_vad_set_stream_proto_callback?(
+    handle: number,
+    callbackPtr: number,
+    userData: number,
+  ): number;
+  _rac_vad_unset_stream_proto_callback?(handle: number): number;
+  _rac_vad_proto_quiesce?(): void;
+  _rac_vad_stream_start_proto?(
+    handle: number,
+    optionsBytes: number,
+    optionsSize: number,
+    outSessionIdPtr: number,
+  ): number;
+  _rac_vad_stream_feed_audio_proto?(
+    sessionId: bigint,
+    audioBytes: number,
+    audioSize: number,
+  ): number;
+  _rac_vad_stream_stop_proto?(sessionId: bigint): number;
+  _rac_vad_stream_cancel_proto?(sessionId: bigint): number;
 
   _rac_voice_agent_initialize_proto?(
     handle: number,
@@ -382,12 +439,12 @@ export function streamYield(): Promise<void> {
  * Web-side slot.fn(user_data) lifetime contract (pass3-syn-033 / cross-SDK
  * mirror of rac_llm_stream.h `@warning` block).
  *
- * The Web SDK runs RACommons as a single-threaded WASM module, so the
- * "callback may fire on a background thread AFTER unset returns" race
- * that affects native SDKs (Swift, Kotlin, RN) does NOT apply here: every
- * Emscripten export, every C-side callback, and every JS microtask runs
- * sequentially on the main thread. The contract below still holds and is
- * worth documenting so SDK-internal adapters stay correct when:
+ * Current Web adapters register JS trampolines on the calling Emscripten
+ * runtime and quiesce the native callback source before releasing them. The
+ * pthread pool is used for native inference work, not as an excuse to release
+ * a trampoline while it can still be called. The contract below therefore
+ * still holds and is worth documenting so SDK-internal adapters stay correct
+ * when:
  *
  *   1. The Asyncify / Worker backend lands (see
  *      docs/STREAM_DELIVERY_DESIGN.md) — at that point the callback can
@@ -523,15 +580,13 @@ export function streamCallback<T>(
 
       // `runNativeCall` is async so the `call` wrapper may opt into
       // returning a Promise<number> instead of a sync number. Synchronous
-      // Emscripten exports (the production llamacpp / ONNX path today)
-      // continue to work transparently — `await sync_number` resolves
-      // immediately. The architectural value of the `await` is unlocking
-      // cooperative (async) wrappers without breaking any caller:
+      // CPU/ONNX exports continue to work transparently — `await sync_number`
+      // resolves immediately — while the WebGPU release artifact resumes its
+      // Asyncify call only after browser GPU work settles.
       //   • Test mocks can simulate live delivery (see
       //     `tests/unit/Adapters/StreamLiveDelivery.test.ts`).
-      //   • A future Asyncify / Web Worker backend can drop in an async
-      //     wrapper that yields between callback batches without any
-      //     change to `streamCallback` or its consumers.
+      //   • Asyncify / Web Worker backends can yield between callback batches
+      //     without any change to `streamCallback` or its consumers.
       const runNativeCall = async (): Promise<void> => {
         if (finished) {
           // Cancelled before the deferred call started — nothing to invoke.

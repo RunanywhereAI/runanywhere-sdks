@@ -16,10 +16,8 @@
   resolved "https://registry.npmjs.org/@babel/helper-validator-identifier/-/helper-validator-identifier-7.29.7.tgz"
   integrity sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==
 
-"@esbuild/linux-x64@0.28.1":
+"@esbuild/darwin-arm64@0.28.1":
   version "0.28.1"
-  resolved "https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.28.1.tgz"
-  integrity sha512-u/anNYF2mmVOEDwLtnQ1wOr3EZ9sTNGLWrsYGYwHWzGA3Si84IOkHXlbWTD1NB+9/1lcnweYKO54uhxZydNzfA==
 
 "@eslint-community/eslint-utils@^4.8.0", "@eslint-community/eslint-utils@^4.9.1":
   version "4.9.1"
@@ -153,7 +151,7 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
-"@playwright/test@^1.60.0":
+"@playwright/test@^1.61.1":
   version "1.61.1"
   resolved "https://registry.npmjs.org/@playwright/test/-/test-1.61.1.tgz"
   integrity sha512-8nKv6+0RJSL9FE4jYOEGXnPeM/Hg12qZpmqzZjRh3qM0Y7c3z1mrOTfFLids72RDQYVh9WpLEfR5WdpNX4fkig==
@@ -207,28 +205,26 @@
   resolved "https://registry.npmjs.org/@protobufjs/utf8/-/utf8-1.1.1.tgz"
   integrity sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==
 
-"@rollup/rollup-linux-x64-gnu@4.62.2":
+"@rollup/rollup-darwin-arm64@4.62.2":
   version "4.62.2"
-  resolved "https://registry.npmjs.org/@rollup/rollup-linux-x64-gnu/-/rollup-linux-x64-gnu-4.62.2.tgz"
-  integrity sha512-5BqxR/pshjey51iliyzTD5Xi3EN0aLmQ2lZ3lvefVV9c82BvrLo2/6OT55iifpWBufs6kdwWbuOKS841DrmK9A==
 
-"@runanywhere/proto-ts@^0.19.13", "@runanywhere/proto-ts@file:/home/home/AndroidStudioProjects/runanywhere-sdks/sdk/shared/proto-ts":
+"@runanywhere/proto-ts@^0.19.13", "@runanywhere/proto-ts@file:../shared/proto-ts":
   version "0.19.13"
   resolved "file:../shared/proto-ts"
   dependencies:
-    "@bufbuild/protobuf" "^2.12.0"
+    "@bufbuild/protobuf" "^2.12.1"
 
-"@runanywhere/web-llamacpp@file:/home/home/AndroidStudioProjects/runanywhere-sdks/sdk/runanywhere-web/packages/llamacpp":
+"@runanywhere/web-llamacpp@file:packages/llamacpp":
   version "0.19.13"
   resolved "file:packages/llamacpp"
   dependencies:
     "@runanywhere/proto-ts" "^0.19.13"
 
-"@runanywhere/web-onnx@file:/home/home/AndroidStudioProjects/runanywhere-sdks/sdk/runanywhere-web/packages/onnx":
+"@runanywhere/web-onnx@file:packages/onnx":
   version "0.19.13"
   resolved "file:packages/onnx"
 
-"@runanywhere/web@>=0.19.13 <1", "@runanywhere/web@file:/home/home/AndroidStudioProjects/runanywhere-sdks/sdk/runanywhere-web/packages/core":
+"@runanywhere/web@>=0.19.13 <1", "@runanywhere/web@file:packages/core":
   version "0.19.13"
   resolved "file:packages/core"
   dependencies:
@@ -929,6 +925,12 @@ flatted@^3.2.9:
   version "3.4.2"
   resolved "https://registry.npmjs.org/flatted/-/flatted-3.4.2.tgz"
   integrity sha512-PjDse7RzhcPkIJwy5t7KPWQSZ9cAbzQXcafsetQoD7sOJRQlGikNbx7yZp2OotDnJyrDcbyRq3Ttb18iYOqkxA==
+
+fsevents@~2.3.2, fsevents@2.3.2:
+  version "2.3.2"
+
+fsevents@~2.3.3:
+  version "2.3.3"
 
 function-bind@^1.1.2:
   version "1.1.2"

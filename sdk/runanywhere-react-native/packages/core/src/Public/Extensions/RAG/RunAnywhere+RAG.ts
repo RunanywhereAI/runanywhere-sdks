@@ -37,6 +37,7 @@ import {
 } from '@runanywhere/proto-ts/rag';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
+import { isJsonObject } from '../../../services/JSONValidation';
 
 const logger = new SDKLogger('RunAnywhere.RAG');
 
@@ -159,7 +160,7 @@ export async function ragIngest(
     document = RAGDocument.create({
       id: '',
       text: textOrDocument,
-      metadata: parseMetadata(metadataJson),
+      metadata: parseRAGMetadataJSON(metadataJson),
     });
   } else {
     document = textOrDocument;
@@ -170,20 +171,24 @@ export async function ragIngest(
   return decodeRequired(statsBytes, RAGStatisticsMessage.decode, 'ragIngestProto');
 }
 
-function parseMetadata(json?: string): Record<string, string> {
+/** Decode legacy JSON metadata after narrowing the external value to an object. */
+export function parseRAGMetadataJSON(json?: string): Record<string, string> {
   if (!json) return {};
   const trimmed = json.trim();
   if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return {};
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    const out: Record<string, string> = {};
-    for (const [k, v] of Object.entries(parsed)) {
-      out[k] = typeof v === 'string' ? v : String(v);
-    }
-    return out;
+    parsed = JSON.parse(trimmed);
   } catch {
     return {};
   }
+  if (!isJsonObject(parsed)) return {};
+
+  const entries = Object.entries(parsed).map(([key, value]) => [
+    key,
+    typeof value === 'string' ? value : String(value),
+  ] as const);
+  return Object.fromEntries(entries);
 }
 
 /**

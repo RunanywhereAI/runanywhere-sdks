@@ -7,16 +7,16 @@
  * results. See HybridWasmModule.ts for the WASM build delta this needs to run.
  */
 
-export { HybridSttRouter } from './HybridSttRouter';
-export { Cloud, cloud } from './Cloud';
-export type { CloudModelEntry, CloudSTTConfig } from './Cloud';
+export { HybridSttRouter } from './HybridSttRouter.js';
+export { Cloud, cloud } from './Cloud.js';
+export type { CloudModelEntry, CloudSTTConfig } from './Cloud.js';
 // Custom-filter registrars are internal-only — Swift parity:
 // HybridCustomFilter.swift:31 (filters travel inside the policy spec).
 export {
   setHybridDeviceStateProvider,
   browserDeviceStateProvider,
-} from './HybridDeviceState';
-export type { HybridDeviceStateProvider } from './HybridDeviceState';
+} from './HybridDeviceState.js';
+export type { HybridDeviceStateProvider } from './HybridDeviceState.js';
 export {
   HybridBackendKind,
   HybridModelType,
@@ -29,7 +29,7 @@ export {
   confidenceCascade,
   offlineSherpa,
   onlineCloud,
-} from './HybridTypes';
+} from './HybridTypes.js';
 export type {
   HybridFilterSpec,
   HybridCascadeSpec,
@@ -38,8 +38,8 @@ export type {
   HybridTranscribeOptions,
   HybridTranscribeResult,
   HybridRoutedMetadata,
-} from './HybridTypes';
+} from './HybridTypes.js';
 export {
   hasHybridRouterExports,
   hybridRouterRequirementMessage,
-} from './HybridWasmModule';
+} from './HybridWasmModule.js';

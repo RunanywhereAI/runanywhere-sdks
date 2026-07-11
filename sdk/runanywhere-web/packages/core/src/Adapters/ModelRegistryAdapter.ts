@@ -12,13 +12,13 @@
  * for discovery.
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
 import {
   RAC_OK as RAC_SUCCESS,
   RAC_ERROR_NOT_FOUND,
   RAC_ERROR_FEATURE_NOT_AVAILABLE,
   RAC_ERROR_INVALID_ARGUMENT,
-} from '../Foundation/RACErrors';
+} from '../Foundation/RACErrors.js';
 import {
   ModelImportRequest as ProtoModelImportRequestCodec,
   ModelImportResult as ProtoModelImportResultCodec,
@@ -33,7 +33,7 @@ import {
   type ModelInfoList as ProtoModelInfoList,
   type ModelQuery as ProtoModelQuery,
 } from '@runanywhere/proto-ts/model_types';
-import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
+import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm.js';
 
 const logger = new SDKLogger('ModelRegistryAdapter');
 const OUT_PTR_SIZE = 4;

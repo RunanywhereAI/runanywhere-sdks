@@ -22,8 +22,9 @@
  * destroying the services (avoiding the use-after-free called out in
  * rac_stt_hybrid_router.h), and tears everything down in `close()`.
  *
- * The WASM single-threaded model makes the actor/lock machinery the Swift and
- * Kotlin bindings need unnecessary here — there is no concurrent transcribe.
+ * The Web binding serializes router operations from the main JS runtime and
+ * does not launch concurrent transcribe calls. Native inference may still use
+ * the module's pthread worker pool internally.
  *
  * NOTE: requires the hybrid-router proto-byte exports + cloud engine, which
  * the current Web WASM targets do NOT ship. See HybridWasmModule.ts BUILD
@@ -31,13 +32,13 @@
  * raise a clear `backendNotAvailable` (never faked behaviour).
  */
 
-import { SDKException } from '../../../Foundation/SDKException';
-import { SDKLogger } from '../../../Foundation/SDKLogger';
-import { RAC_OK } from '../../../Foundation/RACErrors';
+import { SDKException } from '../../../Foundation/SDKException.js';
+import { SDKLogger } from '../../../Foundation/SDKLogger.js';
+import { RAC_OK } from '../../../Foundation/RACErrors.js';
 import {
   getModuleForCapability,
-} from '../../../runtime/EmscriptenModule';
-import { ProtoWasmBridge } from '../../../runtime/ProtoWasm';
+} from '../../../runtime/EmscriptenModule.js';
+import { ProtoWasmBridge } from '../../../runtime/ProtoWasm.js';
 import {
   customFiltersOf,
   decodeTranscribeResponse,
@@ -49,19 +50,19 @@ import {
   type HybridRoutingPolicySpec,
   type HybridTranscribeOptions,
   type HybridTranscribeResult,
-} from './HybridTypes';
+} from './HybridTypes.js';
 import {
   hasHybridRouterExports,
   hybridRouterRequirementMessage,
   missingHybridRouterExports,
   RAC_PRIMITIVE_TRANSCRIBE,
   type HybridWasmModule,
-} from './HybridWasmModule';
-import { Cloud } from './Cloud';
+} from './HybridWasmModule.js';
+import { Cloud } from './Cloud.js';
 import {
   registerHybridCustomFilter,
   unregisterHybridCustomFilter,
-} from './HybridDeviceState';
+} from './HybridDeviceState.js';
 
 const logger = new SDKLogger('Hybrid.STTRouter');
 

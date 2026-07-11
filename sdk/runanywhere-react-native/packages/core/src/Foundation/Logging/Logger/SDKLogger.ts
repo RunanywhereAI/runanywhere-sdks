@@ -127,8 +127,10 @@ export class SDKLogger {
   // ==========================================================================
 
   /**
-   * Log an Error object with full context.
-   * Extracts error information and logs with appropriate metadata.
+   * Log an Error object using only non-secret structural identifiers.
+   * Arbitrary messages, stacks, nested transport errors, and caller context
+   * can contain credentials or request bodies and therefore stay out of
+   * device logs. The original exception remains available to the caller.
    *
    * Matches iOS: logError(_ error:, additionalInfo:, file:, line:, function:)
    *
@@ -136,33 +138,30 @@ export class SDKLogger {
    * @param additionalInfo - Optional additional context
    */
   public logError(error: Error, additionalInfo?: string): void {
-    const errorDesc = error.message || 'Unknown error';
-
-    let message = errorDesc;
-    if (additionalInfo) {
-      message += ` | Context: ${additionalInfo}`;
-    }
-
     const metadata: Record<string, unknown> = {
       error_name: error.name,
-      error_message: error.message,
-      error_stack: error.stack,
+      context_provided: Boolean(additionalInfo),
     };
 
-    // If SDKException, include additional fields from the wrapped proto.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sdkErr = error as any;
-    if (sdkErr.code !== undefined) {
+    // SDKException-shaped fields are optional because this logger deliberately
+    // accepts the base Error type and must not depend on one throwable class.
+    const sdkErr = error as Error & {
+      readonly code?: unknown;
+      readonly category?: unknown;
+    };
+    if (typeof sdkErr.code === 'number') {
       metadata.error_code = sdkErr.code;
     }
-    if (sdkErr.category !== undefined) {
+    if (typeof sdkErr.category === 'number') {
       metadata.error_category = sdkErr.category;
     }
-    if (sdkErr.proto?.nestedMessage) {
-      metadata.nested_message = sdkErr.proto.nestedMessage;
-    }
 
-    LoggingManager.shared.log(LogLevel.LOG_LEVEL_ERROR, this.category, message, metadata);
+    LoggingManager.shared.log(
+      LogLevel.LOG_LEVEL_ERROR,
+      this.category,
+      'SDK operation failed',
+      metadata
+    );
   }
 
   // ==========================================================================

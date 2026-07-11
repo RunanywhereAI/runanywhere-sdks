@@ -14,15 +14,12 @@
  *   are identical across platforms.
  *
  * Module injection:
- *   The Web backend packages (`@runanywhere/web-llamacpp`,
- *   `@runanywhere/web-onnx`) each load an independent Emscripten
- *   module. They call `HTTPAdapter.setDefaultModule(module)` on load,
- *   so the core package (pure TypeScript) can reach into C++ without
- *   a hard dependency on any specific backend. Core callers that want
- *   to issue HTTP requests ask for `HTTPAdapter.tryDefault()`; when
- *   no backend has loaded yet, the helper returns `null` and the
- *   caller may fall back to browser fetch only for the carve-outs
- *   documented in `HTTP_FETCH_CARVE_OUTS`.
+ *   Core and each Web backend load independent Emscripten modules containing
+ *   the commons HTTP ABI. Module registration makes an HTTP-capable instance
+ *   available without coupling core to a concrete backend. Callers ask for
+ *   `HTTPAdapter.tryDefault()`; before any module is available, browser fetch
+ *   is allowed only for the carve-outs documented in
+ *   `HTTP_FETCH_CARVE_OUTS`.
  *
  * Threading / blocking:
  *   `_rac_http_request_send` / `_rac_http_request_stream` /
@@ -36,9 +33,10 @@
 
 import { HttpDownloadStatus } from '@runanywhere/proto-ts/download_service';
 
-import { SDKException, ProtoErrorCode } from '../Foundation/SDKException';
-import { SDKLogger } from '../Foundation/SDKLogger';
-import { FetchHttpTransport } from './FetchHttpTransport';
+import { SDKException, ProtoErrorCode } from '../Foundation/SDKException.js';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { wasmUint64ToSafeNumber } from '../runtime/WasmInt64.js';
+import { FetchHttpTransport } from './FetchHttpTransport.js';
 
 const logger = new SDKLogger('HTTPAdapter');
 
@@ -50,7 +48,7 @@ const logger = new SDKLogger('HTTPAdapter');
 export const HTTP_FETCH_CARVE_OUTS = {
   bootstrapOnly: 'bootstrap-only: fetches the WASM/glue asset needed before any HTTPAdapter-capable module exists',
   browserOnlyBlobImport: 'browser-only blob import: fetches JavaScript text that must be patched and imported from a Blob URL',
-  noWasmModuleRegisteredFallback: 'fallback when no WASM module registered: preserves pure-core or ONNX-only browser usage before an HTTPAdapter default exists',
+  noWasmModuleRegisteredFallback: 'fallback before any HTTP-capable WASM module has registered an HTTPAdapter default',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -68,7 +66,7 @@ export interface HTTPModule {
   stringToUTF8(str: string, ptr: number, maxBytesToWrite: number): void;
   lengthBytesUTF8(str: string): number;
 
-  addFunction(fn: (...args: Array<number | bigint>) => number | void, signature: string): number;
+  addFunction(fn: (...args: never[]) => number | bigint | void, signature: string): number;
   removeFunction(ptr: number): void;
 
   HEAPU8?: Uint8Array;
@@ -206,10 +204,6 @@ export { HttpDownloadStatus as DownloadStatus } from '@runanywhere/proto-ts/down
 // these raw ints through the chunk / progress callbacks.
 const RAC_TRUE = 1;
 const RAC_FALSE = 0;
-
-function i64ToNumber(value: number | bigint): number {
-  return typeof value === 'bigint' ? Number(value) : value;
-}
 
 // ---------------------------------------------------------------------------
 // Internals
@@ -407,18 +401,16 @@ export class HTTPAdapter {
     let cancelled = false;
     const cbPtr = this.m.addFunction(
       (
-        chunkPtrRaw: number | bigint,
-        chunkLenRaw: number | bigint,
-        totalWrittenRaw: number | bigint,
-        contentLengthRaw: number | bigint,
-        _userData: number | bigint,
+        chunkPtr: number,
+        chunkLen: number,
+        totalWrittenRaw: bigint,
+        contentLengthRaw: bigint,
+        _userData: number,
       ) => {
         void _userData;
         try {
-          const chunkPtr = Number(chunkPtrRaw);
-          const chunkLen = Number(chunkLenRaw);
-          const totalWritten = i64ToNumber(totalWrittenRaw);
-          const contentLength = i64ToNumber(contentLengthRaw);
+          const totalWritten = wasmUint64ToSafeNumber(totalWrittenRaw, 'HTTP total written');
+          const contentLength = wasmUint64ToSafeNumber(contentLengthRaw, 'HTTP content length');
           const bytes = readBytes(this.m, chunkPtr, chunkLen);
           const keep = onChunk(bytes, totalWritten, contentLength);
           if (keep === false) {
@@ -478,14 +470,14 @@ export class HTTPAdapter {
     const progressPtr = onProgress
       ? this.m.addFunction(
           (
-            bytesWrittenRaw: number | bigint,
-            totalBytesRaw: number | bigint,
-            _userData: number | bigint,
+            bytesWrittenRaw: bigint,
+            totalBytesRaw: bigint,
+            _userData: number,
           ) => {
             void _userData;
             try {
-              const bytesWritten = i64ToNumber(bytesWrittenRaw);
-              const totalBytes = i64ToNumber(totalBytesRaw);
+              const bytesWritten = wasmUint64ToSafeNumber(bytesWrittenRaw, 'HTTP bytes written');
+              const totalBytes = wasmUint64ToSafeNumber(totalBytesRaw, 'HTTP total bytes');
               const keep = onProgress(bytesWritten, totalBytes);
               if (keep === false) {
                 cancelled = true;

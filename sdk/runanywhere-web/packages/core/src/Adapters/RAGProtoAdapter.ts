@@ -10,14 +10,14 @@ import {
   type RAGResult as ProtoRAGResult,
   type RAGStatistics as ProtoRAGStatistics,
 } from '@runanywhere/proto-ts/rag';
-import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm';
+import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
   ensureExports,
   missingExports,
   modalityLogger as logger,
   type ModalityProtoModule,
-} from './ProtoAdapterTypes';
+} from './ProtoAdapterTypes.js';
 
 export class RAGProtoAdapter {
   static tryDefault(): RAGProtoAdapter | null {

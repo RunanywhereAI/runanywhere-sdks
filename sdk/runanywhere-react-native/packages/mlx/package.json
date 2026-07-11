@@ -20,8 +20,10 @@
     "*.podspec"
   ],
   "scripts": {
+    "build": "tsc -b",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.ts\"",
+    "clean": "tsc -b --clean && rm -rf lib",
+    "lint": "eslint \"src/**/*.ts\" --max-warnings 0",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "prepublishOnly": "npm run typecheck && npm run lint"
   },
@@ -41,6 +43,7 @@
     "react-native-nitro-modules": "^0.33.9"
   },
   "devDependencies": {
+    "eslint": "^9.39.4",
     "typescript": "^5.9.3"
   }
 }

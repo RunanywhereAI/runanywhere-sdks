@@ -6,7 +6,7 @@
  * still deny persist without a user gesture (common in headless automation).
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
 
 const logger = new SDKLogger('BrowserStorage');
 

@@ -54,6 +54,7 @@ import {
   type RecommendedSelection,
 } from '../services/model-recommendation';
 import { showToast } from './dialogs';
+import { appLogger } from '../services/app-logger';
 
 // ---------------------------------------------------------------------------
 // State (module-scope, one selection sheet per app)
@@ -92,9 +93,17 @@ const listeners: Array<() => void> = [];
 export interface OpenSheetOptions {
   filterCategories?: readonly ModelCategory[];
   title?: string;
+  /**
+   * Called only after the chosen catalog entry is loaded and ready. This lets
+   * multi-model surfaces (for example Voice AI) update a specific pipeline
+   * slot without coupling the shared picker to that surface's state.
+   */
+  onModelReady?: (entry: CatalogEntry) => void;
 }
 
 let activeSheetOptions: OpenSheetOptions = {};
+let toolbarSheetOptions: OpenSheetOptions = {};
+let overlaySheetOptions: OpenSheetOptions = {};
 
 // Hardware detection is async and stable for a session, so we probe once and
 // cache. The recommendation set is derived purely from the tier + catalog.
@@ -138,7 +147,7 @@ export function notifyCatalogRegistered(registeredCount: number): void {
           try {
             listener();
           } catch (err) {
-            console.warn('[model-selection] hydrated listener threw', err);
+            appLogger.warning('[model-selection] hydrated listener threw', err);
           }
         }
       });
@@ -146,6 +155,18 @@ export function notifyCatalogRegistered(registeredCount: number): void {
       hydratedSubscribed = false; // EventBus unavailable; retry on next call
     }
   }
+  refreshToolbarLabel();
+  refreshOverlayVisibility();
+}
+
+/**
+ * Clear the view's SDK-lifetime state before `RunAnywhere.shutdown()`.
+ * Shutdown resets EventBus, so the next catalog registration must subscribe
+ * to `models.hydrated` again even though this UI module stays loaded.
+ */
+export function resetCatalogRegistrationState(): void {
+  catalogRegistered = false;
+  hydratedSubscribed = false;
   refreshToolbarLabel();
   refreshOverlayVisibility();
 }
@@ -159,6 +180,7 @@ export function notifyCatalogRegistered(registeredCount: number): void {
  * Optional and unfiltered by default so other tabs keep their behavior.
  */
 export function buildToolbarModelButton(sheetOptions: OpenSheetOptions = {}): HTMLElement {
+  toolbarSheetOptions = sheetOptions;
   const btn = document.createElement('button');
   btn.id = 'chat-toolbar-model';
   btn.className = 'toolbar-model-btn';
@@ -188,6 +210,7 @@ export function buildToolbarModelButton(sheetOptions: OpenSheetOptions = {}): HT
  * `buildToolbarModelButton`).
  */
 export function buildGetStartedOverlay(sheetOptions: OpenSheetOptions = {}): HTMLElement {
+  overlaySheetOptions = sheetOptions;
   const overlay = document.createElement('div');
   overlay.id = 'chat-model-overlay';
   overlay.className = 'chat-model-overlay';
@@ -245,11 +268,12 @@ export function onModelStateChange(listener: () => void): () => void {
  */
 export function findLoadedModelForCategory(category: ModelCategory): ModelInfo | null {
   try {
-    const current = RunAnywhere.currentModel();
-    if (!current?.modelId) return null;
-    const info = RunAnywhere.getModel(current.modelId);
-    if (info?.category === category) return info;
-    return null;
+    const current = RunAnywhere.currentModel({
+      category,
+      includeModelMetadata: true,
+    });
+    if (!current?.found || !current.modelId) return null;
+    return current.model ?? RunAnywhere.getModel(current.modelId);
   } catch {
     return null;
   }
@@ -381,7 +405,7 @@ async function ensureCapabilities(): Promise<void> {
       getCatalog(),
     );
   } catch (err) {
-    console.warn('[model-selection] capability probe failed', err);
+    appLogger.warning('[model-selection] capability probe failed', err);
   }
 }
 
@@ -452,10 +476,12 @@ function renderRows(): void {
   bindFamilyInteractions(host);
 }
 
+type ModelAction = 'download' | 'load' | 'unload' | 'select';
+
 function bindRowActions(host: HTMLElement): void {
   host.querySelectorAll('[data-action]').forEach((el) => {
     const btn = el as HTMLButtonElement;
-    const action = btn.dataset.action as 'download' | 'load' | 'unload';
+    const action = btn.dataset.action as ModelAction;
     const modelId = btn.dataset.modelId!;
     btn.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -641,7 +667,9 @@ function groupByFamily(entries: readonly CatalogEntry[]): FamilyGroup[] {
  * loaded/downloaded the card reflects that with a subtle status dot.
  */
 function renderFamilyCard(family: FamilyGroup): string {
-  const expanded = expandedFamilies.has(family.key);
+  // Searching is a direct lookup, so surface matching variants immediately
+  // instead of hiding exact results behind a second family-card click.
+  const expanded = expandedFamilies.has(family.key) || searchQuery.trim().length > 0;
   const options = family.entries.length;
   const representative = pickRepresentative(family.entries);
   const tag = consumerTags(representative)[0];
@@ -713,7 +741,7 @@ function renderVariantRow(entry: CatalogEntry, isBest: boolean): string {
     : '';
 
   return `
-    <div class="variant-row variant-row--${state.status}${isBest ? ' variant-row--best' : ''}" data-model-id="${entry.id}">
+    <div class="variant-row variant-row--${state.status}${isBest ? ' variant-row--best' : ''}" data-model-id="${escapeHtml(entry.id)}">
       <div class="variant-row__info">
         <div class="variant-row__name">${escapeHtml(cleanModelName(entry.name))}${bestBadge}</div>
         <div class="variant-row__meta">
@@ -796,7 +824,7 @@ function renderRecommendedCard(entry: CatalogEntry, state: RowState, isDefault: 
     ? '<span class="reco-card__best">Best for this device</span>'
     : '';
   return `
-    <div class="reco-card${isDefault ? ' reco-card--default' : ''} reco-card--${state.status}" data-model-id="${entry.id}">
+    <div class="reco-card${isDefault ? ' reco-card--default' : ''} reco-card--${state.status}" data-model-id="${escapeHtml(entry.id)}">
       <div class="reco-card__head">
         <div class="model-logo reco-card__logo">${modalityEmoji(entry.category)}</div>
         <div class="reco-card__title-wrap">
@@ -829,7 +857,7 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
     ? `<span class="tag-pill tag-pill--capability">${escapeHtml(capability)}</span>`
     : '';
   return `
-    <div class="model-row model-row--${state.status}" data-model-id="${entry.id}">
+    <div class="model-row model-row--${state.status}" data-model-id="${escapeHtml(entry.id)}">
       <div class="model-logo">${modalityEmoji(entry.category)}</div>
       <div class="model-info">
         <div class="model-name">${escapeHtml(cleanModelName(entry.name))}</div>
@@ -847,19 +875,23 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
 }
 
 function actionButton(modelId: string, state: RowState): string {
+  const safeModelId = escapeHtml(modelId);
   switch (state.status) {
     case 'registered':
-      return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${modelId}">Download</button>`;
+      return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${safeModelId}">Download</button>`;
     case 'downloading':
       return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>${Math.round((state.progress ?? 0) * 100)}%</button>`;
     case 'downloaded':
-      return `<button type="button" class="model-action-btn load" data-action="load" data-model-id="${modelId}">Use</button>`;
+      return `<button type="button" class="model-action-btn load" data-action="load" data-model-id="${safeModelId}">Use</button>`;
     case 'loading':
       return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>Loading&hellip;</button>`;
     case 'loaded':
-      return `<button type="button" class="model-action-btn loaded" data-action="unload" data-model-id="${modelId}" title="Tap to unload">&#10003; Active</button>`;
+      if (activeSheetOptions.onModelReady) {
+        return `<button type="button" class="model-action-btn loaded" data-action="select" data-model-id="${safeModelId}">&#10003; Use</button>`;
+      }
+      return `<button type="button" class="model-action-btn loaded" data-action="unload" data-model-id="${safeModelId}" title="Tap to unload">&#10003; Active</button>`;
     case 'error':
-      return `<button type="button" class="model-action-btn model-action-btn--retry" data-action="download" data-model-id="${modelId}">Retry</button>`;
+      return `<button type="button" class="model-action-btn model-action-btn--retry" data-action="download" data-model-id="${safeModelId}">Retry</button>`;
   }
 }
 
@@ -867,10 +899,21 @@ function actionButton(modelId: string, state: RowState): string {
 // Actions — download / load / unload
 // ---------------------------------------------------------------------------
 
-async function handleAction(action: 'download' | 'load' | 'unload', modelId: string): Promise<void> {
+async function handleAction(action: ModelAction, modelId: string): Promise<void> {
   if (action === 'download') await startDownload(modelId);
-  else if (action === 'load') await loadModel(modelId);
+  else if (action === 'load') {
+    // Capture before awaiting: closing/reopening a sheet while a model loads
+    // must not redirect the completed selection to a different consumer.
+    const onModelReady = activeSheetOptions.onModelReady;
+    const sourceModal = modalEl;
+    if (await loadModel(modelId)) {
+      completeSheetSelection(modelId, onModelReady, sourceModal);
+    }
+  }
   else if (action === 'unload') await unloadModel(modelId);
+  else if (action === 'select') {
+    completeSheetSelection(modelId, activeSheetOptions.onModelReady, modalEl);
+  }
 }
 
 async function startDownload(modelId: string): Promise<void> {
@@ -904,7 +947,7 @@ async function startDownload(modelId: string): Promise<void> {
   }
 }
 
-async function loadModel(modelId: string): Promise<void> {
+async function loadModel(modelId: string): Promise<boolean> {
   setRow(modelId, { status: 'loading' });
   try {
     const result = await RunAnywhere.loadModel({
@@ -915,14 +958,44 @@ async function loadModel(modelId: string): Promise<void> {
     if (!result || !result.success) {
       throw new Error(result?.errorMessage || 'Model load failed');
     }
+    const loadedEntry = getCatalog().find((entry) => entry.id === modelId);
+    if (loadedEntry) {
+      // A category has one native "current" model. Downgrade the previous
+      // choice in that category while preserving loaded rows in other
+      // modalities (LLM + STT + TTS must remain simultaneously visible).
+      for (const entry of getCatalog()) {
+        if (entry.id === modelId || entry.category !== loadedEntry.category) continue;
+        if (rowStates.get(entry.id)?.status === 'loaded') {
+          rowStates.set(entry.id, { status: 'downloaded' });
+        }
+      }
+    }
     setRow(modelId, { status: 'loaded' });
     showToast(`Loaded ${modelId}`, 'success');
-    closeSheet();
+    return true;
   } catch (err) {
     const message = formatError(err);
     setRow(modelId, { status: 'error', error: message });
     showToast(`Load failed: ${message}`, 'warning');
+    return false;
   }
+}
+
+/** Complete an explicit picker choice after the entry is known to be ready. */
+function completeSheetSelection(
+  modelId: string,
+  onModelReady: OpenSheetOptions['onModelReady'],
+  sourceModal: HTMLElement | null,
+): void {
+  const entry = getCatalog().find((candidate) => candidate.id === modelId);
+  if (entry && onModelReady) {
+    try {
+      onModelReady(entry);
+    } catch (err) {
+      appLogger.warning('[model-selection] model-ready callback threw', err);
+    }
+  }
+  if (modalEl === sourceModal) closeSheet();
 }
 
 async function unloadModel(modelId: string): Promise<void> {
@@ -976,7 +1049,7 @@ function setRow(modelId: string, patch: Partial<RowState>): void {
     try {
       listener();
     } catch (err) {
-      console.warn('[model-selection] listener threw', err);
+      appLogger.warning('[model-selection] listener threw', err);
     }
   }
 }
@@ -984,12 +1057,9 @@ function setRow(modelId: string, patch: Partial<RowState>): void {
 function refreshToolbarLabel(): void {
   if (!toolbarBtn || !toolbarText) return;
 
-  const loaded = findLoadedModelId();
+  const loaded = findLoadedModelForScope(toolbarSheetOptions.filterCategories);
   if (loaded) {
-    const info = lookupModelInfo(loaded);
-    toolbarText.textContent = info
-      ? `${info.name || loaded} · ${formatFramework(info.framework)}`
-      : loaded;
+    toolbarText.textContent = `${loaded.name || loaded.id} · ${formatFramework(loaded.framework)}`;
   } else {
     toolbarText.textContent = catalogRegistered ? 'Select Model' : 'Loading...';
   }
@@ -997,7 +1067,7 @@ function refreshToolbarLabel(): void {
 
 function refreshOverlayVisibility(): void {
   if (!getStartedOverlay) return;
-  const shouldShow = !findLoadedModelId();
+  const shouldShow = !findLoadedModelForScope(overlaySheetOptions.filterCategories);
   getStartedOverlay.classList.toggle('hidden', !shouldShow);
   if (getStartedBtn) {
     getStartedBtn.disabled = !catalogRegistered;
@@ -1007,9 +1077,19 @@ function refreshOverlayVisibility(): void {
   }
 }
 
-function findLoadedModelId(): string | null {
+function findLoadedModelForScope(
+  categories?: readonly ModelCategory[],
+): ModelInfo | null {
+  if (categories && categories.length > 0) {
+    for (const category of categories) {
+      const model = findLoadedModelForCategory(category);
+      if (model) return model;
+    }
+    return null;
+  }
+
   for (const [id, state] of rowStates.entries()) {
-    if (state.status === 'loaded') return id;
+    if (state.status === 'loaded') return lookupModelInfo(id);
   }
   return null;
 }
@@ -1027,21 +1107,48 @@ function lookupModelInfo(modelId: string): ModelInfo | null {
  * and currently-loaded models so the UI reflects their real state.
  */
 function hydrateRowStatesFromRegistry(): void {
+  const catalog = getCatalog();
+  const downloadedIds = new Set<string>();
   try {
     const downloaded = RunAnywhere.downloadedModels();
     for (const model of downloaded?.models ?? []) {
-      rowStates.set(model.id, { status: 'downloaded' });
+      downloadedIds.add(model.id);
     }
   } catch {
     // ignore — listDownloaded may be unavailable in some WASM builds
   }
 
-  try {
-    const current = RunAnywhere.currentModel();
-    if (current?.modelId) {
-      rowStates.set(current.modelId, { status: 'loaded' });
+  // Refresh every stable row from the registry before overlaying loaded state.
+  // In-progress download/load operations remain authoritative until they end.
+  for (const entry of catalog) {
+    const state = rowStates.get(entry.id);
+    if (state?.status === 'downloading' || state?.status === 'loading') continue;
+    let isDownloaded = downloadedIds.has(entry.id);
+    if (!isDownloaded) {
+      try {
+        isDownloaded = Boolean(RunAnywhere.getModel(entry.id)?.isDownloaded);
+      } catch {
+        // The catalog entry may not have reached the native registry yet.
+      }
     }
-  } catch {
-    // ignore — lifecycle may be unavailable
+    rowStates.set(entry.id, { status: isDownloaded ? 'downloaded' : 'registered' });
+  }
+
+  // The native lifecycle tracks a current model per modality. Query every
+  // category represented by the catalog so loading STT/TTS/VAD/VLM models does
+  // not hide one another behind the legacy unscoped currentModel() result.
+  const categories = new Set(catalog.map((entry) => entry.category));
+  for (const category of categories) {
+    try {
+      const current = RunAnywhere.currentModel({
+        category,
+        includeModelMetadata: false,
+      });
+      if (current?.modelId) {
+        rowStates.set(current.modelId, { status: 'loaded' });
+      }
+    } catch {
+      // One unavailable modality must not prevent the others from hydrating.
+    }
   }
 }

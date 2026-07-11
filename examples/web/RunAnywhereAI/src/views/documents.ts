@@ -339,16 +339,16 @@ async function askQuestion(): Promise<void> {
   try {
     documentCount = await RunAnywhere.ragGetDocumentCount();
   } catch (err) {
-    setAnswer(`Failed: ${formatError(err)}`);
+    setAnswerText(`Failed: ${formatError(err)}`);
     return;
   }
   if (documentCount === 0) {
-    setAnswer('Upload a document first.');
+    setAnswerText('Upload a document first.');
     return;
   }
 
   isBusy = true;
-  setAnswer('Searching...');
+  setAnswerText('Searching...');
   try {
     // Full-options overload (Swift parity: `ragQuery(_ options:)` with
     // RARAGQueryOptions.defaults(question:) — RAGViewModel.swift:137-144).
@@ -361,18 +361,18 @@ async function askQuestion(): Promise<void> {
     });
 
     if (result.errorCode !== 0) {
-      setAnswer(`Failed: ${result.errorMessage ?? 'RAG query failed'}`);
+      setAnswerText(`Failed: ${result.errorMessage ?? 'RAG query failed'}`);
       return;
     }
 
     if (result.retrievedChunks.length === 0) {
-      setAnswer('No relevant chunks found.');
+      setAnswerText('No relevant chunks found.');
       return;
     }
 
-    setAnswer(formatAnswer(result.answer, result.retrievedChunks, result.thinkingContent));
+    setAnswerHtml(formatAnswer(result.answer, result.retrievedChunks, result.thinkingContent));
   } catch (err) {
-    setAnswer(`Failed: ${formatError(err)}`);
+    setAnswerText(`Failed: ${formatError(err)}`);
   } finally {
     isBusy = false;
   }
@@ -451,9 +451,19 @@ function setStatus(msg: string): void {
   if (el) el.textContent = msg;
 }
 
-function setAnswer(msg: string): void {
-  const el = container.querySelector('#docs-answer') as HTMLElement;
-  el.innerHTML = msg;
+function answerElement(): HTMLElement | null {
+  return container.querySelector<HTMLElement>('#docs-answer');
+}
+
+function setAnswerText(message: string): void {
+  const el = answerElement();
+  if (el) el.textContent = message;
+}
+
+/** Accepts only markup assembled by formatAnswer(), which escapes every value. */
+function setAnswerHtml(html: string): void {
+  const el = answerElement();
+  if (el) el.innerHTML = html;
 }
 
 /**

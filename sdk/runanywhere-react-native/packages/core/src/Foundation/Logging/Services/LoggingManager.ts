@@ -142,7 +142,7 @@ export class LoggingManager {
     const entry: LogEntry = {
       level,
       category,
-      message,
+      message: sanitizeLogMessage(message),
       metadata: sanitizeMetadata(metadata),
       timestamp: new Date(),
     };
@@ -207,6 +207,32 @@ const SENSITIVE_SUBSTRINGS = [
   'credential',
 ] as const;
 
+/**
+ * Secret-bearing assignments commonly found in HTTP errors, provider errors,
+ * and serialized diagnostic fragments. The label/delimiter is retained so a
+ * log remains actionable while only its value is removed.
+ */
+const SENSITIVE_ASSIGNMENT_PATTERN = /(\b(?:api[-_ ]?key|authorization|access[-_ ]?token|refresh[-_ ]?token|id[-_ ]?token|token|password|secret|credential)\b\s*["']?\s*[:=]\s*)(?:["'][^"'\r\n]*["']|(?:Bearer|Basic)\s+[^\s"',;)\]}]+|[^\s"',;&)\]}]+)/gi;
+const AUTH_SCHEME_PATTERN = /\b(Bearer|Basic)\s+[^\s"',;)\]}]+/gi;
+const SECRET_KEY_PATTERN = /\bsk-[A-Za-z0-9_-]{8,}\b/g;
+const URL_USERINFO_PATTERN = /(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi;
+
+/**
+ * Redact secrets embedded in free-form log messages.
+ *
+ * Metadata-key redaction alone is insufficient because native/provider errors
+ * often arrive as interpolated strings. Keep the surrounding operation, URL
+ * path, and field label so diagnostics remain useful without retaining the
+ * credential value.
+ */
+export function sanitizeLogMessage(message: string): string {
+  return message
+    .replace(URL_USERINFO_PATTERN, '$1[REDACTED]@')
+    .replace(SENSITIVE_ASSIGNMENT_PATTERN, '$1[REDACTED]')
+    .replace(AUTH_SCHEME_PATTERN, '$1 [REDACTED]')
+    .replace(SECRET_KEY_PATTERN, '[REDACTED-KEY]');
+}
+
 function shouldRedact(key: string): boolean {
   const lowered = key.toLowerCase();
   return SENSITIVE_SUBSTRINGS.some((needle) => lowered.includes(needle));
@@ -224,6 +250,12 @@ function sanitizeMetadata(
   for (const [key, value] of Object.entries(metadata)) {
     if (shouldRedact(key)) {
       sanitized[key] = '[REDACTED]';
+    } else if (typeof value === 'string') {
+      sanitized[key] = sanitizeLogMessage(value);
+    } else if (Array.isArray(value)) {
+      sanitized[key] = value.map((entry) =>
+        typeof entry === 'string' ? sanitizeLogMessage(entry) : entry
+      );
     } else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
       sanitized[key] = sanitizeMetadata(value as Record<string, unknown>) ?? {};
     } else {

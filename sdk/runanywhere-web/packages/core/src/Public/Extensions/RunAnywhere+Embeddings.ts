@@ -20,10 +20,10 @@ import type {
   EmbeddingsRequest,
   EmbeddingsResult,
 } from '@runanywhere/proto-ts/embeddings_options';
-import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { EmbeddingsProtoAdapter } from '../../Adapters/EmbeddingsProtoAdapter';
-import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
+import { SDKLogger } from '../../Foundation/SDKLogger.js';
+import { EmbeddingsProtoAdapter } from '../../Adapters/EmbeddingsProtoAdapter.js';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 
 const logger = new SDKLogger('Embeddings');
 
@@ -140,7 +140,7 @@ async function embedBatch(
   // currently-loaded model, matching Swift's
   // `CppBridge.EmbeddingsProto.embedBatchLifecycle` which also operates on
   // the loaded model rather than an explicit handle.
-  const result = adapter.embedBatch(0, lifecycleRequest);
+  const result = await adapter.embedBatch(0, lifecycleRequest);
 
   if (!result) {
     throw SDKException.backendNotAvailable(

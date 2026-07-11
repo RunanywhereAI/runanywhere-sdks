@@ -64,14 +64,15 @@ import {
   type ToolResult,
 } from '@runanywhere/proto-ts/tool_calling';
 import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
-import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
+import { SDKLogger } from '../../Foundation/SDKLogger.js';
+import { ProtoWasmBridge } from '../../runtime/ProtoWasm.js';
+import { readWasmUint64, wasmUint64ToSafeNumber } from '../../runtime/WasmInt64.js';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
-} from '../../runtime/EmscriptenModule';
-import { TextGeneration } from './RunAnywhere+TextGeneration';
+} from '../../runtime/EmscriptenModule.js';
+import { TextGeneration } from './RunAnywhere+TextGeneration.js';
 
 const logger = new SDKLogger('ToolCalling');
 
@@ -494,13 +495,13 @@ function decodeSessionEvent(
 }
 
 function encodeStepRequest(
-  sessionHandle: number,
+  sessionHandle: bigint,
   toolCallId: string,
   resultJson: string,
   error?: string,
 ): Uint8Array {
   const message = ToolCallingSessionStepWithResultRequestMessage.fromPartial({
-    sessionHandle,
+    sessionHandle: wasmUint64ToSafeNumber(sessionHandle, 'tool-calling session handle'),
     toolCallId,
     resultJson,
     error,
@@ -689,8 +690,8 @@ export const ToolCalling = {
     // pass3-syn-153: short-circuit when the AbortSignal is already aborted
     // BEFORE allocating the trampoline / handle slot or calling commons.
     // DOM AbortSignal does NOT re-fire the 'abort' event on a signal that is
-    // already aborted, and under WASM single-threaded execution the
-    // synchronous `_rac_tool_calling_session_create_proto` call runs an
+    // already aborted, and the synchronous main-runtime
+    // `_rac_tool_calling_session_create_proto` call runs an
     // entire `run_generate_loop` (one full LLM generate, multi-second on
     // realistic models) before returning. Catching the already-aborted case
     // here mirrors Swift's eager `Task.checkCancellation()` pattern and
@@ -741,9 +742,9 @@ export const ToolCalling = {
       }
     }, 'viii');
 
-    // Reserve 8 bytes for the uint64 out-session-handle. Without WASM_BIGINT
-    // the WASM ABI returns uint64 via two i32s; we read low/high halves from
-    // the pointer.
+    // Reserve 8 bytes for the uint64 out-session-handle. The pointer itself
+    // is WASM32; reconstruct its two uint32 words directly as bigint before
+    // passing the handle to any WASM_BIGINT export.
     const handlePtr = module._malloc(8);
     if (!handlePtr) {
       module.removeFunction(callbackPtr);
@@ -755,14 +756,15 @@ export const ToolCalling = {
     module.HEAPU32[handlePtr >>> 2] = 0;
     module.HEAPU32[(handlePtr >>> 2) + 1] = 0;
 
-    let sessionHandle = 0;
+    let sessionHandle = 0n;
     // pass2-syn-007: wire AbortSignal into _rac_tool_calling_session_cancel_proto.
-    // The WASM module is single-threaded, so cancel fires after the current
-    // async tick returns to the event loop. It still lets us short-circuit
-    // multi-iteration loops between native calls.
+    // Browser JS cannot re-enter the main runtime while a synchronous export
+    // is blocking, so cancel fires after the current async tick returns to the
+    // event loop. It still lets us short-circuit multi-iteration loops between
+    // native calls; backend compute may use pthread workers internally.
     const onAbort = () => {
       if (
-        sessionHandle !== 0 &&
+        sessionHandle !== 0n &&
         typeof module._rac_tool_calling_session_cancel_proto === 'function'
       ) {
         try {
@@ -778,7 +780,7 @@ export const ToolCalling = {
     const cleanup = () => {
       extra.signal?.removeEventListener('abort', onAbort);
       try {
-        if (sessionHandle !== 0) {
+        if (sessionHandle !== 0n) {
           module._rac_tool_calling_session_destroy_proto!(sessionHandle);
         }
       } catch (err) {
@@ -801,12 +803,7 @@ export const ToolCalling = {
           `rc=${createRc}`,
         );
       }
-      const handleLow = module.HEAPU32[handlePtr >>> 2] ?? 0;
-      const handleHigh = module.HEAPU32[(handlePtr >>> 2) + 1] ?? 0;
-      // Session handles are sequential `uint64_t` counters starting at 1
-      // (tool_calling_session.cpp:104); they fit in 53 bits well into the
-      // future, so combining low/high as a JS Number is safe.
-      sessionHandle = handleLow + handleHigh * 0x100000000;
+      sessionHandle = readWasmUint64(module.HEAPU32, handlePtr);
       // pass2-syn-007: if the AbortSignal already fired before the session
       // handle was published, fan that cancel through to commons now.
       if (extra.signal?.aborted) {

@@ -35,7 +35,12 @@ export function showToast(
 
   const toast = document.createElement('div');
   toast.className = 'toast';
-  toast.innerHTML = `${TOAST_ICONS[variant]}<span>${message}</span>`;
+  // The icon is a closed, source-controlled SVG. Toast messages frequently
+  // contain backend/model/download errors, so keep them out of an HTML sink.
+  toast.innerHTML = TOAST_ICONS[variant];
+  const label = document.createElement('span');
+  label.textContent = message;
+  toast.appendChild(label);
   document.body.appendChild(toast);
 
   requestAnimationFrame(() => {

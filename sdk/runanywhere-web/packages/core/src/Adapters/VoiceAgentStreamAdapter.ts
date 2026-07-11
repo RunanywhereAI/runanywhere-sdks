@@ -26,7 +26,7 @@ import { streamVoiceAgent } from '@runanywhere/proto-ts/streams/voice_agent_serv
 import {
   runanywhereModule,
   type EmscriptenRunanywhereModule,
-} from '../runtime/EmscriptenModule';
+} from '../runtime/EmscriptenModule.js';
 
 /**
  * Adapter that exposes the C++ proto-byte voice agent callback as a

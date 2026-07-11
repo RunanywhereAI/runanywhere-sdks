@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Yarn Berry (3.6.1) workspaces monorepo containing three npm packages for on-device AI in React Native. Version `0.19.13`, React Native `0.83.1`. The SDK bridges pre-built C++ inference engines (`runanywhere-commons`) into React Native via **NitroModules** (Nitrogen/Nitro) — a JSI-based zero-serialization bridge, NOT the classic React Native bridge or TurboModules.
+Yarn Berry (3.6.1) workspaces monorepo containing one core package and four backend packages for on-device AI in React Native. Version `0.19.13`. The SDK bridges pre-built C++ inference engines (`runanywhere-commons`) into React Native via **NitroModules** (Nitrogen/Nitro) — a JSI-based zero-serialization bridge, NOT the classic React Native bridge or TurboModules.
 
 Swift alignment source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`, especially §4 folder layout, §12 generated proto code, and §15 build/deployment. React Native follows that iOS 17.0+ minimum and native/proto-byte ownership model; JavaScript is the facade, not the owner of model registry, downloads, storage paths, or native HTTP routing.
 
@@ -15,6 +15,8 @@ Swift alignment source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`, especi
 | `packages/core` | `@runanywhere/core` | SDK lifecycle, auth, native event/model/storage facades, all AI capability proxies |
 | `packages/llamacpp` | `@runanywhere/llamacpp` | LlamaCPP backend registration (GGUF LLM + VLM inference) |
 | `packages/onnx` | `@runanywhere/onnx` | ONNX/Sherpa backend registration (STT, TTS, VAD) |
+| `packages/qhexrt` | `@runanywhere/qhexrt` | Qualcomm Hexagon NPU backend registration and capability probe |
+| `packages/mlx` | `@runanywhere/mlx` | Apple MLX runtime registration facade |
 
 Additional workspace dependency: `../shared/proto-ts` (`@runanywhere/proto-ts`) provides protobuf-generated TypeScript types.
 
@@ -62,7 +64,14 @@ yarn nitrogen                   # Regenerate Nitrogen bridge code
 
 ### Running tests
 
-RN SDK currently has no unit tests; a streaming-parity harness was removed and will be reintroduced in a future iteration (see `RN-TEST-HARNESS-RELAND` in `gaps/gaps/inconsistencies/react-native.md`).
+```bash
+yarn workspace @runanywhere/core test --runInBand
+```
+
+Core unit tests cover proto bytes/wire encoding, structured SDK errors,
+network configuration validation, generated Solutions surfaces, and other
+backend-neutral helpers. Native/backend inference still requires the platform
+example/device workflows; a JavaScript unit pass is not native validation.
 
 ### Packaging for distribution
 
@@ -171,7 +180,7 @@ On Android, Kotlin `SDKLogger` uses `android.util.Log.*`.
 
 ### TypeScript
 
-No bundler — `tsc` only. All three `package.json` files point `main`/`types`/`exports` at `src/index.ts` directly (consumers resolve TypeScript source via Metro). `tsconfig.base.json` at root; per-package `tsconfig.json` extends it with `composite: true` and project references (`llamacpp` and `onnx` reference `core`).
+No bundler — `tsc` only. Package entrypoints point `main`/`types`/`exports` at `src/index.ts` directly (consumers resolve TypeScript source via Metro). `tsconfig.base.json` at root; per-package `tsconfig.json` extends it with `composite: true`, and every backend references `core`.
 
 ### Nitrogen Code Generation
 
@@ -244,8 +253,8 @@ The inner `sdk/runanywhere-react-native/package.json` also declares workspaces (
 ## Conventions
 
 - **Strict TypeScript**: `strict`, `noImplicitAny`, `strictNullChecks`, `noImplicitReturns`, `noFallthroughCasesInSwitch` all enabled
-- **ESLint**: `@typescript-eslint/recommended` + `prettier`, `no-console: error`, `no-explicit-any: warn`
+- **ESLint**: `@typescript-eslint/recommended` + `prettier`, `no-console: error`, `no-explicit-any: error`
 - **Prettier**: single quotes, 2-space indent, es5 trailing commas
 - **SwiftLint**: All iOS logging must go through `SDKLogger` — `print()`, `NSLog()`, `os_log()`, `debugPrint()`, `Logger` are banned
-- **Versioning**: All three packages share the same semver, managed by Lerna with conventional commits
+- **Versioning**: Core and backend packages share the same semver, managed by Lerna with conventional commits
 - **Package naming**: Kotlin Nitro-generated code uses namespace `com.margelo.nitro.runanywhere.*`

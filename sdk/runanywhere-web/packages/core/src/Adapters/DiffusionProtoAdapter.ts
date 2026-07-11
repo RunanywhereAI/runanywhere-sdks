@@ -6,7 +6,7 @@ import {
   type DiffusionProgress as ProtoDiffusionProgress,
   type DiffusionResult as ProtoDiffusionResult,
 } from '@runanywhere/proto-ts/diffusion_options';
-import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm';
+import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
   ensureExports,
@@ -15,7 +15,7 @@ import {
   withOptionalCallback,
   type ModalityProtoModule,
   type ProtoEventHandler,
-} from './ProtoAdapterTypes';
+} from './ProtoAdapterTypes.js';
 
 export class DiffusionProtoAdapter {
   static tryDefault(): DiffusionProtoAdapter | null {

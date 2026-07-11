@@ -2,16 +2,16 @@ import {
   SDKEvent,
   type SDKEvent as ProtoSDKEvent,
 } from '@runanywhere/proto-ts/sdk_events';
-import { SDKLogger } from '../Foundation/SDKLogger';
-import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm.js';
 
 const logger = new SDKLogger('SDKEventStreamAdapter');
 
 export interface SDKEventStreamModule extends ProtoWasmModule {
   addFunction?(fn: (...args: number[]) => number | void, signature: string): number;
   removeFunction?(ptr: number): void;
-  _rac_sdk_event_subscribe?(callbackPtr: number, userData: number): number | bigint;
-  _rac_sdk_event_unsubscribe?(subscriptionId: number | bigint): void;
+  _rac_sdk_event_subscribe?(callbackPtr: number, userData: number): bigint;
+  _rac_sdk_event_unsubscribe?(subscriptionId: bigint): void;
   _rac_sdk_event_publish_proto?(protoBytes: number, protoSize: number): number;
   _rac_sdk_event_poll?(outEvent: number): number;
   _rac_sdk_event_publish_failure?(
@@ -171,10 +171,10 @@ export class SDKEventStreamAdapter {
   }
 }
 
-function isZeroSubscription(subscriptionId: number | bigint): boolean {
-  return typeof subscriptionId === 'bigint' ? subscriptionId === 0n : subscriptionId === 0;
+function isZeroSubscription(subscriptionId: bigint): boolean {
+  return subscriptionId === 0n;
 }
 
-function subscriptionKey(subscriptionId: number | bigint): string {
-  return typeof subscriptionId === 'bigint' ? subscriptionId.toString() : String(subscriptionId);
+function subscriptionKey(subscriptionId: bigint): string {
+  return subscriptionId.toString();
 }

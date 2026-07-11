@@ -21,7 +21,8 @@
  * it in.
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { redactResourceURL } from '../Foundation/BackendContract.js';
 
 const logger = new SDKLogger('PlatformAdapter');
 
@@ -715,7 +716,11 @@ async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs)
     const aborted = controller.signal.aborted
       || (error instanceof DOMException && error.name === 'AbortError');
     if (!aborted) {
-      logger.warning(`http_download '${url}' failed: ${error instanceof Error ? error.message : String(error)}`);
+      logger.warning(
+        `http_download '${redactResourceURL(url)}' failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
     invokeCompleteCallback(
       m,

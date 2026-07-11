@@ -33,10 +33,10 @@ import type {
   StorageInfoResult,
 } from '@runanywhere/proto-ts/storage_types';
 import { StorageDeleteRequest as StorageDeleteRequestMessage } from '@runanywhere/proto-ts/storage_types';
-import { SDKException } from '../../Foundation/SDKException';
-import { StorageAdapter } from '../../Adapters/StorageAdapter';
-import { ModelRegistry } from './RunAnywhere+ModelRegistry';
-import { categoryRequiresContextLength } from '../../types/ModelTypes+Artifacts';
+import { SDKException } from '../../Foundation/SDKException.js';
+import { StorageAdapter } from '../../Adapters/StorageAdapter.js';
+import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
+import { categoryRequiresContextLength } from '../../types/ModelTypes+Artifacts.js';
 
 function requireNativeStorage(operation: string): StorageAdapter {
   const adapter = StorageAdapter.tryDefault();

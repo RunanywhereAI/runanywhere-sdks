@@ -1,0 +1,6 @@
+RunAnywhere release verification fact sheet
+
+The deterministic project codename is MERIDIAN-742.
+Its verified launch color is cobalt blue.
+Model lifecycle operations are implemented in the shared C++ commons core.
+The Web SDK stores downloaded model artifacts in browser OPFS and performs inference locally.

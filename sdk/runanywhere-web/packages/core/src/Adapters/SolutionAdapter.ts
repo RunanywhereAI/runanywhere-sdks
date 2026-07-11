@@ -17,12 +17,12 @@
  */
 
 import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
-import { SDKException } from '../Foundation/SDKException';
-import { RAC_OK, RAC_ERROR_FEATURE_NOT_AVAILABLE } from '../Foundation/RACErrors';
+import { SDKException } from '../Foundation/SDKException.js';
+import { RAC_OK, RAC_ERROR_FEATURE_NOT_AVAILABLE } from '../Foundation/RACErrors.js';
 import {
   runanywhereModule,
   type EmscriptenRunanywhereModule,
-} from '../runtime/EmscriptenModule';
+} from '../runtime/EmscriptenModule.js';
 
 function assertOk(op: string, rc: number): void {
   if (rc === RAC_ERROR_FEATURE_NOT_AVAILABLE) {
