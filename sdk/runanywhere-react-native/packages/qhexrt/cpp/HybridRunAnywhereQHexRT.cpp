@@ -127,8 +127,8 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereQHexRT::registerBackend() {
   return Promise<bool>::async([this]() {
     RAC_LOG_DEBUG(LOG_CATEGORY, "Registering QHexRT backend with C++ registry");
 
-    // Note: ADSP_LIBRARY_PATH (Hexagon DSP skel discovery) is set by the QHexRT
-    // engine itself before its first runtime create — no platform glue needed.
+    // Android package bootstrap extracts the DSP skels from assets and passes
+    // the app-private directory to the QHexRT engine before this call.
 
 #if !RAC_QHEXRT_BACKEND_AVAILABLE
     RAC_LOG_WARNING(

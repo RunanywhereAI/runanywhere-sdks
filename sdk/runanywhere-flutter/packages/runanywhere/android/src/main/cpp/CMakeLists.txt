@@ -20,6 +20,15 @@ target_compile_options(
         -Wextra
 )
 
+if(ANDROID)
+    target_link_options(
+        runanywhere_flutter_helpers
+        PRIVATE
+            -Wl,-z,max-page-size=16384
+            -Wl,-z,common-page-size=16384
+    )
+endif()
+
 set(RAC_FLUTTER_JNILIBS_DIR "" CACHE PATH "Directory containing Flutter RACommons jniLibs")
 set(RAC_COMMONS_LIB "${RAC_FLUTTER_JNILIBS_DIR}/${ANDROID_ABI}/librac_commons.so")
 

@@ -27,6 +27,7 @@ class QhexrtBindings {
   late final RacQhexrtModelSupportsArchDart? _modelSupportsArch;
   late final RacQhexrtRegisterModelForDeviceProtoDart?
   _registerModelForDeviceProto;
+  late final RacQhexrtSetSkelDirectoryDart? _setSkelDirectory;
 
   QhexrtBindings() : this.fromDynamicLibrary(_loadBackend());
 
@@ -139,6 +140,16 @@ class QhexrtBindings {
       );
       _registerModelForDeviceProto = null;
     }
+    try {
+      _setSkelDirectory = _backend
+          .lookupFunction<
+            RacQhexrtSetSkelDirectoryNative,
+            RacQhexrtSetSkelDirectoryDart
+          >('rac_qhexrt_set_skel_directory');
+    } catch (e) {
+      _logger.warning('Failed to resolve rac_qhexrt_set_skel_directory: $e');
+      _setSkelDirectory = null;
+    }
   }
 
   bool get isAvailable => _register != null;
@@ -146,6 +157,28 @@ class QhexrtBindings {
   int register() => _register?.call() ?? RacResultCode.errorNotSupported;
 
   int unregister() => _unregister?.call() ?? RacResultCode.errorNotSupported;
+
+  /// Configure the app-private directory containing extracted FastRPC skels.
+  /// Must be called before backend registration can create a QNN runtime.
+  void setSkelDirectory(String? path) {
+    final fn = _setSkelDirectory;
+    if (fn == null) {
+      throw StateError(
+        'rac_qhexrt_set_skel_directory is unavailable in the QHexRT backend',
+      );
+    }
+    if (path == null || path.isEmpty) {
+      fn(nullptr.cast<Utf8>());
+      return;
+    }
+
+    final nativePath = path.toNativeUtf8();
+    try {
+      fn(nativePath);
+    } finally {
+      calloc.free(nativePath);
+    }
+  }
 
   /// Probe the Hexagon NPU via `rac_qhexrt_probe_proto`, decoding the
   /// serialized `runanywhere.v1.NpuCapability`. Throws when the symbol is
@@ -282,3 +315,5 @@ typedef RacQhexrtRegisterModelForDeviceProtoDart =
       Pointer<Int32>,
       Pointer<RacProtoBuffer>,
     );
+typedef RacQhexrtSetSkelDirectoryNative = Void Function(Pointer<Utf8>);
+typedef RacQhexrtSetSkelDirectoryDart = void Function(Pointer<Utf8>);

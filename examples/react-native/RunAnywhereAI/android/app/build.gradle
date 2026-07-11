@@ -130,7 +130,7 @@ android {
                           "-DCMAKE_MODULE_PATH=${projectDir}"
             }
         }
-        ndkVersion "27.0.12077973"
+        ndkVersion "27.3.13750724"
     }
     signingConfigs {
         debug {

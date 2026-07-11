@@ -43,18 +43,20 @@ validation, and local-path workflow. A null model is a normal device mismatch.
 
 ## Native libraries
 
-The private QHexRT natives are **staged, not committed**: the
-`android/src/main/jniLibs/arm64-v8a/` directory is gitignored and must be
-populated before a real (non-stub) build:
+The private QHexRT natives are **staged, not committed**. Android host/stub
+libraries go under `android/src/main/jniLibs/arm64-v8a/`; DSP `Skel.so` files
+go under `android/src/main/assets/runanywhere/qhexrt/skels/arm64-v8a/` and are
+extracted to an app-private, versioned directory before QHexRT registration:
 
 ```bash
 scripts/stage-natives.sh --natives-from /path/to/android-libs
 ```
 
 The script copies `librac_backend_qhexrt*.so` (QHexRT engine), the QAIRT
-runtime/skel set (`libQnnHtp*.so`, `libQnnSystem.so`, per-arch
-v75/v79/v81 Skel/Stub/CalculatorStub) and `libc++_shared.so` — the same set
-the React Native `package-sdk.sh` stages for its qhexrt package.
+runtime set (`libQnnHtp*.so`, `libQnnSystem.so`, per-arch v75/v79/v81
+Skel/Stub/CalculatorStub) and `libc++_shared.so`. Skels are deliberately not
+Android JNI libraries: FastRPC discovers the extracted private directory via
+QHexRT's `rac_qhexrt_set_skel_directory()` contract.
 `librac_commons.so` is provided by the core `runanywhere` plugin.
 
 Building without staged natives is allowed (the Gradle build prints a

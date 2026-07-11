@@ -28,3 +28,9 @@ architecture probing and model/device selection, then composes the shared C++
 registry, Hugging Face resolver, download, extraction, validation, and
 local-path workflow. `null` is the normal result when a definition does not
 match the current device.
+
+QHexRT host and stub libraries are staged under
+`android/src/main/jniLibs/arm64-v8a`. FastRPC DSP `Skel.so` payloads are staged
+under `android/src/main/assets/runanywhere/qhexrt/skels/arm64-v8a`, then the
+Android package extracts them to a versioned app-private directory and passes
+that directory to the native QHexRT engine before registration.

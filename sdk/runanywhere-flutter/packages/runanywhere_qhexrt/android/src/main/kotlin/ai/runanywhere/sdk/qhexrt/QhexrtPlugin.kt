@@ -15,6 +15,7 @@ import io.flutter.plugin.common.MethodChannel.Result
  */
 class QhexrtPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
+    private lateinit var applicationContext: android.content.Context
 
     companion object {
         private const val CHANNEL_NAME = "runanywhere_qhexrt"
@@ -40,10 +41,9 @@ class QhexrtPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        applicationContext = binding.applicationContext
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel.setMethodCallHandler(this)
-        // Note: ADSP_LIBRARY_PATH (Hexagon DSP skel discovery) is set by the QHexRT
-        // engine itself before its first runtime create — no plugin glue needed.
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -51,6 +51,8 @@ class QhexrtPlugin : FlutterPlugin, MethodCallHandler {
             "getPlatformVersion" -> result.success("Android ${Build.VERSION.RELEASE}")
             "getBackendVersion" -> result.success(BACKEND_VERSION)
             "getBackendName" -> result.success(BACKEND_NAME)
+            "prepareSkelDirectory" ->
+                result.success(QHexRTSkelInstaller.installIfAvailable(applicationContext))
             else -> result.notImplemented()
         }
     }

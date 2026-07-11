@@ -2,7 +2,9 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/hardware_profile.pb.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
@@ -26,6 +28,7 @@ class QHexRT {
   static bool _isRegistered = false;
   static QhexrtBindings? _bindings;
   static final _logger = SDKLogger('QHexRT');
+  static const _platformChannel = MethodChannel('runanywhere_qhexrt');
 
   /// The unknown/unsupported fallback returned when the probe is unavailable.
   static NpuCapability _unknownCapability() =>
@@ -99,6 +102,10 @@ class QHexRT {
     }
     try {
       _bindings ??= QhexrtBindings();
+      final skelDirectory = Platform.isAndroid
+          ? await _platformChannel.invokeMethod<String>('prepareSkelDirectory')
+          : null;
+      _bindings!.setSkelDirectory(skelDirectory);
       final result = _bindings!.register();
       _logger.info('rac_backend_qhexrt_register() returned: $result');
       if (result == RacResultCode.errorBackendUnavailable ||

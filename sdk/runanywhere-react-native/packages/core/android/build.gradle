@@ -117,7 +117,7 @@ def androidNdkHomeForRuntime() {
     def androidSdk = System.getenv("ANDROID_HOME") ?:
         System.getenv("ANDROID_SDK_ROOT") ?:
         "${System.getProperty('user.home')}/Library/Android/sdk"
-    def ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.0.12077973"
+    def ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.3.13750724"
     return file("${androidSdk}/ndk/${ndkVersion}")
 }
 
@@ -184,6 +184,7 @@ def syncAndroidNdkRuntimeLibs(File outputDir, boolean includeLibcxx, boolean inc
 
 android {
     namespace "com.margelo.nitro.runanywhere.core"
+    ndkVersion rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.3.13750724"
 
     compileSdkVersion getExtOrIntegerDefault('compileSdkVersion')
 

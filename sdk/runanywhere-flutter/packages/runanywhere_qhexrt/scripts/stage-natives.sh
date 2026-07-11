@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # stage-natives.sh — stage the private QHexRT native libraries into this
-# Flutter plugin's android/src/main/jniLibs/arm64-v8a.
+# Flutter plugin. Android host/stub libraries go to jniLibs; FastRPC DSP
+# Skel.so files go to assets and are extracted to app-private storage at runtime.
 #
 # Mirrors the qhexrt section of
 # sdk/runanywhere-react-native/scripts/package-sdk.sh: the QHexRT backend .so
-# plus the QAIRT runtime/skel set (libQnn*) are PRIVATE and staged directly
-# into the package from a local build output — they are never fetched from a
+# plus the QAIRT runtime/skel set (libQnn*) are PRIVATE and staged into the
+# package from a local build output — they are never fetched from a
 # public release. QHexRT is Qualcomm-only: arm64-v8a exclusively.
 #
 # Usage:
@@ -19,7 +20,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEST="$PKG_DIR/android/src/main/jniLibs/arm64-v8a"
+JNI_DEST="$PKG_DIR/android/src/main/jniLibs/arm64-v8a"
+SKEL_DEST="$PKG_DIR/android/src/main/assets/runanywhere/qhexrt/skels/arm64-v8a"
 
 NATIVES_FROM=""
 while [ $# -gt 0 ]; do
@@ -56,7 +58,7 @@ fi
 
 # The same lib set package-sdk.sh stages for the RN qhexrt package, plus the
 # _jni backend variant this plugin's bindings also probe for.
-LIBS=(
+JNI_LIBS=(
     librac_backend_qhexrt.so
     librac_backend_qhexrt_jni.so
     libc++_shared.so
@@ -65,31 +67,54 @@ LIBS=(
     libQnnHtpPrepare.so
     libQnnSystem.so
     libQnnHtpV75CalculatorStub.so
-    libQnnHtpV75Skel.so
     libQnnHtpV75Stub.so
     libQnnHtpV79CalculatorStub.so
-    libQnnHtpV79Skel.so
     libQnnHtpV79Stub.so
     libQnnHtpV81CalculatorStub.so
-    libQnnHtpV81Skel.so
     libQnnHtpV81Stub.so
 )
 
-mkdir -p "$DEST"
+SKEL_LIBS=(
+    libQnnHtpV75Skel.so
+    libQnnHtpV79Skel.so
+    libQnnHtpV81Skel.so
+)
 
-staged=0
-for lib in "${LIBS[@]}"; do
+mkdir -p "$JNI_DEST" "$SKEL_DEST"
+
+staged_jni=0
+for lib in "${JNI_LIBS[@]}"; do
     if [ -f "$SRC/$lib" ]; then
-        cp -f "$SRC/$lib" "$DEST/"
-        staged=$((staged + 1))
+        cp -f "$SRC/$lib" "$JNI_DEST/"
+        staged_jni=$((staged_jni + 1))
     else
         echo "  (skipping $lib — not present in $SRC)"
     fi
 done
 
-if [ ! -f "$DEST/librac_backend_qhexrt.so" ] && [ ! -f "$DEST/librac_backend_qhexrt_jni.so" ]; then
+staged_skels=0
+for lib in "${SKEL_LIBS[@]}"; do
+    if [ -f "$SRC/$lib" ]; then
+        cp -f "$SRC/$lib" "$SKEL_DEST/"
+        staged_skels=$((staged_skels + 1))
+    else
+        echo "  (skipping $lib — not present in $SRC)"
+    fi
+done
+
+# Never leave DSP binaries in Android's JNI namespace. FastRPC needs real
+# private filesystem paths, not Android linker paths.
+find "$JNI_DEST" -maxdepth 1 -type f -name 'libQnnHtpV*Skel.so' -delete
+
+if [ ! -f "$JNI_DEST/librac_backend_qhexrt.so" ] && [ ! -f "$JNI_DEST/librac_backend_qhexrt_jni.so" ]; then
     echo "ERROR: no QHexRT backend .so (librac_backend_qhexrt*.so) was staged from $SRC" >&2
     exit 1
 fi
 
-echo "Staged $staged native lib(s) into $DEST"
+if [ "$staged_skels" -eq 0 ] && ! find "$SKEL_DEST" -maxdepth 1 -type f -name 'libQnnHtpV*Skel.so' -print -quit | grep -q .; then
+    echo "ERROR: no QHexRT DSP Skel.so assets were staged from $SRC" >&2
+    exit 1
+fi
+
+echo "Staged $staged_jni JNI lib(s) into $JNI_DEST"
+echo "Staged $staged_skels DSP skel asset(s) into $SKEL_DEST"
