@@ -39,10 +39,10 @@ function requireAdapter(): EmbeddingsProtoAdapter {
       'No backend is registered for the Embeddings capability. Register a backend WASM module (e.g. OnnxRuntime.register()) during app init.',
     );
   }
-  if (!adapter.supportsProtoEmbeddings()) {
+  if (!adapter.supportsLifecycleProtoEmbeddings()) {
     throw SDKException.backendNotAvailable(
       'Embeddings',
-      'The active Web WASM build does not export _rac_embeddings_embed_batch_proto. Rebuild with RAC_BACKEND_EMBEDDINGS=ON.',
+      'The active Web WASM build does not export _rac_embeddings_embed_batch_lifecycle_proto. Rebuild with RAC_BACKEND_EMBEDDINGS=ON.',
     );
   }
   return adapter;
@@ -134,13 +134,11 @@ async function embedBatch(
 
   const adapter = requireAdapter();
 
-  // EmbeddingsProtoAdapter.embedBatch requires a numeric handle. The Web
-  // adapter tracks state through the WASM modality slot (adapterState); a
-  // handle of 0 is the sentinel that makes commons use the lifecycle-resolved
-  // currently-loaded model, matching Swift's
-  // `CppBridge.EmbeddingsProto.embedBatchLifecycle` which also operates on
-  // the loaded model rather than an explicit handle.
-  const result = await adapter.embedBatch(0, lifecycleRequest);
+  // Use the handle-less lifecycle ABI, matching Swift's
+  // `CppBridge.EmbeddingsProto.embedBatchLifecycle`. The handle-based
+  // `_rac_embeddings_embed_batch_proto` rejects a null handle; zero is not a
+  // lifecycle sentinel.
+  const result = await adapter.embedBatchLifecycle(lifecycleRequest);
 
   if (!result) {
     throw SDKException.backendNotAvailable(

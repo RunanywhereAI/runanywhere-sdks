@@ -15,7 +15,7 @@ There are exactly three publishable Web SDK packages:
 | Package | Responsibility | Native artifacts |
 | --- | --- | --- |
 | `@runanywhere/web` | Backend-neutral initialization, lifecycle, generated types, model registry, downloads, OPFS storage, events, routing, and browser helpers | `racommons.{js,wasm}` |
-| `@runanywhere/web-llamacpp` | llama.cpp LLM, VLM, embeddings, tool calling, and structured output | CPU and WebGPU/Asyncify `racommons-llamacpp` variants |
+| `@runanywhere/web-llamacpp` | llama.cpp LLM, VLM, LoRA, tool calling, and structured output | CPU and WebGPU/Asyncify `racommons-llamacpp` variants |
 | `@runanywhere/web-onnx` | ONNX Runtime embeddings plus Sherpa-ONNX STT, TTS, and VAD | `racommons-onnx-sherpa.{js,wasm}` |
 
 `@runanywhere/web/browser`, `@runanywhere/web/backend`, and

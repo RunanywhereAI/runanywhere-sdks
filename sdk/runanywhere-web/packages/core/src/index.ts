@@ -87,6 +87,7 @@ export type {
   RAGAvailability,
   RAGDocumentSummary,
   RAGEnsureReadyOptions,
+  RAGPipelineState,
 } from './Public/Extensions/RunAnywhere+RAG.js';
 export type {
   EmbeddingsOptions,

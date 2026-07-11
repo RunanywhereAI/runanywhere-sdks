@@ -15,7 +15,7 @@ There are exactly three publishable Web packages:
 | Package | Responsibility | Native artifacts |
 | --- | --- | --- |
 | `@runanywhere/web` | Backend-neutral lifecycle, generated types, model registry, downloads, storage, events, cross-backend orchestration, and browser helpers | `racommons.{js,wasm}` (commons only) |
-| `@runanywhere/web-llamacpp` | llama.cpp LLM, VLM, embeddings, tool calling, and structured output | CPU and WebGPU/JSPI `racommons-llamacpp` variants |
+| `@runanywhere/web-llamacpp` | llama.cpp LLM, VLM, LoRA, tool calling, and structured output | CPU and WebGPU/Asyncify `racommons-llamacpp` variants |
 | `@runanywhere/web-onnx` | ONNX Runtime embeddings plus Sherpa-ONNX STT, TTS, and VAD | `racommons-onnx-sherpa.{js,wasm}` |
 
 `@runanywhere/web/browser`, `@runanywhere/web/backend`, and
@@ -108,7 +108,7 @@ from generated `@runanywhere/proto-ts` types. External input should begin as
 - WebAssembly and modern JavaScript modules.
 - OPFS for persistent, origin-scoped model storage.
 - Web Audio/MediaDevices for microphone, playback, and camera flows.
-- WebGPU plus JSPI for the accelerated llama.cpp artifact; the SDK selects the
+- WebGPU plus Asyncify for the accelerated llama.cpp artifact; the SDK selects the
   CPU artifact when those capabilities are unavailable.
 - Cross-origin isolation for `SharedArrayBuffer` and threaded artifacts.
 

@@ -428,6 +428,16 @@ export class OPFSBridge {
     return max;
   }
 
+  /** Modules that expose the Emscripten filesystem required for hydration. */
+  private static filesystemModules(modules: ModuleLike[]): ModuleLike[] {
+    return modules.filter((module) => getFS(module) !== null);
+  }
+
+  /** FS-bearing modules whose private MEMFS does not contain the artifact. */
+  private static modulesMissingPath(modules: ModuleLike[], path: string): ModuleLike[] {
+    return modules.filter((module) => OPFSBridge.memfsFileSize(module, path) === 0);
+  }
+
   /**
    * After a download completes, flush MEMFS → OPFS and mirror bytes into every
    * backend module's MEMFS. Throws when persistence cannot be verified so
@@ -471,30 +481,37 @@ export class OPFSBridge {
       }
     }
 
-    if (allModules.length === 0) return;
+    const filesystemModules = OPFSBridge.filesystemModules(allModules);
+    if (filesystemModules.length === 0) return;
 
     // Directory artifacts: mirror the entire tree into every module's MEMFS so
     // a subsequent loadModel that runs in a non-downloader module (e.g. Sherpa
     // STT loading a directory that commons extracted) can find the files.
     if (isDirectoryArtifact) {
-      await OPFSBridge.restoreDirectoryToMemfsAll(allModules, localPath);
+      // Replay the complete OPFS tree to every target. The restore validates
+      // each persisted file, so a module containing only one companion file
+      // cannot masquerade as a fully hydrated model bundle.
+      await OPFSBridge.restoreDirectoryToMemfsAll(filesystemModules, localPath);
       return;
     }
 
-    await OPFSBridge.restoreToMemfsAll(allModules, localPath);
-    const memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(allModules, localPath);
-    if (memfsMax > 0) return;
+    let missingModules = OPFSBridge.modulesMissingPath(filesystemModules, localPath);
+    if (missingModules.length === 0) return;
+    await OPFSBridge.restoreToMemfsAll(missingModules, localPath);
+    missingModules = OPFSBridge.modulesMissingPath(missingModules, localPath);
+    if (missingModules.length === 0) return;
 
     const downloaderOnly = OPFSBridge.memfsFileSize(downloaderModule, localPath);
     if (downloaderOnly > 0 && opfsExpected) {
       await OPFSBridge.flushFromMemfs(downloaderModule, localPath);
-      await OPFSBridge.restoreToMemfsAll(allModules, localPath);
+      await OPFSBridge.restoreToMemfsAll(missingModules, localPath);
     }
 
-    const retryMax = OPFSBridge.maxMemfsFileSizeAcrossModules(allModules, localPath);
-    if (retryMax === 0) {
+    const stillMissing = OPFSBridge.modulesMissingPath(missingModules, localPath);
+    if (stillMissing.length > 0) {
       throw new Error(
-        `Download persist failed: '${localPath}' has 0 bytes in MEMFS after OPFS restore`,
+        `Download persist failed: '${localPath}' is missing from `
+        + `${stillMissing.length} MEMFS module(s) after OPFS restore`,
       );
     }
   }
@@ -507,16 +524,23 @@ export class OPFSBridge {
     modules: ModuleLike[],
     path: string,
   ): Promise<void> {
-    if (modules.length === 0) return;
+    const filesystemModules = OPFSBridge.filesystemModules(modules);
+    if (filesystemModules.length === 0) return;
     const segments = pathToOPFSSegments(path);
     if (!segments) return;
     if (OPFSBridge.isSuppressed(path)) {
       throw new Error(`Model load failed: '${path}' was deleted from browser storage`);
     }
 
-    // Fast-path: any module already has the file in MEMFS with bytes.
-    const memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(modules, path);
-    if (memfsMax > 0) return;
+    let missingModules = OPFSBridge.modulesMissingPath(filesystemModules, path);
+    const anyMemfsDirectory = filesystemModules.some((module) => {
+      const fs = getFS(module);
+      return fs !== null && isMemfsDirectory(fs, path);
+    });
+    // Preserve the zero-I/O fast path for single-file models. Directories must
+    // still be compared against the complete OPFS tree because one surviving
+    // companion file does not prove the bundle is fully hydrated.
+    if (missingModules.length === 0 && !anyMemfsDirectory) return;
 
     // Detect whether the OPFS counterpart is a file or a directory (tar.gz
     // extract). Sherpa STT/TTS and VLM artifacts are directories; the
@@ -525,19 +549,27 @@ export class OPFSBridge {
     const opfsSupported = isOPFSSupported();
     if (opfsSupported) {
       if (await OPFSBridge.isOPFSDirectory(segments)) {
-        await OPFSBridge.restoreDirectoryToMemfsAll(modules, path);
+        await OPFSBridge.restoreDirectoryToMemfsAll(filesystemModules, path);
         return;
-      }
-      if (!(await OPFSBridge.exists(path))) {
-        throw new Error(`Model load failed: '${path}' not found in OPFS`);
       }
     }
 
-    await OPFSBridge.restoreToMemfsAll(modules, path);
-    const memfsMaxRetry = OPFSBridge.maxMemfsFileSizeAcrossModules(modules, path);
-    if (memfsMaxRetry === 0) {
+    // Each Emscripten artifact owns a private MEMFS. A surviving sibling may
+    // retain model bytes after an acceleration switch while the replacement
+    // llama.cpp module is empty, so only return when every FS-bearing module
+    // has the artifact.
+    if (missingModules.length === 0) return;
+
+    if (opfsSupported && !(await OPFSBridge.exists(path))) {
+      throw new Error(`Model load failed: '${path}' not found in OPFS`);
+    }
+
+    await OPFSBridge.restoreToMemfsAll(missingModules, path);
+    missingModules = OPFSBridge.modulesMissingPath(missingModules, path);
+    if (missingModules.length > 0) {
       throw new Error(
-        `Model load failed: '${path}' has 0 bytes in MEMFS after OPFS restore`,
+        `Model load failed: '${path}' is missing from `
+        + `${missingModules.length} MEMFS module(s) after OPFS restore`,
       );
     }
   }
@@ -573,7 +605,12 @@ export class OPFSBridge {
       const fs = getFS(module);
       if (!fs) continue;
       ensureMemfsDirectory(fs, dirPath);
-      await OPFSBridge.restoreOPFSDirToFs(dir, dirPath, fs);
+      const restoredArtifacts = await OPFSBridge.restoreOPFSDirToFs(dir, dirPath, fs);
+      if (restoredArtifacts === 0) {
+        throw new Error(
+          `OPFS directory '${dirPath}' contains no non-empty model artifacts`,
+        );
+      }
     }
   }
 
@@ -581,35 +618,51 @@ export class OPFSBridge {
     dir: FileSystemDirectoryHandle,
     dirPath: string,
     fs: EmscriptenFS,
-  ): Promise<void> {
+  ): Promise<number> {
     const iterable = dir as unknown as IterableFileSystemDirectoryHandle;
     const entries = iterable.entries?.() ?? null;
-    if (!entries) return;
+    if (!entries) {
+      throw new Error(`OPFS directory iteration is unavailable for '${dirPath}'`);
+    }
+    let artifactCount = 0;
     for await (const [name, handle] of entries) {
       const childPath = `${dirPath}/${name}`;
       if (handle.kind === 'file') {
+        const fileHandle = handle as FileSystemFileHandle;
+        const file = await fileHandle.getFile();
+        if (file.size === 0) {
+          throw new Error(`OPFS model artifact '${childPath}' is empty`);
+        }
+        let currentSize = 0;
         try {
-          const fileHandle = handle as FileSystemFileHandle;
-          const bytes = await readBytesFromOPFSFile(fileHandle);
+          currentSize = fs.stat(childPath).size;
+        } catch {
+          // Missing from this module's MEMFS — restore below.
+        }
+        if (currentSize !== file.size) {
+          const bytes = new Uint8Array(await file.arrayBuffer());
           const parent = childPath.slice(0, childPath.lastIndexOf('/')) || '/';
           ensureMemfsDirectory(fs, parent);
           fs.writeFile(childPath, bytes);
-        } catch (err) {
-          logger.warning(
-            `restoreDirectoryToMemfsAll: failed to write '${childPath}' to MEMFS: ${
-              err instanceof Error ? err.message : String(err)
-            }`,
+        }
+        const restoredSize = fs.stat(childPath).size;
+        if (restoredSize !== file.size) {
+          throw new Error(
+            `MEMFS restore size mismatch for '${childPath}': `
+            + `expected ${file.size}, received ${restoredSize}`,
           );
         }
+        artifactCount += 1;
       } else if (handle.kind === 'directory') {
         ensureMemfsDirectory(fs, childPath);
-        await OPFSBridge.restoreOPFSDirToFs(
+        artifactCount += await OPFSBridge.restoreOPFSDirToFs(
           handle as FileSystemDirectoryHandle,
           childPath,
           fs,
         );
       }
     }
+    return artifactCount;
   }
 
   /**

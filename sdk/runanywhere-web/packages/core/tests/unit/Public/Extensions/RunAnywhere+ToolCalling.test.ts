@@ -585,6 +585,58 @@ describe('ToolCalling.generateWithTools — addFunction trampoline lifecycle', (
     expect(module.destroyHandles[0]).toBe(FAKE_SESSION_HANDLE);
   });
 
+  it('keeps the callback live until Asyncify create and step calls resolve', async () => {
+    const module = makeFakeModule({
+      onCreate: [toolCallEvent('echo', { value: 'async' })],
+      onStep: [[finalResultEvent('async complete')]],
+    });
+    const directCreate = module._rac_tool_calling_session_create_proto!.bind(module);
+    const directStep = module._rac_tool_calling_session_step_with_result_proto!.bind(module);
+    const ccallSpy = vi.fn(async (
+      functionName: string,
+      _returnType: string | null,
+      _argumentTypes: string[],
+      args: unknown[],
+      options?: { async?: boolean },
+    ): Promise<number> => {
+      expect(options).toEqual({ async: true });
+      await Promise.resolve();
+      expect(module.activeCallbackIds.size).toBe(1);
+      if (functionName === 'rac_tool_calling_session_create_proto') {
+        return directCreate(
+          Number(args[0]),
+          Number(args[1]),
+          Number(args[2]),
+          Number(args[3]),
+          Number(args[4]),
+        );
+      }
+      if (functionName === 'rac_tool_calling_session_step_with_result_proto') {
+        return directStep(Number(args[0]), Number(args[1]));
+      }
+      throw new Error(`unexpected ccall: ${functionName}`);
+    });
+    module.ccall = ccallSpy;
+    setRunanywhereModule(module);
+
+    ToolCalling.registerTool(
+      ToolDefinition.fromPartial({ name: 'echo', description: '', parameters: [] }),
+      async (args) => ({ echoed: args['value']! }),
+    );
+
+    const result = await ToolCalling.generateWithTools('use echo', {
+      tools: [ToolDefinition.fromPartial({ name: 'echo' })],
+    });
+
+    expect(result.text).toBe('async complete');
+    expect(ccallSpy.mock.calls.map(([functionName]) => functionName)).toEqual([
+      'rac_tool_calling_session_create_proto',
+      'rac_tool_calling_session_step_with_result_proto',
+    ]);
+    expect(module.activeCallbackIds.size).toBe(0);
+    expect(module.destroyHandles).toEqual([FAKE_SESSION_HANDLE]);
+  });
+
   it('removes the callback even when the executor closure rejects through the step path', async () => {
     const module = makeFakeModule({
       onCreate: [toolCallEvent('explodes', {})],

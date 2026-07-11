@@ -55,6 +55,40 @@ export class EmbeddingsProtoAdapter {
     );
   }
 
+  supportsLifecycleProtoEmbeddings(): boolean {
+    return missingExports(
+      this.module,
+      ['_rac_embeddings_embed_batch_lifecycle_proto'],
+    ).length === 0;
+  }
+
+  async embedBatchLifecycle(
+    request: ProtoEmbeddingsRequest,
+  ): Promise<ProtoEmbeddingsResult | null> {
+    if (!ensureExports(this.module, 'embeddings.embedBatchLifecycle', [
+      '_rac_embeddings_embed_batch_lifecycle_proto',
+    ])) {
+      return null;
+    }
+    return this.bridge().withEncodedRequestAsync(
+      request,
+      EmbeddingsRequest,
+      EmbeddingsResult,
+      (requestPtr, requestSize, outResult) => callEmscriptenAsyncNumber(
+        this.module,
+        'rac_embeddings_embed_batch_lifecycle_proto',
+        ['number', 'number', 'number'],
+        [requestPtr, requestSize, outResult],
+        () => this.module._rac_embeddings_embed_batch_lifecycle_proto!(
+          requestPtr,
+          requestSize,
+          outResult,
+        ),
+      ),
+      'rac_embeddings_embed_batch_lifecycle_proto',
+    );
+  }
+
   private bridge(): ProtoWasmBridge {
     return new ProtoWasmBridge(this.module, logger);
   }

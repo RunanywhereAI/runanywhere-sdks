@@ -267,19 +267,15 @@ export class SherpaONNXBridge {
       completeNativePhase1ForModule(this._module);
 
       // Claim speech + embedding + RAG. The dedicated racommons-onnx-sherpa
-      // artifact exports `_rac_embeddings_embed_batch_proto` (in the BASE
+      // artifact exports `_rac_embeddings_embed_batch_lifecycle_proto` (in the BASE
       // export list — see `RAC_EXPORTED_FUNCTIONS_BASE` in
       // sdk/runanywhere-web/wasm/CMakeLists.txt) and the 6 `_rac_rag_*_proto`
       // symbols (gated by `RAC_BACKEND_RAG=ON`, which is the default — see
       // the `_onnx_exports` block around CMakeLists.txt line 1300). Claiming
       // both capabilities here makes `RAGProtoAdapter.tryDefault()` and the
-      // embeddings adapter route to this module when the LlamaCpp bridge is
-      // not registered (or when the caller wants ONNX-backed embeddings).
-      // Registration order is last-writer-wins per capability, so apps that
-      // also register LlamaCPP will still get the llama.cpp engine for RAG
-      // unless ONNX is the more recent register call — match the platform
-      // convention by listing both here and letting registration order
-      // resolve the tie.
+      // embeddings adapter route to the only Web engine with embedding ops.
+      // LlamaCPP intentionally does not claim either slot, so an acceleration
+      // reload cannot redirect lifecycle embeddings into the wrong WASM heap.
       const capabilities: WasmCapability[] = [
         'stt',
         'tts',

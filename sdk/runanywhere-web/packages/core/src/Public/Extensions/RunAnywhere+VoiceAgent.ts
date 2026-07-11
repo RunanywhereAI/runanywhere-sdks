@@ -61,6 +61,8 @@ const VOICE_SYSTEM_PROMPT =
   'If you are unsure or lack the information, say so briefly instead of guessing.';
 const VOICE_MAX_TOKENS = 200;
 const VOICE_MAX_HISTORY_ENTRIES = 20;
+const DEFAULT_VAD_ENERGY_THRESHOLD = 0.005;
+const MODEL_VAD_PROBABILITY_THRESHOLD = 0.5;
 
 export type VoiceAgentAvailabilitySource =
   | 'provider'
@@ -727,6 +729,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
   ): Promise<TurnVADVerdict> {
     const samples = toFloat32Audio(audio);
     const durationMs = (samples.length / (this.config.vadSampleRate || 16_000)) * 1000;
+    const energyThreshold = this.config.vadEnergyThreshold || DEFAULT_VAD_ENERGY_THRESHOLD;
     const currentVAD = WebModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       includeModelMetadata: false,
@@ -735,14 +738,17 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
       try {
         const result = await VAD.detectVoiceAuto(samples, {
           modelId: currentVAD.modelId,
-          threshold: this.config.vadEnergyThreshold || 0,
           minSpeechDurationMs: 100,
           minSilenceDurationMs: this.config.sessionConfig?.silenceDurationMs || 800,
           maxSpeechDurationMs: this.config.sessionConfig?.maxRecordingDurationMs || 0,
           config: {
             sampleRate: this.config.vadSampleRate || 16_000,
             frameLengthMs: Math.round((this.config.vadFrameLength || 0.1) * 1000),
-            threshold: this.config.vadEnergyThreshold || 0.015,
+            // `vadEnergyThreshold` is an RMS amplitude threshold for the
+            // fallback detector. Model-backed Silero expects a posterior
+            // probability instead; forwarding 0.005 makes Sherpa reject its
+            // configuration because model thresholds must be at least 0.01.
+            threshold: MODEL_VAD_PROBABILITY_THRESHOLD,
           },
         });
         return {
@@ -759,10 +765,9 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     }
 
     const energy = rmsAudio(samples);
-    const threshold = this.config.vadEnergyThreshold || 0.015;
     return {
-      isSpeech: energy >= threshold,
-      confidence: Math.min(1, energy / threshold),
+      isSpeech: energy >= energyThreshold,
+      confidence: Math.min(1, energy / energyThreshold),
       durationMs,
       noiseFloorDb: amplitudeToDb(energy),
     };
@@ -1013,7 +1018,7 @@ function defaultVoiceAgentComposeConfig(ttsVoiceID?: string): VoiceAgentComposeC
   return {
     vadSampleRate: 16000,
     vadFrameLength: 0.1,
-    vadEnergyThreshold: 0.005,
+    vadEnergyThreshold: DEFAULT_VAD_ENERGY_THRESHOLD,
     wakewordEnabled: false,
     wakewordThreshold: 0.5,
     sessionId: 'web-voice-agent',

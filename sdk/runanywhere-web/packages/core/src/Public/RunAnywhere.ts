@@ -56,7 +56,11 @@ import { Runtime, prepareModelLoad } from '../Foundation/RuntimeConfig.js';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions.js';
 import { Embeddings as EmbeddingsCapability } from './Extensions/RunAnywhere+Embeddings.js';
 import { LoRA as LoRACapability } from './Extensions/RunAnywhere+LoRA.js';
-import { RAG as RAGCapability } from './Extensions/RunAnywhere+RAG.js';
+import {
+  RAG as RAGCapability,
+  ragDestroyPipeline,
+  resetRAGFacadeState,
+} from './Extensions/RunAnywhere+RAG.js';
 import { VoiceAgent as VoiceAgentCapability } from './Extensions/RunAnywhere+VoiceAgent.js';
 import { Downloads as DownloadsCapability } from './Extensions/RunAnywhere+Downloads.js';
 import { SDKEvents as SDKEventsCapability } from './Extensions/RunAnywhere+SDKEvents.js';
@@ -1863,6 +1867,18 @@ export const RunAnywhere = {
 
   async shutdown(): Promise<void> {
     logger.info('Shutting down RunAnywhere Web SDK...');
+
+    // RAG owns provider state outside the WASM adapter registry (including
+    // the cross-WASM in-memory vector index). Destroy it while backend modules
+    // are still available when possible, then synchronously invalidate the
+    // facade even if a caller already unregistered a backend or destroy fails.
+    try {
+      await ragDestroyPipeline();
+    } catch (err) {
+      logger.warning(`RAG teardown failed during SDK shutdown: ${String(err)}`);
+    } finally {
+      resetRAGFacadeState();
+    }
 
     // Release the core WASM singleton itself, not only the adapter registry.
     // `initialize()` obtains this singleton again on the next SDK lifetime;

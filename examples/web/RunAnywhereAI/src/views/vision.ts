@@ -51,6 +51,8 @@ let status = '';
 let isBusy = false;
 let cancelAnalyze: (() => void) | null = null;
 let unsubscribeState: (() => void) | null = null;
+let cameraStartGeneration = 0;
+let cameraStartPending = false;
 
 export function initVisionTab(el: HTMLElement): TabLifecycle {
   container = el;
@@ -189,7 +191,7 @@ function reattachCameraPreview(): void {
   const host = container.querySelector<HTMLElement>('#vision-preview');
   if (!host) return;
   host.innerHTML = '';
-  if (camera) {
+  if (camera?.isCapturing) {
     host.appendChild(camera.videoElement);
     return;
   }
@@ -222,30 +224,47 @@ async function toggleCamera(): Promise<void> {
 }
 
 async function startCamera(): Promise<void> {
-  camera = camera ?? new VideoCapture({
+  const generation = ++cameraStartGeneration;
+  const candidate = new VideoCapture({
     facingMode: 'environment',
     idealWidth: 640,
     idealHeight: 480,
   });
+  cameraStartPending = true;
   isBusy = true;
   setStatus('Requesting camera access…');
   renderView();
   try {
-    await camera.start();
+    await candidate.start();
+    if (generation !== cameraStartGeneration) {
+      candidate.stop();
+      return;
+    }
+    camera = candidate;
     setStatus('Camera ready.');
   } catch (err) {
+    candidate.stop();
+    if (generation !== cameraStartGeneration) return;
     setStatus(`Camera error: ${formatError(err)}`);
     camera = null;
   } finally {
-    isBusy = false;
-    renderView();
+    if (generation === cameraStartGeneration) {
+      cameraStartPending = false;
+      isBusy = false;
+      renderView();
+    }
   }
 }
 
 function stopCamera(): void {
+  cameraStartGeneration += 1;
   camera?.stop();
   camera = null;
   latestFrame = null;
+  if (cameraStartPending) {
+    cameraStartPending = false;
+    isBusy = false;
+  }
 }
 
 function captureFrame(): void {

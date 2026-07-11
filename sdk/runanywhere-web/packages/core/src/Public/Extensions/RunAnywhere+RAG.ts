@@ -86,6 +86,17 @@ export interface RAGAvailability {
   missingExports: string[];
 }
 
+/**
+ * Identity of the facade-owned active RAG pipeline. The generation changes on
+ * every successful create, destroy, or provider replacement—even when the
+ * model ids are unchanged—so mounted Web views can detect global provider
+ * replacement without inspecting backend-private state.
+ */
+export interface RAGPipelineState {
+  generation: number;
+  configuration: RAGConfiguration | null;
+}
+
 export interface RAGNativeProviderOptions {
   adapter?: RAGProtoAdapter;
   session?: number;
@@ -93,9 +104,31 @@ export interface RAGNativeProviderOptions {
 }
 
 let _provider: RAGProvider | null = null;
+let _pipelineGeneration = 0;
+let _pipelineConfiguration: RAGConfiguration | null = null;
+
+function advancePipelineState(configuration: RAGConfiguration | null): void {
+  _pipelineGeneration += 1;
+  _pipelineConfiguration = configuration ? { ...configuration } : null;
+}
+
+export function getRAGPipelineState(): RAGPipelineState {
+  return {
+    generation: _pipelineGeneration,
+    configuration: _pipelineConfiguration ? { ..._pipelineConfiguration } : null,
+  };
+}
 
 export function setRAGProvider(provider: RAGProvider | null): void {
   _provider = provider;
+  advancePipelineState(null);
+}
+
+/** Core-lifecycle cleanup for shutdown paths where a provider destroy fails. */
+export function resetRAGFacadeState(): void {
+  const hadState = _provider !== null || _pipelineConfiguration !== null;
+  _provider = null;
+  if (hadState) advancePipelineState(null);
 }
 
 export function createRAGNativeProvider(
@@ -124,6 +157,7 @@ export function setRAGSessionHandle(
 ): void {
   assertNativeHandle(session, 'RAG.setSessionHandle');
   _provider = createRAGNativeProvider({ adapter, session });
+  advancePipelineState(null);
 }
 
 function activeProvider(): RAGProvider | null {
@@ -588,6 +622,25 @@ class CrossWasmRAGProvider implements RAGProvider {
       context,
       query,
     );
+
+    // Acceleration changes replace the entire llama.cpp Emscripten module.
+    // The TypeScript-owned vector index remains valid, but its configured LLM
+    // no longer exists in the new module's lifecycle heap. Re-establish that
+    // dependency immediately before generation without recreating (and
+    // clearing) the RAG pipeline.
+    const currentLlm = WebModelLifecycle.currentModel({
+      category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      includeModelMetadata: false,
+    });
+    if (!currentLlm?.found || currentLlm.modelId !== this.config.llmModelId) {
+      await loadRagArtifactModel(
+        this.config.llmModelId,
+        ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        'LLM',
+      );
+      this.assertCurrent(version, 'RAG.query');
+    }
+
     const generationStarted = nowMs();
     const generated = await TextGeneration.generate({
       prompt,
@@ -698,7 +751,7 @@ class CrossWasmRAGProvider implements RAGProvider {
 
 function supportsCrossWasmRAG(): boolean {
   const embeddings = EmbeddingsProtoAdapter.tryDefault();
-  return Boolean(embeddings?.supportsProtoEmbeddings())
+  return Boolean(embeddings?.supportsLifecycleProtoEmbeddings())
     && TextGeneration.supportsProtoLLM();
 }
 
@@ -1047,6 +1100,7 @@ export async function ragCreatePipeline(
   if (provider) {
     try {
       await provider.ragCreatePipeline(config);
+      advancePipelineState(config);
       logger.info('RAG pipeline created');
       return;
     } catch (error) {
@@ -1064,6 +1118,7 @@ export async function ragCreatePipeline(
   const nativeProvider = new NativeRAGSessionProvider(adapter, { config });
   await nativeProvider.ragCreatePipeline(config);
   _provider = nativeProvider;
+  advancePipelineState(config);
   logger.info('RAG pipeline created');
 }
 
@@ -1075,6 +1130,7 @@ export async function ragDestroyPipeline(): Promise<void> {
   if (!provider) return;
   await provider.ragDestroyPipeline();
   _provider = null;
+  advancePipelineState(null);
   logger.info('RAG pipeline destroyed');
 }
 
@@ -1306,6 +1362,7 @@ export async function ragEnsureReady(
 /** Internal constructor used by focused split-WASM provider contract tests. */
 export const __testing__ = {
   createCrossWasmRAGProvider: (): RAGProvider => new CrossWasmRAGProvider(),
+  resetFacadeState: resetRAGFacadeState,
 };
 
 /**
@@ -1331,6 +1388,8 @@ export const RAG = {
   setSessionHandle: setRAGSessionHandle,
   /** @webOnly Inspect provider/availability without throwing. */
   availability: getRAGAvailability,
+  /** @webOnly Identify the exact active pipeline across global provider replacement. */
+  pipelineState: getRAGPipelineState,
   /** @webOnly Convenience boolean for availability checks. */
   isAvailable: isRAGAvailable,
   /** @webOnly Inspect the active provider's declared capabilities (listing/removal/persistence). */

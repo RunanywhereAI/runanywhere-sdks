@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   synthesize: vi.fn(),
   generate: vi.fn(),
   cancelGeneration: vi.fn(),
+  detectVoiceAuto: vi.fn(),
+  vadLifecycleAvailable: false,
 }));
 
 vi.mock('../../../../src/Public/Extensions/RunAnywhere+STT', () => ({
@@ -28,15 +30,16 @@ vi.mock('../../../../src/Public/Extensions/RunAnywhere+TextGeneration', () => ({
 
 vi.mock('../../../../src/Public/Extensions/RunAnywhere+VAD', () => ({
   VAD: {
-    supportsLifecycleProtoVAD: () => false,
-    detectVoiceAuto: vi.fn(),
+    supportsLifecycleProtoVAD: () => mocks.vadLifecycleAvailable,
+    detectVoiceAuto: mocks.detectVoiceAuto,
   },
 }));
 
 vi.mock('../../../../src/Public/Extensions/RunAnywhere+ModelLifecycle', () => ({
   WebModelLifecycle: {
     currentModel: ({ category }: { category: ModelCategory }) => ({
-      found: category !== ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+      found: category !== ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
+        || mocks.vadLifecycleAvailable,
       modelId: `model-${category}`,
       resolvedPath: `/models/${category}`,
     }),
@@ -75,6 +78,39 @@ describe('CrossWasmVoiceAgentProvider', () => {
       .mockResolvedValueOnce({ text: 'First answer.', finishReason: 'stop' })
       .mockResolvedValueOnce({ text: 'Second answer.', finishReason: 'stop' });
     mocks.cancelGeneration.mockReset();
+    mocks.vadLifecycleAvailable = false;
+    mocks.detectVoiceAuto.mockReset().mockResolvedValue({
+      isSpeech: true,
+      confidence: 0.99,
+      durationMs: 1_000,
+      energy: 0.2,
+    });
+  });
+
+  it('keeps energy and model-backed VAD thresholds in their native units', async () => {
+    mocks.vadLifecycleAvailable = true;
+    const provider = __testing__.createCrossWasmVoiceAgentProvider();
+    await provider.initializeVoiceAgent({
+      vadSampleRate: 16_000,
+      vadFrameLength: 0.1,
+      vadEnergyThreshold: 0.005,
+      wakewordEnabled: false,
+      wakewordThreshold: 0.5,
+      sessionId: 'model-vad',
+    });
+
+    await provider.processVoiceTurn(new Float32Array(16_000).fill(0.2));
+
+    expect(mocks.detectVoiceAuto).toHaveBeenCalledOnce();
+    expect(mocks.detectVoiceAuto.mock.calls[0]?.[1]).toMatchObject({
+      modelId: `model-${ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION}`,
+      config: {
+        sampleRate: 16_000,
+        frameLengthMs: 100,
+        threshold: 0.5,
+      },
+    });
+    expect(mocks.detectVoiceAuto.mock.calls[0]?.[1]).not.toHaveProperty('threshold');
   });
 
   it('applies the spoken system prompt and bounded conversational history', async () => {

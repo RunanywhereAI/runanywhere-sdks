@@ -220,6 +220,11 @@ export interface EmscriptenRunanywhereModule {
     requestSize: number,
     outResult: number,
   ): number;
+  _rac_embeddings_embed_batch_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
 
   _rac_diffusion_generate_proto?(
     handle: number,
@@ -374,8 +379,9 @@ export interface EmscriptenRunanywhereModule {
   /**
    * `_rac_tool_calling_session_step_with_result_proto(requestBytes, requestSize)`:
    *   Accepts a serialized `runanywhere.v1.ToolCallingSessionStepWithResultRequest`
-   *   and synchronously resumes the run loop. Any new events (further tool_call,
-   *   final_result, or error) fire via the callback installed at session create.
+   *   and resumes the run loop. WebGPU hosts must await it through Asyncify-aware
+   *   `ccall`; any new events (further tool_call, final_result, or error) fire via
+   *   the callback installed at session create before that call resolves.
    */
   _rac_tool_calling_session_step_with_result_proto?(
     requestBytes: number,
@@ -398,10 +404,10 @@ export interface EmscriptenRunanywhereModule {
    *   LifecycleLlmRef to interrupt the underlying backend `ops->generate`.
    *   Distinct from `_rac_tool_calling_session_destroy_proto` — the host
    *   should still call destroy once the in-flight call has resolved. Safe
-   *   to call from any context. Browser JS cannot invoke the export while a
-   *   synchronous main-runtime call is blocking, so an AbortSignal callback
-   *   actually fires after the current async tick returns control; native
-   *   inference workers may still run on the pthread pool.
+   *   to call from any context. Asyncify-backed calls yield to the browser
+   *   event loop, so an AbortSignal callback can latch cancellation after the
+   *   session handle is published; native inference workers may still run on
+   *   their own execution backend.
    */
   _rac_tool_calling_session_cancel_proto?(
     sessionHandle: bigint,
@@ -793,10 +799,9 @@ export interface EmscriptenRunanywhereModule {
 //
 // Capability ownership (typical layout):
 //   - racommons.wasm           → 'commons'
-//   - racommons-llamacpp.wasm  → 'llm', 'vlm', 'embedding', 'rag',
-//                                 'diffusion', 'structured-output',
+//   - racommons-llamacpp.wasm  → 'llm', 'vlm', 'structured-output',
 //                                 'tool-calling', 'lora'
-//   - racommons-onnx-sherpa.wasm → 'stt', 'tts', 'vad'
+//   - racommons-onnx-sherpa.wasm → 'stt', 'tts', 'vad', 'embedding', 'rag'
 //
 // The same module may register multiple capabilities; duplicate registration
 // of a capability replaces the previous owner (last-writer-wins per

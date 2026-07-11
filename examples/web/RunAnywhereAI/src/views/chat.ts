@@ -32,6 +32,7 @@ import {
   buildGetStartedOverlay,
   onModelStateChange,
   openSheet,
+  refreshModelSelectionState,
   type OpenSheetOptions,
 } from '../components/model-selection';
 import { showToast } from '../components/dialogs';
@@ -142,6 +143,12 @@ const VLM_SHEET_OPTIONS: OpenSheetOptions = {
   ],
 };
 
+const CHAT_CAPABLE_MODEL_CATEGORIES: readonly ModelCategory[] = [
+  ModelCategory.MODEL_CATEGORY_LANGUAGE,
+  ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+  ModelCategory.MODEL_CATEGORY_VISION,
+];
+
 // Minimal localStorage-backed conversation persistence — mirrors iOS
 // ConversationStore (Core/Services/ConversationStore.swift) semantics at MVP
 // scope: one current conversation, saved on update, restored on mount.
@@ -213,7 +220,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   // readiness probe's overlay visibility check works. The overlay is shown
   // whenever no model is loaded and hidden once a model enters the loaded
   // state.
-  container.appendChild(buildGetStartedOverlay(CHAT_SHEET_OPTIONS));
+  container.appendChild(buildGetStartedOverlay(
+    CHAT_SHEET_OPTIONS,
+    CHAT_CAPABLE_MODEL_CATEGORIES,
+  ));
 
   const messagesEl = container.querySelector('#chat-messages') as HTMLElement;
   const inputEl = container.querySelector('#chat-input') as HTMLTextAreaElement;
@@ -538,6 +548,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   if (rootParent) disposeObserver.observe(rootParent, { childList: true });
 
   return {
+    onActivate: () => {
+      refreshModelSelectionState();
+      refreshSendButton();
+    },
     onDeactivate: () => {
       if (cancelGeneration) cancelGeneration();
     },
@@ -1207,11 +1221,12 @@ function renderLastMessage(host: HTMLElement, msg: ChatMessage): void {
 function renderMessageBody(msg: ChatMessage, streaming = false): string {
   // Collapsible thinking section — iOS parity:
   // ChatMessageComponents.swift:128-181 (thinkingSection).
-  const thinkingSection = msg.role === 'assistant' && msg.thinking
+  const thinking = msg.thinking?.trim();
+  const thinkingSection = msg.role === 'assistant' && thinking
     ? `
       <details class="chat-thinking">
         <summary>Thinking</summary>
-        <pre class="chat-thinking-content">${escapeHtml(msg.thinking)}</pre>
+        <pre class="chat-thinking-content">${escapeHtml(thinking)}</pre>
       </details>
     `
     : '';
@@ -1265,7 +1280,7 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
     : '';
   const body = msg.content
     ? renderMarkdownLite(msg.content) + cursor
-    : (msg.thinking
+    : (thinking
       ? `<span class="chat-bubble-typing">Thinking&hellip;</span>${cursor}`
       : cursor || '<span class="chat-bubble-typing">&hellip;</span>');
 

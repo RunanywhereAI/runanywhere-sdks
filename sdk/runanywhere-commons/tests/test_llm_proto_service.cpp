@@ -91,7 +91,9 @@ rac_result_t mock_generate(void* impl, const char* prompt, const rac_llm_options
                            rac_llm_result_t* out_result) {
     if (!impl || !prompt || !out_result)
         return RAC_ERROR_NULL_POINTER;
-    const char* text = "<think>plan</think>final {\"ok\":true}";
+    const char* text = std::strstr(prompt, "empty response") != nullptr
+                           ? " \n\t "
+                           : "<think>plan</think>final {\"ok\":true}";
     out_result->text = dup_cstr(text);
     if (!out_result->text)
         return RAC_ERROR_OUT_OF_MEMORY;
@@ -350,6 +352,23 @@ int test_mocked_generation(rac_model_registry_handle_t registry) {
     return 0;
 }
 
+int test_empty_generation_skips_structured_validation(rac_model_registry_handle_t registry) {
+    CHECK(load_mock_model(registry), "mock lifecycle LLM loads for empty response");
+    std::vector<uint8_t> bytes = generate_request_bytes("empty response");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = rac_llm_generate_proto(bytes.data(), bytes.size(), &out);
+    runanywhere::v1::LLMGenerationResult result;
+    CHECK(rc == RAC_SUCCESS, "empty generation returns success");
+    CHECK(parse_buffer(out, &result), "empty generation returns parsable result");
+    CHECK(!result.has_json_output(), "empty generation has no JSON output");
+    CHECK(!result.has_structured_output_validation(),
+          "empty generation skips structured-output validation");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
 int test_stream_terminal_once(rac_model_registry_handle_t registry) {
     CHECK(load_mock_model(registry), "mock lifecycle LLM loads for stream");
     std::vector<uint8_t> bytes = generate_request_bytes("stream please");
@@ -554,6 +573,7 @@ int main() {
         test_request_parse_error();
         test_missing_lifecycle_model();
         test_mocked_generation(registry);
+        test_empty_generation_skips_structured_validation(registry);
         test_stream_terminal_once(registry);
         test_stream_thinking_envelope(registry);
         test_structured_generate_proto(registry);

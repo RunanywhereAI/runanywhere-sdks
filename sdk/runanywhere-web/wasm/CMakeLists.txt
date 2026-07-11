@@ -912,6 +912,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_embeddings_embed"
     "_rac_embeddings_embed_batch"
     "_rac_embeddings_embed_batch_proto"
+    "_rac_embeddings_embed_batch_lifecycle_proto"
     "_rac_embeddings_get_info"
     "_rac_embeddings_cleanup"
     "_rac_embeddings_destroy"

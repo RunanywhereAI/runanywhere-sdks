@@ -15,6 +15,9 @@ import { TextGeneration } from '../../../../src/Public/Extensions/RunAnywhere+Te
 import {
   __testing__,
   createDefaultRAGConfiguration,
+  RAG,
+  ragCreatePipeline,
+  ragDestroyPipeline,
 } from '../../../../src/Public/Extensions/RunAnywhere+RAG';
 import { WebModelLifecycle } from '../../../../src/Public/Extensions/RunAnywhere+ModelLifecycle';
 import { ModelRegistry } from '../../../../src/Public/Extensions/RunAnywhere+ModelRegistry';
@@ -25,7 +28,7 @@ afterEach(() => {
 
 describe('CrossWasmRAGProvider', () => {
   it('routes embeddings and grounded generation across independent backends', async () => {
-    installBackendSpies();
+    const { loadModel } = installBackendSpies();
     const embedBatch = vi.spyOn(Embeddings, 'embedBatch').mockImplementation(
       async (request): Promise<EmbeddingsResult> => embeddingsResult(
         request.texts.map((text, index) => vector(
@@ -59,6 +62,11 @@ describe('CrossWasmRAGProvider', () => {
       JSON.stringify({ docId: 'maple', docName: 'Maple Notes' }),
     );
 
+    // Simulate an acceleration switch replacing the llama.cpp module after
+    // the index was built. Query must restore the configured LLM without
+    // recreating or clearing the TypeScript-owned document index.
+    loadModel.mockClear();
+
     const result = await provider.ragQuery('What is the Zephyr launch code?', {
       retrievalTopK: 1,
       maxTokens: 64,
@@ -76,6 +84,12 @@ describe('CrossWasmRAGProvider', () => {
     expect(generate).toHaveBeenCalledWith(expect.objectContaining({
       prompt: expect.stringContaining('ORBIT-7'),
       disableThinking: true,
+    }));
+    expect(loadModel).toHaveBeenCalledTimes(1);
+    expect(loadModel).toHaveBeenCalledWith(expect.objectContaining({
+      modelId: 'lfm2-350m-q4_k_m',
+      category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      forceReload: false,
     }));
     await expect(provider.ragListDocuments?.()).resolves.toEqual([
       { id: 'zephyr', name: 'Zephyr Notes', chunkCount: 1 },
@@ -118,15 +132,65 @@ describe('CrossWasmRAGProvider', () => {
     await provider.ragClearDocuments();
     await expect(provider.ragGetDocumentCount()).resolves.toBe(0);
   });
+
+  it('increments the facade pipeline identity when a provider is replaced', async () => {
+    installBackendSpies();
+    const configuration = createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+    });
+    const initialGeneration = RAG.pipelineState().generation;
+
+    try {
+      await ragCreatePipeline(configuration);
+      const first = RAG.pipelineState();
+      expect(first.generation).toBeGreaterThan(initialGeneration);
+      expect(first.configuration).toMatchObject({
+        embeddingModelId: 'all-minilm-l6-v2',
+        llmModelId: 'lfm2-350m-q4_k_m',
+      });
+
+      await ragCreatePipeline(configuration);
+      const replacement = RAG.pipelineState();
+      expect(replacement.generation).toBeGreaterThan(first.generation);
+      expect(replacement.configuration).toEqual(first.configuration);
+    } finally {
+      await ragDestroyPipeline();
+    }
+
+    expect(RAG.pipelineState()).toMatchObject({
+      generation: expect.any(Number),
+      configuration: null,
+    });
+  });
+
+  it('invalidates provider identity during unconditional SDK cleanup', async () => {
+    installBackendSpies();
+    await ragCreatePipeline(createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+    }));
+    const created = RAG.pipelineState();
+
+    __testing__.resetFacadeState();
+
+    expect(RAG.availability().available).toBe(false);
+    expect(RAG.pipelineState()).toEqual({
+      generation: created.generation + 1,
+      configuration: null,
+    });
+  });
 });
 
-function installBackendSpies(): void {
+function installBackendSpies() {
   vi.spyOn(EmbeddingsProtoAdapter, 'tryDefault').mockReturnValue({
     supportsProtoEmbeddings: () => true,
+    supportsLifecycleProtoEmbeddings: () => true,
   } as unknown as EmbeddingsProtoAdapter);
   vi.spyOn(TextGeneration, 'supportsProtoLLM').mockReturnValue(true);
   vi.spyOn(ModelRegistry, 'getModel').mockReturnValue(null);
-  vi.spyOn(WebModelLifecycle, 'loadModelAsync').mockImplementation(
+  vi.spyOn(WebModelLifecycle, 'currentModel').mockReturnValue(null);
+  const loadModel = vi.spyOn(WebModelLifecycle, 'loadModelAsync').mockImplementation(
     async (request): Promise<ModelLoadResult> => ({
       success: true,
       modelId: request.modelId,
@@ -140,6 +204,7 @@ function installBackendSpies(): void {
       resolvedArtifacts: [],
     }),
   );
+  return { loadModel };
 }
 
 function vector(values: number[], text: string, inputIndex: number): EmbeddingVector {

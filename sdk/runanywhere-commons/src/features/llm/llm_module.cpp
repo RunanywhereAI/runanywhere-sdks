@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -1611,6 +1612,13 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_res
 
 void set_structured_output_if_present(const char* response, LLMGenerationResult* out) {
     if (!response || !out) {
+        return;
+    }
+    const auto* cursor = reinterpret_cast<const unsigned char*>(response);
+    while (*cursor != '\0' && std::isspace(*cursor)) {
+        ++cursor;
+    }
+    if (*cursor == '\0') {
         return;
     }
     rac_structured_output_validation_t validation{};

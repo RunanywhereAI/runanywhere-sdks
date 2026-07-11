@@ -4,13 +4,13 @@
  * Loads `racommons-llamacpp.wasm` (CPU) or `racommons-llamacpp-webgpu.wasm` (WebGPU)
  * as a fully independent Emscripten module, registers the platform adapter,
  * runs `rac_init`, registers the unified llama.cpp backend (LLM + VLM in a
- * single call), then installs the loaded module on every core proto-byte
- * adapter through `setRunanywhereModule(...)`.
+ * single call), then installs the loaded module only in its capability-scoped
+ * core adapter slots through `registerWasmModule(...)`.
  *
  * This is intentionally MINIMAL — the heavy lifting (LLM/VLM/structured/tool
- * calling/embeddings/diffusion) flows through `@runanywhere/web` core's
- * proto-byte adapters (`LLMProtoAdapter`, `VLMProtoAdapter`, etc.) once the
- * module is installed on the singleton.
+ * calling/LoRA) flows through `@runanywhere/web` core's
+ * proto-byte adapters (`LLMProtoAdapter`, `VLMProtoAdapter`, etc.) once their
+ * capability slots are registered.
  */
 
 import {
@@ -319,12 +319,15 @@ export class LlamaCppBridge {
       // do NOT claim 'commons' here. That keeps `RunAnywhere.initialize()`
       // and sibling-backend lookups stable across LlamaCPP.register() +
       // ONNX.register() in either order.
+      //
+      // Do not claim embedding, RAG, or diffusion merely because their
+      // generic proto wrappers are linked into this artifact. The llama.cpp
+      // engine vtable has no embedding/diffusion provider; claiming those
+      // slots would redirect ONNX embeddings into this module after an
+      // acceleration reload, where the lifecycle model is not loaded.
       const capabilities: WasmCapability[] = [
         'llm',
         'vlm',
-        'embedding',
-        'rag',
-        'diffusion',
         'structured-output',
         'tool-calling',
         'lora',

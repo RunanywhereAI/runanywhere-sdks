@@ -72,6 +72,7 @@ import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule.js';
+import { callEmscriptenAsyncNumber } from '../../runtime/EmscriptenAsync.js';
 import { TextGeneration } from './RunAnywhere+TextGeneration.js';
 
 const logger = new SDKLogger('ToolCalling');
@@ -690,12 +691,11 @@ export const ToolCalling = {
     // pass3-syn-153: short-circuit when the AbortSignal is already aborted
     // BEFORE allocating the trampoline / handle slot or calling commons.
     // DOM AbortSignal does NOT re-fire the 'abort' event on a signal that is
-    // already aborted, and the synchronous main-runtime
-    // `_rac_tool_calling_session_create_proto` call runs an
+    // already aborted, and `_rac_tool_calling_session_create_proto` runs an
     // entire `run_generate_loop` (one full LLM generate, multi-second on
-    // realistic models) before returning. Catching the already-aborted case
-    // here mirrors Swift's eager `Task.checkCancellation()` pattern and
-    // saves the wasted generate cycle.
+    // realistic models) before its Asyncify-aware call resolves. Catching that
+    // state here mirrors Swift's eager `Task.checkCancellation()` pattern and
+    // avoids entering the Asyncify-backed generate cycle at all.
     if (extra.signal?.aborted) {
       throw SDKException.fromCode(
         -ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED,
@@ -724,9 +724,11 @@ export const ToolCalling = {
     const bridge = new ProtoWasmBridge(module, logger);
     const requestBytes = buildSessionCreateRequest(prompt, tools, effectiveOptions, extra);
 
-    // Event queue: the C session callback fires synchronously inside
-    // session_create_proto / session_step_with_result_proto. We buffer events
-    // and drain them on the JS side between commons calls.
+    // Event queue: the C session callback fires before each awaited
+    // session_create_proto / session_step_with_result_proto invocation
+    // resolves. WebGPU may unwind either export through Asyncify, so the
+    // callback and request heap storage must remain live until the matching
+    // ccall({ async: true }) promise settles.
     const events: ToolCallingSessionEvent[] = [];
     // pass3-syn-152: latch the first decode failure so the drain loop can
     // surface a structured error (instead of falling through to the
@@ -758,10 +760,10 @@ export const ToolCalling = {
 
     let sessionHandle = 0n;
     // pass2-syn-007: wire AbortSignal into _rac_tool_calling_session_cancel_proto.
-    // Browser JS cannot re-enter the main runtime while a synchronous export
-    // is blocking, so cancel fires after the current async tick returns to the
-    // event loop. It still lets us short-circuit multi-iteration loops between
-    // native calls; backend compute may use pthread workers internally.
+    // Asyncify yields to the browser event loop while an awaited native call
+    // is in flight. Once commons has published the session handle, abort can
+    // therefore latch cancellation during a later step continuation;
+    // backend compute may use its own workers internally.
     const onAbort = () => {
       if (
         sessionHandle !== 0n &&
@@ -793,8 +795,20 @@ export const ToolCalling = {
     };
 
     try {
-      const createRc = bridge.withHeapBytes(requestBytes, (ptr, size) => (
-        module._rac_tool_calling_session_create_proto!(ptr, size, callbackPtr, 0, handlePtr)
+      const createRc = await bridge.withHeapBytesAsync(requestBytes, (ptr, size) => (
+        callEmscriptenAsyncNumber(
+          module,
+          'rac_tool_calling_session_create_proto',
+          ['number', 'number', 'number', 'number', 'number'],
+          [ptr, size, callbackPtr, 0, handlePtr],
+          () => module._rac_tool_calling_session_create_proto!(
+            ptr,
+            size,
+            callbackPtr,
+            0,
+            handlePtr,
+          ),
+        )
       ));
       if (createRc !== 0) {
         throw SDKException.fromCode(
@@ -814,8 +828,8 @@ export const ToolCalling = {
       //  - final_result    -> done
       //  - error_bytes     -> error
       //  - tool_call       -> execute in TS, feed back via step_with_result_proto
-      // session_create / step_with_result are synchronous, so when they
-      // return the buffered events fully describe the next state.
+      // Once each awaited create/step call resolves, its buffered events fully
+      // describe the next session state.
       while (true) {
         const drained = events.splice(0, events.length);
         let pendingToolCall: ToolCall | null = null;
@@ -842,7 +856,7 @@ export const ToolCalling = {
           );
         }
         if (!pendingToolCall) {
-          // pass3-syn-152: if the synchronous callback observed at least one
+          // pass3-syn-152: if the session callback observed at least one
           // proto-decode failure since the last drain, surface that as the
           // root cause — the "stalled" symptom is downstream of the dropped
           // event. Without this, telemetry would chase the C++
@@ -857,7 +871,7 @@ export const ToolCalling = {
             );
           }
           // No tool call and no final/error event — commons should always emit
-          // one of these terminal events at end of the synchronous step.
+          // one of these terminal events when the awaited native step resolves.
           // Treat as an internal protocol violation.
           throw SDKException.fromCode(
             -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
@@ -875,8 +889,14 @@ export const ToolCalling = {
           toolResult.resultJson ?? '',
           toolResult.success ? undefined : toolResult.error,
         );
-        const stepRc = bridge.withHeapBytes(stepBytes, (ptr, size) => (
-          module._rac_tool_calling_session_step_with_result_proto!(ptr, size)
+        const stepRc = await bridge.withHeapBytesAsync(stepBytes, (ptr, size) => (
+          callEmscriptenAsyncNumber(
+            module,
+            'rac_tool_calling_session_step_with_result_proto',
+            ['number', 'number'],
+            [ptr, size],
+            () => module._rac_tool_calling_session_step_with_result_proto!(ptr, size),
+          )
         ));
         if (stepRc !== 0) {
           throw SDKException.fromCode(

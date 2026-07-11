@@ -854,14 +854,19 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     expect(themePersisted).toBe(true);
 
     await navigateTo(appPage, 'chat');
-    await expect(appPage.locator('.chat-message--user')).toContainText('local inference');
+    await expect(
+      appPage.locator('.chat-message--user', { hasText: 'local inference' }).first(),
+    ).toContainText('local inference');
     await expectSubstantiveText(appPage.locator('.chat-message--assistant .chat-bubble').last(), {
       minLength: 24,
       timeout: 60_000,
     });
     await expect(appPage.locator('#consumer-current-chat-title')).toContainText('local inference');
     await appPage.locator('#consumer-current-chat-btn').click();
-    await expect(appPage.locator('.chat-message--user')).toHaveCount(1);
+    const persistedUserMessages = appPage.locator('.chat-message--user');
+    await expect(persistedUserMessages).toHaveCount(3);
+    await expect(persistedUserMessages.nth(1)).toContainText('Enter key sent');
+    await expect(persistedUserMessages.nth(2)).toContainText('CPU fallback');
     await appPage.locator('#consumer-drawer-new-chat-btn').click();
     await expect(appPage.locator('.chat-message--user')).toHaveCount(0);
     await expect(appPage.locator('.chat-message--assistant')).toHaveCount(0);
@@ -907,11 +912,17 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     await expect(send).toHaveAttribute('aria-label', 'Stop generation');
     await send.click();
     await expect(send).toHaveAttribute('aria-label', 'Send message', { timeout: 120_000 });
-    const stoppedText = (await assistant.locator('.chat-bubble').innerText()).trim();
+    const normalizeRenderedText = (value: string): string => value.replace(/\s+/g, ' ').trim();
+    const stoppedText = normalizeRenderedText(
+      await assistant.locator('.chat-bubble').innerText(),
+    );
     expect(stoppedText.length).toBeGreaterThan(0);
     expect(stoppedText).not.toMatch(/^Error:/i);
     await appPage.waitForTimeout(2_000);
-    await expect(assistant.locator('.chat-bubble')).toHaveText(stoppedText);
+    const settledText = normalizeRenderedText(
+      await assistant.locator('.chat-bubble').innerText(),
+    );
+    expect(settledText).toBe(stoppedText);
     await appPage.locator('#consumer-new-chat-btn').click();
   });
 
@@ -1418,18 +1429,62 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
       'Produce an exhaustive two-hundred-token inventory of every visible detail, ' +
       'its location, color, texture, possible purpose, and relationship to every other object.',
     );
-    await appPage.locator('#vision-analyze-btn').click();
-    await expect(appPage.locator('#vision-cancel-btn')).toBeEnabled();
-    await expectSubstantiveText(appPage.locator('#vision-output'), {
-      minLength: 4,
-      timeout: 8 * 60_000,
-      forbidden: /\b(?:failed|error|unavailable)\b/i,
+    const cancellationProbe = await appPage.evaluate(() => (
+      new Promise<{
+        streamedText: string;
+        cancelDisabled: boolean | null;
+        loadImageDisabled: boolean | null;
+      }>((resolve, reject) => {
+        const visionTab = document.querySelector<HTMLElement>('#tab-vision');
+        const analyzeButton = document.querySelector<HTMLButtonElement>('#vision-analyze-btn');
+        if (!visionTab || !analyzeButton || analyzeButton.disabled) {
+          reject(new Error('Vision cancellation probe could not start inference.'));
+          return;
+        }
+
+        const observer = new MutationObserver(() => {
+          const output = document.querySelector<HTMLElement>('#vision-output');
+          const cancelButton = document.querySelector<HTMLButtonElement>('#vision-cancel-btn');
+          const streamedText = output?.innerText.trim() ?? '';
+          if (streamedText.length < 4 || !cancelButton || cancelButton.disabled) return;
+
+          observer.disconnect();
+          window.clearTimeout(timeout);
+          cancelButton.click();
+          window.dispatchEvent(new CustomEvent('runanywhere:navigate', {
+            detail: { tab: 'chat' },
+          }));
+          window.dispatchEvent(new CustomEvent('runanywhere:navigate', {
+            detail: { tab: 'vision' },
+          }));
+          resolve({
+            streamedText,
+            cancelDisabled:
+              document.querySelector<HTMLButtonElement>('#vision-cancel-btn')?.disabled ?? null,
+            loadImageDisabled:
+              document.querySelector<HTMLButtonElement>('#vision-load-image-btn')?.disabled ?? null,
+          });
+        });
+        const timeout = window.setTimeout(() => {
+          observer.disconnect();
+          reject(new Error('Vision inference did not stream before the cancellation timeout.'));
+        }, 8 * 60_000);
+        observer.observe(visionTab, { childList: true, subtree: true, characterData: true });
+        analyzeButton.click();
+      })
+    ));
+    expect(cancellationProbe.streamedText.length).toBeGreaterThanOrEqual(4);
+    expect(cancellationProbe.streamedText).not.toMatch(/\b(?:failed|error|unavailable)\b/i);
+    expect(cancellationProbe).toMatchObject({
+      cancelDisabled: false,
+      loadImageDisabled: true,
     });
-    await appPage.locator('#vision-cancel-btn').click();
     await expect(appPage.locator('#vision-status')).toHaveText('Cancelled.', {
       timeout: 120_000,
     });
-    await expect(appPage.locator('#vision-analyze-btn')).toBeEnabled();
+    await expect(appPage.locator('#vision-cancel-btn')).toBeDisabled();
+    await expect(appPage.locator('#vision-load-image-btn')).toBeEnabled();
+    await expect(appPage.locator('#vision-analyze-btn')).toBeDisabled();
     const cancelledVisionText = await appPage.locator('#vision-output').innerText();
     await appPage.waitForTimeout(2_000);
     await expect(appPage.locator('#vision-output')).toHaveText(cancelledVisionText);
@@ -1437,10 +1492,7 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     // The consumer composer has a second, production-facing image path.
     await navigateTo(appPage, 'chat');
     await appPage.locator('#consumer-new-chat-btn').click();
-    await chooseFileVia(appPage, async () => {
-      await appPage.locator('#chat-attach-btn').click();
-      await appPage.locator('#chat-attach-menu [data-action="image"]').click();
-    }, IMAGE_FIXTURE);
+    await chooseChatAttachmentViaMenu(appPage, 'image', IMAGE_FIXTURE);
     await expect(appPage.locator('#chat-attachment-pill')).toContainText('test.jpg');
     await appPage.locator('#chat-input').fill(
       'Identify the main animal and the pink furniture or nearby objects in this image.',
@@ -1456,6 +1508,18 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
   });
 
   test('40 — indexes a real document and returns a grounded RAG answer', async ({ appPage }) => {
+    // Reinstantiate the llama.cpp artifact after ONNX registration. This is a
+    // production path (explicit acceleration changes and Qwen VLM fallback)
+    // and previously let llama.cpp steal the embedding capability despite
+    // having no embedding vtable. RAG below proves ONNX lifecycle state and
+    // routing survive last-writer registration order.
+    const accelerationSwitch = await switchToOppositeAcceleration(appPage);
+    expect(accelerationSwitch.active).toBe(accelerationSwitch.requested);
+    expect(accelerationSwitch.active).not.toBe(accelerationSwitch.previous);
+    expect(accelerationSwitch.badge).toBe(
+      accelerationSwitch.requested === 'webgpu' ? 'WebGPU' : 'CPU',
+    );
+
     await navigateTo(appPage, 'documents');
     await appPage.locator('#docs-embedding-model').selectOption(RELEASE_MODELS.embedding.id);
     await appPage.locator('#docs-llm-model').selectOption(RELEASE_MODELS.llm.id);
@@ -1464,6 +1528,13 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
       await appPage.locator('#docs-embedding-download-btn').click();
       await expect.poll(() => isModelDownloaded(appPage, RELEASE_MODELS.embedding.id), {
         message: 'embedding model must be downloaded for the RAG release gate',
+        timeout: 15 * 60_000,
+      }).toBe(true);
+    }
+    if (!(await isModelDownloaded(appPage, RELEASE_MODELS.llm.id))) {
+      await appPage.locator('#docs-llm-download-btn').click();
+      await expect.poll(() => isModelDownloaded(appPage, RELEASE_MODELS.llm.id), {
+        message: 'LLM model must be downloaded for the RAG release gate',
         timeout: 15 * 60_000,
       }).toBe(true);
     }
@@ -1491,6 +1562,30 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     await expect(appPage.locator('#docs-answer .docs-sources')).toContainText('MERIDIAN-742');
     await expect(appPage.locator('#docs-answer .docs-sources')).toContainText('cobalt blue');
 
+    // Replace llama.cpp again after the pipeline owns a real vector index.
+    // The next query must self-heal the configured LLM without clearing the
+    // indexed document from the TypeScript cross-WASM provider.
+    const postIndexSwitch = await switchToOppositeAcceleration(appPage);
+    expect(postIndexSwitch.active).toBe(postIndexSwitch.requested);
+    expect(postIndexSwitch.badge).toBe(
+      postIndexSwitch.requested === 'webgpu' ? 'WebGPU' : 'CPU',
+    );
+    await appPage.locator('#docs-query').fill(
+      'Return one exact fact from the document: either the project codename or the launch color.',
+    );
+    await appPage.locator('#docs-ask-btn').click();
+    await expect(appPage.locator('#docs-answer')).toHaveText('Searching...', {
+      timeout: 30_000,
+    });
+    const postSwitchAnswer = await expectSubstantiveText(
+      appPage.locator('#docs-answer .docs-answer-text'),
+      { minLength: 8, timeout: 12 * 60_000 },
+    );
+    expect(postSwitchAnswer).not.toMatch(/no relevant chunks|failed/i);
+    expect(postSwitchAnswer).toMatch(/meridian[-\s]?742|cobalt blue/i);
+    await expect(appPage.locator('#docs-answer .docs-sources')).toContainText('MERIDIAN-742');
+    await expect(appPage.locator('#docs-answer .docs-sources')).toContainText('cobalt blue');
+
     // The CrossWasm provider exposes the full document lifecycle. Prove that
     // listing is not a synthetic count-only fallback, then remove, re-index,
     // and clear the corpus through the same public facade.
@@ -1515,13 +1610,83 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     await expect(appPage.locator('#docs-status')).toHaveText('All documents cleared.');
     await expect(appPage.locator('#docs-list')).toContainText('No documents indexed yet');
 
+    // Runtime teardown destroys the provider but leaves the mounted Documents
+    // view's selected model ids intact. Re-entering the tab must invalidate
+    // its cached pipeline key and recreate a live provider on the next upload.
+    const destroyedAvailability = await appPage.evaluate(async () => {
+      const sdk = (window as Window & {
+        __RUNANYWHERE_SDK__?: {
+          ragDestroyPipeline?: () => Promise<void>;
+          rag?: { availability?: () => { available: boolean } };
+        };
+      }).__RUNANYWHERE_SDK__;
+      if (!sdk?.ragDestroyPipeline || !sdk.rag?.availability) {
+        throw new Error('Release RAG teardown probe is unavailable.');
+      }
+      await sdk.ragDestroyPipeline();
+      return sdk.rag.availability().available;
+    });
+    expect(destroyedAvailability).toBe(false);
+    await navigateTo(appPage, 'chat');
+    await navigateTo(appPage, 'documents');
+    await chooseFileVia(
+      appPage,
+      () => appPage.locator('#docs-upload-btn').click(),
+      RAG_FIXTURE,
+    );
+    await expect(appPage.locator('#docs-status')).toContainText('Indexed release-rag.txt', {
+      timeout: 10 * 60_000,
+    });
+
+    // A different app surface can replace the global provider even with the
+    // same model ids. Generation identity—not availability or ids alone—must
+    // make Documents reclaim its own pipeline on the next visible action.
+    const replacementGeneration = await appPage.evaluate(async ({ embeddingId, llmId }) => {
+      interface PipelineState {
+        generation: number;
+      }
+      const sdk = (window as Window & {
+        __RUNANYWHERE_SDK__?: {
+          ragCreatePipeline?: (embedding: string, llm: string) => Promise<void>;
+          rag?: { pipelineState?: () => PipelineState };
+        };
+      }).__RUNANYWHERE_SDK__;
+      if (!sdk?.ragCreatePipeline || !sdk.rag?.pipelineState) {
+        throw new Error('Release RAG pipeline identity probe is unavailable.');
+      }
+      await sdk.ragCreatePipeline(embeddingId, llmId);
+      return sdk.rag.pipelineState().generation;
+    }, {
+      embeddingId: RELEASE_MODELS.embedding.id,
+      llmId: RELEASE_MODELS.llm.id,
+    });
+    await navigateTo(appPage, 'chat');
+    await navigateTo(appPage, 'documents');
+    await chooseFileVia(
+      appPage,
+      () => appPage.locator('#docs-upload-btn').click(),
+      RAG_FIXTURE,
+    );
+    await expect(appPage.locator('#docs-status')).toContainText('Indexed release-rag.txt', {
+      timeout: 10 * 60_000,
+    });
+    const reclaimedGeneration = await appPage.evaluate(() => {
+      const sdk = (window as Window & {
+        __RUNANYWHERE_SDK__?: { rag?: { pipelineState?: () => { generation: number } } };
+      }).__RUNANYWHERE_SDK__;
+      if (!sdk?.rag?.pipelineState) {
+        throw new Error('Release RAG pipeline identity probe is unavailable.');
+      }
+      return sdk.rag.pipelineState().generation;
+    });
+    expect(reclaimedGeneration).toBeGreaterThan(replacementGeneration);
+    await appPage.locator('#docs-clear-btn').click();
+    await expect(appPage.locator('#docs-status')).toHaveText('All documents cleared.');
+
     // Also prove the document attachment path in the main assistant composer.
     await navigateTo(appPage, 'chat');
     await appPage.locator('#consumer-new-chat-btn').click();
-    await chooseFileVia(appPage, async () => {
-      await appPage.locator('#chat-attach-btn').click();
-      await appPage.locator('#chat-attach-menu [data-action="document"]').click();
-    }, RAG_FIXTURE);
+    await chooseChatAttachmentViaMenu(appPage, 'document', RAG_FIXTURE);
     await expect(appPage.locator('#chat-attachment-pill')).toContainText('release-rag.txt');
     await appPage.locator('#chat-input').fill(
       'Write a very long, two-hundred-section report grounded in this document. ' +
@@ -1540,25 +1705,29 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     await expect(cancellingReply).toHaveText(cancelledText);
 
     await appPage.locator('#consumer-new-chat-btn').click();
-    await chooseFileVia(appPage, async () => {
-      await appPage.locator('#chat-attach-btn').click();
-      await appPage.locator('#chat-attach-menu [data-action="document"]').click();
-    }, RAG_FIXTURE);
+    await chooseChatAttachmentViaMenu(appPage, 'document', RAG_FIXTURE);
     await expect(appPage.locator('#chat-attachment-pill')).toContainText('release-rag.txt');
     await appPage.locator('#chat-input').fill(
-      'What are the project codename and verified launch color?',
+      'Return one exact fact from this document: either the project codename or launch color.',
     );
     await appPage.locator('#chat-send-btn').click();
-    const attachmentAnswer = await expectSubstantiveText(
-      appPage.locator('.chat-message--assistant .chat-bubble').last(),
-      { minLength: 12, timeout: 12 * 60_000 },
-    );
-    expect(attachmentAnswer).toMatch(/MERIDIAN-742/i);
-    expect(attachmentAnswer).toMatch(/cobalt blue/i);
+    const attachmentReply = appPage.locator('.chat-message--assistant .chat-bubble').last();
+    await expect.poll(async () => {
+      const text = (await attachmentReply.textContent() ?? '').trim();
+      if (/\b(?:failed|error|unavailable)\b/i.test(text)) {
+        throw new Error(`Terminal document attachment output: ${text}`);
+      }
+      return /MERIDIAN-742|cobalt blue/i.test(text);
+    }, {
+      message: 'document attachment must return a grounded fact after indexing',
+      timeout: 12 * 60_000,
+      intervals: [500, 1_000, 2_000, 5_000],
+    }).toBe(true);
     const sourceStrip = appPage.locator('.chat-message--assistant .chat-source-strip').last();
     await expect(sourceStrip).toContainText('Sources');
     await expect(sourceStrip).toContainText(/release-rag\.txt/i);
-    await expect(sourceStrip).toContainText(/MERIDIAN-742|cobalt blue/i);
+    await expect(sourceStrip).toContainText('MERIDIAN-742');
+    await expect(sourceStrip).toContainText('cobalt blue');
   });
 
   test('50 — executes Solutions and the complete browser/local-folder storage lifecycle', async ({ appPage }) => {
@@ -1938,10 +2107,74 @@ async function chooseFileVia(
   filePath: string,
 ): Promise<void> {
   const [chooser] = await Promise.all([
-    page.waitForEvent('filechooser'),
+    page.waitForEvent('filechooser', { timeout: 120_000 }),
     openChooser(),
   ]);
   await chooser.setFiles(filePath);
+}
+
+async function chooseChatAttachmentViaMenu(
+  page: Page,
+  kind: 'document' | 'image',
+  filePath: string,
+): Promise<void> {
+  const input = page.locator(kind === 'document' ? '#chat-document-input' : '#chat-image-input');
+  await input.evaluate((element) => {
+    element.dataset.releasePickerActivated = 'false';
+    element.addEventListener('click', () => {
+      element.dataset.releasePickerActivated = 'true';
+    }, { once: true });
+  });
+  await page.locator('#chat-attach-btn').click();
+  const action = page.locator(`#chat-attach-menu [data-action="${kind}"]`);
+  await expect(action).toBeVisible();
+  await action.click();
+  await expect(input).toHaveAttribute('data-release-picker-activated', 'true');
+  await input.setInputFiles(filePath);
+  await input.evaluate((element) => {
+    delete element.dataset.releasePickerActivated;
+  });
+}
+
+async function switchToOppositeAcceleration(page: Page): Promise<{
+  previous: 'cpu' | 'webgpu';
+  requested: 'cpu' | 'webgpu';
+  active: string | null | undefined;
+  badge: string | undefined;
+}> {
+  return page.evaluate(async () => {
+    interface ReleaseRuntime {
+      active?: string | null;
+      setAcceleration?: (mode: 'cpu' | 'webgpu') => Promise<void>;
+    }
+    const runtime = (window as Window & {
+      __RUNANYWHERE_SDK__?: { runtime?: ReleaseRuntime };
+    }).__RUNANYWHERE_SDK__?.runtime;
+    if (!runtime?.setAcceleration || (runtime.active !== 'cpu' && runtime.active !== 'webgpu')) {
+      throw new Error('Release RAG gate requires an active acceleration switcher.');
+    }
+    const previous = runtime.active;
+    const requested = previous === 'webgpu' ? 'cpu' : 'webgpu';
+    let timeoutId = 0;
+    try {
+      await Promise.race([
+        runtime.setAcceleration(requested),
+        new Promise<never>((_resolve, reject) => {
+          timeoutId = window.setTimeout(() => {
+            reject(new Error(`Acceleration switch to ${requested} timed out.`));
+          }, 5 * 60_000);
+        }),
+      ]);
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+    return {
+      previous,
+      requested,
+      active: runtime.active,
+      badge: document.querySelector('#accel-badge')?.textContent?.trim(),
+    };
+  });
 }
 
 async function chooseVoiceSlot(

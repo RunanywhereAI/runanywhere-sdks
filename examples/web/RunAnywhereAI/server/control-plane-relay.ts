@@ -210,7 +210,7 @@ function requestIsSameOrigin(request: Request, url: URL): boolean {
 
   // The relay is browser-only. Requiring at least one browser context header
   // blocks bare server-to-server clients by default; Vercel WAF supplies the
-  // globally coordinated abuse limit for headers that a custom client spoofs.
+  // globally deployed abuse boundary for headers that a custom client spoofs.
   return origin !== null || fetchSite !== null;
 }
 

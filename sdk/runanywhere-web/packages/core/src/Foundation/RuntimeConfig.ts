@@ -52,7 +52,8 @@ export type StreamingMode = 'auto' | 'worker' | 'main';
 
 /**
  * Function installed by a backend (typically the llamacpp bridge) to perform
- * the acceleration switch. Should be idempotent.
+ * the acceleration switch. Should be idempotent and must report the mode it
+ * actually loaded through `setActiveAccelerationMode(...)` before resolving.
  */
 export type RuntimeAccelerationSwitcher = (mode: 'cpu' | 'webgpu') => Promise<void>;
 export interface RuntimeModelLoadRequest {
@@ -118,7 +119,10 @@ export const Runtime = {
       return;
     }
     await _switcher(mode);
-    _activeMode = mode;
+    // The requested mode is only a preference. A backend may resolve WebGPU
+    // to CPU after capability detection or fallback, and the switcher reports
+    // that actual result via setActiveAccelerationMode(). Never overwrite it
+    // with the request after the switch completes.
   },
 
   /**

@@ -103,7 +103,7 @@ export interface OpenSheetOptions {
 
 let activeSheetOptions: OpenSheetOptions = {};
 let toolbarSheetOptions: OpenSheetOptions = {};
-let overlaySheetOptions: OpenSheetOptions = {};
+let overlayLoadedCategories: readonly ModelCategory[] | undefined;
 
 // Hardware detection is async and stable for a session, so we probe once and
 // cache. The recommendation set is derived purely from the tier + catalog.
@@ -207,10 +207,16 @@ export function buildToolbarModelButton(sheetOptions: OpenSheetOptions = {}): HT
  * Mount the `#chat-model-overlay` "Get Started" overlay into the panel host.
  * The overlay is hidden automatically as soon as a model is loaded.
  * `sheetOptions` scope the picker opened from the overlay (see
- * `buildToolbarModelButton`).
+ * `buildToolbarModelButton`). `loadedCategories` may broaden which loaded
+ * model types make the underlying experience usable without broadening that
+ * picker (for example, Chat accepts VLM-only image conversations while its
+ * primary model picker remains language-model scoped).
  */
-export function buildGetStartedOverlay(sheetOptions: OpenSheetOptions = {}): HTMLElement {
-  overlaySheetOptions = sheetOptions;
+export function buildGetStartedOverlay(
+  sheetOptions: OpenSheetOptions = {},
+  loadedCategories: readonly ModelCategory[] | undefined = sheetOptions.filterCategories,
+): HTMLElement {
+  overlayLoadedCategories = loadedCategories;
   const overlay = document.createElement('div');
   overlay.id = 'chat-model-overlay';
   overlay.className = 'chat-model-overlay';
@@ -259,6 +265,23 @@ export function onModelStateChange(listener: () => void): () => void {
     const idx = listeners.indexOf(listener);
     if (idx >= 0) listeners.splice(idx, 1);
   };
+}
+
+/** Reconcile picker/toolbar/overlay state after another app surface performs
+ * lifecycle work directly through RunAnywhere (for example Documents RAG).
+ * Those loads bypass this component's row-state setters, so tab activation
+ * must query the canonical native lifecycle instead of showing stale UI. */
+export function refreshModelSelectionState(): void {
+  if (catalogRegistered) hydrateRowStatesFromRegistry();
+  refreshToolbarLabel();
+  refreshOverlayVisibility();
+  for (const listener of listeners) {
+    try {
+      listener();
+    } catch (err) {
+      appLogger.warning('[model-selection] refresh listener threw', err);
+    }
+  }
 }
 
 /**
@@ -341,10 +364,10 @@ function renderSheet(): void {
   modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
   modalEl.innerHTML = `
-    <div class="modal-sheet" role="dialog" aria-modal="true">
+    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="model-sheet-title">
       <div class="modal-handle"></div>
       <div class="modal-header">
-        <h3 class="text-md font-semibold">${title}</h3>
+        <h3 class="text-md font-semibold" id="model-sheet-title">${title}</h3>
         <button type="button" class="btn-ghost" id="model-sheet-close" aria-label="Close">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -1067,7 +1090,7 @@ function refreshToolbarLabel(): void {
 
 function refreshOverlayVisibility(): void {
   if (!getStartedOverlay) return;
-  const shouldShow = !findLoadedModelForScope(overlaySheetOptions.filterCategories);
+  const shouldShow = !findLoadedModelForScope(overlayLoadedCategories);
   getStartedOverlay.classList.toggle('hidden', !shouldShow);
   if (getStartedBtn) {
     getStartedBtn.disabled = !catalogRegistered;

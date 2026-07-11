@@ -4,14 +4,13 @@
  * V2 canonical: this package is a SHELL. It only loads the WASM module,
  * registers the platform adapter, calls `rac_init`, registers the unified
  * llama.cpp backend (LLM + VLM in a single call), then installs the module
- * on every core proto-byte adapter via `setRunanywhereModule(...)`.
+ * only in its capability-scoped adapter slots via `registerWasmModule(...)`.
  *
  * After `LlamaCPP.register()` resolves, `RunAnywhere.textGeneration.*`,
- * tool calling, structured output,
- * embeddings, and diffusion all flow through `@runanywhere/web` core's
- * proto-byte adapters (`LLMProtoAdapter`, `EmbeddingsProtoAdapter`,
- * `DiffusionProtoAdapter`, `StructuredOutputProtoAdapter`,
- * `VLMProtoAdapter`, etc.) without any further per-package wiring.
+ * tool calling, structured output, LoRA, and VLM all flow through
+ * `@runanywhere/web` core's proto-byte adapters (`LLMProtoAdapter`,
+ * `StructuredOutputProtoAdapter`, `VLMProtoAdapter`, etc.) without any
+ * further per-package wiring. ONNX owns Web embeddings and cross-WASM RAG.
  *
  * Usage:
  *
@@ -163,10 +162,8 @@ export const LlamaCPP = {
    * 4. Calls `rac_init()` (async, may suspend through ASYNCIFY).
    * 5. Calls `rac_backend_llamacpp_register()` — the unified entry point
    *    that wires both LLM and VLM modalities in a single call.
-   * 6. Installs the module on `setRunanywhereModule()` so every core
-   *    proto-byte adapter (LLM/VLM/embeddings/diffusion/structured/tool/
-   *    model-registry/lifecycle/download/hardware/storage/SDKEvent/HTTP)
-   *    can find it.
+   * 6. Registers the module for its actual LLM/VLM/structured/tool/LoRA
+   *    capabilities while leaving ONNX embeddings and cross-WASM RAG intact.
    * 7. Wires `RunAnywhere.runtime.setAcceleration(mode)` to the bridge's
    *    acceleration switcher.
    *
