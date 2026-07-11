@@ -9,9 +9,6 @@ import unittest
 
 SCRIPT = Path(__file__).with_name("build-core-android.sh")
 SOURCE = SCRIPT.read_text(encoding="utf-8")
-AAB_SOURCE = (
-    SCRIPT.parents[2] / "examples/android/RunAnywhereAI/scripts/build-play-aab.sh"
-).read_text(encoding="utf-8")
 
 
 def function_source(name: str, next_name: str) -> str:
@@ -66,27 +63,6 @@ class BuildCoreAndroidGuardTest(unittest.TestCase):
             self.assertNotEqual(self.run_bash(command).returncode, 0)
             engine.write_bytes(b"prefix qhexrt:engine-available suffix")
             self.assertEqual(self.run_bash(command).returncode, 0)
-
-    def test_play_aab_load_alignment_does_not_accept_partial_readelf_failure(self):
-        start = AAB_SOURCE.index("minimum_elf_load_alignment() {")
-        end = AAB_SOURCE.index("\n}\n\nwhile IFS= read -r staged_elf", start) + 2
-        function = AAB_SOURCE[start:end]
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            readelf = root / "llvm-readelf"
-            readelf.write_text(
-                "#!/bin/sh\n"
-                "echo '  LOAD 0 0 0 0 0 R E 0x4000'\n"
-                "[ \"$READELF_FAIL\" = 1 ] && exit 9\n"
-                "exit 0\n",
-                encoding="utf-8",
-            )
-            readelf.chmod(0o755)
-            elf = root / "lib.so"
-            elf.write_bytes(b"fixture")
-            command = f'{function}\nANDROID_READELF="{readelf}"\nminimum_elf_load_alignment "{elf}"'
-            self.assertEqual(self.run_bash(command, {"READELF_FAIL": "0"}).returncode, 0)
-            self.assertNotEqual(self.run_bash(command, {"READELF_FAIL": "1"}).returncode, 0)
 
     def test_stub_never_discovers_or_stages_sibling_qairt(self):
         function = function_source("stage_qhexrt_qnn_runtime_libs", "validate_elf_16kb_alignment")

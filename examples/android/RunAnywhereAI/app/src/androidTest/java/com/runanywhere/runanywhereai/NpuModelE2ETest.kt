@@ -74,7 +74,7 @@ import java.security.MessageDigest
  *   -e hfToken <hf_...>   download private runanywhere/<name>_HNPU repos (never committed/logged)
  *   -e maxNew <n>         override LLM/VLM max new tokens (default 48)
  *
- * Run via scripts/run_npu_e2e.sh (loops the catalog, one model at a time, aggregates).
+ * Run via QHexRT/device_suites/run_android_e2e.sh (one model at a time, then aggregate).
  */
 @RunWith(AndroidJUnit4::class)
 class NpuModelE2ETest {
@@ -118,7 +118,7 @@ class NpuModelE2ETest {
             val requestedHfRepo = args.getString("hfRepo")?.takeIf { it.isNotBlank() }
             if (requestedModelId == null && requestedHfRepo == null) {
                 val message =
-                    "NPU model arguments are required; run scripts/run_npu_e2e.sh or pass -e modelId <id>"
+                    "NPU model arguments are required; run QHexRT/device_suites/run_android_e2e.sh or pass -e modelId <id>"
                 Log.i(tag, "NPU_E2E status=SKIP phase=lookup detail=\"$message\"")
                 assumeTrue(message, false)
                 return

@@ -58,12 +58,10 @@ jobs:
         run: bash scripts/validation/gates/check_flutter_centralization.sh
       - name: Gradle / Kotlin centralization
         run: bash scripts/validation/gates/check_gradle_centralization.sh
-      - name: QHexRT prebuilt and Android E2E contract tests
+      - name: QHexRT prebuilt and Android build contract tests
         run: |
           python3 scripts/build/test_validate_qhexrt_prebuilt.py
           python3 scripts/build/test_build_core_android_guards.py
-          python3 examples/android/RunAnywhereAI/scripts/test_preflight_npu_assets.py
-          python3 examples/android/RunAnywhereAI/scripts/test_npu_e2e_report.py
 
   # =============================================================================
   # Native core builds (one job per CMake preset family)
