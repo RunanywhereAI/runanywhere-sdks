@@ -60,19 +60,15 @@ import { appLogger } from '../services/app-logger';
 // State (module-scope, one selection sheet per app)
 // ---------------------------------------------------------------------------
 
-type RowStatus =
-  | 'registered'       // not downloaded yet
-  | 'downloading'
-  | 'downloaded'       // on disk but not loaded
-  | 'loading'
-  | 'loaded'
-  | 'error';
+type RowState =
+  | { status: 'registered' }      // not downloaded yet
+  | { status: 'downloading'; progress: number } // progress is 0..1
+  | { status: 'downloaded' }      // on disk but not loaded
+  | { status: 'loading' }
+  | { status: 'loaded' }
+  | { status: 'error'; error: string };
 
-interface RowState {
-  status: RowStatus;
-  progress?: number;   // 0..1
-  error?: string;
-}
+type RowStatus = RowState['status'];
 
 const rowStates = new Map<string, RowState>();
 
@@ -325,8 +321,12 @@ export interface ModelStatusSnapshot {
 
 /** Read the current lifecycle status for a model id. */
 export function getModelStatus(modelId: string): ModelStatusSnapshot {
-  const state = rowStates.get(modelId) ?? { status: 'registered' as RowStatus };
-  return { status: state.status, progress: state.progress ?? 0, error: state.error };
+  const state = rowStates.get(modelId) ?? { status: 'registered' };
+  return {
+    status: state.status,
+    progress: state.status === 'downloading' ? state.progress : 0,
+    error: state.status === 'error' ? state.error : undefined,
+  };
 }
 
 /** True once a model is downloaded and successfully loaded. */
@@ -750,9 +750,9 @@ function renderFamilyVariants(family: FamilyGroup): string {
 function renderVariantRow(entry: CatalogEntry, isBest: boolean): string {
   const state = stateOf(entry.id);
   const progressBar = state.status === 'downloading'
-    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
+    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round(state.progress * 100)}%"></div></div>`
     : '';
-  const errorBar = state.error
+  const errorBar = state.status === 'error'
     ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
     : '';
   const bestBadge = isBest
@@ -810,7 +810,7 @@ function bestVariantForDevice(entries: CatalogEntry[]): CatalogEntry | undefined
 
 /** Read-through row state accessor with a sensible default. */
 function stateOf(id: string): RowState {
-  return rowStates.get(id) ?? { status: 'registered' as RowStatus };
+  return rowStates.get(id) ?? { status: 'registered' };
 }
 
 /**
@@ -838,9 +838,9 @@ function matchesSearch(entry: CatalogEntry, query: string): boolean {
 function renderRecommendedCard(entry: CatalogEntry, state: RowState, isDefault: boolean): string {
   const tags = consumerTags(entry).map(renderTagPill).join('');
   const progressBar = state.status === 'downloading'
-    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
+    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round(state.progress * 100)}%"></div></div>`
     : '';
-  const errorBar = state.error
+  const errorBar = state.status === 'error'
     ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
     : '';
   const bestBadge = isDefault
@@ -870,9 +870,9 @@ function renderTagPill(tag: ConsumerTag): string {
 /** Compact companion row (ASR/TTS/VLM/embedding): name, size + backend, tag. */
 function renderModelRow(entry: CatalogEntry, state: RowState): string {
   const progressBar = state.status === 'downloading'
-    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
+    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round(state.progress * 100)}%"></div></div>`
     : '';
-  const errorBar = state.error
+  const errorBar = state.status === 'error'
     ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
     : '';
   const capability = modelCapability(entry);
@@ -903,7 +903,7 @@ function actionButton(modelId: string, state: RowState): string {
     case 'registered':
       return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${safeModelId}">Download</button>`;
     case 'downloading':
-      return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>${Math.round((state.progress ?? 0) * 100)}%</button>`;
+      return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>${Math.round(state.progress * 100)}%</button>`;
     case 'downloaded':
       return `<button type="button" class="model-action-btn load" data-action="load" data-model-id="${safeModelId}">Use</button>`;
     case 'loading':
@@ -1041,7 +1041,7 @@ async function unloadModel(modelId: string): Promise<void> {
 function applyProgress(modelId: string, progress: DownloadProgress): void {
   const fraction = Math.max(0, Math.min(1, progress.overallProgress));
   if (progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED) {
-    setRow(modelId, { status: 'downloaded', progress: 1 });
+    setRow(modelId, { status: 'downloaded' });
     return;
   }
   if (progress.state === DownloadState.DOWNLOAD_STATE_FAILED) {
@@ -1062,9 +1062,8 @@ function applyProgress(modelId: string, progress: DownloadProgress): void {
 // State + toolbar updates
 // ---------------------------------------------------------------------------
 
-function setRow(modelId: string, patch: Partial<RowState>): void {
-  const previous = rowStates.get(modelId) ?? { status: 'registered' as RowStatus };
-  rowStates.set(modelId, { ...previous, ...patch });
+function setRow(modelId: string, state: RowState): void {
+  rowStates.set(modelId, state);
   if (modalEl) renderRows();
   refreshToolbarLabel();
   refreshOverlayVisibility();
