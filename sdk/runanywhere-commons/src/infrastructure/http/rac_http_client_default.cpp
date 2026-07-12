@@ -40,6 +40,11 @@
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 
+// Maps POSIX strcasecmp -> _stricmp on Windows (MSVC). Without it the
+// strcasecmp() call below fails to compile on Windows (error C3861). No-op on
+// non-Windows platforms.
+#include "core/internal/platform_compat.h"
+
 namespace {
 constexpr const char* kTag = "rac_http_client_default";
 

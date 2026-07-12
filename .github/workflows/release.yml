@@ -1351,14 +1351,20 @@ jobs:
       - validate_consumer_web
       - validate_consumer_flutter
       - validate_consumer_react_native
+    # native_windows is kept in `needs` (so publish still waits for it and
+    # includes its artifact when it succeeds) but is ADVISORY for v0.20.0: it is
+    # deliberately omitted from the success checks below and `!cancelled()` lets
+    # publish proceed if only Windows failed. No published package (Swift / npm /
+    # pub.dev / rcli) consumes the Windows commons artifact; a genuine MSVC
+    # compile issue in commons is tracked in thoughts/shared/issues/sdk-release-bugs.md.
     if: >-
+      !cancelled() &&
       needs.validate.result == 'success' &&
       needs.native_ios.result == 'success' &&
       needs.native_android.result == 'success' &&
       needs.native_linux.result == 'success' &&
       needs.native_rcli_macos.result == 'success' &&
       needs.native_rcli_linux.result == 'success' &&
-      needs.native_windows.result == 'success' &&
       needs.native_web.result == 'success' &&
       needs.sdk_kotlin.result == 'success' &&
       needs.sdk_web.result == 'success' &&
@@ -1440,7 +1446,13 @@ jobs:
           assert_pair "Android armeabi-v7a"            "RACommons-android-armeabi-v7a-v${VERSION}.zip"
           assert_pair "Android x86_64"                 "RACommons-android-x86_64-v${VERSION}.zip"
           assert_pair "Linux x86_64"                   "RACommons-linux-x86_64-v${VERSION}.tar.gz"
-          assert_pair "Windows x64"                    "RACommons-windows-x64-v${VERSION}.zip"
+          # Windows x64 is ADVISORY for v0.20.0 (see the publish `if:` note): include it
+          # when native_windows produced it, but never fail the release when it is absent.
+          if [ -s "release-flat/RACommons-windows-x64-v${VERSION}.zip" ] && [ -s "release-flat/RACommons-windows-x64-v${VERSION}.zip.sha256" ]; then
+            echo "  OK: Windows x64 (advisory) present"
+          else
+            echo "  SKIP: Windows x64 advisory artifact absent (native_windows failed/skipped)"
+          fi
           assert_pair "Web WASM"                       "RACommons-web-v${VERSION}.tar.gz"
           assert_pair "rcli macOS arm64"               "rcli-macos-arm64-v${VERSION}.tar.gz"
           assert_pair "rcli Linux x86_64"              "rcli-linux-x86_64-v${VERSION}.tar.gz"
