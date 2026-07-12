@@ -96,7 +96,11 @@ case "${PLATFORM}" in
             local_name="$(basename "${dep}")"
             src="${dep}"
             if [[ "${dep}" == @rpath/* || ! -f "${dep}" ]]; then
-                src="$(find "${BUILD_DIR}" -name "${local_name}" -type f 2>/dev/null | head -1)"
+                # Release archives may contain a dSYM DWARF file with the same
+                # basename as the linked dylib. Search only real lib payloads
+                # so filesystem traversal order cannot select debug symbols.
+                src="$(find "${BUILD_DIR}" -path "*/lib/${local_name}" -type f \
+                    ! -path "*/.dSYM/*" 2>/dev/null | LC_ALL=C sort | head -1)"
             fi
             if [ -z "${src}" ] || [ ! -f "${src}" ]; then
                 echo "ERROR: cannot locate linked library ${dep}" >&2
