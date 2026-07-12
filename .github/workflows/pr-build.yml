@@ -363,12 +363,15 @@ jobs:
       # `workspace:*` deps it can't parse, and bails (EUNSUPPORTEDPROTOCOL).
       # `--workspaces=false` keeps npm from inheriting the root workspace
       # context and resolves the long/protobufjs deps in-tree directly.
-      - name: Install proto-ts dependencies (standalone install)
-        working-directory: sdk/shared/proto-ts
-        run: npm ci --no-audit --no-fund --workspaces=false
       - name: Install workspace dependencies
         working-directory: sdk/runanywhere-web
         run: npm ci --no-audit --no-fund
+      # npm may clean the external workspace's own node_modules while laying
+      # out the Web workspace. Install proto-ts last so TypeScript resolution
+      # from its real path always sees its direct @bufbuild/protobuf dependency.
+      - name: Install proto-ts dependencies (standalone install)
+        working-directory: sdk/shared/proto-ts
+        run: npm ci --no-audit --no-fund --workspaces=false
       - name: Typecheck Web workspace (proto-ts + packages)
         working-directory: sdk/runanywhere-web
         run: npm run typecheck
