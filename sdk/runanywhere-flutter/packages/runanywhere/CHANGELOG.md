@@ -5,6 +5,14 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-07-12
+
+### Changed
+- Adopted the canonical 0.20 API contracts and release-native packaging.
+
+### Removed
+- Removed deprecated compatibility configuration APIs.
+
 ## [0.19.15] - 2026-07-11
 
 ### Changed

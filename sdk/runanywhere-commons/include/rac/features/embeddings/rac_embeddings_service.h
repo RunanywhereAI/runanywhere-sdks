@@ -116,8 +116,7 @@ rac_result_t rac_embeddings_embed(rac_handle_t handle, const char* text,
  * @return RAC_SUCCESS or error code
  */
 rac_result_t rac_embeddings_embed_batch(rac_handle_t handle, const char* const* texts,
-                                        size_t num_texts,
-                                        const rac_embeddings_options_t* options,
+                                        size_t num_texts, const rac_embeddings_options_t* options,
                                         rac_embeddings_result_t* out_result);
 
 /**

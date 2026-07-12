@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let sdkVersion = "0.19.15"
+let sdkVersion = "0.20.0"
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 
 func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
@@ -23,11 +23,11 @@ func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
 
 let onnxTarget = runAnywhereBinaryTarget(
     name: "RABackendONNX",
-    checksum: "a8094dfe7721ec6f79d54b337550d72a95a90fd06ec5c997a822176d2219d3ee"
+    checksum: "5972f2dd232f19cb72507c6aa042fafda209faa2b3c223dd5404cb921653f3e7"
 )
 let sherpaTarget = runAnywhereBinaryTarget(
     name: "RABackendSherpa",
-    checksum: "c7322c80d9c18d707fba41aef2ad09a211806977400050c388ccdc2a2301cf06"
+    checksum: "a75a3c160dfec4ca36e786e4e828d04fb38fbc88b2b61d868f1acaab5f39b399"
 )
 
 let package = Package(

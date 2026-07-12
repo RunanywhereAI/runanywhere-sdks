@@ -26,18 +26,22 @@ import com.runanywhere.sdk.public.configuration.cEnvironment
 import com.runanywhere.sdk.public.configuration.description
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * Telemetry bridge — owns the native `rac_telemetry_manager_*` handle
  * and forwards the HTTP callback from C++ through [HTTPClientAdapter].
  *
  * Thread safety: handle/state mutations are guarded by a [lock] sync
- * block; the HTTP callback dispatches to the shared [scope] running on
- * `Dispatchers.IO`.
+ * block; each SDK lifetime owns a replaceable callback scope that is drained
+ * before copied HTTP configuration can be released.
  */
-object CppBridgeTelemetry {
+internal object CppBridgeTelemetry {
     private const val TAG = "CppBridgeTelemetry"
 
     @Volatile private var isRegistered: Boolean = false
@@ -63,8 +67,18 @@ object CppBridgeTelemetry {
 
     private val lock = Any()
 
-    /** Background scope for the C++→Kotlin HTTP callback. */
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private data class CallbackLifetime(
+        val environment: SDKEnvironment,
+        val job: Job,
+        val scope: CoroutineScope,
+    )
+
+    private data class TeardownSnapshot(
+        val lifetime: CallbackLifetime?,
+        val managerHandle: Long,
+    )
+
+    private var callbackLifetime: CallbackLifetime? = null
 
     // Lifecycle (parity with Swift `CppBridge.Events.register/unregister`
     // and `CppBridge.Telemetry.initialize/shutdown`)
@@ -81,6 +95,14 @@ object CppBridgeTelemetry {
         sdkVersion: String,
     ) {
         synchronized(lock) {
+            val callbackJob = SupervisorJob()
+            val lifetime =
+                CallbackLifetime(
+                    environment = environment,
+                    job = callbackJob,
+                    scope = CoroutineScope(callbackJob + Dispatchers.IO),
+                )
+            callbackLifetime = lifetime
             telemetryHttpDisabled = false
             currentEnvironment = environment
 
@@ -114,7 +136,17 @@ object CppBridgeTelemetry {
                         bodyLength: Int,
                         requiresAuth: Boolean,
                     ) {
-                        scope.launch { performTelemetryHttp(endpoint, body, requiresAuth) }
+                        synchronized(lock) {
+                            if (callbackLifetime !== lifetime) return
+                            lifetime.scope.launch {
+                                performTelemetryHttp(
+                                    environment = lifetime.environment,
+                                    path = endpoint,
+                                    json = body,
+                                    requiresAuth = requiresAuth,
+                                )
+                            }
+                        }
                     }
                 }
             RunAnywhereBridge.racTelemetryManagerSetHttpCallback(telemetryManagerHandle, httpCallback)
@@ -141,15 +173,6 @@ object CppBridgeTelemetry {
         }
     }
 
-    /** Flush pending telemetry events through the native manager. */
-    fun flush() {
-        synchronized(lock) {
-            if (telemetryManagerHandle != 0L) {
-                RunAnywhereBridge.racTelemetryManagerFlush(telemetryManagerHandle)
-            }
-        }
-    }
-
     /**
      * Tear down the telemetry bridge.
      *
@@ -158,30 +181,78 @@ object CppBridgeTelemetry {
      * silently dropped at SDK shutdown.
      */
     fun unregister() {
+        runBlocking { unregisterSuspending() }
+    }
+
+    /** Suspend until every callback from the retiring lifetime has stopped. */
+    suspend fun unregisterSuspending() {
+        val snapshot =
+            synchronized(lock) {
+                TeardownSnapshot(
+                    lifetime = callbackLifetime,
+                    managerHandle = telemetryManagerHandle,
+                )
+            }
+
+        if (snapshot.managerHandle != 0L) {
+            // Native sink detach is quiescent: it may wait for an active route
+            // whose JNI callback needs [lock]. Never hold the Kotlin monitor
+            // across detach, flush, or destroy.
+            try {
+                RunAnywhereBridge.racEventsSetTelemetrySink(0L)
+            } catch (_: Throwable) {
+                // Best-effort; native lib may already be unloaded.
+            }
+            // Keep admission open through the synchronous terminal flush so
+            // every final callback is attached to the retiring lifetime.
+            try {
+                RunAnywhereBridge.racTelemetryManagerFlush(snapshot.managerHandle)
+            } catch (_: Throwable) {
+                runCatching {
+                    log(
+                        CppBridgePlatformAdapter.LogLevel.WARN,
+                        "Telemetry flush failed during teardown",
+                    )
+                }
+            }
+        }
+
         synchronized(lock) {
-            if (!isRegistered) {
+            if (callbackLifetime === snapshot.lifetime && telemetryManagerHandle == snapshot.managerHandle) {
+                // Close admission and reset every owner after the terminal
+                // flush. Credentials are copied independently of manager
+                // creation and must not survive a failed lifetime.
+                callbackLifetime = null
+                telemetryManagerHandle = 0
                 currentEnvironment = null
                 telemetryHttpDisabled = false
-                return
+                isRegistered = false
+                _apiKey = null
+                _baseUrl = null
             }
-            if (telemetryManagerHandle != 0L) {
-                // Detach the telemetry sink first so the C++ router stops
-                // feeding events into a manager we are about to destroy.
-                try {
-                    RunAnywhereBridge.racEventsSetTelemetrySink(0L)
-                } catch (_: Throwable) {
-                    // Best-effort; native lib may already be unloaded.
+        }
+
+        if (snapshot.managerHandle != 0L) {
+            try {
+                RunAnywhereBridge.racTelemetryManagerDestroy(snapshot.managerHandle)
+            } catch (_: Throwable) {
+                runCatching {
+                    log(
+                        CppBridgePlatformAdapter.LogLevel.WARN,
+                        "Telemetry destroy failed during teardown",
+                    )
                 }
-                // Flush BEFORE destroy — parity with Swift Telemetry.shutdown().
-                RunAnywhereBridge.racTelemetryManagerFlush(telemetryManagerHandle)
-                RunAnywhereBridge.racTelemetryManagerDestroy(telemetryManagerHandle)
-                telemetryManagerHandle = 0
             }
-            // Mirrors Swift's `activeEnvironment.withLock { $0 = nil }` in
-            // `CppBridge.Telemetry.shutdown()`.
-            currentEnvironment = null
-            telemetryHttpDisabled = false
-            isRegistered = false
+        }
+
+        snapshot.lifetime?.job?.let { callbackJob ->
+            // Admission is closed under [lock], so this is a stable snapshot of
+            // every callback accepted before or during the terminal flush.
+            // Let that final work finish before retiring its parent lifetime.
+            callbackJob.children.toList().joinAll()
+            callbackJob.cancelAndJoin()
+        }
+        runCatching {
             log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Telemetry unregistered")
         }
     }
@@ -224,13 +295,17 @@ object CppBridgeTelemetry {
      * matches Swift's `CppBridge.HTTP.hasUsableConfiguration` + `isConfigured`
      * preflight.
      */
-    private suspend fun performTelemetryHttp(path: String, json: String, requiresAuth: Boolean) {
+    private suspend fun performTelemetryHttp(
+        environment: SDKEnvironment,
+        path: String,
+        json: String,
+        requiresAuth: Boolean,
+    ) {
         if (telemetryHttpDisabled) {
             log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Skipping telemetry $path: endpoint disabled")
             return
         }
-        val env = currentEnvironment
-        if ((env == null || env == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) &&
+        if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT &&
             !CppBridgeDevConfig.hasUsableSupabaseConfig
         ) {
             log(CppBridgePlatformAdapter.LogLevel.WARN, "Skipping telemetry $path: no usable dev config")
@@ -253,11 +328,11 @@ object CppBridgeTelemetry {
                 telemetryHttpDisabled = true
                 log(
                     CppBridgePlatformAdapter.LogLevel.WARN,
-                    "Disabling telemetry HTTP for this session; endpoint rejected $path: ${e.message}",
+                    "Disabling telemetry HTTP for this session; endpoint rejected $path",
                 )
                 return
             }
-            log(CppBridgePlatformAdapter.LogLevel.WARN, "Telemetry HTTP failed for $path: ${e.message}")
+            log(CppBridgePlatformAdapter.LogLevel.WARN, "Telemetry HTTP failed for $path")
         }
     }
 

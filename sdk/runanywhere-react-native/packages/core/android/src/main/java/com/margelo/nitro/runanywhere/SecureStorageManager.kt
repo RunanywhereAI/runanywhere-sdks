@@ -1,38 +1,49 @@
 /**
  * SecureStorageManager.kt
  *
- * Android secure storage using EncryptedSharedPreferences.
- * Provides hardware-backed encryption when available (Android Keystore).
+ * Android secure storage backed directly by an Android Keystore AES-256-GCM key.
  *
- * Reference: sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/security/SecureStorage.kt
+ * Reference: sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/foundation/security/
+ * AndroidKeychainManager.kt
  */
 
 package com.margelo.nitro.runanywhere
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.SharedPreferences
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
 import android.util.Log
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
-import java.util.UUID
+import java.nio.charset.StandardCharsets
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 
 /**
  * Secure storage manager for persistent device identity and sensitive data.
- * Uses EncryptedSharedPreferences backed by Android Keystore.
+ * Values are authenticated and encrypted; the non-exportable key lives in Android Keystore.
  */
 object SecureStorageManager {
     private const val TAG = "SecureStorageManager"
-    private const val PREFS_NAME = "runanywhere_secure_prefs"
-    private const val DEVICE_UUID_KEY = "com.runanywhere.sdk.device.uuid"
+    private const val STORE_DIRECTORY_NAME = "runanywhere_react_native_secure_storage"
+    private const val LEGACY_PREFS_NAME = "runanywhere_secure_prefs"
+    private const val ANDROID_KEYSTORE = "AndroidKeyStore"
+    private const val KEY_ALIAS = "com.runanywhere.reactnative.secure-storage.aes-gcm"
+    private const val CIPHER_TRANSFORMATION = "AES/GCM/NoPadding"
+    private const val KEY_SIZE_BITS = 256
+    private const val GCM_TAG_BITS = 128
 
     @SuppressLint("StaticFieldLeak")
+    @Volatile
     private var context: Context? = null
-    private var encryptedPrefs: SharedPreferences? = null
+    @Volatile
+    private var ciphertextStore: NoBackupCiphertextStore? = null
+    @Volatile
+    private var encryptionKey: SecretKey? = null
 
-    /**
-     * Get the stored context (for platform bridge operations)
-     */
+    /** Get the stored context for platform bridge operations. */
     @JvmStatic
     fun getContext(): Context? = context
 
@@ -42,107 +53,115 @@ object SecureStorageManager {
      */
     @JvmStatic
     fun initialize(applicationContext: Context) {
-        if (context != null) return
+        if (ciphertextStore != null && encryptionKey != null) return
         synchronized(this) {
-            if (context != null) return
-            context = applicationContext.applicationContext
+            if (ciphertextStore != null && encryptionKey != null) return
+            val appContext = applicationContext.applicationContext
             try {
-                val masterKey = MasterKey.Builder(context!!)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
+                check(appContext.deleteSharedPreferences(LEGACY_PREFS_NAME)) {
+                    "Could not delete legacy secure storage"
+                }
+                val initializedStore = NoBackupCiphertextStore(appContext, STORE_DIRECTORY_NAME)
+                val initializedKey = loadOrCreateEncryptionKey()
 
-                encryptedPrefs = EncryptedSharedPreferences.create(
-                    context!!,
-                    PREFS_NAME,
-                    masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                )
+                ciphertextStore = initializedStore
+                encryptionKey = initializedKey
+                // Publish the context last. PlatformAdapterBridge uses a non-null
+                // context as the readiness signal for secure storage.
+                context = appContext
                 Log.i(TAG, "SecureStorageManager initialized")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to initialize EncryptedSharedPreferences", e)
+            } catch (exception: Exception) {
+                context = null
+                ciphertextStore = null
+                encryptionKey = null
+                Log.e(TAG, "Failed to initialize Android Keystore secure storage", exception)
             }
         }
     }
 
-    /**
-     * Set a secure string value
-     */
+    /** Set a secure string value. */
     @JvmStatic
     fun set(key: String, value: String): Boolean {
+        val activeStore = ciphertextStore ?: return false
+        val activeKey = encryptionKey ?: return false
         return try {
-            encryptedPrefs?.edit()?.putString(key, value)?.apply()
-            Log.d(TAG, "secureSet key=$key")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "secureSet failed for key=$key", e)
+            activeStore.write(key, encrypt(activeKey, key, value))
+        } catch (exception: Exception) {
+            Log.e(TAG, "Failed to write secure-storage entry", exception)
             false
         }
     }
 
-    /**
-     * Get a secure string value
-     */
+    /** Get a secure string value, or null only when the key is absent. */
     @JvmStatic
     fun get(key: String): String? {
-        return try {
-            val value = encryptedPrefs?.getString(key, null)
-            Log.d(TAG, "secureGet key=$key found=${value != null}")
-            value
-        } catch (e: Exception) {
-            Log.e(TAG, "secureGet failed for key=$key", e)
-            null
-        }
+        val activeStore =
+            checkNotNull(ciphertextStore) { "Secure storage is not initialized" }
+        val activeKey =
+            checkNotNull(encryptionKey) { "Secure storage is not initialized" }
+        val envelope = activeStore.read(key) ?: return null
+        return decrypt(activeKey, key, envelope)
     }
 
-    /**
-     * Delete a secure value
-     */
+    /** Delete a secure value. */
     @JvmStatic
     fun delete(key: String): Boolean {
+        val activeStore = ciphertextStore ?: return false
         return try {
-            encryptedPrefs?.edit()?.remove(key)?.apply()
-            Log.d(TAG, "secureDelete key=$key")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "secureDelete failed for key=$key", e)
+            activeStore.delete(key)
+        } catch (exception: Exception) {
+            Log.e(TAG, "Failed to delete secure-storage entry", exception)
             false
         }
     }
 
-    /**
-     * Check if key exists
-     */
-    @JvmStatic
-    fun exists(key: String): Boolean {
-        return try {
-            encryptedPrefs?.contains(key) ?: false
-        } catch (e: Exception) {
-            Log.e(TAG, "secureExists failed for key=$key", e)
-            false
-        }
+    private fun encrypt(encryptionKey: SecretKey, key: String, value: String): ByteArray {
+        val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, encryptionKey)
+        cipher.updateAAD(associatedData(key))
+        val ciphertext = cipher.doFinal(value.toByteArray(StandardCharsets.UTF_8))
+        val iv = cipher.iv
+        require(iv.size <= 0xff) { "AES-GCM IV is too large" }
+
+        val envelope = ByteArray(1 + iv.size + ciphertext.size)
+        envelope[0] = iv.size.toByte()
+        iv.copyInto(envelope, destinationOffset = 1)
+        ciphertext.copyInto(envelope, destinationOffset = 1 + iv.size)
+        return envelope
     }
 
-    /**
-     * Get or create persistent device UUID
-     * Survives app reinstalls (stored in EncryptedSharedPreferences)
-     */
-    @JvmStatic
-    fun getPersistentDeviceUUID(): String {
-        // Try to get existing UUID
-        val existingUUID = get(DEVICE_UUID_KEY)
-        if (!existingUUID.isNullOrEmpty()) {
-            Log.i(TAG, "Loaded persistent device UUID from secure storage")
-            return existingUUID
-        }
+    private fun decrypt(encryptionKey: SecretKey, key: String, envelope: ByteArray): String {
+        require(envelope.isNotEmpty()) { "Encrypted value is empty" }
+        val ivSize = envelope[0].toInt() and 0xff
+        require(ivSize > 0 && envelope.size > 1 + ivSize) { "Encrypted value is malformed" }
 
-        // Generate new UUID
-        val newUUID = UUID.randomUUID().toString()
-        if (set(DEVICE_UUID_KEY, newUUID)) {
-            Log.i(TAG, "Generated and stored new persistent device UUID")
-        } else {
-            Log.w(TAG, "Generated device UUID but failed to persist")
-        }
-        return newUUID
+        val iv = envelope.copyOfRange(1, 1 + ivSize)
+        val ciphertext = envelope.copyOfRange(1 + ivSize, envelope.size)
+        val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+        cipher.init(Cipher.DECRYPT_MODE, encryptionKey, GCMParameterSpec(GCM_TAG_BITS, iv))
+        cipher.updateAAD(associatedData(key))
+        return cipher.doFinal(ciphertext).toString(StandardCharsets.UTF_8)
+    }
+
+    private fun associatedData(key: String): ByteArray =
+        "$STORE_DIRECTORY_NAME\u0000$key".toByteArray(StandardCharsets.UTF_8)
+
+    private fun loadOrCreateEncryptionKey(): SecretKey {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+
+        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
+        keyGenerator.init(
+            KeyGenParameterSpec
+                .Builder(
+                    KEY_ALIAS,
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setRandomizedEncryptionRequired(true)
+                .setKeySize(KEY_SIZE_BITS)
+                .build(),
+        )
+        return keyGenerator.generateKey()
     }
 }

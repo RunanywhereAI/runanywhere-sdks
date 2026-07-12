@@ -418,6 +418,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # Events
     "_rac_sdk_event_subscribe"
     "_rac_sdk_event_unsubscribe"
+    "_rac_sdk_event_quiesce"
     "_rac_sdk_event_publish_proto"
     "_rac_sdk_event_poll"
     "_rac_sdk_event_publish_failure"

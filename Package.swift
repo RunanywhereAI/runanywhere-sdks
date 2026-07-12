@@ -9,7 +9,7 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.19.15")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.20.0")
 //   No environment override is needed. SPM downloads the checksum-verified
 //   XCFramework archives from the GitHub release by default.
 //
@@ -43,7 +43,7 @@ let useLocalNatives = ProcessInfo.processInfo.environment["RUNANYWHERE_USE_LOCAL
 
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
-let sdkVersion = "0.19.15"
+let sdkVersion = "0.20.0"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
@@ -531,7 +531,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "aa8732b5ab3447c0d94855558a4f2ce08aed71666b346857aba32d5fe28bea3d"
+                checksum: "21835b3fbbbe3bac4e740621ce45f50bc35bc0f995d4cbb997d532e3182f0b65"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
@@ -541,12 +541,12 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "a8094dfe7721ec6f79d54b337550d72a95a90fd06ec5c997a822176d2219d3ee"
+                checksum: "5972f2dd232f19cb72507c6aa042fafda209faa2b3c223dd5404cb921653f3e7"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "c7322c80d9c18d707fba41aef2ad09a211806977400050c388ccdc2a2301cf06"
+                checksum: "a75a3c160dfec4ca36e786e4e828d04fb38fbc88b2b61d868f1acaab5f39b399"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",

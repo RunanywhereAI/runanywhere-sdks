@@ -15,6 +15,7 @@ name: PR build matrix
 on:
   pull_request:
     branches: [main, dev, "feat/v2-architecture"]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main, dev, "feat/v2-architecture"]
   workflow_dispatch: {}
@@ -49,7 +50,15 @@ jobs:
       - name: WASM vendor provenance schema contract
         run: bash scripts/validation/gates/check_wasm_provenance_contract.sh
       - name: Release-train version coherence
-        run: bash scripts/validation/gates/check_release_version_coherence.sh
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_RELEASE_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          if [ -n "${PR_BASE_SHA}" ]; then
+            git fetch --no-tags --depth=1 origin "${PR_BASE_SHA}"
+          fi
+          bash scripts/validation/gates/check_release_version_coherence.sh
       - name: Flutter dependency centralization
         # Strict by default — drift in ffi / http / protobuf is runtime-critical
         # because these deps lockstep with the C ABI surface. Use STRICT=0 only
@@ -145,6 +154,8 @@ jobs:
           "$RCLI" backends
           "$RCLI" list --all
           "$RCLI" info --json
+      - name: Package smoke
+        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
 
   rcli-linux:
     # rcli desktop CLI on Linux — release build, unit tests, modelless smoke.
@@ -166,6 +177,8 @@ jobs:
           "$RCLI" backends
           "$RCLI" list --all
           "$RCLI" info --json
+      - name: Package smoke
+        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
 
   wasm:
     runs-on: ubuntu-22.04

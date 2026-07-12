@@ -113,6 +113,8 @@ export class CommonsModule {
   private _module: CoreCommonsModule | null = null;
   private _loaded = false;
   private _loading: Promise<void> | null = null;
+  /** True after canonical native shutdown succeeds for the retained module. */
+  private _nativeShutdownComplete = false;
   /** Browser platform adapter installed into this module's `rac_init`
    * config. `rac_init` enforces non-NULL mandatory slots (file/secure/log/
    * now_ms), so a zero stub is not valid — the shared `PlatformAdapter`
@@ -167,59 +169,75 @@ export class CommonsModule {
   }
 
   private _teardown(): void {
+    const failures: unknown[] = [];
+    const recordFailure = (operation: string, error: unknown): void => {
+      logger.warning(`${operation} failed during Commons teardown`);
+      failures.push(error);
+    };
+
     if (this._storageAnalyzerAdapter) {
       try {
         this._storageAnalyzerAdapter.cleanup();
+        this._storageAnalyzerAdapter = null;
       } catch (error) {
-        logger.warning(
-          `BrowserStorageAnalyzerAdapter cleanup threw: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
-      this._storageAnalyzerAdapter = null;
-    }
-    if (this._module) {
-      try {
-        this._module._rac_shutdown?.();
-      } catch (error) {
-        logger.warning(
-          `rac_shutdown threw: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        recordFailure('BrowserStorageAnalyzerAdapter cleanup', error);
       }
     }
     if (this._deviceRegistrationAdapter) {
       try {
         this._deviceRegistrationAdapter.cleanup();
+        this._deviceRegistrationAdapter = null;
       } catch (error) {
-        logger.warning(
-          `DeviceRegistrationAdapter cleanup threw: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        recordFailure('DeviceRegistrationAdapter cleanup', error);
       }
-      this._deviceRegistrationAdapter = null;
+    }
+    if (this._module && !this._nativeShutdownComplete) {
+      try {
+        this._module._rac_shutdown?.();
+        this._nativeShutdownComplete = true;
+      } catch (error) {
+        recordFailure('rac_shutdown', error);
+      }
     }
     if (this._platformAdapter) {
       try {
         this._platformAdapter.cleanup();
+        this._platformAdapter = null;
       } catch (error) {
-        logger.warning(
-          `PlatformAdapter cleanup threw: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        recordFailure('PlatformAdapter cleanup', error);
       }
-      this._platformAdapter = null;
     }
-    HTTPAdapter.clearDefaultModule();
+    try {
+      HTTPAdapter.clearDefaultModule();
+    } catch (error) {
+      recordFailure('HTTPAdapter cleanup', error);
+    }
     if (this._module) {
       // Drop ONLY this module from the registry adapter — siblings that
       // still hold the catalog stay untouched. `unregisterWasmModule`
       // below also performs this drop, so the explicit call here is just
       // defensive against an out-of-order shutdown sequence.
-      ModelRegistryAdapter.unregisterModule(this._module);
-      unregisterWasmModule(this._module);
+      try {
+        ModelRegistryAdapter.unregisterModule(this._module);
+      } catch (error) {
+        recordFailure('ModelRegistryAdapter cleanup', error);
+      }
+      try {
+        unregisterWasmModule(this._module);
+      } catch (error) {
+        recordFailure('WASM module unregister', error);
+      }
     }
-    this._module = null;
     this._loaded = false;
     this._loading = null;
+
+    if (failures.length === 0) {
+      this._module = null;
+      this._nativeShutdownComplete = false;
+      return;
+    }
+    if (failures.length === 1) throw failures[0];
+    throw new AggregateError(failures, 'Multiple Commons teardown operations failed');
   }
 
   private async _doLoad(configuration: DeviceRegistrationConfiguration): Promise<void> {
@@ -232,6 +250,7 @@ export class CommonsModule {
     if (existing) {
       logger.info('Reusing already-installed RACommons module from sibling backend');
       this._module = existing;
+      this._nativeShutdownComplete = false;
       this._deviceRegistrationAdapter = DeviceRegistrationAdapter.install(
         existing,
         configuration,
@@ -263,6 +282,7 @@ export class CommonsModule {
         printErr: (text) => logger.info(text),
         locateFile: (path) => baseUrl + path,
       });
+      this._nativeShutdownComplete = false;
 
       // Smoke check
       const pingFn = this._module._rac_wasm_ping;
@@ -310,9 +330,15 @@ export class CommonsModule {
       this._loaded = true;
       logger.info('Commons WASM module loaded successfully');
     } catch (error) {
-      this._teardown();
+      try {
+        this._teardown();
+      } catch {
+        // Preserve the load error. The retained singleton owns any failed
+        // teardown resource and RunAnywhere's rollback will retry it.
+        logger.warning('Commons load rollback did not complete');
+      }
       const message = error instanceof Error ? error.message : String(error);
-      logger.error(`Failed to load Commons WASM: ${message}`);
+      logger.error('Failed to load Commons WASM');
       throw new SDKException(
         -ProtoErrorCode.ERROR_CODE_WASM_LOAD_FAILED,
         `Failed to load Commons WASM module: ${message}`,
@@ -417,9 +443,9 @@ export class CommonsModule {
       m.stringToUTF8(base, ptr, len);
       const rc = setFn(ptr);
       if (rc !== 0) {
-        logger.warning(`rac_model_paths_set_base_dir('${base}') returned ${rc}`);
+        logger.warning(`rac_model_paths_set_base_dir returned ${rc}`);
       } else {
-        logger.info(`Model paths base dir set to synthetic prefix '${base}'`);
+        logger.info('Model paths base directory configured');
       }
     } finally {
       m._free(ptr);

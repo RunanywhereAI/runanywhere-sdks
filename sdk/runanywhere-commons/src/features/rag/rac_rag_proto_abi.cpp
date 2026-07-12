@@ -26,17 +26,16 @@
 #include <unordered_map>
 #include <vector>
 
+#include "../embeddings/embeddings_service_internal.h"
+#include "features/llm/llm_thinking_tags_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
-#include "features/llm/llm_thinking_tags_internal.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/rag/rac_rag.h"
-
-#include "../embeddings/embeddings_service_internal.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
@@ -95,9 +94,9 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         float progress, int64_t input_count, int64_t output_count,
-                        const char* error, double duration_ms = 0.0,
-                        const char* model_id = nullptr, int64_t top_k = 0,
-                        double retrieval_time_ms = 0.0, const char* embedding_model = nullptr) {
+                        const char* error, double duration_ms = 0.0, const char* model_id = nullptr,
+                        int64_t top_k = 0, double retrieval_time_ms = 0.0,
+                        const char* embedding_model = nullptr) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -468,8 +467,8 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     LOGI("sessionCreate: embed_path=%s, llm_path=%s", embedding_path.c_str(),
          llm_path.empty() ? "(none)" : llm_path.c_str());
 
-    rac_result_t rc = rac::embeddings::create_service(
-        embedding_path.c_str(), embedding_config_json, &embed_handle);
+    rac_result_t rc = rac::embeddings::create_service(embedding_path.c_str(), embedding_config_json,
+                                                      &embed_handle);
     if (rc != RAC_SUCCESS || !embed_handle) {
         rc = rc != RAC_SUCCESS ? rc : RAC_ERROR_INITIALIZATION_FAILED;
         publish_failure(rc, "rag.sessionCreate", rac_error_message(rc));
@@ -623,10 +622,9 @@ rac_result_t rac_rag_ingest_proto(rac_handle_t session, const uint8_t* document_
 
     auto stats = make_stats(*s->backend);
     rac_result_t rc = copy_proto(stats, out_stats);
-    const double ingest_ms =
-        std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
-            std::chrono::steady_clock::now() - ingest_start)
-            .count();
+    const double ingest_ms = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
+                                 std::chrono::steady_clock::now() - ingest_start)
+                                 .count();
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED,
                        "rag.ingest", 1.0f, 1, stats.indexed_chunks(), nullptr, ingest_ms,
                        s->embedding_model_id.c_str(), /*top_k=*/0, /*retrieval_time_ms=*/0.0,
@@ -745,13 +743,12 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     size_t thinking_len = 0;
     std::string thinking_open_tag;
     std::string thinking_close_tag;
-    (void)rac::llm::model_thinking_tags_from_registry(
-        s->llm_model_id.c_str(), &thinking_open_tag, &thinking_close_tag);
+    (void)rac::llm::model_thinking_tags_from_registry(s->llm_model_id.c_str(), &thinking_open_tag,
+                                                      &thinking_close_tag);
     if (rac_llm_extract_thinking_with_tags(
             raw_answer, thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
-            thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &answer,
-            &answer_len, &thinking, &thinking_len) ==
-        RAC_SUCCESS) {
+            thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &answer, &answer_len,
+            &thinking, &thinking_len) == RAC_SUCCESS) {
         proto.set_answer(answer ? std::string(answer, answer_len) : std::string());
         if (thinking && thinking_len > 0) {
             proto.set_thinking_content(std::string(thinking, thinking_len));

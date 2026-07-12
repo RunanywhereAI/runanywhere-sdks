@@ -34,12 +34,12 @@
 #include <string>
 #include <vector>
 
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "infrastructure/rac_path_safety_internal.h"
 
 #ifdef RAC_HAVE_PROTOBUF
 
@@ -73,8 +73,10 @@ bool ends_with_ci(const std::string& value, const char* suffix) {
     for (size_t i = 0; i < suffix_len; ++i) {
         char a = value[value.size() - suffix_len + i];
         char b = suffix[i];
-        if (a >= 'A' && a <= 'Z') a = static_cast<char>(a + ('a' - 'A'));
-        if (b >= 'A' && b <= 'Z') b = static_cast<char>(b + ('a' - 'A'));
+        if (a >= 'A' && a <= 'Z')
+            a = static_cast<char>(a + ('a' - 'A'));
+        if (b >= 'A' && b <= 'Z')
+            b = static_cast<char>(b + ('a' - 'A'));
         if (a != b) {
             return false;
         }
@@ -83,8 +85,7 @@ bool ends_with_ci(const std::string& value, const char* suffix) {
 }
 
 bool should_skip_exact_size_check(const rac_model_info_t* model,
-                                  const rac_model_file_descriptor_t& descriptor,
-                                  const char* name) {
+                                  const rac_model_file_descriptor_t& descriptor, const char* name) {
     if (model == nullptr || model->framework != RAC_FRAMEWORK_QHEXRT || name == nullptr) {
         return false;
     }

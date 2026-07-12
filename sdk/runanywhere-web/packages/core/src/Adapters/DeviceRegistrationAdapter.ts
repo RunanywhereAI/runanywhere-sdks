@@ -285,8 +285,8 @@ export class DeviceRegistrationAdapter {
   private readonly callbackLayout: CallbackLayout;
   private readonly deviceInfoLayout: DeviceInfoLayout;
   private readonly responseLayout: HTTPResponseLayout;
-  private readonly configuredBaseURL: string;
-  private readonly configuredApiKey: string;
+  private configuredBaseURL: string;
+  private configuredApiKey: string;
   private readonly requestTimeoutMs: number;
   private pendingRequest: Promise<void> | null = null;
   private preparedRequest: PreparedHTTPRequest | null = null;
@@ -342,6 +342,8 @@ export class DeviceRegistrationAdapter {
     this.pendingRequest = null;
     this.preparedRequest = null;
     this.nativeRetryRequired = false;
+    this.configuredBaseURL = '';
+    this.configuredApiKey = '';
     if (DeviceRegistrationAdapter.installedAdapters.get(this.module) === this) {
       DeviceRegistrationAdapter.installedAdapters.delete(this.module);
     }

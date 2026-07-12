@@ -17,6 +17,7 @@ private enum SDKEventProtoABI {
     ) -> Void
     typealias Subscribe = @convention(c) (EventCallback?, UnsafeMutableRawPointer?) -> UInt64
     typealias Unsubscribe = @convention(c) (UInt64) -> Void
+    typealias Quiesce = @convention(c) () -> Void
     typealias Publish = @convention(c) (UnsafePointer<UInt8>?, Int) -> rac_result_t
     typealias Poll = @convention(c) (UnsafeMutablePointer<rac_proto_buffer_t>?) -> rac_result_t
     typealias PublishFailure = @convention(c) (
@@ -30,6 +31,7 @@ private enum SDKEventProtoABI {
 
     static let subscribe = NativeProtoABI.load("rac_sdk_event_subscribe", as: Subscribe.self)
     static let unsubscribe = NativeProtoABI.load("rac_sdk_event_unsubscribe", as: Unsubscribe.self)
+    static let quiesce = NativeProtoABI.load("rac_sdk_event_quiesce", as: Quiesce.self)
     static let publish = NativeProtoABI.load("rac_sdk_event_publish_proto", as: Publish.self)
     static let poll = NativeProtoABI.load("rac_sdk_event_poll", as: Poll.self)
     static let publishFailure = NativeProtoABI.load(
@@ -83,7 +85,19 @@ extension CppBridge.Events {
     }
 
     public static func unsubscribeSDKEvents(_ subscriptionId: UInt64) {
-        SDKEventProtoABI.unsubscribe?(subscriptionId)
+        // Both symbols are required before retirement can begin. In particular,
+        // a stale native artifact without quiesce must retain the context rather
+        // than free user_data while a snapshotted callback may still use it.
+        guard let unsubscribe = SDKEventProtoABI.unsubscribe,
+              let quiesce = SDKEventProtoABI.quiesce else {
+            return
+        }
+        unsubscribe(subscriptionId)
+
+        // Commons dispatches a subscription snapshot after dropping its mutex.
+        // Unsubscribe prevents new dispatch, then quiesce drains callbacks that
+        // already passed the alive check before the retained Swift box is freed.
+        quiesce()
 
         let context = sdkEventSubscriptionPointers.withLock { pointers in
             pointers.removeValue(forKey: subscriptionId)

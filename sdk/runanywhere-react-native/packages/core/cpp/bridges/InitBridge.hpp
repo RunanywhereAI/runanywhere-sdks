@@ -10,9 +10,8 @@
 
 #pragma once
 
-#include <string>
-#include <functional>
 #include <memory>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -38,30 +37,6 @@ inline const char* defaultNativePlatform() {
 }
 
 /**
- * @brief Platform callbacks provided by React Native/JavaScript layer
- *
- * These callbacks are invoked by C++ when platform-specific operations are needed.
- */
-struct PlatformCallbacks {
-    // File operations
-    std::function<bool(const std::string& path)> fileExists;
-    std::function<std::string(const std::string& path)> fileRead;
-    std::function<bool(const std::string& path, const std::string& data)> fileWrite;
-    std::function<bool(const std::string& path)> fileDelete;
-
-    // Secure storage (keychain/keystore)
-    std::function<std::string(const std::string& key)> secureGet;
-    std::function<bool(const std::string& key, const std::string& value)> secureSet;
-    std::function<bool(const std::string& key)> secureDelete;
-
-    // Logging
-    std::function<void(int level, const std::string& category, const std::string& message)> log;
-
-    // Clock
-    std::function<int64_t()> nowMs;
-};
-
-/**
  * @brief SDK initialization bridge singleton
  *
  * Manages the lifecycle of the runanywhere-commons SDK.
@@ -72,38 +47,24 @@ public:
     static InitBridge& shared();
 
     /**
-     * @brief Register platform callbacks
-     *
-     * Must be called BEFORE initialize() to set up platform operations.
-     *
-     * @param callbacks Platform-specific callbacks
-     */
-    void setPlatformCallbacks(const PlatformCallbacks& callbacks);
-
-    /**
      * @brief Initialize the SDK
      *
      * 1. Registers platform adapter with RACommons
      * 2. Configures logging for environment
      * 3. Initializes SDK state
      *
-     * @param environment SDK environment (RAC_ENV_DEVELOPMENT/STAGING/PRODUCTION)
+     * @param environment SDK environment
+     * (RAC_ENV_DEVELOPMENT/STAGING/PRODUCTION)
      * @param apiKey API key for authentication
      * @param baseURL Base URL for API requests
-     * @param deviceId Persistent device identifier
      * @return RAC_SUCCESS or error code
      */
-    rac_result_t initialize(rac_environment_t environment,
-                           const std::string& apiKey,
-                           const std::string& baseURL,
-                           const std::string& deviceId,
-                           const std::string& platform,
-                           const std::string& sdkVersion,
-                           const std::string& buildToken,
-                           bool forceRefreshAssignments,
-                           bool flushTelemetry,
-                           bool discoverDownloadedModels,
-                           bool rescanLocalModels);
+    rac_result_t
+    initialize(rac_environment_t environment, const std::string &apiKey,
+               const std::string &baseURL, const std::string &platform,
+               const std::string &sdkVersion, const std::string &buildToken,
+               bool forceRefreshAssignments, bool flushTelemetry,
+               bool discoverDownloadedModels, bool rescanLocalModels);
 
     /**
      * @brief Complete deferred services initialization
@@ -146,7 +107,7 @@ public:
      * @param baseDirectory Native model base directory
      * @return RAC_SUCCESS or error code
      */
-    rac_result_t setBaseDirectory(const std::string& baseDirectory);
+    rac_result_t setBaseDirectory(const std::string &baseDirectory);
 
     /**
      * @brief Resolve the native default model base directory
@@ -158,9 +119,19 @@ public:
     std::string getDefaultModelBaseDirectory();
 
     /**
-     * @brief Shutdown the SDK
+     * @brief Quiesce device callbacks and run canonical Commons shutdown.
+     *
+     * Keeps telemetry, HTTP, the platform adapter, and local configuration
+     * alive so the coordinator can flush the terminal lifecycle event.
      */
-    void shutdown();
+    void shutdownCommons();
+
+    /**
+     * @brief Release RN-owned HTTP, adapter, and local configuration state.
+     *
+     * Call only after shutdownCommons() and telemetry teardown.
+     */
+    void releasePlatformState();
 
     /**
      * @brief Check if SDK is initialized
@@ -194,29 +165,16 @@ public:
     bool secureGet(const std::string& key, std::string& outValue);
 
     /**
-     * @brief Delete a value from secure storage
-     * @param key Storage key
-     * @return true if deleted or didn't exist
-     */
-    bool secureDelete(const std::string& key);
-
-    /**
-     * @brief Check if a key exists in secure storage
-     * @param key Storage key
-     * @return true if key exists
-     */
-    bool secureExists(const std::string& key);
-
-    /**
-     * @brief Get or create persistent device UUID
+     * @brief Get or create the effective persistent device UUID.
      *
-     * Strategy (matches Swift DeviceIdentity):
-     * 1. Try to load from secure storage (survives reinstalls)
-     * 2. If not found, generate new UUID and store
+     * Uses the explicit initialization override when present; otherwise
+     * delegates to the canonical commons resolver and preserves its exact
+     * error code. The output is cleared on failure.
      *
-     * @return Persistent device UUID
+     * @param outValue Resolved persistent device UUID.
+     * @return RAC_SUCCESS or the resolver's exact error code.
      */
-    std::string getPersistentDeviceUUID();
+    rac_result_t getPersistentDeviceUUID(std::string &outValue);
 
     // =========================================================================
     // Device Info (Synchronous)
@@ -318,21 +276,20 @@ public:
      * @param supabaseKey Supabase API key (for dev mode, empty for prod)
      * @return tuple<success, statusCode, responseBody, errorMessage>
      */
-    std::tuple<bool, int, std::string, std::string> httpPostSync(
-        const std::string& url,
-        const std::string& jsonBody,
-        const std::string& supabaseKey
-    );
+    std::tuple<bool, int, std::string, std::string>
+    httpPostSync(const std::string &url, const std::string &jsonBody,
+                 const std::string &supabaseKey);
 
-private:
+  private:
     InitBridge() = default;
-    ~InitBridge();
+    ~InitBridge() = default;
 
     // Disable copy/move
-    InitBridge(const InitBridge&) = delete;
-    InitBridge& operator=(const InitBridge&) = delete;
+    InitBridge(const InitBridge &) = delete;
+    InitBridge &operator=(const InitBridge &) = delete;
 
-    void registerPlatformAdapter();
+    rac_result_t registerPlatformAdapter();
+    void resetNativeState();
 
     bool initialized_ = false;
     bool adapterRegistered_ = false;
@@ -343,14 +300,11 @@ private:
     std::string baseURL_;
     std::string deviceId_;
     std::string platform_;
-    std::string sdkVersion_;  // SDK version from TypeScript SDKConstants
+    std::string sdkVersion_; // SDK version from TypeScript SDKConstants
     std::vector<uint8_t> phase2RequestBytes_;
 
     // Platform adapter - must persist for C++ to call
     rac_platform_adapter_t adapter_{};
-
-    // Platform callbacks from JS layer
-    PlatformCallbacks callbacks_{};
 };
 
 } // namespace bridges

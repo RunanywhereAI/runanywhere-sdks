@@ -97,7 +97,7 @@ Two patterns coexist:
 - **AudioRecordingService** — wraps `record` package; 16kHz mono WAV; emits normalized dB levels on a broadcast stream
 - **AudioPlayerService** — wraps `audioplayers`; constructs WAV headers from raw PCM16 bytes; writes temp files for playback
 - **ConversationStore** — file-based JSON persistence under `<documents>/Conversations/<id>.json`; messages carry optional `thinkingContent` and `MessageAnalytics`
-- **KeychainService / KeychainHelper** — wraps `flutter_secure_storage`; iOS Keychain with `first_unlock_this_device`, Android `EncryptedSharedPreferences`; keys prefixed with `com.runanywhere.RunAnywhereAI_`
+- **KeychainService / KeychainHelper** — wraps `flutter_secure_storage`; iOS Keychain with `first_unlock_this_device`, Android Keystore-backed secure storage; keys prefixed with `com.runanywhere.RunAnywhereAI_`
 - **PermissionService** — wraps `permission_handler`; requests microphone + speech (iOS only) for STT, camera for VLM
 
 ### SDK API Surface Used

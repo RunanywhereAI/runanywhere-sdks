@@ -75,10 +75,8 @@ rac_result_t rac_llm_extract_thinking(const char* text, const char** out_respons
  * proto fields populated by commons.
  */
 rac_result_t rac_llm_extract_thinking_with_tags(const char* text, const char* open_tag,
-                                                const char* close_tag,
-                                                const char** out_response,
-                                                size_t* out_response_len,
-                                                const char** out_thinking,
+                                                const char* close_tag, const char** out_response,
+                                                size_t* out_response_len, const char** out_thinking,
                                                 size_t* out_thinking_len);
 
 /**

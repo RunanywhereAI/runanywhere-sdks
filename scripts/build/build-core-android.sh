@@ -405,6 +405,7 @@ for ABI in "${ABIS[@]}"; do
         "--preset" "${PRESET}"
         "-DCMAKE_C_FLAGS=${PREFIX_MAP_FLAGS}"
         "-DCMAKE_CXX_FLAGS=${PREFIX_MAP_FLAGS}"
+        "-DRAC_INCLUDE_LOCAL_DEV_CONFIG=OFF"
     )
     QHEXRT_ENABLED=0
     if [ "${ABI}" = "arm64-v8a" ]; then

@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <mutex>
 #include <optional>
 #include <string>
 
@@ -44,17 +45,17 @@ public:
     /**
      * Check if configured
      */
-    bool isConfigured() const { return configured_; }
+    bool isConfigured() const;
 
     /**
      * Get base URL
      */
-    const std::string& getBaseURL() const { return baseURL_; }
+    std::string getBaseURL() const;
 
     /**
      * Get API key
      */
-    const std::string& getAPIKey() const { return apiKey_; }
+    std::string getAPIKey() const;
 
     /**
      * Set authorization token
@@ -71,6 +72,9 @@ public:
      */
     void clearAuthorizationToken();
 
+    /** Clear process-local endpoint and credential state. */
+    void reset();
+
     /**
      * Build full URL from endpoint
      */
@@ -83,6 +87,7 @@ private:
     HTTPBridge& operator=(const HTTPBridge&) = delete;
 
     bool configured_ = false;
+    mutable std::mutex mutex_;
     std::string baseURL_;
     std::string apiKey_;
     std::optional<std::string> authToken_;

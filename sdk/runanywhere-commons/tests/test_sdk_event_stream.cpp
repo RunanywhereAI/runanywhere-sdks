@@ -5,15 +5,18 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdio>
 #include <mutex>
 #include <thread>
 #include <vector>
 
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_sdk_state.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 #include "rac/lifecycle/rac_sdk_init.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
@@ -163,9 +166,8 @@ int main() {
         const std::string phase1_bytes = phase1_request.SerializeAsString();
         rac_proto_buffer_t phase1_result;
         rac_proto_buffer_init(&phase1_result);
-        rc = rac_sdk_init_phase1_proto(
-            reinterpret_cast<const uint8_t*>(phase1_bytes.data()), phase1_bytes.size(),
-            &phase1_result);
+        rc = rac_sdk_init_phase1_proto(reinterpret_cast<const uint8_t*>(phase1_bytes.data()),
+                                       phase1_bytes.size(), &phase1_result);
         CHECK(rc == RAC_SUCCESS, "phase1 proto succeeds");
         rac_proto_buffer_free(&phase1_result);
     }
@@ -247,6 +249,21 @@ int main() {
     CHECK(rac_sdk_event_poll(&noop_shutdown_poll) == RAC_ERROR_NOT_FOUND,
           "state shutdown after shutdown emits no SDKEvent");
     rac_proto_buffer_free(&noop_shutdown_poll);
+
+    CHECK(rac_state_initialize(RAC_ENV_PRODUCTION, "event-secret", "https://api.runanywhere.ai",
+                               "123e4567-e89b-12d3-a456-426614174000") == RAC_SUCCESS,
+          "state reinitializes for canonical shutdown event test");
+    rac_sdk_event_clear_queue();
+    rac_shutdown();
+    runanywhere::v1::SDKEvent canonical_shutdown;
+    CHECK(poll_event(&canonical_shutdown), "rac_shutdown publishes the canonical shutdown event");
+    CHECK(canonical_shutdown.category() == runanywhere::v1::EVENT_CATEGORY_SHUTDOWN,
+          "rac_shutdown event category is canonical");
+    rac_proto_buffer_t duplicate_shutdown_poll;
+    rac_proto_buffer_init(&duplicate_shutdown_poll);
+    CHECK(rac_sdk_event_poll(&duplicate_shutdown_poll) == RAC_ERROR_NOT_FOUND,
+          "rac_shutdown publishes exactly one shutdown event");
+    rac_proto_buffer_free(&duplicate_shutdown_poll);
 
     // Hardware-profile and engine-route SDKEvents were removed with the routing
     // scorer — backend selection is now simple priority order via
@@ -362,6 +379,165 @@ int main() {
           "concurrent publishes do not tear the subscriber buffer view");
 
     rac_sdk_event_unsubscribe(concurrent_sub);
+    rac_sdk_event_clear_queue();
+
+    // A callback may unsubscribe itself and then quiesce before releasing its
+    // host-side user_data. Quiesce must exclude the current callback frame or
+    // this reentrant cleanup deadlocks waiting for itself.
+    struct SelfUnsubscribeContext {
+        uint64_t subscription_id = 0;
+        std::atomic<uint64_t> callbacks{0};
+        std::atomic<bool> quiesce_returned{false};
+    } self_unsubscribe;
+
+    auto self_unsubscribe_callback = +[](const uint8_t*, size_t, void* user_data) {
+        auto* context = static_cast<SelfUnsubscribeContext*>(user_data);
+        context->callbacks.fetch_add(1, std::memory_order_relaxed);
+        rac_sdk_event_unsubscribe(context->subscription_id);
+        rac_sdk_event_quiesce();
+        context->quiesce_returned.store(true, std::memory_order_release);
+    };
+
+    self_unsubscribe.subscription_id =
+        rac_sdk_event_subscribe(self_unsubscribe_callback, &self_unsubscribe);
+    CHECK(self_unsubscribe.subscription_id != 0, "self-unsubscribe subscription succeeds");
+    constexpr uint8_t kSelfUnsubscribeEvent = 1;
+    CHECK(rac_sdk_event_publish_proto(&kSelfUnsubscribeEvent, 1) == RAC_SUCCESS,
+          "self-unsubscribe callback returns from quiesce");
+    CHECK(self_unsubscribe.callbacks.load(std::memory_order_acquire) == 1 &&
+              self_unsubscribe.quiesce_returned.load(std::memory_order_acquire),
+          "reentrant quiesce excludes its current callback frame");
+    CHECK(rac_sdk_event_publish_proto(&kSelfUnsubscribeEvent, 1) == RAC_SUCCESS &&
+              self_unsubscribe.callbacks.load(std::memory_order_acquire) == 1,
+          "self-unsubscribed callback is not dispatched again");
+    rac_sdk_event_clear_queue();
+
+    // Reentrant exclusion is thread-local: a caller must still wait for an
+    // in-flight callback owned by another publishing thread.
+    struct BlockingSDKEventCallback {
+        std::mutex mutex;
+        std::condition_variable entered_condition;
+        std::condition_variable release_condition;
+        bool entered = false;
+        bool release = false;
+    } blocking_event;
+
+    auto blocking_event_callback = +[](const uint8_t*, size_t, void* user_data) {
+        auto* state = static_cast<BlockingSDKEventCallback*>(user_data);
+        std::unique_lock<std::mutex> lock(state->mutex);
+        state->entered = true;
+        state->entered_condition.notify_all();
+        state->release_condition.wait(lock, [state] { return state->release; });
+    };
+
+    const uint64_t blocking_sub = rac_sdk_event_subscribe(blocking_event_callback, &blocking_event);
+    CHECK(blocking_sub != 0, "blocking SDKEvent subscription succeeds");
+    std::atomic<rac_result_t> blocking_publish_result{RAC_ERROR_UNKNOWN};
+    std::thread blocking_publish_thread([&] {
+        blocking_publish_result.store(rac_sdk_event_publish_proto(&kSelfUnsubscribeEvent, 1),
+                                      std::memory_order_release);
+    });
+    {
+        std::unique_lock<std::mutex> lock(blocking_event.mutex);
+        blocking_event.entered_condition.wait(lock, [&] { return blocking_event.entered; });
+    }
+
+    rac_sdk_event_unsubscribe(blocking_sub);
+    std::atomic<bool> event_quiesce_finished{false};
+    std::thread event_quiesce_thread([&] {
+        rac_sdk_event_quiesce();
+        event_quiesce_finished.store(true, std::memory_order_release);
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    CHECK(!event_quiesce_finished.load(std::memory_order_acquire),
+          "quiesce waits for a callback on another thread");
+
+    {
+        std::lock_guard<std::mutex> lock(blocking_event.mutex);
+        blocking_event.release = true;
+    }
+    blocking_event.release_condition.notify_all();
+    blocking_publish_thread.join();
+    event_quiesce_thread.join();
+    CHECK(blocking_publish_result.load(std::memory_order_acquire) == RAC_SUCCESS &&
+              event_quiesce_finished.load(std::memory_order_acquire),
+          "quiesce returns after the other thread's callback completes");
+    rac_sdk_event_clear_queue();
+
+    // Detaching the borrowed telemetry manager must quiesce both router and
+    // explicit-flush leases before it returns. Hold a flush inside its platform
+    // callback, publish concurrently, and verify detach cannot complete until
+    // that callback is released. The caller then destroys the manager safely.
+    struct BlockingTelemetryHTTP {
+        std::mutex mutex;
+        std::condition_variable entered_condition;
+        std::condition_variable release_condition;
+        bool entered = false;
+        bool release = false;
+    } blocking_http;
+
+    auto blocking_http_callback =
+        +[](void* user_data, const char* /*endpoint*/, const char* /*json_body*/,
+            size_t /*json_length*/, rac_bool_t /*requires_auth*/) {
+            auto* state = static_cast<BlockingTelemetryHTTP*>(user_data);
+            std::unique_lock<std::mutex> lock(state->mutex);
+            state->entered = true;
+            state->entered_condition.notify_all();
+            state->release_condition.wait(lock, [state] { return state->release; });
+        };
+
+    auto* telemetry_manager =
+        rac_telemetry_manager_create(RAC_ENV_DEVELOPMENT, "lease-device", "test", "0.20.0");
+    CHECK(telemetry_manager != nullptr, "telemetry lease manager initializes");
+    rac_events_set_telemetry_sink(telemetry_manager);
+    // Seed before installing the blocking callback: development managers
+    // auto-flush every event as soon as a callback exists.
+    rac_sdk_event_publish_failure(RAC_ERROR_INVALID_ARGUMENT, "lease seed", "llm", "leaseSeed",
+                                  RAC_FALSE);
+    rac_telemetry_manager_set_http_callback(telemetry_manager, blocking_http_callback,
+                                            &blocking_http);
+
+    std::atomic<rac_result_t> flush_result{RAC_ERROR_UNKNOWN};
+    std::thread flush_thread(
+        [&] { flush_result.store(rac_events_flush_telemetry_sink(), std::memory_order_release); });
+    {
+        std::unique_lock<std::mutex> lock(blocking_http.mutex);
+        blocking_http.entered_condition.wait(lock, [&] { return blocking_http.entered; });
+    }
+
+    std::atomic<bool> keep_publishing{true};
+    std::thread route_thread([&] {
+        while (keep_publishing.load(std::memory_order_acquire)) {
+            rac_sdk_event_publish_failure(RAC_ERROR_INVALID_ARGUMENT, "lease route", "llm",
+                                          "leaseRoute", RAC_FALSE);
+        }
+    });
+
+    std::atomic<bool> detach_finished{false};
+    std::thread detach_thread([&] {
+        rac_events_set_telemetry_sink(nullptr);
+        detach_finished.store(true, std::memory_order_release);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    CHECK(!detach_finished.load(std::memory_order_acquire),
+          "telemetry detach waits for an in-flight flush lease");
+
+    {
+        std::lock_guard<std::mutex> lock(blocking_http.mutex);
+        blocking_http.release = true;
+    }
+    blocking_http.release_condition.notify_all();
+    flush_thread.join();
+    detach_thread.join();
+    keep_publishing.store(false, std::memory_order_release);
+    route_thread.join();
+
+    CHECK(flush_result.load(std::memory_order_acquire) == RAC_SUCCESS,
+          "leased telemetry flush completes successfully");
+    CHECK(detach_finished.load(std::memory_order_acquire),
+          "telemetry detach completes after all leases quiesce");
+    rac_telemetry_manager_destroy(telemetry_manager);
     rac_sdk_event_clear_queue();
 
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);

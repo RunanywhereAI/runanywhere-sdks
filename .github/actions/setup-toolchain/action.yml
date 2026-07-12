@@ -63,8 +63,9 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        actual_version="$(xcodebuild -version | awk '/^Xcode / { print $2; exit }')"
-        actual_build="$(xcodebuild -version | awk '/^Build version / { print $3; exit }')"
+        xcode_version_output="$(xcodebuild -version)"
+        actual_version="$(awk '/^Xcode / { print $2 }' <<< "$xcode_version_output")"
+        actual_build="$(awk '/^Build version / { print $3 }' <<< "$xcode_version_output")"
         if [ "$actual_version" != "$XCODE_VERSION" ] || [ "$actual_build" != "$XCODE_BUILD" ]; then
           echo "::error::Expected Xcode $XCODE_VERSION ($XCODE_BUILD), found $actual_version ($actual_build)."
           exit 1

@@ -47,9 +47,8 @@ std::string trim(std::string_view sv) {
 }
 
 rac_result_t extract_thinking_with_pair(const char* text, std::string_view open_tag,
-                                        std::string_view close_tag,
-                                        const char** out_response, size_t* out_response_len,
-                                        const char** out_thinking,
+                                        std::string_view close_tag, const char** out_response,
+                                        size_t* out_response_len, const char** out_thinking,
                                         size_t* out_thinking_len) {
     if (text == nullptr || out_response == nullptr || out_response_len == nullptr ||
         out_thinking == nullptr || out_thinking_len == nullptr) {
@@ -128,10 +127,11 @@ rac_result_t extract_thinking_with_pair(const char* text, std::string_view open_
     return RAC_SUCCESS;
 }
 
-rac_result_t extract_thinking_with_pairs(
-    const char* text, const std::pair<std::string_view, std::string_view>* pairs,
-    size_t pair_count, const char** out_response, size_t* out_response_len,
-    const char** out_thinking, size_t* out_thinking_len) {
+rac_result_t extract_thinking_with_pairs(const char* text,
+                                         const std::pair<std::string_view, std::string_view>* pairs,
+                                         size_t pair_count, const char** out_response,
+                                         size_t* out_response_len, const char** out_thinking,
+                                         size_t* out_thinking_len) {
     if (text == nullptr || out_response == nullptr || out_response_len == nullptr ||
         out_thinking == nullptr || out_thinking_len == nullptr) {
         return RAC_ERROR_NULL_POINTER;
@@ -179,10 +179,8 @@ rac_result_t rac_llm_extract_thinking(const char* text, const char** out_respons
 }
 
 rac_result_t rac_llm_extract_thinking_with_tags(const char* text, const char* open_tag,
-                                                const char* close_tag,
-                                                const char** out_response,
-                                                size_t* out_response_len,
-                                                const char** out_thinking,
+                                                const char* close_tag, const char** out_response,
+                                                size_t* out_response_len, const char** out_thinking,
                                                 size_t* out_thinking_len) {
     if (open_tag == nullptr || open_tag[0] == '\0' || close_tag == nullptr ||
         close_tag[0] == '\0') {

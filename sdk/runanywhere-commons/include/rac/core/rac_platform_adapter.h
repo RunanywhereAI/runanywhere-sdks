@@ -231,9 +231,9 @@ typedef struct rac_platform_adapter {
      *     RAC_ERROR_SECURE_STORAGE_FAILED (or another non-RAC_SUCCESS,
      *     non-RAC_ERROR_FILE_NOT_FOUND code).
      *   - Returning RAC_ERROR_NOT_FOUND, RAC_ERROR_SECURE_STORAGE_FAILED, or
-     *     any other code for the not-found case is a contract violation —
-     *     commons will conservatively treat all non-RAC_SUCCESS results as
-     *     "miss" today, but future consumers may rely on the discrimination.
+     *     any other code for the not-found case is a contract violation.
+     *     Commons propagates every non-miss failure and will not synthesize a
+     *     replacement identity after a real storage error.
      *
      * @param key Key name
      * @param out_value Output value (caller must free with rac_free); only

@@ -633,7 +633,7 @@ This package includes native bindings via Nitrogen/Nitro for:
 
 - **RACommons** — Core C++ infrastructure
 - **PlatformAdapter** — Platform-specific implementations
-- **SecureStorage** — Keychain (iOS) / EncryptedSharedPreferences (Android)
+- **SecureStorage** — Keychain (iOS) / Android Keystore-backed storage (Android)
 - **SDKLogger** — Native logging
 - **AudioDecoder** — Audio file decoding
 

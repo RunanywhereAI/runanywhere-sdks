@@ -21,12 +21,12 @@
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #else
-#include "rac_error.h"
-#include "rac_types.h"
 #include "rac_embeddings_service.h"
+#include "rac_error.h"
 #include "rac_llm_service.h"
 #include "rac_stt_service.h"
 #include "rac_tts_service.h"
+#include "rac_types.h"
 #include "rac_vlm_service.h"
 #endif
 
@@ -57,19 +57,21 @@ typedef rac_result_t (*rac_mlx_llm_generate_fn)(rac_handle_t handle, const char*
                                                 const rac_llm_options_t* options,
                                                 rac_llm_result_t* out_result, void* user_data);
 
-typedef rac_result_t (*rac_mlx_llm_generate_stream_fn)(
-    rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
-    rac_llm_stream_callback_fn callback, void* callback_user_data, void* user_data);
+typedef rac_result_t (*rac_mlx_llm_generate_stream_fn)(rac_handle_t handle, const char* prompt,
+                                                       const rac_llm_options_t* options,
+                                                       rac_llm_stream_callback_fn callback,
+                                                       void* callback_user_data, void* user_data);
 
 typedef rac_result_t (*rac_mlx_vlm_process_fn)(rac_handle_t handle, const rac_vlm_image_t* image,
-                                               const char* prompt,
-                                               const rac_vlm_options_t* options,
+                                               const char* prompt, const rac_vlm_options_t* options,
                                                rac_vlm_result_t* out_result, void* user_data);
 
-typedef rac_result_t (*rac_mlx_vlm_process_stream_fn)(
-    rac_handle_t handle, const rac_vlm_image_t* image, const char* prompt,
-    const rac_vlm_options_t* options, rac_vlm_stream_callback_fn callback,
-    void* callback_user_data, void* user_data);
+typedef rac_result_t (*rac_mlx_vlm_process_stream_fn)(rac_handle_t handle,
+                                                      const rac_vlm_image_t* image,
+                                                      const char* prompt,
+                                                      const rac_vlm_options_t* options,
+                                                      rac_vlm_stream_callback_fn callback,
+                                                      void* callback_user_data, void* user_data);
 
 typedef rac_result_t (*rac_mlx_embed_batch_fn)(rac_handle_t handle, const char* const* texts,
                                                size_t num_texts,
@@ -78,31 +80,30 @@ typedef rac_result_t (*rac_mlx_embed_batch_fn)(rac_handle_t handle, const char* 
                                                void* user_data);
 
 typedef rac_result_t (*rac_mlx_embedding_info_fn)(rac_handle_t handle,
-                                                  rac_embeddings_info_t* out_info,
-                                                  void* user_data);
+                                                  rac_embeddings_info_t* out_info, void* user_data);
 
 typedef rac_result_t (*rac_mlx_stt_transcribe_fn)(rac_handle_t handle, const void* audio_data,
                                                   size_t audio_size,
                                                   const rac_stt_options_t* options,
-                                                  rac_stt_result_t* out_result,
-                                                  void* user_data);
+                                                  rac_stt_result_t* out_result, void* user_data);
 
-typedef rac_result_t (*rac_mlx_stt_transcribe_stream_fn)(
-    rac_handle_t handle, const void* audio_data, size_t audio_size,
-    const rac_stt_options_t* options, rac_stt_stream_callback_t callback,
-    void* callback_user_data, void* user_data);
+typedef rac_result_t (*rac_mlx_stt_transcribe_stream_fn)(rac_handle_t handle,
+                                                         const void* audio_data, size_t audio_size,
+                                                         const rac_stt_options_t* options,
+                                                         rac_stt_stream_callback_t callback,
+                                                         void* callback_user_data, void* user_data);
 
 typedef rac_result_t (*rac_mlx_stt_info_fn)(rac_handle_t handle, rac_stt_info_t* out_info,
                                             void* user_data);
 
 typedef rac_result_t (*rac_mlx_tts_synthesize_fn)(rac_handle_t handle, const char* text,
                                                   const rac_tts_options_t* options,
-                                                  rac_tts_result_t* out_result,
-                                                  void* user_data);
+                                                  rac_tts_result_t* out_result, void* user_data);
 
-typedef rac_result_t (*rac_mlx_tts_synthesize_stream_fn)(
-    rac_handle_t handle, const char* text, const rac_tts_options_t* options,
-    rac_tts_stream_callback_t callback, void* callback_user_data, void* user_data);
+typedef rac_result_t (*rac_mlx_tts_synthesize_stream_fn)(rac_handle_t handle, const char* text,
+                                                         const rac_tts_options_t* options,
+                                                         rac_tts_stream_callback_t callback,
+                                                         void* callback_user_data, void* user_data);
 
 typedef rac_result_t (*rac_mlx_tts_stop_fn)(rac_handle_t handle, void* user_data);
 typedef rac_result_t (*rac_mlx_tts_info_fn)(rac_handle_t handle, rac_tts_info_t* out_info,

@@ -89,6 +89,15 @@ case "${PLATFORM}" in
     linux-*) LD_LIBRARY_PATH="${STAGE}/lib" "${STAGE}/bin/rcli" version >/dev/null ;;
 esac
 
+# Release artifacts must not disclose the packager's checkout location. Keep
+# this gate here so both CI smoke packages and tagged releases fail closed.
+while IFS= read -r -d '' artifact; do
+    if LC_ALL=C grep -aF -q -- "${REPO_ROOT}" "${artifact}"; then
+        echo "ERROR: packaged artifact embeds the local checkout path: ${artifact#"${STAGE}/"}" >&2
+        exit 1
+    fi
+done < <(find "${STAGE}/bin" "${STAGE}/lib" -type f -print0)
+
 mkdir -p "${DIST_DIR}"
 rm -f "${TARBALL}" "${TARBALL}.sha256"
 tar -czf "${TARBALL}" -C "${STAGE_ROOT}" "rcli-${PLATFORM}"

@@ -122,7 +122,6 @@ public enum DeviceInfoFactory {
         info.coreCount = Int32(coreCount)
         info.performanceCores = Int32(perfCores)
         info.efficiencyCores = Int32(effCores)
-        info.deviceFingerprint = CppBridge.Device.persistentId
         return info
     }
 

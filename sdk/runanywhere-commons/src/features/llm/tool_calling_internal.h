@@ -79,8 +79,7 @@ typedef struct rac_tool_calling_options {
     }
 
 rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_call_t* out_result);
-rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
-                                             rac_tool_call_format_t format,
+rac_result_t rac_tool_call_parse_with_format(const char* llm_output, rac_tool_call_format_t format,
                                              rac_tool_call_t* out_result);
 rac_result_t rac_tool_call_validate(const rac_tool_call_t* call,
                                     const rac_tool_definition_t* definitions,
@@ -95,9 +94,10 @@ rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_output);
 rac_tool_call_format_t rac_tool_call_format_from_name(const char* name);
 rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t* definitions,
                                          size_t num_definitions, char** out_prompt);
-rac_result_t rac_tool_call_format_prompt_with_format(
-    const rac_tool_definition_t* definitions, size_t num_definitions,
-    rac_tool_call_format_t format, char** out_prompt);
+rac_result_t rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions,
+                                                     size_t num_definitions,
+                                                     rac_tool_call_format_t format,
+                                                     char** out_prompt);
 rac_result_t rac_tool_call_format_prompt_json(const char* tools_json, char** out_prompt);
 rac_result_t rac_tool_call_format_prompt_json_with_format(const char* tools_json,
                                                           rac_tool_call_format_t format,
@@ -109,8 +109,7 @@ rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt, const c
                                                 const rac_tool_calling_options_t* options,
                                                 char** out_prompt);
 rac_result_t rac_tool_call_build_followup_prompt(const char* original_user_prompt,
-                                                 const char* tools_prompt,
-                                                 const char* tool_name,
+                                                 const char* tools_prompt, const char* tool_name,
                                                  const char* tool_result_json,
                                                  rac_bool_t keep_tools_available,
                                                  char** out_prompt);

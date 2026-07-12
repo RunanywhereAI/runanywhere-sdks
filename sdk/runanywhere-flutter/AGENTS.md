@@ -91,7 +91,7 @@ LlamaCpp | Sherpa/ONNX | QHexRT HNPU (Backend engines registered via vtable v4)
 3. **Two-phase SDK init.** Phase 1 (sync): library load → register `rac_platform_adapter_t` → `rac_sdk_init` → configure logging → register events/device/file-manager/telemetry callbacks. Phase 2 (async, fire-and-forget): device registration + authentication + model assignment + telemetry flush. Offline inference works without Phase 2. This is truly fire-and-forget — Phase 2 is now assigned to `_servicesInitFuture` without awaiting (Swift `Task.detached` parity); previously the implementation eagerly awaited despite the doc claim.
 4. **Platform HTTP transport injection.** iOS registers a URLSession-backed `rac_http_transport_ops_t` vtable from ObjC++; Android registers an OkHttp-backed vtable via JNI. C++ uses the installed transport for all HTTP.
 5. **EventBus = pure `dart:async`.** `lib/public/events/event_bus.dart` is a `StreamController.broadcast()` singleton. rxdart is **not** a dependency.
-6. **Secure storage vtable.** C++ auth manager calls Dart secure storage callbacks synchronously via a `_secureCache` map; Dart side wraps `flutter_secure_storage`.
+6. **Secure storage vtable.** C++ platform/auth managers call Dart callbacks synchronously. Flutter delegates those callbacks to plugin-owned native helpers: Keychain on Apple and Android Keystore AES-GCM with atomic no-backup ciphertext files on Android. A callback returns success only after the mutation completes.
 7. **Hand-written FFI bindings.** No `ffigen` is used. `lib/core/native/rac_native.dart` (~2.1K LOC) plus `lib/native/native_functions.dart` (~380 LOC cached lookup registry) define every C ABI binding.
 
 ### Native Library Loading
@@ -316,15 +316,15 @@ Both engines share the **underlying ONNX Runtime** (`libonnxruntime.so` / equiva
 
 | Package / Artifact | Version |
 |---|---|
-| `runanywhere` (Dart package) | 0.19.15 |
-| `runanywhere_llamacpp` | 0.19.15 |
-| `runanywhere_onnx` | 0.19.15 |
-| `runanywhere_qhexrt` | 0.19.15 |
+| `runanywhere` (Dart package) | 0.20.0 |
+| `runanywhere_llamacpp` | 0.20.0 |
+| `runanywhere_onnx` | 0.20.0 |
+| `runanywhere_qhexrt` | 0.20.0 |
 | `RACommons` native | 0.1.6 |
 | QHexRT native | private staged artifact |
 | llama.cpp engine | b7199 |
 | ONNX Runtime | 1.24.3 |
-| Canonical version source | `sdk/runanywhere-commons/VERSION` (0.19.15) |
+| Canonical version source | `sdk/runanywhere-commons/VERSION` (0.20.0) |
 
 ## 2026-07 Callback Architecture Update
 

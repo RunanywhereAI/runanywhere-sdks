@@ -353,11 +353,11 @@ void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status, const std
 
 // The handle is allocated before any LLM work and published synchronously so
 // hosts can fan it into a thread-safe cancellation sink before generation.
-static rac_result_t
-run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
-              rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
-              rac_tool_calling_handle_published_callback_fn on_handle_published,
-              void* on_handle_user_data, rac_proto_buffer_t* out_result) {
+static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
+                                  rac_tool_execute_callback_fn on_execute,
+                                  void* on_execute_user_data,
+                                  rac_tool_calling_handle_published_callback_fn on_handle_published,
+                                  void* on_handle_user_data, rac_proto_buffer_t* out_result) {
     if (!on_execute || !on_handle_published || !out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -709,11 +709,11 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
 #endif
 }
 
-extern "C" rac_result_t rac_tool_calling_run_loop_proto(
-    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
-    void* on_execute_user_data,
-    rac_tool_calling_handle_published_callback_fn on_handle_published,
-    void* on_handle_user_data, rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t
+rac_tool_calling_run_loop_proto(const uint8_t* in_request_bytes, size_t in_size,
+                                rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
+                                rac_tool_calling_handle_published_callback_fn on_handle_published,
+                                void* on_handle_user_data, rac_proto_buffer_t* out_result) {
     return run_loop_impl(in_request_bytes, in_size, on_execute, on_execute_user_data,
                          on_handle_published, on_handle_user_data, out_result);
 }
@@ -738,8 +738,7 @@ extern "C" rac_result_t rac_tool_calling_run_loop_cancel_proto(uint64_t run_loop
     std::lock_guard<std::mutex> guard(state->active_ref_mu);
     if (state->active_ref) {
         rac::llm::request_lifecycle_llm_cancel(state->active_ref);
-        if (state->generation_started && state->active_ref->ops &&
-            state->active_ref->ops->cancel) {
+        if (state->generation_started && state->active_ref->ops && state->active_ref->ops->cancel) {
             (void)state->active_ref->ops->cancel(state->active_ref->impl);
         }
     }

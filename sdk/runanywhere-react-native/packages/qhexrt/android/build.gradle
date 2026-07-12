@@ -140,8 +140,8 @@ def syncAndroidNdkRuntimeLibs(File outputDir) {
 }
 
 android {
-    namespace "com.margelo.nitro.runanywhere.qhexrt"
-    ndkVersion rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.3.13750724"
+    namespace = "com.margelo.nitro.runanywhere.qhexrt"
+    ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.3.13750724"
 
     compileSdkVersion getExtOrIntegerDefault('compileSdkVersion')
 
@@ -166,7 +166,7 @@ android {
     externalNativeBuild {
         cmake {
             path "CMakeLists.txt"
-            version "3.30.5"
+            version = "3.30.5"
         }
     }
 
@@ -190,8 +190,8 @@ android {
     }
 
     buildFeatures {
-        buildConfig true
-        prefab true
+        buildConfig = true
+        prefab = true
     }
 
     buildTypes {

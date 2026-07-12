@@ -190,8 +190,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
 
     // Step 9: Handle response
     if (result != RAC_SUCCESS || response.result != RAC_SUCCESS) {
-        const rac_result_t response_result =
-            result != RAC_SUCCESS ? result : response.result;
+        const rac_result_t response_result = result != RAC_SUCCESS ? result : response.result;
         if (response_result == RAC_ERROR_NOT_INITIALIZED) {
             // Browser callbacks start a bounded fetch on the event loop and
             // return this sentinel. The Web facade awaits it and invokes this
@@ -245,14 +244,27 @@ void rac_device_manager_clear_registration(void) {
 }
 
 const char* rac_device_manager_get_device_id(void) {
+    static thread_local std::string device_id_snapshot;
+
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
 
     if (!state.callbacks_set) {
+        device_id_snapshot.clear();
         return nullptr;
     }
 
-    return state.callbacks.get_device_id(state.callbacks.user_data);
+    const char* device_id = state.callbacks.get_device_id(state.callbacks.user_data);
+    if (device_id == nullptr) {
+        device_id_snapshot.clear();
+        return nullptr;
+    }
+
+    // The callback owns its returned buffer and platform teardown may release
+    // that storage as soon as this critical section ends. Snapshot it before
+    // unlocking so callers never observe callback-owned memory after return.
+    device_id_snapshot = device_id;
+    return device_id_snapshot.c_str();
 }
 
 }  // extern "C"

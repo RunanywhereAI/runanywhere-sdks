@@ -32,7 +32,7 @@ dependencies:
   permission_handler: ^12.0.3
   shared_preferences: ^2.5.5
   # Secure storage (iOS Keychain, Android Keystore)
-  flutter_secure_storage: ^10.2.0
+  flutter_secure_storage: ^10.3.1
   # File system access
   path_provider: ^2.1.5
   # Device information — bumped 2026-05-19 (P10 dep-bump): aligned with
@@ -79,11 +79,11 @@ dependency_overrides:
   # and `package_info_plus 10.x` both require win32 ^6.x. Win32 is a
   # mobile-no-op (this app targets iOS/Android only), so 6.x is safe.
   win32: ^6.2.0
-  # flutter_secure_storage 10.2.0 pulls in flutter_secure_storage_windows
+  # flutter_secure_storage 10.3.1 pulls in flutter_secure_storage_windows
   # 4.1.0 which hard-codes win32 ^5.5.4 — incompatible with the win32 6.x
-  # override above. 4.2.1 (latest) declares win32 ^6.0.1 and compiles on
+  # override above. 4.2.2 declares win32 ^6.0.1 and compiles on the
   # Android target. P10 dep-bump 2026-05-19.
-  flutter_secure_storage_windows: ^4.2.1
+  flutter_secure_storage_windows: ^4.2.2
 
 flutter:
   uses-material-design: true

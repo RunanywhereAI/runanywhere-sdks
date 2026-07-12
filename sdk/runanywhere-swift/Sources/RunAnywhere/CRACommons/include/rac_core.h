@@ -68,8 +68,11 @@ RAC_API rac_result_t rac_init(const rac_config_t* config);
 /**
  * Shuts down the commons library.
  *
- * This releases all resources and unregisters all modules. Any active
- * handles become invalid after this call.
+ * This is the canonical process-lifetime teardown boundary. It quiesces
+ * device callbacks, clears runtime state, auth-storage callbacks, copied SDK
+ * configuration/credentials, and the platform adapter. A real initialized
+ * lifetime emits exactly one canonical shutdown event. Any active handles
+ * become invalid after this call. The operation is idempotent.
  */
 RAC_API void rac_shutdown(void);
 
@@ -95,7 +98,7 @@ RAC_API rac_version_t rac_get_version(void);
  * truth every platform SDK delegates to for its public `version` constant
  * instead of hand-maintaining a copy that can drift.
  *
- * @return Static, NUL-terminated version string (e.g. "0.19.13"); never NULL,
+ * @return Static, NUL-terminated version string (e.g. "0.20.0"); never NULL,
  *         valid for the lifetime of the process. Do not free.
  */
 RAC_API const char* rac_sdk_get_version(void);

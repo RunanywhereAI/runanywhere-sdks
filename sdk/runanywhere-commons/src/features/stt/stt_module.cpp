@@ -522,10 +522,10 @@ void emit_stt_stream_event(const runanywhere::v1::STTStreamEvent& event,
     }
 }
 
-void publish_stt_voice_event(runanywhere::v1::VoiceEventKind kind, const char* text,
-                             float confidence, rac_result_t error_code = RAC_SUCCESS,
-                             runanywhere::v1::EventDestination destination =
-                                 runanywhere::v1::EVENT_DESTINATION_ALL) {
+void publish_stt_voice_event(
+    runanywhere::v1::VoiceEventKind kind, const char* text, float confidence,
+    rac_result_t error_code = RAC_SUCCESS,
+    runanywhere::v1::EventDestination destination = runanywhere::v1::EVENT_DESTINATION_ALL) {
     runanywhere::v1::SDKEvent event;
     event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_id(generate_unique_id());
@@ -1177,10 +1177,9 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         // transcribe_stream per chunk), so routing it to telemetry produced
         // rows + an HTTP flush per chunk. The session summary is recorded once
         // at rac_stt_stream_stop_proto instead.
-        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
-                                          runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
-                                          transcription_id.c_str(),
-                                          runanywhere::v1::EVENT_DESTINATION_PUBLIC);
+        rac::events::publish_with_session(
+            runanywhere::v1::SDK_COMPONENT_STT, runanywhere::v1::EVENT_CATEGORY_STT,
+            std::move(voice), transcription_id.c_str(), runanywhere::v1::EVENT_DESTINATION_PUBLIC);
     }
 #endif
 
@@ -1241,10 +1240,9 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         // PUBLIC only: per-chunk completion (see the STARTED emit above). The
         // STT_COMPLETED kind is a telemetry completion trigger, so on the
         // telemetry path it forced one HTTP flush PER CHUNK.
-        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
-                                          runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
-                                          transcription_id.c_str(),
-                                          runanywhere::v1::EVENT_DESTINATION_PUBLIC);
+        rac::events::publish_with_session(
+            runanywhere::v1::SDK_COMPONENT_STT, runanywhere::v1::EVENT_CATEGORY_STT,
+            std::move(voice), transcription_id.c_str(), runanywhere::v1::EVENT_DESTINATION_PUBLIC);
 #endif
     }
 
@@ -1814,11 +1812,10 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
                                       std::chrono::steady_clock::now() - transcribe_start)
                                       .count();
     if (rc != RAC_SUCCESS) {
-        publish_stt_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED,
-                                    transcription_id.c_str(), ref.model_id, nullptr, 0.0f,
-                                    processing_ms, 0, 0, 0, 0.0, options.language,
-                                    options.sample_rate, rac_error_message(rc),
-                                    ref.framework_name, /*is_streaming=*/false);
+        publish_stt_lifecycle_event(
+            runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED, transcription_id.c_str(), ref.model_id,
+            nullptr, 0.0f, processing_ms, 0, 0, 0, 0.0, options.language, options.sample_rate,
+            rac_error_message(rc), ref.framework_name, /*is_streaming=*/false);
         rac::lifecycle::release_lifecycle_stt(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
@@ -1854,11 +1851,11 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
         (duration_ms > 0 && processing_ms > 0)
             ? static_cast<double>(duration_ms) / static_cast<double>(processing_ms)
             : 0.0;
-    publish_stt_lifecycle_event(
-        runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED, transcription_id.c_str(), ref.model_id,
-        raw.text, raw.confidence, processing_ms, duration_ms,
-        static_cast<int32_t>(audio.size()), word_count, real_time_factor, options.language,
-        options.sample_rate, nullptr, ref.framework_name, /*is_streaming=*/false);
+    publish_stt_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED,
+                                transcription_id.c_str(), ref.model_id, raw.text, raw.confidence,
+                                processing_ms, duration_ms, static_cast<int32_t>(audio.size()),
+                                word_count, real_time_factor, options.language, options.sample_rate,
+                                nullptr, ref.framework_name, /*is_streaming=*/false);
 
     rc = copy_proto(output, out_result);
     rac_stt_result_free(&raw);

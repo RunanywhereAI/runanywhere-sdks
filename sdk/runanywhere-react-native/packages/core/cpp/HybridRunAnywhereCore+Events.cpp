@@ -6,6 +6,9 @@
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
+#include <exception>
+#include <stdexcept>
+
 namespace margelo::nitro::runanywhere {
 
 using namespace ::runanywhere::bridges;
@@ -105,9 +108,27 @@ HybridRunAnywhereCore::subscribeSDKEventsProto(
         }
 
         registration->subscriptionId = subscriptionId;
+        std::exception_ptr insertionError;
         {
             std::lock_guard<std::mutex> lock(g_sdkEventProtoMutex);
-            g_sdkEventProtoRegistrations[subscriptionId] = registration;
+            try {
+              const bool inserted = g_sdkEventProtoRegistrations
+                                        .emplace(subscriptionId, registration)
+                                        .second;
+              if (!inserted) {
+                insertionError = std::make_exception_ptr(
+                    std::runtime_error("duplicate SDKEvent subscription id"));
+              }
+            } catch (...) {
+              insertionError = std::current_exception();
+            }
+        }
+        if (insertionError != nullptr) {
+          registration->active.store(false, std::memory_order_release);
+          rac_sdk_event_unsubscribe(subscriptionId);
+          rac_sdk_event_quiesce();
+          delete registration;
+          std::rethrow_exception(insertionError);
         }
 
         return static_cast<double>(subscriptionId);

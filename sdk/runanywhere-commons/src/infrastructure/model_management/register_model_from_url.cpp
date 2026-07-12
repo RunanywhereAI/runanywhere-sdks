@@ -24,8 +24,8 @@
  * workaround is needed to skip already-known IDs.
  */
 
-#include "hf_resolver.h"
 #include "bundle_policy_registry_internal.h"
+#include "hf_resolver.h"
 
 #include <cstdint>
 #include <cstring>

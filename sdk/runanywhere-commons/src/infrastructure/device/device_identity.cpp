@@ -17,6 +17,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -29,15 +30,30 @@ constexpr const char* kLogCategory = "DeviceIdentity";
 constexpr const char* kSecureStorageKey = "com.runanywhere.sdk.device.uuid";
 constexpr size_t kCanonicalUuidLen = 36u;  // 8-4-4-4-12 plus four hyphens
 
-struct DeviceIdentityState {
-    std::mutex mutex;
-    std::string cached;  // empty when uncached
-    const rac_platform_adapter_t* cached_adapter = nullptr;
-};
+std::mutex& identity_mutex() {
+    static std::mutex mutex;
+    return mutex;
+}
 
-DeviceIdentityState& get_state() {
-    static DeviceIdentityState state;
-    return state;
+bool is_canonical_uuid(std::string_view value) {
+    if (value.size() != kCanonicalUuidLen) {
+        return false;
+    }
+    for (size_t i = 0; i < value.size(); ++i) {
+        const char c = value[i];
+        if (i == 8 || i == 13 || i == 18 || i == 23) {
+            if (c != '-') {
+                return false;
+            }
+            continue;
+        }
+        const bool is_hex =
+            (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        if (!is_hex) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /**
@@ -84,22 +100,31 @@ struct SecureGetResult {
  */
 SecureGetResult try_secure_get(const rac_platform_adapter_t* adapter) {
     if (!adapter || !adapter->secure_get) {
-        return {RAC_ERROR_FILE_NOT_FOUND, std::string()};
+        return {RAC_ERROR_ADAPTER_NOT_SET, std::string()};
     }
 
     char* raw = nullptr;
     rac_result_t rc = adapter->secure_get(kSecureStorageKey, &raw, adapter->user_data);
-    if (rc != RAC_SUCCESS || raw == nullptr) {
+    if (rc != RAC_SUCCESS) {
+        if (raw != nullptr) {
+            rac_free(raw);
+        }
         return {rc, std::string()};
+    }
+    if (raw == nullptr) {
+        return {RAC_ERROR_SECURE_STORAGE_FAILED, std::string()};
     }
 
     std::string value(raw);
     rac_free(raw);
+    if (!is_canonical_uuid(value)) {
+        return {RAC_ERROR_SECURE_STORAGE_FAILED, std::string()};
+    }
     return {RAC_SUCCESS, value};
 }
 
 bool is_clean_secure_miss(rac_result_t rc) {
-    return rc == RAC_ERROR_FILE_NOT_FOUND || rc == RAC_ERROR_NOT_FOUND;
+    return rc == RAC_ERROR_FILE_NOT_FOUND;
 }
 
 /**
@@ -123,23 +148,25 @@ std::string try_vendor_id(const rac_platform_adapter_t* adapter) {
     if (buffer[0] == '\0') {
         return std::string();
     }
-    return std::string(buffer);
+    std::string value(buffer);
+    return is_canonical_uuid(value) ? value : std::string();
 }
 
 /**
- * Persist the resolved id back into secure storage. Logs but does not fail
- * the resolution if the write fails — Swift's DeviceIdentity uses `try?` here
- * for the same reason.
+ * Persist the resolved id back into secure storage. The callback is mandatory:
+ * callers must never observe or cache an identity that was not durably
+ * committed.
  */
-void try_secure_set(const rac_platform_adapter_t* adapter, const std::string& value) {
+rac_result_t try_secure_set(const rac_platform_adapter_t* adapter, const std::string& value) {
     if (!adapter || !adapter->secure_set) {
-        return;
+        return RAC_ERROR_ADAPTER_NOT_SET;
     }
     rac_result_t rc = adapter->secure_set(kSecureStorageKey, value.c_str(), adapter->user_data);
     if (rc != RAC_SUCCESS) {
         RAC_LOG_WARNING(kLogCategory, "Failed to persist device id to secure storage (rc=%d)",
                         static_cast<int>(rc));
     }
+    return rc;
 }
 
 /**
@@ -168,9 +195,9 @@ rac_result_t rac_device_get_or_create_persistent_id(char* out, size_t out_size) 
     if (out_size < RAC_DEVICE_ID_BUFFER_MIN_SIZE) {
         return RAC_ERROR_BUFFER_TOO_SMALL;
     }
+    out[0] = '\0';
 
-    auto& state = get_state();
-    std::lock_guard<std::mutex> lock(state.mutex);
+    std::lock_guard<std::mutex> lock(identity_mutex());
 
     const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
     if (adapter == nullptr) {
@@ -178,65 +205,43 @@ rac_result_t rac_device_get_or_create_persistent_id(char* out, size_t out_size) 
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    // Re-read secure storage before trusting the in-process cache so a
-    // shutdown/re-init with a different backing store cannot return a stale id.
     SecureGetResult secure_result = try_secure_get(adapter);
     if (!secure_result.value.empty()) {
         RAC_LOG_DEBUG(kLogCategory, "Loaded device id from secure storage");
-        state.cached = std::move(secure_result.value);
-        state.cached_adapter = adapter;
-        return copy_into_out(state.cached, out, out_size);
+        return copy_into_out(secure_result.value, out, out_size);
     }
 
     if (secure_result.rc != RAC_SUCCESS && !is_clean_secure_miss(secure_result.rc)) {
-        if (!state.cached.empty() && state.cached_adapter == adapter) {
-            RAC_LOG_WARNING(kLogCategory,
-                            "Secure storage read failed (rc=%d); using cached device id",
-                            static_cast<int>(secure_result.rc));
-            return copy_into_out(state.cached, out, out_size);
-        }
         RAC_LOG_ERROR(kLogCategory, "Secure storage read failed (rc=%d); refusing new device id",
                       static_cast<int>(secure_result.rc));
         return secure_result.rc;
     }
 
-    if (!state.cached.empty() && state.cached_adapter == adapter &&
-        adapter->secure_get == nullptr) {
-        return copy_into_out(state.cached, out, out_size);
-    }
-    state.cached.clear();
-    state.cached_adapter = nullptr;
-
     // 1) Platform vendor id (Apple identifierForVendor, etc.).
     std::string resolved = try_vendor_id(adapter);
     if (!resolved.empty()) {
         RAC_LOG_DEBUG(kLogCategory, "Resolved device id from platform vendor id");
-        try_secure_set(adapter, resolved);
-        state.cached = std::move(resolved);
-        state.cached_adapter = adapter;
-        return copy_into_out(state.cached, out, out_size);
+        const rac_result_t persist_rc = try_secure_set(adapter, resolved);
+        if (persist_rc != RAC_SUCCESS) {
+            return persist_rc;
+        }
+        return copy_into_out(resolved, out, out_size);
     }
 
     // 2) Synthesize a fresh UUID.
     resolved = generate_uuid_v4();
-    if (resolved.size() != kCanonicalUuidLen) {
+    if (!is_canonical_uuid(resolved)) {
         // generate_uuid_v4 has a deterministic length contract; this branch is
         // a defensive guard only.
         RAC_LOG_ERROR(kLogCategory, "Generated UUID has unexpected length: %zu", resolved.size());
         return RAC_ERROR_INTERNAL;
     }
+    const rac_result_t persist_rc = try_secure_set(adapter, resolved);
+    if (persist_rc != RAC_SUCCESS) {
+        return persist_rc;
+    }
     RAC_LOG_DEBUG(kLogCategory, "Generated and persisted new device id");
-    try_secure_set(adapter, resolved);
-    state.cached = std::move(resolved);
-    state.cached_adapter = adapter;
-    return copy_into_out(state.cached, out, out_size);
-}
-
-void rac_device_identity_reset_cache_for_testing(void) {
-    auto& state = get_state();
-    std::lock_guard<std::mutex> lock(state.mutex);
-    state.cached.clear();
-    state.cached_adapter = nullptr;
+    return copy_into_out(resolved, out, out_size);
 }
 
 }  // extern "C"

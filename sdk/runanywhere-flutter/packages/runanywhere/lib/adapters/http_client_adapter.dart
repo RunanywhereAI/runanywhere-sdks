@@ -87,6 +87,30 @@ class _HttpRequestResult {
   final int elapsedMs;
 }
 
+class _HttpAdapterSnapshot {
+  const _HttpAdapterSnapshot({
+    required this.generation,
+    required this.baseURL,
+    required this.apiKey,
+    required this.environment,
+    required this.accessToken,
+    required this.timeoutMs,
+    required this.supabaseKey,
+    required this.tokenResolver,
+    required this.refreshTokenCallback,
+  });
+
+  final int generation;
+  final String baseURL;
+  final String apiKey;
+  final SDKEnvironment environment;
+  final String? accessToken;
+  final int timeoutMs;
+  final String supabaseKey;
+  final Future<String?> Function({required bool requiresAuth})? tokenResolver;
+  final Future<String?> Function()? refreshTokenCallback;
+}
+
 /// High-level HTTP client shared across the Flutter SDK.
 ///
 /// Usage:
@@ -119,6 +143,7 @@ class HTTPClientAdapter {
   // Development (Supabase) overrides.
   String _supabaseURL = '';
   String _supabaseKey = '';
+  int _configurationGeneration = 0;
 
   // Per-request token resolver (injected by auth bridge to avoid a
   // cyclic import between this adapter and DartBridgeAuth).
@@ -135,19 +160,19 @@ class HTTPClientAdapter {
     SDKEnvironment environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
     int timeoutMs = defaultTimeoutMs,
   }) {
+    _configurationGeneration++;
     _baseURL = baseURL;
     _apiKey = apiKey;
     _environment = environment;
     _timeoutMs = timeoutMs;
-    _logger.info(
-      'Configured for ${environment.name} environment: ${_hostname(baseURL)}',
-    );
+    _logger.info('Configured for ${environment.name} environment');
   }
 
   void configureDev({
     required String supabaseURL,
     required String supabaseKey,
   }) {
+    _configurationGeneration++;
     if (!DartBridgeDevConfig.isUsableHttpUrl(supabaseURL) ||
         !DartBridgeDevConfig.isUsableCredential(supabaseKey)) {
       _supabaseURL = '';
@@ -214,15 +239,21 @@ class HTTPClientAdapter {
     int? timeoutMs,
     bool followRedirects = true,
   }) async {
+    final requestHeaders = headers ?? const <String, String>{};
     final spec = _HttpRequestSpec(
       method: method.toUpperCase(),
       url: url,
-      headers: headers ?? const <String, String>{},
+      headers: requestHeaders,
       body: body,
       timeoutMs: timeoutMs ?? _timeoutMs,
-      followRedirects: followRedirects,
+      // Enforce the credential policy at the lowest Dart transport boundary.
+      // This also protects internal callers that intentionally use rawRequest.
+      followRedirects: _redirectsAllowedForHeaders(
+        followRedirects,
+        requestHeaders,
+      ),
     );
-    _logger.debug('${spec.method} ${spec.url}');
+    _logger.debug('${spec.method} HTTP request');
     // Commons HTTP now routes through platform transports:
     //   - iOS: URLSession via RACommons.xcframework (H3)
     //   - Android: OkHttp via librac_commons_jni.so (H4)
@@ -256,48 +287,62 @@ class HTTPClientAdapter {
     int? timeoutMs,
     bool followRedirects = true,
   }) async {
-    if (!isConfigured) {
+    final snapshot = _snapshot();
+    if (snapshot.baseURL.isEmpty) {
       throw HttpClientException('HTTPClientAdapter not configured');
     }
 
-    final url = _buildFullURL(path);
+    final url = _buildFullURL(path, snapshot.baseURL);
     final resolvedHeaders = await _buildHeaders(
+      snapshot: snapshot,
       path: path,
       extra: headers,
       requiresAuth: requiresAuth,
     );
+    _requireCurrentConfiguration(snapshot.generation);
     final encodedBody = _encodeBody(body);
 
     var response = await rawRequest(
       method: method,
-      url: _maybeAppendSupabaseUpsert(url, path),
+      url: _maybeAppendSupabaseUpsert(url, path, snapshot.environment),
       headers: resolvedHeaders,
       body: encodedBody,
-      timeoutMs: timeoutMs,
-      followRedirects: followRedirects,
+      timeoutMs: timeoutMs ?? snapshot.timeoutMs,
+      followRedirects: _redirectsAllowedForHeaders(
+        followRedirects,
+        resolvedHeaders,
+      ),
     );
+    _requireCurrentConfiguration(snapshot.generation);
 
     // Retry-once on 401 after a token refresh.
     if (response.statusCode == 401 &&
         requiresAuth &&
-        _refreshTokenCallback != null) {
+        snapshot.refreshTokenCallback != null) {
       try {
-        final newToken = await _refreshTokenCallback!.call();
+        _requireCurrentConfiguration(snapshot.generation);
+        final newToken = await snapshot.refreshTokenCallback!.call();
+        _requireCurrentConfiguration(snapshot.generation);
         if (newToken != null && newToken.isNotEmpty) {
           _accessToken = newToken;
           final retryHeaders = Map<String, String>.from(resolvedHeaders);
           retryHeaders['Authorization'] = 'Bearer $newToken';
           response = await rawRequest(
             method: method,
-            url: _maybeAppendSupabaseUpsert(url, path),
+            url: _maybeAppendSupabaseUpsert(url, path, snapshot.environment),
             headers: retryHeaders,
             body: encodedBody,
-            timeoutMs: timeoutMs,
-            followRedirects: followRedirects,
+            timeoutMs: timeoutMs ?? snapshot.timeoutMs,
+            followRedirects: _redirectsAllowedForHeaders(
+              followRedirects,
+              retryHeaders,
+            ),
           );
+          _requireCurrentConfiguration(snapshot.generation);
         }
-      } catch (e) {
-        _logger.warning('Token refresh failed: $e');
+      } catch (_) {
+        _requireCurrentConfiguration(snapshot.generation);
+        _logger.warning('Token refresh failed');
       }
     }
 
@@ -360,8 +405,9 @@ class HTTPClientAdapter {
     timeoutMs: timeoutMs,
   );
 
-  /// Reset for testing — clears config + token resolver hooks.
-  void resetForTesting() {
+  /// Clear every lifetime-scoped endpoint, credential, and auth callback.
+  void shutdown() {
+    _configurationGeneration++;
     _baseURL = '';
     _apiKey = '';
     _environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
@@ -377,21 +423,25 @@ class HTTPClientAdapter {
   // Internal helpers
   // --------------------------------------------------------------------------
 
-  String _buildFullURL(String path) {
+  String _buildFullURL(String path, String configuredBaseURL) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;
     }
-    final base = baseURL.endsWith('/')
-        ? baseURL.substring(0, baseURL.length - 1)
-        : baseURL;
+    final base = configuredBaseURL.endsWith('/')
+        ? configuredBaseURL.substring(0, configuredBaseURL.length - 1)
+        : configuredBaseURL;
     final endpoint = path.startsWith('/') ? path : '/$path';
     return '$base$endpoint';
   }
 
   /// Supabase device-registration endpoints need `on_conflict=device_id`
   /// to do an UPSERT instead of rejecting duplicates.
-  String _maybeAppendSupabaseUpsert(String url, String path) {
-    if (_environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) return url;
+  String _maybeAppendSupabaseUpsert(
+    String url,
+    String path,
+    SDKEnvironment environment,
+  ) {
+    if (environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) return url;
     if (!_isDeviceRegistrationPath(path)) return url;
     final separator = url.contains('?') ? '&' : '?';
     return '$url${separator}on_conflict=device_id';
@@ -403,7 +453,25 @@ class HTTPClientAdapter {
         path.contains('rest/v1/sdk_devices');
   }
 
+  bool _redirectsAllowedForHeaders(
+    bool requested,
+    Map<String, String> headers,
+  ) {
+    if (!requested) return false;
+    const credentialHeaders = <String>{
+      'authorization',
+      'proxy-authorization',
+      'apikey',
+      'x-api-key',
+      'cookie',
+    };
+    return !headers.keys.any(
+      (name) => credentialHeaders.contains(name.toLowerCase()),
+    );
+  }
+
   Future<Map<String, String>> _buildHeaders({
+    required _HttpAdapterSnapshot snapshot,
     required String path,
     required Map<String, String>? extra,
     required bool requiresAuth,
@@ -416,42 +484,62 @@ class HTTPClientAdapter {
     final headers = _commonsDefaultHeaders();
     headers['X-Platform'] = SDKConstants.platform;
 
-    if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      if (_supabaseKey.isNotEmpty) {
-        headers['apikey'] = _supabaseKey;
-        headers['Authorization'] = 'Bearer $_supabaseKey';
+    if (snapshot.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+      if (snapshot.supabaseKey.isNotEmpty) {
+        headers['apikey'] = snapshot.supabaseKey;
+        headers['Authorization'] = 'Bearer ${snapshot.supabaseKey}';
         headers['Prefer'] = _isDeviceRegistrationPath(path)
             ? 'resolution=merge-duplicates'
             : 'return=representation';
       }
     } else {
-      if (requiresAuth && _tokenResolver != null) {
+      if (requiresAuth && snapshot.tokenResolver != null) {
         try {
-          final token = await _tokenResolver!.call(requiresAuth: true);
+          final token = await snapshot.tokenResolver!.call(requiresAuth: true);
           if (token != null && token.isNotEmpty) {
             headers['Authorization'] = 'Bearer $token';
-          } else if (_apiKey.isNotEmpty) {
-            headers['Authorization'] = 'Bearer $_apiKey';
+          } else if (snapshot.apiKey.isNotEmpty) {
+            headers['Authorization'] = 'Bearer ${snapshot.apiKey}';
           }
-        } catch (e) {
-          _logger.debug('Token resolver failed: $e');
-          if (_apiKey.isNotEmpty) {
-            headers['Authorization'] = 'Bearer $_apiKey';
+        } catch (_) {
+          _logger.debug('Token resolver failed');
+          if (snapshot.apiKey.isNotEmpty) {
+            headers['Authorization'] = 'Bearer ${snapshot.apiKey}';
           }
         }
       } else {
-        final token = _accessToken ?? _apiKey;
+        final token = snapshot.accessToken ?? snapshot.apiKey;
         if (token.isNotEmpty) {
           headers['Authorization'] = 'Bearer $token';
         }
       }
-      if (_apiKey.isNotEmpty) {
-        headers['apikey'] = _apiKey;
+      if (snapshot.apiKey.isNotEmpty) {
+        headers['apikey'] = snapshot.apiKey;
       }
     }
 
     if (extra != null) headers.addAll(extra);
     return headers;
+  }
+
+  _HttpAdapterSnapshot _snapshot() => _HttpAdapterSnapshot(
+    generation: _configurationGeneration,
+    baseURL: baseURL,
+    apiKey: _apiKey,
+    environment: _environment,
+    accessToken: _accessToken,
+    timeoutMs: _timeoutMs,
+    supabaseKey: _supabaseKey,
+    tokenResolver: _tokenResolver,
+    refreshTokenCallback: _refreshTokenCallback,
+  );
+
+  void _requireCurrentConfiguration(int generation) {
+    if (_configurationGeneration != generation) {
+      throw HttpClientException(
+        'HTTP adapter lifetime changed before request dispatch',
+      );
+    }
   }
 
   /// Snapshot of commons' canonical `rac_http_default_headers` list.
@@ -508,13 +596,6 @@ class HTTPClientAdapter {
         'HTTPClientAdapter: unsupported body type ${body.runtimeType}',
       );
     }
-  }
-
-  String _hostname(String url) {
-    final match = RegExp(r'^https?://([^/:]+)').firstMatch(url);
-    return match != null
-        ? match.group(1)!
-        : url.substring(0, url.length.clamp(0, 30));
   }
 }
 

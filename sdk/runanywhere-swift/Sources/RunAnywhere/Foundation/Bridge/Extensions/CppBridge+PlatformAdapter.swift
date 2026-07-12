@@ -121,6 +121,13 @@ extension CppBridge {
 
             SDKLogger(category: "CppBridge.PlatformAdapter").debug("Platform adapter registered")
         }
+
+        /// Mark the process-lifetime adapter for re-registration on the next
+        /// SDK lifetime. The backing vtable remains allocated in static state;
+        /// `rac_shutdown` only releases Commons' borrowed pointer.
+        static func unregister() {
+            registration.withLock { $0.isRegistered = false }
+        }
     }
 }
 

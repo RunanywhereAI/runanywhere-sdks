@@ -67,6 +67,7 @@ import { formatFramework } from './Helpers/formatFramework';
 import { EventBus } from './Events/EventBus';
 import {
   asSDKException,
+  sdkExceptionFromRcResult,
   SDKException,
 } from '../Foundation/Errors/SDKException';
 
@@ -81,6 +82,35 @@ let servicesInitPromise: Promise<void> | null = null;
 // In-flight Phase 1 promise shared across concurrent initialize() callers.
 // Mirrors Swift's `guard !isInitializedFlag else { return }` + Kotlin's `synchronized` guard.
 let initializingPromise: Promise<void> | null = null;
+// In-flight offline HTTP recovery. Reset joins this before native teardown so
+// retry cannot race credential/config release or rewrite a newer lifetime.
+let httpRetryPromise: Promise<void> | null = null;
+// Reset is a process-wide lifetime barrier: concurrent resets join it and new
+// initialization/services work waits until native destroy completes.
+let resetPromise: Promise<void> | null = null;
+let lifecycleGeneration = 0;
+// A failed native destroy leaves ownership uncertain. Keep the facade closed
+// until a later reset successfully completes teardown.
+let resetRequired = false;
+
+function requireCurrentLifecycle(
+  generation: number,
+  operation: string
+): void {
+  if (generation !== lifecycleGeneration) {
+    throw SDKException.notInitialized(`SDK lifetime ended during ${operation}`);
+  }
+}
+
+async function awaitSettlement(promise: Promise<unknown> | null): Promise<void> {
+  if (!promise) return;
+  try {
+    await promise;
+  } catch {
+    // The originating caller owns the error; reset still must destroy any
+    // partially initialized native lifetime.
+  }
+}
 
 /**
  * Decode the serialized `RASdkInitResult` returned by the native phase-2 /
@@ -100,6 +130,21 @@ function decodeSdkInitResultPayload(payload: ArrayBuffer): {
     httpConfigured: decoded.hasCompletedHttpSetup || decoded.httpConfigured,
     httpApplicable: decoded.httpApplicable,
   };
+}
+
+const nativeRacResultPattern = /(?:^|\s)RAC_RESULT=(-?\d+)(?:\s|$)/;
+
+/** Convert a native bridge failure carrying RAC_RESULT into the canonical proto error. */
+async function asNativeSDKException(error: unknown): Promise<SDKException> {
+  if (error instanceof Error) {
+    const match = nativeRacResultPattern.exec(error.message);
+    if (match?.[1]) {
+      const rc = Number.parseInt(match[1], 10);
+      const mapped = await sdkExceptionFromRcResult(rc);
+      if (mapped) return mapped;
+    }
+  }
+  return asSDKException(error);
 }
 
 function mapSdkInitEnvironment(
@@ -172,11 +217,21 @@ export const RunAnywhere = {
   // ============================================================================
 
   async initialize(options: SDKInitOptions = {}): Promise<void> {
+    const activeReset = resetPromise;
+    if (activeReset) await activeReset;
+    if (resetRequired) {
+      throw SDKException.notInitialized(
+        'Previous SDK teardown did not complete; call reset() again'
+      );
+    }
+
     // Idempotency guard — mirrors Swift `guard !isInitializedFlag else { return }`.
     if (initState.isCoreInitialized) return;
     // Re-entrancy guard — concurrent callers share the in-flight Phase 1 promise
     // instead of racing through init and double-emitting lifecycle events.
     if (initializingPromise) return initializingPromise;
+
+    const generation = lifecycleGeneration;
 
     initializingPromise = (async () => {
       try {
@@ -251,6 +306,8 @@ export const RunAnywhere = {
           });
         }
 
+        requireCurrentLifecycle(generation, 'initialization');
+
         if (!isNativeModuleAvailable()) {
           logger.warning('Native module not available');
           const nativeUnavailableError = SDKException.nativeModuleUnavailable();
@@ -287,6 +344,7 @@ export const RunAnywhere = {
             );
           }
 
+          requireCurrentLifecycle(generation, 'initialization');
           initState = markCoreInitialized(initState, initParams);
 
           logger.info('SDK initialized successfully');
@@ -295,6 +353,7 @@ export const RunAnywhere = {
           // Do NOT wipe it here — an unconditional null would destroy any in-flight
           // Phase 2 promise from a concurrent ensureServicesReady caller.
           void this.completeServicesInitialization().catch((err) => {
+            if (generation !== lifecycleGeneration) return;
             logger.warning(
               `Phase 2 services initialization failed (non-fatal): ${
                 err instanceof Error ? err.message : String(err)
@@ -302,15 +361,17 @@ export const RunAnywhere = {
             );
           });
         } catch (error) {
-          const sdkError = asSDKException(error);
-          // Initialization failures can originate in auth/config transports.
-          // Log only structured non-secret identifiers; the full exception is
-          // returned to the caller and must not be copied into device logs.
-          logger.error('SDK initialization failed', {
-            errorCode: sdkError.code,
-            errorCategory: sdkError.category,
-          });
-          initState = markInitializationFailed(initState, sdkError);
+          const sdkError = await asNativeSDKException(error);
+          if (generation === lifecycleGeneration) {
+            // Initialization failures can originate in auth/config transports.
+            // Log only structured non-secret identifiers; the full exception is
+            // returned to the caller and must not be copied into device logs.
+            logger.error('SDK initialization failed', {
+              errorCode: sdkError.code,
+              errorCategory: sdkError.category,
+            });
+            initState = markInitializationFailed(initState, sdkError);
+          }
           throw sdkError;
         }
       } finally {
@@ -321,18 +382,48 @@ export const RunAnywhere = {
     return initializingPromise;
   },
 
-  async reset(): Promise<void> {
-    // Clear local state BEFORE destroying native — mirrors Swift's order:
-    // clear flags first, then `await CppBridge.shutdown()`. This ensures any
-    // in-flight Phase 2 awaiter sees the reset state rather than hitting a
-    // dead bridge (RAC_ERROR_NOT_INITIALIZED).
+  reset(): Promise<void> {
+    if (resetPromise) return resetPromise;
+
+    const pendingInitialization = initializingPromise;
+    const pendingServicesInitialization = servicesInitPromise;
+    const pendingHTTPRetry = httpRetryPromise;
+    lifecycleGeneration += 1;
+    resetRequired = true;
+    // Close the facade synchronously. Generation guards prevent Phase 1,
+    // Phase 2, and HTTP recovery from reopening this lifetime while their
+    // native work settles.
     initState = resetState();
-    servicesInitPromise = null;
-    initializingPromise = null;
-    if (isNativeModuleAvailable()) {
-      const native = requireNativeModule();
-      await native.destroy();
-    }
+
+    const operation = (async () => {
+      // Never destroy native state underneath Phase 1/2. Both operations are
+      // invalidated by the generation bump above, so their late completions
+      // cannot reopen the facade while reset waits for them to settle.
+      await awaitSettlement(pendingInitialization);
+      await awaitSettlement(pendingServicesInitialization);
+      await awaitSettlement(pendingHTTPRetry);
+
+      initializingPromise = null;
+      servicesInitPromise = null;
+      httpRetryPromise = null;
+
+      if (isNativeModuleAvailable()) {
+        const native = requireNativeModule();
+        await native.destroy();
+      }
+      resetRequired = false;
+    })();
+
+    resetPromise = operation;
+    void operation.then(
+      () => {
+        if (resetPromise === operation) resetPromise = null;
+      },
+      () => {
+        if (resetPromise === operation) resetPromise = null;
+      }
+    );
+    return operation;
   },
 
   /**
@@ -352,6 +443,9 @@ export const RunAnywhere = {
    * Matches Swift: `RunAnywhere.completeServicesInitialization()`.
    */
   async completeServicesInitialization(): Promise<void> {
+    const activeReset = resetPromise;
+    if (activeReset) await activeReset;
+
     if (!initState.isCoreInitialized) {
       throw SDKException.notInitialized(
         'completeServicesInitialization() requires the SDK core to be initialised. Call initialize() first.'
@@ -370,15 +464,18 @@ export const RunAnywhere = {
       throw SDKException.nativeModuleUnavailable();
     }
 
-    servicesInitPromise = (async () => {
+    const generation = lifecycleGeneration;
+    const operation = (async () => {
       const native = requireNativeModule();
 
+      requireCurrentLifecycle(generation, 'services initialization');
       initState = markServicesInitializing(initState);
 
       const phase2Result = await native.completeServicesInitialization();
       const decoded = decodeSdkInitResultPayload(phase2Result);
       const { httpConfigured, httpApplicable } = decoded;
 
+      requireCurrentLifecycle(generation, 'services initialization');
       initState = markServicesInitialized(
         initState,
         httpConfigured,
@@ -396,15 +493,23 @@ export const RunAnywhere = {
         );
       }
     })();
+    servicesInitPromise = operation;
 
     try {
-      await servicesInitPromise;
+      await operation;
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.error(`Services initialisation failed: ${msg}`);
-      throw error;
+      const sdkError = await asNativeSDKException(error);
+      if (generation === lifecycleGeneration) {
+        logger.error('Services initialisation failed', {
+          errorCode: sdkError.code,
+          errorCategory: sdkError.category,
+        });
+      }
+      throw sdkError;
     } finally {
-      servicesInitPromise = null;
+      if (servicesInitPromise === operation) {
+        servicesInitPromise = null;
+      }
     }
   },
 
@@ -513,28 +618,34 @@ export const RunAnywhere = {
   /**
    * Get device ID from native device state.
    *
-   * Matches Swift `RunAnywhere.deviceId: String` (sync property). RN
-   * returns `Promise<string>` because the value lives in
-   * Keychain/Keystore behind the Nitro async bridge; falls back to the
-   * persistent device UUID and finally `''` if neither is resolvable.
+   * Matches Swift's throwing `RunAnywhere.deviceId` property. RN returns a
+   * Promise because the value lives behind the Nitro async bridge and rejects
+   * if native identity cannot be resolved durably.
    */
   async getDeviceId(): Promise<string> {
-    if (!isNativeModuleAvailable()) return '';
+    if (!isNativeModuleAvailable()) {
+      throw SDKException.nativeModuleUnavailable();
+    }
     const native = requireNativeModule();
-    return (
-      (await native.getDeviceId()) ||
-      (await native.getPersistentDeviceUUID()) ||
-      ''
-    );
+    try {
+      const registeredDeviceId = await native.getDeviceId();
+      if (registeredDeviceId) return registeredDeviceId;
+
+      const persistentDeviceId = await native.getPersistentDeviceUUID();
+      if (!persistentDeviceId) {
+        throw SDKException.notInitialized('Persistent device identity');
+      }
+      return persistentDeviceId;
+    } catch (error) {
+      throw await asNativeSDKException(error);
+    }
   },
 
   /**
-   * Device ID (Keychain/Keystore-persisted, survives reinstalls).
+   * Device ID persisted in platform secure storage for the app installation.
    *
-   * RN-only property accessor — matches Swift's sync
-   * `RunAnywhere.deviceId: String` in semantics, but returns
-   * `Promise<string>` because RN resolves this through the Nitro async
-   * native bridge. Identical to calling `getDeviceId()`.
+   * RN-only property accessor — matches Swift's throwing device-ID getter,
+   * but returns `Promise<string>` through the Nitro async native bridge.
    */
   get deviceId(): Promise<string> {
     return this.getDeviceId();
@@ -741,14 +852,27 @@ export const RunAnywhere = {
 // ============================================================================
 
 async function retryHTTPSetupInternal(): Promise<void> {
+  const activeReset = resetPromise;
+  if (activeReset) await activeReset;
+  if (resetRequired) {
+    throw SDKException.notInitialized(
+      'Previous SDK teardown did not complete; call reset() again'
+    );
+  }
+  if (httpRetryPromise) return httpRetryPromise;
   if (!isNativeModuleAvailable()) {
     return;
   }
-  const native = requireNativeModule();
-  logger.debug('Retrying HTTP/auth setup...');
-  try {
+
+  const generation = lifecycleGeneration;
+  const operation = (async () => {
+    requireCurrentLifecycle(generation, 'HTTP setup retry');
+    const native = requireNativeModule();
+    logger.debug('Retrying HTTP/auth setup...');
+
     const retryResult = await native.retryHTTPSetupProto();
     const decoded = decodeSdkInitResultPayload(retryResult);
+    requireCurrentLifecycle(generation, 'HTTP setup retry');
     initState = markHTTPSetupResult(
       initState,
       decoded.httpConfigured,
@@ -761,13 +885,24 @@ async function retryHTTPSetupInternal(): Promise<void> {
         'HTTP setup not applicable for this configuration; retries stopped.'
       );
     }
-    return;
+  })();
+  httpRetryPromise = operation;
+
+  try {
+    await operation;
   } catch (error) {
-    logger.debug(
-      `HTTP/Auth retry failed (still offline?): ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
+    const sdkError = await asNativeSDKException(error);
+    if (generation === lifecycleGeneration) {
+      logger.debug('HTTP/Auth retry failed', {
+        errorCode: sdkError.code,
+        errorCategory: sdkError.category,
+      });
+    }
+    throw sdkError;
+  } finally {
+    if (httpRetryPromise === operation) {
+      httpRetryPromise = null;
+    }
   }
 }
 

@@ -152,8 +152,8 @@ export interface RunAnywhereCore extends HybridObject<{
   isDeviceRegistered(): Promise<boolean>;
 
   /**
-   * Get the device ID
-   * @returns Device ID or empty if not registered
+   * Get the registered device ID, or empty before Phase 2 callback wiring.
+   * The public facade falls back to the durable identity resolver.
    */
   getDeviceId(): Promise<string>;
 
@@ -869,7 +869,7 @@ export interface RunAnywhereCore extends HybridObject<{
 
   /**
    * Get persistent device UUID.
-   * Survives app reinstalls (stored in Keychain/Keystore).
+   * Persists in platform secure storage for the lifetime of the app installation.
    * Matches Swift: DeviceIdentity.persistentUUID
    * @returns Persistent device UUID
    */

@@ -94,6 +94,7 @@
 #include "rac_modality_proto_abi.h"
 #include "rac_voice_agent.h"
 #include "rac_voice_event_abi.h"
+#include "rac_wakeword_types.h"
 
 // Embeddings
 #include "rac_embeddings.h"

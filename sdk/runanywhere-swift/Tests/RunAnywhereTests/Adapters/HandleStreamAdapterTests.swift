@@ -483,8 +483,14 @@ final class HandleStreamAdapterTests: XCTestCase {
         let consumerCount = 5
         var consumers: [Task<Void, Never>] = []
         for _ in 0..<consumerCount {
+            // Construct the stream synchronously so every subscriber is
+            // attached before cancellation begins. Starting the Task first
+            // lets a slow executor leave some bodies unstarted; those
+            // already-cancelled bodies can then attach after teardown and
+            // create a second, unrelated registration.
+            let stream = adapter.stream()
             consumers.append(Task {
-                for await _ in adapter.stream() {
+                for await _ in stream {
                     // No events; we cancel below.
                 }
             })

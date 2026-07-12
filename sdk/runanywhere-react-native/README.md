@@ -61,7 +61,7 @@ On-device AI for React Native. Run LLMs, Speech-to-Text, Text-to-Speech, and Voi
 - Proto-byte SDK event stream decoded by the TypeScript facade
 - Built-in analytics and telemetry
 - Structured logging with multiple log levels
-- Keychain-persisted device identity (iOS) / EncryptedSharedPreferences (Android)
+- Keychain-persisted device identity (iOS) / Android Keystore-backed storage (Android)
 
 ---
 

@@ -196,10 +196,10 @@ void fill_tts_output(const rac_tts_result_t& result, const char* text, const cha
     metadata->set_audio_duration_ms(result.duration_ms);
 }
 
-void publish_tts_voice_event(runanywhere::v1::VoiceEventKind kind, int64_t duration_ms,
-                             rac_result_t error_code = RAC_SUCCESS,
-                             runanywhere::v1::EventDestination destination =
-                                 runanywhere::v1::EVENT_DESTINATION_ALL) {
+void publish_tts_voice_event(
+    runanywhere::v1::VoiceEventKind kind, int64_t duration_ms,
+    rac_result_t error_code = RAC_SUCCESS,
+    runanywhere::v1::EventDestination destination = runanywhere::v1::EVENT_DESTINATION_ALL) {
     runanywhere::v1::SDKEvent event;
     event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_id(generate_uuid_v4());
@@ -1193,11 +1193,10 @@ rac_result_t rac_tts_synthesize_lifecycle_proto(const uint8_t* request_proto_byt
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
 
-    publish_tts_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_COMPLETED,
-                                synthesis_id.c_str(), ref.model_id, char_count,
-                                static_cast<int64_t>(raw.duration_ms),
-                                static_cast<int32_t>(raw.audio_size), processing_ms,
-                                static_cast<int32_t>(raw.sample_rate), nullptr, ref.framework_name);
+    publish_tts_lifecycle_event(
+        runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_COMPLETED, synthesis_id.c_str(), ref.model_id,
+        char_count, static_cast<int64_t>(raw.duration_ms), static_cast<int32_t>(raw.audio_size),
+        processing_ms, static_cast<int32_t>(raw.sample_rate), nullptr, ref.framework_name);
 
     runanywhere::v1::TTSOutput output;
     if (!rac::foundation::rac_tts_result_to_proto(&raw, &output)) {

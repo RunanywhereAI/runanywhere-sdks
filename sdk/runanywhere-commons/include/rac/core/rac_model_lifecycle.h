@@ -84,7 +84,11 @@ RAC_API rac_result_t rac_component_lifecycle_snapshot_proto(uint32_t component,
                                                             rac_proto_buffer_t* out_snapshot);
 
 /**
- * @brief Test helper: unload all tracked models and reset lifecycle state.
+ * @brief Unload all tracked models and reset global lifecycle state.
+ *
+ * Waits for active lifecycle references to drain, then destroys every loaded
+ * backend implementation. rac_shutdown() calls this before detaching platform
+ * callbacks; callers may also use it to explicitly clear lifecycle state.
  */
 RAC_API void rac_model_lifecycle_reset(void);
 

@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let sdkVersion = "0.19.15"
+let sdkVersion = "0.20.0"
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 
 func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
@@ -23,7 +23,7 @@ func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
 
 let raCommonsTarget = runAnywhereBinaryTarget(
     name: "RACommons",
-    checksum: "aa8732b5ab3447c0d94855558a4f2ce08aed71666b346857aba32d5fe28bea3d"
+    checksum: "21835b3fbbbe3bac4e740621ce45f50bc35bc0f995d4cbb997d532e3182f0b65"
 )
 
 let package = Package(
@@ -54,6 +54,7 @@ let package = Package(
                 .linkedLibrary("bz2"),
                 .linkedLibrary("z"),
                 .linkedFramework("Foundation"),
+                .linkedFramework("Security"),
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox"),
                 .linkedFramework("CoreML"),

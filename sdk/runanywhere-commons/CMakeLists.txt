@@ -32,6 +32,11 @@ option(RAC_BUILD_JNI "Build JNI bridge for Android/JVM" OFF)
 option(RAC_BUILD_TESTS "Build unit tests" OFF)
 option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
+option(
+    RAC_INCLUDE_LOCAL_DEV_CONFIG
+    "Compile the ignored local development_config.cpp (may contain credentials; local development only)"
+    OFF
+)
 # Consumed by the root CMakeLists + engines/ (per-engine compilation); this file
 # does not branch on it — RAG is folded into rac_commons independently (see below).
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, RAG)" OFF)
@@ -629,23 +634,33 @@ if(ANDROID)
 endif()
 
 # =============================================================================
-# AUTO-GENERATE DEVELOPMENT CONFIG IF MISSING
+# DEVELOPMENT CONFIG SOURCE
 # =============================================================================
-# development_config.cpp is git-ignored because it can contain secrets.
-# For CI builds or fresh checkouts, we auto-generate a stub from the template.
+# Release and normal builds must be independent of ignored machine-local state.
+# They compile the credential-free tracked template from the build directory.
+# Developers who explicitly need team development credentials may opt in with
+# -DRAC_INCLUDE_LOCAL_DEV_CONFIG=ON; that mode is never suitable for packaging.
 
 set(DEV_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/infrastructure/network/development_config.cpp")
 set(DEV_CONFIG_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/src/infrastructure/network/development_config.cpp.template")
 
-if(NOT EXISTS "${DEV_CONFIG_FILE}")
-    if(EXISTS "${DEV_CONFIG_TEMPLATE}")
-        message(STATUS "development_config.cpp not found, generating stub from template...")
-        file(READ "${DEV_CONFIG_TEMPLATE}" DEV_CONFIG_CONTENT)
-        file(WRITE "${DEV_CONFIG_FILE}" "${DEV_CONFIG_CONTENT}")
-        message(STATUS "Generated: ${DEV_CONFIG_FILE}")
-    else()
-        message(FATAL_ERROR "Neither development_config.cpp nor .template found!")
+if(RAC_INCLUDE_LOCAL_DEV_CONFIG)
+    if(NOT EXISTS "${DEV_CONFIG_FILE}")
+        message(FATAL_ERROR
+            "RAC_INCLUDE_LOCAL_DEV_CONFIG=ON requires ${DEV_CONFIG_FILE}"
+        )
     endif()
+    set(RAC_DEV_CONFIG_SOURCE "${DEV_CONFIG_FILE}")
+    message(WARNING
+        "Including ignored local development credentials; do not package or distribute this build"
+    )
+else()
+    if(NOT EXISTS "${DEV_CONFIG_TEMPLATE}")
+        message(FATAL_ERROR "Missing credential-free development config template: ${DEV_CONFIG_TEMPLATE}")
+    endif()
+    set(RAC_DEV_CONFIG_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/development_config.cpp")
+    configure_file("${DEV_CONFIG_TEMPLATE}" "${RAC_DEV_CONFIG_SOURCE}" COPYONLY)
+    message(STATUS "Using credential-free development config stub")
 endif()
 
 # =============================================================================
@@ -741,7 +756,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/network/endpoints.cpp
     src/infrastructure/network/api_types.cpp
     src/infrastructure/network/auth_manager.cpp
-    src/infrastructure/network/development_config.cpp
+    ${RAC_DEV_CONFIG_SOURCE}
     # Native HTTP transport.
     # - Native targets (macOS/iOS/Android/Windows/Linux): the default
     #   client in rac_http_client_default.cpp dispatches every request

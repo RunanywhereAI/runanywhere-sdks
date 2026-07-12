@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.runanywhere.runanywhereai.data.security.SecureStringPreferences
 import com.runanywhere.runanywhereai.data.security.migrateSensitiveString
 import com.runanywhere.runanywhereai.data.security.securePreferences
 import com.runanywhere.runanywhereai.util.RACLog
@@ -22,7 +23,7 @@ object CloudProviderRepository {
 
     private val json = Json { ignoreUnknownKeys = true }
     private val serializer = ListSerializer(CloudProviderConfig.serializer())
-    private var prefs: SharedPreferences? = null
+    private var prefs: SecureStringPreferences? = null
 
     var providers: List<CloudProviderConfig> by mutableStateOf(emptyList())
         private set
@@ -34,7 +35,7 @@ object CloudProviderRepository {
 
     internal fun initialize(
         context: Context,
-        securePreferencesFactory: (Context, String) -> SharedPreferences,
+        securePreferencesFactory: (Context, String) -> SecureStringPreferences,
     ) {
         if (prefs != null) return
         val secure = runCatching { securePreferencesFactory(context, SECURE_PREFS) }
@@ -46,9 +47,9 @@ object CloudProviderRepository {
         }
         val legacy = context.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE)
         val migration = migrateSensitiveString(
-            readSecure = { secure.getString(KEY_LIST, null) },
+            readSecure = { secure.getString(KEY_LIST) },
             readLegacy = { legacy.getString(KEY_LIST, null) },
-            writeSecure = { secure.edit().putString(KEY_LIST, it).commit() },
+            writeSecure = { secure.putString(KEY_LIST, it) },
             removeLegacy = { legacy.edit().remove(KEY_LIST).commit() },
             validate = { encoded ->
                 runCatching { json.decodeFromString(serializer, encoded) }.isSuccess
@@ -122,7 +123,7 @@ object CloudProviderRepository {
         val encoded = runCatching { json.encodeToString(serializer, updated) }
             .getOrElse { return Result.failure(IllegalStateException("Could not encode cloud providers", it)) }
         val committed = runCatching {
-            secure.edit().putString(KEY_LIST, encoded).commit()
+            secure.putString(KEY_LIST, encoded)
         }.getOrElse {
             return Result.failure(IllegalStateException("Could not write secure cloud-provider storage", it))
         }

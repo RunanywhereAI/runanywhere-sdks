@@ -234,11 +234,11 @@ rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t f
     // Mirrors Swift's InferenceFramework.usesDirectoryBasedModels
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
-        case RAC_FRAMEWORK_SHERPA:   // Sherpa-ONNX speech models extract to directories
-                                     // (encoder/decoder/tokens.txt)
-        case RAC_FRAMEWORK_COREML:   // CoreML compiled models (.mlmodelc) are directories
-        case RAC_FRAMEWORK_MLX:      // MLX models are local HF-style folders
-        case RAC_FRAMEWORK_QHEXRT:   // QHexRT models are directories (manifest.json + bin files)
+        case RAC_FRAMEWORK_SHERPA:  // Sherpa-ONNX speech models extract to directories
+                                    // (encoder/decoder/tokens.txt)
+        case RAC_FRAMEWORK_COREML:  // CoreML compiled models (.mlmodelc) are directories
+        case RAC_FRAMEWORK_MLX:     // MLX models are local HF-style folders
+        case RAC_FRAMEWORK_QHEXRT:  // QHexRT models are directories (manifest.json + bin files)
             return RAC_TRUE;
         default:
             return RAC_FALSE;

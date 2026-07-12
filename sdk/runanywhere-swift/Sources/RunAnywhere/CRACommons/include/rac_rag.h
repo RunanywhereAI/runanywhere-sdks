@@ -1,39 +1,6 @@
-/**
- * @file rac_rag.h
- * @brief RunAnywhere Commons - RAG Pipeline Public API
- *
- * Registration and control functions for the RAG pipeline module.
- */
+#ifndef RAC_SWIFT_RAG_FORWARDER_H
+#define RAC_SWIFT_RAG_FORWARDER_H
 
-#ifndef RAC_RAG_H
-#define RAC_RAG_H
+#include "rac/features/rag/rac_rag.h"
 
-#include "rac_proto_buffer.h"
-#include "rac_types.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * @brief Register the RAG pipeline module
- *
- * Must be called before using RAG functionality.
- * Also registers the ONNX embeddings service provider if available.
- *
- * @return RAC_SUCCESS on success, error code otherwise
- */
-RAC_API rac_result_t rac_backend_rag_register(void);
-
-/**
- * @brief Unregister the RAG pipeline module
- *
- * @return RAC_SUCCESS on success, error code otherwise
- */
-RAC_API rac_result_t rac_backend_rag_unregister(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif  // RAC_RAG_H
+#endif  // RAC_SWIFT_RAG_FORWARDER_H

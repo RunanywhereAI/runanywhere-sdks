@@ -1111,8 +1111,7 @@ static bool parse_assignment_json_models(const char* data, size_t len,
         model.set_id(json_first_string(object, {"id", "model_id", "modelId"}));
         model.set_name(json_first_string(object, {"name", "display_name", "displayName"}));
         model.set_download_url(json_first_string(object, {"download_url", "downloadUrl", "url"}));
-        const std::string top_level_description =
-            json_first_string(object, {"description"});
+        const std::string top_level_description = json_first_string(object, {"description"});
         if (!top_level_description.empty()) {
             model.mutable_metadata()->set_description(top_level_description);
         }

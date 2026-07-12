@@ -90,6 +90,21 @@ scan_grep() {
   done
 }
 
+# Scan tracked files only. This is used for repo-wide retired names so local
+# build trees, dependency caches, and ignored generated artifacts cannot turn a
+# source-policy gate into a machine-state-dependent result.
+scan_git_grep() {
+  local pattern="$1" category="$2"
+  shift 2
+
+  local hits
+  hits=$(git -C "${REPO_ROOT}" grep -l -I -E "${pattern}" -- "$@" 2>/dev/null || true)
+  local rel
+  for rel in ${hits}; do
+    record_hit "${rel}" "${category}"
+  done
+}
+
 # Find files by name pattern and record hits.
 # $1 = directory (relative to REPO_ROOT)
 # $2 = find -name pattern
@@ -289,6 +304,27 @@ scan_grep "sdk/runanywhere-commons/include" \
 # 6c. Deprecated C/C++ public declarations.
 scan_grep "sdk/runanywhere-commons/include" \
   "(RAC_DEPRECATED|__attribute__\\(\\(deprecated|\\[\\[deprecated)" "*.h" "cpp:deprecated-declaration"
+
+# 6d. Packaged header mirrors are public API too. A clean canonical header is
+# insufficient if SwiftPM or an AAR still advertises a retired declaration.
+scan_grep "sdk/runanywhere-swift/Sources/RunAnywhere/CRACommons/include" \
+  "(RAC_DEPRECATED|__attribute__\\(\\(deprecated|\\[\\[deprecated)" "*.h" "swift-c:deprecated-declaration"
+scan_grep "sdk/runanywhere-react-native/packages/core/android/src/main/jniLibs/include" \
+  "(RAC_DEPRECATED|__attribute__\\(\\(deprecated|\\[\\[deprecated)" "*.h" "rn-c:deprecated-declaration"
+
+# 6e. Retired compatibility surfaces that must never reappear under a neutral
+# name or in one hand-maintained package mirror.
+scan_git_grep \
+  "enable_sentry_logging|SentryManager|SentryDestination|sentry_logging" \
+  "all:retired-sentry-surface" "idl" "sdk"
+scan_git_grep \
+  "rac_device_identity_reset_cache_for_testing[[:space:]]*\\(" \
+  "all:public-test-hook" "sdk"
+scan_git_grep \
+  "rac_extract_archive[[:space:]]*\\(" \
+  "all:retired-archive-adapter-api" "sdk/runanywhere-commons/include" \
+  "sdk/runanywhere-swift/Sources/RunAnywhere/CRACommons/include" \
+  "sdk/runanywhere-react-native/packages/core/android/src/main/jniLibs/include"
 
 # ---------------------------------------------------------------------------
 # Report

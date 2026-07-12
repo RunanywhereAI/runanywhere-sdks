@@ -1154,6 +1154,11 @@ static rac_result_t jni_file_delete_callback(const char* path, void* user_data) 
 }
 
 static rac_result_t jni_secure_get_callback(const char* key, char** out_value, void* user_data) {
+    if (out_value == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out_value = nullptr;
+
     JNIEnv* env = getJNIEnv();
     std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_get == nullptr) {
@@ -1161,24 +1166,37 @@ static rac_result_t jni_secure_get_callback(const char* key, char** out_value, v
     }
 
     jstring jKey = env->NewStringUTF(key ? key : "");
+    if (jKey == nullptr) {
+        jniClearPendingException(env);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jstring result =
         static_cast<jstring>(env->CallObjectMethod(g_platform_adapter, g_method_secure_get, jKey));
     env->DeleteLocalRef(jKey);
+
+    // Kotlin returns null only for a clean miss. Authentication, decoding, and
+    // Android Keystore failures throw so Commons can refuse to synthesize a
+    // replacement device identity or silently discard persisted auth state.
+    if (jniClearPendingException(env)) {
+        if (result != nullptr) {
+            env->DeleteLocalRef(result);
+        }
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
 
     // Contract (rac_platform_adapter.h secure_get): MUST return
     // RAC_ERROR_FILE_NOT_FOUND on a clean key-miss so commons consumers can
     // discriminate misses from real keychain failures. The Kotlin callback
     // returns null for the miss case (see CppBridgePlatformAdapter.secureGetCallback).
     if (result == nullptr) {
-        *out_value = nullptr;
         return RAC_ERROR_FILE_NOT_FOUND;
     }
 
     const char* chars = env->GetStringUTFChars(result, nullptr);
     if (!chars) {
+        jniClearPendingException(env);
         env->DeleteLocalRef(result);
-        *out_value = nullptr;
-        return RAC_ERROR_INTERNAL;
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
     *out_value = strdup(chars);
     env->ReleaseStringUTFChars(result, chars);
@@ -1199,12 +1217,25 @@ static rac_result_t jni_secure_set_callback(const char* key, const char* value, 
 
     jstring jKey = env->NewStringUTF(key ? key : "");
     jstring jValue = env->NewStringUTF(value ? value : "");
+    if (jKey == nullptr || jValue == nullptr) {
+        jniClearPendingException(env);
+        if (jKey != nullptr) {
+            env->DeleteLocalRef(jKey);
+        }
+        if (jValue != nullptr) {
+            env->DeleteLocalRef(jValue);
+        }
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_secure_set, jKey, jValue);
 
     env->DeleteLocalRef(jKey);
     env->DeleteLocalRef(jValue);
+    if (jniClearPendingException(env)) {
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
 
-    return result ? RAC_SUCCESS : RAC_ERROR_STORAGE_ERROR;
+    return result ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
 
 static rac_result_t jni_secure_delete_callback(const char* key, void* user_data) {
@@ -1215,10 +1246,17 @@ static rac_result_t jni_secure_delete_callback(const char* key, void* user_data)
     }
 
     jstring jKey = env->NewStringUTF(key ? key : "");
+    if (jKey == nullptr) {
+        jniClearPendingException(env);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_secure_delete, jKey);
     env->DeleteLocalRef(jKey);
+    if (jniClearPendingException(env)) {
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
 
-    return result ? RAC_SUCCESS : RAC_ERROR_STORAGE_ERROR;
+    return result ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
 
 static int64_t jni_now_ms_callback(void* user_data) {
@@ -2829,6 +2867,42 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerSetCall
     return static_cast<jint>(result);
 }
 
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerClearCallbacks(
+    JNIEnv* env, jclass clazz) {
+    {
+        // Lock order invariant shared with racDeviceManagerSetCallbacks:
+        // JNI state first, then the native device-manager state. Native clear
+        // is the quiescence barrier; it waits for in-flight callbacks before
+        // we release their global reference below.
+        std::lock_guard<std::mutex> lock(g_device_jni_state.mtx);
+        rac_device_manager_clear_callbacks();
+        if (g_device_jni_state.callback_obj != nullptr) {
+            env->DeleteGlobalRef(g_device_jni_state.callback_obj);
+            g_device_jni_state.callback_obj = nullptr;
+        }
+        g_device_jni_state.get_device_info_method = nullptr;
+        g_device_jni_state.get_device_id_method = nullptr;
+        g_device_jni_state.is_registered_method = nullptr;
+        g_device_jni_state.set_registered_method = nullptr;
+        g_device_jni_state.http_post_method = nullptr;
+        g_cached_device_id.clear();
+    }
+    std::lock_guard<std::mutex> info_lock(g_device_info_strings.mtx);
+    g_device_info_strings.device_id.clear();
+    g_device_info_strings.device_model.clear();
+    g_device_info_strings.device_name.clear();
+    g_device_info_strings.platform.clear();
+    g_device_info_strings.os_version.clear();
+    g_device_info_strings.form_factor.clear();
+    g_device_info_strings.architecture.clear();
+    g_device_info_strings.chip_name.clear();
+    g_device_info_strings.gpu_family.clear();
+    g_device_info_strings.battery_state.clear();
+    g_device_info_strings.device_fingerprint.clear();
+    g_device_info_strings.manufacturer.clear();
+}
+
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerRegisterIfNeeded(
     JNIEnv* env, jclass clazz, jint environment, jstring buildToken) {
@@ -3906,11 +3980,15 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventSubscribe(JN
     }
     RAC_JNI_TRY {
         jobject globalListener = env->NewGlobalRef(listener);
+        if (globalListener == nullptr) {
+            return 0;
+        }
         uint64_t subscriptionId = rac_sdk_event_subscribe(sdk_event_jni_callback, globalListener);
         if (subscriptionId == 0) {
             env->DeleteGlobalRef(globalListener);
             return 0;
         }
+        std::exception_ptr insertionError;
         {
             std::lock_guard<std::mutex> lock(g_sdk_event_listener_mutex);
             // commons-056: map allocation can throw std::bad_alloc on low-mem
@@ -3919,10 +3997,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventSubscribe(JN
             try {
                 g_sdk_event_listeners[subscriptionId] = globalListener;
             } catch (...) {
-                rac_sdk_event_unsubscribe(subscriptionId);
-                env->DeleteGlobalRef(globalListener);
-                throw;
+                insertionError = std::current_exception();
             }
+        }
+        if (insertionError != nullptr) {
+            rac_sdk_event_unsubscribe(subscriptionId);
+            rac_sdk_event_quiesce();
+            env->DeleteGlobalRef(globalListener);
+            std::rethrow_exception(insertionError);
         }
         return static_cast<jlong>(subscriptionId);
     }
@@ -3944,6 +4026,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventUnsubscribe(
     }
     rac_sdk_event_unsubscribe(id);
     if (listener != nullptr) {
+        rac_sdk_event_quiesce();
         env->DeleteGlobalRef(listener);
     }
 }
@@ -4097,68 +4180,123 @@ static int auth_storage_store(const char* key, const char* value, void* /*ctx*/)
         return -1;
     }
     jstring jKey = env->NewStringUTF(key ? key : "");
+    if (jKey == nullptr) {
+        jniClearPendingException(env);
+        return -1;
+    }
     // Auth-manager values are already base64-safe (random bytes from JWTs);
     // the platform adapter's secureSet takes base64, so we base64 the value
     // here. We'd pay the same cost either way; doing it here keeps the
     // existing rac_platform_adapter_t contract unchanged.
     jclass base64Class = env->FindClass("android/util/Base64");
-    jboolean ok = JNI_FALSE;
-    if (base64Class != nullptr) {
-        jmethodID encodeToString =
-            env->GetStaticMethodID(base64Class, "encodeToString", "([BI)Ljava/lang/String;");
-        size_t len = value ? strlen(value) : 0;
-        jbyteArray raw = env->NewByteArray(static_cast<jsize>(len));
-        if (raw != nullptr) {
-            env->SetByteArrayRegion(raw, 0, static_cast<jsize>(len),
-                                    reinterpret_cast<const jbyte*>(value ? value : ""));
-            jstring encoded = static_cast<jstring>(
-                env->CallStaticObjectMethod(base64Class, encodeToString, raw, /*NO_WRAP=*/2));
-            if (encoded != nullptr) {
-                ok = env->CallBooleanMethod(g_platform_adapter, g_method_secure_set, jKey, encoded);
-                env->DeleteLocalRef(encoded);
-            }
-            env->DeleteLocalRef(raw);
-        }
-        env->DeleteLocalRef(base64Class);
+    if (base64Class == nullptr) {
+        jniClearPendingException(env);
+        env->DeleteLocalRef(jKey);
+        return -1;
     }
+    jmethodID encodeToString =
+        env->GetStaticMethodID(base64Class, "encodeToString", "([BI)Ljava/lang/String;");
+    if (encodeToString == nullptr) {
+        jniClearPendingException(env);
+        env->DeleteLocalRef(base64Class);
+        env->DeleteLocalRef(jKey);
+        return -1;
+    }
+    const size_t len = value ? strlen(value) : 0;
+    if (len > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+        env->DeleteLocalRef(base64Class);
+        env->DeleteLocalRef(jKey);
+        return -1;
+    }
+    jbyteArray raw = env->NewByteArray(static_cast<jsize>(len));
+    if (raw == nullptr) {
+        jniClearPendingException(env);
+        env->DeleteLocalRef(base64Class);
+        env->DeleteLocalRef(jKey);
+        return -1;
+    }
+    env->SetByteArrayRegion(raw, 0, static_cast<jsize>(len),
+                            reinterpret_cast<const jbyte*>(value ? value : ""));
+    if (jniClearPendingException(env)) {
+        env->DeleteLocalRef(raw);
+        env->DeleteLocalRef(base64Class);
+        env->DeleteLocalRef(jKey);
+        return -1;
+    }
+    jstring encoded = static_cast<jstring>(
+        env->CallStaticObjectMethod(base64Class, encodeToString, raw, /*NO_WRAP=*/2));
+    if (jniClearPendingException(env) || encoded == nullptr) {
+        env->DeleteLocalRef(raw);
+        env->DeleteLocalRef(base64Class);
+        env->DeleteLocalRef(jKey);
+        return -1;
+    }
+    const jboolean ok =
+        env->CallBooleanMethod(g_platform_adapter, g_method_secure_set, jKey, encoded);
+    const bool call_failed = jniClearPendingException(env);
+    env->DeleteLocalRef(encoded);
+    env->DeleteLocalRef(raw);
+    env->DeleteLocalRef(base64Class);
     env->DeleteLocalRef(jKey);
-    return ok ? 0 : -1;
+    return !call_failed && ok == JNI_TRUE ? 0 : -1;
 }
 
 static int auth_storage_retrieve(const char* key, char* out_value, size_t buffer_size,
                                  void* /*ctx*/) {
     if (out_value == nullptr || buffer_size == 0)
-        return -1;
+        return RAC_ERROR_INVALID_ARGUMENT;
     JNIEnv* env = getJNIEnv();
     std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_get == nullptr) {
-        return -1;
+        return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
     jstring jKey = env->NewStringUTF(key ? key : "");
+    if (jKey == nullptr) {
+        jniClearPendingException(env);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jstring encodedJ =
         static_cast<jstring>(env->CallObjectMethod(g_platform_adapter, g_method_secure_get, jKey));
     env->DeleteLocalRef(jKey);
-    if (encodedJ == nullptr)
-        return -1;
+    if (jniClearPendingException(env)) {
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    if (encodedJ == nullptr) {
+        return RAC_ERROR_FILE_NOT_FOUND;
+    }
 
     // Decode the base64 payload back to bytes
     jclass base64Class = env->FindClass("android/util/Base64");
-    int written = -1;
+    int written = RAC_ERROR_SECURE_STORAGE_FAILED;
     if (base64Class != nullptr) {
         jmethodID decode = env->GetStaticMethodID(base64Class, "decode", "(Ljava/lang/String;I)[B");
-        jbyteArray raw = static_cast<jbyteArray>(
-            env->CallStaticObjectMethod(base64Class, decode, encodedJ, /*NO_WRAP=*/2));
-        if (raw != nullptr) {
-            jsize len = env->GetArrayLength(raw);
-            if (static_cast<size_t>(len) + 1 <= buffer_size) {
-                env->GetByteArrayRegion(raw, 0, len, reinterpret_cast<jbyte*>(out_value));
-                out_value[len] = '\0';
-                written = static_cast<int>(len);
+        if (decode != nullptr) {
+            jbyteArray raw = static_cast<jbyteArray>(
+                env->CallStaticObjectMethod(base64Class, decode, encodedJ, /*NO_WRAP=*/2));
+            if (!jniClearPendingException(env) && raw != nullptr) {
+                jsize len = env->GetArrayLength(raw);
+                if (len <= 0) {
+                    written = RAC_ERROR_SECURE_STORAGE_FAILED;
+                } else if (static_cast<size_t>(len) + 1 > buffer_size) {
+                    written = RAC_ERROR_BUFFER_TOO_SMALL;
+                } else {
+                    env->GetByteArrayRegion(raw, 0, len, reinterpret_cast<jbyte*>(out_value));
+                    if (jniClearPendingException(env)) {
+                        written = RAC_ERROR_SECURE_STORAGE_FAILED;
+                    } else {
+                        out_value[len] = '\0';
+                        written = static_cast<int>(len);
+                    }
+                }
+                env->DeleteLocalRef(raw);
             }
-            env->DeleteLocalRef(raw);
+        } else {
+            jniClearPendingException(env);
         }
         env->DeleteLocalRef(base64Class);
+    } else {
+        jniClearPendingException(env);
     }
     env->DeleteLocalRef(encodedJ);
     return written;
@@ -4171,12 +4309,16 @@ static int auth_storage_delete(const char* key, void* /*ctx*/) {
         return -1;
     }
     jstring jKey = env->NewStringUTF(key ? key : "");
+    if (jKey == nullptr) {
+        jniClearPendingException(env);
+        return -1;
+    }
     jboolean ok = env->CallBooleanMethod(g_platform_adapter, g_method_secure_delete, jKey);
     env->DeleteLocalRef(jKey);
-    return ok ? 0 : -1;
+    return !jniClearPendingException(env) && ok == JNI_TRUE ? 0 : -1;
 }
 
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthInit(
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthInit(
     JNIEnv* /*env*/, jclass /*cls*/) {
     // Require the platform adapter to have been registered first so our
     // storage vtable has somewhere to delegate. If the Kotlin SDK forgot to
@@ -4186,7 +4328,7 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
                         "racAuthInit called before platform adapter registered — "
                         "tokens will NOT persist across process restart");
         rac_auth_init(nullptr);
-        return;
+        return static_cast<jint>(RAC_ERROR_ADAPTER_NOT_SET);
     }
 
     rac_secure_storage_t storage = {};
@@ -4197,11 +4339,16 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     rac_auth_init(&storage);
 
     // Restore any previously persisted tokens into the in-memory auth state.
-    if (rac_auth_load_stored_tokens() == 0) {
+    const int load_result = rac_auth_load_stored_tokens();
+    if (load_result == RAC_SUCCESS) {
         RAC_LOG_INFO(JNI_LOG_TAG, "rac_auth_init: restored tokens from secure storage");
-    } else {
+    } else if (load_result == RAC_ERROR_FILE_NOT_FOUND) {
         RAC_LOG_DEBUG(JNI_LOG_TAG, "rac_auth_init: no persisted tokens (first launch or cleared)");
+    } else {
+        RAC_LOG_ERROR(JNI_LOG_TAG, "rac_auth_init: secure storage read failed (rc=%d)",
+                      load_result);
     }
+    return static_cast<jint>(load_result);
 }
 
 JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthReset(
@@ -4340,9 +4487,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetValidToken(JN
     return arr;
 }
 
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthClear(
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthClear(
     JNIEnv* /*env*/, jclass /*cls*/) {
-    rac_auth_clear();
+    return static_cast<jint>(rac_auth_clear());
 }
 
 JNIEXPORT jint JNICALL
@@ -6911,10 +7058,18 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStateReset(JNIEnv* e
 
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceGetOrCreatePersistentId(
-    JNIEnv* env, jclass clazz) {
+    JNIEnv* env, jclass clazz, jintArray outRc) {
     (void)clazz;
+    auto writeRc = [&](rac_result_t rc) {
+        if (outRc == nullptr || env->GetArrayLength(outRc) < 1) {
+            return;
+        }
+        const jint value = static_cast<jint>(rc);
+        env->SetIntArrayRegion(outRc, 0, 1, &value);
+    };
     char buf[RAC_DEVICE_ID_BUFFER_MIN_SIZE * 2] = {0};
     rac_result_t rc = rac_device_get_or_create_persistent_id(buf, sizeof(buf));
+    writeRc(rc);
     if (rc != RAC_SUCCESS) {
         return nullptr;
     }

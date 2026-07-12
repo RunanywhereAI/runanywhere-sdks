@@ -11,9 +11,9 @@ Privacy-first, on-device AI SDK for Flutter. Run LLMs, Speech-to-Text, Text-to-S
 
 ```yaml
 dependencies:
-  runanywhere: ^0.19.15
-  runanywhere_onnx: ^0.19.15      # STT, TTS, VAD
-  runanywhere_llamacpp: ^0.19.15  # LLM text generation
+  runanywhere: ^0.20.0
+  runanywhere_onnx: ^0.20.0      # STT, TTS, VAD
+  runanywhere_llamacpp: ^0.20.0  # LLM text generation
 ```
 
 **Step 2:** Configure platforms (see below).

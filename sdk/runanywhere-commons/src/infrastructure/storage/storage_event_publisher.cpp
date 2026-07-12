@@ -18,10 +18,9 @@
 #include <cstdio>
 #include <string>
 
+#include "infrastructure/events/sdk_event_publish.h"
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
-
-#include "infrastructure/events/sdk_event_publish.h"
 
 namespace rac::storage {
 namespace {

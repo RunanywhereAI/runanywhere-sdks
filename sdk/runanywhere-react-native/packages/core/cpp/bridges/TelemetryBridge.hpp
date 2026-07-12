@@ -3,7 +3,8 @@
  *
  * C++ telemetry bridge for React Native - aligned with Swift/Kotlin SDKs.
  *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+Telemetry.swift
+ * Reference:
+ * sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+Telemetry.swift
  *
  * Architecture:
  * - C++ telemetry manager handles all event logic (batching, JSON building)
@@ -14,13 +15,19 @@
 
 #pragma once
 
-#include <string>
+#include <condition_variable>
+#include <cstddef>
+#include <memory>
 #include <mutex>
-#include "rac_telemetry_manager.h"
+#include <string>
+
 #include "rac_environment.h"
+#include "rac_telemetry_manager.h"
 
 namespace runanywhere {
 namespace bridges {
+
+struct TelemetryCallbackContext;
 
 /**
  * TelemetryBridge - Manages C++ telemetry manager lifecycle
@@ -84,32 +91,24 @@ public:
      */
     void unregisterEventsCallback();
 
-    /**
-     * Get telemetry manager handle (for advanced use)
-     */
-    rac_telemetry_manager_t* getHandle() const { return manager_; }
-
-    /**
-     * Get current environment
-     */
-    rac_environment_t getEnvironment() const { return environment_; }
-
-private:
+  private:
     TelemetryBridge() = default;
-    ~TelemetryBridge();
+    ~TelemetryBridge() = default;
 
     // Non-copyable
-    TelemetryBridge(const TelemetryBridge&) = delete;
-    TelemetryBridge& operator=(const TelemetryBridge&) = delete;
+    TelemetryBridge(const TelemetryBridge &) = delete;
+    TelemetryBridge &operator=(const TelemetryBridge &) = delete;
 
     // Telemetry manager handle
-    rac_telemetry_manager_t* manager_ = nullptr;
+    rac_telemetry_manager_t *manager_ = nullptr;
+    std::unique_ptr<TelemetryCallbackContext> callbackContext_;
 
-    // Current environment
-    rac_environment_t environment_ = RAC_ENV_PRODUCTION;
-
-    // Thread safety
+    // Lifecycle transitions wait for public flush/registration operations,
+    // but never hold this mutex while telemetry invokes the HTTP callback.
     mutable std::mutex mutex_;
+    std::condition_variable stateChanged_;
+    std::size_t activeOperations_ = 0;
+    bool lifecycleTransition_ = false;
 
     // Events callback registered flag
     bool eventsCallbackRegistered_ = false;

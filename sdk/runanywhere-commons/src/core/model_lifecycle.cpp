@@ -35,8 +35,8 @@
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_engine_ids.h"
+#include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 namespace rac::core::model_lifecycle::detail {

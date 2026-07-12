@@ -99,7 +99,7 @@ def getExtOrIntegerDefault(name) {
 // RABackendONNX from runanywhere-sdks
 // =============================================================================
 def coreVersionFile = file("${projectDir.canonicalPath}/../../../../runanywhere-commons/VERSION")
-def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : "0.19.15"
+def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : "0.20.0"
 
 // =============================================================================
 // Binary Source - RABackendONNX from runanywhere-sdks
@@ -199,8 +199,8 @@ def syncAndroidNdkRuntimeLibs(File outputDir) {
 }
 
 android {
-    namespace "com.margelo.nitro.runanywhere.onnx"
-    ndkVersion rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.3.13750724"
+    namespace = "com.margelo.nitro.runanywhere.onnx"
+    ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.3.13750724"
 
     compileSdkVersion getExtOrIntegerDefault('compileSdkVersion')
 
@@ -226,7 +226,7 @@ android {
     externalNativeBuild {
         cmake {
             path "CMakeLists.txt"
-            version "3.30.5"
+            version = "3.30.5"
         }
     }
 
@@ -249,8 +249,8 @@ android {
     }
 
     buildFeatures {
-        buildConfig true
-        prefab true
+        buildConfig = true
+        prefab = true
     }
 
     buildTypes {

@@ -68,11 +68,11 @@ struct rac_telemetry_manager {
     // Batching configuration
     static constexpr size_t BATCH_SIZE_PRODUCTION = 10;  // Flush after 10 events in production
     static constexpr int64_t BATCH_TIMEOUT_MS = 5000;    // Flush after 5 seconds in production
-    static constexpr size_t MAX_QUEUE_SIZE = 256;  // Cap while flushes defer (e.g. pre-auth)
+    static constexpr size_t MAX_QUEUE_SIZE = 256;        // Cap while flushes defer (e.g. pre-auth)
     // Cap the poll-path HTTP queue (drop-oldest) — it was unbounded, so a
     // platform that never drains (Flutter isolate gone) grew it without limit.
     static constexpr size_t MAX_HTTP_QUEUE_SIZE = 64;
-    int64_t last_flush_time_ms = 0;                // Track last flush time for timeout
+    int64_t last_flush_time_ms = 0;  // Track last flush time for timeout
 };
 
 // =============================================================================
@@ -459,8 +459,7 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
             // Generation events are emitted by both LLM and VLM (streamed VLM
             // rides the same GenerationEvent); prefix by component so a VLM
             // stream doesn't surface as "llm.generation.*" under modality vlm.
-            const char* p =
-                ev.component() == runanywhere::v1::SDK_COMPONENT_VLM ? "vlm" : "llm";
+            const char* p = ev.component() == runanywhere::v1::SDK_COMPONENT_VLM ? "vlm" : "llm";
             switch (ev.generation().kind()) {
                 case runanywhere::v1::GENERATION_EVENT_KIND_STARTED:
                     return std::string(p) + ".generation.started";
@@ -746,8 +745,7 @@ bool telemetry_records(const SDKEvent& ev) {
             // records only the per-turn MetricsEvent summary; all other pipeline
             // sub-events (tokens, state changes, audio frames) stay public/log only.
             if (ev.component() == runanywhere::v1::SDK_COMPONENT_VAD) {
-                return ev.has_error() ||
-                       ev.category() == runanywhere::v1::EVENT_CATEGORY_FAILURE;
+                return ev.has_error() || ev.category() == runanywhere::v1::EVENT_CATEGORY_FAILURE;
             }
             return ev.voice_pipeline().payload_case() == runanywhere::v1::VoiceEvent::kMetrics;
         case SDKEvent::kModel:
@@ -883,7 +881,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
         // Prefer the negative rac_result_t (c_abi_code) when present; else the
         // ErrorCode enum value.
         error_code_num = ev.error().has_c_abi_code() ? ev.error().c_abi_code()
-                                                      : static_cast<int>(ev.error().code());
+                                                     : static_cast<int>(ev.error().code());
     } else if (payload_error != nullptr && !payload_error->empty()) {
         payload.success = RAC_FALSE;
         payload.has_success = RAC_TRUE;
@@ -934,7 +932,8 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.max_tokens = g.max_tokens();
             payload.context_length = g.context_length();
             if ((ev.generation().kind() == runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED ||
-                 ev.generation().kind() == runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED) &&
+                 ev.generation().kind() ==
+                     runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED) &&
                 !ev.has_error()) {
                 payload.success = RAC_TRUE;
                 payload.has_success = RAC_TRUE;
@@ -1024,8 +1023,8 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 // envelope properties carrier (no VoiceLifecycleEvent fields).
                 if (!v.model_id().empty()) {
                     payload.model_id = v.model_id().c_str();
-                    payload.model_name = !v.model_name().empty() ? v.model_name().c_str()
-                                                                 : v.model_id().c_str();
+                    payload.model_name =
+                        !v.model_name().empty() ? v.model_name().c_str() : v.model_id().c_str();
                 }
                 payload.speech_duration_ms = static_cast<double>(v.duration_ms());
                 payload.sample_rate = v.sample_rate();
@@ -1098,8 +1097,8 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     payload.operation =
                         c.kind() == runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED
                             ? "attach"
-                            : (c.kind() ==
-                                       runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED
+                            : (c.kind() == runanywhere::v1::
+                                               CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED
                                    ? "detach"
                                    : "failed");
                     // adapter_id rides the properties carrier; points into `ev`,
@@ -1125,7 +1124,8 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     // V2 row carries them alongside image_count.
                     auto in_it = ev.properties().find("input_tokens");
                     if (in_it != ev.properties().end()) {
-                        payload.input_tokens = static_cast<int32_t>(std::atoi(in_it->second.c_str()));
+                        payload.input_tokens =
+                            static_cast<int32_t>(std::atoi(in_it->second.c_str()));
                     }
                     auto tot_it = ev.properties().find("total_tokens");
                     payload.total_tokens =
@@ -1151,7 +1151,8 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     // Vision-specific metrics ride the properties carrier (no proto fields).
                     auto vt_it = ev.properties().find("vision_tokens");
                     if (vt_it != ev.properties().end()) {
-                        payload.vision_tokens = static_cast<int32_t>(std::atoi(vt_it->second.c_str()));
+                        payload.vision_tokens =
+                            static_cast<int32_t>(std::atoi(vt_it->second.c_str()));
                     }
                     auto vet_it = ev.properties().find("vision_encode_time_ms");
                     if (vet_it != ev.properties().end()) {
@@ -1258,8 +1259,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             const auto& vp = ev.voice_pipeline();
             if (ev.component() == runanywhere::v1::SDK_COMPONENT_VAD) {
                 if (vp.payload_case() == runanywhere::v1::VoiceEvent::kVad) {
-                    payload.speech_duration_ms =
-                        static_cast<double>(vp.vad().speech_duration_ms());
+                    payload.speech_duration_ms = static_cast<double>(vp.vad().speech_duration_ms());
                     payload.silence_duration_ms =
                         static_cast<double>(vp.vad().silence_duration_ms());
                 }
@@ -1435,7 +1435,8 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
         rac_result_t result =
             rac_telemetry_manager_batch_to_json(&batch, manager->environment, &json, &json_len);
         if (result != RAC_SUCCESS || !json) {
-            RAC_LOG_WARNING("Telemetry", "Re-queuing telemetry batch: JSON build failed (rc=%d, "
+            RAC_LOG_WARNING("Telemetry",
+                            "Re-queuing telemetry batch: JSON build failed (rc=%d, "
                             "modality=%s, %zu events)",
                             (int)result, modality.c_str(), modality_events.size());
             failed_modalities[modality] = true;
@@ -1450,8 +1451,7 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
             // by Flutter, whose Dart FFI data callbacks are isolate-bound.
             {
                 std::lock_guard<std::mutex> lock(manager->http_queue_mutex);
-                while (manager->http_queue.size() >=
-                       rac_telemetry_manager::MAX_HTTP_QUEUE_SIZE) {
+                while (manager->http_queue.size() >= rac_telemetry_manager::MAX_HTTP_QUEUE_SIZE) {
                     RAC_LOG_WARNING("Telemetry",
                                     "HTTP queue full (%zu) — dropping oldest pending batch",
                                     manager->http_queue.size());

@@ -199,6 +199,7 @@ if [ -n "$NATIVES_FROM" ]; then
             mkdir -p "$android_jni/$abi"
             for lib in "$@"; do
                 cp -f "$src/$lib" "$android_jni/$abi/"
+                chmod u+w "$android_jni/$abi/$lib"
             done
         done
     }
@@ -220,6 +221,7 @@ if [ -n "$NATIVES_FROM" ]; then
         mkdir -p "$assets_root/arm64-v8a"
         for lib in libQnnHtpV75Skel.so libQnnHtpV79Skel.so libQnnHtpV81Skel.so; do
             cp -f "$src/$lib" "$assets_root/arm64-v8a/"
+            chmod u+w "$assets_root/arm64-v8a/$lib"
         done
     }
 
@@ -250,9 +252,11 @@ if [ -n "$NATIVES_FROM" ]; then
             libQnnHtpV79CalculatorStub.so libQnnHtpV79Stub.so \
             libQnnHtpV81CalculatorStub.so libQnnHtpV81Stub.so; do
             cp -f "$src/$lib" "$android_jni/"
+            chmod u+w "$android_jni/$lib"
         done
         if [ -f "$src/librac_backend_qhexrt_jni.so" ]; then
             cp -f "$src/librac_backend_qhexrt_jni.so" "$android_jni/"
+            chmod u+w "$android_jni/librac_backend_qhexrt_jni.so"
         fi
     }
 

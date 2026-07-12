@@ -140,6 +140,7 @@ let _isInitialized = false;
 let _initOptions: SDKInitOptions | null = null;
 let _initializingPromise: Promise<void> | null = null;
 let _shutdownPromise: Promise<void> | null = null;
+let _shutdownRequired = false;
 let _localFileStorage: LocalFileStorage | null = null;
 let _deviceId: string | null = null;
 let _hasCompletedNativePhase1 = false;
@@ -199,56 +200,47 @@ function generateDeviceId(): string {
   });
 }
 
-/** Persist + retrieve a device ID across SDK sessions.
- *
- * Mirrors Swift's `CppBridge.Device.persistentId`: delegates to commons'
- * device-identity chain (secure_get → vendor ID → synthesized UUID) when a
- * WASM module is available, falling back to the TS-local UUID only when no
- * module is installed. This ensures the same canonical ID is returned whether
- * the call happens before or after a backend module registers.
- *
- * The `rac_state_get_persistent_device_id` function is exported by the commons
- * WASM and reads/writes via the `secure_get` / `secure_set` ABI backed by
- * `localStorage` with the `rac_sdk_` key prefix — the same storage slot that
- * C++ uses, so there is only one device-ID registry entry.
- */
+const DEVICE_ID_STORAGE_KEY =
+  'rac_sdk_plaintext_com.runanywhere.sdk.device.uuid';
+const CANONICAL_DEVICE_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Persist + retrieve the canonical browser device ID across SDK sessions. */
 function ensureDeviceId(): string {
   if (_deviceId) return _deviceId;
 
-  // Prefer the commons device-identity chain so all layers share one ID.
-  try {
-    const mod = tryRunanywhereModule();
-    const modWithDeviceId = mod as (EmscriptenRunanywhereModule & { _rac_state_get_persistent_device_id?: () => number }) | null;
-    if (modWithDeviceId && typeof modWithDeviceId._rac_state_get_persistent_device_id === 'function') {
-      const ptr = modWithDeviceId._rac_state_get_persistent_device_id();
-      if (ptr) {
-        const id = modWithDeviceId.UTF8ToString(ptr);
-        if (id) {
-          _deviceId = id;
-          return id;
-        }
-      }
-    }
-  } catch { /* fall through to TS fallback */ }
+  if (typeof localStorage === 'undefined') {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+      'Persistent browser storage is required for device identity.',
+    );
+  }
 
-  // TS fallback: persist one stable browser-local device identity.
   try {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('runanywhere.deviceId');
-      if (stored) {
-        _deviceId = stored;
-        return stored;
+    const stored = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (stored !== null) {
+      if (!CANONICAL_DEVICE_ID_PATTERN.test(stored)) {
+        throw new Error('stored device identity is not a canonical UUID');
       }
+      _deviceId = stored;
+      return stored;
     }
-  } catch { /* ignore */ }
-  const id = generateDeviceId();
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('runanywhere.deviceId', id);
+
+    const id = generateDeviceId();
+    localStorage.setItem(DEVICE_ID_STORAGE_KEY, id);
+    if (localStorage.getItem(DEVICE_ID_STORAGE_KEY) !== id) {
+      throw new Error('localStorage did not retain the device identity');
     }
-  } catch { /* ignore */ }
-  _deviceId = id;
-  return id;
+    _deviceId = id;
+    return id;
+  } catch (error) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+      `Failed to persist browser device identity: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
 }
 
 function mapSdkInitEnvironment(env: SDKEnvironment): SdkInitEnvironment {
@@ -444,7 +436,7 @@ function throwIfSdkInitFailed(result: ProtoSdkInitResult | null, phase: string):
     });
   }
   if (result.warning) {
-    logger.warning(`${phase} warning: ${result.warning}`);
+    logger.warning(`${phase} completed with a warning`);
   }
 }
 
@@ -864,7 +856,7 @@ async function retryHTTPSetup(): Promise<void> {
   throwIfSdkInitFailed(result, 'SDK HTTP retry');
   _hasCompletedHTTPSetup = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
   if (result?.warning) {
-    logger.debug(`HTTP/Auth retry warning: ${result.warning}`);
+    logger.debug('HTTP/Auth retry completed with a warning');
   }
   if (_hasCompletedHTTPSetup) {
     logger.info('HTTP/Auth setup succeeded on retry');
@@ -986,6 +978,11 @@ export const RunAnywhere = {
     if (_shutdownPromise) {
       await _shutdownPromise;
     }
+    if (_shutdownRequired) {
+      throw SDKException.invalidState(
+        'The previous SDK shutdown did not complete; retry shutdown before initialization.',
+      );
+    }
     if (_isInitialized) {
       logger.debug('Already initialized');
       return;
@@ -1020,8 +1017,8 @@ export const RunAnywhere = {
 
         try {
           await RunAnywhere.storage.restoreLocalStorage();
-        } catch (err) {
-          logger.warning(`Failed to restore local storage: ${err instanceof Error ? err.message : String(err)}`);
+        } catch {
+          logger.warning('Failed to restore local storage');
         }
         throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
 
@@ -1057,9 +1054,9 @@ export const RunAnywhere = {
         // The promise itself is intentionally fire-and-forget; consumers
         // who need to wait can call `RunAnywhere.completeServicesInitialization()`
         // (or `ensureServicesReady()`) directly and await the same promise.
-        void RunAnywhere.completeServicesInitialization().catch((err) => {
-          const message = err instanceof Error ? err.message : String(err);
-          logger.warning(`Phase 2 init failed (non-fatal): ${message}`);
+        void RunAnywhere.completeServicesInitialization().catch(() => {
+          const message = 'Phase 2 initialization failed';
+          logger.warning('Phase 2 init failed (non-fatal)');
           EventBus.shared.publish(
             'sdk.initializationFailed',
             EventCategory.EVENT_CATEGORY_INITIALIZATION,
@@ -1075,10 +1072,8 @@ export const RunAnywhere = {
         // call is idempotent and no-ops if the registry is empty.
         try {
           await RunAnywhere.hydrateModelRegistry();
-        } catch (err) {
-          logger.warning(
-            `Initial model registry hydrate failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-          );
+        } catch {
+          logger.warning('Initial model registry hydrate failed (non-fatal)');
         }
         throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
       } catch (error) {
@@ -1088,14 +1083,28 @@ export const RunAnywhere = {
         }
         // Swift parity (RunAnywhere.swift performCoreInitSerial error path):
         // reset init state fully and rethrow so callers observe the failure.
-        logger.error(
-          `Initialization failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        logger.error('Initialization failed');
+        const rollbackFailures: unknown[] = [];
+        const rollback = (operation: string, action: () => void): void => {
+          try {
+            action();
+          } catch (rollbackError) {
+            logger.warning(`${operation} failed during initialization rollback`);
+            rollbackFailures.push(rollbackError);
+          }
+        };
+        rollback('Commons shutdown', () => CommonsModule.shared.shutdown());
+        rollback('WASM module cleanup', clearRunanywhereModule);
+        rollback('HTTP adapter cleanup', () => HTTPAdapter.clearDefaultModule());
+        rollback('Storage adapter cleanup', () => StorageAdapter.clearDefaultHandles());
         _isInitialized = false;
         _initOptions = null;
+        _deviceId = null;
+        _hasCompletedNativePhase1 = false;
         _hasCompletedServicesInit = false;
         _hasCompletedHTTPSetup = false;
         _servicesInitPromise = null;
+        _shutdownRequired = rollbackFailures.length > 0;
         throw error;
       }
     })();
@@ -1119,6 +1128,9 @@ export const RunAnywhere = {
    * work.
    */
   async completeServicesInitialization(): Promise<void> {
+    if (_shutdownPromise || _shutdownRequired) {
+      throw SDKException.invalidState('SDK shutdown is in progress.');
+    }
     if (_hasCompletedServicesInit) return;
     if (_servicesInitPromise) return _servicesInitPromise;
 
@@ -1217,6 +1229,9 @@ export const RunAnywhere = {
    *   3. Cold-start path: Phase 2 not yet run → completeServicesInitialization().
    */
   async ensureServicesReady(): Promise<void> {
+    if (_shutdownPromise || _shutdownRequired) {
+      throw SDKException.invalidState('SDK shutdown is in progress.');
+    }
     if (!_isInitialized && !tryRunanywhereModule()) {
       throw SDKException.notInitialized(
         'RunAnywhere.initialize() must complete before services can be used.',
@@ -1999,9 +2014,26 @@ export const RunAnywhere = {
     // The generation check prevents this lifetime from mutating flags after a
     // subsequent initialize has begun.
     _lifecycleGeneration += 1;
+    _shutdownRequired = true;
+    // Close the public facade synchronously. Native/module owners remain alive
+    // until the shared shutdown promise drains them below.
+    _isInitialized = false;
     const initializingPromise = _initializingPromise;
+    const servicesInitPromise = _servicesInitPromise;
     const shutdownPromise = (async () => {
       logger.info('Shutting down RunAnywhere Web SDK...');
+      const shutdownFailures: unknown[] = [];
+      const recordShutdownFailure = (operation: string, error: unknown): void => {
+        logger.warning(`${operation} failed during SDK shutdown`);
+        shutdownFailures.push(error);
+      };
+      const cleanup = (operation: string, action: () => void): void => {
+        try {
+          action();
+        } catch (error) {
+          recordShutdownFailure(operation, error);
+        }
+      };
 
       // Initialization owns module registration and state publication. Join
       // the invalidated lifetime before tearing those resources down so stale
@@ -2014,16 +2046,32 @@ export const RunAnywhere = {
         }
       }
 
+      // Phase 2 may be awaiting browser fetch/device registration while holding
+      // callbacks borrowed from Commons. Join the invalidated operation before
+      // releasing those callbacks or the WASM module.
+      if (servicesInitPromise) {
+        try {
+          await servicesInitPromise;
+        } catch {
+          // The originating caller owns the Phase-2 error. Generation guards
+          // prevent stale state publication; shutdown only needs quiescence.
+        }
+      }
+
       // Stop admitting destructive storage work and drain every delete accepted
       // by this runtime before destroying its analyzer callbacks or WASM module.
-      await StorageAdapter.prepareForShutdown();
+      try {
+        await StorageAdapter.prepareForShutdown();
+      } catch (error) {
+        recordShutdownFailure('StorageAdapter.prepareForShutdown', error);
+      }
 
     // Voice-agent providers may own native handles, stream subscribers, and
     // cross-WASM conversation state. Release them before their backend modules.
       try {
         await resetVoiceAgentFacadeState();
       } catch (err) {
-        logger.warning(`Voice-agent teardown failed during SDK shutdown: ${String(err)}`);
+        recordShutdownFailure('Voice-agent teardown', err);
       }
 
     // RAG owns provider state outside the WASM adapter registry (including
@@ -2033,9 +2081,9 @@ export const RunAnywhere = {
       try {
         await ragDestroyPipeline();
       } catch (err) {
-        logger.warning(`RAG teardown failed during SDK shutdown: ${String(err)}`);
+        recordShutdownFailure('RAG teardown', err);
       } finally {
-        resetRAGFacadeState();
+        cleanup('RAG facade cleanup', resetRAGFacadeState);
       }
 
     // Release the core WASM singleton itself, not only the adapter registry.
@@ -2047,7 +2095,7 @@ export const RunAnywhere = {
       try {
         CommonsModule.shared.shutdown();
       } catch (err) {
-        logger.warning(`CommonsModule.shutdown threw during SDK shutdown: ${String(err)}`);
+        recordShutdownFailure('CommonsModule shutdown', err);
       }
 
     // Clear every WASM adapter singleton that module registration
@@ -2056,11 +2104,11 @@ export const RunAnywhere = {
     // and null the global module so post-shutdown calls into
     // ModalityProtoAdapter / tryRunanywhereModule()
     // can't acquire stale references to a torn-down backend.
-      clearRunanywhereModule();
+      cleanup('WASM module cleanup', clearRunanywhereModule);
     // HTTPAdapter and StorageAdapter are owned outside the capability registry,
     // so they must be cleared explicitly to complete the ownership boundary.
-      HTTPAdapter.clearDefaultModule();
-      StorageAdapter.clearDefaultHandles();
+      cleanup('HTTP adapter cleanup', () => HTTPAdapter.clearDefaultModule());
+      cleanup('Storage adapter cleanup', () => StorageAdapter.clearDefaultHandles());
 
     // Tear down the Worker streaming pipeline. The WASM ownership boundary
     // is `clearRunanywhereModule()`, but the Worker singletons
@@ -2073,15 +2121,16 @@ export const RunAnywhere = {
       try {
         OffscreenRuntimeBridge.disposeShared();
       } catch (err) {
-        logger.warning(`OffscreenRuntimeBridge.disposeShared threw during shutdown: ${String(err)}`);
+        recordShutdownFailure('Offscreen runtime cleanup', err);
       }
-      setStreamWorkerFactory(null);
-      setStreamWorkerInit(null);
+      cleanup('Stream worker factory cleanup', () => setStreamWorkerFactory(null));
+      cleanup('Stream worker state cleanup', () => setStreamWorkerInit(null));
 
-      EventBus.reset();
+      cleanup('Event bus cleanup', () => EventBus.reset());
 
       _isInitialized = false;
       _initOptions = null;
+      _deviceId = null;
       OPFSBridge.setPersistentRoot(null);
       _localFileStorage = null;
       _hasCompletedNativePhase1 = false;
@@ -2089,7 +2138,19 @@ export const RunAnywhere = {
       _hasCompletedHTTPSetup = false;
       _servicesInitPromise = null;
 
-      logger.info('RunAnywhere Web SDK shut down');
+      if (shutdownFailures.length === 0) {
+        _shutdownRequired = false;
+        logger.info('RunAnywhere Web SDK shut down');
+      } else {
+        logger.warning('RunAnywhere Web SDK shutdown remains incomplete');
+      }
+      if (shutdownFailures.length === 1) throw shutdownFailures[0];
+      if (shutdownFailures.length > 1) {
+        throw new AggregateError(
+          shutdownFailures,
+          'Multiple SDK shutdown operations failed',
+        );
+      }
     })();
     _shutdownPromise = shutdownPromise;
     void shutdownPromise.finally(() => {

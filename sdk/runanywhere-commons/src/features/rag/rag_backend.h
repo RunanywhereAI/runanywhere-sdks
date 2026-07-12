@@ -19,8 +19,8 @@
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
-#include <unordered_set>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "rac/core/rac_types.h"

@@ -56,8 +56,8 @@
  *     `..._get_response_headers`.
  */
 
-#include "rac_http_transport_ref.h"
 #include "rac_http_hf_auth.h"
+#include "rac_http_transport_ref.h"
 #include "rac_http_upsert_mode.h"
 
 #include <chrono>
@@ -441,8 +441,8 @@ PreparedRequest prepare_request(const rac_http_request_t* req) {
         prepared.effective_request.header_count = prepared.header_storage.size();
     }
 
-    auto bearer = rac::http::hf_bearer_for_url(prepared.effective_request.url,
-                                               has_authorization_header(&prepared.effective_request));
+    auto bearer = rac::http::hf_bearer_for_url(
+        prepared.effective_request.url, has_authorization_header(&prepared.effective_request));
     if (!bearer.empty()) {
         if (prepared.header_storage.empty() && req->header_count > 0) {
             prepared.header_storage.reserve(req->header_count + 1);

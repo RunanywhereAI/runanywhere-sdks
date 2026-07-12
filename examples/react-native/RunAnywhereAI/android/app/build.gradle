@@ -105,11 +105,11 @@ def enableProguardInReleaseBuilds = true
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 android {
-    ndkVersion rootProject.ext.ndkVersion
+    ndkVersion = rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.runanywhereaI"
+    namespace = "com.runanywhereaI"
     defaultConfig {
         applicationId "com.runanywhereaI"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -130,7 +130,7 @@ android {
                           "-DCMAKE_MODULE_PATH=${projectDir}"
             }
         }
-        ndkVersion "27.3.13750724"
+        ndkVersion = "27.3.13750724"
     }
     signingConfigs {
         debug {
@@ -155,12 +155,12 @@ android {
     }
     buildTypes {
         debug {
-            signingConfig signingConfigs.debug
+            signingConfig = signingConfigs.debug
         }
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.release.storeFile != null ? signingConfigs.release : signingConfigs.debug
+            signingConfig = signingConfigs.release.storeFile != null ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

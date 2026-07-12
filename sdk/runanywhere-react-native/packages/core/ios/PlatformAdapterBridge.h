@@ -30,10 +30,12 @@ bool PlatformAdapter_secureSet(const char* key, const char* value);
 /**
  * Get a value from the Keychain
  * @param key The key to retrieve
- * @param outValue Pointer to store the result (must be freed by caller with free())
- * @return true if found
+ * @param outValue Pointer to store the result (must be freed by caller with
+ * free())
+ * @return RAC_SUCCESS if found, RAC_ERROR_FILE_NOT_FOUND for a clean miss,
+ *         or RAC_ERROR_SECURE_STORAGE_FAILED on Keychain/authentication errors
  */
-bool PlatformAdapter_secureGet(const char* key, char** outValue);
+int PlatformAdapter_secureGet(const char *key, char **outValue);
 
 /**
  * Delete a value from the Keychain
@@ -41,20 +43,6 @@ bool PlatformAdapter_secureGet(const char* key, char** outValue);
  * @return true if successful
  */
 bool PlatformAdapter_secureDelete(const char* key);
-
-/**
- * Check if a key exists in the Keychain
- * @param key The key to check
- * @return true if exists
- */
-bool PlatformAdapter_secureExists(const char* key);
-
-/**
- * Get persistent device UUID (from Keychain or generate new)
- * @param outValue Pointer to store the UUID (must be freed by caller with free())
- * @return true if successful
- */
-bool PlatformAdapter_getPersistentDeviceUUID(char** outValue);
 
 // ============================================================================
 // Native Directories

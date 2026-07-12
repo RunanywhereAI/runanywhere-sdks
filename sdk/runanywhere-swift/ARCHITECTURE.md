@@ -41,7 +41,7 @@ The Swift SDK (`sdk/runanywhere-swift/`) is a thin platform bridge that adapts A
 - macOS deployment target: 14.5
 - Swift tools version: 5.9 (`Package.swift:1`)
 - Xcode required: 15+
-- Current SDK version: `0.19.15` (`sdk/runanywhere-swift/VERSION:1`)
+- Current SDK version: `0.20.0` (`sdk/runanywhere-swift/VERSION:1`)
 
 ### §1.3 Package layout (preview)
 
@@ -87,7 +87,7 @@ The full slot map and per-slot implementation notes are documented in §6.5.18 (
 sdk/runanywhere-swift/
 ├── Package.swift               ← local dev manifest (references Binaries/)
 ├── Package.resolved
-├── VERSION                     ← 0.19.15
+├── VERSION                     ← 0.20.0
 ├── AGENTS.md
 ├── README.md
 ├── ARCHITECTURE.md             ← this document
@@ -150,7 +150,7 @@ File: `sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift` (~404
 | `isActive` | `Bool` | `isInitializedFlag && initParams != nil` | both internal flags | 57 |
 | `version` | `String` | SDK version string | `SDKConstants.version` | 60 |
 | `environment` | `SDKEnvironment?` | Current environment or `nil` | `currentEnvironment` | 63 |
-| `deviceId` | `String` | Keychain-persisted device UUID | `CppBridge.Device.persistentId` | 68 |
+| `deviceId` | `String` (`get throws`) | Durably Keychain-persisted device UUID | `CppBridge.Device.persistentId` | 82 |
 | `events` | `EventBus` | The event bus singleton | `EventBus.shared` | 73 |
 | `isAuthenticated` | `Bool` | Whether auth token is present | `CppBridge.Auth.isAuthenticated` | 84 |
 
@@ -1050,8 +1050,8 @@ Calls `rac_api_error_from_response(statusCode, bodyC, urlC, &apiError)`. Maps st
 
 | Method | Line | C ABI |
 |---|---|---|
-| `persistentId` | 44 | `rac_device_get_or_create_persistent_id` |
-| `register()` | 83 | `rac_device_manager_set_callbacks` |
+| `persistentId` (`get throws`) | 51 | `rac_device_get_or_create_persistent_id` |
+| `register()` (`throws`) | 93 | `rac_device_manager_set_callbacks` |
 | `registerIfNeeded(environment:)` async throws | 209 | `rac_device_manager_register_if_needed` |
 | `isRegistered` | 246 | `rac_device_manager_is_registered` |
 | `clearRegistration()` | 251 | `rac_device_manager_clear_registration` |
@@ -1568,7 +1568,7 @@ Seven files under `Foundation/Bridge/Extensions/` form the type-conversion layer
 
 | Constant | Value / Derivation |
 |---|---|
-| `version` | `"0.19.15"` (line 14) — kept in sync with `sdk/runanywhere-commons/VERSION` |
+| `version` | `"0.20.0"` (line 14) — kept in sync with `sdk/runanywhere-commons/VERSION` |
 | `name` | `"RunAnywhere SDK"` (line 17) |
 | `userAgent` | `"\(name)/\(version) (Swift)"` (line 20) |
 | `platform` | Compile-time conditional (lines 23–33): `"ios"`, `"macos"`, `"tvos"`, `"watchos"`, or `"unknown"` |
@@ -2636,7 +2636,7 @@ All files in `Generated/` are produced by `idl/codegen/generate_all.sh` and must
 | **Streaming primitive** | `AsyncStream<Event>` | `Flow<Event>` | `Stream<Event>` (via `StreamController.broadcast`) | `AsyncIterable<Event>` (manual iteration; Hermes does not support `for await...of` w/ NitroModules) | `AsyncIterable<Event>` |
 | **Error type** | `SDKException` (proto-backed struct) | `SDKException` (proto-backed class) | `SDKException` (proto-backed class) | `SDKException` (proto-backed class) | `SDKException` (proto-backed class) |
 | **Event bus** | `EventBus` (Combine `PassthroughSubject`) | `EventBus` (Kotlin `SharedFlow`) | `EventBus` (custom pub/sub via `dart:async broadcast StreamController`) | `EventBus` (RN `NativeEventEmitter`) | `EventBus` (custom pub/sub) |
-| **Secure storage** | Keychain (Security.framework) | EncryptedSharedPrefs (Android) / AES-encrypted files (JVM) | flutter_secure_storage + cache | Keychain (iOS) / EncryptedSharedPrefs (Android) | `localStorage` |
+| **Secure storage** | Keychain (Security.framework) | Android Keystore-backed storage | Keychain (iOS) / Android Keystore + atomic no-backup ciphertext files | Keychain (iOS) / Android Keystore-backed storage | `localStorage` |
 | **HTTP transport** | URLSession (`URLSessionHttpTransport` enum) | OkHttp (Android/JVM) | OkHttp (Android) / URLSession (iOS) | OkHttp (Android) / URLSession (iOS) | `emscripten_fetch` / `fetch()` |
 | **Platform adapter IoC** | `rac_platform_adapter_t` populated in `CppBridge+PlatformAdapter.swift` | Same struct populated via JNI in jvmAndroidMain | Same struct populated via Dart FFI | Same struct populated via NitroModules C++ bridge | Same struct populated in JS callbacks via emscripten |
 | **FFI mechanism** | XCFramework + `module.modulemap` (clang module) | JNI (`librunanywhere_jni.so`) | Dart FFI (`ffi` package) | NitroModules (JSI HybridObject) | Emscripten WASM + JS glue |

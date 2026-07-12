@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.data.settings
 
 import android.content.SharedPreferences
+import com.runanywhere.runanywhereai.data.security.SecureStringPreferences
 import com.runanywhere.runanywhereai.util.RACLog
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -30,7 +31,7 @@ class SettingsRepositoryHfTokenMigrationTest {
         val legacy = FakeSharedPreferences(mapOf(HF_TOKEN_KEY to OLD_TOKEN)).apply {
             failedHfTokenRemovalCommits = 1
         }
-        val secure = FakeSharedPreferences()
+        val secure = FakeSecureStringPreferences()
 
         SettingsRepository.initializeForTesting(legacy, secure)
 
@@ -40,7 +41,7 @@ class SettingsRepositoryHfTokenMigrationTest {
         assertTrue(SettingsRepository.setHfToken("").isSuccess)
         assertFalse(legacy.contains(HF_TOKEN_KEY))
         assertTrue(secure.contains(HF_TOKEN_KEY))
-        assertEquals("", secure.getString(HF_TOKEN_KEY, null))
+        assertEquals("", secure.getString(HF_TOKEN_KEY))
 
         SettingsRepository.resetForTesting()
         SettingsRepository.initializeForTesting(legacy, secure)
@@ -54,14 +55,14 @@ class SettingsRepositoryHfTokenMigrationTest {
         val legacy = FakeSharedPreferences(mapOf(HF_TOKEN_KEY to OLD_TOKEN)).apply {
             failedHfTokenRemovalCommits = 3
         }
-        val secure = FakeSharedPreferences()
+        val secure = FakeSecureStringPreferences()
 
         SettingsRepository.initializeForTesting(legacy, secure)
         val clearResult = SettingsRepository.setHfToken("")
 
         assertTrue(clearResult.isFailure)
         assertEquals("", SettingsRepository.settings.hfToken)
-        assertEquals("", secure.getString(HF_TOKEN_KEY, null))
+        assertEquals("", secure.getString(HF_TOKEN_KEY))
         assertEquals(OLD_TOKEN, legacy.getString(HF_TOKEN_KEY, null))
 
         SettingsRepository.resetForTesting()
@@ -76,13 +77,13 @@ class SettingsRepositoryHfTokenMigrationTest {
         val legacy = FakeSharedPreferences(mapOf(HF_TOKEN_KEY to OLD_TOKEN)).apply {
             failedHfTokenRemovalCommits = 1
         }
-        val secure = FakeSharedPreferences()
+        val secure = FakeSecureStringPreferences()
 
         SettingsRepository.initializeForTesting(legacy, secure)
 
         assertTrue(SettingsRepository.setHfToken(NEW_TOKEN).isSuccess)
         assertFalse(legacy.contains(HF_TOKEN_KEY))
-        assertEquals(NEW_TOKEN, secure.getString(HF_TOKEN_KEY, null))
+        assertEquals(NEW_TOKEN, secure.getString(HF_TOKEN_KEY))
 
         SettingsRepository.resetForTesting()
         SettingsRepository.initializeForTesting(legacy, secure)
@@ -194,6 +195,19 @@ class SettingsRepositoryHfTokenMigrationTest {
                 commit()
             }
         }
+    }
+
+    private class FakeSecureStringPreferences : SecureStringPreferences {
+        private val values = mutableMapOf<String, String>()
+
+        override fun getString(key: String): String? = values[key]
+
+        override fun putString(key: String, value: String): Boolean {
+            values[key] = value
+            return true
+        }
+
+        override fun contains(key: String): Boolean = values.containsKey(key)
     }
 
     private companion object {

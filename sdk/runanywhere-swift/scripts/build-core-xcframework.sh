@@ -182,6 +182,82 @@ merge_static_archives() {
     run xcrun libtool -static -o "${output}" "${inputs[@]}"
 }
 
+# Some pinned upstream Apple archives embed their CI checkout roots in
+# __FILE__ strings. Rewrite only the reviewed, version-pinned prefixes while
+# preserving every byte offset, then fail closed if any host path remains.
+# The expected counts intentionally make an upstream binary change require a
+# fresh audit instead of silently accepting a new or incomplete rewrite.
+sanitize_and_validate_archive_host_paths() {
+    local archive="$1"
+    local label="$2"
+    shift 2
+
+    if [ "${DRY_RUN}" = "1" ]; then
+        return
+    fi
+
+    python3 - "${archive}" "${label}" "$@" <<'PY'
+import os
+from pathlib import Path
+import stat
+import sys
+import tempfile
+
+archive = Path(sys.argv[1])
+label = sys.argv[2]
+arguments = sys.argv[3:]
+if len(arguments) % 3 != 0:
+    raise SystemExit(f"error: invalid host-path rewrite specification for {label}")
+
+payload = archive.read_bytes()
+replacement_total = 0
+for offset in range(0, len(arguments), 3):
+    source = arguments[offset].encode()
+    replacement = arguments[offset + 1].encode()
+    expected_count = int(arguments[offset + 2])
+    if len(source) != len(replacement):
+        raise SystemExit(
+            f"error: {label} host-path replacement must preserve binary offsets"
+        )
+    actual_count = payload.count(source)
+    if actual_count != expected_count:
+        raise SystemExit(
+            f"error: {label} expected {expected_count} occurrence(s) of "
+            f"{source.decode()!r}, found {actual_count}"
+        )
+    if payload.count(replacement) != 0:
+        raise SystemExit(
+            f"error: {label} replacement {replacement.decode()!r} was already present"
+        )
+    payload = payload.replace(source, replacement)
+    replacement_total += actual_count
+
+host_markers = (b"/Users/", b"/home/", b"/var/folders/", b"\\Users\\")
+remaining = [marker.decode(errors="replace") for marker in host_markers if marker in payload]
+if remaining:
+    raise SystemExit(
+        f"error: {label} still contains unreviewed host path marker(s): "
+        + ", ".join(remaining)
+    )
+
+if replacement_total:
+    mode = stat.S_IMODE(archive.stat().st_mode)
+    descriptor, temporary_path = tempfile.mkstemp(
+        prefix=f".{archive.name}.", dir=archive.parent
+    )
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(payload)
+        os.chmod(temporary_path, mode)
+        os.replace(temporary_path, archive)
+    finally:
+        if os.path.exists(temporary_path):
+            os.unlink(temporary_path)
+
+print(f"  ✓ {label} host-path audit ({replacement_total} replacement(s))")
+PY
+}
+
 RAC_PROTO_STATIC_DEPS=()
 
 collect_protobuf_static_deps() {
@@ -672,6 +748,7 @@ cmake_extra=(
     "-DCMAKE_OBJC_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
     "-DCMAKE_OBJCXX_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
     "-DRAC_ENABLE_PROTOBUF=ON"
+    "-DRAC_INCLUDE_LOCAL_DEV_CONFIG=OFF"
     "-DRAC_ENABLE_SOLUTIONS=${RAC_ENABLE_SOLUTIONS:-ON}"
     "-DRAC_VENDOR_PROTOBUF=ON"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
@@ -853,6 +930,9 @@ COMMONS_MAC_LIB="${STAGING_DIR}/Release-macos/librac_commons.a"
 merge_commons_slice "${DEV_BIN}" "Release-iphoneos" "${COMMONS_DEV_LIB}" "arm64"
 merge_commons_slice "${SIM_BIN}" "Release-iphonesimulator" "${COMMONS_SIM_LIB}" "arm64"
 merge_commons_macos_slice "${MAC_BIN}" "${COMMONS_MAC_LIB}" "arm64"
+sanitize_and_validate_archive_host_paths "${COMMONS_DEV_LIB}" "ios-device RACommons"
+sanitize_and_validate_archive_host_paths "${COMMONS_SIM_LIB}" "ios-simulator RACommons"
+sanitize_and_validate_archive_host_paths "${COMMONS_MAC_LIB}" "macos RACommons"
 validate_isolated_protobuf_archive "${COMMONS_DEV_LIB}" "ios-device"
 validate_isolated_protobuf_archive "${COMMONS_SIM_LIB}" "ios-simulator"
 validate_isolated_protobuf_archive "${COMMONS_MAC_LIB}" "macos"
@@ -863,6 +943,9 @@ LLAMACPP_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_llamacpp.a"
 merge_llamacpp_backend_slice "${DEV_BIN}" "Release-iphoneos" "${LLAMACPP_DEV_LIB}" "arm64"
 merge_llamacpp_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${LLAMACPP_SIM_LIB}" "arm64"
 merge_llamacpp_backend_macos_slice "${MAC_BIN}" "${LLAMACPP_MAC_LIB}" "arm64"
+sanitize_and_validate_archive_host_paths "${LLAMACPP_DEV_LIB}" "ios-device RABackendLLAMACPP"
+sanitize_and_validate_archive_host_paths "${LLAMACPP_SIM_LIB}" "ios-simulator RABackendLLAMACPP"
+sanitize_and_validate_archive_host_paths "${LLAMACPP_MAC_LIB}" "macos RABackendLLAMACPP"
 
 build_xcframework_from_paths_with_macos "${COMMONS_DEV_LIB}" "${COMMONS_SIM_LIB}" "${COMMONS_MAC_LIB}" "RACommons.xcframework" --with-headers
 build_xcframework_from_paths_with_macos "${LLAMACPP_DEV_LIB}" "${LLAMACPP_SIM_LIB}" "${LLAMACPP_MAC_LIB}" "RABackendLLAMACPP.xcframework"
@@ -873,6 +956,18 @@ if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     merge_onnx_backend_slice "${DEV_BIN}" "Release-iphoneos" "${ONNX_DEV_LIB}" "arm64"
     merge_onnx_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${ONNX_SIM_LIB}" "arm64"
     merge_onnx_backend_macos_slice "${MAC_BIN}" "${ONNX_MAC_LIB}" "arm64"
+    sanitize_and_validate_archive_host_paths \
+        "${ONNX_DEV_LIB}" "ios-device RABackendONNX" \
+        "/Users/runner/work/1/s" "/runanywhere/vendor/rt" 512 \
+        "/Users/runner/work/1/b" "/runanywhere/build/ort" 99
+    sanitize_and_validate_archive_host_paths \
+        "${ONNX_SIM_LIB}" "ios-simulator RABackendONNX" \
+        "/Users/runner/work/1/s" "/runanywhere/vendor/rt" 512 \
+        "/Users/runner/work/1/b" "/runanywhere/build/ort" 99
+    sanitize_and_validate_archive_host_paths \
+        "${ONNX_MAC_LIB}" "macos RABackendONNX" \
+        "/Users/runner/work/onnxruntime-build/onnxruntime-build" \
+        "/runanywhere/vendor/onnxruntime/source/build/checkout0" 1632
     build_xcframework_from_paths_with_macos "${ONNX_DEV_LIB}" "${ONNX_SIM_LIB}" "${ONNX_MAC_LIB}" "RABackendONNX.xcframework"
 else
     echo "▶ Skipping RABackendONNX.xcframework (RAC_BACKEND_ONNX=OFF)"
@@ -887,6 +982,16 @@ if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
         merge_sherpa_backend_slice "${DEV_BIN}" "Release-iphoneos" "${SHERPA_DEV_LIB}" "arm64"
         merge_sherpa_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${SHERPA_SIM_LIB}" "arm64"
         merge_sherpa_backend_macos_slice "${MAC_BIN}" "${SHERPA_MAC_LIB}" "arm64"
+        sanitize_and_validate_archive_host_paths \
+            "${SHERPA_DEV_LIB}" "ios-device RABackendSherpa" \
+            "/Users/runner/work/sherpa-onnx/sherpa-onnx" \
+            "/runanywhere/vendor/sherpa-onnx/src/source" 274
+        sanitize_and_validate_archive_host_paths \
+            "${SHERPA_SIM_LIB}" "ios-simulator RABackendSherpa" \
+            "/Users/runner/work/sherpa-onnx/sherpa-onnx" \
+            "/runanywhere/vendor/sherpa-onnx/src/source" 274
+        sanitize_and_validate_archive_host_paths \
+            "${SHERPA_MAC_LIB}" "macos RABackendSherpa"
         build_xcframework_from_paths_with_macos "${SHERPA_DEV_LIB}" "${SHERPA_SIM_LIB}" "${SHERPA_MAC_LIB}" "RABackendSherpa.xcframework"
     else
         echo "▶ Skipping RABackendSherpa.xcframework (target not built — engines/sherpa disabled?)"
@@ -904,6 +1009,9 @@ if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
     merge_mlx_backend_slice "${DEV_BIN}" "Release-iphoneos" "${MLX_DEV_LIB}" "arm64"
     merge_mlx_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${MLX_SIM_LIB}" "arm64"
     merge_mlx_backend_macos_slice "${MAC_BIN}" "${MLX_MAC_LIB}" "arm64"
+    sanitize_and_validate_archive_host_paths "${MLX_DEV_LIB}" "ios-device RABackendMLX"
+    sanitize_and_validate_archive_host_paths "${MLX_SIM_LIB}" "ios-simulator RABackendMLX"
+    sanitize_and_validate_archive_host_paths "${MLX_MAC_LIB}" "macos RABackendMLX"
     build_xcframework_from_paths_with_macos "${MLX_DEV_LIB}" "${MLX_SIM_LIB}" "${MLX_MAC_LIB}" "RABackendMLX.xcframework"
 else
     echo "▶ Skipping RABackendMLX.xcframework (RAC_BACKEND_MLX=OFF)"

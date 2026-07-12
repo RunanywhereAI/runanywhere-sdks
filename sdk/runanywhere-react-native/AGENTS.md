@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Yarn Berry (3.6.1) workspaces monorepo containing one core package and four backend packages for on-device AI in React Native. Version `0.19.15`. The SDK bridges pre-built C++ inference engines (`runanywhere-commons`) into React Native via **NitroModules** (Nitrogen/Nitro) — a JSI-based zero-serialization bridge, NOT the classic React Native bridge or TurboModules.
+Yarn Berry (3.6.1) workspaces monorepo containing one core package and four backend packages for on-device AI in React Native. Version `0.20.0`. The SDK bridges pre-built C++ inference engines (`runanywhere-commons`) into React Native via **NitroModules** (Nitrogen/Nitro) — a JSI-based zero-serialization bridge, NOT the classic React Native bridge or TurboModules.
 
 Swift alignment source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`, especially §4 folder layout, §12 generated proto code, and §15 build/deployment. React Native follows that iOS 17.5+ minimum and native/proto-byte ownership model; JavaScript is the facade, not the owner of model registry, downloads, storage paths, or native HTTP routing.
 
@@ -96,7 +96,7 @@ Layer 3: C++ Bridge Code (packages/core/cpp/)
 
 Layer 4: Platform Native Code
   iOS: PlatformAdapterBridge.m (C ABI → Swift), URLSessionHttpTransport.mm, KeychainManager.swift, AudioDecoder.m, SDKLogger.swift
-  Android: PlatformAdapterBridge.kt (JNI ↔ Kotlin), okhttp_transport_adapter.cpp, SecureStorageManager.kt (EncryptedSharedPreferences), SDKLogger.kt, OkHttpTransport.kt
+  Android: PlatformAdapterBridge.kt (JNI ↔ Kotlin), okhttp_transport_adapter.cpp, SecureStorageManager.kt (Android Keystore), SDKLogger.kt, OkHttpTransport.kt
 
 Layer 5: Pre-built C++ Libraries (runanywhere-commons)
   RACommons.xcframework / librac_commons.so       — Core infrastructure, registry, storage, events, proto ABI

@@ -73,12 +73,12 @@ class DartBridgeHTTP {
         calloc.free(basePtr);
         calloc.free(keyPtr);
       }
-    } catch (e) {
-      _logger.debug('rac_http_configure not available: $e');
+    } catch (_) {
+      _logger.debug('Native HTTP configuration unavailable');
     }
 
     _isConfigured = true;
-    _logger.debug('HTTP configured', metadata: {'baseURL': _baseURL});
+    _logger.debug('HTTP configured');
   }
 
   void setAccessToken(String? token) {
@@ -87,6 +87,16 @@ class DartBridgeHTTP {
 
   void setApiKey(String key) {
     _apiKey = key;
+  }
+
+  /// Clear process-local HTTP credentials and configuration between SDK
+  /// lifetimes. Native SDK state is reset separately by the state bridge.
+  void shutdown() {
+    _baseURL = null;
+    _apiKey = null;
+    _accessToken = null;
+    _defaultHeaders.clear();
+    _isConfigured = false;
   }
 
   void addHeader(String key, String value) {
@@ -207,6 +217,7 @@ class DartBridgeHTTP {
         headers: requestHeaders,
         body: bodyBytes,
         timeoutMs: (timeout ?? const Duration(seconds: 30)).inMilliseconds,
+        followRedirects: false,
       );
 
       // Auth refresh is owned by commons through `rac_sdk_retry_http_proto`.
@@ -226,16 +237,9 @@ class DartBridgeHTTP {
         headers: response.headers,
         error: _parseError(response.body, response.statusCode),
       );
-    } catch (e) {
-      _logger.error(
-        'HTTP request failed',
-        metadata: {
-          'method': method,
-          'endpoint': endpoint,
-          'error': e.toString(),
-        },
-      );
-      return HTTPResult.failure(e.toString());
+    } catch (_) {
+      _logger.error('HTTP request failed', metadata: {'method': method});
+      return HTTPResult.failure('HTTP request failed');
     }
   }
 
@@ -264,8 +268,8 @@ class DartBridgeHTTP {
           _logger.info('Token refreshed successfully');
           return newToken;
         }
-      } catch (e) {
-        _logger.warning('commons retryHTTP failed: $e');
+      } catch (_) {
+        _logger.warning('Commons HTTP retry failed');
       }
     }
 
@@ -298,6 +302,7 @@ class DartBridgeHTTP {
         url: resolved,
         headers: extraHeaders,
         timeoutMs: (timeout ?? const Duration(seconds: 30)).inMilliseconds,
+        followRedirects: extraHeaders.isEmpty,
       );
 
       if (!response.isSuccess) {
@@ -317,8 +322,8 @@ class DartBridgeHTTP {
         statusCode: response.statusCode,
         body: destinationPath,
       );
-    } catch (e) {
-      return HTTPResult.failure(e.toString());
+    } catch (_) {
+      return HTTPResult.failure('Download failed');
     }
   }
 

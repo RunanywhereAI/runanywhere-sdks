@@ -1,23 +1,23 @@
 // ignore_for_file: avoid_classes_with_only_static_members
 
-import 'dart:async';
-import 'dart:convert';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:runanywhere/adapters/http_client_adapter.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
+import 'package:runanywhere/native/dart_bridge_secure_storage.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 // =============================================================================
 // Secure Storage Callbacks
 // =============================================================================
 
-const int _exceptionalReturnInt = -1;
+const int _exceptionalReturnInt = -333; // RAC_ERROR_SECURE_STORAGE_FAILED
 
 // =============================================================================
 // Auth Manager Bridge
@@ -32,7 +32,7 @@ const int _exceptionalReturnInt = -1;
 /// - Auth state management
 ///
 /// Dart provides:
-/// - Secure storage (via flutter_secure_storage)
+/// - Synchronous platform-native secure storage callbacks
 /// - Token resolver hooks that defer retry/auth work back to commons
 class DartBridgeAuth {
   DartBridgeAuth._();
@@ -41,9 +41,6 @@ class DartBridgeAuth {
   static final DartBridgeAuth instance = DartBridgeAuth._();
 
   static bool _isInitialized = false;
-
-  /// Secure storage callbacks pointer
-  static Pointer<RacSecureStorageCallbacksStruct>? _storagePtr;
 
   // ============================================================================
   // Initialization
@@ -58,37 +55,49 @@ class DartBridgeAuth {
 
     try {
       final lib = PlatformLoader.loadCommons();
+      // Resolve the synchronous helper before installing callbacks. Missing
+      // native storage is an initialization error, not an in-memory fallback.
+      DartBridgeSecureStorage.instance;
 
-      // Allocate and set up secure storage callbacks
-      _storagePtr = calloc<RacSecureStorageCallbacksStruct>();
-      _storagePtr!.ref.store =
-          Pointer.fromFunction<RacSecureStoreCallbackNative>(
-            _secureStoreCallback,
-            _exceptionalReturnInt,
-          );
-      _storagePtr!.ref.retrieve =
-          Pointer.fromFunction<RacSecureRetrieveCallbackNative>(
-            _secureRetrieveCallback,
-            _exceptionalReturnInt,
-          );
-      _storagePtr!.ref.deleteKey =
-          Pointer.fromFunction<RacSecureDeleteCallbackNative>(
-            _secureDeleteCallback,
-            _exceptionalReturnInt,
-          );
-      _storagePtr!.ref.context = nullptr;
-
-      // Initialize auth with storage
       final initAuth = lib
           .lookupFunction<
             Void Function(Pointer<RacSecureStorageCallbacksStruct>),
             void Function(Pointer<RacSecureStorageCallbacksStruct>)
           >('rac_auth_init');
 
-      initAuth(_storagePtr!);
+      // Allocate and set up secure storage callbacks
+      final storagePtr = calloc<RacSecureStorageCallbacksStruct>();
+      storagePtr.ref.store = Pointer.fromFunction<RacSecureStoreCallbackNative>(
+        _secureStoreCallback,
+        _exceptionalReturnInt,
+      );
+      storagePtr.ref.retrieve =
+          Pointer.fromFunction<RacSecureRetrieveCallbackNative>(
+            _secureRetrieveCallback,
+            _exceptionalReturnInt,
+          );
+      storagePtr.ref.deleteKey =
+          Pointer.fromFunction<RacSecureDeleteCallbackNative>(
+            _secureDeleteCallback,
+            _exceptionalReturnInt,
+          );
+      storagePtr.ref.context = nullptr;
 
-      // Load stored tokens
-      await instance._loadStoredTokens();
+      // Commons copies the vtable, so the temporary struct can be released.
+      try {
+        initAuth(storagePtr);
+      } finally {
+        calloc.free(storagePtr);
+      }
+
+      final loadFn = lib.lookupFunction<Int32 Function(), int Function()>(
+        'rac_auth_load_stored_tokens',
+      );
+      final loadResult = loadFn();
+      if (loadResult != RacResultCode.success &&
+          loadResult != RacResultCode.errorFileNotFound) {
+        SDKException.throwIfError(loadResult);
+      }
 
       // Wire token refresh hooks into the shared HTTP client so any
       // request with `requiresAuth: true` can pick up / refresh tokens
@@ -104,12 +113,10 @@ class DartBridgeAuth {
           'hasBaseURL': '${baseURL != null && baseURL.isNotEmpty}',
         },
       );
-    } catch (e, stack) {
-      _logger.debug(
-        'Auth initialization error: $e',
-        metadata: {'stack': stack.toString()},
-      );
-      _isInitialized = true; // Avoid retry loops
+    } catch (_) {
+      _isInitialized = false;
+      _logger.error('Auth initialization failed');
+      rethrow;
     }
   }
 
@@ -121,8 +128,8 @@ class DartBridgeAuth {
         'rac_auth_reset',
       );
       resetFn();
-    } catch (e) {
-      _logger.debug('rac_auth_reset not available: $e');
+    } catch (_) {
+      _logger.debug('Auth reset bridge unavailable');
     }
     // Mirror Swift CppBridge.State.shutdown() which resets authStorageInstalled
     // so that a subsequent initialize() re-wires the secure-storage vtable.
@@ -144,15 +151,11 @@ class DartBridgeAuth {
   /// vtable installed at `rac_auth_init`). Delegates fully to the native
   /// auth manager — matches Swift `CppBridge.State.clearAuth`.
   Future<void> clearAuth() async {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final clearFn = lib.lookupFunction<Void Function(), void Function()>(
-        'rac_auth_clear',
-      );
-      clearFn();
-    } catch (e) {
-      _logger.debug('rac_auth_clear not available: $e');
-    }
+    final lib = PlatformLoader.loadCommons();
+    final clearFn = lib.lookupFunction<Int32 Function(), int Function()>(
+      'rac_auth_clear',
+    );
+    SDKException.throwIfError(clearFn());
   }
 
   // ============================================================================
@@ -280,9 +283,7 @@ class DartBridgeAuth {
     // expired, so we never strand an auth'd request that had a valid token.
     if (current != null && current.isNotEmpty) return current;
 
-    // Last-resort cached access token (may still be stale; the server
-    // will reject it and the 401 retry path will refresh again).
-    return _secureCache['com.runanywhere.sdk.accessToken'];
+    return null;
   }
 
   /// Adapter-facing refresh hook. Returns the new access token, or
@@ -299,77 +300,14 @@ class DartBridgeAuth {
     try {
       final result = DartBridgeSdkInit.retryHTTP();
       if (!result.success) return null;
-    } catch (e) {
-      _logger.debug('rac_sdk_retry_http_proto did not refresh auth: $e');
+    } catch (_) {
+      _logger.debug('HTTP retry did not refresh auth');
       return null;
     }
 
     final fresh = getAccessToken();
     if (fresh != null && fresh.isNotEmpty) return fresh;
-    return _secureCache['com.runanywhere.sdk.accessToken'];
-  }
-
-  /// Load stored tokens from secure storage
-  Future<void> _loadStoredTokens() async {
-    // Try C++ method first
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final loadFn = lib.lookupFunction<Int32 Function(), int Function()>(
-        'rac_auth_load_stored_tokens',
-      );
-      loadFn();
-    } catch (e) {
-      _logger.debug('rac_auth_load_stored_tokens not available: $e');
-    }
-
-    // Also pre-load tokens into cache from Flutter secure storage
-    try {
-      const storage = FlutterSecureStorage(
-        aOptions: AndroidOptions(),
-        iOptions: IOSOptions(
-          accessibility: KeychainAccessibility.first_unlock_this_device,
-        ),
-      );
-
-      final accessToken = await storage.read(
-        key: 'com.runanywhere.sdk.accessToken',
-      );
-      final refreshToken = await storage.read(
-        key: 'com.runanywhere.sdk.refreshToken',
-      );
-      final deviceId = await storage.read(key: 'com.runanywhere.sdk.deviceId');
-      final userId = await storage.read(key: 'com.runanywhere.sdk.userId');
-      final organizationId = await storage.read(
-        key: 'com.runanywhere.sdk.organizationId',
-      );
-
-      if (accessToken != null) {
-        _secureCache['com.runanywhere.sdk.accessToken'] = accessToken;
-      }
-      if (refreshToken != null) {
-        _secureCache['com.runanywhere.sdk.refreshToken'] = refreshToken;
-      }
-      if (deviceId != null) {
-        _secureCache['com.runanywhere.sdk.deviceId'] = deviceId;
-      }
-      if (userId != null) {
-        _secureCache['com.runanywhere.sdk.userId'] = userId;
-      }
-      if (organizationId != null) {
-        _secureCache['com.runanywhere.sdk.organizationId'] = organizationId;
-      }
-
-      _logger.debug(
-        'Loaded tokens from secure storage',
-        metadata: {
-          'hasAccessToken': accessToken != null,
-          'hasRefreshToken': refreshToken != null,
-          'hasDeviceId': deviceId != null,
-        },
-      );
-    } catch (e) {
-      _logger.debug('Failed to pre-load tokens from secure storage: $e');
-    }
+    return null;
   }
 }
 
@@ -377,30 +315,20 @@ class DartBridgeAuth {
 // Secure Storage Callbacks
 // =============================================================================
 
-/// Cached secure storage values for sync access
-final Map<String, String> _secureCache = {};
-
 /// Store callback
 int _secureStoreCallback(
   Pointer<Utf8> key,
   Pointer<Utf8> value,
   Pointer<Void> context,
 ) {
-  if (key == nullptr || value == nullptr) return -1;
+  if (key == nullptr || value == nullptr) {
+    return RacResultCode.errorInvalidArgument;
+  }
 
   try {
-    final keyStr = key.toDartString();
-    final valueStr = value.toDartString();
-
-    // Update cache
-    _secureCache[keyStr] = valueStr;
-
-    // Schedule async write (fire-and-forget, cache is authoritative)
-    unawaited(_writeToSecureStorage(keyStr, valueStr));
-
-    return 0;
-  } catch (e) {
-    return -1;
+    return DartBridgeSecureStorage.instance.storePointers(key, value);
+  } catch (_) {
+    return RacResultCode.errorSecureStorageFailed;
   }
 }
 
@@ -411,82 +339,29 @@ int _secureRetrieveCallback(
   int bufferSize,
   Pointer<Void> context,
 ) {
-  if (key == nullptr || outValue == nullptr) return -1;
+  if (key == nullptr || outValue == nullptr || bufferSize <= 0) {
+    return RacResultCode.errorInvalidArgument;
+  }
 
   try {
-    final keyStr = key.toDartString();
-    final value = _secureCache[keyStr];
-
-    if (value == null) return -1;
-
-    // Copy UTF-8 bytes into the caller buffer. `codeUnits` emits UTF-16 code
-    // units and silently mangles any non-ASCII secret; `utf8.encode` matches
-    // the Swift bridge, which copies `value.utf8CString`.
-    final bytes = utf8.encode(value);
-    final maxLen = bufferSize - 1; // Leave room for null terminator
-
-    if (bytes.length > maxLen) {
-      return -1; // Buffer too small
-    }
-
-    final outPtr = outValue.cast<Uint8>();
-    for (var i = 0; i < bytes.length; i++) {
-      outPtr[i] = bytes[i];
-    }
-    outPtr[bytes.length] = 0; // Null terminator
-
-    return bytes.length;
-  } catch (e) {
-    return -1;
+    return DartBridgeSecureStorage.instance.retrievePointers(
+      key,
+      outValue,
+      bufferSize,
+    );
+  } catch (_) {
+    return RacResultCode.errorSecureStorageFailed;
   }
 }
 
 /// Delete callback
 int _secureDeleteCallback(Pointer<Utf8> key, Pointer<Void> context) {
-  if (key == nullptr) return -1;
+  if (key == nullptr) return RacResultCode.errorInvalidArgument;
 
   try {
-    final keyStr = key.toDartString();
-
-    // Update cache
-    _secureCache.remove(keyStr);
-
-    // Schedule async delete (fire-and-forget, cache is authoritative)
-    unawaited(_deleteFromSecureStorage(keyStr));
-
-    return 0;
-  } catch (e) {
-    return -1;
-  }
-}
-
-/// Async write to secure storage
-Future<void> _writeToSecureStorage(String key, String value) async {
-  try {
-    const storage = FlutterSecureStorage(
-      aOptions: AndroidOptions(),
-      iOptions: IOSOptions(
-        accessibility: KeychainAccessibility.first_unlock_this_device,
-      ),
-    );
-    await storage.write(key: key, value: value);
-  } catch (e) {
-    // Ignore - cache is authoritative
-  }
-}
-
-/// Async delete from secure storage
-Future<void> _deleteFromSecureStorage(String key) async {
-  try {
-    const storage = FlutterSecureStorage(
-      aOptions: AndroidOptions(),
-      iOptions: IOSOptions(
-        accessibility: KeychainAccessibility.first_unlock_this_device,
-      ),
-    );
-    await storage.delete(key: key);
-  } catch (e) {
-    // Ignore
+    return DartBridgeSecureStorage.instance.deletePointer(key);
+  } catch (_) {
+    return RacResultCode.errorSecureStorageFailed;
   }
 }
 

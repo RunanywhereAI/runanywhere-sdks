@@ -3,13 +3,12 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 
+#include "tool_calling.pb.h"
+
 #include <cctype>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <utility>
-
-#include <nlohmann/json.hpp>
-
-#include "tool_calling.pb.h"
 
 namespace rac::llm::tool_calling {
 
@@ -18,8 +17,8 @@ struct WebSearchAttribution {
     std::string source_url;
 };
 
-inline WebSearchAttribution web_search_attribution(
-    const runanywhere::v1::ToolCallingResult& result) {
+inline WebSearchAttribution
+web_search_attribution(const runanywhere::v1::ToolCallingResult& result) {
     for (int index = result.tool_results_size() - 1; index >= 0; --index) {
         const auto& tool_result = result.tool_results(index);
         if (tool_result.name() != "search_web" || tool_result.result_json().empty()) {

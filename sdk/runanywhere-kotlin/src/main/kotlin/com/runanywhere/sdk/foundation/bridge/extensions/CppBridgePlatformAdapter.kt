@@ -454,19 +454,15 @@ object CppBridgePlatformAdapter {
      *
      * @param key The key to retrieve
      * @return The stored value as ByteArray, or null if not found
-     * @throws IllegalStateException if platform secure storage is not configured
+     * @throws Exception if platform secure storage is unavailable or the stored value cannot be
+     * authenticated. JNI maps this separately from a clean key miss.
      *
      * NOTE: This function is called from JNI. Do not capture any state.
      */
     @JvmStatic
     fun secureGetCallback(key: String): ByteArray? {
         val storage = requirePlatformStorage()
-        return try {
-            storage.get(key)
-        } catch (e: Exception) {
-            logCallback(LogLevel.ERROR, "SecureStorage", "secureGet failed for key '$key': ${e.message}")
-            null
-        }
+        return storage.get(key)
     }
 
     /**
@@ -488,11 +484,11 @@ object CppBridgePlatformAdapter {
         return try {
             val ok = storage.set(key, value)
             if (ok) {
-                logCallback(LogLevel.DEBUG, "SecureStorage", "Persisted key '$key' to platform storage")
+                logCallback(LogLevel.DEBUG, "SecureStorage", "Persisted secure-storage entry")
             }
             ok
-        } catch (e: Exception) {
-            logCallback(LogLevel.ERROR, "SecureStorage", "secureSet failed for key '$key': ${e.message}")
+        } catch (_: Exception) {
+            logCallback(LogLevel.ERROR, "SecureStorage", "secureSet failed")
             false
         }
     }
@@ -514,9 +510,8 @@ object CppBridgePlatformAdapter {
         val storage = requirePlatformStorage()
         return try {
             storage.delete(key)
-            true
-        } catch (e: Exception) {
-            logCallback(LogLevel.ERROR, "SecureStorage", "secureDelete failed for key '$key': ${e.message}")
+        } catch (_: Exception) {
+            logCallback(LogLevel.ERROR, "SecureStorage", "secureDelete failed")
             false
         }
     }

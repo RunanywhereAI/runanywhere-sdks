@@ -19,8 +19,6 @@ jclass g_platformAdapterBridgeClass = nullptr;
 jmethodID g_secureSetMethod = nullptr;
 jmethodID g_secureGetMethod = nullptr;
 jmethodID g_secureDeleteMethod = nullptr;
-jmethodID g_secureExistsMethod = nullptr;
-jmethodID g_getPersistentDeviceUUIDMethod = nullptr;
 jmethodID g_getModelBaseDirectoryMethod = nullptr;
 jmethodID g_getDeviceModelMethod = nullptr;
 jmethodID g_getOSVersionMethod = nullptr;
@@ -60,9 +58,9 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       // Cache all methods we need
       g_secureSetMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureSet", "(Ljava/lang/String;Ljava/lang/String;)Z");
       g_secureGetMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureGet", "(Ljava/lang/String;)Ljava/lang/String;");
-      g_secureDeleteMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureDelete", "(Ljava/lang/String;)Z");
-      g_secureExistsMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureExists", "(Ljava/lang/String;)Z");
-      g_getPersistentDeviceUUIDMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getPersistentDeviceUUID", "()Ljava/lang/String;");
+      g_secureDeleteMethod =
+          env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureDelete",
+                                 "(Ljava/lang/String;)Z");
       g_getModelBaseDirectoryMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getModelBaseDirectory", "()Ljava/lang/String;");
       g_getDeviceModelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getDeviceModel", "()Ljava/lang/String;");
       g_getOSVersionMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getOSVersion", "()Ljava/lang/String;");
@@ -88,11 +86,16 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_isNonEmptyDirectoryMethod = env->GetStaticMethodID(
           g_platformAdapterBridgeClass, "isNonEmptyDirectory", "(Ljava/lang/String;)Z");
 
-      if (g_secureSetMethod && g_secureGetMethod && g_getPersistentDeviceUUIDMethod &&
-          g_getModelBaseDirectoryMethod &&
-          g_getDeviceModelMethod && g_getOSVersionMethod && g_getChipNameMethod &&
-          g_getTotalMemoryMethod && g_getAvailableMemoryMethod && g_getCoreCountMethod &&
-          g_getArchitectureMethod && g_getGPUFamilyMethod && g_isTabletMethod &&
+      if (g_secureSetMethod && g_secureGetMethod && g_secureDeleteMethod &&
+          g_getModelBaseDirectoryMethod && g_fileListDirectoryMethod &&
+          g_isNonEmptyDirectoryMethod && g_getDeviceModelMethod &&
+          g_getOSVersionMethod && g_getChipNameMethod &&
+          g_getTotalMemoryMethod && g_getAvailableMemoryMethod &&
+          g_getCoreCountMethod && g_getArchitectureMethod &&
+          g_getGPUFamilyMethod && g_isTabletMethod &&
+          g_getAppIdentifierMethod && g_getAppNameMethod &&
+          g_getAppVersionMethod && g_getAppBuildMethod &&
+          g_getLocaleIdentifierMethod && g_getTimezoneIdentifierMethod &&
           g_httpDownloadMethod && g_httpDownloadCancelMethod) {
         LOGI("PlatformAdapterBridge class and methods cached successfully");
       } else {

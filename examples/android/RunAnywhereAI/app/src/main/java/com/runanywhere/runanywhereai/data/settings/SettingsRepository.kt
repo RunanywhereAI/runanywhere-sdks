@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.runanywhere.runanywhereai.BuildConfig
+import com.runanywhere.runanywhereai.data.security.SecureStringPreferences
 import com.runanywhere.runanywhereai.data.security.migrateSensitiveString
 import com.runanywhere.runanywhereai.data.security.securePreferences
 import com.runanywhere.runanywhereai.util.RACLog
@@ -24,7 +25,7 @@ object SettingsRepository {
     private const val KEY_HF_TOKEN = "hf_token"
 
     private var prefs: SharedPreferences? = null
-    private var securePrefs: SharedPreferences? = null
+    private var securePrefs: SecureStringPreferences? = null
 
     var settings: AppSettings by mutableStateOf(AppSettings())
         private set
@@ -33,7 +34,7 @@ object SettingsRepository {
 
     internal fun initialize(
         context: Context,
-        securePreferencesFactory: (Context, String) -> SharedPreferences,
+        securePreferencesFactory: (Context, String) -> SecureStringPreferences,
     ) {
         if (prefs != null) return
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -45,23 +46,23 @@ object SettingsRepository {
 
     internal fun initializeForTesting(
         legacyPreferences: SharedPreferences,
-        encryptedPreferences: SharedPreferences?,
+        securePreferences: SecureStringPreferences?,
     ) {
         if (prefs != null) return
-        initializePreferences(legacyPreferences, encryptedPreferences)
+        initializePreferences(legacyPreferences, securePreferences)
     }
 
     private fun initializePreferences(
         p: SharedPreferences,
-        secure: SharedPreferences?,
+        secure: SecureStringPreferences?,
     ) {
         val hfToken = if (secure == null) {
             ""
         } else {
             val migration = migrateSensitiveString(
-                readSecure = { secure.getString(KEY_HF_TOKEN, null) },
+                readSecure = { secure.getString(KEY_HF_TOKEN) },
                 readLegacy = { p.getString(KEY_HF_TOKEN, null) },
-                writeSecure = { secure.edit().putString(KEY_HF_TOKEN, it).commit() },
+                writeSecure = { secure.putString(KEY_HF_TOKEN, it) },
                 removeLegacy = { p.edit().remove(KEY_HF_TOKEN).commit() },
                 normalize = { it.trim() },
                 allowBlankSecureValue = true,
@@ -171,14 +172,14 @@ object SettingsRepository {
             ?: return Result.failure(IllegalStateException("Secure credential storage is unavailable"))
         val normalized = value.trim()
         val committed = runCatching {
-            secure.edit().putString(KEY_HF_TOKEN, normalized).commit()
+            secure.putString(KEY_HF_TOKEN, normalized)
         }.getOrElse {
             return Result.failure(IllegalStateException("Could not write secure credential storage", it))
         }
         if (!committed) {
             return Result.failure(IllegalStateException("Could not commit secure credential storage"))
         }
-        val verified = runCatching { secure.getString(KEY_HF_TOKEN, null) }
+        val verified = runCatching { secure.getString(KEY_HF_TOKEN) }
             .getOrElse {
                 return Result.failure(
                     IllegalStateException("Could not verify secure credential storage", it),

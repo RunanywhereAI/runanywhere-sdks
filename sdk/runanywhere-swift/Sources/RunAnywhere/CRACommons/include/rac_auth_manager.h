@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "rac_error.h"
 #include "rac_api_types.h"
 #include "rac_environment.h"
 
@@ -61,7 +62,10 @@ typedef struct {
      * @param key Storage key
      * @param out_value Output buffer (caller provides)
      * @param buffer_size Size of output buffer
-     * @return Length of value, or -1 on error/not found
+     * @return Positive, non-zero value length on success,
+     * RAC_ERROR_FILE_NOT_FOUND for a clean miss, or
+     * RAC_ERROR_SECURE_STORAGE_FAILED (or another negative rac_result_t) for
+     * a real storage/authentication failure. Zero is a contract violation.
      */
     int (*retrieve)(const char* key, char* out_value, size_t buffer_size, void* context);
 
@@ -191,7 +195,8 @@ RAC_API char* rac_auth_build_refresh_request(void);
  * Updates internal auth state and optionally persists to secure storage.
  *
  * @param json JSON response body
- * @return 0 on success, -1 on parse error
+ * @return RAC_SUCCESS on success, RAC_ERROR_SECURE_STORAGE_FAILED when the
+ * authenticated state cannot be persisted, or another negative error
  */
 RAC_API int rac_auth_handle_authenticate_response(const char* json);
 
@@ -201,7 +206,8 @@ RAC_API int rac_auth_handle_authenticate_response(const char* json);
  * Updates internal auth state and optionally persists to secure storage.
  *
  * @param json JSON response body
- * @return 0 on success, -1 on parse error
+ * @return RAC_SUCCESS on success, RAC_ERROR_SECURE_STORAGE_FAILED when the
+ * authenticated state cannot be persisted, or another negative error
  */
 RAC_API int rac_auth_handle_refresh_response(const char* json);
 
@@ -231,9 +237,13 @@ RAC_API int rac_auth_get_valid_token(const char** out_token, bool* out_needs_ref
 /**
  * @brief Clear all authentication state
  *
- * Clears in-memory state and secure storage.
+ * Clears in-memory state and attempts every secure-storage deletion even when
+ * one fails.
+ *
+ * @return RAC_SUCCESS when every persisted key was deleted, otherwise
+ * RAC_ERROR_SECURE_STORAGE_FAILED
  */
-RAC_API void rac_auth_clear(void);
+RAC_API rac_result_t rac_auth_clear(void);
 
 // =============================================================================
 // Persistence
@@ -244,7 +254,8 @@ RAC_API void rac_auth_clear(void);
  *
  * Call during initialization to restore saved auth state.
  *
- * @return 0 on success (tokens loaded), -1 if not found or error
+ * @return RAC_SUCCESS when tokens loaded, RAC_ERROR_FILE_NOT_FOUND when no
+ * access token is stored, or the underlying storage error on a real failure
  */
 RAC_API int rac_auth_load_stored_tokens(void);
 
@@ -253,7 +264,8 @@ RAC_API int rac_auth_load_stored_tokens(void);
  *
  * Called automatically by response handlers, but can be called manually.
  *
- * @return 0 on success, -1 on error
+ * @return RAC_SUCCESS on success or RAC_ERROR_SECURE_STORAGE_FAILED when any
+ * token cannot be persisted
  */
 RAC_API int rac_auth_save_tokens(void);
 

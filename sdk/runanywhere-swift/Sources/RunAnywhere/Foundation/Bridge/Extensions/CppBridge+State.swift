@@ -45,7 +45,7 @@ extension CppBridge {
             apiKey: String,
             baseURL: URL,
             deviceId: String
-        ) {
+        ) throws {
             _ = environment
             _ = apiKey
             _ = baseURL
@@ -53,7 +53,7 @@ extension CppBridge {
 
             // Install Keychain-backed secure storage into the auth manager and
             // restore any previously persisted tokens.
-            installAuthSecureStorage()
+            try installAuthSecureStorage()
 
             SDKLogger(category: "CppBridge.State").debug("Auth secure storage initialized")
         }
@@ -71,8 +71,7 @@ extension CppBridge {
 
         /// Shutdown state manager
         public static func shutdown() {
-            rac_state_shutdown()
-            rac_auth_reset()
+            rac_shutdown()
             authStorageInstalled.withLock { $0 = false }
         }
 
@@ -135,8 +134,8 @@ extension CppBridge {
         }
 
         /// Clear authentication state (in-memory + persisted)
-        public static func clearAuth() {
-            rac_auth_clear()
+        public static func clearAuth() throws {
+            try SDKException.throwIfError(rac_auth_clear())
             SDKLogger(category: "CppBridge.State").debug("Auth state cleared")
         }
 
@@ -160,7 +159,7 @@ extension CppBridge {
         /// restore any tokens persisted from a previous launch. Without this
         /// wiring, rac_auth_save_tokens / rac_auth_clear are no-ops and
         /// tokens are lost on every process restart.
-        private static func installAuthSecureStorage() {
+        private static func installAuthSecureStorage() throws {
             let shouldInstall = authStorageInstalled.withLock { installed in
                 guard !installed else { return false }
                 installed = true
@@ -177,10 +176,18 @@ extension CppBridge {
 
             rac_auth_init(&storage)
 
-            // Restore any previously persisted tokens.
-            _ = rac_auth_load_stored_tokens()
-
-            SDKLogger(category: "CppBridge.State").debug("Keychain secure storage installed into rac_auth_manager")
+            // Restore any previously persisted tokens without collapsing a
+            // Keychain failure into a first-launch miss.
+            let loadResult = rac_auth_load_stored_tokens()
+            let logger = SDKLogger(category: "CppBridge.State")
+            if loadResult == RAC_SUCCESS {
+                logger.debug("Keychain secure storage restored auth state")
+            } else if loadResult == RAC_ERROR_FILE_NOT_FOUND {
+                logger.debug("Keychain secure storage installed; no persisted auth state")
+            } else {
+                authStorageInstalled.withLock { $0 = false }
+                try SDKException.throwIfError(loadResult)
+            }
         }
     }
 }
@@ -214,16 +221,18 @@ private func authSecureStorageRetrieve(
     bufferSize: Int,
     context _: UnsafeMutableRawPointer?
 ) -> Int32 {
-    guard let key = key, let outValue = outValue, bufferSize > 0 else { return -1 }
+    guard let key = key, let outValue = outValue, bufferSize > 0 else {
+        return RAC_ERROR_INVALID_ARGUMENT
+    }
     let keyStr = String(cString: key)
     do {
-        guard let value = try KeychainManager.shared.retrieveIfExists(for: keyStr),
-              !value.isEmpty else {
-            return -1
+        guard let value = try KeychainManager.shared.retrieveIfExists(for: keyStr) else {
+            return RAC_ERROR_FILE_NOT_FOUND
         }
+        guard !value.isEmpty else { return RAC_ERROR_SECURE_STORAGE_FAILED }
         // Copy UTF-8 bytes + trailing NUL into the caller-provided buffer.
         let utf8 = value.utf8CString  // includes trailing NUL
-        if utf8.count > bufferSize { return -1 }
+        if utf8.count > bufferSize { return RAC_ERROR_BUFFER_TOO_SMALL }
         utf8.withUnsafeBufferPointer { src in
             if let base = src.baseAddress {
                 outValue.update(from: base, count: utf8.count)
@@ -232,7 +241,7 @@ private func authSecureStorageRetrieve(
         // Per header contract: return length excluding NUL terminator.
         return Int32(utf8.count - 1)
     } catch {
-        return -1
+        return RAC_ERROR_SECURE_STORAGE_FAILED
     }
 }
 

@@ -243,16 +243,23 @@ rac_result_t post_auth_json(rac_environment_t env, const char* endpoint, const c
     std::string body(reinterpret_cast<const char*>(response.body_bytes), response.body_len);
     rac_http_response_free(&response);
 
-    return response_handler(body.c_str()) == 0 ? RAC_SUCCESS : RAC_ERROR_INVALID_RESPONSE;
+    return response_handler(body.c_str());
 }
 
 rac_result_t handle_authenticate_response_for_init(const char* json) {
-    return rac_auth_handle_authenticate_response(json) == 0 ? RAC_SUCCESS
-                                                            : RAC_ERROR_INVALID_RESPONSE;
+    const int result = rac_auth_handle_authenticate_response(json);
+    if (result == RAC_SUCCESS || result == RAC_ERROR_SECURE_STORAGE_FAILED) {
+        return static_cast<rac_result_t>(result);
+    }
+    return RAC_ERROR_INVALID_RESPONSE;
 }
 
 rac_result_t handle_refresh_response_for_init(const char* json) {
-    return rac_auth_handle_refresh_response(json) == 0 ? RAC_SUCCESS : RAC_ERROR_INVALID_RESPONSE;
+    const int result = rac_auth_handle_refresh_response(json);
+    if (result == RAC_SUCCESS || result == RAC_ERROR_SECURE_STORAGE_FAILED) {
+        return static_cast<rac_result_t>(result);
+    }
+    return RAC_ERROR_INVALID_RESPONSE;
 }
 
 rac_result_t perform_token_refresh(SdkInitResult* result);
@@ -287,7 +294,12 @@ rac_result_t perform_authentication(SdkInitResult* result) {
                         "Token refresh rejected (rc=%d), clearing auth state and "
                         "re-authenticating",
                         refresh_rc);
-        rac_auth_clear();
+        const rac_result_t clear_rc = rac_auth_clear();
+        if (clear_rc != RAC_SUCCESS) {
+            result->set_http_configured(false);
+            result->set_has_completed_http_setup(false);
+            return clear_rc;
+        }
     }
 
     const rac_environment_t env = rac_state_get_environment();
@@ -539,7 +551,7 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
     // round-trip. Mirrors RunAnywhere.swift Phase 1 step 3 + 4.5. Persistence
     // of api_key/base_url to Keychain/Keystore stays on the platform side
     // (Swift's KeychainManager.storeSDKParams) because OS storage policies
-    // (kSecAttrAccessible* on Apple, EncryptedSharedPreferences on Android)
+    // (kSecAttrAccessible* on Apple, Android Keystore-backed storage on Android)
     // are platform-specific.
     const rac_result_t state_rc = rac_state_initialize(env, api_key.empty() ? "" : api_key.c_str(),
                                                        base_url.empty() ? "" : base_url.c_str(),

@@ -8,9 +8,13 @@
 // helpers over NativeCallable.isolateLocal when present, matching the iOS
 // helpers in packages/runanywhere/ios/Classes/*NativePort.mm.
 
+#include <jni.h>
+
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -25,9 +29,81 @@ struct rac_voice_agent;
 using rac_voice_agent_handle_t = rac_voice_agent*;
 
 constexpr rac_result_t RAC_SUCCESS = 0;
+constexpr rac_result_t RAC_ERROR_FILE_NOT_FOUND = -183;
 constexpr rac_result_t RAC_ERROR_INVALID_ARGUMENT = -259;
+constexpr rac_result_t RAC_ERROR_BUFFER_TOO_SMALL = -261;
+constexpr rac_result_t RAC_ERROR_SECURE_STORAGE_FAILED = -333;
 constexpr rac_bool_t RAC_TRUE = 1;
 constexpr rac_bool_t RAC_FALSE = 0;
+
+JavaVM* g_java_vm = nullptr;
+jclass g_secure_storage_class = nullptr;
+jmethodID g_secure_storage_set = nullptr;
+jmethodID g_secure_storage_get = nullptr;
+jmethodID g_secure_storage_delete = nullptr;
+
+class ScopedJniEnv {
+   public:
+    ScopedJniEnv() {
+        if (!g_java_vm) {
+            return;
+        }
+        const jint status = g_java_vm->GetEnv(reinterpret_cast<void**>(&env_), JNI_VERSION_1_6);
+        if (status == JNI_EDETACHED && g_java_vm->AttachCurrentThread(&env_, nullptr) == JNI_OK) {
+            attached_ = true;
+        } else if (status != JNI_OK) {
+            env_ = nullptr;
+        }
+    }
+
+    ~ScopedJniEnv() {
+        if (attached_) {
+            g_java_vm->DetachCurrentThread();
+        }
+    }
+
+    JNIEnv* get() const { return env_; }
+
+   private:
+    JNIEnv* env_ = nullptr;
+    bool attached_ = false;
+};
+
+bool clear_jni_exception(JNIEnv* env) {
+    if (!env || !env->ExceptionCheck()) {
+        return false;
+    }
+    env->ExceptionClear();
+    return true;
+}
+
+bool secure_storage_jni_ready() {
+    return g_secure_storage_class && g_secure_storage_set && g_secure_storage_get &&
+           g_secure_storage_delete;
+}
+
+jbyteArray new_utf8_bytes(JNIEnv* env, const char* value) {
+    if (!env || !value) {
+        return nullptr;
+    }
+    const size_t size = std::strlen(value);
+    if (size > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+        return nullptr;
+    }
+    jbyteArray bytes = env->NewByteArray(static_cast<jsize>(size));
+    if (!bytes || clear_jni_exception(env)) {
+        return nullptr;
+    }
+    if (size > 0) {
+        env->SetByteArrayRegion(bytes, 0, static_cast<jsize>(size),
+                                reinterpret_cast<const jbyte*>(value));
+        if (clear_jni_exception(env)) {
+            env->DeleteLocalRef(bytes);
+            return nullptr;
+        }
+    }
+    return bytes;
+}
 
 using Dart_Port = int64_t;
 
@@ -166,6 +242,47 @@ void erase_voice_context(rac_voice_agent_handle_t handle) {
 
 extern "C" {
 
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
+    if (!vm) {
+        return JNI_ERR;
+    }
+
+    JNIEnv* env = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK || !env) {
+        return JNI_ERR;
+    }
+
+    jclass local_class = env->FindClass("ai/runanywhere/sdk/FlutterSecureStorageBridge");
+    if (!local_class || clear_jni_exception(env)) {
+        return JNI_ERR;
+    }
+
+    g_secure_storage_class = static_cast<jclass>(env->NewGlobalRef(local_class));
+    env->DeleteLocalRef(local_class);
+    if (!g_secure_storage_class) {
+        clear_jni_exception(env);
+        return JNI_ERR;
+    }
+
+    g_secure_storage_set =
+        env->GetStaticMethodID(g_secure_storage_class, "set", "([B[B)Z");
+    g_secure_storage_get =
+        env->GetStaticMethodID(g_secure_storage_class, "get", "([B)[B");
+    g_secure_storage_delete =
+        env->GetStaticMethodID(g_secure_storage_class, "delete", "([B)Z");
+    if (clear_jni_exception(env) || !secure_storage_jni_ready()) {
+        env->DeleteGlobalRef(g_secure_storage_class);
+        g_secure_storage_class = nullptr;
+        g_secure_storage_set = nullptr;
+        g_secure_storage_get = nullptr;
+        g_secure_storage_delete = nullptr;
+        return JNI_ERR;
+    }
+
+    g_java_vm = vm;
+    return JNI_VERSION_1_6;
+}
+
 rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                            size_t request_proto_size,
                                            LlmStreamCallback callback,
@@ -199,6 +316,108 @@ rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t handle,
                                                 VoiceAgentCallback callback,
                                                 void* user_data);
 void rac_voice_agent_proto_quiesce(void);
+
+__attribute__((visibility("default"))) int32_t ra_flutter_secure_storage_store(const char* key,
+                                                                               const char* value) {
+    if (!key || !value) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    ScopedJniEnv scoped_env;
+    JNIEnv* env = scoped_env.get();
+    if (!env || !secure_storage_jni_ready()) {
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+
+    jbyteArray java_key = new_utf8_bytes(env, key);
+    jbyteArray java_value = new_utf8_bytes(env, value);
+    if (!java_key || !java_value || clear_jni_exception(env)) {
+        if (java_key) env->DeleteLocalRef(java_key);
+        if (java_value) env->DeleteLocalRef(java_value);
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+
+    const jboolean stored = env->CallStaticBooleanMethod(
+        g_secure_storage_class, g_secure_storage_set, java_key, java_value);
+    const bool failed = clear_jni_exception(env);
+    env->DeleteLocalRef(java_value);
+    env->DeleteLocalRef(java_key);
+    return !failed && stored == JNI_TRUE ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
+}
+
+__attribute__((visibility("default"))) int32_t
+ra_flutter_secure_storage_retrieve(const char* key, char* out_value, size_t buffer_size) {
+    if (!key || !out_value || buffer_size == 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    out_value[0] = '\0';
+
+    ScopedJniEnv scoped_env;
+    JNIEnv* env = scoped_env.get();
+    if (!env || !secure_storage_jni_ready()) {
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+
+    jbyteArray java_key = new_utf8_bytes(env, key);
+    if (!java_key || clear_jni_exception(env)) {
+        if (java_key) env->DeleteLocalRef(java_key);
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    auto* java_value = static_cast<jbyteArray>(
+        env->CallStaticObjectMethod(g_secure_storage_class, g_secure_storage_get, java_key));
+    env->DeleteLocalRef(java_key);
+    if (clear_jni_exception(env)) {
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    if (!java_value) {
+        return RAC_ERROR_FILE_NOT_FOUND;
+    }
+
+    const jsize java_value_size = env->GetArrayLength(java_value);
+    if (clear_jni_exception(env) || java_value_size < 0) {
+        env->DeleteLocalRef(java_value);
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    const size_t value_size = static_cast<size_t>(java_value_size);
+    if (value_size + 1 > buffer_size) {
+        env->DeleteLocalRef(java_value);
+        return RAC_ERROR_BUFFER_TOO_SMALL;
+    }
+
+    if (value_size > 0) {
+        env->GetByteArrayRegion(java_value, 0, java_value_size,
+                                reinterpret_cast<jbyte*>(out_value));
+        if (clear_jni_exception(env)) {
+            env->DeleteLocalRef(java_value);
+            return RAC_ERROR_SECURE_STORAGE_FAILED;
+        }
+    }
+    out_value[value_size] = '\0';
+    env->DeleteLocalRef(java_value);
+    return value_size == 0 ? RAC_ERROR_SECURE_STORAGE_FAILED
+                           : static_cast<int32_t>(value_size);
+}
+
+__attribute__((visibility("default"))) int32_t ra_flutter_secure_storage_delete(const char* key) {
+    if (!key) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    ScopedJniEnv scoped_env;
+    JNIEnv* env = scoped_env.get();
+    if (!env || !secure_storage_jni_ready()) {
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+
+    jbyteArray java_key = new_utf8_bytes(env, key);
+    if (!java_key || clear_jni_exception(env)) {
+        if (java_key) env->DeleteLocalRef(java_key);
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    const jboolean deleted =
+        env->CallStaticBooleanMethod(g_secure_storage_class, g_secure_storage_delete, java_key);
+    const bool failed = clear_jni_exception(env);
+    env->DeleteLocalRef(java_key);
+    return !failed && deleted == JNI_TRUE ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
+}
 
 __attribute__((visibility("default"))) int32_t ra_flutter_llm_generate_stream_proto_native_port(
     const uint8_t* request_proto_bytes,

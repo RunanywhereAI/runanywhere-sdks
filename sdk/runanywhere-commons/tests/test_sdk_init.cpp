@@ -235,6 +235,19 @@ void run_invalid_arguments() {
     CHECK(rc3 == RAC_ERROR_INVALID_ARGUMENT, "retryHTTP NULL out_buffer rejected");
 }
 
+void run_sdk_config_reset() {
+    std::fprintf(stdout, "-- sdk config reset wipes copied credentials --\n");
+    CHECK(rac_sdk_is_initialized(), "sdk config initialized before reset");
+    CHECK(rac_sdk_get_config() != nullptr, "sdk config snapshot available before reset");
+
+    rac_sdk_reset();
+
+    CHECK(!rac_sdk_is_initialized(), "sdk config reports uninitialized after reset");
+    CHECK(rac_sdk_get_config() == nullptr, "sdk config snapshot unavailable after reset");
+    CHECK(rac_sdk_get_environment() == RAC_ENV_DEVELOPMENT,
+          "sdk environment returns non-sensitive default after reset");
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -253,6 +266,7 @@ int main() {
     run_phase2_offline_mode();
     run_phase2_without_phase1();
     run_retry_http_no_external_config();
+    run_sdk_config_reset();
 
     rac_state_shutdown();
     rac_auth_reset();

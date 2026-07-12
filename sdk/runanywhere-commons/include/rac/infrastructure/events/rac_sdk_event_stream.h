@@ -48,7 +48,8 @@ RAC_API void rac_sdk_event_unsubscribe(uint64_t subscription_id);
 
 /**
  * @brief Spin-wait until all in-flight rac_sdk_event_publish_proto callbacks
- *        have returned. Mirrors rac_vad_proto_quiesce / rac_llm_proto_quiesce.
+ *        on other threads have returned. Mirrors rac_vad_proto_quiesce /
+ *        rac_llm_proto_quiesce.
  *
  * @details rac_sdk_event_publish_proto snapshots the subscription list under
  *          its internal mutex, releases the mutex, then invokes each
@@ -61,7 +62,10 @@ RAC_API void rac_sdk_event_unsubscribe(uint64_t subscription_id);
  *            (a) rac_sdk_event_unsubscribe(id) — no NEW dispatch sees alive;
  *            (b) rac_sdk_event_quiesce()        — wait out in-flight callbacks;
  *            (c) free the host object / user_data.
- *          Safe to call from any thread.
+ *          Safe to call from any thread, including reentrantly from a
+ *          subscriber callback. A reentrant call excludes the calling
+ *          thread's active dispatch frames while still waiting for callbacks
+ *          on every other thread.
  */
 RAC_API void rac_sdk_event_quiesce(void);
 
@@ -105,7 +109,9 @@ RAC_API void rac_sdk_event_clear_queue(void);
  *
  * This replaces the legacy rac_analytics_events_set_callback round-trip: SDKs
  * register the telemetry manager once and the router feeds it directly from the
- * proto event stream.
+ * proto event stream. Detaching with NULL is quiescent: it blocks new router /
+ * flush leases and returns only after every in-flight use of the old borrowed
+ * manager has completed, so the caller may destroy that manager immediately.
  */
 RAC_API void rac_events_set_telemetry_sink(void* telemetry_manager);
 

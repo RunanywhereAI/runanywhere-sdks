@@ -128,25 +128,10 @@ object CppBridgeState {
         logger.debug("C++ state initialized")
     }
 
-    /**
-     * Shutdown the C++ state manager and clear auth state.
-     *
-     * Mirrors Swift's `CppBridge.State.shutdown()` which calls
-     * `rac_state_shutdown()` + `rac_auth_reset()`. Kotlin routes the
-     * state-shutdown half through the `racStateReset` thunk until a
-     * dedicated `rac_state_shutdown` thunk exists.
-     */
+    /** Reset Kotlin-side lifetime gates after the canonical native shutdown. */
     fun shutdown() {
-        try {
-            RunAnywhereBridge.racStateReset()
-        } catch (t: Throwable) {
-            logger.warn("racStateReset threw during state shutdown: ${t.message}")
-        }
-        try {
-            RunAnywhereBridge.racAuthReset()
-        } catch (t: Throwable) {
-            logger.warn("racAuthReset threw during state shutdown: ${t.message}")
-        }
+        CppBridgeAuth.resetInitializationState()
+        reset()
     }
 
     // Persisted state accessors (rac_sdk_state — non-auth)
@@ -208,11 +193,6 @@ object CppBridgeState {
      * Mirrors Swift's `CppBridge.State.reset()`.
      */
     fun reset() {
-        try {
-            RunAnywhereBridge.racStateReset()
-        } catch (t: Throwable) {
-            logger.warn("racStateReset threw during state reset: ${t.message}")
-        }
         isInitialized = false
         servicesInitialized = false
         servicesInitializing = false

@@ -131,10 +131,21 @@ abstract final class RunAnywhere {
   /// `_hasCompletedHTTPSetup` (RunAnywhere.kt:121).
   static bool get hasCompletedHTTPSetup => _hasCompletedHTTPSetup;
 
-  /// Cached device id — populated during initialization. Mirrors Swift's
-  /// `deviceId: String`.
-  static String get deviceId =>
-      DartBridgeDevice.cachedDeviceId ?? 'unknown-device';
+  /// Device id populated by successful secure-storage initialization.
+  /// Access before initialization is a caller error; a fabricated sentinel
+  /// must never leak into telemetry, registration, or auth state.
+  static String get deviceId {
+    if (!isInitialized) {
+      throw SDKException.notInitialized(
+        'Device ID is unavailable before RunAnywhere.initialize().',
+      );
+    }
+    final value = DartBridgeDevice.cachedDeviceId;
+    if (value == null || value.isEmpty) {
+      throw StateError('Device ID was not resolved during initialization');
+    }
+    return value;
+  }
 
   /// Authenticated user id, or null if not signed in. Mirrors Swift's
   /// `getUserId()`.
@@ -290,7 +301,13 @@ abstract final class RunAnywhere {
   // Swift which uses `_servicesInitLock: DispatchQueue`).
   static Future<void>? _servicesInitFuture;
 
-  /// SDK semver string (e.g. "0.19.15").
+  // Phase-1 and reset are mutually ordered across await boundaries. Dart's
+  // event loop makes assignment of these shared futures atomic; callers join
+  // an existing operation instead of racing native callback teardown.
+  static Future<void>? _initializationFuture;
+  static Future<void>? _resetFuture;
+
+  /// SDK semver string (e.g. "0.20.0").
   static String get version => SDKConstants.version;
 
   /// Event bus for cross-capability SDK events.
@@ -490,7 +507,34 @@ abstract final class RunAnywhere {
   ///   are non-critical — they are swallowed at the detach site (logged
   ///   as warnings) but still observable to anyone awaiting
   ///   [completeServicesInitialization] directly.
-  static Future<void> initializeWithParams(SDKInitParams params) async {
+  static Future<void> initializeWithParams(SDKInitParams params) {
+    final existing = _initializationFuture;
+    if (existing != null) return existing;
+
+    final resetInProgress = _resetFuture;
+    final operation = () async {
+      if (resetInProgress != null) await resetInProgress;
+      await _initializeWithParams(params);
+    }();
+    _initializationFuture = operation;
+    unawaited(
+      operation.then<void>(
+        (_) {
+          if (identical(_initializationFuture, operation)) {
+            _initializationFuture = null;
+          }
+        },
+        onError: (Object _, StackTrace _) {
+          if (identical(_initializationFuture, operation)) {
+            _initializationFuture = null;
+          }
+        },
+      ),
+    );
+    return operation;
+  }
+
+  static Future<void> _initializeWithParams(SDKInitParams params) async {
     if (DartBridge.isInitialized) return;
 
     final logger = SDKLogger('RunAnywhere.Init');
@@ -545,12 +589,13 @@ abstract final class RunAnywhere {
       // (non-critical) but still observable to direct awaiters.
       final phase2 = _dispatchPhase2(params, logger);
       unawaited(
-        phase2.catchError((Object error, StackTrace _) {
-          logger.warning('Phase 2 failed (non-critical): $error');
+        phase2.catchError((Object _, StackTrace _) {
+          logger.warning('Phase 2 failed (non-critical)');
         }),
       );
-    } catch (e) {
-      logger.error('SDK initialization failed: $e');
+    } catch (_) {
+      logger.error('SDK initialization failed');
+      await DartBridge.shutdown();
       _cachedInitParams = null;
       _hasCompletedHTTPSetup = false;
       _httpSetupApplicable = true;
@@ -653,15 +698,15 @@ abstract final class RunAnywhere {
       _hasCompletedHTTPSetup = _isHTTPSetupComplete(proto);
       _httpSetupApplicable = proto.httpApplicable;
       if (proto.hasWarning()) {
-        logger.debug('HTTP retry warning: ${proto.warning}');
+        logger.debug('HTTP retry completed with a warning');
       }
       if (_hasCompletedHTTPSetup) {
         logger.info('HTTP/Auth setup succeeded on retry');
       } else {
         logger.debug('HTTP/Auth retry still missing usable config');
       }
-    } catch (e) {
-      logger.debug('HTTP retry proto failed: $e');
+    } catch (_) {
+      logger.debug('HTTP retry failed');
     }
   }
 
@@ -676,7 +721,53 @@ abstract final class RunAnywhere {
   /// `if (DartBridge.isInitialized) return;` and the SDK stays in a
   /// half-reset state (Dart caches empty, native bridge still marked
   /// initialized).
-  static Future<void> reset() async {
+  static Future<void> reset() {
+    final existing = _resetFuture;
+    if (existing != null) return existing;
+
+    // Reject new public work immediately. In-flight initialization/services
+    // retain their native owners until this reset drains them below.
+    DartBridge.beginShutdown();
+    final initializationInProgress = _initializationFuture;
+    // Disown the retiring lifetime immediately. The reset keeps its local
+    // reference and drains it below, while initialize() calls arriving during
+    // reset can publish exactly one fresh operation that waits for reset.
+    if (identical(_initializationFuture, initializationInProgress)) {
+      _initializationFuture = null;
+    }
+    final operation = () async {
+      if (initializationInProgress != null) {
+        try {
+          await initializationInProgress;
+        } catch (_) {
+          // Initialization owns its rollback; reset still completes teardown.
+        }
+      }
+      final servicesInProgress = _servicesInitFuture;
+      if (servicesInProgress != null) {
+        try {
+          await servicesInProgress;
+        } catch (_) {
+          // Phase 2 is non-critical; teardown must still run.
+        }
+      }
+      await _reset();
+    }();
+    _resetFuture = operation;
+    unawaited(
+      operation.then<void>(
+        (_) {
+          if (identical(_resetFuture, operation)) _resetFuture = null;
+        },
+        onError: (Object _, StackTrace _) {
+          if (identical(_resetFuture, operation)) _resetFuture = null;
+        },
+      ),
+    );
+    return operation;
+  }
+
+  static Future<void> _reset() async {
     DartBridgeTelemetry.flush();
 
     DartBridge.modelLifecycle.reset();
@@ -685,7 +776,6 @@ abstract final class RunAnywhere {
     _cachedInitParams = null;
     _servicesInitFuture = null;
     DartBridgeModelRegistry.instance.shutdown();
-    HTTPClientAdapter.shared.resetForTesting();
     // Tear down the bridge LAST so dependents (telemetry/registry/HTTP)
     // can flush against a still-initialized native side, and AWAIT it so a
     // `reset(); initialize()` sequence cannot race the still-true

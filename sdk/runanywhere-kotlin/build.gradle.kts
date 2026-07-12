@@ -213,7 +213,6 @@ dependencies {
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.security.crypto)
 
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.kotlinx.coroutines.test)

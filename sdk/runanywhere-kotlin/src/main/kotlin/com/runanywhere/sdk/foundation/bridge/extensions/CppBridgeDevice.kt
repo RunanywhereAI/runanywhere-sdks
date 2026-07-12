@@ -33,11 +33,11 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.DeviceInfo
 import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
-import java.util.UUID
 
 object CppBridgeDevice {
     private const val TAG = "CppBridgeDevice"
@@ -169,6 +169,7 @@ object CppBridgeDevice {
                     TAG,
                     "Failed to register device manager callbacks: $result",
                 )
+                SDKException.throwIfError(result)
             }
         }
     }
@@ -179,13 +180,24 @@ object CppBridgeDevice {
      */
     fun unregister() {
         synchronized(lock) {
-            if (!callbacksRegistered) return
-            callbacksRegistered = false
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Device manager callbacks unregistered",
-            )
+            try {
+                RunAnywhereBridge.racDeviceManagerClearCallbacks()
+            } catch (t: Throwable) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "Device manager callback teardown failed: ${t.message}",
+                )
+            } finally {
+                callbacksRegistered = false
+                deviceId = null
+                deviceRegistered = false
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "Device manager callbacks unregistered",
+                )
+            }
         }
     }
 
@@ -437,28 +449,20 @@ object CppBridgeDevice {
      *   2. get_vendor_id callback (vendor id on iOS; unset on Android)
      *   3. freshly synthesized RFC-4122 v4 UUID (then persisted)
      *
-     * On the rare resolver failure (e.g. platform adapter not yet
-     * registered) we synthesize a transient UUID locally so callers
-     * always receive a stable, non-empty string for the SDK lifetime.
+     * Resolver and durable-write failures abort initialization. A transient
+     * replacement would split auth, telemetry, and device-registration state.
      */
     private fun initializeDeviceId() {
         if (deviceId != null) return
 
-        val resolved = RunAnywhereBridge.racDeviceGetOrCreatePersistentId()
+        val outRc = intArrayOf(RunAnywhereBridge.RAC_SUCCESS)
+        val resolved = RunAnywhereBridge.racDeviceGetOrCreatePersistentId(outRc)
         if (!resolved.isNullOrEmpty()) {
             deviceId = resolved
             return
         }
-
-        // Fallback: commons resolver unavailable. Synthesize a UUID so
-        // callers never see an empty string. Non-persistent for this run.
-        val fallback = UUID.randomUUID().toString()
-        deviceId = fallback
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.WARN,
-            TAG,
-            "racDeviceGetOrCreatePersistentId failed; using a transient in-memory identifier",
-        )
+        SDKException.throwIfError(outRc[0])
+        throw SDKException.operation("Persistent device ID resolver returned an empty value")
     }
 
     /** Load persisted `device_registered` flag from secure storage. */

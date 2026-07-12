@@ -35,8 +35,8 @@
 #include <vector>
 
 #include "features/common/rac_component_lifecycle_internal.h"
-#include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/llm/llm_thinking_tags_internal.h"
+#include "features/llm/rac_llm_lifecycle_bridge.h"
 // BUG-STREAMING-001: the canonical 13-field LLM stream emitter shared with the
 // registry-backed path (rac_llm_stream.cpp). The component section invokes
 // `rac::llm::dispatch_llm_stream_event()` once per token and once on terminal
@@ -1297,10 +1297,10 @@ rac_result_t publish_sdk_event(const SDKEvent& event) {
 void publish_generation_event(GenerationEventKind kind, const char* prompt, const char* token,
                               const char* response, const char* error, const char* model_id,
                               int32_t token_count, int64_t latency_ms, int32_t input_tokens = 0,
-                              const char* framework_name = nullptr,
-                              double tokens_per_second = 0.0, double ttft_ms = 0.0,
-                              float temperature = -1.0f, int32_t max_tokens = 0,
-                              int32_t context_length = 0, bool is_streaming = false) {
+                              const char* framework_name = nullptr, double tokens_per_second = 0.0,
+                              double ttft_ms = 0.0, float temperature = -1.0f,
+                              int32_t max_tokens = 0, int32_t context_length = 0,
+                              bool is_streaming = false) {
     SDKEvent event;
     const bool failed = kind == runanywhere::v1::GENERATION_EVENT_KIND_FAILED;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_LLM,
@@ -1403,8 +1403,7 @@ std::string system_prompt_from_request(const LLMGenerateRequest& request) {
 
 void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
                                          const rac::llm::LifecycleLlmRef& ref,
-                                         std::string* out_open_tag,
-                                         std::string* out_close_tag) {
+                                         std::string* out_open_tag, std::string* out_close_tag) {
     if (out_open_tag) {
         out_open_tag->clear();
     }
@@ -1434,13 +1433,11 @@ void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
 //
 // `request.options()` is the sole generation-settings contract. When absent,
 // retain RAC_LLM_OPTIONS_DEFAULT values.
-rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
-                                       const std::string& system_prompt,
-                                       std::vector<std::string>& stop_storage,
-                                       std::vector<const char*>& stop_ptrs,
-                                       std::string& grammar_storage,
-                                       std::vector<std::string>& history_storage,
-                                       std::vector<const char*>& history_ptrs) {
+rac_llm_options_t
+options_from_request(const LLMGenerateRequest& request, const std::string& system_prompt,
+                     std::vector<std::string>& stop_storage, std::vector<const char*>& stop_ptrs,
+                     std::string& grammar_storage, std::vector<std::string>& history_storage,
+                     std::vector<const char*>& history_ptrs) {
     rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
 
     const bool has_options = request.has_options();
@@ -1523,8 +1520,7 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     const int history_count = request.history_size();
     if (history_count > 0) {
         history_storage.reserve(static_cast<size_t>(history_count));
-        runanywhere::v1::MessageRole last_role =
-            runanywhere::v1::MESSAGE_ROLE_UNSPECIFIED;
+        runanywhere::v1::MessageRole last_role = runanywhere::v1::MESSAGE_ROLE_UNSPECIFIED;
         for (const auto& msg : request.history()) {
             const auto role = msg.role();
             if (role != runanywhere::v1::MESSAGE_ROLE_USER &&
@@ -1688,8 +1684,7 @@ size_t matching_close_suffix_len(const std::string& text, const StreamThinkingTa
 
 const StreamThinkingTagPair* find_earliest_open_pair(const std::string& text,
                                                      const StreamThinkingTagPair* pairs,
-                                                     size_t pair_count,
-                                                     size_t* out_open_pos) {
+                                                     size_t pair_count, size_t* out_open_pos) {
     size_t best = std::string::npos;
     const StreamThinkingTagPair* best_pair = nullptr;
     for (size_t i = 0; i < pair_count; ++i) {
@@ -1707,8 +1702,7 @@ const StreamThinkingTagPair* find_earliest_open_pair(const std::string& text,
 
 const StreamThinkingTagPair* find_earliest_close_pair(const std::string& text,
                                                       const StreamThinkingTagPair* pairs,
-                                                      size_t pair_count,
-                                                      size_t* out_close_pos) {
+                                                      size_t pair_count, size_t* out_close_pos) {
     size_t best = std::string::npos;
     const StreamThinkingTagPair* best_pair = nullptr;
     for (size_t i = 0; i < pair_count; ++i) {
@@ -1857,10 +1851,9 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
     }};
     const StreamThinkingTagPair* tag_pairs =
         has_custom_tags ? custom_tag_pairs.data() : kDefaultStreamThinkingTags;
-    const size_t tag_pair_count =
-        has_custom_tags ? custom_tag_pairs.size()
-                        : sizeof(kDefaultStreamThinkingTags) /
-                              sizeof(kDefaultStreamThinkingTags[0]);
+    const size_t tag_pair_count = has_custom_tags ? custom_tag_pairs.size()
+                                                  : sizeof(kDefaultStreamThinkingTags) /
+                                                        sizeof(kDefaultStreamThinkingTags[0]);
 
     ctx->raw_text += token;
     ctx->pending_text += token;
@@ -2032,8 +2025,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STARTED,
-                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0, 0,
-                             0, ref.framework_name);
+                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
+                             0, 0, ref.framework_name);
 
     const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
@@ -2041,9 +2034,9 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     std::string grammar_storage;
     std::vector<std::string> history_storage;
     std::vector<const char*> history_ptrs;
-    rac_llm_options_t options = options_from_request(
-        request, system_prompt, stop_storage, stop_ptrs, grammar_storage, history_storage,
-        history_ptrs);
+    rac_llm_options_t options =
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage,
+                             history_storage, history_ptrs);
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};
@@ -2076,8 +2069,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     thinking_tags_from_request_or_model(request, ref, &thinking_open_tag, &thinking_close_tag);
     (void)rac_llm_extract_thinking_with_tags(
         raw_text, thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
-        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
-        &response_len, &thinking, &thinking_len);
+        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response, &response_len,
+        &thinking, &thinking_len);
 
     int32_t thinking_tokens = 0;
     int32_t response_tokens = raw.completion_tokens;
@@ -2143,8 +2136,8 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STARTED,
-                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0, 0,
-                             0, ref.framework_name);
+                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
+                             0, 0, ref.framework_name);
 
     const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
@@ -2152,9 +2145,9 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     std::string grammar_storage;
     std::vector<std::string> history_storage;
     std::vector<const char*> history_ptrs;
-    rac_llm_options_t options = options_from_request(
-        request, system_prompt, stop_storage, stop_ptrs, grammar_storage, history_storage,
-        history_ptrs);
+    rac_llm_options_t options =
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage,
+                             history_storage, history_ptrs);
     options.streaming_enabled = RAC_TRUE;
 
     ProtoStreamContext ctx;
@@ -2223,16 +2216,16 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
         const int64_t stream_decode = (stream_ttft > 0 && stream_ttft < stream_elapsed)
                                           ? stream_elapsed - stream_ttft
                                           : stream_elapsed;
-        publish_generation_event(
-            runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED, request.prompt().c_str(),
-            nullptr, ctx.response_text.c_str(), nullptr, ref.model_id, ctx.token_count,
-            stream_elapsed, ctx.prompt_tokens, ref.framework_name,
-            (ctx.token_count > 0 && stream_decode > 0)
-                ? ctx.token_count * 1000.0 / static_cast<double>(stream_decode)
-                : 0.0,
-            static_cast<double>(stream_ttft), options.temperature, options.max_tokens,
-            lifecycle_context_length(ref),
-            /*is_streaming=*/true);
+        publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED,
+                                 request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
+                                 nullptr, ref.model_id, ctx.token_count, stream_elapsed,
+                                 ctx.prompt_tokens, ref.framework_name,
+                                 (ctx.token_count > 0 && stream_decode > 0)
+                                     ? ctx.token_count * 1000.0 / static_cast<double>(stream_decode)
+                                     : 0.0,
+                                 static_cast<double>(stream_ttft), options.temperature,
+                                 options.max_tokens, lifecycle_context_length(ref),
+                                 /*is_streaming=*/true);
     }
 
     rac::llm::release_lifecycle_llm(&ref);

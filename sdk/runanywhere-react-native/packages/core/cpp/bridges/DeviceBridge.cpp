@@ -8,6 +8,7 @@
 
 #include "DeviceBridge.hpp"
 #include "rac_error.h"
+#include <cstddef>
 #include <cstring>
 
 // Platform-specific logging
@@ -33,6 +34,48 @@ namespace bridges {
 
 static DevicePlatformCallbacks* g_deviceCallbacks = nullptr;
 
+static void wipeAndClear(std::string &value) {
+  volatile char *bytes = value.empty() ? nullptr : value.data();
+  for (std::size_t i = 0; i < value.size(); ++i) {
+    bytes[i] = '\0';
+  }
+  value.clear();
+}
+
+struct DeviceCallbackStrings {
+  std::string deviceId;
+  std::string deviceModel;
+  std::string deviceName;
+  std::string platform;
+  std::string osVersion;
+  std::string formFactor;
+  std::string architecture;
+  std::string chipName;
+  std::string gpuFamily;
+  std::string batteryState;
+  std::string deviceFingerprint;
+  std::string responseBody;
+  std::string errorMessage;
+
+  void clear() {
+    wipeAndClear(deviceId);
+    wipeAndClear(deviceModel);
+    wipeAndClear(deviceName);
+    wipeAndClear(platform);
+    wipeAndClear(osVersion);
+    wipeAndClear(formFactor);
+    wipeAndClear(architecture);
+    wipeAndClear(chipName);
+    wipeAndClear(gpuFamily);
+    wipeAndClear(batteryState);
+    wipeAndClear(deviceFingerprint);
+    wipeAndClear(responseBody);
+    wipeAndClear(errorMessage);
+  }
+};
+
+static DeviceCallbackStrings g_deviceCallbackStrings;
+
 // =============================================================================
 // C Callback Implementations (called by RACommons)
 // =============================================================================
@@ -45,49 +88,49 @@ static void deviceGetInfoCallback(rac_device_registration_info_t* outInfo, void*
 
     DeviceInfo info = g_deviceCallbacks->getDeviceInfo();
 
-    // Note: We need to use static storage for strings since RACommons
-    // only keeps pointers. In a real implementation, these would need
-    // to be managed carefully for lifetime.
-    static std::string s_deviceId, s_deviceModel, s_deviceName, s_platform;
-    static std::string s_osVersion, s_formFactor, s_architecture, s_chipName;
-    static std::string s_gpuFamily, s_batteryState;
-    static std::string s_deviceFingerprint;
-
-    s_deviceId = info.deviceId;
-    s_deviceModel = info.deviceModel;
-    s_deviceName = info.deviceName;
-    s_platform = info.platform;
-    s_osVersion = info.osVersion;
-    s_formFactor = info.formFactor;
-    s_architecture = info.architecture;
-    s_chipName = info.chipName;
-    s_gpuFamily = info.gpuFamily;
-    s_batteryState = info.batteryState;
-    s_deviceFingerprint = info.deviceId;
+    // Commons consumes these pointers synchronously while holding the device
+    // manager lock. Process-local storage keeps them valid for that call and
+    // is cleared when the callbacks are unregistered.
+    g_deviceCallbackStrings.deviceId = info.deviceId;
+    g_deviceCallbackStrings.deviceModel = info.deviceModel;
+    g_deviceCallbackStrings.deviceName = info.deviceName;
+    g_deviceCallbackStrings.platform = info.platform;
+    g_deviceCallbackStrings.osVersion = info.osVersion;
+    g_deviceCallbackStrings.formFactor = info.formFactor;
+    g_deviceCallbackStrings.architecture = info.architecture;
+    g_deviceCallbackStrings.chipName = info.chipName;
+    g_deviceCallbackStrings.gpuFamily = info.gpuFamily;
+    g_deviceCallbackStrings.batteryState = info.batteryState;
+    g_deviceCallbackStrings.deviceFingerprint = info.deviceId;
 
     // Fill out the struct - matches Swift's implementation
-    outInfo->device_id = s_deviceId.c_str();
-    outInfo->device_model = s_deviceModel.c_str();
-    outInfo->device_name = s_deviceName.c_str();
-    outInfo->platform = s_platform.c_str();
-    outInfo->os_version = s_osVersion.c_str();
-    outInfo->form_factor = s_formFactor.c_str();
-    outInfo->architecture = s_architecture.c_str();
-    outInfo->chip_name = s_chipName.c_str();
+    outInfo->device_id = g_deviceCallbackStrings.deviceId.c_str();
+    outInfo->device_model = g_deviceCallbackStrings.deviceModel.c_str();
+    outInfo->device_name = g_deviceCallbackStrings.deviceName.c_str();
+    outInfo->platform = g_deviceCallbackStrings.platform.c_str();
+    outInfo->os_version = g_deviceCallbackStrings.osVersion.c_str();
+    outInfo->form_factor = g_deviceCallbackStrings.formFactor.c_str();
+    outInfo->architecture = g_deviceCallbackStrings.architecture.c_str();
+    outInfo->chip_name = g_deviceCallbackStrings.chipName.c_str();
     outInfo->total_memory = info.totalMemory;
     outInfo->available_memory = info.availableMemory;
     outInfo->has_neural_engine = info.hasNeuralEngine ? RAC_TRUE : RAC_FALSE;
     outInfo->neural_engine_cores = info.neuralEngineCores;
-    outInfo->gpu_family = s_gpuFamily.c_str();
+    outInfo->gpu_family = g_deviceCallbackStrings.gpuFamily.c_str();
     outInfo->battery_level = info.batteryLevel;
-    outInfo->battery_state = s_batteryState.empty() ? nullptr : s_batteryState.c_str();
+    outInfo->battery_state = g_deviceCallbackStrings.batteryState.empty()
+                                 ? nullptr
+                                 : g_deviceCallbackStrings.batteryState.c_str();
     outInfo->is_low_power_mode = info.isLowPowerMode ? RAC_TRUE : RAC_FALSE;
     outInfo->core_count = info.coreCount;
     outInfo->performance_cores = info.performanceCores;
     outInfo->efficiency_cores = info.efficiencyCores;
-    outInfo->device_fingerprint = s_deviceFingerprint.c_str();
+    outInfo->device_fingerprint =
+        g_deviceCallbackStrings.deviceFingerprint.c_str();
 
-    LOGD("Device info populated: model=%s, platform=%s", s_deviceModel.c_str(), s_platform.c_str());
+    LOGD("Device info populated: model=%s, platform=%s",
+         g_deviceCallbackStrings.deviceModel.c_str(),
+         g_deviceCallbackStrings.platform.c_str());
 }
 
 static const char* deviceGetIdCallback(void* userData) {
@@ -96,9 +139,8 @@ static const char* deviceGetIdCallback(void* userData) {
         return nullptr;
     }
 
-    static std::string s_deviceId;
-    s_deviceId = g_deviceCallbacks->getDeviceId();
-    return s_deviceId.c_str();
+    g_deviceCallbackStrings.deviceId = g_deviceCallbacks->getDeviceId();
+    return g_deviceCallbackStrings.deviceId.c_str();
 }
 
 static rac_bool_t deviceIsRegisteredCallback(void* userData) {
@@ -134,20 +176,21 @@ static rac_result_t deviceHttpPostCallback(
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    LOGI("Making HTTP POST to: %s", endpoint);
+    LOGI("Device HTTP POST starting");
 
     auto [success, statusCode, responseBody, errorMessage] =
         g_deviceCallbacks->httpPost(endpoint, jsonBody, requiresAuth == RAC_TRUE);
 
-    // Store response strings statically for lifetime
-    static std::string s_responseBody, s_errorMessage;
-    s_responseBody = responseBody;
-    s_errorMessage = errorMessage;
+    g_deviceCallbackStrings.responseBody = responseBody;
+    g_deviceCallbackStrings.errorMessage = errorMessage;
 
     if (success) {
         outResponse->result = RAC_SUCCESS;
         outResponse->status_code = statusCode;
-        outResponse->response_body = s_responseBody.empty() ? nullptr : s_responseBody.c_str();
+        outResponse->response_body =
+            g_deviceCallbackStrings.responseBody.empty()
+                ? nullptr
+                : g_deviceCallbackStrings.responseBody.c_str();
         outResponse->error_message = nullptr;
         LOGI("HTTP POST succeeded with status %d", statusCode);
         return RAC_SUCCESS;
@@ -155,8 +198,11 @@ static rac_result_t deviceHttpPostCallback(
         outResponse->result = RAC_ERROR_NETWORK_ERROR;
         outResponse->status_code = statusCode;
         outResponse->response_body = nullptr;
-        outResponse->error_message = s_errorMessage.empty() ? nullptr : s_errorMessage.c_str();
-        LOGE("HTTP POST failed: %s", s_errorMessage.c_str());
+        outResponse->error_message =
+            g_deviceCallbackStrings.errorMessage.empty()
+                ? nullptr
+                : g_deviceCallbackStrings.errorMessage.c_str();
+        LOGE("HTTP POST failed");
         return RAC_ERROR_NETWORK_ERROR;
     }
 }
@@ -171,7 +217,10 @@ DeviceBridge& DeviceBridge::shared() {
 }
 
 void DeviceBridge::setPlatformCallbacks(const DevicePlatformCallbacks& callbacks) {
+  {
+    std::lock_guard<std::mutex> lock(platformCallbacksMutex_);
     platformCallbacks_ = callbacks;
+  }
 
     // Store in global for C callbacks
     static DevicePlatformCallbacks storedCallbacks;
@@ -211,25 +260,44 @@ rac_result_t DeviceBridge::registerCallbacks() {
     return result;
 }
 
+void DeviceBridge::unregisterCallbacks() {
+  // Commons takes the device-manager lock, so no callback can still be
+  // using the process-local strings when this returns.
+  rac_device_manager_clear_callbacks();
+  callbacksRegistered_ = false;
+  g_deviceCallbacks = nullptr;
+  g_deviceCallbackStrings.clear();
+  memset(&racCallbacks_, 0, sizeof(racCallbacks_));
+  {
+    std::lock_guard<std::mutex> lock(platformCallbacksMutex_);
+    platformCallbacks_ = {};
+  }
+  LOGI("Device manager callbacks unregistered");
+}
+
 bool DeviceBridge::isRegistered() const {
     return rac_device_manager_is_registered() == RAC_TRUE;
 }
 
 std::string DeviceBridge::getDeviceId() const {
-    const char* id = rac_device_manager_get_device_id();
-    return id ? std::string(id) : "";
+  std::lock_guard<std::mutex> lock(platformCallbacksMutex_);
+  if (!platformCallbacks_.getDeviceId) {
+    return "";
+  }
+  return platformCallbacks_.getDeviceId();
 }
 
 DeviceInfo DeviceBridge::getDeviceInfo() const {
-    if (!g_deviceCallbacks || !g_deviceCallbacks->getDeviceInfo) {
-        LOGE("getDeviceInfo callback not available");
-        return DeviceInfo{};
-    }
+  std::lock_guard<std::mutex> lock(platformCallbacksMutex_);
+  if (!platformCallbacks_.getDeviceInfo) {
+    LOGE("getDeviceInfo callback not available");
+    return DeviceInfo{};
+  }
 
-    DeviceInfo info = g_deviceCallbacks->getDeviceInfo();
-    LOGD("Device info retrieved: availableMemory=%lld bytes",
-         static_cast<long long>(info.availableMemory));
-    return info;
+  DeviceInfo info = platformCallbacks_.getDeviceInfo();
+  LOGD("Device info retrieved: availableMemory=%lld bytes",
+       static_cast<long long>(info.availableMemory));
+  return info;
 }
 
 } // namespace bridges

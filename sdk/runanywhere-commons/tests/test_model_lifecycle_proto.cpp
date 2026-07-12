@@ -11,8 +11,10 @@
 #include <string>
 #include <vector>
 
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_model_lifecycle.h"
+#include "rac/core/rac_platform_adapter.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -71,6 +73,58 @@ int g_vlm_create_count = 0;
 int g_vlm_initialize_count = 0;
 int g_vlm_cleanup_count = 0;
 int g_vlm_destroy_count = 0;
+
+void lifecycle_test_log(rac_log_level_t, const char*, const char*, void*) {}
+
+int64_t lifecycle_test_now_ms(void*) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+rac_bool_t lifecycle_test_file_exists(const char*, void*) {
+    return RAC_TRUE;
+}
+
+rac_result_t lifecycle_test_file_read(const char*, void**, size_t*, void*) {
+    return RAC_ERROR_FILE_NOT_FOUND;
+}
+
+rac_result_t lifecycle_test_file_write(const char*, const void*, size_t, void*) {
+    return RAC_SUCCESS;
+}
+
+rac_result_t lifecycle_test_file_delete(const char*, void*) {
+    return RAC_SUCCESS;
+}
+
+rac_result_t lifecycle_test_secure_get(const char*, char**, void*) {
+    return RAC_ERROR_FILE_NOT_FOUND;
+}
+
+rac_result_t lifecycle_test_secure_set(const char*, const char*, void*) {
+    return RAC_SUCCESS;
+}
+
+rac_result_t lifecycle_test_secure_delete(const char*, void*) {
+    return RAC_SUCCESS;
+}
+
+rac_platform_adapter_t make_lifecycle_test_adapter() {
+    rac_platform_adapter_t adapter{};
+    adapter.abi_version = RAC_PLATFORM_ADAPTER_ABI_VERSION;
+    adapter.struct_size = static_cast<uint32_t>(sizeof(rac_platform_adapter_t));
+    adapter.file_exists = lifecycle_test_file_exists;
+    adapter.file_read = lifecycle_test_file_read;
+    adapter.file_write = lifecycle_test_file_write;
+    adapter.file_delete = lifecycle_test_file_delete;
+    adapter.secure_get = lifecycle_test_secure_get;
+    adapter.secure_set = lifecycle_test_secure_set;
+    adapter.secure_delete = lifecycle_test_secure_delete;
+    adapter.log = lifecycle_test_log;
+    adapter.now_ms = lifecycle_test_now_ms;
+    return adapter;
+}
 
 rac_result_t dummy_llm_create(const char* model_id, const char*, void** out_impl) {
     if (!model_id || !out_impl)
@@ -720,6 +774,82 @@ int test_load_replaces_previous_model(rac_model_registry_handle_t registry) {
     return 0;
 }
 
+int test_shutdown_resets_lifecycle_for_reinitialize(rac_model_registry_handle_t registry) {
+    rac_shutdown();
+    g_create_count = g_initialize_count = g_cleanup_count = g_destroy_count = 0;
+    (void)rac_plugin_unregister("llamacpp");
+
+    rac_llm_service_ops_t ops{};
+    ops.create = dummy_llm_create;
+    ops.initialize = dummy_llm_initialize;
+    ops.cleanup = dummy_llm_cleanup;
+    ops.destroy = dummy_llm_destroy;
+    const uint32_t formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+    auto vtable = make_dummy_llm_vtable(&ops, formats);
+    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "shutdown lifecycle plugin registers");
+    CHECK(register_model(registry, build_llm_model()), "shutdown lifecycle model registers");
+
+    const rac_platform_adapter_t adapter = make_lifecycle_test_adapter();
+    rac_config_t config{};
+    config.platform_adapter = &adapter;
+    config.log_level = RAC_LOG_WARNING;
+    config.log_tag = "LIFECYCLE_SHUTDOWN_TEST";
+    CHECK(rac_init(&config) == RAC_SUCCESS, "first Commons lifetime initializes");
+
+    runanywhere::v1::ModelLoadRequest load;
+    load.set_model_id("lifecycle.llm");
+    std::vector<uint8_t> load_bytes;
+    CHECK(serialize(load, &load_bytes), "shutdown lifecycle load request serializes");
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc =
+        rac_model_lifecycle_load_proto(registry, load_bytes.data(), load_bytes.size(), &out);
+    runanywhere::v1::ModelLoadResult load_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &load_result) && load_result.success(),
+          "first Commons lifetime loads a model");
+    rac_proto_buffer_free(&out);
+
+    rac_shutdown();
+    CHECK(g_cleanup_count == 1 && g_destroy_count == 1,
+          "shutdown destroys the loaded backend exactly once");
+
+    rac_proto_buffer_init(&out);
+    rc = rac_component_lifecycle_snapshot_proto(
+        static_cast<uint32_t>(runanywhere::v1::SDK_COMPONENT_LLM), &out);
+    runanywhere::v1::ComponentLifecycleSnapshot snapshot;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &snapshot),
+          "post-shutdown lifecycle snapshot parses");
+    CHECK(snapshot.state() == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED &&
+              snapshot.model_id().empty(),
+          "post-shutdown lifecycle snapshot is empty");
+    rac_proto_buffer_free(&out);
+
+    CHECK(rac_init(&config) == RAC_SUCCESS, "Commons reinitializes after lifecycle teardown");
+    rac_proto_buffer_init(&out);
+    rc = rac_component_lifecycle_snapshot_proto(
+        static_cast<uint32_t>(runanywhere::v1::SDK_COMPONENT_LLM), &out);
+    snapshot.Clear();
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &snapshot) &&
+              snapshot.state() == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED &&
+              snapshot.model_id().empty(),
+          "new Commons lifetime does not inherit the previous model");
+    rac_proto_buffer_free(&out);
+
+    rac_proto_buffer_init(&out);
+    rc = rac_model_lifecycle_load_proto(registry, load_bytes.data(), load_bytes.size(), &out);
+    load_result.Clear();
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &load_result) && load_result.success(),
+          "reinitialized Commons lifetime can load the model again");
+    rac_proto_buffer_free(&out);
+    rac_shutdown();
+    CHECK(g_cleanup_count == 2 && g_destroy_count == 2,
+          "second lifetime shutdown destroys only its own backend");
+
+    rac_plugin_unregister("llamacpp");
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -742,6 +872,7 @@ int main() {
         test_foundation_model_pins_platform_over_mlx(registry);
         test_vlm_lifecycle_resolved_artifacts(registry);
         test_load_replaces_previous_model(registry);
+        test_shutdown_resets_lifecycle_for_reinitialize(registry);
 
         rac_model_registry_destroy(registry);
         std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);

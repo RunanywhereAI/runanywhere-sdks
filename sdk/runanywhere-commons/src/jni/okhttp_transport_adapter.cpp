@@ -387,8 +387,7 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
     }
 
     jlong j_timeout_ms = static_cast<jlong>(req->timeout_ms);
-    jboolean j_follow_redirects =
-        req->follow_redirects != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
+    jboolean j_follow_redirects = req->follow_redirects != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
 
     // Dispatch-boundary timing for `out_resp->elapsed_ms`.
     auto t_start = std::chrono::steady_clock::now();
@@ -396,9 +395,9 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
     // Call into Kotlin. OkHttpTransport.executeRequest returns a non-null
     // HttpResponse on any transport outcome (including errors) — a null
     // return only happens on catastrophic JVM state.
-    jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_request_mid, j_method,
-                                                 j_url, j_headers, j_body, j_timeout_ms,
-                                                 j_follow_redirects);
+    jobject j_resp =
+        env->CallStaticObjectMethod(g.transport_cls, g.execute_request_mid, j_method, j_url,
+                                    j_headers, j_body, j_timeout_ms, j_follow_redirects);
 
     if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionDescribe();
@@ -553,8 +552,7 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
     // in deliverChunkNative.
     jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
     jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
-    jboolean j_follow_redirects =
-        req->follow_redirects != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
+    jboolean j_follow_redirects = req->follow_redirects != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
 
     // Dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
     auto t_start = std::chrono::steady_clock::now();
@@ -697,16 +695,14 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
     jlong j_resume_from = static_cast<jlong>(resume_from_byte);
     jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
     jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
-    jboolean j_follow_redirects =
-        req->follow_redirects != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
+    jboolean j_follow_redirects = req->follow_redirects != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
 
     // Dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
     auto t_start = std::chrono::steady_clock::now();
 
-    jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_resume_request_mid,
-                                                 j_method, j_url, j_headers, j_body, j_timeout_ms,
-                                                 j_resume_from, j_native_cb, j_native_ud,
-                                                 j_follow_redirects);
+    jobject j_resp = env->CallStaticObjectMethod(
+        g.transport_cls, g.execute_resume_request_mid, j_method, j_url, j_headers, j_body,
+        j_timeout_ms, j_resume_from, j_native_cb, j_native_ud, j_follow_redirects);
 
     if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionDescribe();

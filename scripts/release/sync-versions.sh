@@ -20,12 +20,13 @@
 #   sdk/runanywhere-swift/.../Generated/Versions.swift     (RAVersions.sdkVersion)
 #   sdk/runanywhere-kotlin/gradle.properties               (runanywhere.nativeLibVersion + SDK_VERSION)
 #   sdk/runanywhere-kotlin/src/main/.../SDKConstants.kt    (Kotlin VERSION constant)
-#   sdk/shared/proto-ts/package.json                       (proto-ts package version)
+#   sdk/shared/proto-ts/package.json + package-lock.json   (proto-ts package version)
 #   sdk/runanywhere-web/package.json                       (root version)
 #   sdk/runanywhere-web/packages/*/package.json            (each package version)
 #   sdk/runanywhere-web/.../Version.ts                     (web SDK_VERSION constant)
 #   sdk/runanywhere-react-native/package.json              (root)
 #   sdk/runanywhere-react-native/packages/*/package.json   (each package + first-party deps)
+#   sdk/runanywhere-react-native backend Gradle fallbacks  (native archive version)
 #   sdk/runanywhere-react-native/lerna.json                (fixed package train version)
 #   sdk/runanywhere-react-native/.../SDKConstants.ts       (RN version constant)
 #   sdk/runanywhere-flutter/packages/*/pubspec.yaml        (each version + core dep)
@@ -34,6 +35,8 @@
 #   SDK AGENTS/architecture/install docs                   (release-facing version examples)
 #
 # Does NOT touch (intentional, documented SoT for distinct domains):
+#   - package CHANGELOG prose — release notes require a reviewed, human-written
+#     entry. The coherence gate still requires a heading for NEW_VERSION.
 #   - sdk/runanywhere-swift/.../SDKConstants.swift — its `version` constant now
 #     reads `rac_sdk_get_version()` from commons at runtime (single source of
 #     truth = sdk/runanywhere-commons/VERSION above), so it has no literal to
@@ -98,6 +101,26 @@ bump_line() {
 bump_json_version() {
     local file="$1"
     bump_line "$file" '^  "version": "[^"]+"' "  \"version\": \"${NEW_VERSION}\""
+}
+
+bump_npm_lock_root_version() {
+    local file="$1"
+    if [ ! -f "$file" ]; then
+        echo "ERROR: target path missing (sync-versions configuration is stale): $file" >&2
+        return 1
+    fi
+    node - "$file" "$NEW_VERSION" <<'NODE'
+const fs = require('node:fs');
+const [file, version] = process.argv.slice(2);
+const lock = JSON.parse(fs.readFileSync(file, 'utf8'));
+if (typeof lock.version !== 'string' || typeof lock.packages?.['']?.version !== 'string') {
+  throw new Error(`package-lock root version fields are missing: ${file}`);
+}
+lock.version = version;
+lock.packages[''].version = version;
+fs.writeFileSync(file, `${JSON.stringify(lock, null, 2)}\n`);
+NODE
+    echo "  bumped: $file"
 }
 
 bump_pubspec_version() {
@@ -243,6 +266,7 @@ bump_line "${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/s
 echo ""
 echo ">> Shared proto-ts:"
 bump_json_version "${REPO_ROOT}/sdk/shared/proto-ts/package.json"
+bump_npm_lock_root_version "${REPO_ROOT}/sdk/shared/proto-ts/package-lock.json"
 # Also bump the first-party `@runanywhere/proto-ts` pin in
 # `dependencies/versions.json` (the central TS-deps registry that
 # renovate.json's customManager and syncpack read). The proto-ts package is
@@ -294,6 +318,13 @@ bump_line "${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/src/Foundatio
 bump_line "${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/src/QHexRTProvider.ts" \
     "static readonly version = '[^']+'" \
     "static readonly version = '${NEW_VERSION}'"
+for gradle_file in \
+    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/android/build.gradle" \
+    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/build.gradle"; do
+    bump_line "$gradle_file" \
+        'def coreVersion = coreVersionFile\.exists\(\) \? coreVersionFile\.text\.trim\(\) : "[^"]+"' \
+        "def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : \"${NEW_VERSION}\""
+done
 
 # 6. Flutter SDK packages
 echo ""

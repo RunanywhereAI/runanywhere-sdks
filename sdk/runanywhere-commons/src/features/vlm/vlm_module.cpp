@@ -901,13 +901,12 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         float progress, int64_t input_count, int64_t output_count,
-                        const char* error, double duration_ms = 0.0,
-                        const char* model_id = nullptr, int64_t input_tokens = 0,
-                        int64_t total_tokens = 0, double tokens_per_second = 0.0,
-                        double ttft_ms = 0.0, const char* framework = nullptr,
-                        double temperature = -1.0, int32_t max_tokens = 0,
-                        int64_t vision_tokens = 0, double vision_encode_ms = 0.0,
-                        const char* image_resolution = nullptr) {
+                        const char* error, double duration_ms = 0.0, const char* model_id = nullptr,
+                        int64_t input_tokens = 0, int64_t total_tokens = 0,
+                        double tokens_per_second = 0.0, double ttft_ms = 0.0,
+                        const char* framework = nullptr, double temperature = -1.0,
+                        int32_t max_tokens = 0, int64_t vision_tokens = 0,
+                        double vision_encode_ms = 0.0, const char* image_resolution = nullptr) {
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, (error != nullptr && error[0] != '\0')
                                   ? runanywhere::v1::ERROR_SEVERITY_ERROR
@@ -1153,8 +1152,8 @@ rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data)
         return RAC_TRUE;
     }
 
-    return dispatch_vlm_stream_event(ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN, display_token,
-                                     false, nullptr, nullptr, 0);
+    return dispatch_vlm_stream_event(ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN,
+                                     display_token, false, nullptr, nullptr, 0);
 }
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -1398,7 +1397,8 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
                            result.total_tokens(), static_cast<double>(result.tokens_per_second()),
                            static_cast<double>(result.time_to_first_token_ms()), ref.framework_name,
                            static_cast<double>(options.temperature), options.max_tokens,
-                           result.image_tokens(), static_cast<double>(result.image_encode_time_ms()),
+                           result.image_tokens(),
+                           static_cast<double>(result.image_encode_time_ms()),
                            vlm_stream_res.empty() ? nullptr : vlm_stream_res.c_str());
     }
 

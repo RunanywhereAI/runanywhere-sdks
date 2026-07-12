@@ -73,7 +73,6 @@ object PlatformAdapterBridge {
      */
     @JvmStatic
     fun secureSet(key: String, value: String): Boolean {
-        Log.d(TAG, "secureSet key=$key")
         applicationContext()
         return SecureStorageManager.set(key, value)
     }
@@ -83,7 +82,6 @@ object PlatformAdapterBridge {
      */
     @JvmStatic
     fun secureGet(key: String): String? {
-        Log.d(TAG, "secureGet key=$key")
         applicationContext()
         return SecureStorageManager.get(key)
     }
@@ -93,28 +91,8 @@ object PlatformAdapterBridge {
      */
     @JvmStatic
     fun secureDelete(key: String): Boolean {
-        Log.d(TAG, "secureDelete key=$key")
         applicationContext()
         return SecureStorageManager.delete(key)
-    }
-
-    /**
-     * Called from C++ to check if key exists
-     */
-    @JvmStatic
-    fun secureExists(key: String): Boolean {
-        applicationContext()
-        return SecureStorageManager.exists(key)
-    }
-
-    /**
-     * Called from C++ to get persistent device UUID
-     */
-    @JvmStatic
-    fun getPersistentDeviceUUID(): String {
-        Log.d(TAG, "getPersistentDeviceUUID")
-        applicationContext()
-        return SecureStorageManager.getPersistentDeviceUUID()
     }
 
     /**

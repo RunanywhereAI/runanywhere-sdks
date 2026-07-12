@@ -5,7 +5,9 @@
 
 #include "rag_backend.h"
 
+#include "bm25_index.h"
 #include "rag_pipeline_graph.h"
+#include "vector_store_usearch.h"
 
 #include <algorithm>
 #include <cctype>
@@ -14,9 +16,6 @@
 #include <cstring>
 #include <initializer_list>
 #include <unordered_set>
-
-#include "bm25_index.h"
-#include "vector_store_usearch.h"
 
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -45,7 +44,7 @@ std::string first_string_metadata(const nlohmann::json& metadata,
     return {};
 }
 
-} // namespace
+}  // namespace
 
 namespace {
 

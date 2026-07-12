@@ -19,7 +19,7 @@ class QhexrtPlugin : FlutterPlugin, MethodCallHandler {
 
     companion object {
         private const val CHANNEL_NAME = "runanywhere_qhexrt"
-        private const val BACKEND_VERSION = "0.19.15"
+        private const val BACKEND_VERSION = "0.20.0"
         private const val BACKEND_NAME = "QHexRT"
 
         @JvmStatic

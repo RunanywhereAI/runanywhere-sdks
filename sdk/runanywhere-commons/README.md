@@ -239,6 +239,7 @@ rac_shutdown();
 | `RAC_BUILD_TESTS` | OFF | Build unit tests |
 | `RAC_BUILD_SHARED` | OFF | Build shared libraries (default: static) |
 | `RAC_BUILD_PLATFORM` | ON | Build platform backend (Apple FM, System TTS) |
+| `RAC_INCLUDE_LOCAL_DEV_CONFIG` | OFF | Compile the ignored local development credentials; local development only, never packaging |
 | `RAC_BUILD_BACKENDS` | OFF | Build ML backends |
 | `RAC_BACKEND_LLAMACPP` | ON | Build LlamaCPP backend (when BACKENDS=ON) |
 | `RAC_BACKEND_ONNX` | ON | Build ONNX backend (when BACKENDS=ON) |
@@ -473,7 +474,7 @@ typedef struct rac_platform_adapter {
 All versions are centralized in the `VERSIONS` file:
 
 ```bash
-PROJECT_VERSION=0.19.15
+PROJECT_VERSION=0.20.0
 IOS_DEPLOYMENT_TARGET=17.5
 MACOS_DEPLOYMENT_TARGET=14.5
 ANDROID_MIN_SDK=24

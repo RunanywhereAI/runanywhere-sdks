@@ -78,8 +78,9 @@ if ! command -v xcodebuild >/dev/null 2>&1; then
     echo "error: xcodebuild is required" >&2
     exit 1
 fi
-actual_xcode_version="$(xcodebuild -version | awk '/^Xcode / { print $2; exit }')"
-actual_xcode_build="$(xcodebuild -version | awk '/^Build version / { print $3; exit }')"
+xcode_version_output="$(xcodebuild -version)"
+actual_xcode_version="$(awk '/^Xcode / { print $2 }' <<< "${xcode_version_output}")"
+actual_xcode_build="$(awk '/^Build version / { print $3 }' <<< "${xcode_version_output}")"
 if [ "${actual_xcode_version}" != "${XCODE_VERSION}" ] || [ "${actual_xcode_build}" != "${XCODE_BUILD}" ]; then
     echo "error: expected Xcode ${XCODE_VERSION} (${XCODE_BUILD}), found ${actual_xcode_version} (${actual_xcode_build})" >&2
     exit 1

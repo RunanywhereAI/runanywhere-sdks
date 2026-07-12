@@ -9,6 +9,14 @@ const registrationState = vi.hoisted(() => ({
 const protoState = vi.hoisted(() => ({
   hasCompletedHttpSetup: true,
 }));
+const deviceIdentityStorage = vi.hoisted(() => new Map<string, string>());
+
+vi.stubGlobal('localStorage', {
+  getItem: (key: string) => deviceIdentityStorage.get(key) ?? null,
+  setItem: (key: string, value: string) => {
+    deviceIdentityStorage.set(key, value);
+  },
+});
 
 vi.mock('../../../src/runtime/EmscriptenModule', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -76,6 +84,7 @@ describe('RunAnywhere services lifecycle', () => {
     registrationState.waitForPendingRegistration.mockReset();
     protoState.hasCompletedHttpSetup = true;
     runtimeState.module = null;
+    deviceIdentityStorage.clear();
     await RunAnywhere.shutdown();
   });
 
@@ -111,9 +120,14 @@ describe('RunAnywhere services lifecycle', () => {
       expect(registrationState.waitForPendingRegistration).toHaveBeenCalledOnce();
     });
 
-    await RunAnywhere.shutdown();
+    let shutdownSettled = false;
+    const shutdown = RunAnywhere.shutdown().finally(() => {
+      shutdownSettled = true;
+    });
+    await Promise.resolve();
+    expect(shutdownSettled).toBe(false);
     releaseRegistration(true);
-    await oldServices;
+    await Promise.all([oldServices, shutdown]);
 
     expect(oldModule._rac_device_manager_register_if_needed).not.toHaveBeenCalled();
     expect(RunAnywhere.areServicesReady).toBe(false);

@@ -49,7 +49,7 @@ sdk/runanywhere-flutter/
     └── runanywhere_qhexrt/          # Qualcomm Hexagon NPU (Android-only)
 ```
 
-Backend packages depend on `runanywhere ^0.19.15`. Source checkouts prefer
+Backend packages depend on `runanywhere ^0.20.0`. Source checkouts prefer
 package-owned XCFramework/JNI staging, while public pub archives omit those
 large binaries and resolve versioned, checksum-verified release archives through
 CocoaPods/SwiftPM on iOS and Gradle on Android.
@@ -224,9 +224,10 @@ Plus supporting modules:
 6. **EventBus is pure `dart:async`.** `lib/public/events/event_bus.dart` is a
    `StreamController.broadcast()` singleton. **`rxdart` is not a dependency.**
 
-7. **Secure-storage vtable.** The C++ auth manager calls Dart secure-storage
-   callbacks synchronously via a `_secureCache` map; the Dart side wraps
-   `flutter_secure_storage` (and `EncryptedSharedPreferences` on Android).
+7. **Secure-storage vtable.** The C++ platform/auth managers call Dart
+   callbacks synchronously. Dart delegates to plugin-owned native helpers:
+   Keychain on Apple and Android Keystore AES-GCM with atomic no-backup
+   ciphertext files on Android. Success means the mutation has completed.
 
 8. **Hand-written FFI bindings.** No `ffigen` is used. `core/native/rac_native.dart`
    plus `native/native_functions.dart` define every C ABI binding by hand.
@@ -413,10 +414,10 @@ lives in the bundled C++ backend library.
 
 | Component | Version |
 |-----------|---------|
-| `runanywhere` (Dart) | 0.19.15 |
-| `runanywhere_llamacpp` | 0.19.15 |
-| `runanywhere_onnx` | 0.19.15 |
-| `runanywhere_qhexrt` | 0.19.15 |
+| `runanywhere` (Dart) | 0.20.0 |
+| `runanywhere_llamacpp` | 0.20.0 |
+| `runanywhere_onnx` | 0.20.0 |
+| `runanywhere_qhexrt` | 0.20.0 |
 | `RACommons` native | 0.1.6 |
 | llama.cpp engine | b7199 |
 | ONNX Runtime | 1.24.3 |

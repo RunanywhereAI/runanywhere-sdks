@@ -530,6 +530,17 @@ target_compile_features(test_auth_sdk_events PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_auth_sdk_events)
 add_test(NAME auth_sdk_event_tests COMMAND test_auth_sdk_events)
 
+# --- Auth secure-storage failure semantics ---------------------------------
+add_executable(test_auth_secure_storage test_auth_secure_storage.cpp)
+target_include_directories(test_auth_secure_storage PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_auth_secure_storage PRIVATE rac_commons)
+rac_link_archive_deps(test_auth_secure_storage)
+target_compile_features(test_auth_secure_storage PRIVATE cxx_std_17)
+add_test(NAME auth_secure_storage_tests COMMAND test_auth_secure_storage)
+
 # --- Canonical two-phase SDK init ABI tests --------------------------
 # Drives rac_sdk_init_phase{1,2}_proto + rac_sdk_retry_http_proto with hand
 # built request bytes; verifies the SdkInitResult envelope mirrors Swift's
@@ -1488,18 +1499,19 @@ target_compile_features(test_hf_resolver_folder PRIVATE cxx_std_20)
 add_test(NAME hf_resolver_folder_tests COMMAND test_hf_resolver_folder)
 
 # --- Bundle-policy registry + the QHexRT policy (offline) --------------
-# Registry semantics plus the real QHexRT manifest predicate, included
-# header-only from engines/qhexrt (public-repo source; no prebuilt engine
-# needed) and driven through the generic folder resolver.
+# Registry semantics plus the real public QHexRT policy, driven through the
+# generic folder resolver without any private runtime headers or binaries.
+get_filename_component(QHEXRT_ENGINE_DIR
+    "${CMAKE_CURRENT_LIST_DIR}/../../../engines/qhexrt" ABSOLUTE)
 add_executable(test_bundle_policy
     test_bundle_policy.cpp
-    ${CMAKE_SOURCE_DIR}/engines/qhexrt/qhexrt_device_capability.cpp
+    ${QHEXRT_ENGINE_DIR}/qhexrt_device_capability.cpp
 )
 target_include_directories(test_bundle_policy PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
-    ${CMAKE_SOURCE_DIR}/engines/qhexrt
-    ${CMAKE_SOURCE_DIR}/engines/qhexrt/include
+    ${CMAKE_SOURCE_DIR}/include
+    ${QHEXRT_ENGINE_DIR}
+    ${QHEXRT_ENGINE_DIR}/include
 )
 target_link_libraries(test_bundle_policy PRIVATE rac_commons)
 rac_link_archive_deps(test_bundle_policy)

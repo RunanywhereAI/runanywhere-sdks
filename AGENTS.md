@@ -40,7 +40,7 @@ Use the machine's available capacity for local builds and verification instead o
 
 1. **C++ commons** (`sdk/runanywhere-commons/`) — If logic is cross-platform and not I/O-specific, it belongs here. All 5 SDKs get the fix for free. Examples: model lifecycle, registry management, download orchestration, RAG session management, inference routing.
 
-2. **Platform SDK layer** — If logic is platform-specific I/O or runtime bridging (e.g. Web OPFS persistence, iOS Keychain, Android EncryptedSharedPrefs, WASM MEMFS mirroring), it belongs in the platform SDK, not the example app. Examples: `OPFSBridge`, platform adapter registration, WASM module broadcast, MEMFS hydration.
+2. **Platform SDK layer** — If logic is platform-specific I/O or runtime bridging (e.g. Web OPFS persistence, iOS Keychain, Android Keystore, WASM MEMFS mirroring), it belongs in the platform SDK, not the example app. Examples: `OPFSBridge`, platform adapter registration, WASM module broadcast, MEMFS hydration.
 
 3. **Example apps** — Only UI rendering, tab navigation, and thin SDK API calls. **No business logic, no workarounds, no internal SDK knowledge.** If you find yourself writing multi-step bootstrap sequences, duplicating internal constants (e.g. filesystem path patterns), or routing around SDK limitations inside an example, **stop and fix the SDK instead**.
 
@@ -62,7 +62,7 @@ When the correct behavior is ambiguous, check the iOS Swift implementation first
 
 Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-commons`, ~118K first-party LOC plus ~420K generated proto bindings) implements all AI business logic behind a pure C ABI (`rac_*` prefix). Five platform SDKs are thin bridges that supply platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control struct and call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings for every language.
 
-**Current version**: `0.19.15` (canonical source: `sdk/runanywhere-commons/VERSION`)
+**Current version**: `0.20.0` (canonical source: `sdk/runanywhere-commons/VERSION`)
 
 ### SDK Implementations
 | SDK | Path | Bridge Mechanism | Platforms |
@@ -419,7 +419,7 @@ Requires WASM pre-built. `SharedArrayBuffer` needs cross-origin isolation header
 
 ## Version Management
 
-Canonical version: `sdk/runanywhere-commons/VERSION` (single-line file, e.g. `0.19.15`).
+Canonical version: `sdk/runanywhere-commons/VERSION` (single-line file, e.g. `0.20.0`).
 
 ```bash
 # Bump everywhere: VERSION, Package.swift, gradle.properties, package.json, pubspec.yaml
@@ -519,7 +519,7 @@ Standard Android library layout. There is no `commonMain`/`jvmAndroidMain`/`andr
 | Streaming | `AsyncStream` | `Flow` | `Stream` (via `StreamController`) | `AsyncIterable` (manual iteration) | `AsyncIterable` |
 | Events | `EventBus` (Combine) | `EventBus` (SharedFlow) | `EventBus` (custom pub/sub via dart:async broadcast StreamController) | `EventBus` (NativeEventEmitter) | `EventBus` (custom pub/sub) |
 | Error type | `SDKException` (proto-backed) | `SDKException` (proto-backed) | `SDKException` | `SDKException` | `SDKException` |
-| Secure storage | Keychain | EncryptedSharedPrefs | flutter_secure_storage + cache | Keychain (iOS), EncryptedSharedPrefs (Android) | localStorage |
+| Secure storage | Keychain | Android Keystore | Keychain (iOS), Android Keystore + atomic no-backup ciphertext files | Keychain (iOS), Android Keystore | localStorage |
 | HTTP transport | URLSession | OkHttp | OkHttp (Android), URLSession (iOS) | OkHttp (Android), URLSession (iOS) | emscripten_fetch / fetch() |
 
 ---

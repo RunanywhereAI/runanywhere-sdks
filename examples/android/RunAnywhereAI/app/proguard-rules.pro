@@ -60,11 +60,8 @@
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
 
-# Optional deps referenced by libraries we use but don't bundle:
-#  - JPEG2000 decoder for pdfbox-android (we don't decode JP2)
-#  - errorprone annotations from Tink (androidx.security.crypto), compile-only
+# Optional JPEG2000 decoder referenced by pdfbox-android; this app does not decode JP2.
 -dontwarn com.gemalto.jp2.**
--dontwarn com.google.errorprone.annotations.**
 # Required only when the exact minified release APK is instrumented for device
 # acceptance. AndroidJUnitRunner calls this class before any test method runs.
 -keep class androidx.tracing.Trace { *; }
@@ -92,6 +89,20 @@
 -keep class com.runanywhere.runanywhereai.state.GlobalState { *; }
 -keep class com.runanywhere.runanywhereai.tools.WebSearchTool { *; }
 -keep class com.runanywhere.runanywhereai.util.RACLog { *; }
+
+# Security acceptance tests run against the exact minified release APK. Keep
+# only the app-private stores, top-level factory facade, and repositories those
+# tests call directly; the separate test APK cannot invoke members R8 removes
+# from the target even when it consumes the target mapping file.
+-keep class com.runanywhere.runanywhereai.data.security.NoBackupCiphertextStore { *; }
+-keep class com.runanywhere.runanywhereai.data.security.SecureStringPreferences { *; }
+-keep class com.runanywhere.runanywhereai.data.security.SecurePreferencesKt { *; }
+-keep class com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository { *; }
+-keep class com.runanywhere.runanywhereai.data.settings.SettingsRepository { *; }
+-keepclassmembers class com.runanywhere.runanywhereai.data.settings.AppSettings {
+    java.lang.String getHfToken();
+}
+
 -keep class kotlin.Unit { *; }
 -keep class kotlin.Result** { *; }
 -keep class kotlin.ResultKt { *; }

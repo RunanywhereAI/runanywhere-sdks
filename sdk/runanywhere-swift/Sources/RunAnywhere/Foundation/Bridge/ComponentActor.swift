@@ -53,16 +53,28 @@ extension CppBridge {
         /// agnostic). Cleared on `unload()` and `destroy()`.
         private var loadedAssetId: String?
 
-        /// Once true, the actor has been destroyed and is no longer
-        /// usable; further `getHandle()` calls throw.
+        /// Tracks whether this actor was destroyed in the prior bridge
+        /// lifetime. A new handle is admitted only after the bridge completes
+        /// a later initialization.
         private var isClosed = false
 
+        private let bridgeIsInitialized: @Sendable () -> Bool
         private let logger: SDKLogger
 
         // MARK: - Init
 
         public init(vtable: ComponentVTable) {
             self.vtable = vtable
+            self.bridgeIsInitialized = { CppBridge.isInitialized }
+            self.logger = SDKLogger(category: "CppBridge.\(vtable.component.displayName)")
+        }
+
+        init(
+            vtable: ComponentVTable,
+            bridgeIsInitialized: @escaping @Sendable () -> Bool
+        ) {
+            self.vtable = vtable
+            self.bridgeIsInitialized = bridgeIsInitialized
             self.logger = SDKLogger(category: "CppBridge.\(vtable.component.displayName)")
         }
 
@@ -73,7 +85,7 @@ extension CppBridge {
             if let handle = handle {
                 return ComponentHandle(rawValue: handle)
             }
-            if isClosed {
+            if isClosed && !bridgeIsInitialized() {
                 throw SDKException(
                     code: .notInitialized,
                     message: "\(vtable.component.displayName) component is shut down",
@@ -91,6 +103,7 @@ extension CppBridge {
                 )
             }
             self.handle = createdHandle
+            isClosed = false
             logger.debug("\(vtable.component.displayName) component created")
             return ComponentHandle(rawValue: createdHandle)
         }
@@ -171,8 +184,8 @@ extension CppBridge {
             logger.info("\(vtable.component.displayName) model unloaded")
         }
 
-        /// Destroy the component, releasing C resources and marking the
-        /// actor closed. Subsequent `getHandle()` throws.
+        /// Destroy the component, releasing C resources and closing handle
+        /// creation until a later bridge lifetime is initialized.
         public func destroy() {
             if let handle = handle {
                 vtable.destroy(handle)

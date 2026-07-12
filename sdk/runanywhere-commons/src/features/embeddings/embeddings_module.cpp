@@ -137,8 +137,7 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
         (*event.mutable_properties())["duration_ms"] = std::to_string(duration_ms);
     }
     if (embedding_dimension > 0) {
-        (*event.mutable_properties())["embedding_dimension"] =
-            std::to_string(embedding_dimension);
+        (*event.mutable_properties())["embedding_dimension"] = std::to_string(embedding_dimension);
     }
     publish_event(event);
 }
@@ -422,8 +421,8 @@ rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_p
         runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED, "embeddings.embed",
         1.0f, static_cast<int64_t>(texts.size()), static_cast<int64_t>(result.vectors_size()),
         nullptr, static_cast<double>(now_ms() - embed_start_ms),
-        raw.num_embeddings > 0 ? static_cast<int64_t>(raw.embeddings[0].dimension) : 0, ref.model_id,
-        ref.framework_name);
+        raw.num_embeddings > 0 ? static_cast<int64_t>(raw.embeddings[0].dimension) : 0,
+        ref.model_id, ref.framework_name);
     rc = copy_proto(result, out_result);
     rac_embeddings_result_free(&raw);
     rac::lifecycle::release_lifecycle_embeddings(&ref);

@@ -712,6 +712,7 @@ export interface EmscriptenRunanywhereModule {
   // -----------------------------------------------------------------------------
   _rac_sdk_event_subscribe?(callbackPtr: number, userData: number): bigint;
   _rac_sdk_event_unsubscribe?(subscriptionId: bigint): void;
+  _rac_sdk_event_quiesce?(): void;
   _rac_sdk_event_publish_proto?(protoBytes: number, protoSize: number): number;
   _rac_sdk_event_poll?(outEvent: number): number;
   _rac_sdk_event_publish_failure?(

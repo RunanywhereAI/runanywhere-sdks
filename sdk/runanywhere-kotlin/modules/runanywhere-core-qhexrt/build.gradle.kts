@@ -101,7 +101,6 @@ android {
         }
         jniLibs.keepDebugSymbols += "**/*.so"
     }
-
 }
 
 kotlin {

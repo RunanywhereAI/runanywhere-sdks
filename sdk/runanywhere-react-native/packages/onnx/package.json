@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/onnx",
-  "version": "0.19.15",
+  "version": "0.20.0",
   "description": "ONNX Runtime backend for RunAnywhere React Native SDK - Speech-to-Text, Text-to-Speech, and VAD",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -56,7 +56,7 @@
     "@runanywhere/proto-ts": "workspace:*"
   },
   "peerDependencies": {
-    "@runanywhere/core": ">=0.19.15",
+    "@runanywhere/core": ">=0.20.0",
     "react": ">=19.0.0",
     "react-native": ">=0.83.1",
     "react-native-nitro-modules": "^0.33.9"

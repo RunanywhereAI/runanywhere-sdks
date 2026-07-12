@@ -28,9 +28,9 @@
 #include <utility>
 #include <vector>
 
+#include "features/llm/tool_calling_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
-#include "features/llm/tool_calling_internal.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "tool_calling.pb.h"

@@ -20,6 +20,100 @@ private struct ManagerHandle: @unchecked Sendable {
     let ptr: OpaquePointer
 }
 
+/// Owns every unstructured telemetry HTTP task for exactly one SDK lifetime.
+///
+/// The C callback is synchronous, while HTTP delivery is asynchronous. Without
+/// an explicit registry, a callback task can survive reset and read the next
+/// lifetime's credentials from `HTTPClientAdapter`. Admission and the task map
+/// are protected by one unfair lock; normal shutdown closes admission and
+/// awaits the snapshot, while synchronous partial-init rollback cancels and
+/// waits for the same group before another lifetime can begin.
+final class TelemetryHTTPTaskRegistry: @unchecked Sendable {
+    private struct State {
+        var generation: UInt64 = 0
+        var acceptsTasks = false
+        var nextTaskID: UInt64 = 0
+        var tasks: [UInt64: Task<Void, Never>] = [:]
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+    private let pendingTasks = DispatchGroup()
+
+    /// Start a fresh admission generation after fail-closed retirement of any
+    /// inconsistent prior state.
+    @discardableResult
+    func beginLifetime() -> UInt64 {
+        cancelAndWait()
+        return state.withLock { current in
+            current.generation &+= 1
+            current.acceptsTasks = true
+            return current.generation
+        }
+    }
+
+    /// Admit one callback task into the current lifetime. Returns false after
+    /// shutdown has closed admission, so late native callbacks are discarded.
+    @discardableResult
+    func submit(_ operation: @escaping @Sendable () async -> Void) -> Bool {
+        state.withLock { current in
+            guard current.acceptsTasks else { return false }
+
+            current.nextTaskID &+= 1
+            let taskID = current.nextTaskID
+            let generation = current.generation
+            pendingTasks.enter()
+            current.tasks[taskID] = Task { [self] in
+                defer { finish(taskID: taskID, generation: generation) }
+                guard !Task.isCancelled else { return }
+                await operation()
+            }
+            return true
+        }
+    }
+
+    /// Close callback admission and await every task already handed off by C++.
+    func drain() async {
+        let tasks = closeAdmission(cancel: false)
+        for task in tasks {
+            await task.value
+        }
+    }
+
+    /// Fail-closed synchronous retirement for Phase-1 rollback. No HTTP adapter
+    /// is configured before Phase 2, so cancellation completes without waiting
+    /// on a configured network request and prevents work crossing into a retry.
+    func cancelAndWait() {
+        _ = closeAdmission(cancel: true)
+        pendingTasks.wait()
+    }
+
+    var pendingTaskCount: Int {
+        state.withLock { $0.tasks.count }
+    }
+
+    private func closeAdmission(cancel: Bool) -> [Task<Void, Never>] {
+        let tasks = state.withLock { current -> [Task<Void, Never>] in
+            current.acceptsTasks = false
+            return Array(current.tasks.values)
+        }
+        if cancel {
+            tasks.forEach { $0.cancel() }
+        }
+        return tasks
+    }
+
+    private func finish(taskID: UInt64, generation: UInt64) {
+        state.withLock { current in
+            if current.generation == generation {
+                current.tasks.removeValue(forKey: taskID)
+            }
+        }
+        pendingTasks.leave()
+    }
+}
+
+private let telemetryHTTPTasks = TelemetryHTTPTaskRegistry()
+
 // MARK: - Events Bridge
 
 extension CppBridge {
@@ -87,16 +181,22 @@ extension CppBridge {
         private static let activeEnvironment = OSAllocatedUnfairLock<SDKEnvironment?>(initialState: nil)
 
         /// Initialize telemetry manager
-        static func initialize(environment: SDKEnvironment) {
-            // Destroy existing if any
-            let existing = manager.withLock { $0 }
+        static func initialize(environment: SDKEnvironment, deviceId: String) {
+            // Fail closed if an inconsistent caller skipped shutdown. Existing
+            // callback tasks must finish before a new credential lifetime opens.
+            telemetryHTTPTasks.cancelAndWait()
+            let existing = manager.withLock { current -> ManagerHandle? in
+                let snapshot = current
+                current = nil
+                return snapshot
+            }
             if let existing {
                 rac_telemetry_manager_destroy(existing.ptr)
             }
 
+            telemetryHTTPTasks.beginLifetime()
             activeEnvironment.withLock { $0 = environment }
 
-            let deviceId = CppBridge.Device.persistentId
             let deviceInfo = DeviceInfoFactory.current
 
             let createdPtr: OpaquePointer? = deviceId.withCString { did in
@@ -122,10 +222,8 @@ extension CppBridge {
             rac_telemetry_manager_set_http_callback(newManager?.ptr, telemetryHttpCallback, userData)
         }
 
-        /// Shutdown telemetry manager
-        static func shutdown() {
-            activeEnvironment.withLock { $0 = nil }
-
+        /// Shutdown telemetry manager and drain every accepted HTTP callback.
+        static func shutdown() async {
             let mgr = manager.withLock { current -> ManagerHandle? in
                 let snapshot = current
                 current = nil
@@ -136,6 +234,31 @@ extension CppBridge {
                 rac_telemetry_manager_flush(mgr.ptr)
                 rac_telemetry_manager_destroy(mgr.ptr)
             }
+
+            // `flush` invokes the C callback synchronously, so by this point all
+            // terminal batches are admitted. Close admission before awaiting to
+            // prevent a late callback from escaping this SDK lifetime.
+            await telemetryHTTPTasks.drain()
+            activeEnvironment.withLock { $0 = nil }
+        }
+
+        /// Synchronous fail-closed teardown used only while Phase 1 is rolling
+        /// back. Phase 2 has not configured HTTP yet, so pending callback tasks
+        /// are canceled and joined instead of being allowed into a later retry.
+        static func rollbackInitialization() {
+            let mgr = manager.withLock { current -> ManagerHandle? in
+                let snapshot = current
+                current = nil
+                return snapshot
+            }
+
+            if let mgr {
+                rac_telemetry_manager_flush(mgr.ptr)
+                rac_telemetry_manager_destroy(mgr.ptr)
+            }
+
+            telemetryHTTPTasks.cancelAndWait()
+            activeEnvironment.withLock { $0 = nil }
         }
 
         /// The live telemetry-manager handle, if initialized.
@@ -174,7 +297,7 @@ private func telemetryHttpCallback(
     let json = String(cString: jsonBody)
     let needsAuth = requiresAuth == RAC_TRUE
 
-    Task {
+    telemetryHTTPTasks.submit {
         await performTelemetryHTTP(path: path, json: json, requiresAuth: needsAuth)
     }
 }
@@ -205,7 +328,7 @@ private func performTelemetryHTTP(path: String, json: String, requiresAuth: Bool
         _ = try await CppBridge.HTTP.shared.post(path, json: json, requiresAuth: requiresAuth)
         logger.debug("✅ Telemetry sent to \(path)")
     } catch {
-        logger.error("❌ HTTP failed for telemetry to \(path): \(error)")
+        logger.warning("Telemetry delivery failed; request details omitted")
     }
 }
 

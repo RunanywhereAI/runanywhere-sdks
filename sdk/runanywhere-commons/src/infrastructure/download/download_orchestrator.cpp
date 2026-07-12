@@ -114,16 +114,22 @@ int64_t filesystem_available_bytes(const std::string& path) {
     std::error_code ec;
     fs::path probe(path);
     while (!probe.empty()) {
-        if (fs::exists(probe, ec)) break;
+        if (fs::exists(probe, ec))
+            break;
         fs::path parent = probe.parent_path();
-        if (parent == probe) break;
+        if (parent == probe)
+            break;
         probe = parent;
     }
-    if (probe.empty()) return -1;
+    if (probe.empty())
+        return -1;
     fs::space_info si = fs::space(probe, ec);
-    if (ec) return -1;
-    if (si.available == static_cast<uintmax_t>(-1)) return -1;
-    if (si.available > static_cast<uintmax_t>(INT64_MAX)) return INT64_MAX;
+    if (ec)
+        return -1;
+    if (si.available == static_cast<uintmax_t>(-1))
+        return -1;
+    if (si.available > static_cast<uintmax_t>(INT64_MAX))
+        return INT64_MAX;
     return static_cast<int64_t>(si.available);
 }
 
@@ -132,9 +138,11 @@ int64_t filesystem_available_bytes(const std::string& path) {
 // Used at plan time to size multi-file bundles whose catalog entries carry no
 // per-file size, so the pre-flight storage gate can fire before any bytes land.
 int64_t http_head_content_length(const std::string& url) {
-    if (rac_http_transport_is_registered() != RAC_TRUE) return -1;
+    if (rac_http_transport_is_registered() != RAC_TRUE)
+        return -1;
     rac_http_client_t* client = nullptr;
-    if (rac_http_client_create(&client) != RAC_SUCCESS || client == nullptr) return -1;
+    if (rac_http_client_create(&client) != RAC_SUCCESS || client == nullptr)
+        return -1;
     rac_http_request_t req{};
     req.method = "HEAD";
     req.url = url.c_str();
@@ -147,14 +155,17 @@ int64_t http_head_content_length(const std::string& url) {
         for (size_t i = 0; i < resp.header_count; ++i) {
             const char* name = resp.headers[i].name;
             const char* value = resp.headers[i].value;
-            if (name == nullptr || value == nullptr) continue;
+            if (name == nullptr || value == nullptr)
+                continue;
             static const char* kWant = "content-length";
             const size_t n = std::strlen(kWant);
-            if (std::strlen(name) != n) continue;
+            if (std::strlen(name) != n)
+                continue;
             bool match = true;
             for (size_t k = 0; k < n; ++k) {
                 char c = name[k];
-                if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+                if (c >= 'A' && c <= 'Z')
+                    c = static_cast<char>(c - 'A' + 'a');
                 if (c != kWant[k]) {
                     match = false;
                     break;
@@ -162,7 +173,8 @@ int64_t http_head_content_length(const std::string& url) {
             }
             if (match) {
                 long long v = std::strtoll(value, nullptr, 10);
-                if (v > 0) len = static_cast<int64_t>(v);
+                if (v > 0)
+                    len = static_cast<int64_t>(v);
                 break;
             }
         }
@@ -285,8 +297,8 @@ static std::string get_filename(const char* url) {
 
 static std::string safe_filename_stem(std::string value) {
     for (char& c : value) {
-        const bool alpha_num = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                               (c >= '0' && c <= '9');
+        const bool alpha_num =
+            (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
         if (!alpha_num && c != '-' && c != '_' && c != '.') {
             c = '_';
         }
@@ -398,7 +410,7 @@ struct proto_download_task {
     int64_t last_partial_bytes = 0;
     int64_t last_deleted_bytes = 0;
     int64_t started_at_unix_ms = 0;
-    bool download_telemetry_started = false;  // model.download.started emitted once
+    bool download_telemetry_started = false;   // model.download.started emitted once
     bool download_telemetry_finished = false;  // terminal model.download.* emitted once
     // Framework + archive structure preserved from the registry at task
     // creation so the worker can (a) extract into the canonical per-model
@@ -904,10 +916,9 @@ void mark_task_stopped(const std::shared_ptr<proto_download_task>& task) {
         std::lock_guard<std::mutex> lock(task->mutex);
         task->running = false;
         final_state = task->progress.state();
-        if (!task->download_telemetry_finished &&
-            (final_state == rav1::DOWNLOAD_STATE_COMPLETED ||
-             final_state == rav1::DOWNLOAD_STATE_FAILED ||
-             final_state == rav1::DOWNLOAD_STATE_CANCELLED)) {
+        if (!task->download_telemetry_finished && (final_state == rav1::DOWNLOAD_STATE_COMPLETED ||
+                                                   final_state == rav1::DOWNLOAD_STATE_FAILED ||
+                                                   final_state == rav1::DOWNLOAD_STATE_CANCELLED)) {
             task->download_telemetry_finished = true;
             emit_terminal = true;
             model_id = task->model_id;
@@ -1035,9 +1046,10 @@ struct parallel_progress_snapshot {
     float overall_override = -1.0f;
 };
 
-parallel_progress_snapshot update_parallel_progress(
-    const std::shared_ptr<proto_download_task>& task, size_t file_index, int64_t bytes_written,
-    int64_t total_bytes, int64_t total_expected, bool mark_done) {
+parallel_progress_snapshot
+update_parallel_progress(const std::shared_ptr<proto_download_task>& task, size_t file_index,
+                         int64_t bytes_written, int64_t total_bytes, int64_t total_expected,
+                         bool mark_done) {
     parallel_progress_snapshot snapshot;
     if (!task) {
         return snapshot;
@@ -1099,10 +1111,10 @@ rac_bool_t proto_http_progress(uint64_t bytes_written, uint64_t total_bytes, voi
     }
 
     if (ctx->aggregate_parallel_files) {
-        parallel_progress_snapshot snapshot = update_parallel_progress(
-            ctx->task, static_cast<size_t>(std::max(ctx->file_index, 0)),
-            static_cast<int64_t>(bytes_written), static_cast<int64_t>(total_bytes),
-            ctx->total_expected, false);
+        parallel_progress_snapshot snapshot =
+            update_parallel_progress(ctx->task, static_cast<size_t>(std::max(ctx->file_index, 0)),
+                                     static_cast<int64_t>(bytes_written),
+                                     static_cast<int64_t>(total_bytes), ctx->total_expected, false);
         set_task_progress(ctx->task, rav1::DOWNLOAD_STATE_DOWNLOADING,
                           rav1::DOWNLOAD_STAGE_DOWNLOADING, snapshot.bytes_downloaded,
                           snapshot.total_bytes, ctx->file_index, ctx->storage_key, "", "",
@@ -1127,15 +1139,16 @@ rac_bool_t proto_http_progress(uint64_t bytes_written, uint64_t total_bytes, voi
     float overall_override = -1.0f;
     const size_t num_files = ctx->task->files.size();
     if (ctx->total_expected <= 0 && num_files > 1) {
-        double file_fraction =
-            total_bytes > 0
-                ? std::min(1.0, static_cast<double>(bytes_written) / static_cast<double>(total_bytes))
-                : 0.0;
-        overall_override = static_cast<float>(
-            (static_cast<double>(ctx->file_index) + file_fraction) / static_cast<double>(num_files));
+        double file_fraction = total_bytes > 0 ? std::min(1.0, static_cast<double>(bytes_written) /
+                                                                   static_cast<double>(total_bytes))
+                                               : 0.0;
+        overall_override =
+            static_cast<float>((static_cast<double>(ctx->file_index) + file_fraction) /
+                               static_cast<double>(num_files));
     }
     set_task_progress(ctx->task, rav1::DOWNLOAD_STATE_DOWNLOADING, rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                      downloaded, total, ctx->file_index, ctx->storage_key, "", "", overall_override);
+                      downloaded, total, ctx->file_index, ctx->storage_key, "", "",
+                      overall_override);
     emit_progress(ctx->task);
     return RAC_TRUE;
 }
@@ -1233,8 +1246,7 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
         // and the planner can't size files the server won't HEAD. Refuse before
         // streaming so we never fill the disk and strand a half-written model.
         if (file.expected_bytes > 0) {
-            int64_t still_needed =
-                file.expected_bytes - static_cast<int64_t>(file_resume_from);
+            int64_t still_needed = file.expected_bytes - static_cast<int64_t>(file_resume_from);
             if (still_needed > 0) {
                 int64_t available = filesystem_available_bytes(file.destination_path);
                 const int64_t margin = 32LL * 1024 * 1024;  // 32 MiB headroom
@@ -1642,11 +1654,11 @@ bool run_parallel_direct_download_worker(const std::shared_ptr<proto_download_ta
         std::lock_guard<std::mutex> lock(result_mutex);
         const rav1::DownloadState state =
             terminal_cancelled ? rav1::DOWNLOAD_STATE_CANCELLED : rav1::DOWNLOAD_STATE_FAILED;
-        set_task_progress(task, state, rav1::DOWNLOAD_STAGE_DOWNLOADING, snapshot.bytes_downloaded,
-                          snapshot.total_bytes, static_cast<int32_t>(terminal_index),
-                          terminal_index < task->files.size() ? task->files[terminal_index].storage_key
-                                                              : "",
-                          "", terminal_error);
+        set_task_progress(
+            task, state, rav1::DOWNLOAD_STAGE_DOWNLOADING, snapshot.bytes_downloaded,
+            snapshot.total_bytes, static_cast<int32_t>(terminal_index),
+            terminal_index < task->files.size() ? task->files[terminal_index].storage_key : "", "",
+            terminal_error);
         mark_task_stopped(task);
         emit_progress(task);
         return true;
@@ -1666,8 +1678,8 @@ bool run_parallel_direct_download_worker(const std::shared_ptr<proto_download_ta
     if (!validate_downloaded_sizes(task, failing_index, sanity_error)) {
         set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
                           snapshot.bytes_downloaded, snapshot.total_bytes,
-                          static_cast<int32_t>(failing_index), task->files[failing_index].storage_key,
-                          "", sanity_error);
+                          static_cast<int32_t>(failing_index),
+                          task->files[failing_index].storage_key, "", sanity_error);
         mark_task_stopped(task);
         emit_progress(task);
         return true;
@@ -1868,8 +1880,9 @@ void web_download_on_progress(int64_t bytes_downloaded, int64_t total_bytes, voi
                                    ? std::min(1.0, static_cast<double>(bytes_downloaded) /
                                                        static_cast<double>(total_bytes))
                                    : 0.0;
-        overall_override = static_cast<float>(
-            (static_cast<double>(drv->file_index) + file_fraction) / static_cast<double>(num_files));
+        overall_override =
+            static_cast<float>((static_cast<double>(drv->file_index) + file_fraction) /
+                               static_cast<double>(num_files));
     }
     set_task_progress(task, rav1::DOWNLOAD_STATE_DOWNLOADING, rav1::DOWNLOAD_STAGE_DOWNLOADING,
                       downloaded, drv->total_expected, static_cast<int32_t>(drv->file_index),
@@ -1878,7 +1891,8 @@ void web_download_on_progress(int64_t bytes_downloaded, int64_t total_bytes, voi
 }
 
 // rac_http_complete_callback_fn: void (rac_result_t, const char* path, void* user_data).
-void web_download_on_complete(rac_result_t result, const char* /*downloaded_path*/, void* user_data) {
+void web_download_on_complete(rac_result_t result, const char* /*downloaded_path*/,
+                              void* user_data) {
     auto* drv = static_cast<web_download_driver*>(user_data);
     if (!drv) {
         return;
@@ -1952,12 +1966,11 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
             file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
             nullptr, &extraction_result);
         if (extract_rc != RAC_SUCCESS) {
-            set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
-                              drv->total_expected > 0
-                                  ? drv->completed_before_file + file.expected_bytes
-                                  : 0,
-                              drv->total_expected, static_cast<int32_t>(i), file.storage_key, "",
-                              "archive extraction failed");
+            set_task_progress(
+                task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
+                drv->total_expected > 0 ? drv->completed_before_file + file.expected_bytes : 0,
+                drv->total_expected, static_cast<int32_t>(i), file.storage_key, "",
+                "archive extraction failed");
             mark_task_stopped(task);
             emit_progress(task);
             web_download_finish(drv);
@@ -2031,8 +2044,8 @@ void web_download_start_file(web_download_driver* drv) {
     const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
     char* task_id = nullptr;
     rac_result_t rc = adapter->http_download(file.url.c_str(), file.destination_path.c_str(),
-                                             web_download_on_progress, web_download_on_complete, drv,
-                                             &task_id, adapter->user_data);
+                                             web_download_on_progress, web_download_on_complete,
+                                             drv, &task_id, adapter->user_data);
     drv->current_task_id = task_id;
     if (rc != RAC_SUCCESS) {
         set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
@@ -2074,11 +2087,10 @@ void web_download_finalize_all(web_download_driver* drv) {
     }
 
     std::string completion_local_path = resolve_completion_local_path(task, drv->final_path);
-    set_task_progress(task, rav1::DOWNLOAD_STATE_COMPLETED, rav1::DOWNLOAD_STAGE_COMPLETED,
-                      completed_bytes, drv->total_expected,
-                      static_cast<int32_t>(task->files.size() - 1),
-                      task->files.empty() ? "" : task->files.back().storage_key,
-                      completion_local_path, "");
+    set_task_progress(
+        task, rav1::DOWNLOAD_STATE_COMPLETED, rav1::DOWNLOAD_STAGE_COMPLETED, completed_bytes,
+        drv->total_expected, static_cast<int32_t>(task->files.size() - 1),
+        task->files.empty() ? "" : task->files.back().storage_key, completion_local_path, "");
     mark_task_stopped(task);
     emit_progress(task);
     self_heal_registry(task, completion_local_path);
@@ -2168,7 +2180,8 @@ std::string destination_from_model_file(const std::string& model_folder,
     // backslash are rejected) and enforces containment under model_folder, so
     // this preserves the path-traversal hardening while allowing legit subdirs.
     auto subpath_destination = [&](const std::string& rel) -> std::optional<std::string> {
-        if (rel.empty() || (rel.find('/') == std::string::npos && rel.find('\\') == std::string::npos))
+        if (rel.empty() ||
+            (rel.find('/') == std::string::npos && rel.find('\\') == std::string::npos))
             return std::nullopt;
         return safe_descriptor_path_under(model_folder, rel);
     };

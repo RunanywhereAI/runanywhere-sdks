@@ -13,9 +13,10 @@
 #include "rac/features/llm/rac_llm_types.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include "infrastructure/events/sdk_event_publish.h"
 #include "sdk_events.pb.h"
 #include "tool_calling.pb.h"
+
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 namespace rac::llm::tool_calling {
@@ -51,8 +52,7 @@ inline void split_display_text_and_thinking(const std::string& raw_text, std::st
     if (rac_llm_extract_thinking_with_tags(
             raw_text.c_str(),
             generation.thinking_open_tag.empty() ? nullptr : generation.thinking_open_tag.c_str(),
-            generation.thinking_close_tag.empty() ? nullptr
-                                                  : generation.thinking_close_tag.c_str(),
+            generation.thinking_close_tag.empty() ? nullptr : generation.thinking_close_tag.c_str(),
             &response, &response_len, &thinking, &thinking_len) != RAC_SUCCESS) {
         if (out_text) {
             *out_text = raw_text;
@@ -73,10 +73,10 @@ inline void split_display_text_and_thinking(const std::string& raw_text, std::st
 }
 
 #if defined(RAC_HAVE_PROTOBUF)
-inline GenerationState generation_for_tool_step(
-    const GenerationState& base, uint32_t iteration, bool has_tool_choice,
-    runanywhere::v1::ToolChoiceMode tool_choice,
-    runanywhere::v1::ToolCallFormatName format) {
+inline GenerationState generation_for_tool_step(const GenerationState& base, uint32_t iteration,
+                                                bool has_tool_choice,
+                                                runanywhere::v1::ToolChoiceMode tool_choice,
+                                                runanywhere::v1::ToolCallFormatName format) {
     GenerationState step = base;
     const bool forced_decision = iteration == 1 && has_tool_choice &&
                                  tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
@@ -87,9 +87,8 @@ inline GenerationState generation_for_tool_step(
     step.temperature = 0.0f;
     step.top_p = 1.0f;
     step.disable_thinking = true;
-    step.stop_sequence = format == runanywhere::v1::TOOL_CALL_FORMAT_NAME_LFM2
-                             ? "<|tool_call_end|>"
-                             : "</tool_call>";
+    step.stop_sequence = format == runanywhere::v1::TOOL_CALL_FORMAT_NAME_LFM2 ? "<|tool_call_end|>"
+                                                                               : "</tool_call>";
     return step;
 }
 
@@ -285,8 +284,7 @@ inline bool run_generate_once(GenerationState& generation,
     }
 
     rac_llm_result_t raw{};
-    const std::string effective_prompt =
-        apply_no_think_directive(prompt, options.disable_thinking);
+    const std::string effective_prompt = apply_no_think_directive(prompt, options.disable_thinking);
     rc = ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw);
 
     if (cancel_binding.active_ref_mu && cancel_binding.active_ref) {

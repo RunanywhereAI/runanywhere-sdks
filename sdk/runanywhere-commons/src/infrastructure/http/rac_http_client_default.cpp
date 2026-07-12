@@ -114,8 +114,7 @@ bool has_authorization_header(const rac_http_request_t* req) {
 PreparedRequest prepare_request(const rac_http_request_t* req) {
     PreparedRequest prepared;
     auto transform = rac::http::consume_upsert_transform(req);
-    std::string hf_bearer =
-        rac::http::hf_bearer_for_url(req->url, has_authorization_header(req));
+    std::string hf_bearer = rac::http::hf_bearer_for_url(req->url, has_authorization_header(req));
     if (!transform.engaged && hf_bearer.empty()) {
         prepared.effective_request = *req;
         return prepared;

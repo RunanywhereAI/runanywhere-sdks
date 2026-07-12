@@ -61,10 +61,17 @@ std::vector<SDKEventSubscription> g_sdk_event_subscriptions;
 // spin-wait until every in-flight callback has returned before the host
 // frees user_data. Mirrors rac_vad_proto_quiesce.
 std::atomic<int> g_sdk_event_in_flight{0};
+thread_local int g_sdk_event_dispatch_depth = 0;
 
 struct SDKEventInFlightGuard {
-    SDKEventInFlightGuard() { g_sdk_event_in_flight.fetch_add(1, std::memory_order_acq_rel); }
-    ~SDKEventInFlightGuard() { g_sdk_event_in_flight.fetch_sub(1, std::memory_order_acq_rel); }
+    SDKEventInFlightGuard() {
+        ++g_sdk_event_dispatch_depth;
+        g_sdk_event_in_flight.fetch_add(1, std::memory_order_acq_rel);
+    }
+    ~SDKEventInFlightGuard() {
+        g_sdk_event_in_flight.fetch_sub(1, std::memory_order_acq_rel);
+        --g_sdk_event_dispatch_depth;
+    }
     SDKEventInFlightGuard(const SDKEventInFlightGuard&) = delete;
     SDKEventInFlightGuard& operator=(const SDKEventInFlightGuard&) = delete;
 };
@@ -285,7 +292,8 @@ rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t prot
 }
 
 void rac_sdk_event_quiesce(void) {
-    while (g_sdk_event_in_flight.load(std::memory_order_acquire) > 0) {
+    const int current_thread_depth = g_sdk_event_dispatch_depth;
+    while (g_sdk_event_in_flight.load(std::memory_order_acquire) > current_thread_depth) {
         std::this_thread::yield();
     }
 }
@@ -557,18 +565,3 @@ rac_result_t publish_auth_failed(rac_result_t error_code, const char* message, c
 }
 
 }  // namespace rac::events
-
-// =============================================================================
-// INTERNAL RESET (for testing)
-// =============================================================================
-
-namespace rac_internal {
-
-void reset_event_publisher() {
-    std::lock_guard<std::mutex> sdk_lock(g_sdk_event_mutex);
-    g_sdk_event_subscriptions.clear();
-    g_sdk_event_queue.clear();
-    g_next_sdk_event_subscription_id.store(1);
-}
-
-}  // namespace rac_internal

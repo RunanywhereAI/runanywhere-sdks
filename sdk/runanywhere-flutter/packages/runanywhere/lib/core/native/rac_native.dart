@@ -1798,20 +1798,15 @@ class RacBindings {
           'rac_download_progress_poll_proto',
         ),
       ),
-      rac_sdk_event_subscribe = _lookupOptional<RacSdkEventSubscribeDart>(
-        () =>
-            lib.lookupFunction<
-              RacSdkEventSubscribeNative,
-              RacSdkEventSubscribeDart
-            >('rac_sdk_event_subscribe'),
-      ),
-      rac_sdk_event_unsubscribe = _lookupOptional<RacSdkEventUnsubscribeDart>(
-        () =>
-            lib.lookupFunction<
-              RacSdkEventUnsubscribeNative,
-              RacSdkEventUnsubscribeDart
-            >('rac_sdk_event_unsubscribe'),
-      ),
+      rac_sdk_event_subscribe = lib
+          .lookupFunction<RacSdkEventSubscribeNative, RacSdkEventSubscribeDart>(
+            'rac_sdk_event_subscribe',
+          ),
+      rac_sdk_event_unsubscribe = lib
+          .lookupFunction<
+            RacSdkEventUnsubscribeNative,
+            RacSdkEventUnsubscribeDart
+          >('rac_sdk_event_unsubscribe'),
       rac_sdk_event_quiesce = lib
           .lookupFunction<RacSdkEventQuiesceNative, RacSdkEventQuiesceDart>(
             'rac_sdk_event_quiesce',
@@ -2306,9 +2301,9 @@ class RacBindings {
 
   // SDK event stream proto-byte API -----------------------------------------
 
-  final RacSdkEventSubscribeDart? rac_sdk_event_subscribe;
+  final RacSdkEventSubscribeDart rac_sdk_event_subscribe;
 
-  final RacSdkEventUnsubscribeDart? rac_sdk_event_unsubscribe;
+  final RacSdkEventUnsubscribeDart rac_sdk_event_unsubscribe;
 
   final RacSdkEventQuiesceDart rac_sdk_event_quiesce;
 

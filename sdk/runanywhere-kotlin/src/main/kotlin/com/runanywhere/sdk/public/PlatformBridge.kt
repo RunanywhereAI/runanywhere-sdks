@@ -14,6 +14,7 @@ import android.os.Build
 import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -47,7 +48,7 @@ internal fun initializePlatformBridge(environment: SDKEnvironment, apiKey: Strin
     // Configure telemetry base URL if provided
     if (!baseURL.isNullOrEmpty()) {
         CppBridgeTelemetry.setBaseUrl(baseURL)
-        logger.debug("Telemetry base URL configured: $baseURL")
+        logger.debug("Telemetry base URL configured")
     }
     if (!apiKey.isNullOrEmpty()) {
         CppBridgeTelemetry.setApiKey(apiKey)
@@ -154,15 +155,15 @@ internal suspend fun initializePlatformBridgeServices() {
     logger.debug("CppBridge services initialization complete")
 }
 
-/**
- * Shutdown CppBridge and release resources.
- */
-internal fun shutdownPlatformBridge() {
+/** Roll back partial Phase 1 while EventBus can receive native shutdown. */
+internal fun rollbackPlatformBridgeInitialization() {
+    CppBridge.rollbackInitialization(afterNativeShutdown = EventBus::stop)
+}
+
+/** Shutdown CppBridge without blocking the calling coroutine thread. */
+internal suspend fun shutdownPlatformBridgeSuspending() {
     logger.debug("Shutting down CppBridge...")
-    // Tear down the native SDKEvent subscription before C++ commons is
-    // shutdown so the unsubscribe call still has a working ABI surface.
-    EventBus.stop()
-    CppBridge.shutdown()
+    CppBridge.shutdownSuspending(afterNativeShutdown = EventBus::stop)
     logger.debug("CppBridge shutdown complete")
 }
 
@@ -178,4 +179,6 @@ internal fun platformIsAuthenticated(): Boolean = RunAnywhereBridge.racAuthIsAut
 internal fun platformIsDeviceRegistered(): Boolean = CppBridgeDevice.isRegistered()
 
 internal fun platformDeviceId(): String =
-    CppBridgeDevice.getDeviceId() ?: RunAnywhereBridge.racAuthGetDeviceId() ?: ""
+    CppBridgeDevice.getDeviceId()
+        ?: RunAnywhereBridge.racAuthGetDeviceId()
+        ?: throw SDKException.notInitialized("Persistent device identity")

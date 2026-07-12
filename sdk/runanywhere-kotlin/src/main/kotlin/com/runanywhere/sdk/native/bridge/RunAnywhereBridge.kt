@@ -637,6 +637,10 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racDeviceManagerSetCallbacks(callbacks: Any): Int
 
+    /** Quiesce and release the JNI device-manager callback object. */
+    @JvmStatic
+    external fun racDeviceManagerClearCallbacks()
+
     /**
      * Register device with backend if not already registered.
      * @param environment SDK environment (0=DEVELOPMENT, 1=STAGING, 2=PRODUCTION)
@@ -1445,12 +1449,14 @@ object RunAnywhereBridge {
     // (no JNI httpPost helper); native owns request building + response
     // parsing + state.
 
-    /** Initialize auth state with in-memory storage. KeyStore-backed
-     *  variant is a follow-up. */
-    @JvmStatic external fun racAuthInit()
+    /** Install platform secure storage and restore persisted auth state. */
+    @JvmStatic external fun racAuthInit(): Int
 
-    /** Reset auth state (clears in-memory tokens + IDs). */
+    /** Reset only the process-local auth state. */
     @JvmStatic external fun racAuthReset()
+
+    /** Clear process-local auth state and delete persisted tokens and IDs. */
+    @JvmStatic external fun racAuthClear(): Int
 
     @JvmStatic external fun racAuthIsAuthenticated(): Boolean
 
@@ -1631,8 +1637,8 @@ object RunAnywhereBridge {
     /** Reset SDK state to defaults without tearing down every subsystem. */
     @JvmStatic external fun racStateReset()
 
-    /** Resolve or create the persistent device ID. Returns null on failure. */
-    @JvmStatic external fun racDeviceGetOrCreatePersistentId(): String?
+    /** Resolve or create the persistent device ID and write rac_result_t to outRc[0]. */
+    @JvmStatic external fun racDeviceGetOrCreatePersistentId(outRc: IntArray): String?
 
     // MODEL PATHS — FULL SURFACE (Swift-alignment)
     //
@@ -2029,6 +2035,7 @@ object RunAnywhereBridge {
     // proto enum rather than hand-written to stay in lock-step with the C ABI
     // (every other SDK uses the same negate-the-proto-magnitude convention).
     const val RAC_SUCCESS = 0
+    val RAC_ERROR_FILE_NOT_FOUND = -ErrorCode.ERROR_CODE_FILE_NOT_FOUND.value
     val RAC_ERROR_INVALID_PARAMETER = -ErrorCode.ERROR_CODE_INVALID_PARAMETER.value
     val RAC_ERROR_INVALID_HANDLE = -ErrorCode.ERROR_CODE_INVALID_HANDLE.value
     val RAC_ERROR_NOT_INITIALIZED = -ErrorCode.ERROR_CODE_NOT_INITIALIZED.value

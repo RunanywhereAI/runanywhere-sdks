@@ -9,6 +9,8 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include "model_manifest_internal.h"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -24,7 +26,6 @@
 #include <vector>
 
 #include "infrastructure/rac_path_safety_internal.h"
-#include "model_manifest_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 
@@ -248,8 +249,9 @@ static bool is_common_non_model_root_file(const fs::path& path) {
                                "changelog.txt", "changelog.md"})) {
         return true;
     }
-    return has_extension(path, "md") || has_extension(path, "txt") || has_extension(path, "sha256") ||
-           has_extension(path, "sha256sum") || has_extension(path, "jsonl");
+    return has_extension(path, "md") || has_extension(path, "txt") ||
+           has_extension(path, "sha256") || has_extension(path, "sha256sum") ||
+           has_extension(path, "jsonl");
 }
 
 static rac_resolved_model_file_role_t infer_file_role(const fs::path& path,
@@ -338,8 +340,8 @@ rac_result_t rac_infer_model_file_role(const char* filename, int32_t modality_pr
         *out_role_proto = RAC_MODEL_FILE_ROLE_CONFIG;
         return RAC_SUCCESS;
     }
-    if (has_extension(fs::path(name), "py") || name_equals_any(name, {"readme.md", "license.md",
-                                                                      "trainer_state.json"})) {
+    if (has_extension(fs::path(name), "py") ||
+        name_equals_any(name, {"readme.md", "license.md", "trainer_state.json"})) {
         *out_role_proto = RAC_MODEL_FILE_ROLE_COMPANION;
         return RAC_SUCCESS;
     }
@@ -1355,9 +1357,9 @@ rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_
     // under {Models}/{framework}/{id}/ will be parsed as direct
     // {Models}/{id}/ entries and model-id extraction will collapse to the
     // framework name (observed previously for Sherpa which was missing here).
-    const char* frameworks[] = {"ONNX",      "Sherpa",     "LlamaCpp", "MLX",
-                                "FoundationModels", "SystemTTS", "FluidAudio", "BuiltIn",
-                                "CoreML",    "QHexRT",     "None",     "Unknown"};
+    const char* frameworks[] = {"ONNX",      "Sherpa",     "LlamaCpp", "MLX",    "FoundationModels",
+                                "SystemTTS", "FluidAudio", "BuiltIn",  "CoreML", "QHexRT",
+                                "None",      "Unknown"};
     for (const char* fw : frameworks) {
         if (nextComponent == fw) {
             isFramework = true;

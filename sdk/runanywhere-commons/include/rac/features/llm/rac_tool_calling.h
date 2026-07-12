@@ -33,13 +33,11 @@ RAC_API rac_result_t rac_tool_value_to_json_proto(const uint8_t* in_tool_value_b
                                                   size_t in_size,
                                                   rac_proto_buffer_t* out_string_proto);
 
-RAC_API rac_result_t rac_tool_value_from_json_proto(const uint8_t* in_string_bytes,
-                                                    size_t in_size,
+RAC_API rac_result_t rac_tool_value_from_json_proto(const uint8_t* in_string_bytes, size_t in_size,
                                                     rac_proto_buffer_t* out_tool_value);
 
 typedef void (*rac_tool_calling_session_event_callback_fn)(const uint8_t* event_bytes,
-                                                           size_t event_size,
-                                                           void* user_data);
+                                                           size_t event_size, void* user_data);
 
 /**
  * Fired synchronously after a cancellable handle is created and before the
@@ -51,8 +49,7 @@ typedef void (*rac_tool_calling_handle_published_callback_fn)(uint64_t handle, v
 RAC_API rac_result_t rac_tool_calling_session_create_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_tool_calling_session_event_callback_fn callback, void* user_data,
-    rac_tool_calling_handle_published_callback_fn on_handle_published,
-    void* on_handle_user_data);
+    rac_tool_calling_handle_published_callback_fn on_handle_published, void* on_handle_user_data);
 
 RAC_API rac_result_t rac_tool_calling_session_step_with_result_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size);
@@ -70,9 +67,8 @@ typedef rac_result_t (*rac_tool_execute_callback_fn)(const uint8_t* in_tool_call
                                                      void* user_data);
 
 RAC_API rac_result_t rac_tool_calling_run_loop_proto(
-    const uint8_t* in_request_bytes, size_t in_size,
-    rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
-    rac_tool_calling_handle_published_callback_fn on_handle_published,
+    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
+    void* on_execute_user_data, rac_tool_calling_handle_published_callback_fn on_handle_published,
     void* on_handle_user_data, rac_proto_buffer_t* out_result);
 
 RAC_API rac_result_t rac_tool_calling_run_loop_cancel_proto(uint64_t run_loop_handle);
