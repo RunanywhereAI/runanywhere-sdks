@@ -1,6 +1,30 @@
 // swift-tools-version: 6.2
 
 import PackageDescription
+import Foundation
+
+let sdkVersion = "0.19.15"
+let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+
+func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
+    let relativePath = "Frameworks/\(name).xcframework"
+    if FileManager.default.fileExists(
+        atPath: packageRoot.appendingPathComponent(relativePath).path
+    ) {
+        return .binaryTarget(name: name, path: relativePath)
+    }
+
+    return .binaryTarget(
+        name: name,
+        url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/\(name)-ios-v\(sdkVersion).zip",
+        checksum: checksum
+    )
+}
+
+let llamaTarget = runAnywhereBinaryTarget(
+    name: "RABackendLLAMACPP",
+    checksum: "63edb07524eb7aed9147f5bfb8a3e4dca0334911e1282f6acb1e22bd7e1fa5a1"
+)
 
 let package = Package(
     name: "runanywhere_llamacpp",
@@ -18,10 +42,7 @@ let package = Package(
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
     ],
     targets: [
-        .binaryTarget(
-            name: "RABackendLLAMACPP",
-            path: "Frameworks/RABackendLLAMACPP.xcframework"
-        ),
+        llamaTarget,
         .target(
             name: "runanywhere_llamacpp",
             dependencies: [

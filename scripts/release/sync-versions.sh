@@ -318,6 +318,17 @@ done
 # Flutter public `RunAnywhere.version` surface — Dart constant consumed by
 # `RunAnywhere.version` getter and by the native init payload.
 
+# Flutter's nested iOS Swift manifests construct checksum-pinned release URLs
+# for clean pub.dev consumers, so their archive version must remain in lockstep.
+for package_manifest in \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere/Package.swift" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp/Package.swift" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx/Package.swift"; do
+    bump_line "$package_manifest" \
+        'let sdkVersion = "[^"]+"' \
+        "let sdkVersion = \"${NEW_VERSION}\""
+done
+
 # Flutter Gradle package versions follow the package release train.
 for gradle_file in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/build.gradle" \

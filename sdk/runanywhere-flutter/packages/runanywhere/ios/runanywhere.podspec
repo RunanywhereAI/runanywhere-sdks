@@ -1,12 +1,22 @@
 #
 # RunAnywhere Core SDK - iOS
 #
-# Vendors the locally built RACommons.xcframework into Flutter iOS apps.
+# Uses a locally staged RACommons.xcframework during monorepo development. A
+# clean pub.dev package downloads the checksum-pinned release archive before
+# CocoaPods resolves the vendored framework.
 #
-# The xcframework is staged into this plugin's ios/runanywhere/Frameworks/ directory by
-# sdk/runanywhere-swift/scripts/build-core-xcframework.sh → sync_flutter_frameworks(). Run that
-# script once after checkout, and re-run it whenever the native layer changes.
-#
+
+package_manifest = File.read(File.join(__dir__, 'runanywhere', 'Package.swift'))
+checksum_for = lambda do |name|
+  match = package_manifest.match(
+    /runAnywhereBinaryTarget\(\s*name:\s*"#{Regexp.escape(name)}",\s*checksum:\s*"([0-9a-f]{64})"\s*\)/m
+  )
+  unless match
+    raise Pod::Informative, "Missing immutable checksum for #{name} in runanywhere/Package.swift"
+  end
+
+  match[1]
+end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere'
@@ -22,16 +32,77 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 
+  # Published Flutter packages intentionally omit large XCFrameworks. CocoaPods
+  # runs prepare_command for both registry and `:path` pods, so fetch the exact
+  # release archive when the local development framework is absent. The base URL
+  # override is scoped to release-contract tests; checksums remain immutable.
+  s.prepare_command = <<-CMD
+set -euo pipefail
+
+fail() {
+  echo "RunAnywhere iOS preparation failed: $*" >&2
+  exit 1
+}
+
+release_base_url="${RUNANYWHERE_FLUTTER_IOS_RELEASE_BASE_URL:-https://github.com/RunanywhereAI/runanywhere-sdks/releases/download}"
+while [ "${release_base_url%/}" != "$release_base_url" ]; do
+  release_base_url="${release_base_url%/}"
+done
+
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/runanywhere-flutter-ios.XXXXXX")"
+trap 'rm -rf "$work_root"' EXIT HUP INT TERM
+
+download_xcframework() {
+  name="$1"
+  expected_checksum="$2"
+  framework_root="$3"
+  destination="$framework_root/$name.xcframework"
+
+  if [ -d "$destination" ]; then
+    [ -f "$destination/Info.plist" ] || fail "$destination is incomplete"
+    return
+  fi
+  [ ! -e "$destination" ] || fail "$destination exists but is not an XCFramework directory"
+
+  archive_url="$release_base_url/v#{s.version}/$name-ios-v#{s.version}.zip"
+  case "$archive_url" in
+    https://*|file://*) ;;
+    *) fail "unsupported release URL: $archive_url" ;;
+  esac
+
+  archive="$work_root/$name.zip"
+  curl --fail --location --silent --show-error \
+    --proto '=https,file' --proto-redir '=https' --tlsv1.2 --retry 3 \
+    --output "$archive" "$archive_url"
+
+  actual_checksum="$(shasum -a 256 "$archive" | awk '{print $1}')"
+  [ "$actual_checksum" = "$expected_checksum" ] || \
+    fail "checksum mismatch for $name (expected $expected_checksum, got $actual_checksum)"
+
+  mkdir -p "$framework_root"
+  staging="$(mktemp -d "$framework_root/.$name.XXXXXX")"
+  ditto -x -k "$archive" "$staging"
+  [ -f "$staging/$name.xcframework/Info.plist" ] || \
+    fail "archive does not contain $name.xcframework"
+  mv "$staging/$name.xcframework" "$destination"
+  rmdir "$staging"
+}
+
+download_xcframework \
+  RACommons \
+  "#{checksum_for.call('RACommons')}" \
+  runanywhere/Frameworks
+  CMD
+
   s.ios.deployment_target = '17.5'
   s.swift_version = '6.2'
 
-  # Source files: Swift plugin entry point + URLSession HTTP transport.
-  # The URLSession ObjC++ wrapper in the shared CocoaPods/SwiftPM source tree
-  # `#include`s the canonical implementation at
-  # sdk/shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm
-  # (shared with React Native) via a path RELATIVE to the .mm file on disk,
-  # so no additional HEADER_SEARCH_PATHS entry is needed.
+  # Source files: Swift plugin entry point + URLSession HTTP transport. The
+  # implementation include is mirrored into this package so clean pub.dev
+  # consumers never depend on the monorepo layout. It is included by the .mm
+  # wrapper and excluded as a standalone compilation unit.
   s.source_files = 'runanywhere/Sources/**/*.{h,m,mm,swift}'
+  s.exclude_files = 'runanywhere/Sources/runanywhere_native/URLSessionHttpTransportImpl.inc.mm'
   s.resource_bundles = {
     'runanywhere_privacy' => [
       'runanywhere/Sources/runanywhere/PrivacyInfo.xcprivacy',
@@ -41,18 +112,15 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
   s.dependency 'Flutter'
 
   # =============================================================================
-  # Vendored xcframework (built by sdk/runanywhere-swift/scripts/build-core-xcframework.sh)
+  # Vendored xcframework (local build or checksum-pinned release archive)
   # =============================================================================
   s.vendored_frameworks = 'runanywhere/Frameworks/RACommons.xcframework'
 
-  # Keep the xcframework next to the installed pod so downstream toolchains
-  # can resolve headers. The canonical shared URLSessionHttpTransportImpl.inc.mm
-  # is referenced here to document the cross-pod dependency (the actual file
-  # is reached through a source-relative `#include`, no HEADER_SEARCH_PATHS
-  # entry required).
+  # Keep the framework and package-local implementation include available to
+  # downstream toolchains.
   s.preserve_paths = [
     'runanywhere/Frameworks/**/*',
-    '../../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm',
+    'runanywhere/Sources/runanywhere_native/URLSessionHttpTransportImpl.inc.mm',
   ]
 
   # Required frameworks

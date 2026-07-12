@@ -49,8 +49,10 @@ sdk/runanywhere-flutter/
     └── runanywhere_qhexrt/          # Qualcomm Hexagon NPU (Android-only)
 ```
 
-Backend packages depend on `runanywhere ^0.19.0` and vendor their own
-XCFramework + `.so` files.
+Backend packages depend on `runanywhere ^0.19.15`. Source checkouts prefer
+package-owned XCFramework/JNI staging, while public pub archives omit those
+large binaries and resolve versioned, checksum-verified release archives through
+CocoaPods/SwiftPM on iOS and Gradle on Android.
 
 ### 2.2 Layer Stack
 

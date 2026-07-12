@@ -8,7 +8,8 @@
 # with `flutter pub publish --dry-run`.
 #
 # Public packages intentionally exclude gitignored staged binaries and retain
-# the pinned Gradle download + checksum path instead. No tarball is produced.
+# pinned Gradle, CocoaPods, and SwiftPM download/checksum paths instead. No
+# tarball is produced.
 #
 # USAGE:
 #   package-sdk.sh [--mode local|ci] [--natives-from PATH]
@@ -248,6 +249,16 @@ if ! cmp -s "$SWIFT_PRIVACY_MANIFEST" "$FLUTTER_PRIVACY_MANIFEST"; then
 fi
 plutil -lint "$FLUTTER_PRIVACY_MANIFEST" >/dev/null
 
+# Flutter publishes as an independent archive, so its ObjC++ HTTP transport
+# cannot include a source file through a monorepo-relative path. Keep the small
+# package mirror byte-identical to the canonical cross-SDK implementation.
+SHARED_HTTP_TRANSPORT="${REPO_ROOT}/sdk/shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm"
+FLUTTER_HTTP_TRANSPORT="${FLUTTER_ROOT}/packages/runanywhere/ios/runanywhere/Sources/runanywhere_native/URLSessionHttpTransportImpl.inc.mm"
+if ! cmp -s "$SHARED_HTTP_TRANSPORT" "$FLUTTER_HTTP_TRANSPORT"; then
+    echo "ERROR: Flutter URLSession transport mirror drifted from the canonical shared implementation" >&2
+    exit 1
+fi
+
 # Defense in depth: public package directories may contain only their explicit
 # allowlists above. Refuse packaging if any private QHexRT/QNN binary escaped
 # into a public package tree.
@@ -270,22 +281,62 @@ fi
 # locally staged native trees must stay gitignored so `pub publish` cannot
 # accidentally embed large host-built binaries or private build provenance.
 validate_public_remote_binary_contract() {
-    local pkg component pkg_dir build_gradle binary_config file relative
+    local pkg component pkg_dir build_gradle binary_config podspec package_manifest
+    local file relative expected_target expected_targets expected_count actual_count
     for pkg in runanywhere runanywhere_llamacpp runanywhere_onnx; do
         case "$pkg" in
-            runanywhere) component="jni" ;;
-            runanywhere_llamacpp) component="llamacpp" ;;
-            runanywhere_onnx) component="onnx" ;;
+            runanywhere)
+                component="jni"
+                expected_count=1
+                expected_targets="RACommons"
+                ;;
+            runanywhere_llamacpp)
+                component="llamacpp"
+                expected_count=1
+                expected_targets="RABackendLLAMACPP"
+                ;;
+            runanywhere_onnx)
+                component="onnx"
+                expected_count=2
+                expected_targets="RABackendONNX RABackendSherpa"
+                ;;
         esac
         pkg_dir="$FLUTTER_ROOT/packages/$pkg"
         build_gradle="$pkg_dir/android/build.gradle"
         binary_config="$pkg_dir/android/binary_config.gradle"
+        podspec="$pkg_dir/ios/$pkg.podspec"
+        package_manifest="$pkg_dir/ios/$pkg/Package.swift"
         [ ! -e "$pkg_dir/.pubignore" ] || { echo "ERROR: $pkg .pubignore would override the remote-binary publish contract" >&2; exit 1; }
+
+        # Android downloads per-ABI archives through Gradle and validates the
+        # published SHA-256 sidecar before extraction.
         grep -Fq 'verifyDownloadedArchive' "$build_gradle" || { echo "ERROR: $pkg is missing checksum verification" >&2; exit 1; }
         # shellcheck disable=SC2016 # Match the literal Gradle interpolation expression.
         grep -Fq '${downloadUrl}.sha256' "$build_gradle" || { echo "ERROR: $pkg is missing checksum sidecar download" >&2; exit 1; }
         grep -Fq "\${abi}/$component" "$build_gradle" || { echo "ERROR: $pkg does not consume canonical $component archive ownership" >&2; exit 1; }
         grep -Fq 'runanywhere.releaseBaseUrl' "$binary_config" || { echo "ERROR: $pkg is missing pinned remote binary configuration" >&2; exit 1; }
+
+        # CocoaPods fetches the same immutable Apple release archives during
+        # prepare_command. Only the fixture base URL can change; the manifest
+        # checksum cannot be overridden.
+        grep -Fq 's.prepare_command = <<-CMD' "$podspec" || { echo "ERROR: $pkg podspec is missing prepare_command" >&2; exit 1; }
+        grep -Fq 'RUNANYWHERE_FLUTTER_IOS_RELEASE_BASE_URL' "$podspec" || { echo "ERROR: $pkg podspec is missing the test-only release URL override" >&2; exit 1; }
+        grep -Fq "shasum -a 256" "$podspec" || { echo "ERROR: $pkg podspec is missing Apple archive checksum verification" >&2; exit 1; }
+        grep -Fq -- "--proto '=https,file'" "$podspec" || { echo "ERROR: $pkg podspec does not restrict download protocols" >&2; exit 1; }
+        grep -Fq -- '-ios-v#{s.version}.zip' "$podspec" || { echo "ERROR: $pkg podspec is missing versioned Apple release archive URLs" >&2; exit 1; }
+
+        # SwiftPM chooses a staged local framework for monorepo development and
+        # the checksum-pinned remote target for clean pub.dev consumers.
+        grep -Fq 'func runAnywhereBinaryTarget(name: String, checksum: String)' "$package_manifest" || { echo "ERROR: $pkg SwiftPM manifest is missing local/remote binary selection" >&2; exit 1; }
+        grep -Fq 'https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/\(name)-ios-v\(sdkVersion).zip' "$package_manifest" || { echo "ERROR: $pkg SwiftPM manifest is missing the fixed HTTPS release URL" >&2; exit 1; }
+        actual_count="$(grep -Ec 'checksum: "[0-9a-f]{64}"' "$package_manifest" || true)"
+        [ "$actual_count" -eq "$expected_count" ] || { echo "ERROR: $pkg SwiftPM manifest has $actual_count immutable checksums; expected $expected_count" >&2; exit 1; }
+        for expected_target in $expected_targets; do
+            grep -Fq "name: \"$expected_target\"" "$package_manifest" || { echo "ERROR: $pkg SwiftPM manifest is missing $expected_target" >&2; exit 1; }
+            grep -Fq "$expected_target" "$podspec" || { echo "ERROR: $pkg podspec is missing $expected_target" >&2; exit 1; }
+        done
+
+        # Every locally staged binary must remain excluded from the pub archive.
         for file in "$pkg_dir/android/src/main/jniLibs"/*/*.so; do
             [ -f "$file" ] || continue
             relative="${file#"$REPO_ROOT"/}"
@@ -294,7 +345,20 @@ validate_public_remote_binary_contract() {
                 exit 1
             fi
         done
+        while IFS= read -r -d '' file; do
+            relative="${file#"$REPO_ROOT"/}"
+            if ! git -C "$REPO_ROOT" check-ignore -q -- "$relative"; then
+                echo "ERROR: staged Apple native would enter the pub inventory: $relative" >&2
+                exit 1
+            fi
+        done < <(find "$pkg_dir/ios/$pkg/Frameworks" -type f -print0 2>/dev/null)
     done
+
+    relative="${FLUTTER_HTTP_TRANSPORT#"$REPO_ROOT"/}"
+    if git -C "$REPO_ROOT" check-ignore -q -- "$relative"; then
+        echo "ERROR: package-local URLSession transport would be omitted from pub inventory: $relative" >&2
+        exit 1
+    fi
 }
 validate_public_remote_binary_contract
 
@@ -337,5 +401,5 @@ done
 
 echo ""
 echo ">> Flutter SDK packages validated. No tarball emitted — consumers"
-echo "   use the pinned remote native download/checksum configuration. Staged"
-echo "   local JNI binaries are intentionally excluded from public pub inventory."
+echo "   use pinned Android Gradle and Apple CocoaPods/SwiftPM downloads. Staged"
+echo "   local native binaries are intentionally excluded from public pub inventory."

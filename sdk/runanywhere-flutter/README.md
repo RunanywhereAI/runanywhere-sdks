@@ -634,8 +634,12 @@ melos bootstrap
 
 | Mode | Description |
 |------|-------------|
-| **Local** (default) | `runanywhere.useLocalNatives=true` in `gradle.properties`; iOS podspecs vendor local `Frameworks/` |
-| **Remote** | CI override `-Prunanywhere.useLocalNatives=false`; downloads from GitHub Releases |
+| **Source checkout** | Android uses staged JNI when `runanywhere.useLocalNatives=true`; CocoaPods and SwiftPM prefer package-owned `Frameworks/` when present. |
+| **Published package** | Pub archives omit native binaries. Android Gradle downloads per-ABI archives and verifies their published SHA-256 sidecars; CocoaPods and SwiftPM download versioned Apple archives and verify immutable checksums from the package manifest. |
+
+`RUNANYWHERE_FLUTTER_IOS_RELEASE_BASE_URL` is a CocoaPods release-contract test
+fixture override only. SwiftPM always uses the fixed GitHub HTTPS release URL;
+neither path allows archive checksums to be overridden.
 
 ### Testing with the Flutter Sample App
 

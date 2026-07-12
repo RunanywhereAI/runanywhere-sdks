@@ -1,16 +1,26 @@
 #
 # RunAnywhere ONNX Backend - iOS
 #
-# Vendors the locally built RABackendONNX.xcframework (STT/TTS/VAD/embeddings
-# via ONNX Runtime + Sherpa-ONNX) into Flutter iOS apps.
-#
-# The xcframework is staged into this plugin's ios/runanywhere_onnx/Frameworks/ directory by
-# sdk/runanywhere-swift/scripts/build-core-xcframework.sh → sync_flutter_frameworks().
+# Uses locally staged RABackendONNX and RABackendSherpa XCFrameworks during
+# monorepo development. A clean pub.dev package downloads checksum-pinned
+# release archives before CocoaPods resolves the vendored frameworks.
 #
 # Note: as of v0.19.0 the ONNX Runtime C library is statically linked
 # directly into RABackendONNX.a — no separate onnxruntime.xcframework is
 # required (matches the Swift SPM + React Native setup).
 #
+
+package_manifest = File.read(File.join(__dir__, 'runanywhere_onnx', 'Package.swift'))
+checksum_for = lambda do |name|
+  match = package_manifest.match(
+    /runAnywhereBinaryTarget\(\s*name:\s*"#{Regexp.escape(name)}",\s*checksum:\s*"([0-9a-f]{64})"\s*\)/m
+  )
+  unless match
+    raise Pod::Informative, "Missing immutable checksum for #{name} in runanywhere_onnx/Package.swift"
+  end
+
+  match[1]
+end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_onnx'
@@ -27,6 +37,70 @@ RABackendONNX.xcframework.
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 
+  # The base URL override is for release-contract fixtures only; archive
+  # checksums are read from the package manifest and cannot be overridden.
+  s.prepare_command = <<-CMD
+set -euo pipefail
+
+fail() {
+  echo "RunAnywhere iOS preparation failed: $*" >&2
+  exit 1
+}
+
+release_base_url="${RUNANYWHERE_FLUTTER_IOS_RELEASE_BASE_URL:-https://github.com/RunanywhereAI/runanywhere-sdks/releases/download}"
+while [ "${release_base_url%/}" != "$release_base_url" ]; do
+  release_base_url="${release_base_url%/}"
+done
+
+work_root="$(mktemp -d "${TMPDIR:-/tmp}/runanywhere-flutter-ios.XXXXXX")"
+trap 'rm -rf "$work_root"' EXIT HUP INT TERM
+
+download_xcframework() {
+  name="$1"
+  expected_checksum="$2"
+  framework_root="$3"
+  destination="$framework_root/$name.xcframework"
+
+  if [ -d "$destination" ]; then
+    [ -f "$destination/Info.plist" ] || fail "$destination is incomplete"
+    return
+  fi
+  [ ! -e "$destination" ] || fail "$destination exists but is not an XCFramework directory"
+
+  archive_url="$release_base_url/v#{s.version}/$name-ios-v#{s.version}.zip"
+  case "$archive_url" in
+    https://*|file://*) ;;
+    *) fail "unsupported release URL: $archive_url" ;;
+  esac
+
+  archive="$work_root/$name.zip"
+  curl --fail --location --silent --show-error \
+    --proto '=https,file' --proto-redir '=https' --tlsv1.2 --retry 3 \
+    --output "$archive" "$archive_url"
+
+  actual_checksum="$(shasum -a 256 "$archive" | awk '{print $1}')"
+  [ "$actual_checksum" = "$expected_checksum" ] || \
+    fail "checksum mismatch for $name (expected $expected_checksum, got $actual_checksum)"
+
+  mkdir -p "$framework_root"
+  staging="$(mktemp -d "$framework_root/.$name.XXXXXX")"
+  ditto -x -k "$archive" "$staging"
+  [ -f "$staging/$name.xcframework/Info.plist" ] || \
+    fail "archive does not contain $name.xcframework"
+  mv "$staging/$name.xcframework" "$destination"
+  rmdir "$staging"
+}
+
+download_xcframework \
+  RABackendONNX \
+  "#{checksum_for.call('RABackendONNX')}" \
+  runanywhere_onnx/Frameworks
+download_xcframework \
+  RABackendSherpa \
+  "#{checksum_for.call('RABackendSherpa')}" \
+  runanywhere_onnx/Frameworks
+  CMD
+
   s.ios.deployment_target = '17.5'
   s.swift_version = '6.2'
 
@@ -37,7 +111,7 @@ RABackendONNX.xcframework.
   s.dependency 'runanywhere'
 
   # =============================================================================
-  # Vendored xcframeworks (built by sdk/runanywhere-swift/scripts/build-core-xcframework.sh)
+  # Vendored xcframeworks (local builds or checksum-pinned release archives)
   # =============================================================================
   # RABackendONNX provides the ONNX Runtime engine.
   # RABackendSherpa provides STT/TTS/VAD via sherpa-onnx — its plugin entry

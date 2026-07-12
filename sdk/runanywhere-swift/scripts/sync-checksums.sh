@@ -2,9 +2,9 @@
 # =============================================================================
 # sync-checksums.sh
 # =============================================================================
-# Updates the SHA-256 checksum lines in Package.swift's remote binaryTarget
-# entries to match freshly-built XCFramework zips. Run after the native
-# iOS/macOS builds have produced the zips and before cutting a release tag.
+# Updates the SHA-256 checksum lines in the root Swift manifest and Flutter's
+# nested iOS Swift manifests to match freshly-built XCFramework zips. Run after
+# the native iOS/macOS builds have produced the zips and before cutting a tag.
 #
 # Usage:
 #   sdk/runanywhere-swift/scripts/sync-checksums.sh ZIP_DIR
@@ -39,11 +39,24 @@ fi
 ZIP_DIR="$1"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 PACKAGE_SWIFT="${REPO_ROOT}/Package.swift"
+FLUTTER_CORE_PACKAGE="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere/Package.swift"
+FLUTTER_LLAMA_PACKAGE="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp/Package.swift"
+FLUTTER_ONNX_PACKAGE="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx/Package.swift"
 
 if [ ! -f "$PACKAGE_SWIFT" ]; then
     echo "ERROR: Package.swift not found at $PACKAGE_SWIFT" >&2
     exit 1
 fi
+
+for flutter_manifest in \
+    "$FLUTTER_CORE_PACKAGE" \
+    "$FLUTTER_LLAMA_PACKAGE" \
+    "$FLUTTER_ONNX_PACKAGE"; do
+    if [ ! -f "$flutter_manifest" ]; then
+        echo "ERROR: Flutter Package.swift not found at $flutter_manifest" >&2
+        exit 1
+    fi
+done
 
 if [ ! -d "$ZIP_DIR" ]; then
     echo "ERROR: zip dir not found: $ZIP_DIR" >&2
@@ -55,6 +68,18 @@ if [ -z "$SDK_VERSION" ]; then
     echo "ERROR: could not read sdkVersion from Package.swift" >&2
     exit 1
 fi
+
+for flutter_manifest in \
+    "$FLUTTER_CORE_PACKAGE" \
+    "$FLUTTER_LLAMA_PACKAGE" \
+    "$FLUTTER_ONNX_PACKAGE"; do
+    flutter_version="$(sed -nE 's/^let sdkVersion = "([^"]+)"$/\1/p' "$flutter_manifest")"
+    if [ "$flutter_version" != "$SDK_VERSION" ]; then
+        echo "ERROR: Flutter manifest version mismatch: $flutter_manifest" >&2
+        echo "       expected $SDK_VERSION, found ${flutter_version:-<missing>}" >&2
+        exit 1
+    fi
+done
 
 # swiftpm binary target name → local-filename-prefix pairs. Names match the
 # `.binaryTarget(name: "X", ...)` entries in Package.swift.
@@ -82,26 +107,37 @@ sha256_of() {
 process_checksum_line() {
     local binary_name="$1"
     local new_sum="$2"
-    python3 - "$MODE" "$binary_name" "$new_sum" "$PACKAGE_SWIFT" <<'PY'
+    local manifest="$3"
+    local pattern_kind="$4"
+    python3 - "$MODE" "$binary_name" "$new_sum" "$manifest" "$pattern_kind" <<'PY'
 import re, sys
 
-mode, binary_name, new_sum, path = sys.argv[1:]
+mode, binary_name, new_sum, path, pattern_kind = sys.argv[1:]
 with open(path) as f:
     src = f.read()
 
-# Find the remote-mode binaryTarget: `name: "X", url: "...", checksum: "..."`.
-# We require `url:` between name and checksum to avoid the local-mode entry
-# (which uses `path:` and has no checksum) — without this anchor, the non-
-# greedy `.*?` would skip past the local entry and match the checksum of
-# the NEXT remote target in the file, causing cross-target mis-assignment.
-pattern = re.compile(
-    r'(name:\s*"' + re.escape(binary_name) + r'"\s*,\s*url:\s*"[^"]+"\s*,\s*checksum:\s*")([0-9a-f]{64})(")',
-    re.DOTALL,
-)
+if pattern_kind == "remote-binary-target":
+    # Root manifest: require `url:` between name and checksum to avoid the
+    # local-mode entry, which uses `path:` and has no checksum.
+    pattern = re.compile(
+        r'(name:\s*"' + re.escape(binary_name) + r'"\s*,\s*url:\s*"[^"]+"\s*,\s*checksum:\s*")([0-9a-f]{64})(")',
+        re.DOTALL,
+    )
+elif pattern_kind == "flutter-helper":
+    # Flutter manifests select a local path when staged frameworks exist and
+    # otherwise construct the remote binaryTarget through this helper call.
+    pattern = re.compile(
+        r'(runAnywhereBinaryTarget\(\s*name:\s*"' + re.escape(binary_name)
+        + r'"\s*,\s*checksum:\s*")([0-9a-f]{64})("\s*\))',
+        re.DOTALL,
+    )
+else:
+    print(f"  error: unknown checksum pattern kind: {pattern_kind}", file=sys.stderr)
+    sys.exit(1)
 
 m = pattern.search(src)
 if not m:
-    print(f"  error: no remote binary target named '{binary_name}' found in Package.swift",
+    print(f"  error: no checksum target named '{binary_name}' found in {path}",
           file=sys.stderr)
     sys.exit(1)
 
@@ -109,7 +145,7 @@ old_sum = m.group(2)
 if mode == "check":
     if old_sum != new_sum:
         print(f"  mismatch: {binary_name}", file=sys.stderr)
-        print(f"    Package.swift: {old_sum}", file=sys.stderr)
+        print(f"    {path}: {old_sum}", file=sys.stderr)
         print(f"    release zip:   {new_sum}", file=sys.stderr)
         sys.exit(1)
     print(f"  verified:  {binary_name} ({old_sum[:12]}...)")
@@ -147,9 +183,39 @@ while IFS='|' read -r binary_name zip_prefix; do
         continue
     fi
     sum=$(sha256_of "$zip_file")
-    if ! process_checksum_line "$binary_name" "$sum"; then
+    if ! process_checksum_line \
+        "$binary_name" "$sum" "$PACKAGE_SWIFT" remote-binary-target; then
         failed=$((failed + 1))
     fi
+    case "$binary_name" in
+        RACommonsBinary)
+            if ! process_checksum_line \
+                RACommons "$sum" "$FLUTTER_CORE_PACKAGE" flutter-helper; then
+                failed=$((failed + 1))
+            fi
+            ;;
+        RABackendLlamaCPPBinary)
+            if ! process_checksum_line \
+                RABackendLLAMACPP "$sum" "$FLUTTER_LLAMA_PACKAGE" flutter-helper; then
+                failed=$((failed + 1))
+            fi
+            ;;
+        RABackendONNXBinary)
+            if ! process_checksum_line \
+                RABackendONNX "$sum" "$FLUTTER_ONNX_PACKAGE" flutter-helper; then
+                failed=$((failed + 1))
+            fi
+            ;;
+        RABackendSherpaBinary)
+            if ! process_checksum_line \
+                RABackendSherpa "$sum" "$FLUTTER_ONNX_PACKAGE" flutter-helper; then
+                failed=$((failed + 1))
+            fi
+            ;;
+        RABackendMLXBinary)
+            # Flutter does not currently publish an MLX backend package.
+            ;;
+    esac
     processed=$((processed + 1))
 done < <(declare_mapping)
 
@@ -161,7 +227,7 @@ if [ "$MODE" = "check" ]; then
         echo "ERROR: built Swift archives do not match the immutable tagged manifest" >&2
         exit 1
     fi
-    echo ">> Tagged Package.swift matches every Swift release archive."
+    echo ">> Root and Flutter Package.swift manifests match every release archive."
 else
     if [ "$missing" -ne 0 ] || [ "$failed" -ne 0 ]; then
         echo "ERROR: could not update every Swift binary target checksum" >&2
@@ -169,5 +235,5 @@ else
     fi
     echo ""
     echo ">> Verify with:"
-    echo "    git diff -- Package.swift"
+    echo "    git diff -- Package.swift sdk/runanywhere-flutter/packages/*/ios/*/Package.swift"
 fi

@@ -58,6 +58,10 @@ end
 
 > **Important:** Without `use_frameworks! :linkage => :static`, you will see "symbol not found" errors at runtime.
 
+For a pub.dev dependency, CocoaPods downloads the version-matched RACommons
+XCFramework and verifies its immutable SHA-256 checksum automatically. Source
+checkouts use a locally staged framework when present.
+
 ### 2. Update `ios/Runner/Info.plist`
 
 Add microphone permission for STT/Voice features:

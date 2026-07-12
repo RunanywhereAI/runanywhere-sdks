@@ -192,6 +192,13 @@ for podspec in \
   expect_literal "${podspec}" "s.version          = '${VERSION}'"
 done
 
+for package_manifest in \
+  sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere/Package.swift \
+  sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp/Package.swift \
+  sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx/Package.swift; do
+  expect_literal "${package_manifest}" "let sdkVersion = \"${VERSION}\""
+done
+
 for release_doc in \
   sdk/runanywhere-react-native/AGENTS.md \
   sdk/runanywhere-flutter/AGENTS.md \

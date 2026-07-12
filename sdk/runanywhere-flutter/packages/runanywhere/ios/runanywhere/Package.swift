@@ -1,6 +1,30 @@
 // swift-tools-version: 6.2
 
 import PackageDescription
+import Foundation
+
+let sdkVersion = "0.19.15"
+let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+
+func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
+    let relativePath = "Frameworks/\(name).xcframework"
+    if FileManager.default.fileExists(
+        atPath: packageRoot.appendingPathComponent(relativePath).path
+    ) {
+        return .binaryTarget(name: name, path: relativePath)
+    }
+
+    return .binaryTarget(
+        name: name,
+        url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/\(name)-ios-v\(sdkVersion).zip",
+        checksum: checksum
+    )
+}
+
+let raCommonsTarget = runAnywhereBinaryTarget(
+    name: "RACommons",
+    checksum: "02c3ab0dc3366391644ab2573d43eda14dc57e125cb6db52de4574e49785047b"
+)
 
 let package = Package(
     name: "runanywhere",
@@ -14,14 +38,12 @@ let package = Package(
         .package(name: "FlutterFramework", path: "../FlutterFramework"),
     ],
     targets: [
-        .binaryTarget(
-            name: "RACommons",
-            path: "Frameworks/RACommons.xcframework"
-        ),
+        raCommonsTarget,
         .target(
             name: "runanywhere_native",
             dependencies: ["RACommons"],
             path: "Sources/runanywhere_native",
+            exclude: ["URLSessionHttpTransportImpl.inc.mm"],
             publicHeadersPath: "include",
             cxxSettings: [
                 .headerSearchPath("include"),

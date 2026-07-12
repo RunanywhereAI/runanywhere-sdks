@@ -2,7 +2,7 @@
 //
 // URLSessionHttpTransport.mm (Flutter wrapper)
 //
-// Per-SDK wrapper around the canonical implementation in
+// Per-SDK wrapper around the package mirror of the canonical implementation in
 //   sdk/shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm
 //
 // flutter-core-012: this used to be a 686-line standalone copy of the
@@ -17,19 +17,14 @@
 // are unchanged; the Swift façade at `URLSessionHttpTransport.swift`
 // continues to reference them via `@_silgen_name`.
 //
-// The path below is RELATIVE to this file on disk
-// (sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere/Sources/
-// runanywhere_native/) so that the
-// compiler resolves it without needing a custom HEADER_SEARCH_PATHS entry.
-// CocoaPods can mount this pod through a symlink (e.g. Flutter's
-// `.symlinks/plugins/runanywhere`) but clang receives the realpath of the
-// .mm at compile time, so relative-to-source resolution Just Works for
-// both Flutter and React Native consumers.
+// Flutter pub archives cannot include files outside the package root. The
+// adjacent mirror is therefore a release payload, and package-sdk.sh enforces
+// that it stays byte-identical to the canonical shared implementation.
 
 #define RAC_URLS_C_PREFIX    ra_flutter
 #define RAC_URLS_OBJC_PREFIX RAFlutter
 
-#include "../../../../../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm"
+#include "URLSessionHttpTransportImpl.inc.mm"
 
 #undef RAC_URLS_C_PREFIX
 #undef RAC_URLS_OBJC_PREFIX

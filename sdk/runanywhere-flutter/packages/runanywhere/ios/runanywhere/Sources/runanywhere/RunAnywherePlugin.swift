@@ -1,4 +1,4 @@
-import Flutter
+@preconcurrency import Flutter
 import UIKit
 
 // NOTE: @_silgen_name symbol declarations removed.
