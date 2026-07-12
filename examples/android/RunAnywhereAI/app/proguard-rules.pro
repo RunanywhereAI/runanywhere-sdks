@@ -66,6 +66,10 @@
 # acceptance. AndroidJUnitRunner calls this class before any test method runs.
 -keep class androidx.tracing.Trace { *; }
 
+# The separately packaged navigation test links this Compose scope while
+# reflecting its test method. Keep only that cross-APK type in the target APK.
+-keep class androidx.compose.animation.AnimatedContentScope { *; }
+
 # AndroidX Test's TestDirCalculator calls kotlin.LazyKt.lazy(Function0), whose
 # implementation lives on the LazyKt multifile facade's superclass. Keeping
 # only the facade lets R8 merge the hierarchy, rename lazy(), and strengthen
