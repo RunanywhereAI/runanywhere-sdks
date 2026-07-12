@@ -65,15 +65,37 @@ case "${PLATFORM}" in
             install_name_tool -change "${dep}" "@rpath/${local_name}" "${STAGE}/bin/rcli"
         done
 
+        # A copied Homebrew dylib may retain an absolute install ID or refer
+        # to another copied dylib through its Cellar path. Make the complete
+        # staged set self-contained before validating the executable.
+        for library in "${STAGE}"/lib/*.dylib; do
+            [ -e "${library}" ] || continue
+            library_name="$(basename "${library}")"
+            install_name_tool -id "@rpath/${library_name}" "${library}"
+            library_deps=$(otool -L "${library}" | awk 'NR>1 {print $1}')
+            for library_dep in ${library_deps}; do
+                dep_name="$(basename "${library_dep}")"
+                if [ "${dep_name}" != "${library_name}" ] && [ -f "${STAGE}/lib/${dep_name}" ]; then
+                    install_name_tool -change "${library_dep}" "@loader_path/${dep_name}" "${library}"
+                fi
+            done
+            while IFS= read -r rpath; do
+                install_name_tool -delete_rpath "${rpath}" "${library}"
+            done < <(otool -l "${library}" | awk '
+                $1 == "cmd" && $2 == "LC_RPATH" { in_rpath = 1; next }
+                in_rpath && $1 == "path" { print $2; in_rpath = 0 }
+            ')
+        done
+
         # The build-tree executable carries absolute LC_RPATH entries so it
-        # can locate fetched dylibs before packaging. Retire every build-root
+        # can locate fetched dylibs before packaging. Retire every non-package
         # entry and install exactly one relocatable package rpath before the
         # privacy scan and ad-hoc signature.
         has_package_rpath=0
         while IFS= read -r rpath; do
             if [ "${rpath}" = "@loader_path/../lib" ]; then
                 has_package_rpath=1
-            elif [[ "${rpath}" == "${BUILD_DIR}"* ]]; then
+            else
                 install_name_tool -delete_rpath "${rpath}" "${STAGE}/bin/rcli"
             fi
         done < <(otool -l "${STAGE}/bin/rcli" | awk '
@@ -99,6 +121,9 @@ case "${PLATFORM}" in
             exit 1
         }
         patchelf --set-rpath "\$ORIGIN/../lib" "${STAGE}/bin/rcli"
+        while IFS= read -r -d '' library; do
+            patchelf --set-rpath "\$ORIGIN" "${library}"
+        done < <(find "${STAGE}/lib" -type f -print0)
         ;;
     *)
         echo "ERROR: unknown platform tag '${PLATFORM}'" >&2
@@ -110,8 +135,7 @@ esac
 # Fail-closed sanity run from the staged layout.
 # ----------------------------------------------------------------------------
 case "${PLATFORM}" in
-    macos-*) DYLD_LIBRARY_PATH="${STAGE}/lib" "${STAGE}/bin/rcli" version >/dev/null ;;
-    linux-*) LD_LIBRARY_PATH="${STAGE}/lib" "${STAGE}/bin/rcli" version >/dev/null ;;
+    macos-*|linux-*) "${STAGE}/bin/rcli" version >/dev/null ;;
 esac
 
 # Release artifacts must not disclose the packager's checkout location. Keep
@@ -119,6 +143,11 @@ esac
 while IFS= read -r -d '' artifact; do
     if LC_ALL=C grep -aF -q -- "${REPO_ROOT}" "${artifact}"; then
         echo "ERROR: packaged artifact embeds the local checkout path: ${artifact#"${STAGE}/"}" >&2
+        exit 1
+    fi
+    if LC_ALL=C grep -aE -q -- '/Users/[^/]+/|/home/[^/]+/' "${artifact}" \
+        || LC_ALL=C grep -aE -q -- "[A-Za-z]:\\\\Users\\\\" "${artifact}"; then
+        echo "ERROR: packaged artifact embeds a developer home path: ${artifact#"${STAGE}/"}" >&2
         exit 1
     fi
 done < <(find "${STAGE}/bin" "${STAGE}/lib" -type f -print0)
