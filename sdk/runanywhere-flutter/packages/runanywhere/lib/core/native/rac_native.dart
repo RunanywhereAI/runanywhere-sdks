@@ -462,11 +462,6 @@ typedef RacRagSessionCreateProtoDart =
 typedef RacLoraRegistryGetNative = ffi.Pointer<ffi.Void> Function();
 typedef RacLoraRegistryGetDart = ffi.Pointer<ffi.Void> Function();
 
-typedef RacEmbeddingsInitializeNative =
-    ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Pointer<Utf8>);
-typedef RacEmbeddingsInitializeDart =
-    int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<Utf8>);
-
 // ============================================================================
 // Tool-calling proto APIs
 // ============================================================================
@@ -1451,13 +1446,6 @@ class RacBindings {
                   RacLifecycleRequestProtoDart
                 >('rac_embeddings_create_proto'),
           ),
-      rac_embeddings_initialize = _lookupOptional<RacEmbeddingsInitializeDart>(
-        () =>
-            lib.lookupFunction<
-              RacEmbeddingsInitializeNative,
-              RacEmbeddingsInitializeDart
-            >('rac_embeddings_initialize'),
-      ),
       rac_embeddings_embed_batch_proto =
           _lookupOptional<RacHandleBytesToProtoDart>(
             () =>
@@ -1474,11 +1462,6 @@ class RacBindings {
                   RacLifecycleRequestProtoDart
                 >('rac_embeddings_embed_batch_lifecycle_proto'),
           ),
-      rac_embeddings_destroy = _lookupOptional<RacDestroyHandleDart>(
-        () => lib.lookupFunction<RacDestroyHandleNative, RacDestroyHandleDart>(
-          'rac_embeddings_destroy',
-        ),
-      ),
       rac_diffusion_generate_lifecycle_proto =
           _lookupOptional<RacLifecycleRequestProtoDart>(
             () =>
@@ -2180,14 +2163,10 @@ class RacBindings {
 
   final RacLifecycleRequestProtoDart? rac_embeddings_create_proto;
 
-  final RacEmbeddingsInitializeDart? rac_embeddings_initialize;
-
   final RacHandleBytesToProtoDart? rac_embeddings_embed_batch_proto;
 
   final RacLifecycleRequestProtoDart?
   rac_embeddings_embed_batch_lifecycle_proto;
-
-  final RacDestroyHandleDart? rac_embeddings_destroy;
 
   final RacLifecycleRequestProtoDart? rac_diffusion_generate_lifecycle_proto;
 

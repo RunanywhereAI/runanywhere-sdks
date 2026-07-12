@@ -117,7 +117,11 @@ jobs:
           printf '#!/usr/bin/env bash\nexec java -jar "$HOME/.local/bin/wire-compiler.jar" "$@"\n' > "$HOME/.local/bin/wire-compiler"
           chmod +x "$HOME/.local/bin/wire-compiler"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          if ! java -jar "$HOME/.local/bin/wire-compiler.jar" 2>&1 | grep -qiE "usage|wire|proto|out"; then
+          # Wire 5.5.1 has no --help/--version flag and intentionally exits 1
+          # without generation arguments. Probe its exact diagnostic without
+          # letting pipefail turn that expected exit into a false install error.
+          WIRE_PROBE="$(java -jar "$HOME/.local/bin/wire-compiler.jar" 2>&1 || true)"
+          if ! grep -Fq 'Nothing to do! Specify --java_out=' <<<"$WIRE_PROBE"; then
             echo "::error::wire-compiler not runnable after Maven download (${JAR_URL})"
             exit 1
           fi

@@ -677,8 +677,8 @@ Contributions are welcome. This section explains how to set up your development 
 
 - **Node.js** 18+
 - **Xcode** 15+ (for iOS builds)
-- **Android Studio** with NDK (for Android builds)
-- **CMake** 3.21+
+- **Android Studio** with NDK 27.3.13750724 (for Android builds)
+- **CMake** 3.24+
 
 ### First-Time Setup (Build from Source)
 
@@ -705,6 +705,9 @@ yarn install
 - `RACommons.xcframework` / `librac_commons.so` → `packages/core`
 - `RABackendLLAMACPP.xcframework` / `librac_backend_llamacpp.so` → `packages/llamacpp`
 - `RABackendONNX.xcframework` + `RABackendSherpa.xcframework` / matching `.so` files → `packages/onnx`
+
+Public Android packages include bridge and backend binaries for `arm64-v8a`,
+`armeabi-v7a`, and `x86_64`. Private QHexRT packaging remains arm64-only.
 
 It then type-checks each package and produces `dist/sdk-rn/*.tgz` + `.sha256`.
 

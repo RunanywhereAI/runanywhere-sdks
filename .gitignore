@@ -251,8 +251,6 @@ sdk/runanywhere-web/packages/*/wasm/*.wasm
 sdk/runanywhere-web/packages/*/wasm/*.wasm.map
 sdk/runanywhere-web/packages/*/wasm/*.data
 sdk/runanywhere-web/emsdk/
-sdk/runanywhere-web/package-lock.json
-sdk/shared/proto-ts/package-lock.json
 examples/web/RunAnywhereAI/node_modules/
 
 # External repositories and distribution
