@@ -290,7 +290,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_get_current_time_ms"
     "_rac_http_download"
     "_rac_http_download_cancel"
-    "_rac_extract_archive"
     "_rac_proto_buffer_init"
     "_rac_proto_buffer_copy"
     "_rac_proto_buffer_set_error"
@@ -477,8 +476,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # Expected-files derivation for an artifact (Swift
     # RAModelInfo.expectedArtifactFiles parity).
     "_rac_artifact_expected_files_proto"
-    "_rac_model_registry_discover_downloaded"
-    "_rac_discovery_result_free"
 
     # Model types
     "_rac_framework_display_name"
@@ -791,7 +788,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_framework_display_name_proto"
 
     # VLM service
-    "_rac_vlm_get_builtin_template"
     "_rac_vlm_result_free"
     "_rac_vlm_create"
     "_rac_vlm_initialize"

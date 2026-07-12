@@ -193,8 +193,8 @@ _rac_tool_calling_session_destroy_proto
 # VLM / Diffusion components — non-proto APIs are internal helpers used
 # by JNI during migration. SDK-facing surface is the proto-byte ABI
 # (rac_vlm_*_proto / rac_diffusion_*_proto) below. Helper enums
-# (rac_vlm_get_builtin_template, rac_diffusion_model_registry_*,
-# rac_diffusion_tokenizer_*) are commons-internal — SDKs receive
+# (rac_diffusion_model_registry_*, rac_diffusion_tokenizer_*) are
+# commons-internal — SDKs receive
 # model/storage/download state via generated protos.
 
 # Diffusion lifecycle-owned proto-byte stream ABI
@@ -1109,7 +1109,6 @@ _rac_vlm_component_get_model_id
 _rac_vlm_component_load_model_by_id
 _rac_vlm_component_process
 _rac_vlm_component_process_stream
-_rac_vlm_get_builtin_template
 _rac_vlm_get_info
 _rac_vlm_proto_quiesce
 _rac_vlm_resolve_model_files

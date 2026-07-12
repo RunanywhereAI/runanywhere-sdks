@@ -78,14 +78,6 @@ typedef struct rac_vlm_chat_template {
     const char* default_system_prompt;
 } rac_vlm_chat_template_t;
 
-/**
- * @brief Get built-in chat template for a model family
- *
- * @param family Model family enum value
- * @return Pointer to static template, or NULL if family not supported
- */
-RAC_API const rac_vlm_chat_template_t* rac_vlm_get_builtin_template(rac_vlm_model_family_t family);
-
 // =============================================================================
 // IMAGE INPUT - Supports multiple input formats
 // =============================================================================
