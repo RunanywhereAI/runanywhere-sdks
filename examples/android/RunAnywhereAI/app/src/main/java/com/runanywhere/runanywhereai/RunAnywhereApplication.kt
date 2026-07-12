@@ -72,8 +72,11 @@ class RunAnywhereApplication : Application() {
         // Register backends with the C++ registry BEFORE initialize(): once initialize() runs,
         // a concurrent caller can hit loadModel() while only the platform backend is registered
         // and fail with -422 "No provider could handle the request" (same ordering as iOS).
-        LlamaCPP.register()
-        ONNX.register()
+        // Optional CPU/embedding backends: a missing native library (e.g. an NPU-only
+        // build that omits llamacpp/onnx) must NOT brick SDK init — the QHexRT (NPU) path
+        // below is what a Hexagon device needs. Register best-effort and continue.
+        try { LlamaCPP.register() } catch (e: Throwable) { RACLog.i("LlamaCPP backend unavailable, skipping: ${e.message}") }
+        try { ONNX.register() } catch (e: Throwable) { RACLog.i("ONNX backend unavailable, skipping: ${e.message}") }
         // QHexRT (Qualcomm Hexagon NPU). Registration is rejected internally on
         // unsupported parts, so this is a safe no-op on parts older than v75.
         QHexRT.register()
