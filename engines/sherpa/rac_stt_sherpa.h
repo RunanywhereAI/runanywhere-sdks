@@ -1,20 +1,30 @@
 #ifndef RAC_STT_SHERPA_H
 #define RAC_STT_SHERPA_H
 
-#include "rac/backends/rac_stt_onnx.h"
+#include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
+#include "rac/features/stt/rac_stt.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef rac_stt_onnx_model_type_t rac_stt_sherpa_model_type_t;
-typedef rac_stt_onnx_config_t rac_stt_sherpa_config_t;
+typedef enum rac_stt_sherpa_model_type {
+    RAC_STT_SHERPA_MODEL_WHISPER = 0,
+    RAC_STT_SHERPA_MODEL_ZIPFORMER = 1,
+    RAC_STT_SHERPA_MODEL_PARAFORMER = 2,
+    RAC_STT_SHERPA_MODEL_NEMO_CTC = 3,
+    RAC_STT_SHERPA_MODEL_AUTO = 99
+} rac_stt_sherpa_model_type_t;
 
-#define RAC_STT_SHERPA_MODEL_WHISPER RAC_STT_ONNX_MODEL_WHISPER
-#define RAC_STT_SHERPA_MODEL_ZIPFORMER RAC_STT_ONNX_MODEL_ZIPFORMER
-#define RAC_STT_SHERPA_MODEL_PARAFORMER RAC_STT_ONNX_MODEL_PARAFORMER
-#define RAC_STT_SHERPA_MODEL_NEMO_CTC RAC_STT_ONNX_MODEL_NEMO_CTC
-#define RAC_STT_SHERPA_MODEL_AUTO RAC_STT_ONNX_MODEL_AUTO
+typedef struct rac_stt_sherpa_config {
+    rac_stt_sherpa_model_type_t model_type;
+    int32_t num_threads;
+    rac_bool_t use_coreml;
+} rac_stt_sherpa_config_t;
+
+static const rac_stt_sherpa_config_t RAC_STT_SHERPA_CONFIG_DEFAULT = {
+    .model_type = RAC_STT_SHERPA_MODEL_AUTO, .num_threads = 0, .use_coreml = RAC_TRUE};
 
 rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_config_t* config,
                                    rac_handle_t* out_handle);

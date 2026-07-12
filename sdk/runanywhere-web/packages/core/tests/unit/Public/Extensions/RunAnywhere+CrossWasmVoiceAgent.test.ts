@@ -104,8 +104,6 @@ describe('CrossWasmVoiceAgentProvider', () => {
       vadSampleRate: 16_000,
       vadFrameLength: 0.1,
       vadEnergyThreshold: 0.005,
-      wakewordEnabled: false,
-      wakewordThreshold: 0.5,
       sessionId: 'model-vad',
     });
 
@@ -129,8 +127,6 @@ describe('CrossWasmVoiceAgentProvider', () => {
       vadSampleRate: 16_000,
       vadFrameLength: 0.1,
       vadEnergyThreshold: 0.015,
-      wakewordEnabled: false,
-      wakewordThreshold: 0.5,
       sessionId: 'conversation',
     });
     const audio = new Float32Array(16_000).fill(0.2);
@@ -156,8 +152,6 @@ describe('CrossWasmVoiceAgentProvider', () => {
       vadSampleRate: 16_000,
       vadFrameLength: 0.1,
       vadEnergyThreshold: 0.015,
-      wakewordEnabled: false,
-      wakewordThreshold: 0.5,
       sessionId: 'old',
     };
     await provider.initializeVoiceAgent(config);

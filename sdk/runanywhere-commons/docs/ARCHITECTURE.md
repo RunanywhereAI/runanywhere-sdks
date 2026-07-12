@@ -163,8 +163,8 @@ rac_registry_unload_plugin("llamacpp");
 │  │   Backend       │  │     Backend     │  │    Backend      │         │
 │  │                 │  │                 │  │                 │         │
 │  │  • GGUF models  │  │  • STT (Sherpa) │  │  • Embeddings   │         │
-│  │  • Metal GPU    │  │  • TTS (Piper)  │  │  • WakeWord     │         │
-│  │  • Streaming    │  │  • VAD (Silero) │  │  • ONNX Runtime │         │
+│  │  • Metal GPU    │  │  • TTS (Piper)  │  │  • ONNX Runtime │         │
+│  │  • Streaming    │  │  • VAD (Silero) │  │                 │         │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘         │
 │                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────┐│
@@ -239,9 +239,7 @@ runanywhere-commons/
 │   │
 │   └── backends/                   # Backend-specific public headers
 │       ├── rac_llm_llamacpp.h      # LlamaCPP backend API
-│       ├── rac_stt_onnx.h          # Sherpa STT API
-│       ├── rac_tts_onnx.h          # Sherpa TTS API
-│       └── rac_vad_onnx.h          # Sherpa VAD API
+│       └── rac_embeddings_onnx.h   # Generic ONNX embeddings API
 │
 ├── src/                            # Implementation files
 │   ├── core/                       # Core implementations
@@ -563,24 +561,24 @@ typedef struct rac_vad_result {
    - Atomic boolean flag checked in generation loop
    - Graceful abort with partial result
 
-### ONNX Backend (Sherpa-ONNX)
+### Sherpa-ONNX Backend
 
 **Architecture:**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│    rac_stt_onnx.h    rac_tts_onnx.h    rac_vad_onnx.h      │
-│              Public APIs for STT/TTS/VAD                    │
+│          rac_plugin_entry_sherpa.h + feature APIs           │
+│      Public registration and lifecycle/proto inference      │
 └────────────────────────────┬────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────┐
-│               rac_backend_onnx_register.cpp                  │
-│     • Registers ONNX module                                  │
+│              rac_backend_sherpa_register.cpp                 │
+│     • Registers Sherpa module                                │
 │     • Registers STT, TTS, VAD providers                      │
-│     • Implements vtables wrapping ONNX APIs                  │
+│     • Implements unified engine vtables                      │
 └────────────────────────────┬────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────┐
-│                    onnx_backend.cpp                          │
+│                    sherpa_backend.cpp                        │
 │     Wraps Sherpa-ONNX C API:                                 │
 │     • STT: SherpaOnnxOfflineRecognizer                       │
 │     • TTS: SherpaOnnxOfflineTts                              │

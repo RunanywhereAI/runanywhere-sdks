@@ -55,7 +55,7 @@ public class SolutionHandle(
   public val handle_id: String = "",
   /**
    * String discriminator for the solution kind, e.g. "voice_agent",
-   * "rag", "wakeword", "time_series", "agent_loop". Free-form for
+   * "rag", "time_series", "agent_loop". Free-form for
    * forward-compat with future solutions; canonical values match the
    * `SolutionType` enum names lower-cased.
    */

@@ -363,8 +363,8 @@ Real-world projects built with RunAnywhere. Each ships as a standalone app you c
 - **[Android Use Agent](Playground/android-use-agent/)**: an on-device autonomous Android agent that reads the screen and controls the phone with an on-device LLM. [Benchmarks](Playground/android-use-agent/ASSESSMENT.md).
 - **[On-Device Browser Agent](Playground/on-device-browser-agent/)**: a Chrome extension that automates browser tasks on-device with WebLLM and WebGPU.
 - **[Swift Starter App](Playground/swift-starter-app/)**: a SwiftUI app with LLM chat, speech-to-text, text-to-speech, and a full voice pipeline.
-- **[Linux Voice Assistant](Playground/linux-voice-assistant/)**: an on-device voice pipeline (wake word, VAD, STT, LLM, TTS) in one C++ binary for Raspberry Pi 5, x86_64, and ARM64.
-- **[OpenClaw Hybrid Assistant](Playground/openclaw-hybrid-assistant/)**: on-device wake word, VAD, STT, and TTS with cloud LLM reasoning and barge-in.
+- **[Linux Voice Assistant](Playground/linux-voice-assistant/)**: an on-device voice pipeline (VAD, STT, LLM, TTS) in one C++ binary for Raspberry Pi 5, x86_64, and ARM64.
+- **[OpenClaw Hybrid Assistant](Playground/openclaw-hybrid-assistant/)**: on-device VAD, STT, and TTS with cloud LLM reasoning.
 
 ---
 

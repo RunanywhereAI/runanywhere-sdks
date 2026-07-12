@@ -68,7 +68,7 @@ class Onnx {
   /// Register ONNX backend with the C++ service registry.
   ///
   /// This calls `rac_backend_onnx_register()` to register the generic ONNX
-  /// backend (embeddings + Silero VAD) and then registers the Sherpa-ONNX
+  /// backend (embeddings) and then registers the Sherpa-ONNX
   /// engine plugin so STT (Whisper/Zipformer/Paraformer), TTS (Piper/VITS),
   /// and Sherpa-backed VAD models with `framework == .sherpa` can resolve
   /// through the unified plugin router. The two plugins are peers: "onnx"

@@ -2,7 +2,7 @@
 # Dockerfile for OpenClaw Hybrid Assistant Testing
 # =============================================================================
 # Build and test the voice assistant components without real audio hardware.
-# Uses WAV files for testing wake word, VAD, and ASR.
+# Uses WAV files for testing VAD and STT.
 #
 # IMPORTANT: Build from the root of the sdks repository, not this directory!
 #
@@ -74,13 +74,10 @@ RUN cd /workspace/sdk/runanywhere-commons && \
 RUN chmod +x scripts/*.sh tests/scripts/*.sh && \
     ./scripts/download-models.sh
 
-# Step 4: Download wake word models
-RUN ./scripts/download-models.sh --wakeword
-
-# Step 5: Generate test audio files
+# Step 4: Generate test audio files
 RUN ./tests/scripts/generate-test-audio.sh
 
-# Step 6: Build the assistant and test binary
+# Step 5: Build the assistant and test binary
 RUN mkdir -p build && cd build && \
     cmake .. -DCMAKE_BUILD_TYPE=Release && \
     cmake --build . -j$(nproc)

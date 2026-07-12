@@ -1048,8 +1048,6 @@ function defaultVoiceAgentComposeConfig(ttsVoiceID?: string): VoiceAgentComposeC
     vadSampleRate: 16000,
     vadFrameLength: 0.1,
     vadEnergyThreshold: DEFAULT_VAD_ENERGY_THRESHOLD,
-    wakewordEnabled: false,
-    wakewordThreshold: 0.5,
     sessionId: 'web-voice-agent',
     ...(ttsVoiceID ? { ttsVoiceId: ttsVoiceID } : {}),
   };

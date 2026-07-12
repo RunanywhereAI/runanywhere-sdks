@@ -850,13 +850,6 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
     $core.int? vadSampleRate,
     $core.double? vadFrameLength,
     $core.double? vadEnergyThreshold,
-    $core.bool? wakewordEnabled,
-    $core.String? wakewordModelPath,
-    $core.String? wakewordModelId,
-    $core.String? wakewordPhrase,
-    $core.double? wakewordThreshold,
-    $core.String? wakewordEmbeddingModelPath,
-    $core.String? wakewordVadModelPath,
     VoiceSessionConfig? sessionConfig,
     AudioPipelineConfig? audioPipelineConfig,
     $core.String? sessionId,
@@ -876,15 +869,6 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
     if (vadFrameLength != null) result.vadFrameLength = vadFrameLength;
     if (vadEnergyThreshold != null)
       result.vadEnergyThreshold = vadEnergyThreshold;
-    if (wakewordEnabled != null) result.wakewordEnabled = wakewordEnabled;
-    if (wakewordModelPath != null) result.wakewordModelPath = wakewordModelPath;
-    if (wakewordModelId != null) result.wakewordModelId = wakewordModelId;
-    if (wakewordPhrase != null) result.wakewordPhrase = wakewordPhrase;
-    if (wakewordThreshold != null) result.wakewordThreshold = wakewordThreshold;
-    if (wakewordEmbeddingModelPath != null)
-      result.wakewordEmbeddingModelPath = wakewordEmbeddingModelPath;
-    if (wakewordVadModelPath != null)
-      result.wakewordVadModelPath = wakewordVadModelPath;
     if (sessionConfig != null) result.sessionConfig = sessionConfig;
     if (audioPipelineConfig != null)
       result.audioPipelineConfig = audioPipelineConfig;
@@ -921,14 +905,6 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OF)
     ..aD(12, _omitFieldNames ? '' : 'vadEnergyThreshold',
         fieldType: $pb.PbFieldType.OF)
-    ..aOB(13, _omitFieldNames ? '' : 'wakewordEnabled')
-    ..aOS(14, _omitFieldNames ? '' : 'wakewordModelPath')
-    ..aOS(15, _omitFieldNames ? '' : 'wakewordModelId')
-    ..aOS(16, _omitFieldNames ? '' : 'wakewordPhrase')
-    ..aD(17, _omitFieldNames ? '' : 'wakewordThreshold',
-        fieldType: $pb.PbFieldType.OF)
-    ..aOS(18, _omitFieldNames ? '' : 'wakewordEmbeddingModelPath')
-    ..aOS(19, _omitFieldNames ? '' : 'wakewordVadModelPath')
     ..aOM<VoiceSessionConfig>(20, _omitFieldNames ? '' : 'sessionConfig',
         subBuilder: VoiceSessionConfig.create)
     ..aOM<AudioPipelineConfig>(21, _omitFieldNames ? '' : 'audioPipelineConfig',
@@ -1078,116 +1054,49 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   void clearVadEnergyThreshold() => $_clearField(12);
 
   /// -------------------------------------------------------------------
-  /// Wake-word sub-config (mirrors rac_voice_agent_wakeword_config_t /
-  /// rac_wakeword_config_t).
-  /// -------------------------------------------------------------------
-  @$pb.TagNumber(13)
-  $core.bool get wakewordEnabled => $_getBF(12);
-  @$pb.TagNumber(13)
-  set wakewordEnabled($core.bool value) => $_setBool(12, value);
-  @$pb.TagNumber(13)
-  $core.bool hasWakewordEnabled() => $_has(12);
-  @$pb.TagNumber(13)
-  void clearWakewordEnabled() => $_clearField(13);
-
-  @$pb.TagNumber(14)
-  $core.String get wakewordModelPath => $_getSZ(13);
-  @$pb.TagNumber(14)
-  set wakewordModelPath($core.String value) => $_setString(13, value);
-  @$pb.TagNumber(14)
-  $core.bool hasWakewordModelPath() => $_has(13);
-  @$pb.TagNumber(14)
-  void clearWakewordModelPath() => $_clearField(14);
-
-  @$pb.TagNumber(15)
-  $core.String get wakewordModelId => $_getSZ(14);
-  @$pb.TagNumber(15)
-  set wakewordModelId($core.String value) => $_setString(14, value);
-  @$pb.TagNumber(15)
-  $core.bool hasWakewordModelId() => $_has(14);
-  @$pb.TagNumber(15)
-  void clearWakewordModelId() => $_clearField(15);
-
-  @$pb.TagNumber(16)
-  $core.String get wakewordPhrase => $_getSZ(15);
-  @$pb.TagNumber(16)
-  set wakewordPhrase($core.String value) => $_setString(15, value);
-  @$pb.TagNumber(16)
-  $core.bool hasWakewordPhrase() => $_has(15);
-  @$pb.TagNumber(16)
-  void clearWakewordPhrase() => $_clearField(16);
-
-  @$pb.TagNumber(17)
-  $core.double get wakewordThreshold => $_getN(16);
-  @$pb.TagNumber(17)
-  set wakewordThreshold($core.double value) => $_setFloat(16, value);
-  @$pb.TagNumber(17)
-  $core.bool hasWakewordThreshold() => $_has(16);
-  @$pb.TagNumber(17)
-  void clearWakewordThreshold() => $_clearField(17);
-
-  @$pb.TagNumber(18)
-  $core.String get wakewordEmbeddingModelPath => $_getSZ(17);
-  @$pb.TagNumber(18)
-  set wakewordEmbeddingModelPath($core.String value) => $_setString(17, value);
-  @$pb.TagNumber(18)
-  $core.bool hasWakewordEmbeddingModelPath() => $_has(17);
-  @$pb.TagNumber(18)
-  void clearWakewordEmbeddingModelPath() => $_clearField(18);
-
-  @$pb.TagNumber(19)
-  $core.String get wakewordVadModelPath => $_getSZ(18);
-  @$pb.TagNumber(19)
-  set wakewordVadModelPath($core.String value) => $_setString(18, value);
-  @$pb.TagNumber(19)
-  $core.bool hasWakewordVadModelPath() => $_has(18);
-  @$pb.TagNumber(19)
-  void clearWakewordVadModelPath() => $_clearField(19);
-
-  /// -------------------------------------------------------------------
   /// Session-behavior sub-config. Optional so the C ABI can be invoked
   /// without runtime-behavior overrides (engine defaults applied).
   /// -------------------------------------------------------------------
   @$pb.TagNumber(20)
-  VoiceSessionConfig get sessionConfig => $_getN(19);
+  VoiceSessionConfig get sessionConfig => $_getN(12);
   @$pb.TagNumber(20)
   set sessionConfig(VoiceSessionConfig value) => $_setField(20, value);
   @$pb.TagNumber(20)
-  $core.bool hasSessionConfig() => $_has(19);
+  $core.bool hasSessionConfig() => $_has(12);
   @$pb.TagNumber(20)
   void clearSessionConfig() => $_clearField(20);
   @$pb.TagNumber(20)
-  VoiceSessionConfig ensureSessionConfig() => $_ensure(19);
+  VoiceSessionConfig ensureSessionConfig() => $_ensure(12);
 
   /// Audio state-machine behavior. Optional so defaults can be applied by
   /// the native voice-agent implementation.
   @$pb.TagNumber(21)
-  AudioPipelineConfig get audioPipelineConfig => $_getN(20);
+  AudioPipelineConfig get audioPipelineConfig => $_getN(13);
   @$pb.TagNumber(21)
   set audioPipelineConfig(AudioPipelineConfig value) => $_setField(21, value);
   @$pb.TagNumber(21)
-  $core.bool hasAudioPipelineConfig() => $_has(20);
+  $core.bool hasAudioPipelineConfig() => $_has(13);
   @$pb.TagNumber(21)
   void clearAudioPipelineConfig() => $_clearField(21);
   @$pb.TagNumber(21)
-  AudioPipelineConfig ensureAudioPipelineConfig() => $_ensure(20);
+  AudioPipelineConfig ensureAudioPipelineConfig() => $_ensure(13);
 
   /// Correlation and defaults for event streams and one-shot turn APIs.
   @$pb.TagNumber(22)
-  $core.String get sessionId => $_getSZ(21);
+  $core.String get sessionId => $_getSZ(14);
   @$pb.TagNumber(22)
-  set sessionId($core.String value) => $_setString(21, value);
+  set sessionId($core.String value) => $_setString(14, value);
   @$pb.TagNumber(22)
-  $core.bool hasSessionId() => $_has(21);
+  $core.bool hasSessionId() => $_has(14);
   @$pb.TagNumber(22)
   void clearSessionId() => $_clearField(22);
 
   @$pb.TagNumber(23)
-  $core.String get defaultLanguageCode => $_getSZ(22);
+  $core.String get defaultLanguageCode => $_getSZ(15);
   @$pb.TagNumber(23)
-  set defaultLanguageCode($core.String value) => $_setString(22, value);
+  set defaultLanguageCode($core.String value) => $_setString(15, value);
   @$pb.TagNumber(23)
-  $core.bool hasDefaultLanguageCode() => $_has(22);
+  $core.bool hasDefaultLanguageCode() => $_has(15);
   @$pb.TagNumber(23)
   void clearDefaultLanguageCode() => $_clearField(23);
 }
@@ -1431,9 +1340,9 @@ class VoiceAgentApi {
       _client.invoke<$1.TTSOutput>(
           ctx, 'VoiceAgent', 'SynthesizeSpeech', request, $1.TTSOutput());
 
-  /// Configure / initialize the voice-agent sub-components (STT/LLM/TTS/VAD/
-  /// wake-word). Returns an initial VoiceAgentResult capturing component
-  /// readiness and any initialization errors.
+  /// Configure / initialize the executable voice-agent sub-components
+  /// (STT/LLM/TTS/VAD). Returns an initial VoiceAgentResult capturing
+  /// component readiness and any initialization errors.
   $async.Future<VoiceAgentResult> configure(
           $pb.ClientContext? ctx, VoiceAgentComposeConfig request) =>
       _client.invoke<VoiceAgentResult>(

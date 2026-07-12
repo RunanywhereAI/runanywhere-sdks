@@ -197,10 +197,10 @@ print_success "runanywhere-commons libraries ready"
 print_header "Step 3: Download Models"
 
 MODEL_DIR="${HOME}/.local/share/runanywhere/Models"
-if [ -d "${MODEL_DIR}/ONNX/silero-vad" ] && \
-   [ -d "${MODEL_DIR}/ONNX/whisper-tiny-en" ] && \
+if [ -d "${MODEL_DIR}/Sherpa/silero-vad" ] && \
+   [ -d "${MODEL_DIR}/Sherpa/whisper-tiny-en" ] && \
    [ -d "${MODEL_DIR}/LlamaCpp/qwen3-1.7b" ] && \
-   [ -d "${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium" ] && \
+   [ -d "${MODEL_DIR}/Sherpa/vits-piper-en_US-lessac-medium" ] && \
    [ "$CLEAN_BUILD" = false ]; then
     print_success "Models already downloaded"
 else

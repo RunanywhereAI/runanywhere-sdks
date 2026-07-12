@@ -1,11 +1,12 @@
 /**
  * @file test_vad.cpp
- * @brief Integration tests for ONNX VAD backend via direct RAC API
+ * @brief Integration tests for Sherpa VAD backend via direct RAC API
  *
  * Tests voice activity detection using the Silero VAD ONNX model.
  * Requires: silero_vad.onnx model at the configured path.
  */
 
+#include "rac_tts_sherpa.h"
 #include "rac_vad_sherpa.h"  // engines/sherpa: rac_vad_sherpa_* function declarations
 #include "test_common.h"
 #include "test_config.h"
@@ -13,10 +14,9 @@
 #include <cstdio>
 #include <ctime>
 
-#include "rac_tts_sherpa.h"
-#include "rac/backends/rac_vad_onnx.h"  // for RAC_VAD_ONNX_CONFIG_DEFAULT typedefs and rac_backend_onnx_register()
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/plugin/rac_plugin_entry_onnx.h"
 
 // =============================================================================
 // Minimal Test Platform Adapter
@@ -160,7 +160,7 @@ static TestResult test_create_destroy() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_SHERPA_CONFIG_DEFAULT, &handle);
 
     if (rc != RAC_SUCCESS) {
         result.passed = false;
@@ -196,7 +196,7 @@ static TestResult test_create_invalid_path() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_vad_sherpa_create("/nonexistent.onnx", &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+        rac_vad_sherpa_create("/nonexistent.onnx", &RAC_VAD_SHERPA_CONFIG_DEFAULT, &handle);
 
     if (rc == RAC_SUCCESS) {
         result.passed = false;
@@ -231,7 +231,7 @@ static TestResult test_process_silence() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_SHERPA_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -302,7 +302,7 @@ static TestResult test_process_white_noise() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_SHERPA_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -367,7 +367,7 @@ static TestResult test_start_stop_reset() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_SHERPA_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -416,7 +416,7 @@ static TestResult test_set_threshold() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_SHERPA_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -456,7 +456,7 @@ static TestResult test_is_speech_active() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_SHERPA_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -520,7 +520,7 @@ static TestResult test_vad_detects_tts_speech() {
     }
 
     // Synthesize speech via TTS
-    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
+    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_SHERPA_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
     rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
@@ -550,7 +550,7 @@ static TestResult test_vad_detects_tts_speech() {
 
     // Create VAD handle
     rac_handle_t vad_handle = RAC_INVALID_HANDLE;
-    rc = rac_vad_sherpa_create(vad_model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &vad_handle);
+    rc = rac_vad_sherpa_create(vad_model_path.c_str(), &RAC_VAD_SHERPA_CONFIG_DEFAULT, &vad_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -628,7 +628,7 @@ static TestResult test_vad_mixed_speech_silence() {
     }
 
     // Synthesize "Hello" via TTS
-    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
+    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_SHERPA_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
     rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
@@ -667,7 +667,7 @@ static TestResult test_vad_mixed_speech_silence() {
 
     // Create VAD handle
     rac_handle_t vad_handle = RAC_INVALID_HANDLE;
-    rc = rac_vad_sherpa_create(vad_model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &vad_handle);
+    rc = rac_vad_sherpa_create(vad_model_path.c_str(), &RAC_VAD_SHERPA_CONFIG_DEFAULT, &vad_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -784,7 +784,7 @@ static TestResult test_vad_threshold_sensitivity() {
     }
 
     // Synthesize "Hello world" via TTS
-    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
+    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_SHERPA_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
     rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
@@ -812,7 +812,7 @@ static TestResult test_vad_threshold_sensitivity() {
 
     // Create VAD handle
     rac_handle_t vad_handle = RAC_INVALID_HANDLE;
-    rc = rac_vad_sherpa_create(vad_model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &vad_handle);
+    rc = rac_vad_sherpa_create(vad_model_path.c_str(), &RAC_VAD_SHERPA_CONFIG_DEFAULT, &vad_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);

@@ -156,7 +156,7 @@ RAC_API rac_result_t rac_vad_component_process(rac_handle_t handle, const float*
 RAC_API rac_bool_t rac_vad_component_is_speech_active(rac_handle_t handle);
 
 /**
- * @brief Get current energy threshold
+ * @brief Get the active detector threshold
  *
  * @param handle Component handle
  * @return Current energy threshold
@@ -164,7 +164,10 @@ RAC_API rac_bool_t rac_vad_component_is_speech_active(rac_handle_t handle);
 RAC_API float rac_vad_component_get_energy_threshold(rac_handle_t handle);
 
 /**
- * @brief Set energy threshold
+ * @brief Set the active detector threshold
+ *
+ * Routes to the loaded model backend when present; otherwise configures the
+ * built-in energy detector.
  *
  * @param handle Component handle
  * @param threshold New threshold (0.0 to 1.0)

@@ -86,7 +86,7 @@ Layer 1: TypeScript API
 Layer 2: Nitro Bridge (JSI — no serialization)
   HybridRunAnywhereCore (C++)     — ~60 methods covering all SDK capabilities
   HybridRunAnywhereLlama (C++)    — LlamaCPP backend + VLM
-  HybridRunAnywhereONNX (C++)     — ONNX STT/TTS/VAD backend
+  HybridRunAnywhereONNX (C++)     — generic ONNX + Sherpa speech registration
   HybridRunAnywhereDeviceInfo     — Platform-specific (Swift on iOS, Kotlin on Android)
   HybridLLM / HybridVoiceAgent    — Proto-byte streaming subscription objects
 

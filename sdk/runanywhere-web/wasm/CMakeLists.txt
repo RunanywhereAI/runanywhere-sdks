@@ -1021,21 +1021,6 @@ set(RAC_EXPORTED_FUNCTIONS_ONNX
     "_rac_vad_start_lifecycle_proto"
     "_rac_vad_stop_lifecycle_proto"
     "_rac_vad_reset_lifecycle_proto"
-    # TTS (Piper via ONNX)
-    "_rac_tts_onnx_create"
-    "_rac_tts_onnx_synthesize"
-    "_rac_tts_onnx_get_voices"
-    "_rac_tts_onnx_stop"
-    "_rac_tts_onnx_destroy"
-    # VAD (Silero via ONNX)
-    "_rac_vad_onnx_create"
-    "_rac_vad_onnx_process"
-    "_rac_vad_onnx_start"
-    "_rac_vad_onnx_stop"
-    "_rac_vad_onnx_reset"
-    "_rac_vad_onnx_set_threshold"
-    "_rac_vad_onnx_is_speech_active"
-    "_rac_vad_onnx_destroy"
     "_rac_backend_onnx_register"
     "_rac_backend_onnx_unregister"
 )

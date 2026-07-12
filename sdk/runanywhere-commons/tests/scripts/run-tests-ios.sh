@@ -126,7 +126,7 @@ while [[ "$#" -gt 0 ]]; do
             echo "  --run          Build natively for macOS and run tests"
             echo "  --download     Download models first, then run"
             echo "  --core         Run core tests only"
-            echo "  --onnx         Run ONNX backend tests (VAD, STT, TTS, WakeWord)"
+            echo "  --onnx         Run ONNX/Sherpa tests (VAD, STT, TTS)"
             echo "  --llm          Run LLM tests only"
             echo "  --agent        Run voice agent tests only"
             echo "  --help         Show this help"
@@ -202,7 +202,7 @@ print_ok "iOS Simulator build verification passed"
 # iOS toolchain may create .app bundles instead of bare executables
 echo ""
 echo "iOS Simulator test targets:"
-for binary in test_core test_vad test_stt test_tts test_wakeword test_llm test_voice_agent; do
+for binary in test_core test_vad test_stt test_tts test_llm test_voice_agent; do
     if [ -f "${IOS_BUILD_DIR}/tests/${binary}" ] || [ -f "${IOS_BUILD_DIR}/tests/${binary}.app/${binary}" ]; then
         echo -e "  ${GREEN}[OK]${NC} ${binary}"
     else
@@ -285,14 +285,13 @@ if [ "${RUN_ALL}" = true ] || [ "${RUN_CORE}" = true ]; then
     run_test "test_core" "test_core"
 fi
 
-# ONNX backend tests
+# ONNX/Sherpa speech tests
 if [ "${RUN_ALL}" = true ] || [ "${RUN_ONNX}" = true ]; then
     echo ""
-    echo "ONNX backend:"
+    echo "ONNX/Sherpa speech:"
     run_test "test_vad"      "test_vad"
     run_test "test_stt"      "test_stt"
     run_test "test_tts"      "test_tts"
-    run_test "test_wakeword" "test_wakeword"
 fi
 
 # LLM tests

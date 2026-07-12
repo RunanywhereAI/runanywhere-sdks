@@ -416,21 +416,6 @@ rac_voice_agent_config_t config_from_proto(const runanywhere::v1::VoiceAgentComp
     config.vad_config.energy_threshold = proto.vad_energy_threshold() > 0.0f
                                              ? proto.vad_energy_threshold()
                                              : RAC_VOICE_AGENT_VAD_CONFIG_DEFAULT.energy_threshold;
-    config.wakeword_config.enabled = proto.wakeword_enabled() ? RAC_TRUE : RAC_FALSE;
-    config.wakeword_config.model_path =
-        proto.has_wakeword_model_path() ? proto.wakeword_model_path().c_str() : nullptr;
-    config.wakeword_config.model_id =
-        proto.has_wakeword_model_id() ? proto.wakeword_model_id().c_str() : nullptr;
-    config.wakeword_config.wake_word =
-        proto.has_wakeword_phrase() ? proto.wakeword_phrase().c_str() : nullptr;
-    config.wakeword_config.threshold = proto.wakeword_threshold() > 0.0f
-                                           ? proto.wakeword_threshold()
-                                           : RAC_VOICE_AGENT_WAKEWORD_CONFIG_DEFAULT.threshold;
-    config.wakeword_config.embedding_model_path =
-        proto.has_wakeword_embedding_model_path() ? proto.wakeword_embedding_model_path().c_str()
-                                                  : nullptr;
-    config.wakeword_config.vad_model_path =
-        proto.has_wakeword_vad_model_path() ? proto.wakeword_vad_model_path().c_str() : nullptr;
     return config;
 }
 

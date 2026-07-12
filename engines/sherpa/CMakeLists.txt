@@ -10,7 +10,7 @@
 #   3. An IMPORTED `sherpa_onnx` GLOBAL target so this engine can link
 #      Sherpa-ONNX without re-implementing prebuilt discovery.
 #
-# The runtime source for STT/TTS/VAD and wakeword compatibility lives here;
+# The runtime source for STT/TTS/VAD lives here;
 # engines/onnx keeps only generic ONNX Runtime services and embeddings.
 # =============================================================================
 

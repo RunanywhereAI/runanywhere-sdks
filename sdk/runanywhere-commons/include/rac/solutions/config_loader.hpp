@@ -55,7 +55,7 @@ rac_result_t load_pipeline_from_yaml(const std::string& yaml,
 
 /// Parse a YAML document describing a SolutionConfig. The document is
 /// expected to have exactly one of the oneof keys (`voice_agent`,
-/// `rag`, `wake_word`, `agent_loop`, `time_series`) as the top-level
+/// `rag`, `agent_loop`, `time_series`) as the top-level
 /// key, mirroring the proto oneof.
 rac_result_t load_solution_from_yaml(const std::string& yaml,
                                      runanywhere::v1::SolutionConfig* out_config);

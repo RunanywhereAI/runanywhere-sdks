@@ -34,7 +34,7 @@ const hasSensitiveBrowserState = targetsRemoteOrigin;
 const releaseTraceEnabled = process.env.RA_E2E_TRACE === '1' && !hasSensitiveBrowserState;
 const fakeAudioPath = resolve(
   __dirname,
-  '../../Playground/openclaw-hybrid-assistant/tests/audio/hey-jarvis-real.wav',
+  '../../Playground/openclaw-hybrid-assistant/tests/audio/edge-cases/weather-command.wav',
 );
 const fakeMediaArgs = [
   '--use-fake-ui-for-media-stream',

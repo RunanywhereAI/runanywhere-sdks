@@ -301,7 +301,7 @@ var InferenceFramework;
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_BUILT_IN"] = 20] = "INFERENCE_FRAMEWORK_BUILT_IN";
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_NONE"] = 21] = "INFERENCE_FRAMEWORK_NONE";
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_UNKNOWN"] = 22] = "INFERENCE_FRAMEWORK_UNKNOWN";
-    /** INFERENCE_FRAMEWORK_SHERPA - Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
+    /** INFERENCE_FRAMEWORK_SHERPA - Sherpa-ONNX speech engine (STT/TTS/VAD) */
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_SHERPA"] = 23] = "INFERENCE_FRAMEWORK_SHERPA";
     /** INFERENCE_FRAMEWORK_QHEXRT - Qualcomm Hexagon NPU (QHexRT runtime) */
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_QHEXRT"] = 24] = "INFERENCE_FRAMEWORK_QHEXRT";

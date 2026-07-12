@@ -418,8 +418,7 @@ bool OpenClawClient::send_connect_message() {
          << "\"accountId\":\"" << escape_json_string(config_.account_id) << "\","
          << "\"capabilities\":{"
          <<   "\"stt\":true,"
-         <<   "\"tts\":true,"
-         <<   "\"wakeWord\":true"
+         <<   "\"tts\":true"
          << "}"
          << "}";
 

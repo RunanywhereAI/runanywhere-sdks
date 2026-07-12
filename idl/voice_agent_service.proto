@@ -58,9 +58,9 @@ service VoiceAgent {
     // Helper-level TTS synthesize-speech path used by voice-agent sub-components.
     rpc SynthesizeSpeech(VoiceAgentSynthesizeSpeechProtoRequest) returns (TTSOutput);
 
-    // Configure / initialize the voice-agent sub-components (STT/LLM/TTS/VAD/
-    // wake-word). Returns an initial VoiceAgentResult capturing component
-    // readiness and any initialization errors.
+    // Configure / initialize the executable voice-agent sub-components
+    // (STT/LLM/TTS/VAD). Returns an initial VoiceAgentResult capturing
+    // component readiness and any initialization errors.
     rpc Configure(VoiceAgentComposeConfig) returns (VoiceAgentResult);
 }
 
@@ -219,17 +219,12 @@ message VoiceAgentComposeConfig {
     float  vad_frame_length    = 11;   // default 0.1
     float  vad_energy_threshold = 12;  // default 0.005
 
-    // -------------------------------------------------------------------
-    // Wake-word sub-config (mirrors rac_voice_agent_wakeword_config_t /
-    // rac_wakeword_config_t).
-    // -------------------------------------------------------------------
-    bool   wakeword_enabled              = 13;
-    optional string wakeword_model_path  = 14;
-    optional string wakeword_model_id    = 15;
-    optional string wakeword_phrase      = 16;
-    float  wakeword_threshold            = 17;   // default 0.5
-    optional string wakeword_embedding_model_path = 18;
-    optional string wakeword_vad_model_path       = 19;
+    // Removed: the voice-agent runtime never implemented wake-word composition.
+    // Keep the wire identifiers unavailable for accidental reuse.
+    reserved 13 to 19;
+    reserved "wakeword_enabled", "wakeword_model_path", "wakeword_model_id",
+             "wakeword_phrase", "wakeword_threshold",
+             "wakeword_embedding_model_path", "wakeword_vad_model_path";
 
     // -------------------------------------------------------------------
     // Session-behavior sub-config. Optional so the C ABI can be invoked

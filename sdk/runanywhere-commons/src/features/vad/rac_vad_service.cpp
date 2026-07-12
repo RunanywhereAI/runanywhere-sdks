@@ -45,7 +45,7 @@ rac_result_t create_model_vad_service(const char* model_path, rac_vad_service_t*
     rac_result_t result = rac::features::resolve_model_reference(
         model_path,
         {.log_cat = LOG_CAT,
-         .default_framework = RAC_FRAMEWORK_ONNX,
+         .default_framework = RAC_FRAMEWORK_SHERPA,
          .allow_null_model_id = false,
          .lookup_last_path_component = true,
          .prefer_input_path_when_contains = "/"},  // explicit caller paths win over

@@ -7,7 +7,6 @@
 # - Silero VAD (~2MB)
 # - Parakeet TDT-CTC 110M EN int8 (~126MB) - DEFAULT ASR
 # - Piper TTS Lessac Medium (~61MB) - DEFAULT TTS
-# - openWakeWord (optional, with --wakeword flag)
 #
 # Alternative models (via flags):
 # - Whisper Tiny EN (~150MB) - use --whisper for ASR
@@ -16,14 +15,12 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODEL_DIR="${HOME}/.local/share/runanywhere/Models"
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m'
 
 print_step() {
@@ -39,15 +36,10 @@ print_error() {
 }
 
 # Parse arguments
-DOWNLOAD_WAKEWORD=false
 USE_WHISPER_ASR=false
 USE_KOKORO_TTS=false
 while [[ "$1" == --* ]]; do
     case "$1" in
-        --wakeword)
-            DOWNLOAD_WAKEWORD=true
-            shift
-            ;;
         --whisper)
             USE_WHISPER_ASR=true
             shift
@@ -60,7 +52,6 @@ while [[ "$1" == --* ]]; do
             echo "Usage: $0 [options]"
             echo ""
             echo "Options:"
-            echo "  --wakeword   Also download wake word models (Hey Jarvis)"
             echo "  --whisper    Use Whisper Tiny EN for ASR instead of Parakeet (larger but multilingual)"
             echo "  --kokoro     Use Kokoro TTS instead of Piper (larger but higher quality, multi-speaker)"
             echo "  --help       Show this help"
@@ -91,16 +82,16 @@ fi
 echo ""
 
 # Create directories
-mkdir -p "${MODEL_DIR}/ONNX/silero-vad"
+mkdir -p "${MODEL_DIR}/Sherpa/silero-vad"
 if [ "$USE_WHISPER_ASR" = true ]; then
-    mkdir -p "${MODEL_DIR}/ONNX/whisper-tiny-en"
+    mkdir -p "${MODEL_DIR}/Sherpa/whisper-tiny-en"
 else
-    mkdir -p "${MODEL_DIR}/ONNX/parakeet-tdt-ctc-110m-en-int8"
+    mkdir -p "${MODEL_DIR}/Sherpa/parakeet-tdt-ctc-110m-en-int8"
 fi
 if [ "$USE_KOKORO_TTS" = true ]; then
-    mkdir -p "${MODEL_DIR}/ONNX/kokoro-en-v0_19"
+    mkdir -p "${MODEL_DIR}/Sherpa/kokoro-en-v0_19"
 else
-    mkdir -p "${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium"
+    mkdir -p "${MODEL_DIR}/Sherpa/vits-piper-en_US-lessac-medium"
 fi
 
 # =============================================================================
@@ -108,7 +99,7 @@ fi
 # =============================================================================
 
 print_step "Downloading Silero VAD..."
-VAD_FILE="${MODEL_DIR}/ONNX/silero-vad/silero_vad.onnx"
+VAD_FILE="${MODEL_DIR}/Sherpa/silero-vad/silero_vad.onnx"
 
 # Check if existing file is valid (not an HTML redirect page from Git LFS)
 if [ -f "${VAD_FILE}" ]; then
@@ -151,31 +142,31 @@ fi
 if [ "$USE_WHISPER_ASR" = true ]; then
     # Whisper Tiny EN (alternative - larger, multilingual)
     print_step "Downloading Whisper Tiny EN..."
-    if [ -f "${MODEL_DIR}/ONNX/whisper-tiny-en/tiny-encoder.int8.onnx" ]; then
+    if [ -f "${MODEL_DIR}/Sherpa/whisper-tiny-en/tiny-encoder.int8.onnx" ]; then
         print_success "Whisper Tiny EN already downloaded"
     else
         WHISPER_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2"
-        curl -L "${WHISPER_URL}" | tar -xjf - -C "${MODEL_DIR}/ONNX/"
+        curl -L "${WHISPER_URL}" | tar -xjf - -C "${MODEL_DIR}/Sherpa/"
 
         # Move files to expected location
-        if [ -d "${MODEL_DIR}/ONNX/sherpa-onnx-whisper-tiny.en" ]; then
-            mv "${MODEL_DIR}/ONNX/sherpa-onnx-whisper-tiny.en"/* "${MODEL_DIR}/ONNX/whisper-tiny-en/" 2>/dev/null || true
-            rm -rf "${MODEL_DIR}/ONNX/sherpa-onnx-whisper-tiny.en"
+        if [ -d "${MODEL_DIR}/Sherpa/sherpa-onnx-whisper-tiny.en" ]; then
+            mv "${MODEL_DIR}/Sherpa/sherpa-onnx-whisper-tiny.en"/* "${MODEL_DIR}/Sherpa/whisper-tiny-en/" 2>/dev/null || true
+            rm -rf "${MODEL_DIR}/Sherpa/sherpa-onnx-whisper-tiny.en"
         fi
         print_success "Whisper Tiny EN downloaded"
     fi
 else
     # Parakeet TDT-CTC 110M EN int8 (DEFAULT - faster, smaller, supports punctuation + capitalization)
-    PARAKEET_DIR="${MODEL_DIR}/ONNX/parakeet-tdt-ctc-110m-en-int8"
+    PARAKEET_DIR="${MODEL_DIR}/Sherpa/parakeet-tdt-ctc-110m-en-int8"
     print_step "Downloading Parakeet TDT-CTC 110M EN (int8)..."
     if [ -f "${PARAKEET_DIR}/model.int8.onnx" ]; then
         print_success "Parakeet TDT-CTC already downloaded"
     else
         PARAKEET_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8.tar.bz2"
-        curl -L "${PARAKEET_URL}" | tar -xjf - -C "${MODEL_DIR}/ONNX/"
+        curl -L "${PARAKEET_URL}" | tar -xjf - -C "${MODEL_DIR}/Sherpa/"
 
         # Move files to expected location
-        EXTRACTED_DIR="${MODEL_DIR}/ONNX/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8"
+        EXTRACTED_DIR="${MODEL_DIR}/Sherpa/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8"
         if [ -d "${EXTRACTED_DIR}" ]; then
             mv "${EXTRACTED_DIR}"/* "${PARAKEET_DIR}/" 2>/dev/null || true
             rm -rf "${EXTRACTED_DIR}"
@@ -201,7 +192,7 @@ fi
 if [ "$USE_KOKORO_TTS" = true ]; then
     # Kokoro TTS v0.19 English (alternative - larger, multi-speaker, higher quality)
     print_step "Downloading Kokoro TTS English (v0.19)..."
-    KOKORO_DIR="${MODEL_DIR}/ONNX/kokoro-en-v0_19"
+    KOKORO_DIR="${MODEL_DIR}/Sherpa/kokoro-en-v0_19"
     KOKORO_MODEL="${KOKORO_DIR}/model.onnx"
 
     if [ -f "${KOKORO_MODEL}" ] && [ -f "${KOKORO_DIR}/voices.bin" ]; then
@@ -224,7 +215,7 @@ if [ "$USE_KOKORO_TTS" = true ]; then
     if [ ! -f "${KOKORO_MODEL}" ] || [ ! -f "${KOKORO_DIR}/voices.bin" ]; then
         echo "  Downloading Kokoro TTS English model (~330MB)..."
         KOKORO_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-en-v0_19.tar.bz2"
-        curl -L "${KOKORO_URL}" | tar -xjf - -C "${MODEL_DIR}/ONNX/"
+        curl -L "${KOKORO_URL}" | tar -xjf - -C "${MODEL_DIR}/Sherpa/"
 
         if [ -f "${KOKORO_MODEL}" ] && [ -f "${KOKORO_DIR}/voices.bin" ]; then
             print_success "Kokoro TTS English downloaded"
@@ -239,91 +230,16 @@ if [ "$USE_KOKORO_TTS" = true ]; then
 else
     # Piper TTS Lessac Medium (DEFAULT - smaller, fast, natural voice)
     print_step "Downloading Piper TTS (Lessac Medium)..."
-    if [ -f "${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium/en_US-lessac-medium.onnx" ]; then
+    if [ -f "${MODEL_DIR}/Sherpa/vits-piper-en_US-lessac-medium/en_US-lessac-medium.onnx" ]; then
         print_success "Piper TTS already downloaded"
     else
         PIPER_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2"
-        curl -L "${PIPER_URL}" | tar -xjf - -C "${MODEL_DIR}/ONNX/"
+        curl -L "${PIPER_URL}" | tar -xjf - -C "${MODEL_DIR}/Sherpa/"
         print_success "Piper TTS downloaded"
         echo "  Voice: Natural American male"
         echo "  Sample rate: 22050Hz"
         echo "  Size: ~61MB"
     fi
-fi
-
-# =============================================================================
-# Wake Word Models (optional)
-# =============================================================================
-
-if [ "$DOWNLOAD_WAKEWORD" = true ]; then
-    print_step "Downloading Wake Word models..."
-
-    mkdir -p "${MODEL_DIR}/ONNX/hey-jarvis"
-    mkdir -p "${MODEL_DIR}/ONNX/openwakeword-embedding"
-
-    # Download openWakeWord embedding model from GitHub releases (v0.5.1 has the ONNX models)
-    EMBED_FILE="${MODEL_DIR}/ONNX/openwakeword-embedding/embedding_model.onnx"
-    if [ ! -f "${EMBED_FILE}" ] || [ $(stat -c%s "${EMBED_FILE}" 2>/dev/null || stat -f%z "${EMBED_FILE}" 2>/dev/null || echo 0) -lt 1000000 ]; then
-        echo "  Downloading embedding_model.onnx from GitHub releases (v0.5.1)..."
-        EMBED_URL="https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx"
-        rm -f "${EMBED_FILE}"
-        curl -L -o "${EMBED_FILE}" "${EMBED_URL}"
-        echo "  Size: $(ls -lh "${EMBED_FILE}" 2>/dev/null | awk '{print $5}' || echo 'failed')"
-    fi
-
-    # Download melspectrogram model from GitHub releases
-    MELSPEC_FILE="${MODEL_DIR}/ONNX/openwakeword-embedding/melspectrogram.onnx"
-    if [ ! -f "${MELSPEC_FILE}" ] || [ $(stat -c%s "${MELSPEC_FILE}" 2>/dev/null || stat -f%z "${MELSPEC_FILE}" 2>/dev/null || echo 0) -lt 100000 ]; then
-        echo "  Downloading melspectrogram.onnx from GitHub releases (v0.5.1)..."
-        MELSPEC_URL="https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx"
-        rm -f "${MELSPEC_FILE}"
-        curl -L -o "${MELSPEC_FILE}" "${MELSPEC_URL}"
-        echo "  Size: $(ls -lh "${MELSPEC_FILE}" 2>/dev/null | awk '{print $5}' || echo 'failed')"
-    fi
-
-    # Download Hey Jarvis wake word model from GitHub releases
-    JARVIS_FILE="${MODEL_DIR}/ONNX/hey-jarvis/hey_jarvis_v0.1.onnx"
-    if [ ! -f "${JARVIS_FILE}" ] || [ $(stat -c%s "${JARVIS_FILE}" 2>/dev/null || stat -f%z "${JARVIS_FILE}" 2>/dev/null || echo 0) -lt 10000 ]; then
-        echo "  Downloading hey_jarvis_v0.1.onnx from GitHub releases (v0.5.1)..."
-        JARVIS_URL="https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.onnx"
-        rm -f "${JARVIS_FILE}"
-        curl -L -o "${JARVIS_FILE}" "${JARVIS_URL}"
-        echo "  Size: $(ls -lh "${JARVIS_FILE}" 2>/dev/null | awk '{print $5}' || echo 'failed')"
-    fi
-
-    # Verify downloads
-    echo "  Verifying wake word model files..."
-    ALL_OK=true
-    for f in "${EMBED_FILE}" "${MELSPEC_FILE}" "${JARVIS_FILE}"; do
-        if [ -f "$f" ]; then
-            size=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo 0)
-            filetype=$(file -b "$f" 2>/dev/null || echo "unknown")
-            if echo "$filetype" | grep -qi "html"; then
-                echo "    ERROR: $(basename $f) is an HTML page, not an ONNX model!"
-                rm -f "$f"
-                ALL_OK=false
-            elif [ "$size" -lt 10000 ]; then
-                echo "    WARNING: $(basename $f) seems too small ($size bytes) - may be corrupted"
-                ALL_OK=false
-            else
-                echo "    OK: $(basename $f) ($size bytes, $filetype)"
-            fi
-        else
-            echo "    MISSING: $(basename $f)"
-            ALL_OK=false
-        fi
-    done
-
-    if [ "$ALL_OK" = true ]; then
-        print_success "Wake word models downloaded successfully"
-    else
-        echo -e "${YELLOW}  Some wake word models may not have downloaded correctly${NC}"
-        echo "  Wake word detection may not work properly"
-    fi
-else
-    echo ""
-    echo "Skipping wake word models. To download, run:"
-    echo "  $0 --wakeword"
 fi
 
 # =============================================================================
@@ -376,31 +292,24 @@ echo ""
 echo "Required models (NO LLM):"
 echo ""
 echo "VAD (Silero):"
-ls -la "${MODEL_DIR}/ONNX/silero-vad/"
+ls -la "${MODEL_DIR}/Sherpa/silero-vad/"
 echo ""
 
 if [ "$USE_WHISPER_ASR" = true ]; then
     echo "ASR (Whisper Tiny EN):"
-    ls -la "${MODEL_DIR}/ONNX/whisper-tiny-en/" | head -5
+    ls -la "${MODEL_DIR}/Sherpa/whisper-tiny-en/" | head -5
 else
     echo "ASR (Parakeet TDT-CTC 110M EN int8):"
-    ls -la "${MODEL_DIR}/ONNX/parakeet-tdt-ctc-110m-en-int8/" | head -5
+    ls -la "${MODEL_DIR}/Sherpa/parakeet-tdt-ctc-110m-en-int8/" | head -5
 fi
 
 echo ""
 if [ "$USE_KOKORO_TTS" = true ]; then
     echo "TTS (Kokoro English v0.19):"
-    ls -la "${MODEL_DIR}/ONNX/kokoro-en-v0_19/" | head -8
+    ls -la "${MODEL_DIR}/Sherpa/kokoro-en-v0_19/" | head -8
 else
     echo "TTS (Piper Lessac Medium):"
-    ls -la "${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium/" | head -5
-fi
-
-if [ "$DOWNLOAD_WAKEWORD" = true ]; then
-    echo ""
-    echo "Wake word models:"
-    ls -la "${MODEL_DIR}/ONNX/hey-jarvis/"
-    ls -la "${MODEL_DIR}/ONNX/openwakeword-embedding/"
+    ls -la "${MODEL_DIR}/Sherpa/vits-piper-en_US-lessac-medium/" | head -5
 fi
 
 echo ""

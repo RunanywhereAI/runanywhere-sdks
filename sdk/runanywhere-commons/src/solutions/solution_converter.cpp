@@ -116,27 +116,6 @@ void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
 }
 
 // ---------------------------------------------------------------------------
-// WakeWord — always-on listener → trigger.
-// ---------------------------------------------------------------------------
-void expand_wake_word(const runanywhere::v1::WakeWordConfig& cfg, PipelineSpec* out) {
-    out->set_name("wake_word");
-
-    add_op(out, "audio", "source");
-    auto* detect = add_op(out, "detect", "detect_voice", cfg.model_id());
-    add_op(out, "trigger", "sink");
-
-    if (!cfg.keyword().empty()) {
-        (*detect->mutable_params())["keyword"] = cfg.keyword();
-    }
-    if (cfg.threshold() > 0.0f) {
-        (*detect->mutable_params())["threshold"] = std::to_string(cfg.threshold());
-    }
-
-    add_edge(out, "audio.out", "detect.in");
-    add_edge(out, "detect.out", "trigger.in");
-}
-
-// ---------------------------------------------------------------------------
 // AgentLoop — multi-turn tool-calling LLM loop. Modelled as a single
 // generate_text operator with auxiliary tokenise/context build. The
 // iterative loop runs inside the LLM operator's engine; the DAG just
@@ -202,9 +181,6 @@ rac_result_t convert_solution_to_pipeline(const SolutionConfig& config, Pipeline
             return RAC_SUCCESS;
         case SolutionConfig::kRag:
             expand_rag(config.rag(), out_spec);
-            return RAC_SUCCESS;
-        case SolutionConfig::kWakeWord:
-            expand_wake_word(config.wake_word(), out_spec);
             return RAC_SUCCESS;
         case SolutionConfig::kAgentLoop:
             expand_agent_loop(config.agent_loop(), out_spec);

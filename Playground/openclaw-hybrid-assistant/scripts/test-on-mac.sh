@@ -152,11 +152,9 @@ echo "=== Building runanywhere-commons ==="
 echo "=== Downloading models ==="
 cd Playground/openclaw-hybrid-assistant
 ./scripts/download-models.sh
-./scripts/download-models.sh --wakeword
 
 echo "=== Generating test audio ==="
-chmod +x ./scripts/generate-test-audio.sh
-./scripts/generate-test-audio.sh
+./tests/scripts/generate-test-audio.sh
 
 echo "=== Building ==="
 mkdir -p build
@@ -204,8 +202,7 @@ test_with_orbstack() {
 
         cd Playground/openclaw-hybrid-assistant
         ./scripts/download-models.sh
-        ./scripts/download-models.sh --wakeword
-        ./scripts/generate-test-audio.sh
+        ./tests/scripts/generate-test-audio.sh
 
         mkdir -p build && cd build
         cmake .. -DCMAKE_BUILD_TYPE=Release

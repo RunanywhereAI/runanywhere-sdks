@@ -1,64 +1,97 @@
 // =============================================================================
-// Voice Pipeline - Implementation using runanywhere-commons Voice Agent
+// Voice Pipeline - Implementation using owned runanywhere-commons components
 // =============================================================================
 
 #include "voice_pipeline.h"
 #include "config/model_config.h"
 
-#include <rac/features/voice_agent/rac_voice_agent.h>
+#include <rac/core/rac_error.h>
+#include <rac/features/llm/rac_llm_component.h>
 #include <rac/features/stt/rac_stt_component.h>
 #include <rac/features/tts/rac_tts_component.h>
 #include <rac/features/vad/rac_vad_component.h>
-#include <rac/features/llm/rac_llm_component.h>
-#include <rac/backends/rac_wakeword_onnx.h>
-#include <rac/core/rac_error.h>
 
-#include <vector>
-#include <mutex>
-#include <iostream>
+#include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <iostream>
+#include <mutex>
+#include <vector>
 
 namespace runanywhere {
 
-// =============================================================================
-// Constants (matching iOS VoiceSession behavior)
-// =============================================================================
+namespace {
 
-// Minimum silence duration before treating speech as ended (iOS uses 1.5s)
-static constexpr double SILENCE_DURATION_SEC = 1.5;
+// Minimum silence duration before treating speech as ended.
+constexpr double SILENCE_DURATION_SEC = 1.5;
 
-// Minimum accumulated speech samples before processing (iOS uses 16000 = 0.5s at 16kHz)
-static constexpr size_t MIN_SPEECH_SAMPLES = 16000;
+// Require at least one second of 16 kHz input before processing a turn.
+constexpr size_t MIN_SPEECH_SAMPLES = 16000;
 
-// Wake word detection timeout - return to listening after this many seconds of silence
-static constexpr double WAKE_WORD_TIMEOUT_SEC = 10.0;
+std::string error_message(const char* operation, rac_result_t result) {
+    const char* detail = rac_error_message(result);
+    return std::string(operation) + " failed (" + std::to_string(result) + "): " +
+           (detail ? detail : "unknown error");
+}
 
-// Default TTS output sample rate (Piper default)
-static constexpr int TTS_DEFAULT_SAMPLE_RATE = 22050;
+bool deliver_tts_audio(const rac_tts_result_t& result, const AudioOutputCallback& callback) {
+    if (!callback) {
+        return true;
+    }
+    if (!result.audio_data || result.audio_size == 0 ||
+        result.audio_size % sizeof(float) != 0 || result.sample_rate <= 0) {
+        return false;
+    }
 
-// =============================================================================
-// Implementation
-// =============================================================================
+    // The configured Sherpa TTS backend emits normalized float PCM.
+    const auto* input = static_cast<const float*>(result.audio_data);
+    const size_t sample_count = result.audio_size / sizeof(float);
+    std::vector<int16_t> pcm16(sample_count);
+    for (size_t i = 0; i < sample_count; ++i) {
+        const float sample = std::clamp(input[i], -1.0f, 1.0f);
+        pcm16[i] = static_cast<int16_t>(std::lround(sample * 32767.0f));
+    }
+
+    callback(pcm16.data(), pcm16.size(), result.sample_rate);
+    return true;
+}
+
+}  // namespace
 
 struct VoicePipeline::Impl {
-    rac_voice_agent_handle_t voice_agent = nullptr;
+    rac_handle_t stt_component = nullptr;
+    rac_handle_t llm_component = nullptr;
+    rac_handle_t tts_component = nullptr;
+    rac_handle_t vad_component = nullptr;
 
-    // Wake word detector
-    rac_handle_t wakeword_handle = nullptr;
-    bool wakeword_enabled = false;
-    bool wakeword_activated = false;  // True after wake word detected, until command processed
-    std::chrono::steady_clock::time_point wakeword_activation_time;
-
-    // State
     bool speech_active = false;
     std::vector<int16_t> speech_buffer;
-
-    // Timestamp-based silence tracking (matches iOS VoiceSession pattern)
     std::chrono::steady_clock::time_point last_speech_time;
-    bool speech_callback_fired = false;  // Whether we notified "listening"
-
-    // Thread safety: protects shared state accessed from ALSA capture and main threads
+    bool speech_callback_fired = false;
     std::mutex mutex;
+
+    void reset_components() {
+        if (vad_component) {
+            rac_vad_component_destroy(vad_component);
+            vad_component = nullptr;
+        }
+        if (tts_component) {
+            rac_tts_component_destroy(tts_component);
+            tts_component = nullptr;
+        }
+        if (llm_component) {
+            rac_llm_component_destroy(llm_component);
+            llm_component = nullptr;
+        }
+        if (stt_component) {
+            rac_stt_component_destroy(stt_component);
+            stt_component = nullptr;
+        }
+    }
+
+    ~Impl() {
+        reset_components();
+    }
 };
 
 VoicePipeline::VoicePipeline()
@@ -72,14 +105,7 @@ VoicePipeline::VoicePipeline(const VoicePipelineConfig& config)
 
 VoicePipeline::~VoicePipeline() {
     stop();
-    if (impl_->wakeword_handle) {
-        rac_wakeword_onnx_destroy(impl_->wakeword_handle);
-        impl_->wakeword_handle = nullptr;
-    }
-    if (impl_->voice_agent) {
-        rac_voice_agent_destroy(impl_->voice_agent);
-        impl_->voice_agent = nullptr;
-    }
+    impl_->reset_components();
 }
 
 bool VoicePipeline::initialize() {
@@ -87,88 +113,85 @@ bool VoicePipeline::initialize() {
         return true;
     }
 
-    // Initialize model system (sets base directory)
+    last_error_.clear();
+    impl_->reset_components();
+
     if (!init_model_system()) {
         last_error_ = "Failed to initialize model system";
         return false;
     }
 
-    // Check if all models are available
     if (!are_all_models_available()) {
         last_error_ = "One or more models are missing. Run scripts/download-models.sh";
         print_model_status();
         return false;
     }
 
-    // Initialize wake word detector if enabled
-    if (config_.enable_wake_word) {
-        if (!initialize_wakeword()) {
-            // Wake word init failed, but continue without it
-            std::cerr << "Wake word initialization failed, continuing without wake word\n";
-            impl_->wakeword_enabled = false;
-        } else {
-            impl_->wakeword_enabled = true;
-            std::cout << "  Wake word detection enabled: \"" << config_.wake_word << "\"\n";
-        }
-    }
-
-    // Create standalone voice agent
-    rac_result_t result = rac_voice_agent_create_standalone(&impl_->voice_agent);
-    if (result != RAC_SUCCESS) {
-        last_error_ = "Failed to create voice agent";
-        return false;
-    }
-
-    // Get model paths
-    std::string stt_path = get_stt_model_path();
-    std::string llm_path = get_llm_model_path();
-    std::string tts_path = get_tts_model_path();
+    const std::string stt_path = get_stt_model_path();
+    const std::string llm_path = get_llm_model_path();
+    const std::string tts_path = get_tts_model_path();
+    const std::string vad_path = get_vad_model_path();
 
     std::cout << "Loading models..." << std::endl;
 
-    // Load STT model
-    std::cout << "  Loading STT: " << STT_MODEL_ID << std::endl;
-    result = rac_voice_agent_load_stt_model(
-        impl_->voice_agent,
-        stt_path.c_str(),
-        STT_MODEL_ID,
-        "Whisper Tiny English"
-    );
+    rac_result_t result = rac_stt_component_create(&impl_->stt_component);
+    if (result == RAC_SUCCESS) {
+        std::cout << "  Loading STT: " << STT_MODEL_ID << std::endl;
+        result = rac_stt_component_load_model(impl_->stt_component, stt_path.c_str(),
+                                              STT_MODEL_ID, "Whisper Tiny English");
+    }
     if (result != RAC_SUCCESS) {
-        last_error_ = "Failed to load STT model: " + stt_path;
+        last_error_ = error_message("STT initialization", result);
+        impl_->reset_components();
         return false;
     }
 
-    // Load LLM model
-    std::cout << "  Loading LLM: " << LLM_MODEL_ID << std::endl;
-    result = rac_voice_agent_load_llm_model(
-        impl_->voice_agent,
-        llm_path.c_str(),
-        LLM_MODEL_ID,
-        "Qwen3 1.7B"
-    );
+    result = rac_llm_component_create(&impl_->llm_component);
+    if (result == RAC_SUCCESS) {
+        std::cout << "  Loading LLM: " << LLM_MODEL_ID << std::endl;
+        result = rac_llm_component_load_model(impl_->llm_component, llm_path.c_str(),
+                                              LLM_MODEL_ID, "Qwen3 1.7B");
+    }
     if (result != RAC_SUCCESS) {
-        last_error_ = "Failed to load LLM model: " + llm_path;
+        last_error_ = error_message("LLM initialization", result);
+        impl_->reset_components();
         return false;
     }
 
-    // Load TTS voice
-    std::cout << "  Loading TTS: " << TTS_MODEL_ID << std::endl;
-    result = rac_voice_agent_load_tts_voice(
-        impl_->voice_agent,
-        tts_path.c_str(),
-        TTS_MODEL_ID,
-        "Piper Lessac US"
-    );
+    result = rac_tts_component_create(&impl_->tts_component);
+    if (result == RAC_SUCCESS) {
+        std::cout << "  Loading TTS: " << TTS_MODEL_ID << std::endl;
+        result = rac_tts_component_load_voice(impl_->tts_component, tts_path.c_str(),
+                                              TTS_MODEL_ID, "Piper Lessac US");
+    }
     if (result != RAC_SUCCESS) {
-        last_error_ = "Failed to load TTS voice: " + tts_path;
+        last_error_ = error_message("TTS initialization", result);
+        impl_->reset_components();
         return false;
     }
 
-    // Initialize with loaded models
-    result = rac_voice_agent_initialize_with_loaded_models(impl_->voice_agent);
+    result = rac_vad_component_create(&impl_->vad_component);
+    if (result == RAC_SUCCESS) {
+        rac_vad_config_t vad_config = RAC_VAD_CONFIG_DEFAULT;
+        vad_config.sample_rate = config_.vad_sample_rate;
+        vad_config.energy_threshold = config_.vad_threshold;
+        result = rac_vad_component_configure(impl_->vad_component, &vad_config);
+    }
+    if (result == RAC_SUCCESS) {
+        result = rac_vad_component_initialize(impl_->vad_component);
+    }
+    if (result == RAC_SUCCESS) {
+        std::cout << "  Loading VAD: " << VAD_MODEL_ID << std::endl;
+        result = rac_vad_component_load_model(impl_->vad_component, vad_path.c_str(),
+                                              VAD_MODEL_ID, "Silero VAD");
+    }
+    if (result == RAC_SUCCESS) {
+        result = rac_vad_component_set_energy_threshold(impl_->vad_component,
+                                                        config_.vad_threshold);
+    }
     if (result != RAC_SUCCESS) {
-        last_error_ = "Failed to initialize voice agent";
+        last_error_ = error_message("VAD initialization", result);
+        impl_->reset_components();
         return false;
     }
 
@@ -177,161 +200,51 @@ bool VoicePipeline::initialize() {
     return true;
 }
 
-bool VoicePipeline::initialize_wakeword() {
-    // Check if wake word models are available
-    if (!are_wakeword_models_available()) {
-        last_error_ = "Wake word models not available";
-        return false;
-    }
-
-    // Create wake word detector with default config
-    rac_wakeword_onnx_config_t ww_config = RAC_WAKEWORD_ONNX_CONFIG_DEFAULT;
-    ww_config.threshold = config_.wake_word_threshold;
-
-    rac_result_t result = rac_wakeword_onnx_create(&ww_config, &impl_->wakeword_handle);
-    if (result != RAC_SUCCESS) {
-        last_error_ = "Failed to create wake word detector";
-        return false;
-    }
-
-    // Get model paths
-    std::string embedding_path = get_wakeword_embedding_path();
-    std::string melspec_path = get_wakeword_melspec_path();
-    std::string wakeword_path = get_wakeword_model_path();
-
-    std::cout << "  Loading Wake Word models..." << std::endl;
-
-    // Initialize shared models (embedding + melspectrogram for openWakeWord pipeline)
-    result = rac_wakeword_onnx_init_shared_models(
-        impl_->wakeword_handle,
-        embedding_path.c_str(),
-        melspec_path.c_str()
-    );
-    if (result != RAC_SUCCESS) {
-        last_error_ = "Failed to load wake word embedding model: " + embedding_path;
-        rac_wakeword_onnx_destroy(impl_->wakeword_handle);
-        impl_->wakeword_handle = nullptr;
-        return false;
-    }
-
-    // Load the wake word model
-    result = rac_wakeword_onnx_load_model(
-        impl_->wakeword_handle,
-        wakeword_path.c_str(),
-        WAKEWORD_MODEL_ID,
-        config_.wake_word.c_str()
-    );
-    if (result != RAC_SUCCESS) {
-        last_error_ = "Failed to load wake word model: " + wakeword_path;
-        rac_wakeword_onnx_destroy(impl_->wakeword_handle);
-        impl_->wakeword_handle = nullptr;
-        return false;
-    }
-
-    std::cout << "  Wake word model loaded: " << config_.wake_word << std::endl;
-    return true;
-}
-
 bool VoicePipeline::is_ready() const {
-    if (!impl_->voice_agent) {
-        return false;
-    }
-    rac_bool_t ready = RAC_FALSE;
-    rac_voice_agent_is_ready(impl_->voice_agent, &ready);
-    return ready == RAC_TRUE;
+    return initialized_ && impl_->stt_component && impl_->llm_component &&
+           impl_->tts_component && impl_->vad_component &&
+           rac_stt_component_is_loaded(impl_->stt_component) == RAC_TRUE &&
+           rac_llm_component_is_loaded(impl_->llm_component) == RAC_TRUE &&
+           rac_tts_component_is_loaded(impl_->tts_component) == RAC_TRUE &&
+           rac_vad_component_is_loaded(impl_->vad_component) == RAC_TRUE;
 }
 
 void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
-    if (!initialized_ || !running_) {
+    if (!initialized_ || !running_ || !samples || num_samples == 0) {
         return;
     }
 
     std::lock_guard<std::mutex> lock(impl_->mutex);
 
-    // Convert to float for processing
     std::vector<float> float_samples(num_samples);
     for (size_t i = 0; i < num_samples; ++i) {
         float_samples[i] = samples[i] / 32768.0f;
     }
 
-    auto now = std::chrono::steady_clock::now();
-
-    // If wake word is enabled and not yet activated, check for wake word first
-    if (impl_->wakeword_enabled && !impl_->wakeword_activated) {
-        int32_t detected_index = -1;
-        float confidence = 0.0f;
-
-        rac_result_t result = rac_wakeword_onnx_process(
-            impl_->wakeword_handle,
-            float_samples.data(),
-            num_samples,
-            &detected_index,
-            &confidence
-        );
-
-        if (result == RAC_SUCCESS && detected_index >= 0) {
-            // Wake word detected!
-            impl_->wakeword_activated = true;
-            impl_->wakeword_activation_time = now;
-            impl_->speech_buffer.clear();
-            impl_->speech_active = false;
-            impl_->speech_callback_fired = false;
-
-            // Fire wake word callback
-            if (config_.on_wake_word) {
-                config_.on_wake_word(config_.wake_word, confidence);
-            }
+    rac_bool_t is_speech = RAC_FALSE;
+    const rac_result_t result = rac_vad_component_process(
+        impl_->vad_component, float_samples.data(), num_samples, &is_speech);
+    if (result != RAC_SUCCESS) {
+        if (config_.on_error) {
+            config_.on_error(error_message("VAD processing", result));
         }
-
-        // Don't process further until wake word is detected
         return;
     }
 
-    // Check for wake word timeout (return to wake word listening mode)
-    if (impl_->wakeword_enabled && impl_->wakeword_activated && !impl_->speech_active) {
-        double elapsed = std::chrono::duration<double>(
-            now - impl_->wakeword_activation_time
-        ).count();
-
-        if (elapsed >= WAKE_WORD_TIMEOUT_SEC) {
-            // Timeout - go back to listening for wake word
-            impl_->wakeword_activated = false;
-            impl_->speech_buffer.clear();
-            impl_->speech_callback_fired = false;
-            return;
-        }
-    }
-
-    // Detect speech via VAD
-    rac_bool_t is_speech = RAC_FALSE;
-    rac_voice_agent_detect_speech(
-        impl_->voice_agent,
-        float_samples.data(),
-        num_samples,
-        &is_speech
-    );
-
-    bool speech_detected = (is_speech == RAC_TRUE);
+    const bool speech_detected = is_speech == RAC_TRUE;
+    const auto now = std::chrono::steady_clock::now();
 
     if (speech_detected) {
-        // Update last speech timestamp
         impl_->last_speech_time = now;
 
-        // Also update wake word activation time to keep session alive
-        if (impl_->wakeword_enabled) {
-            impl_->wakeword_activation_time = now;
-        }
-
         if (!impl_->speech_active) {
-            // Speech just started — begin accumulating
             impl_->speech_active = true;
             impl_->speech_buffer.clear();
             impl_->speech_callback_fired = false;
         }
 
-        // Fire "listening" callback once we have enough samples
-        if (!impl_->speech_callback_fired
-            && impl_->speech_buffer.size() + num_samples >= MIN_SPEECH_SAMPLES) {
+        if (!impl_->speech_callback_fired &&
+            impl_->speech_buffer.size() + num_samples >= MIN_SPEECH_SAMPLES) {
             impl_->speech_callback_fired = true;
             if (config_.on_voice_activity) {
                 config_.on_voice_activity(true);
@@ -339,140 +252,160 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
         }
     }
 
-    // Accumulate audio while speech session is active (including silence grace period)
     if (impl_->speech_active) {
-        impl_->speech_buffer.insert(
-            impl_->speech_buffer.end(),
-            samples, samples + num_samples
-        );
+        impl_->speech_buffer.insert(impl_->speech_buffer.end(), samples,
+                                    samples + num_samples);
     }
 
-    // Check if silence has lasted long enough to end the speech session
     if (impl_->speech_active && !speech_detected) {
-        double silence_elapsed = std::chrono::duration<double>(
-            now - impl_->last_speech_time
-        ).count();
+        const double silence_elapsed =
+            std::chrono::duration<double>(now - impl_->last_speech_time).count();
 
         if (silence_elapsed >= SILENCE_DURATION_SEC) {
-            // Silence timeout reached — end speech session
             impl_->speech_active = false;
 
             if (config_.on_voice_activity) {
                 config_.on_voice_activity(false);
             }
 
-            // Only process if we accumulated enough speech
             if (impl_->speech_buffer.size() >= MIN_SPEECH_SAMPLES) {
-                process_voice_turn(
-                    impl_->speech_buffer.data(),
-                    impl_->speech_buffer.size()
-                );
+                process_voice_turn(impl_->speech_buffer.data(), impl_->speech_buffer.size());
             }
 
             impl_->speech_buffer.clear();
             impl_->speech_callback_fired = false;
-
-            // After processing command, go back to wake word mode
-            if (impl_->wakeword_enabled) {
-                impl_->wakeword_activated = false;
-                rac_wakeword_onnx_reset(impl_->wakeword_handle);
-            }
+            (void)rac_vad_component_reset(impl_->vad_component);
         }
     }
 }
 
 bool VoicePipeline::process_voice_turn(const int16_t* samples, size_t num_samples) {
-    if (!initialized_) {
+    if (!is_ready() || !samples || num_samples == 0) {
         return false;
     }
 
-    // Use voice agent to process complete turn (local STT -> LLM -> TTS)
-    rac_voice_agent_result_t result = {};
-
-    rac_result_t status = rac_voice_agent_process_voice_turn(
-        impl_->voice_agent,
-        samples,
-        num_samples * sizeof(int16_t),
-        &result
-    );
-
+    rac_stt_options_t stt_options = RAC_STT_OPTIONS_DEFAULT;
+    stt_options.sample_rate = config_.vad_sample_rate;
+    rac_stt_result_t stt_result = {};
+    rac_result_t status = rac_stt_component_transcribe(
+        impl_->stt_component, samples, num_samples * sizeof(int16_t), &stt_options,
+        &stt_result);
     if (status != RAC_SUCCESS) {
+        rac_stt_result_free(&stt_result);
         if (config_.on_error) {
-            config_.on_error("Voice processing failed");
+            config_.on_error(error_message("Speech transcription", status));
         }
         return false;
     }
 
-    // Report transcription
-    if (result.transcription && config_.on_transcription) {
-        config_.on_transcription(result.transcription, true);
+    const std::string transcription = stt_result.text ? stt_result.text : "";
+    rac_stt_result_free(&stt_result);
+    if (transcription.empty()) {
+        return false;
+    }
+    if (config_.on_transcription) {
+        config_.on_transcription(transcription, true);
     }
 
-    // Report LLM response
-    if (result.response && config_.on_response) {
-        config_.on_response(result.response, true);
+    rac_llm_options_t llm_options = RAC_LLM_OPTIONS_DEFAULT;
+    llm_options.max_tokens = config_.max_tokens;
+    llm_options.temperature = config_.temperature;
+    llm_options.system_prompt = config_.system_prompt.c_str();
+
+    rac_llm_result_t llm_result = {};
+    status = rac_llm_component_generate(impl_->llm_component, transcription.c_str(),
+                                        &llm_options, &llm_result);
+    if (status != RAC_SUCCESS) {
+        rac_llm_result_free(&llm_result);
+        if (config_.on_error) {
+            config_.on_error(error_message("Response generation", status));
+        }
+        return false;
     }
 
-    // Report TTS audio
-    if (result.synthesized_audio && result.synthesized_audio_size > 0 && config_.on_audio_output) {
-        config_.on_audio_output(
-            static_cast<const int16_t*>(result.synthesized_audio),
-            result.synthesized_audio_size / sizeof(int16_t),
-            TTS_DEFAULT_SAMPLE_RATE
-        );
+    const std::string response = llm_result.text ? llm_result.text : "";
+    rac_llm_result_free(&llm_result);
+    if (response.empty()) {
+        if (config_.on_error) {
+            config_.on_error("Response generation returned empty text");
+        }
+        return false;
+    }
+    if (config_.on_response) {
+        config_.on_response(response, true);
     }
 
-    // Capture before freeing (use-after-free fix)
-    bool detected = (result.speech_detected == RAC_TRUE);
+    rac_tts_options_t tts_options = RAC_TTS_OPTIONS_DEFAULT;
+    tts_options.rate = config_.speaking_rate;
+    rac_tts_result_t tts_result = {};
+    status = rac_tts_component_synthesize(impl_->tts_component, response.c_str(),
+                                          &tts_options, &tts_result);
+    if (status != RAC_SUCCESS) {
+        rac_tts_result_free(&tts_result);
+        if (config_.on_error) {
+            config_.on_error(error_message("Speech synthesis", status));
+        }
+        return false;
+    }
 
-    // Free result
-    rac_voice_agent_result_free(&result);
-
-    return detected;
+    const bool delivered = deliver_tts_audio(tts_result, config_.on_audio_output);
+    rac_tts_result_free(&tts_result);
+    if (!delivered && config_.on_error) {
+        config_.on_error("Speech synthesis returned invalid audio");
+    }
+    return delivered;
 }
 
 bool VoicePipeline::speak_text(const std::string& text) {
-    if (!initialized_ || !impl_->voice_agent) {
+    if (!is_ready() || text.empty()) {
         return false;
     }
 
-    // Synthesize speech using local TTS
-    void* audio_data = nullptr;
-    size_t audio_size = 0;
-    rac_result_t status = rac_voice_agent_synthesize_speech(
-        impl_->voice_agent,
-        text.c_str(),
-        &audio_data,
-        &audio_size
-    );
-
-    if (status == RAC_SUCCESS && audio_data && audio_size > 0) {
-        if (config_.on_audio_output) {
-            config_.on_audio_output(
-                static_cast<const int16_t*>(audio_data),
-                audio_size / sizeof(int16_t),
-                TTS_DEFAULT_SAMPLE_RATE
-            );
+    rac_tts_options_t options = RAC_TTS_OPTIONS_DEFAULT;
+    options.rate = config_.speaking_rate;
+    rac_tts_result_t result = {};
+    const rac_result_t status = rac_tts_component_synthesize(
+        impl_->tts_component, text.c_str(), &options, &result);
+    if (status != RAC_SUCCESS) {
+        rac_tts_result_free(&result);
+        if (config_.on_error) {
+            config_.on_error(error_message("Speech synthesis", status));
         }
-        free(audio_data);
-        return true;
+        return false;
     }
 
-    return false;
+    const bool delivered = deliver_tts_audio(result, config_.on_audio_output);
+    rac_tts_result_free(&result);
+    if (!delivered && config_.on_error) {
+        config_.on_error("Speech synthesis returned invalid audio");
+    }
+    return delivered;
 }
 
 void VoicePipeline::start() {
+    if (!initialized_ || !impl_->vad_component) {
+        return;
+    }
+    const rac_result_t result = rac_vad_component_start(impl_->vad_component);
+    if (result != RAC_SUCCESS) {
+        last_error_ = error_message("VAD start", result);
+        if (config_.on_error) {
+            config_.on_error(last_error_);
+        }
+        return;
+    }
     running_ = true;
-    impl_->wakeword_activated = false;  // Start in wake word listening mode
 }
 
 void VoicePipeline::stop() {
     running_ = false;
+    if (impl_->vad_component) {
+        (void)rac_vad_component_stop(impl_->vad_component);
+    }
     std::lock_guard<std::mutex> lock(impl_->mutex);
     impl_->speech_active = false;
     impl_->speech_buffer.clear();
     impl_->speech_callback_fired = false;
-    impl_->wakeword_activated = false;
 }
 
 bool VoicePipeline::is_running() const {
@@ -480,20 +413,17 @@ bool VoicePipeline::is_running() const {
 }
 
 void VoicePipeline::cancel() {
-    // Cancel any ongoing generation
-    // Note: Voice agent API may not support mid-generation cancellation
+    if (impl_->llm_component) {
+        (void)rac_llm_component_cancel(impl_->llm_component);
+    }
+    if (impl_->tts_component) {
+        (void)rac_tts_component_stop(impl_->tts_component);
+    }
+
     std::lock_guard<std::mutex> lock(impl_->mutex);
     impl_->speech_active = false;
     impl_->speech_buffer.clear();
     impl_->speech_callback_fired = false;
-
-    // Return to wake word mode if enabled
-    if (impl_->wakeword_enabled) {
-        impl_->wakeword_activated = false;
-        if (impl_->wakeword_handle) {
-            rac_wakeword_onnx_reset(impl_->wakeword_handle);
-        }
-    }
 }
 
 void VoicePipeline::set_config(const VoicePipelineConfig& config) {
@@ -501,27 +431,27 @@ void VoicePipeline::set_config(const VoicePipelineConfig& config) {
 }
 
 std::string VoicePipeline::get_stt_model_id() const {
-    if (impl_->voice_agent) {
-        const char* id = rac_voice_agent_get_stt_model_id(impl_->voice_agent);
-        return id ? id : "";
+    if (!impl_->stt_component) {
+        return "";
     }
-    return "";
+    const char* id = rac_stt_component_get_model_id(impl_->stt_component);
+    return id ? id : "";
 }
 
 std::string VoicePipeline::get_llm_model_id() const {
-    if (impl_->voice_agent) {
-        const char* id = rac_voice_agent_get_llm_model_id(impl_->voice_agent);
-        return id ? id : "";
+    if (!impl_->llm_component) {
+        return "";
     }
-    return "";
+    const char* id = rac_llm_component_get_model_id(impl_->llm_component);
+    return id ? id : "";
 }
 
 std::string VoicePipeline::get_tts_model_id() const {
-    if (impl_->voice_agent) {
-        const char* id = rac_voice_agent_get_tts_voice_id(impl_->voice_agent);
-        return id ? id : "";
+    if (!impl_->tts_component) {
+        return "";
     }
-    return "";
+    const char* id = rac_tts_component_get_voice_id(impl_->tts_component);
+    return id ? id : "";
 }
 
-} // namespace runanywhere
+}  // namespace runanywhere

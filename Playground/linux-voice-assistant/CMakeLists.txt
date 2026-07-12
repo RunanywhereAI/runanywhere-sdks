@@ -100,7 +100,10 @@ set(HEADERS
 add_executable(voice-assistant ${SOURCES} ${HEADERS})
 
 # Test pipeline binary (feeds WAV file through the full pipeline)
-add_executable(test-pipeline tests/test_pipeline.cpp)
+add_executable(test-pipeline
+    tests/test_pipeline.cpp
+    src/pipeline/voice_pipeline.cpp
+)
 
 # =============================================================================
 # Include Directories
@@ -131,7 +134,7 @@ target_link_directories(voice-assistant PRIVATE
 target_link_libraries(voice-assistant PRIVATE
     # RunAnywhere Commons
     rac_commons
-    rac_backend_onnx
+    rac_backend_sherpa
     rac_backend_llamacpp
 
     # Sherpa-ONNX (for STT/TTS/VAD)
@@ -188,7 +191,7 @@ target_link_directories(test-pipeline PRIVATE
 
 target_link_libraries(test-pipeline PRIVATE
     rac_commons
-    rac_backend_onnx
+    rac_backend_sherpa
     rac_backend_llamacpp
     sherpa-onnx-c-api
     onnxruntime

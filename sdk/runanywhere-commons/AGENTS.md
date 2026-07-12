@@ -113,7 +113,7 @@ scripts/build-windows.bat
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                    Engine Plugins                                 │
 │  llamacpp (LLM+VLM) | sherpa (STT+TTS+VAD)                       │
-│  onnx (Embed+WakeWord) | coreml (Image/Diffusion, Apple)         │
+│  onnx (Embed) | coreml (Image/Diffusion, Apple)                  │
 │  qhexrt (LLM+VLM+STT+TTS, HNPU) | platform (Apple FM+TTS+Diff)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -178,7 +178,7 @@ Foundation Models, System TTS, and CoreML Diffusion all use the same pattern:
 - **Lock-copy-dispatch** in event publisher — prevents deadlock if callbacks re-enter
 - **Atomic cancel** in LLM component — `cancel_requested` is `std::atomic<bool>`, read without mutex in the token callback to avoid deadlock with the generating thread
 - **Lifecycle refcount pinning** — `rac_lifecycle_acquire_service/release_service` prevents model unload during active inference; unload waits on `condition_variable` for refcount == 0
-- **Lock-free VAD path** in voice agent — `rac_voice_agent_detect_speech()` uses `in_flight` atomic counter instead of mutex for real-time audio; `destroy()` spins on `in_flight > 0` after setting `is_shutting_down`
+- **VAD component backend selection** — `rac_vad_component_*` routes model-backed operations through the selected plugin and falls back to the component-owned energy VAD when no model is loaded
 - **Energy VAD hot path** — mean-square computed without sqrt (compares `mean_sq > threshold_sq`); 4-way loop unrolling; callbacks deferred outside lock
 
 ### Voice Agent Pipeline
@@ -277,7 +277,6 @@ Add new codes to `rac_error.h`, add case to `rac_error_message()` in `rac_error.
 | **llamacpp-vlm** | VLM | GGUF + mmproj | llama.cpp mtmd | `rac_backend_llamacpp_vlm_register()` |
 | **sherpa** | STT, TTS, VAD | ONNX | Sherpa-ONNX C API | `rac_backend_sherpa_register()` |
 | **onnx-embeddings** | Embed | ONNX | Sherpa-ONNX | `rac_backend_onnx_embeddings_register()` |
-| **onnx-wakeword** | WakeWord | ONNX | openWakeWord | `rac_backend_wakeword_onnx_register()` |
 | **qhexrt** | LLM, VLM, STT, TTS | QNN context bundle | QHexRT / Hexagon NPU | `rac_backend_qhexrt_register()` |
 | **platform** | LLM, TTS, Diffusion (Apple) | builtin:// | Swift callbacks | `rac_backend_platform_register()` |
 

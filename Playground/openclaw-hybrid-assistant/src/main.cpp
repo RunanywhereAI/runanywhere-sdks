@@ -2,7 +2,7 @@
 // OpenClaw Hybrid Assistant - Main Entry Point
 // =============================================================================
 // A lightweight voice channel for OpenClaw.
-// NO local LLM - just Wake Word + VAD + ASR → OpenClaw, TTS ← OpenClaw
+// NO local LLM - just VAD + ASR → OpenClaw, TTS ← OpenClaw
 //
 // Usage: ./openclaw-assistant [options]
 //
@@ -10,11 +10,8 @@
 //   --list-devices           List available audio devices
 //   --input <device>         Audio input device (default: "default")
 //   --output <device>        Audio output device (default: "default")
-//   --wakeword               Enable wake word detection ("Hey Jarvis")
-//   --wakeword-threshold <f> Wake word threshold 0.0-1.0 (default: 0.5)
 //   --openclaw-url <url>     OpenClaw WebSocket URL (default: "ws://localhost:8082")
 //   --device-id <id>         Device identifier (default: hostname)
-//   --debug-wakeword         Enable wake word debug logging
 //   --debug-vad              Enable VAD debug logging
 //   --debug-stt              Enable STT debug logging
 //   --help                   Show this help message
@@ -31,8 +28,8 @@
 #include "audio/waiting_chime.h"
 
 // Backend registration
-#include <rac/backends/rac_vad_onnx.h>
-#include <rac/backends/rac_wakeword_onnx.h>
+#include <rac/plugin/rac_plugin_entry_onnx.h>
+#include <rac/plugin/rac_plugin_entry_sherpa.h>
 
 #include <iostream>
 #include <csignal>
@@ -67,9 +64,6 @@ struct AppConfig {
     std::string device_id;
     bool list_devices = false;
     bool show_help = false;
-    bool enable_wakeword = false;
-    float wakeword_threshold = 0.5f;
-    bool debug_wakeword = false;
     bool debug_vad = false;
     bool debug_stt = false;
     bool debug_audio = false;
@@ -83,11 +77,8 @@ void print_usage(const char* prog_name) {
               << "  --list-devices           List available audio devices\n"
               << "  --input <device>         Audio input device (default: \"default\")\n"
               << "  --output <device>        Audio output device (default: \"default\")\n"
-              << "  --wakeword               Enable wake word detection (\"Hey Jarvis\")\n"
-              << "  --wakeword-threshold <f> Wake word threshold 0.0-1.0 (default: 0.5)\n"
               << "  --openclaw-url <url>     OpenClaw WebSocket URL (default: \"ws://localhost:8082\")\n"
               << "  --device-id <id>         Device identifier (default: hostname)\n"
-              << "  --debug-wakeword         Enable wake word debug logging\n"
               << "  --debug-vad              Enable VAD debug logging\n"
               << "  --debug-stt              Enable STT debug logging\n"
               << "  --debug-audio            Enable mic audio level logging (RMS, peak)\n"
@@ -115,20 +106,10 @@ AppConfig parse_args(int argc, char* argv[]) {
             config.input_device = argv[++i];
         } else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
             config.output_device = argv[++i];
-        } else if (strcmp(argv[i], "--wakeword") == 0) {
-            config.enable_wakeword = true;
-        } else if (strcmp(argv[i], "--wakeword-threshold") == 0 && i + 1 < argc) {
-            try {
-                config.wakeword_threshold = std::stof(argv[++i]);
-            } catch (const std::exception&) {
-                std::cerr << "Invalid wakeword threshold, using default 0.5\n";
-            }
         } else if (strcmp(argv[i], "--openclaw-url") == 0 && i + 1 < argc) {
             config.openclaw_url = argv[++i];
         } else if (strcmp(argv[i], "--device-id") == 0 && i + 1 < argc) {
             config.device_id = argv[++i];
-        } else if (strcmp(argv[i], "--debug-wakeword") == 0) {
-            config.debug_wakeword = true;
         } else if (strcmp(argv[i], "--debug-vad") == 0) {
             config.debug_vad = true;
         } else if (strcmp(argv[i], "--debug-stt") == 0) {
@@ -188,7 +169,7 @@ int main(int argc, char* argv[]) {
 
     // Check model availability
     std::cout << "Checking models...\n";
-    openclaw::print_model_status(app_config.enable_wakeword);
+    openclaw::print_model_status();
     std::cout << std::endl;
 
     if (!openclaw::are_all_models_available()) {
@@ -196,15 +177,6 @@ int main(int argc, char* argv[]) {
                   << "Please run: ./scripts/download-models.sh\n"
                   << std::endl;
         return 1;
-    }
-
-    // Check wake word models if enabled
-    if (app_config.enable_wakeword && !openclaw::are_wakeword_models_available()) {
-        std::cerr << "WARNING: Wake word models are missing!\n"
-                  << "Please run: ./scripts/download-models.sh --wakeword\n"
-                  << "Disabling wake word detection.\n"
-                  << std::endl;
-        app_config.enable_wakeword = false;
     }
 
     // =============================================================================
@@ -216,17 +188,16 @@ int main(int argc, char* argv[]) {
     if (reg_result != RAC_SUCCESS) {
         std::cerr << "WARNING: Failed to register ONNX backend (code: " << reg_result << ")\n";
     } else {
-        std::cout << "  ONNX backend registered (STT, TTS, VAD)\n";
+        std::cout << "  ONNX backend registered (embeddings)\n";
     }
 
-    if (app_config.enable_wakeword) {
-        reg_result = rac_backend_wakeword_onnx_register();
-        if (reg_result != RAC_SUCCESS) {
-            std::cerr << "WARNING: Failed to register Wake Word backend (code: " << reg_result << ")\n";
-        } else {
-            std::cout << "  Wake Word backend registered (openWakeWord)\n";
-        }
+    reg_result = rac_backend_sherpa_register();
+    if (reg_result != RAC_SUCCESS) {
+        std::cerr << "WARNING: Failed to register Sherpa backend (code: " << reg_result << ")\n";
+    } else {
+        std::cout << "  Sherpa backend registered (STT, TTS, VAD)\n";
     }
+
     std::cout << std::endl;
 
     // =============================================================================
@@ -293,32 +264,15 @@ int main(int argc, char* argv[]) {
 
     openclaw::VoicePipelineConfig pipeline_config;
 
-    // Configure wake word (optional)
-    pipeline_config.enable_wake_word = app_config.enable_wakeword;
-    if (app_config.enable_wakeword) {
-        pipeline_config.wake_word = "Hey Jarvis";
-        pipeline_config.wake_word_threshold = app_config.wakeword_threshold;
-    }
-
     // Debug settings
-    pipeline_config.debug_wakeword = app_config.debug_wakeword;
     pipeline_config.debug_vad = app_config.debug_vad;
     pipeline_config.debug_stt = app_config.debug_stt;
     pipeline_config.debug_audio = app_config.debug_audio;
 
-    // Wake word callback
-    pipeline_config.on_wake_word = [](const std::string& wake_word, float confidence) {
-        std::cout << "\n*** Wake word detected: \"" << wake_word
-                  << "\" (confidence: " << confidence << ") ***\n"
-                  << "[Listening for command...]" << std::flush;
-    };
-
     // Voice activity callback
-    pipeline_config.on_voice_activity = [&app_config](bool is_speaking) {
+    pipeline_config.on_voice_activity = [](bool is_speaking) {
         if (is_speaking) {
-            if (!app_config.enable_wakeword) {
-                std::cout << "\n[Listening...]" << std::flush;
-            }
+            std::cout << "\n[Listening...]" << std::flush;
         } else {
             std::cout << " [Processing...]\n" << std::flush;
         }
@@ -348,7 +302,7 @@ int main(int argc, char* argv[]) {
         }
     };
 
-    // TTS audio callback — uses cancellable play for instant barge-in silence
+    // TTS audio callback with cooperative cancellation.
     pipeline_config.on_audio_output = [&playback, &playback_mutex](const int16_t* samples, size_t num_samples,
                                                    int sample_rate, const std::atomic<bool>& cancel_flag) {
         std::lock_guard<std::mutex> lock(playback_mutex);
@@ -365,7 +319,7 @@ int main(int argc, char* argv[]) {
         playback.stop();
     };
 
-    // Clear stale speak messages on barge-in (called during cancel_speech)
+    // Clear stale speak messages when speech playback is cancelled.
     pipeline_config.on_cancel_pending_responses = [&openclaw_client]() {
         openclaw_client.clear_speak_queue();
     };
@@ -373,14 +327,6 @@ int main(int argc, char* argv[]) {
     // Error callback
     pipeline_config.on_error = [](const std::string& error) {
         std::cerr << "[ERROR] " << error << std::endl;
-    };
-
-    // Barge-in callback: wake word detected during TTS playback
-    pipeline_config.on_speech_interrupted = [&waiting_chime_ptr]() {
-        std::cout << "[BARGE-IN] Speech interrupted by wake word\n";
-        if (waiting_chime_ptr) {
-            waiting_chime_ptr->stop();
-        }
     };
 
     openclaw::VoicePipeline pipeline(pipeline_config);
@@ -436,11 +382,7 @@ int main(int argc, char* argv[]) {
               << "OpenClaw Hybrid Assistant is ready!\n"
               << "Mode: OpenClaw Channel (NO local LLM)\n"
               << "OpenClaw URL: " << app_config.openclaw_url << "\n";
-    if (app_config.enable_wakeword) {
-        std::cout << "Say \"Hey Jarvis\" to activate.\n";
-    } else {
-        std::cout << "Speak to interact.\n";
-    }
+    std::cout << "Speak to interact.\n";
     std::cout << "Press Ctrl+C to exit.\n"
               << "========================================\n"
               << std::endl;

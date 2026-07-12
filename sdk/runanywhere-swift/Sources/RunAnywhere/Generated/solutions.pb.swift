@@ -38,7 +38,6 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
   case unspecified // = 0
   case voiceAgent // = 1
   case rag // = 2
-  case wakeword // = 3
   case timeSeries // = 4
   case agentLoop // = 5
   case UNRECOGNIZED(Int)
@@ -52,7 +51,6 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 0: self = .unspecified
     case 1: self = .voiceAgent
     case 2: self = .rag
-    case 3: self = .wakeword
     case 4: self = .timeSeries
     case 5: self = .agentLoop
     default: self = .UNRECOGNIZED(rawValue)
@@ -64,7 +62,6 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .unspecified: return 0
     case .voiceAgent: return 1
     case .rag: return 2
-    case .wakeword: return 3
     case .timeSeries: return 4
     case .agentLoop: return 5
     case .UNRECOGNIZED(let i): return i
@@ -76,7 +73,6 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
     .unspecified,
     .voiceAgent,
     .rag,
-    .wakeword,
     .timeSeries,
     .agentLoop,
   ]
@@ -197,14 +193,6 @@ public nonisolated struct RASolutionConfig: Sendable {
     set {config = .rag(newValue)}
   }
 
-  public var wakeWord: RAWakeWordConfig {
-    get {
-      if case .wakeWord(let v)? = config {return v}
-      return RAWakeWordConfig()
-    }
-    set {config = .wakeWord(newValue)}
-  }
-
   public var agentLoop: RAAgentLoopConfig {
     get {
       if case .agentLoop(let v)? = config {return v}
@@ -226,7 +214,6 @@ public nonisolated struct RASolutionConfig: Sendable {
   public nonisolated enum OneOf_Config: Equatable, Sendable {
     case voiceAgent(RAVoiceAgentConfig)
     case rag(RARAGConfig)
-    case wakeWord(RAWakeWordConfig)
     case agentLoop(RAAgentLoopConfig)
     case timeSeries(RATimeSeriesConfig)
 
@@ -254,7 +241,7 @@ public nonisolated struct RASolutionHandle: Sendable {
   public var handleID: String = String()
 
   /// String discriminator for the solution kind, e.g. "voice_agent",
-  /// "rag", "wakeword", "time_series", "agent_loop". Free-form for
+  /// "rag", "time_series", "agent_loop". Free-form for
   /// forward-compat with future solutions; canonical values match the
   /// `SolutionType` enum names lower-cased.
   public var solutionType: String = String()
@@ -468,46 +455,6 @@ public nonisolated struct RARAGConfig: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// Wake word — always-on listener that emits a pulse on keyword detection.
-/// ---------------------------------------------------------------------------
-public nonisolated struct RAWakeWordConfig: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// e.g. "hey-mycroft-v1", "kws-zipformer-gigaspeech"
-  public var modelID: String = String()
-
-  /// Phrase to detect
-  public var keyword: String = String()
-
-  /// 0.0..1.0, engine-dependent
-  public var threshold: Float = 0
-
-  /// How much audio to emit before the trigger
-  public var preRollMs: Int32 = 0
-
-  /// default 16000
-  public var sampleRateHz: Int32 = 0
-
-  /// Optional explicit solution-kind tag. See `SolutionType`.
-  public var typeKind: RASolutionType {
-    get {_typeKind ?? .unspecified}
-    set {_typeKind = newValue}
-  }
-  /// Returns true if `typeKind` has been explicitly set.
-  public var hasTypeKind: Bool {self._typeKind != nil}
-  /// Clears the value of `typeKind`. Subsequent reads from it will return its default value.
-  public mutating func clearTypeKind() {self._typeKind = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _typeKind: RASolutionType? = nil
-}
-
-/// ---------------------------------------------------------------------------
 /// Agent loop — multi-turn LLM with tool calling.
 /// ---------------------------------------------------------------------------
 public nonisolated struct RAAgentLoopConfig: Sendable {
@@ -601,7 +548,7 @@ public nonisolated struct RATimeSeriesConfig: Sendable {
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
 nonisolated extension RASolutionType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SOLUTION_TYPE_UNSPECIFIED\0\u{1}SOLUTION_TYPE_VOICE_AGENT\0\u{1}SOLUTION_TYPE_RAG\0\u{1}SOLUTION_TYPE_WAKEWORD\0\u{1}SOLUTION_TYPE_TIME_SERIES\0\u{1}SOLUTION_TYPE_AGENT_LOOP\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SOLUTION_TYPE_UNSPECIFIED\0\u{1}SOLUTION_TYPE_VOICE_AGENT\0\u{1}SOLUTION_TYPE_RAG\0\u{2}\u{2}SOLUTION_TYPE_TIME_SERIES\0\u{1}SOLUTION_TYPE_AGENT_LOOP\0")
 }
 
 nonisolated extension RAAudioSource: SwiftProtobuf._ProtoNameProviding {
@@ -614,7 +561,7 @@ nonisolated extension RAVectorStore: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RASolutionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SolutionConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_agent\0\u{1}rag\0\u{3}wake_word\0\u{3}agent_loop\0\u{3}time_series\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_agent\0\u{1}rag\0\u{4}\u{2}agent_loop\0\u{3}time_series\0\u{b}wake_word\0\u{c}\u{3}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -646,19 +593,6 @@ nonisolated extension RASolutionConfig: SwiftProtobuf.Message, SwiftProtobuf._Me
         if let v = v {
           if hadOneofValue {try decoder.handleConflictingOneOf()}
           self.config = .rag(v)
-        }
-      }()
-      case 3: try {
-        var v: RAWakeWordConfig?
-        var hadOneofValue = false
-        if let current = self.config {
-          hadOneofValue = true
-          if case .wakeWord(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.config = .wakeWord(v)
         }
       }()
       case 4: try {
@@ -705,10 +639,6 @@ nonisolated extension RASolutionConfig: SwiftProtobuf.Message, SwiftProtobuf._Me
     case .rag?: try {
       guard case .rag(let v)? = self.config else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    }()
-    case .wakeWord?: try {
-      guard case .wakeWord(let v)? = self.config else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     }()
     case .agentLoop?: try {
       guard case .agentLoop(let v)? = self.config else { preconditionFailure() }
@@ -1044,65 +974,6 @@ nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._Message
     if lhs.bm25B != rhs.bm25B {return false}
     if lhs.rrfK != rhs.rrfK {return false}
     if lhs.promptTemplate != rhs.promptTemplate {return false}
-    if lhs._typeKind != rhs._typeKind {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAWakeWordConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".WakeWordConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}keyword\0\u{1}threshold\0\u{3}pre_roll_ms\0\u{3}sample_rate_hz\0\u{3}type_kind\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.keyword) }()
-      case 3: try { try decoder.decodeSingularFloatField(value: &self.threshold) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.preRollMs) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.sampleRateHz) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self._typeKind) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.modelID.isEmpty {
-      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
-    }
-    if !self.keyword.isEmpty {
-      try visitor.visitSingularStringField(value: self.keyword, fieldNumber: 2)
-    }
-    if self.threshold.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.threshold, fieldNumber: 3)
-    }
-    if self.preRollMs != 0 {
-      try visitor.visitSingularInt32Field(value: self.preRollMs, fieldNumber: 4)
-    }
-    if self.sampleRateHz != 0 {
-      try visitor.visitSingularInt32Field(value: self.sampleRateHz, fieldNumber: 5)
-    }
-    try { if let v = self._typeKind {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAWakeWordConfig, rhs: RAWakeWordConfig) -> Bool {
-    if lhs.modelID != rhs.modelID {return false}
-    if lhs.keyword != rhs.keyword {return false}
-    if lhs.threshold != rhs.threshold {return false}
-    if lhs.preRollMs != rhs.preRollMs {return false}
-    if lhs.sampleRateHz != rhs.sampleRateHz {return false}
     if lhs._typeKind != rhs._typeKind {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

@@ -56,10 +56,10 @@ struct rac_tts_component {
     rac_tts_options_t default_options;
     std::mutex mtx;
 
-    /** Resolved inference framework (defaults to ONNX, the primary TTS backend) */
+    /** Resolved inference framework (defaults to the Sherpa speech backend) */
     rac_inference_framework_t actual_framework;
 
-    rac_tts_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_ONNX) {
+    rac_tts_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_SHERPA) {
         // Initialize with defaults - matches rac_tts_types.h rac_tts_config_t
         config = RAC_TTS_CONFIG_DEFAULT;
 
@@ -338,7 +338,7 @@ extern "C" rac_result_t rac_tts_component_configure(rac_handle_t handle,
     component->config = *config;
 
     // Resolve actual framework: if caller explicitly set one (not -1=auto), use it;
-    // otherwise keep the default (RAC_FRAMEWORK_ONNX for TTS components)
+    // otherwise keep the default (RAC_FRAMEWORK_SHERPA for TTS components)
     if (config->preferred_framework >= 0 &&
         config->preferred_framework != static_cast<int32_t>(RAC_FRAMEWORK_UNKNOWN)) {
         component->actual_framework =

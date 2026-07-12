@@ -204,7 +204,7 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 
 ### `runanywhere_onnx` — STT + TTS + VAD
 
-- `await Onnx.register()` → FFI `rac_backend_onnx_register()`; Sherpa auto-registers STT/TTS/VAD via ELF constructor
+- `await Onnx.register()` explicitly registers both the generic ONNX engine and the Sherpa STT/TTS/VAD engine
 - Model detection: `whisper`/`zipformer`/`paraformer` (STT), `piper`/`vits` (TTS), always handles VAD
 - Constants: `version='2.0.0'`, `onnxRuntimeVersion='1.24.3'`
 - Custom downloader: `OnnxDownloadStrategy` handles `.tar.bz2` archives via `rac_extract_archive_native`
@@ -310,7 +310,7 @@ The underlying FFI symbol(s) are encapsulated by `LlamaCpp.register()` — Dart 
 | ONNX Runtime backend | `RABackendONNX.xcframework` | `librac_backend_onnx.so`, `librac_backend_onnx_jni.so`, `libonnxruntime.so` | Embeddings + generic ORT services |
 | Sherpa-ONNX backend | `RABackendSherpa.xcframework` | `librac_backend_sherpa.so`, `librunanywhere_sherpa.so`, `libsherpa-onnx-{c-api,jni}.so` | STT + TTS + VAD |
 
-Both engines share the **underlying ONNX Runtime** (`libonnxruntime.so` / equivalent inside the ORT xcframework) — splitting them would double-ship the ORT shared library. They are co-distributed as `runanywhere_onnx` for that reason. `await Onnx.register()` registers the ONNX engine; Sherpa auto-registers its STT/TTS/VAD ops via ELF constructor when the package's `.so` files are loaded.
+Both engines share the **underlying ONNX Runtime** (`libonnxruntime.so` / equivalent inside the ORT xcframework) — splitting them would double-ship the ORT shared library. They are co-distributed as `runanywhere_onnx` for that reason. `await Onnx.register()` explicitly registers the ONNX engine and the Sherpa STT/TTS/VAD engine.
 
 ## Versions
 

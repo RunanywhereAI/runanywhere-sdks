@@ -96,7 +96,7 @@ void main() async {
   // Initialize SDK
   await RunAnywhere.initialize();
 
-  // Register ONNX backend (auto-registers STT/TTS/VAD via Sherpa)
+  // Explicitly registers generic ONNX and Sherpa STT/TTS/VAD backends.
   await Onnx.register();
 
   runApp(MyApp());

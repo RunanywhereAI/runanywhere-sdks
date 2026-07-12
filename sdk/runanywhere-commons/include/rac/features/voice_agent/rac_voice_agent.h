@@ -39,7 +39,6 @@
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/vad/rac_vad_types.h"
-#include "rac/features/wakeword/rac_wakeword_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
@@ -155,44 +154,6 @@ typedef struct rac_voice_agent_tts_config {
 } rac_voice_agent_tts_config_t;
 
 /**
- * @brief Wake word configuration for voice agent.
- */
-typedef struct rac_voice_agent_wakeword_config {
-    /** Whether wake word detection is enabled */
-    rac_bool_t enabled;
-
-    /** Wake word model path (ONNX format, e.g., "hey_jarvis.onnx") */
-    const char* model_path;
-
-    /** Wake word model ID for telemetry */
-    const char* model_id;
-
-    /** Human-readable wake word phrase (e.g., "Hey Jarvis") */
-    const char* wake_word;
-
-    /** Detection threshold (0.0 - 1.0, default: 0.5) */
-    float threshold;
-
-    /** Path to embedding model (required for openWakeWord) */
-    const char* embedding_model_path;
-
-    /** Path to Silero VAD model for pre-filtering (optional) */
-    const char* vad_model_path;
-} rac_voice_agent_wakeword_config_t;
-
-/**
- * @brief Default wake word configuration.
- */
-static const rac_voice_agent_wakeword_config_t RAC_VOICE_AGENT_WAKEWORD_CONFIG_DEFAULT = {
-    .enabled = RAC_FALSE,
-    .model_path = RAC_NULL,
-    .model_id = RAC_NULL,
-    .wake_word = RAC_NULL,
-    .threshold = 0.5f,
-    .embedding_model_path = RAC_NULL,
-    .vad_model_path = RAC_NULL};
-
-/**
  * @brief Voice agent configuration.
  * Mirrors Swift's VoiceAgentConfiguration.
  */
@@ -209,8 +170,6 @@ typedef struct rac_voice_agent_config {
     /** TTS configuration */
     rac_voice_agent_tts_config_t tts_config;
 
-    /** Wake word configuration */
-    rac_voice_agent_wakeword_config_t wakeword_config;
 } rac_voice_agent_config_t;
 
 /**
@@ -220,14 +179,7 @@ static const rac_voice_agent_config_t RAC_VOICE_AGENT_CONFIG_DEFAULT = {
     .vad_config = {.sample_rate = 16000, .frame_length = 0.1f, .energy_threshold = 0.005f},
     .stt_config = {.model_path = RAC_NULL, .model_id = RAC_NULL, .model_name = RAC_NULL},
     .llm_config = {.model_path = RAC_NULL, .model_id = RAC_NULL, .model_name = RAC_NULL},
-    .tts_config = {.voice_path = RAC_NULL, .voice_id = RAC_NULL, .voice_name = RAC_NULL},
-    .wakeword_config = {.enabled = RAC_FALSE,
-                        .model_path = RAC_NULL,
-                        .model_id = RAC_NULL,
-                        .wake_word = RAC_NULL,
-                        .threshold = 0.5f,
-                        .embedding_model_path = RAC_NULL,
-                        .vad_model_path = RAC_NULL}};
+    .tts_config = {.voice_path = RAC_NULL, .voice_id = RAC_NULL, .voice_name = RAC_NULL}};
 
 // =============================================================================
 // AUDIO PIPELINE STATE MANAGER CONFIG - Mirrors Swift's AudioPipelineStateManager.Configuration

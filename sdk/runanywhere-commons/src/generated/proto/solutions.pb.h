@@ -118,14 +118,6 @@ extern const ::google::protobuf::internal::ClassDataFull VoiceAgentConfig_class_
 #else
 extern const VoiceAgentConfigGlobalsTypeInternal VoiceAgentConfig_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
-class WakeWordConfig;
-struct WakeWordConfigGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern WakeWordConfigGlobalsTypeInternal WakeWordConfig_globals_;
-extern const ::google::protobuf::internal::ClassDataFull WakeWordConfig_class_data_;
-#else
-extern const WakeWordConfigGlobalsTypeInternal WakeWordConfig_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
 }  // namespace v1
 }  // namespace runanywhere
 namespace google {
@@ -148,7 +140,6 @@ enum SolutionType : int {
   SOLUTION_TYPE_UNSPECIFIED = 0,
   SOLUTION_TYPE_VOICE_AGENT = 1,
   SOLUTION_TYPE_RAG = 2,
-  SOLUTION_TYPE_WAKEWORD = 3,
   SOLUTION_TYPE_TIME_SERIES = 4,
   SOLUTION_TYPE_AGENT_LOOP = 5,
   SolutionType_INT_MIN_SENTINEL_DO_NOT_USE_ =
@@ -163,7 +154,7 @@ inline constexpr SolutionType SolutionType_MIN =
 inline constexpr SolutionType SolutionType_MAX =
     static_cast<SolutionType>(5);
 [[nodiscard]] inline bool SolutionType_IsValid(int value) {
-  return 0 <= value && value <= 5;
+  return 0 <= value && value <= 5 && ((55u >> value) & 1) != 0;
 }
 inline constexpr int SolutionType_ARRAYSIZE = 5 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
@@ -277,279 +268,6 @@ using ::google::protobuf::internal::generated_enum::AbslUnparseFlag;
 // ===================================================================
 
 
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED WakeWordConfig final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.WakeWordConfig) */ {
- public:
-  inline WakeWordConfig() : WakeWordConfig(nullptr) {}
-  ~WakeWordConfig() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(WakeWordConfig* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(WakeWordConfig));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr WakeWordConfig(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline WakeWordConfig(const WakeWordConfig& from) : WakeWordConfig(nullptr, from) {}
-  inline WakeWordConfig(WakeWordConfig&& from) noexcept : WakeWordConfig(nullptr, ::std::move(from)) {}
-  inline WakeWordConfig& operator=(const WakeWordConfig& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline WakeWordConfig& operator=(WakeWordConfig&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const WakeWordConfig& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<WakeWordConfig>(&WakeWordConfig_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 4;
-  friend void swap(WakeWordConfig& a, WakeWordConfig& b) { a.Swap(&b); }
-  inline void Swap(WakeWordConfig* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(WakeWordConfig* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] WakeWordConfig* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<WakeWordConfig>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const WakeWordConfig& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const WakeWordConfig& from) { WakeWordConfig::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(WakeWordConfig* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.WakeWordConfig"; }
-
-  explicit WakeWordConfig(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  WakeWordConfig(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const WakeWordConfig& from);
-  WakeWordConfig(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, WakeWordConfig&& from) noexcept
-      : WakeWordConfig(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kModelIdFieldNumber = 1,
-    kKeywordFieldNumber = 2,
-    kThresholdFieldNumber = 3,
-    kPreRollMsFieldNumber = 4,
-    kSampleRateHzFieldNumber = 5,
-    kTypeKindFieldNumber = 6,
-  };
-  // string model_id = 1;
-  void clear_model_id() ;
-  [[nodiscard]] const ::std::string& model_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_model_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_model_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
-  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_model_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
-
-  public:
-  // string keyword = 2;
-  void clear_keyword() ;
-  [[nodiscard]] const ::std::string& keyword() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_keyword(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_keyword();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_keyword();
-  void set_allocated_keyword(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_keyword() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_keyword(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_keyword();
-
-  public:
-  // float threshold = 3;
-  void clear_threshold() ;
-  [[nodiscard]] float threshold() const;
-  void set_threshold(float value);
-
-  private:
-  float _internal_threshold() const;
-  void _internal_set_threshold(float value);
-
-  public:
-  // int32 pre_roll_ms = 4;
-  void clear_pre_roll_ms() ;
-  [[nodiscard]] ::int32_t pre_roll_ms() const;
-  void set_pre_roll_ms(::int32_t value);
-
-  private:
-  ::int32_t _internal_pre_roll_ms() const;
-  void _internal_set_pre_roll_ms(::int32_t value);
-
-  public:
-  // int32 sample_rate_hz = 5;
-  void clear_sample_rate_hz() ;
-  [[nodiscard]] ::int32_t sample_rate_hz() const;
-  void set_sample_rate_hz(::int32_t value);
-
-  private:
-  ::int32_t _internal_sample_rate_hz() const;
-  void _internal_set_sample_rate_hz(::int32_t value);
-
-  public:
-  // optional .runanywhere.v1.SolutionType type_kind = 6;
-  [[nodiscard]] bool has_type_kind()
-      const;
-  void clear_type_kind() ;
-  [[nodiscard]] ::runanywhere::v1::SolutionType type_kind() const;
-  void set_type_kind(::runanywhere::v1::SolutionType value);
-
-  private:
-  ::runanywhere::v1::SolutionType _internal_type_kind() const;
-  void _internal_set_type_kind(::runanywhere::v1::SolutionType value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.WakeWordConfig)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
-                          0, 53,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const WakeWordConfig& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr model_id_;
-    ::google::protobuf::internal::ArenaStringPtr keyword_;
-    float threshold_;
-    ::int32_t pre_roll_ms_;
-    ::int32_t sample_rate_hz_;
-    int type_kind_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_solutions_2eproto;
-};
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentConfig final : public ::google::protobuf::Message
@@ -1040,7 +758,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolSpec final : public ::google::p
   [[nodiscard]] static const ToolSpec& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ToolSpec>(&ToolSpec_globals_);
   }
-  static constexpr int kIndexInFileMessages = 6;
+  static constexpr int kIndexInFileMessages = 5;
   friend void swap(ToolSpec& a, ToolSpec& b) { a.Swap(&b); }
   inline void Swap(ToolSpec* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1280,7 +998,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TimeSeriesConfig final : public ::g
   [[nodiscard]] static const TimeSeriesConfig& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<TimeSeriesConfig>(&TimeSeriesConfig_globals_);
   }
-  static constexpr int kIndexInFileMessages = 7;
+  static constexpr int kIndexInFileMessages = 6;
   friend void swap(TimeSeriesConfig& a, TimeSeriesConfig& b) { a.Swap(&b); }
   inline void Swap(TimeSeriesConfig* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2167,7 +1885,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED AgentLoopConfig final : public ::go
   [[nodiscard]] static const AgentLoopConfig& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<AgentLoopConfig>(&AgentLoopConfig_globals_);
   }
-  static constexpr int kIndexInFileMessages = 5;
+  static constexpr int kIndexInFileMessages = 4;
   friend void swap(AgentLoopConfig& a, AgentLoopConfig& b) { a.Swap(&b); }
   inline void Swap(AgentLoopConfig* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2454,7 +2172,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SolutionConfig final : public ::goo
   enum ConfigCase {
     kVoiceAgent = 1,
     kRag = 2,
-    kWakeWord = 3,
     kAgentLoop = 4,
     kTimeSeries = 5,
     CONFIG_NOT_SET = 0,
@@ -2553,7 +2270,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SolutionConfig final : public ::goo
   enum : int {
     kVoiceAgentFieldNumber = 1,
     kRagFieldNumber = 2,
-    kWakeWordFieldNumber = 3,
     kAgentLoopFieldNumber = 4,
     kTimeSeriesFieldNumber = 5,
   };
@@ -2595,26 +2311,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SolutionConfig final : public ::goo
   private:
   const ::runanywhere::v1::RAGConfig& _internal_rag() const;
   ::runanywhere::v1::RAGConfig* PROTOBUF_NONNULL _internal_mutable_rag();
-
-  public:
-  // .runanywhere.v1.WakeWordConfig wake_word = 3;
-  [[nodiscard]] bool has_wake_word()
-      const;
-  private:
-  bool _internal_has_wake_word() const;
-
-  public:
-  void clear_wake_word() ;
-  [[nodiscard]] const ::runanywhere::v1::WakeWordConfig& wake_word() const;
-  [[nodiscard]] ::runanywhere::v1::WakeWordConfig* PROTOBUF_NULLABLE release_wake_word();
-  ::runanywhere::v1::WakeWordConfig* PROTOBUF_NONNULL mutable_wake_word();
-  void set_allocated_wake_word(::runanywhere::v1::WakeWordConfig* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_wake_word(::runanywhere::v1::WakeWordConfig* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::WakeWordConfig* PROTOBUF_NULLABLE unsafe_arena_release_wake_word();
-
-  private:
-  const ::runanywhere::v1::WakeWordConfig& _internal_wake_word() const;
-  ::runanywhere::v1::WakeWordConfig* PROTOBUF_NONNULL _internal_mutable_wake_word();
 
   public:
   // .runanywhere.v1.AgentLoopConfig agent_loop = 4;
@@ -2664,14 +2360,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SolutionConfig final : public ::goo
   class _Internal;
   void set_has_voice_agent();
   void set_has_rag();
-  void set_has_wake_word();
   void set_has_agent_loop();
   void set_has_time_series();
   [[nodiscard]] inline bool has_config() const;
   inline void clear_has_config();
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<0, 5,
-                          5, 0,
+      ::google::protobuf::internal::TcParseTable<0, 4,
+                          4, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2702,7 +2397,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SolutionConfig final : public ::goo
       ::google::protobuf::internal::ConstantInitialized _constinit_;
       ::google::protobuf::Message* PROTOBUF_NULLABLE voice_agent_;
       ::google::protobuf::Message* PROTOBUF_NULLABLE rag_;
-      ::google::protobuf::Message* PROTOBUF_NULLABLE wake_word_;
       ::google::protobuf::Message* PROTOBUF_NULLABLE agent_loop_;
       ::google::protobuf::Message* PROTOBUF_NULLABLE time_series_;
     } config_;
@@ -2891,88 +2585,6 @@ inline ::runanywhere::v1::RAGConfig* PROTOBUF_NONNULL SolutionConfig::mutable_ra
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   ::runanywhere::v1::RAGConfig* _msg = _internal_mutable_rag();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.SolutionConfig.rag)
-  return _msg;
-}
-
-// .runanywhere.v1.WakeWordConfig wake_word = 3;
-inline bool SolutionConfig::has_wake_word() const {
-  return config_case() == kWakeWord;
-}
-inline bool SolutionConfig::_internal_has_wake_word() const {
-  return config_case() == kWakeWord;
-}
-inline void SolutionConfig::set_has_wake_word() {
-  _impl_._oneof_case_[0] = kWakeWord;
-}
-inline void SolutionConfig::clear_wake_word() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (config_case() == kWakeWord) {
-    if (GetArena() == nullptr) {
-      delete _impl_.config_.wake_word_;
-    } else if (::google::protobuf::internal::DebugHardenClearOneofMessageOnArena()) {
-      ::google::protobuf::internal::MaybePoisonAfterClear(_impl_.config_.wake_word_);
-    }
-    clear_has_config();
-  }
-}
-inline ::runanywhere::v1::WakeWordConfig* PROTOBUF_NULLABLE SolutionConfig::release_wake_word() {
-  // @@protoc_insertion_point(field_release:runanywhere.v1.SolutionConfig.wake_word)
-  if (config_case() == kWakeWord) {
-    clear_has_config();
-    auto* temp = reinterpret_cast<::runanywhere::v1::WakeWordConfig*>(_impl_.config_.wake_word_);
-    if (GetArena() != nullptr) {
-      temp = ::google::protobuf::internal::DuplicateIfNonNull(temp);
-    }
-    _impl_.config_.wake_word_ = nullptr;
-    return temp;
-  } else {
-    return nullptr;
-  }
-}
-inline const ::runanywhere::v1::WakeWordConfig& SolutionConfig::_internal_wake_word() const {
-  return config_case() == kWakeWord ? static_cast<const ::runanywhere::v1::WakeWordConfig&>(*reinterpret_cast<::runanywhere::v1::WakeWordConfig*>(_impl_.config_.wake_word_))
-                     : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::WakeWordConfig>(&::runanywhere::v1::WakeWordConfig_globals_);
-}
-inline const ::runanywhere::v1::WakeWordConfig& SolutionConfig::wake_word() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SolutionConfig.wake_word)
-  return _internal_wake_word();
-}
-inline ::runanywhere::v1::WakeWordConfig* PROTOBUF_NULLABLE SolutionConfig::unsafe_arena_release_wake_word() {
-  // @@protoc_insertion_point(field_unsafe_arena_release:runanywhere.v1.SolutionConfig.wake_word)
-  if (config_case() == kWakeWord) {
-    clear_has_config();
-    auto* temp = reinterpret_cast<::runanywhere::v1::WakeWordConfig*>(_impl_.config_.wake_word_);
-    _impl_.config_.wake_word_ = nullptr;
-    return temp;
-  } else {
-    return nullptr;
-  }
-}
-inline void SolutionConfig::unsafe_arena_set_allocated_wake_word(
-    ::runanywhere::v1::WakeWordConfig* PROTOBUF_NULLABLE value) {
-  // We rely on the oneof clear method to free the earlier contents
-  // of this oneof. We can directly use the pointer we're given to
-  // set the new value.
-  clear_config();
-  if (value) {
-    set_has_wake_word();
-    _impl_.config_.wake_word_ = reinterpret_cast<::google::protobuf::Message*>(value);
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.SolutionConfig.wake_word)
-}
-inline ::runanywhere::v1::WakeWordConfig* PROTOBUF_NONNULL SolutionConfig::_internal_mutable_wake_word() {
-  if (config_case() != kWakeWord) {
-    clear_config();
-    set_has_wake_word();
-    _impl_.config_.wake_word_ = reinterpret_cast<::google::protobuf::Message*>(
-        ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::WakeWordConfig>(GetArena()));
-  }
-  return reinterpret_cast<::runanywhere::v1::WakeWordConfig*>(_impl_.config_.wake_word_);
-}
-inline ::runanywhere::v1::WakeWordConfig* PROTOBUF_NONNULL SolutionConfig::mutable_wake_word()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::runanywhere::v1::WakeWordConfig* _msg = _internal_mutable_wake_word();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.SolutionConfig.wake_word)
   return _msg;
 }
 
@@ -4565,238 +4177,6 @@ inline ::runanywhere::v1::SolutionType RAGConfig::_internal_type_kind() const {
   return static_cast<::runanywhere::v1::SolutionType>(_impl_.type_kind_);
 }
 inline void RAGConfig::_internal_set_type_kind(::runanywhere::v1::SolutionType value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.type_kind_ = value;
-}
-
-// -------------------------------------------------------------------
-
-// WakeWordConfig
-
-// string model_id = 1;
-inline void WakeWordConfig::clear_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_id_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::std::string& WakeWordConfig::model_id() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.WakeWordConfig.model_id)
-  return _internal_model_id();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void WakeWordConfig::set_model_id(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.WakeWordConfig.model_id)
-}
-inline ::std::string* PROTOBUF_NONNULL WakeWordConfig::mutable_model_id()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_model_id();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.WakeWordConfig.model_id)
-  return _s;
-}
-inline const ::std::string& WakeWordConfig::_internal_model_id() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.model_id_.Get();
-}
-inline void WakeWordConfig::_internal_set_model_id(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_id_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL WakeWordConfig::_internal_mutable_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.model_id_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE WakeWordConfig::release_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.WakeWordConfig.model_id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.model_id_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.model_id_.Set("", GetArena());
-  }
-  return released;
-}
-inline void WakeWordConfig::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  _impl_.model_id_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
-    _impl_.model_id_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.WakeWordConfig.model_id)
-}
-
-// string keyword = 2;
-inline void WakeWordConfig::clear_keyword() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.keyword_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& WakeWordConfig::keyword() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.WakeWordConfig.keyword)
-  return _internal_keyword();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void WakeWordConfig::set_keyword(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.keyword_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.WakeWordConfig.keyword)
-}
-inline ::std::string* PROTOBUF_NONNULL WakeWordConfig::mutable_keyword()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_keyword();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.WakeWordConfig.keyword)
-  return _s;
-}
-inline const ::std::string& WakeWordConfig::_internal_keyword() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.keyword_.Get();
-}
-inline void WakeWordConfig::_internal_set_keyword(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.keyword_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL WakeWordConfig::_internal_mutable_keyword() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.keyword_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE WakeWordConfig::release_keyword() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.WakeWordConfig.keyword)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.keyword_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.keyword_.Set("", GetArena());
-  }
-  return released;
-}
-inline void WakeWordConfig::set_allocated_keyword(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.keyword_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.keyword_.IsDefault()) {
-    _impl_.keyword_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.WakeWordConfig.keyword)
-}
-
-// float threshold = 3;
-inline void WakeWordConfig::clear_threshold() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.threshold_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline float WakeWordConfig::threshold() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.WakeWordConfig.threshold)
-  return _internal_threshold();
-}
-inline void WakeWordConfig::set_threshold(float value) {
-  _internal_set_threshold(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.WakeWordConfig.threshold)
-}
-inline float WakeWordConfig::_internal_threshold() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.threshold_;
-}
-inline void WakeWordConfig::_internal_set_threshold(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.threshold_ = value;
-}
-
-// int32 pre_roll_ms = 4;
-inline void WakeWordConfig::clear_pre_roll_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.pre_roll_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline ::int32_t WakeWordConfig::pre_roll_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.WakeWordConfig.pre_roll_ms)
-  return _internal_pre_roll_ms();
-}
-inline void WakeWordConfig::set_pre_roll_ms(::int32_t value) {
-  _internal_set_pre_roll_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.WakeWordConfig.pre_roll_ms)
-}
-inline ::int32_t WakeWordConfig::_internal_pre_roll_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.pre_roll_ms_;
-}
-inline void WakeWordConfig::_internal_set_pre_roll_ms(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.pre_roll_ms_ = value;
-}
-
-// int32 sample_rate_hz = 5;
-inline void WakeWordConfig::clear_sample_rate_hz() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.sample_rate_hz_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline ::int32_t WakeWordConfig::sample_rate_hz() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.WakeWordConfig.sample_rate_hz)
-  return _internal_sample_rate_hz();
-}
-inline void WakeWordConfig::set_sample_rate_hz(::int32_t value) {
-  _internal_set_sample_rate_hz(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.WakeWordConfig.sample_rate_hz)
-}
-inline ::int32_t WakeWordConfig::_internal_sample_rate_hz() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.sample_rate_hz_;
-}
-inline void WakeWordConfig::_internal_set_sample_rate_hz(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.sample_rate_hz_ = value;
-}
-
-// optional .runanywhere.v1.SolutionType type_kind = 6;
-inline bool WakeWordConfig::has_type_kind() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
-  return value;
-}
-inline void WakeWordConfig::clear_type_kind() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.type_kind_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-}
-inline ::runanywhere::v1::SolutionType WakeWordConfig::type_kind() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.WakeWordConfig.type_kind)
-  return _internal_type_kind();
-}
-inline void WakeWordConfig::set_type_kind(::runanywhere::v1::SolutionType value) {
-  _internal_set_type_kind(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.WakeWordConfig.type_kind)
-}
-inline ::runanywhere::v1::SolutionType WakeWordConfig::_internal_type_kind() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::SolutionType>(_impl_.type_kind_);
-}
-inline void WakeWordConfig::_internal_set_type_kind(::runanywhere::v1::SolutionType value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.type_kind_ = value;
 }

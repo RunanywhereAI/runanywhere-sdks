@@ -3,8 +3,8 @@
 // =============================================================================
 // Voice Pipeline - Orchestration of VAD -> STT -> LLM -> TTS
 // =============================================================================
-// Wraps the runanywhere-commons Voice Agent to provide a simple interface
-// for the voice assistant application.
+// Owns the runanywhere-commons capability components and provides a simple
+// interface for the voice assistant application.
 //
 // Pipeline flow:
 // 1. VAD: Detect speech in audio
@@ -24,9 +24,6 @@ namespace runanywhere {
 // =============================================================================
 // Callbacks
 // =============================================================================
-
-// Called when wake word is detected
-using WakeWordCallback = std::function<void(const std::string& wake_word, float confidence)>;
 
 // Called when speech is detected/ended
 using VoiceActivityCallback = std::function<void(bool is_speaking)>;
@@ -49,20 +46,14 @@ using ErrorCallback = std::function<void(const std::string& error)>;
 
 struct VoicePipelineConfig {
     // Callbacks (required)
-    WakeWordCallback on_wake_word;
     VoiceActivityCallback on_voice_activity;
     TranscriptionCallback on_transcription;
     ResponseCallback on_response;
     AudioOutputCallback on_audio_output;
     ErrorCallback on_error;
 
-    // Wake word settings (optional)
-    bool enable_wake_word = false;
-    std::string wake_word = "Hey Jarvis";
-    float wake_word_threshold = 0.5f;
-
     // VAD settings
-    float vad_energy_threshold = 0.005f;
+    float vad_threshold = 0.5f;
     int vad_sample_rate = 16000;
 
     // LLM settings
@@ -126,9 +117,6 @@ public:
     bool speak_text(const std::string& text);
 
 private:
-    // Initialize wake word detector
-    bool initialize_wakeword();
-
     struct Impl;
     std::unique_ptr<Impl> impl_;
 

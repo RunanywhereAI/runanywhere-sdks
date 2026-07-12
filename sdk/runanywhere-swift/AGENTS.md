@@ -208,4 +208,4 @@ Configured in `.periphery.yml`. Scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRun
 
 ## Unsupported Features
 
-Speaker diarization and wake-word detection are not yet available as SDK facades. The C ABI stubs exist in commons but are not exposed through the Swift SDK.
+Speaker diarization and wake-word detection are not yet available as SDK facades or executable Commons capabilities.

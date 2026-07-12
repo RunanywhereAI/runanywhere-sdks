@@ -163,7 +163,7 @@ RunAnywhere.events.eventsOfPayload { it.generation }.collect { ... }
 Two optional backend modules in `modules/`:
 
 - **`runanywhere-core-llamacpp`** — LLM backend. Single file (`LlamaCPP.kt`) calling `rac_backend_llamacpp_register()`. Bundles `librac_backend_llamacpp_jni.so`.
-- **`runanywhere-core-onnx`** — STT/TTS/VAD backend. Single file (`ONNX.kt`) calling `rac_backend_onnx_register()`. Bundles sherpa-onnx and ONNX Runtime `.so` files.
+- **`runanywhere-core-onnx`** — co-distributed generic ONNX + Sherpa speech backends. `ONNX.kt` explicitly registers both engines and the module bundles their native `.so` files.
 
 Both follow the same pattern: thin Android-library sub-modules that register a C++ backend with the core's plugin system. They depend on the root SDK via `api()`.
 

@@ -72,11 +72,12 @@ target_link_libraries(openclaw-assistant PRIVATE
     # RunAnywhere Commons (NO LlamaCPP backend - no LLM!)
     rac_commons
     rac_backend_onnx
+    rac_backend_sherpa
 
     # Sherpa-ONNX (for STT/TTS/VAD)
     sherpa-onnx-c-api
 
-    # ONNX Runtime
+    # ONNX Runtime (Sherpa dependency)
     onnxruntime
 
     # System libraries
@@ -94,7 +95,7 @@ set_target_properties(openclaw-assistant PROPERTIES
 # =============================================================================
 # Test executable: test-components
 # =============================================================================
-# Tests wake word, VAD, and ASR with WAV files
+# Tests VAD and STT with WAV files
 
 add_executable(test-components
     tests/test_components.cpp
@@ -105,12 +106,12 @@ add_executable(test-components
 target_link_libraries(test-components PRIVATE
     # RunAnywhere Commons
     rac_commons
-    rac_backend_onnx
+    rac_backend_sherpa
 
     # Sherpa-ONNX
     sherpa-onnx-c-api
 
-    # ONNX Runtime
+    # ONNX Runtime (Sherpa dependency)
     onnxruntime
 
     # System libraries
@@ -147,12 +148,12 @@ add_executable(test-integration
 target_link_libraries(test-integration PRIVATE
     # RunAnywhere Commons
     rac_commons
-    rac_backend_onnx
+    rac_backend_sherpa
 
     # Sherpa-ONNX
     sherpa-onnx-c-api
 
-    # ONNX Runtime
+    # ONNX Runtime (Sherpa dependency)
     onnxruntime
 
     # System libraries

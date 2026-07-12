@@ -225,24 +225,6 @@ export interface VoiceAgentComposeConfig {
   vadEnergyThreshold: number;
   /**
    * -------------------------------------------------------------------
-   * Wake-word sub-config (mirrors rac_voice_agent_wakeword_config_t /
-   * rac_wakeword_config_t).
-   * -------------------------------------------------------------------
-   */
-  wakewordEnabled: boolean;
-  wakewordModelPath?: string | undefined;
-  wakewordModelId?: string | undefined;
-  wakewordPhrase?:
-    | string
-    | undefined;
-  /** default 0.5 */
-  wakewordThreshold: number;
-  wakewordEmbeddingModelPath?: string | undefined;
-  wakewordVadModelPath?:
-    | string
-    | undefined;
-  /**
-   * -------------------------------------------------------------------
    * Session-behavior sub-config. Optional so the C ABI can be invoked
    * without runtime-behavior overrides (engine defaults applied).
    * -------------------------------------------------------------------
@@ -1512,13 +1494,6 @@ function createBaseVoiceAgentComposeConfig(): VoiceAgentComposeConfig {
     vadSampleRate: 0,
     vadFrameLength: 0,
     vadEnergyThreshold: 0,
-    wakewordEnabled: false,
-    wakewordModelPath: undefined,
-    wakewordModelId: undefined,
-    wakewordPhrase: undefined,
-    wakewordThreshold: 0,
-    wakewordEmbeddingModelPath: undefined,
-    wakewordVadModelPath: undefined,
     sessionConfig: undefined,
     audioPipelineConfig: undefined,
     sessionId: undefined,
@@ -1563,27 +1538,6 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
     }
     if (message.vadEnergyThreshold !== 0) {
       writer.uint32(101).float(message.vadEnergyThreshold);
-    }
-    if (message.wakewordEnabled !== false) {
-      writer.uint32(104).bool(message.wakewordEnabled);
-    }
-    if (message.wakewordModelPath !== undefined) {
-      writer.uint32(114).string(message.wakewordModelPath);
-    }
-    if (message.wakewordModelId !== undefined) {
-      writer.uint32(122).string(message.wakewordModelId);
-    }
-    if (message.wakewordPhrase !== undefined) {
-      writer.uint32(130).string(message.wakewordPhrase);
-    }
-    if (message.wakewordThreshold !== 0) {
-      writer.uint32(141).float(message.wakewordThreshold);
-    }
-    if (message.wakewordEmbeddingModelPath !== undefined) {
-      writer.uint32(146).string(message.wakewordEmbeddingModelPath);
-    }
-    if (message.wakewordVadModelPath !== undefined) {
-      writer.uint32(154).string(message.wakewordVadModelPath);
     }
     if (message.sessionConfig !== undefined) {
       VoiceSessionConfig.encode(message.sessionConfig, writer.uint32(162).fork()).join();
@@ -1703,62 +1657,6 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
           message.vadEnergyThreshold = reader.float();
           continue;
         }
-        case 13: {
-          if (tag !== 104) {
-            break;
-          }
-
-          message.wakewordEnabled = reader.bool();
-          continue;
-        }
-        case 14: {
-          if (tag !== 114) {
-            break;
-          }
-
-          message.wakewordModelPath = reader.string();
-          continue;
-        }
-        case 15: {
-          if (tag !== 122) {
-            break;
-          }
-
-          message.wakewordModelId = reader.string();
-          continue;
-        }
-        case 16: {
-          if (tag !== 130) {
-            break;
-          }
-
-          message.wakewordPhrase = reader.string();
-          continue;
-        }
-        case 17: {
-          if (tag !== 141) {
-            break;
-          }
-
-          message.wakewordThreshold = reader.float();
-          continue;
-        }
-        case 18: {
-          if (tag !== 146) {
-            break;
-          }
-
-          message.wakewordEmbeddingModelPath = reader.string();
-          continue;
-        }
-        case 19: {
-          if (tag !== 154) {
-            break;
-          }
-
-          message.wakewordVadModelPath = reader.string();
-          continue;
-        }
         case 20: {
           if (tag !== 162) {
             break;
@@ -1862,41 +1760,6 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
         : isSet(object.vad_energy_threshold)
         ? globalThis.Number(object.vad_energy_threshold)
         : 0,
-      wakewordEnabled: isSet(object.wakewordEnabled)
-        ? globalThis.Boolean(object.wakewordEnabled)
-        : isSet(object.wakeword_enabled)
-        ? globalThis.Boolean(object.wakeword_enabled)
-        : false,
-      wakewordModelPath: isSet(object.wakewordModelPath)
-        ? globalThis.String(object.wakewordModelPath)
-        : isSet(object.wakeword_model_path)
-        ? globalThis.String(object.wakeword_model_path)
-        : undefined,
-      wakewordModelId: isSet(object.wakewordModelId)
-        ? globalThis.String(object.wakewordModelId)
-        : isSet(object.wakeword_model_id)
-        ? globalThis.String(object.wakeword_model_id)
-        : undefined,
-      wakewordPhrase: isSet(object.wakewordPhrase)
-        ? globalThis.String(object.wakewordPhrase)
-        : isSet(object.wakeword_phrase)
-        ? globalThis.String(object.wakeword_phrase)
-        : undefined,
-      wakewordThreshold: isSet(object.wakewordThreshold)
-        ? globalThis.Number(object.wakewordThreshold)
-        : isSet(object.wakeword_threshold)
-        ? globalThis.Number(object.wakeword_threshold)
-        : 0,
-      wakewordEmbeddingModelPath: isSet(object.wakewordEmbeddingModelPath)
-        ? globalThis.String(object.wakewordEmbeddingModelPath)
-        : isSet(object.wakeword_embedding_model_path)
-        ? globalThis.String(object.wakeword_embedding_model_path)
-        : undefined,
-      wakewordVadModelPath: isSet(object.wakewordVadModelPath)
-        ? globalThis.String(object.wakewordVadModelPath)
-        : isSet(object.wakeword_vad_model_path)
-        ? globalThis.String(object.wakeword_vad_model_path)
-        : undefined,
       sessionConfig: isSet(object.sessionConfig)
         ? VoiceSessionConfig.fromJSON(object.sessionConfig)
         : isSet(object.session_config)
@@ -1958,27 +1821,6 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
     if (message.vadEnergyThreshold !== 0) {
       obj.vadEnergyThreshold = message.vadEnergyThreshold;
     }
-    if (message.wakewordEnabled !== false) {
-      obj.wakewordEnabled = message.wakewordEnabled;
-    }
-    if (message.wakewordModelPath !== undefined) {
-      obj.wakewordModelPath = message.wakewordModelPath;
-    }
-    if (message.wakewordModelId !== undefined) {
-      obj.wakewordModelId = message.wakewordModelId;
-    }
-    if (message.wakewordPhrase !== undefined) {
-      obj.wakewordPhrase = message.wakewordPhrase;
-    }
-    if (message.wakewordThreshold !== 0) {
-      obj.wakewordThreshold = message.wakewordThreshold;
-    }
-    if (message.wakewordEmbeddingModelPath !== undefined) {
-      obj.wakewordEmbeddingModelPath = message.wakewordEmbeddingModelPath;
-    }
-    if (message.wakewordVadModelPath !== undefined) {
-      obj.wakewordVadModelPath = message.wakewordVadModelPath;
-    }
     if (message.sessionConfig !== undefined) {
       obj.sessionConfig = VoiceSessionConfig.toJSON(message.sessionConfig);
     }
@@ -2011,13 +1853,6 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
     message.vadSampleRate = object.vadSampleRate ?? 0;
     message.vadFrameLength = object.vadFrameLength ?? 0;
     message.vadEnergyThreshold = object.vadEnergyThreshold ?? 0;
-    message.wakewordEnabled = object.wakewordEnabled ?? false;
-    message.wakewordModelPath = object.wakewordModelPath ?? undefined;
-    message.wakewordModelId = object.wakewordModelId ?? undefined;
-    message.wakewordPhrase = object.wakewordPhrase ?? undefined;
-    message.wakewordThreshold = object.wakewordThreshold ?? 0;
-    message.wakewordEmbeddingModelPath = object.wakewordEmbeddingModelPath ?? undefined;
-    message.wakewordVadModelPath = object.wakewordVadModelPath ?? undefined;
     message.sessionConfig = (object.sessionConfig !== undefined && object.sessionConfig !== null)
       ? VoiceSessionConfig.fromPartial(object.sessionConfig)
       : undefined;

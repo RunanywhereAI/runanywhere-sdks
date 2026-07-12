@@ -266,7 +266,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
                         : 0.0f;
 
     // Apply VADOptions.threshold per frame using the same set/restore pattern
-    // that rac_vad_component_process_proto uses (vad_component.cpp:1019-1041).
+    // that rac_vad_component_process_proto uses.
     // Without this gate the streaming proto path silently ignored every
     // per-call threshold tuning while the one-shot proto path honored it.
     //
@@ -282,10 +282,16 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         auto handle_mutex = rac::vad::get_or_create_threshold_mutex(component_handle);
         std::lock_guard<std::mutex> threshold_lock(*handle_mutex);
         const float original_threshold = rac_vad_component_get_energy_threshold(component_handle);
-        (void)rac_vad_component_set_energy_threshold(component_handle, threshold_override);
-        rc =
-            rac_vad_component_process(component_handle, samples.data(), samples.size(), &is_speech);
-        (void)rac_vad_component_set_energy_threshold(component_handle, original_threshold);
+        rc = rac_vad_component_set_energy_threshold(component_handle, threshold_override);
+        if (rc == RAC_SUCCESS) {
+            rc = rac_vad_component_process(component_handle, samples.data(), samples.size(),
+                                           &is_speech);
+            const rac_result_t restore_rc =
+                rac_vad_component_set_energy_threshold(component_handle, original_threshold);
+            if (rc == RAC_SUCCESS) {
+                rc = restore_rc;
+            }
+        }
     } else {
         // No override → fall back to the component's persistent threshold.
         // Forward to the VAD component. Speech-activity transitions still

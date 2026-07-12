@@ -67,16 +67,16 @@ rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_
         runanywhere::STTModelType model_type = runanywhere::STTModelType::WHISPER;
         if (config != nullptr) {
             switch (config->model_type) {
-                case RAC_STT_ONNX_MODEL_ZIPFORMER:
+                case RAC_STT_SHERPA_MODEL_ZIPFORMER:
                     model_type = runanywhere::STTModelType::ZIPFORMER;
                     break;
-                case RAC_STT_ONNX_MODEL_PARAFORMER:
+                case RAC_STT_SHERPA_MODEL_PARAFORMER:
                     model_type = runanywhere::STTModelType::PARAFORMER;
                     break;
-                case RAC_STT_ONNX_MODEL_NEMO_CTC:
+                case RAC_STT_SHERPA_MODEL_NEMO_CTC:
                     model_type = runanywhere::STTModelType::NEMO_CTC;
                     break;
-                case RAC_STT_ONNX_MODEL_AUTO:
+                case RAC_STT_SHERPA_MODEL_AUTO:
                     // Auto-detect: let load_model figure it out from directory structure
                     model_type = runanywhere::STTModelType::WHISPER;
                     break;

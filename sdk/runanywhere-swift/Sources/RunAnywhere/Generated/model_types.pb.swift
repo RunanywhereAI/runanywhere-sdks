@@ -257,7 +257,7 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
   case none // = 21
   case unknown // = 22
 
-  /// Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
+  /// Sherpa-ONNX speech engine (STT/TTS/VAD)
   case sherpa // = 23
 
   /// Qualcomm Hexagon NPU (QHexRT runtime)

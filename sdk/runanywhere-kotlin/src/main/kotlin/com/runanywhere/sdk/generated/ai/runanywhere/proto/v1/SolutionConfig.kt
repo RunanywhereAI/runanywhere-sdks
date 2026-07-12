@@ -49,19 +49,11 @@ public class SolutionConfig(
   )
   public val rag: RAGConfig? = null,
   @field:WireField(
-    tag = 3,
-    adapter = "ai.runanywhere.proto.v1.WakeWordConfig#ADAPTER",
-    jsonName = "wakeWord",
-    oneofName = "config",
-    schemaIndex = 2,
-  )
-  public val wake_word: WakeWordConfig? = null,
-  @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.AgentLoopConfig#ADAPTER",
     jsonName = "agentLoop",
     oneofName = "config",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val agent_loop: AgentLoopConfig? = null,
   @field:WireField(
@@ -69,14 +61,14 @@ public class SolutionConfig(
     adapter = "ai.runanywhere.proto.v1.TimeSeriesConfig#ADAPTER",
     jsonName = "timeSeries",
     oneofName = "config",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val time_series: TimeSeriesConfig? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SolutionConfig, Nothing>(ADAPTER, unknownFields) {
   init {
-    require(countNonNull(voice_agent, rag, wake_word, agent_loop, time_series) <= 1) {
-      "At most one of voice_agent, rag, wake_word, agent_loop, time_series may be non-null"
+    require(countNonNull(voice_agent, rag, agent_loop, time_series) <= 1) {
+      "At most one of voice_agent, rag, agent_loop, time_series may be non-null"
     }
   }
 
@@ -92,7 +84,6 @@ public class SolutionConfig(
     if (unknownFields != other.unknownFields) return false
     if (voice_agent != other.voice_agent) return false
     if (rag != other.rag) return false
-    if (wake_word != other.wake_word) return false
     if (agent_loop != other.agent_loop) return false
     if (time_series != other.time_series) return false
     return true
@@ -104,7 +95,6 @@ public class SolutionConfig(
       result = unknownFields.hashCode()
       result = result * 37 + (voice_agent?.hashCode() ?: 0)
       result = result * 37 + (rag?.hashCode() ?: 0)
-      result = result * 37 + (wake_word?.hashCode() ?: 0)
       result = result * 37 + (agent_loop?.hashCode() ?: 0)
       result = result * 37 + (time_series?.hashCode() ?: 0)
       super.hashCode = result
@@ -116,7 +106,6 @@ public class SolutionConfig(
     val result = mutableListOf<String>()
     if (voice_agent != null) result += """voice_agent=$voice_agent"""
     if (rag != null) result += """rag=$rag"""
-    if (wake_word != null) result += """wake_word=$wake_word"""
     if (agent_loop != null) result += """agent_loop=$agent_loop"""
     if (time_series != null) result += """time_series=$time_series"""
     return result.joinToString(prefix = "SolutionConfig{", separator = ", ", postfix = "}")
@@ -125,11 +114,10 @@ public class SolutionConfig(
   public fun copy(
     voice_agent: VoiceAgentConfig? = this.voice_agent,
     rag: RAGConfig? = this.rag,
-    wake_word: WakeWordConfig? = this.wake_word,
     agent_loop: AgentLoopConfig? = this.agent_loop,
     time_series: TimeSeriesConfig? = this.time_series,
     unknownFields: ByteString = this.unknownFields,
-  ): SolutionConfig = SolutionConfig(voice_agent, rag, wake_word, agent_loop, time_series, unknownFields)
+  ): SolutionConfig = SolutionConfig(voice_agent, rag, agent_loop, time_series, unknownFields)
 
   public companion object {
     @JvmField
@@ -145,7 +133,6 @@ public class SolutionConfig(
         var size = value.unknownFields.size
         size += VoiceAgentConfig.ADAPTER.encodedSizeWithTag(1, value.voice_agent)
         size += RAGConfig.ADAPTER.encodedSizeWithTag(2, value.rag)
-        size += WakeWordConfig.ADAPTER.encodedSizeWithTag(3, value.wake_word)
         size += AgentLoopConfig.ADAPTER.encodedSizeWithTag(4, value.agent_loop)
         size += TimeSeriesConfig.ADAPTER.encodedSizeWithTag(5, value.time_series)
         return size
@@ -154,7 +141,6 @@ public class SolutionConfig(
       override fun encode(writer: ProtoWriter, `value`: SolutionConfig) {
         VoiceAgentConfig.ADAPTER.encodeWithTag(writer, 1, value.voice_agent)
         RAGConfig.ADAPTER.encodeWithTag(writer, 2, value.rag)
-        WakeWordConfig.ADAPTER.encodeWithTag(writer, 3, value.wake_word)
         AgentLoopConfig.ADAPTER.encodeWithTag(writer, 4, value.agent_loop)
         TimeSeriesConfig.ADAPTER.encodeWithTag(writer, 5, value.time_series)
         writer.writeBytes(value.unknownFields)
@@ -164,7 +150,6 @@ public class SolutionConfig(
         writer.writeBytes(value.unknownFields)
         TimeSeriesConfig.ADAPTER.encodeWithTag(writer, 5, value.time_series)
         AgentLoopConfig.ADAPTER.encodeWithTag(writer, 4, value.agent_loop)
-        WakeWordConfig.ADAPTER.encodeWithTag(writer, 3, value.wake_word)
         RAGConfig.ADAPTER.encodeWithTag(writer, 2, value.rag)
         VoiceAgentConfig.ADAPTER.encodeWithTag(writer, 1, value.voice_agent)
       }
@@ -172,14 +157,12 @@ public class SolutionConfig(
       override fun decode(reader: ProtoReader): SolutionConfig {
         var voice_agent: VoiceAgentConfig? = null
         var rag: RAGConfig? = null
-        var wake_word: WakeWordConfig? = null
         var agent_loop: AgentLoopConfig? = null
         var time_series: TimeSeriesConfig? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> voice_agent = VoiceAgentConfig.ADAPTER.decode(reader)
             2 -> rag = RAGConfig.ADAPTER.decode(reader)
-            3 -> wake_word = WakeWordConfig.ADAPTER.decode(reader)
             4 -> agent_loop = AgentLoopConfig.ADAPTER.decode(reader)
             5 -> time_series = TimeSeriesConfig.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
@@ -188,7 +171,6 @@ public class SolutionConfig(
         return SolutionConfig(
           voice_agent = voice_agent,
           rag = rag,
-          wake_word = wake_word,
           agent_loop = agent_loop,
           time_series = time_series,
           unknownFields = unknownFields
@@ -198,7 +180,6 @@ public class SolutionConfig(
       override fun redact(`value`: SolutionConfig): SolutionConfig = value.copy(
         voice_agent = value.voice_agent?.let(VoiceAgentConfig.ADAPTER::redact),
         rag = value.rag?.let(RAGConfig.ADAPTER::redact),
-        wake_word = value.wake_word?.let(WakeWordConfig.ADAPTER::redact),
         agent_loop = value.agent_loop?.let(AgentLoopConfig.ADAPTER::redact),
         time_series = value.time_series?.let(TimeSeriesConfig.ADAPTER::redact),
         unknownFields = ByteString.EMPTY

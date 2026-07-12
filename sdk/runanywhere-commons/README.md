@@ -137,22 +137,21 @@ rac_llm_llamacpp_generate_stream(handle, "Hello, world!", &options,
     token_callback, user_data);
 ```
 
-### ONNX Backend (via Sherpa-ONNX)
+### Sherpa-ONNX Backend
 - **Capabilities**: STT, TTS, VAD
 - **Model Format**: ONNX
 - **Supported Models**: Whisper, Zipformer, Paraformer (STT); VITS/Piper (TTS); Silero (VAD)
-- **Headers**: `rac_stt_onnx.h`, `rac_tts_onnx.h`, `rac_vad_onnx.h`
+- **Registration**: `rac/plugin/rac_plugin_entry_sherpa.h`
+- **Inference APIs**: generated-proto lifecycle/component APIs under `rac/features/{stt,tts,vad}`
 
 ```c
-// Create STT service
-rac_handle_t stt;
-rac_stt_onnx_create("/path/to/whisper", NULL, &stt);
-
-// Transcribe audio
-rac_stt_result_t result;
-rac_stt_onnx_transcribe(stt, audio_samples, num_samples, NULL, &result);
-printf("Transcription: %s\n", result.text);
+// Dynamic-linkage hosts explicitly register the speech engine, then load and
+// invoke models through the shared lifecycle APIs.
+rac_result_t rc = rac_backend_sherpa_register();
 ```
+
+The generic ONNX Runtime engine is separate and provides embeddings. It is
+registered through `rac/plugin/rac_plugin_entry_onnx.h`.
 
 ### Cloud STT Backend
 - **Capability**: STT (speech-to-text), online
@@ -378,18 +377,14 @@ rac_result_t rac_vad_stop_lifecycle_proto(rac_proto_buffer_t* out_result);
 
 ```c
 rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle);
-rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
-                                            const char* model_path, const char* model_id,
-                                            const char* model_name);
-rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
-                                            const char* model_path, const char* model_id,
-                                            const char* model_name);
-rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
-                                            const char* voice_path, const char* voice_id,
-                                            const char* voice_name);
-rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
-                                                const void* audio_data, size_t audio_size,
-                                                rac_voice_agent_result_t* out_result);
+rac_result_t rac_voice_agent_initialize_proto(rac_voice_agent_handle_t handle,
+                                              const uint8_t* config_bytes,
+                                              size_t config_size,
+                                              rac_proto_buffer_t* out_result);
+rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t handle,
+                                                      const void* audio_data,
+                                                      size_t audio_size,
+                                                      rac_proto_buffer_t* out_result);
 void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
 ```
 

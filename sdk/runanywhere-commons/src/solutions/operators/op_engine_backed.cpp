@@ -3,7 +3,7 @@
 // op_engine_backed.cpp — engine-backed operator factories.
 //
 // Materializes the six "engine-backed" `OperatorSpec.type` strings reachable
-// from `SolutionConfig` (voice_agent / rag / wake_word / agent_loop /
+// from `SolutionConfig` (voice_agent / rag / agent_loop /
 // time_series). Each factory produces a single-input / single-output
 // PipelineNode that:
 //

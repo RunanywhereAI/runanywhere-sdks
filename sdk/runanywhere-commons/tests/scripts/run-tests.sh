@@ -7,7 +7,7 @@
 #   ./run-tests.sh                  # Build + run all
 #   ./run-tests.sh --build-only     # Build only
 #   ./run-tests.sh --core           # Core tests only (no models needed)
-#   ./run-tests.sh --onnx           # ONNX backend tests (VAD, STT, TTS, WakeWord)
+#   ./run-tests.sh --onnx           # ONNX/Sherpa tests (VAD, STT, TTS)
 #   ./run-tests.sh --llm            # LLM tests only
 #   ./run-tests.sh --agent          # Voice agent tests only
 #   ./run-tests.sh --download       # Download models first, then run all
@@ -110,7 +110,7 @@ while [[ "$#" -gt 0 ]]; do
             echo "  --build-only   Build tests without running them"
             echo "  --download     Download models first, then run all tests"
             echo "  --core         Run core tests only (no models needed)"
-            echo "  --onnx         Run ONNX backend tests (VAD, STT, TTS, WakeWord)"
+            echo "  --onnx         Run ONNX/Sherpa tests (VAD, STT, TTS)"
             echo "  --llm          Run LLM tests only"
             echo "  --agent        Run voice agent tests only"
             echo "  --help         Show this help"
@@ -213,14 +213,13 @@ if [ "${RUN_ALL}" = true ] || [ "${RUN_CORE}" = true ]; then
     run_test "test_core" "test_core"
 fi
 
-# ONNX backend tests
+# ONNX/Sherpa speech tests
 if [ "${RUN_ALL}" = true ] || [ "${RUN_ONNX}" = true ]; then
     echo ""
-    echo "ONNX backend:"
+    echo "ONNX/Sherpa speech:"
     run_test "test_vad"      "test_vad"
     run_test "test_stt"      "test_stt"
     run_test "test_tts"      "test_tts"
-    run_test "test_wakeword" "test_wakeword"
 fi
 
 # LLM tests

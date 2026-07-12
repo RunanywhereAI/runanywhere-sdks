@@ -168,10 +168,9 @@ elseif(ANDROID)
         )
         target_include_directories(onnxruntime INTERFACE "${ONNX_HEADER_PATH}")
 
-        # Sherpa-ONNX Android prebuilts only ship the C API header.
-        # The ONNX C++ API headers (onnxruntime_cxx_api.h etc.) are header-only
-        # wrappers still consumed by Sherpa wakeword compatibility code.
-        # Download them if missing.
+        # Sherpa-ONNX Android prebuilts only ship the C API header. Fetch the
+        # matching header-only C++ wrappers when absent so the imported target
+        # exposes a complete, version-matched ONNX Runtime header set.
         if(NOT EXISTS "${ONNX_HEADER_PATH}/onnxruntime_cxx_api.h")
             if(NOT DEFINED RAC_ONNX_COMMIT_ANDROID OR "${RAC_ONNX_COMMIT_ANDROID}" STREQUAL "")
                 message(FATAL_ERROR

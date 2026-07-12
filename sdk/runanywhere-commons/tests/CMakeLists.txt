@@ -1363,11 +1363,11 @@ target_compile_features(test_download_orchestrator PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_download_orchestrator)
 add_test(NAME download_orchestrator_tests COMMAND test_download_orchestrator --run-all)
 
-# --- Sherpa-ONNX speech tests (VAD, STT, TTS, WakeWord) ---
+# --- Sherpa-ONNX speech tests (VAD, STT, TTS) ---
 # Engine-independence refactor: tests link rac_backend_sherpa
-# (which owns the speech ops) and depend on rac_backend_onnx only for the
-# ONNX-named typedefs used in their config defaults. The engines/sherpa/
-# include path exposes the public sherpa function declarations.
+# (which owns the speech ops) and rac_backend_onnx because the test setup
+# registers both shipped plugins. The engines/sherpa/ include path exposes
+# the private engine declarations exercised by these native backend tests.
 if(RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA AND RAC_SHERPA_ONNX_AVAILABLE)
     # VAD test
     add_executable(test_vad test_vad.cpp)
@@ -1402,9 +1402,6 @@ if(RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA AND RAC_SHERPA_ONNX_AVAILABLE)
     target_compile_features(test_tts PRIVATE cxx_std_20)
     add_test(NAME tts_tests COMMAND test_tts --run-all)
 
-    # WakeWord test is temporarily disabled: the legacy rac_wakeword_onnx.h API
-    # was removed, and wake-word coverage needs to migrate to the current
-    # voice-agent/VAD ingress APIs before it can be part of the required lane.
 endif()
 
 # --- LLM test: Requires LlamaCPP backend ---
@@ -1441,7 +1438,7 @@ endif()
 # --- macOS RPATH for ONNX Runtime dylib ---
 if(APPLE)
     set(ONNX_MACOS_LIB_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-macos/lib")
-    foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
+    foreach(test_target test_vad test_stt test_tts test_voice_agent)
         if(TARGET ${test_target})
             set_target_properties(${test_target} PROPERTIES
                 BUILD_RPATH "${ONNX_MACOS_LIB_DIR}"
@@ -1454,7 +1451,7 @@ endif()
 # --- Linux RPATH for Sherpa-ONNX shared libs ---
 if(UNIX AND NOT APPLE)
     set(SHERPA_LINUX_LIB_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/sherpa-onnx-linux/lib")
-    foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
+    foreach(test_target test_vad test_stt test_tts test_voice_agent)
         if(TARGET ${test_target})
             set_target_properties(${test_target} PROPERTIES
                 BUILD_RPATH "$ORIGIN;${SHERPA_LINUX_LIB_DIR}"
@@ -1470,7 +1467,7 @@ endif()
 # is ON). If it's unset the EXISTS check silently evaluates against
 # "/lib/onnxruntime.dll" which is never what we want.
 if(WIN32 AND DEFINED onnxruntime_SOURCE_DIR AND NOT "${onnxruntime_SOURCE_DIR}" STREQUAL "")
-    foreach(test_target test_vad test_stt test_tts test_wakeword)
+    foreach(test_target test_vad test_stt test_tts)
         if(TARGET ${test_target})
             if(EXISTS "${onnxruntime_SOURCE_DIR}/lib/onnxruntime.dll")
                 add_custom_command(TARGET ${test_target} POST_BUILD

@@ -22,28 +22,19 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'solutions.pbenum.dart';
 
-enum SolutionConfig_Config {
-  voiceAgent,
-  rag,
-  wakeWord,
-  agentLoop,
-  timeSeries,
-  notSet
-}
+enum SolutionConfig_Config { voiceAgent, rag, agentLoop, timeSeries, notSet }
 
 /// Top-level union dispatched to the matching solution loader.
 class SolutionConfig extends $pb.GeneratedMessage {
   factory SolutionConfig({
     VoiceAgentConfig? voiceAgent,
     RAGConfig? rag,
-    WakeWordConfig? wakeWord,
     AgentLoopConfig? agentLoop,
     TimeSeriesConfig? timeSeries,
   }) {
     final result = create();
     if (voiceAgent != null) result.voiceAgent = voiceAgent;
     if (rag != null) result.rag = rag;
-    if (wakeWord != null) result.wakeWord = wakeWord;
     if (agentLoop != null) result.agentLoop = agentLoop;
     if (timeSeries != null) result.timeSeries = timeSeries;
     return result;
@@ -62,7 +53,6 @@ class SolutionConfig extends $pb.GeneratedMessage {
       _SolutionConfig_ConfigByTag = {
     1: SolutionConfig_Config.voiceAgent,
     2: SolutionConfig_Config.rag,
-    3: SolutionConfig_Config.wakeWord,
     4: SolutionConfig_Config.agentLoop,
     5: SolutionConfig_Config.timeSeries,
     0: SolutionConfig_Config.notSet
@@ -71,13 +61,11 @@ class SolutionConfig extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'SolutionConfig',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..oo(0, [1, 2, 3, 4, 5])
+    ..oo(0, [1, 2, 4, 5])
     ..aOM<VoiceAgentConfig>(1, _omitFieldNames ? '' : 'voiceAgent',
         subBuilder: VoiceAgentConfig.create)
     ..aOM<RAGConfig>(2, _omitFieldNames ? '' : 'rag',
         subBuilder: RAGConfig.create)
-    ..aOM<WakeWordConfig>(3, _omitFieldNames ? '' : 'wakeWord',
-        subBuilder: WakeWordConfig.create)
     ..aOM<AgentLoopConfig>(4, _omitFieldNames ? '' : 'agentLoop',
         subBuilder: AgentLoopConfig.create)
     ..aOM<TimeSeriesConfig>(5, _omitFieldNames ? '' : 'timeSeries',
@@ -105,14 +93,12 @@ class SolutionConfig extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(1)
   @$pb.TagNumber(2)
-  @$pb.TagNumber(3)
   @$pb.TagNumber(4)
   @$pb.TagNumber(5)
   SolutionConfig_Config whichConfig() =>
       _SolutionConfig_ConfigByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
   @$pb.TagNumber(2)
-  @$pb.TagNumber(3)
   @$pb.TagNumber(4)
   @$pb.TagNumber(5)
   void clearConfig() => $_clearField($_whichOneof(0));
@@ -139,38 +125,27 @@ class SolutionConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   RAGConfig ensureRag() => $_ensure(1);
 
-  @$pb.TagNumber(3)
-  WakeWordConfig get wakeWord => $_getN(2);
-  @$pb.TagNumber(3)
-  set wakeWord(WakeWordConfig value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasWakeWord() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearWakeWord() => $_clearField(3);
-  @$pb.TagNumber(3)
-  WakeWordConfig ensureWakeWord() => $_ensure(2);
-
   @$pb.TagNumber(4)
-  AgentLoopConfig get agentLoop => $_getN(3);
+  AgentLoopConfig get agentLoop => $_getN(2);
   @$pb.TagNumber(4)
   set agentLoop(AgentLoopConfig value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasAgentLoop() => $_has(3);
+  $core.bool hasAgentLoop() => $_has(2);
   @$pb.TagNumber(4)
   void clearAgentLoop() => $_clearField(4);
   @$pb.TagNumber(4)
-  AgentLoopConfig ensureAgentLoop() => $_ensure(3);
+  AgentLoopConfig ensureAgentLoop() => $_ensure(2);
 
   @$pb.TagNumber(5)
-  TimeSeriesConfig get timeSeries => $_getN(4);
+  TimeSeriesConfig get timeSeries => $_getN(3);
   @$pb.TagNumber(5)
   set timeSeries(TimeSeriesConfig value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasTimeSeries() => $_has(4);
+  $core.bool hasTimeSeries() => $_has(3);
   @$pb.TagNumber(5)
   void clearTimeSeries() => $_clearField(5);
   @$pb.TagNumber(5)
-  TimeSeriesConfig ensureTimeSeries() => $_ensure(4);
+  TimeSeriesConfig ensureTimeSeries() => $_ensure(3);
 }
 
 /// ---------------------------------------------------------------------------
@@ -247,7 +222,7 @@ class SolutionHandle extends $pb.GeneratedMessage {
   void clearHandleId() => $_clearField(1);
 
   /// String discriminator for the solution kind, e.g. "voice_agent",
-  /// "rag", "wakeword", "time_series", "agent_loop". Free-form for
+  /// "rag", "time_series", "agent_loop". Free-form for
   /// forward-compat with future solutions; canonical values match the
   /// `SolutionType` enum names lower-cased.
   @$pb.TagNumber(2)
@@ -744,125 +719,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   $core.bool hasTypeKind() => $_has(11);
   @$pb.TagNumber(12)
   void clearTypeKind() => $_clearField(12);
-}
-
-/// ---------------------------------------------------------------------------
-/// Wake word — always-on listener that emits a pulse on keyword detection.
-/// ---------------------------------------------------------------------------
-class WakeWordConfig extends $pb.GeneratedMessage {
-  factory WakeWordConfig({
-    $core.String? modelId,
-    $core.String? keyword,
-    $core.double? threshold,
-    $core.int? preRollMs,
-    $core.int? sampleRateHz,
-    SolutionType? typeKind,
-  }) {
-    final result = create();
-    if (modelId != null) result.modelId = modelId;
-    if (keyword != null) result.keyword = keyword;
-    if (threshold != null) result.threshold = threshold;
-    if (preRollMs != null) result.preRollMs = preRollMs;
-    if (sampleRateHz != null) result.sampleRateHz = sampleRateHz;
-    if (typeKind != null) result.typeKind = typeKind;
-    return result;
-  }
-
-  WakeWordConfig._();
-
-  factory WakeWordConfig.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory WakeWordConfig.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'WakeWordConfig',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aOS(2, _omitFieldNames ? '' : 'keyword')
-    ..aD(3, _omitFieldNames ? '' : 'threshold', fieldType: $pb.PbFieldType.OF)
-    ..aI(4, _omitFieldNames ? '' : 'preRollMs')
-    ..aI(5, _omitFieldNames ? '' : 'sampleRateHz')
-    ..aE<SolutionType>(6, _omitFieldNames ? '' : 'typeKind',
-        enumValues: SolutionType.values)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  WakeWordConfig clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  WakeWordConfig copyWith(void Function(WakeWordConfig) updates) =>
-      super.copyWith((message) => updates(message as WakeWordConfig))
-          as WakeWordConfig;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static WakeWordConfig create() => WakeWordConfig._();
-  @$core.override
-  WakeWordConfig createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static WakeWordConfig getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<WakeWordConfig>(create);
-  static WakeWordConfig? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get modelId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set modelId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasModelId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearModelId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get keyword => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set keyword($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasKeyword() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearKeyword() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.double get threshold => $_getN(2);
-  @$pb.TagNumber(3)
-  set threshold($core.double value) => $_setFloat(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasThreshold() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearThreshold() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get preRollMs => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set preRollMs($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasPreRollMs() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearPreRollMs() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get sampleRateHz => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set sampleRateHz($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasSampleRateHz() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearSampleRateHz() => $_clearField(5);
-
-  /// Optional explicit solution-kind tag. See `SolutionType`.
-  @$pb.TagNumber(6)
-  SolutionType get typeKind => $_getN(5);
-  @$pb.TagNumber(6)
-  set typeKind(SolutionType value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasTypeKind() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearTypeKind() => $_clearField(6);
 }
 
 /// ---------------------------------------------------------------------------

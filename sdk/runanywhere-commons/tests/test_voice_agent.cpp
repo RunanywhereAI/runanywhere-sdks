@@ -22,12 +22,11 @@
 #include <vector>
 
 #include "rac/backends/rac_llm_llamacpp.h"
-#include "rac/backends/rac_tts_onnx.h"
-#include "rac/backends/rac_vad_onnx.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/plugin/rac_plugin_entry_onnx.h"
 #include "rac/plugin/rac_plugin_entry_sherpa.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -160,7 +159,7 @@ static std::vector<int16_t> float_pcm_to_int16(const float* samples, size_t coun
 static bool synthesize_fixture_audio(const std::string& tts_model_path,
                                      std::vector<int16_t>* out_audio) {
     rac_handle_t tts = nullptr;
-    rac_tts_onnx_config_t cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
+    rac_tts_sherpa_config_t cfg = RAC_TTS_SHERPA_CONFIG_DEFAULT;
     rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &cfg, &tts);
     if (rc != RAC_SUCCESS)
         return false;

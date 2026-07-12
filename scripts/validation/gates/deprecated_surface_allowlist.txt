@@ -38,8 +38,6 @@ sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/HybridTypes.ts|we
 # Current C ABI JSON/config boundaries. Backend/service vtables accept
 # engine-owned config JSON; SDK-facing feature calls use generated proto bytes.
 sdk/runanywhere-commons/include/rac/backends/rac_llm_llamacpp.h|cpp:public-json-api
-sdk/runanywhere-commons/include/rac/backends/rac_tts_onnx.h|cpp:public-json-api
-sdk/runanywhere-commons/include/rac/backends/rac_stt_onnx.h|cpp:public-json-api
 sdk/runanywhere-commons/include/rac/features/llm/rac_tool_calling.h|cpp:public-json-api
 sdk/runanywhere-commons/include/rac/features/llm/rac_llm_schema_to_json.h|cpp:public-json-api
 sdk/runanywhere-commons/include/rac/features/tts/rac_tts_service.h|cpp:public-json-api
@@ -47,8 +45,6 @@ sdk/runanywhere-commons/include/rac/features/stt/rac_stt_service.h|cpp:public-js
 sdk/runanywhere-commons/include/rac/cloud/rac_cloud_stt_provider.h|cpp:public-json-api
 sdk/runanywhere-commons/include/rac/infrastructure/telemetry/rac_telemetry_manager.h|cpp:public-json-api
 sdk/runanywhere-commons/include/rac/backends/rac_llm_llamacpp.h|cpp:json-param-in-public-api
-sdk/runanywhere-commons/include/rac/backends/rac_tts_onnx.h|cpp:json-param-in-public-api
-sdk/runanywhere-commons/include/rac/backends/rac_stt_onnx.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/backends/rac_vlm_llamacpp.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/features/llm/rac_llm_service.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/features/llm/rac_llm_structured_output.h|cpp:json-param-in-public-api

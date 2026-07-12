@@ -30,12 +30,12 @@
 #include <vector>
 
 #include "rac/backends/rac_llm_llamacpp.h"
-#include "rac/backends/rac_vad_onnx.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/rag/rac_rag.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/plugin/rac_plugin_entry_onnx.h"
 
 namespace {
 

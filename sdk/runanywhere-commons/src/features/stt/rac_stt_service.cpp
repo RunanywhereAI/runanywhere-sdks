@@ -56,7 +56,7 @@ rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle) {
     rac_result_t result = rac::features::resolve_model_reference(
         model_path,
         {.log_cat = LOG_CAT,
-         .default_framework = RAC_FRAMEWORK_UNKNOWN,
+         .default_framework = RAC_FRAMEWORK_SHERPA,
          .allow_null_model_id = true,
          .lookup_last_path_component = true,
          .prefer_input_path_when_contains = "/"},  // explicit caller paths win over

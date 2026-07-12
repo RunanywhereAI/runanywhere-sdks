@@ -50,8 +50,8 @@
 #endif
 
 #ifdef RAC_WASM_ONNX
-#include "rac/backends/rac_tts_onnx.h"
-#include "rac/backends/rac_vad_onnx.h"
+#include "rac/plugin/rac_plugin_entry_onnx.h"
+#include "rac/plugin/rac_plugin_entry_sherpa.h"
 #endif
 
 // Features

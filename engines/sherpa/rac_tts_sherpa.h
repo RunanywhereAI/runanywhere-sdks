@@ -1,13 +1,22 @@
 #ifndef RAC_TTS_SHERPA_H
 #define RAC_TTS_SHERPA_H
 
-#include "rac/backends/rac_tts_onnx.h"
+#include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
+#include "rac/features/tts/rac_tts.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef rac_tts_onnx_config_t rac_tts_sherpa_config_t;
+typedef struct rac_tts_sherpa_config {
+    int32_t num_threads;
+    rac_bool_t use_coreml;
+    int32_t sample_rate;
+} rac_tts_sherpa_config_t;
+
+static const rac_tts_sherpa_config_t RAC_TTS_SHERPA_CONFIG_DEFAULT = {
+    .num_threads = 0, .use_coreml = RAC_TRUE, .sample_rate = 22050};
 
 rac_result_t rac_tts_sherpa_create(const char* model_path, const rac_tts_sherpa_config_t* config,
                                    rac_handle_t* out_handle);

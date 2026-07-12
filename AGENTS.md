@@ -125,7 +125,7 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
           ┌─────────────┬───────────┼───────────┬─────────────┐
           ▼             ▼           ▼           ▼             ▼
       llamacpp      sherpa-onnx  qhexrt     coreml/cloud    onnx
-     (LLM,VLM)    (STT,TTS,VAD) (HNPU)     (Apple/HTTP) (Embed,WakeWord)
+     (LLM,VLM)    (STT,TTS,VAD) (HNPU)     (Apple/HTTP)   (Embed)
 ```
 
 ### Key Architectural Patterns

@@ -200,13 +200,13 @@ MODEL_DIR="${HOME}/.local/share/runanywhere/Models"
 
 # Check required models (no LLM)
 MODELS_OK=true
-if [ ! -d "${MODEL_DIR}/ONNX/silero-vad" ]; then
+if [ ! -d "${MODEL_DIR}/Sherpa/silero-vad" ]; then
     MODELS_OK=false
 fi
-if [ ! -d "${MODEL_DIR}/ONNX/parakeet-tdt-ctc-110m-en-int8" ]; then
+if [ ! -d "${MODEL_DIR}/Sherpa/parakeet-tdt-ctc-110m-en-int8" ]; then
     MODELS_OK=false
 fi
-if [ ! -d "${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium" ]; then
+if [ ! -d "${MODEL_DIR}/Sherpa/vits-piper-en_US-lessac-medium" ]; then
     MODELS_OK=false
 fi
 
@@ -216,24 +216,24 @@ else
     print_info "Downloading models (NO LLM)..."
 
     # Create model directories
-    mkdir -p "${MODEL_DIR}/ONNX/silero-vad"
-    mkdir -p "${MODEL_DIR}/ONNX/parakeet-tdt-ctc-110m-en-int8"
-    mkdir -p "${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium"
+    mkdir -p "${MODEL_DIR}/Sherpa/silero-vad"
+    mkdir -p "${MODEL_DIR}/Sherpa/parakeet-tdt-ctc-110m-en-int8"
+    mkdir -p "${MODEL_DIR}/Sherpa/vits-piper-en_US-lessac-medium"
 
     # Download Silero VAD
     print_step "Downloading Silero VAD..."
-    if [ ! -f "${MODEL_DIR}/ONNX/silero-vad/silero_vad.onnx" ]; then
-        curl -L -o "${MODEL_DIR}/ONNX/silero-vad/silero_vad.onnx" \
+    if [ ! -f "${MODEL_DIR}/Sherpa/silero-vad/silero_vad.onnx" ]; then
+        curl -L -o "${MODEL_DIR}/Sherpa/silero-vad/silero_vad.onnx" \
             "https://github.com/snakers4/silero-vad/raw/master/files/silero_vad.onnx"
     fi
 
     # Download Parakeet TDT-CTC 110M EN (int8 quantized, NeMo CTC)
-    PARAKEET_DIR="${MODEL_DIR}/ONNX/parakeet-tdt-ctc-110m-en-int8"
+    PARAKEET_DIR="${MODEL_DIR}/Sherpa/parakeet-tdt-ctc-110m-en-int8"
     print_step "Downloading Parakeet TDT-CTC 110M EN (int8)..."
     if [ ! -f "${PARAKEET_DIR}/model.int8.onnx" ]; then
         PARAKEET_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8.tar.bz2"
-        curl -L "${PARAKEET_URL}" | tar -xjf - -C "${MODEL_DIR}/ONNX/"
-        EXTRACTED_DIR="${MODEL_DIR}/ONNX/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8"
+        curl -L "${PARAKEET_URL}" | tar -xjf - -C "${MODEL_DIR}/Sherpa/"
+        EXTRACTED_DIR="${MODEL_DIR}/Sherpa/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8"
         if [ -d "${EXTRACTED_DIR}" ]; then
             mv "${EXTRACTED_DIR}"/* "${PARAKEET_DIR}/" 2>/dev/null || true
             rm -rf "${EXTRACTED_DIR}"
@@ -242,9 +242,9 @@ else
 
     # Download Piper TTS (Lessac medium)
     print_step "Downloading Piper TTS (Lessac)..."
-    if [ ! -f "${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium/en_US-lessac-medium.onnx" ]; then
+    if [ ! -f "${MODEL_DIR}/Sherpa/vits-piper-en_US-lessac-medium/en_US-lessac-medium.onnx" ]; then
         PIPER_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2"
-        curl -L "${PIPER_URL}" | tar -xjf - -C "${MODEL_DIR}/ONNX/"
+        curl -L "${PIPER_URL}" | tar -xjf - -C "${MODEL_DIR}/Sherpa/"
     fi
 
     print_success "Models downloaded"
@@ -262,7 +262,7 @@ cd "${SCRIPT_DIR}/build"
 cmake .. \
     -DCMAKE_BUILD_TYPE=Release
 
-cmake --build . -j$(nproc)
+cmake --build . -j"$(nproc)"
 
 print_success "OpenClaw Hybrid Assistant built successfully"
 
@@ -280,14 +280,13 @@ echo "  ./build/openclaw-assistant"
 echo ""
 echo "Options:"
 echo "  ./build/openclaw-assistant --help"
-echo "  ./build/openclaw-assistant --wakeword"
-echo "  ./build/openclaw-assistant --openclaw-url http://your-pi:8081"
+echo "  ./build/openclaw-assistant --openclaw-url ws://your-host:8082"
 echo ""
 
 # Quick test
 print_step "Verifying executable..."
 if [ -f "${SCRIPT_DIR}/build/openclaw-assistant" ]; then
-    print_success "Executable created: $(ls -lh ${SCRIPT_DIR}/build/openclaw-assistant | awk '{print $5}')"
+    print_success "Executable created: $(ls -lh "${SCRIPT_DIR}/build/openclaw-assistant" | awk '{print $5}')"
 else
     print_error "Executable not found!"
     exit 1

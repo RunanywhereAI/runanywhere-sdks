@@ -829,7 +829,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR
     )
 endif()
 
-# Feature sources - LLM, STT, TTS, VAD, Wake Word, VLM, Diffusion (iOS/Apple only)
+# Feature sources - LLM, STT, TTS, VAD, VLM, Diffusion (iOS/Apple only)
 set(RAC_FEATURES_SOURCES
     # LLM
     # W4: unified module — merges the former llm_component.cpp (legacy
@@ -892,10 +892,8 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/rac_vad_stream.cpp
     # Shared per-handle threshold-mutex registry.
     src/features/vad/vad_threshold_registry.cpp
-    # Wake Word — high-level service scaffold was removed. All real
-    # consumers call the speech backend's rac_wakeword_onnx_* compatibility
-    # API directly. The shared types in
-    # include/rac/features/wakeword/rac_wakeword_types.h remain.
+    # Wake-word execution is not implemented. Shared schema/types remain for
+    # solution planning and event interoperability only.
     # VLM (Vision Language Model)
     # W4: unified module — merges vlm_component.cpp + rac_vlm_proto_abi.cpp.
     src/features/vlm/vlm_module.cpp

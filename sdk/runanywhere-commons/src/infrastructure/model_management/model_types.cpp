@@ -114,7 +114,7 @@ rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t
         case RAC_FRAMEWORK_ONNX:
             return RAC_MODEL_CATEGORY_MULTIMODAL;
         case RAC_FRAMEWORK_SHERPA:
-            // Sherpa-ONNX serves STT/TTS/VAD/wakeword speech models;
+            // Sherpa-ONNX serves STT/TTS/VAD speech models;
             // MULTIMODAL keeps the existing routing (consumer maps to
             // STT vs TTS via model.category at registration time).
             return RAC_MODEL_CATEGORY_MULTIMODAL;
@@ -136,8 +136,9 @@ rac_inference_framework_t rac_model_category_default_framework(rac_model_categor
             return RAC_FRAMEWORK_LLAMACPP;
         case RAC_MODEL_CATEGORY_SPEECH_RECOGNITION:
         case RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS:
-        case RAC_MODEL_CATEGORY_EMBEDDING:
         case RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+            return RAC_FRAMEWORK_SHERPA;
+        case RAC_MODEL_CATEGORY_EMBEDDING:
             return RAC_FRAMEWORK_ONNX;
         default:
             return RAC_FRAMEWORK_UNKNOWN;

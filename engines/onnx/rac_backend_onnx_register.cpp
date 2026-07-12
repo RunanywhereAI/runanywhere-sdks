@@ -38,10 +38,9 @@ rac_result_t rac_backend_onnx_register(void) {
     rac_backend_onnx_embeddings_register();
 #endif
 
-    // Android-fix: on Android the JNI bridges call
-    // this `rac_backend_*_register` function but the unified plugin registry
-    // is never populated through dlopen+dlsym. Register the plugin entry here
-    // so `rac_plugin_find` can find the ONNX-backed STT/TTS/VAD primitives.
+    // Android JNI hosts call this explicit registration path instead of
+    // populating the unified registry through dlopen/dlsym. Register the
+    // generic ONNX plugin entry here; speech primitives are Sherpa-owned.
     extern const rac_engine_vtable_t* rac_plugin_entry_onnx(void);
     const rac_engine_vtable_t* vt = rac_plugin_entry_onnx();
     if (vt != nullptr) {

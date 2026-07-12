@@ -82,6 +82,264 @@
 # from vertically merging that one field type into an unrelated Compose class.
 -keep class kotlin.time.Duration$Companion { *; }
 
+# The Compose navigation instrumentation test is packaged separately from the
+# minified target APK. R8's target mapping cannot describe owners that target
+# shrinking removes or vertically merges, so keep the exact mapped-DEX closure
+# observed from that test and AndroidX Compose Test. Renaming remains allowed so
+# the test APK can consume the target mapping; package-wide keeps are forbidden.
+-keep,allowobfuscation class androidx.activity.ComponentActivity { *; }
+-keep,allowobfuscation class androidx.collection.IntSet { *; }
+-keep,allowobfuscation class androidx.compose.runtime.ComposablesKt { *; }
+-keep,allowobfuscation class androidx.compose.runtime.CompositionLocalKt { *; }
+-keep,allowobfuscation class androidx.compose.runtime.EffectsKt { *; }
+-keep,allowobfuscation class androidx.compose.runtime.MonotonicFrameClock { *; }
+-keep,allowobfuscation class androidx.compose.runtime.MonotonicFrameClock$DefaultImpls { *; }
+-keep,allowobfuscation class androidx.compose.runtime.RecomposeScopeImplKt { *; }
+-keep,allowobfuscation class androidx.compose.runtime.SnapshotMutationPolicy { *; }
+-keep,allowobfuscation class androidx.compose.runtime.SnapshotStateKt { *; }
+-keep,allowobfuscation class androidx.compose.runtime.Updater { *; }
+-keep,allowobfuscation class androidx.compose.runtime.internal.ComposableLambda { *; }
+-keep,allowobfuscation class androidx.compose.runtime.internal.ComposableLambdaKt { *; }
+-keep,allowobfuscation class androidx.compose.runtime.snapshots.Snapshot$Companion { *; }
+-keep,allowobfuscation class androidx.compose.ui.ComposedModifierKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.geometry.Offset$Companion { *; }
+-keep,allowobfuscation class androidx.compose.ui.geometry.OffsetKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.geometry.RectKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.graphics.AndroidImageBitmap_androidKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.graphics.ImageBitmap { *; }
+-keep,allowobfuscation class androidx.compose.ui.input.key.Key$Companion { *; }
+-keep,allowobfuscation class androidx.compose.ui.input.key.KeyEvent_androidKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.input.key.Key_androidKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.layout.LayoutCoordinatesKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.layout.LayoutInfo { *; }
+-keep,allowobfuscation class androidx.compose.ui.layout.LayoutModifierKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.layout.SubcomposeLayoutKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.platform.InfiniteAnimationPolicy { *; }
+-keep,allowobfuscation class androidx.compose.ui.platform.InfiniteAnimationPolicy$DefaultImpls { *; }
+-keep,allowobfuscation class androidx.compose.ui.platform.PlatformTextInputInterceptor { *; }
+-keep,allowobfuscation class androidx.compose.ui.platform.PlatformTextInputMethodRequest { *; }
+-keep,allowobfuscation class androidx.compose.ui.platform.PlatformTextInputSession { *; }
+-keep,allowobfuscation class androidx.compose.ui.platform.ViewRootForTest { *; }
+-keep,allowobfuscation class androidx.compose.ui.platform.ViewRootForTest$Companion { *; }
+-keep,allowobfuscation class androidx.compose.ui.platform.WindowRecomposerFactory { *; }
+-keep,allowobfuscation class androidx.compose.ui.semantics.CustomAccessibilityAction { *; }
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsConfigurationKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsOwnerKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.text.font.FontFamilyResolver_androidKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.text.input.ImeAction$Companion { *; }
+-keep,allowobfuscation class androidx.compose.ui.unit.AndroidDensity_androidKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.unit.Constraints$Companion { *; }
+-keep,allowobfuscation class androidx.compose.ui.unit.DensityKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.unit.Dp$Companion { *; }
+-keep,allowobfuscation class androidx.compose.ui.unit.DpRect { *; }
+-keep,allowobfuscation class androidx.compose.ui.unit.IntSizeKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.util.MathHelpersKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.viewinterop.AndroidView_androidKt { *; }
+-keep,allowobfuscation class androidx.compose.ui.window.DialogWindowProvider { *; }
+-keep,allowobfuscation class androidx.core.os.ConfigurationCompat { *; }
+-keep,allowobfuscation class androidx.core.view.ViewGroupKt { *; }
+-keep,allowobfuscation class androidx.lifecycle.Lifecycle { *; }
+-keep,allowobfuscation class androidx.lifecycle.ViewTreeLifecycleOwner { *; }
+-keep,allowobfuscation class androidx.navigation.NavBackStackEntryKt { *; }
+-keep,allowobfuscation class androidx.navigation.compose.NavGraphBuilderKt { *; }
+-keep,allowobfuscation class androidx.navigation.compose.NavHostControllerKt { *; }
+-keep,allowobfuscation class androidx.navigation.compose.NavHostKt { *; }
+-keep,allowobfuscation class com.runanywhere.runanywhereai.ui.navigation.DestinationsKt { *; }
+-keep,allowobfuscation class kotlin.KotlinNothingValueException { *; }
+-keep,allowobfuscation class kotlin.NoWhenBranchMatchedException { *; }
+-keep,allowobfuscation class kotlin.coroutines.Continuation { *; }
+-keep,allowobfuscation class kotlin.coroutines.ContinuationInterceptor { *; }
+-keep,allowobfuscation class kotlin.coroutines.ContinuationInterceptor$DefaultImpls { *; }
+-keep,allowobfuscation class kotlin.coroutines.ContinuationInterceptor$Key { *; }
+-keep,allowobfuscation class kotlin.coroutines.jvm.internal.DebugProbesKt { *; }
+-keep,allowobfuscation class kotlin.coroutines.jvm.internal.SuspendFunction { *; }
+-keep,allowobfuscation class kotlin.jvm.functions.Function0 { *; }
+-keep,allowobfuscation class kotlin.jvm.internal.InlineMarker { *; }
+-keep,allowobfuscation class kotlin.time.DurationKt { *; }
+-keep,allowobfuscation class kotlinx.coroutines.CompletableJob { *; }
+-keep,allowobfuscation class kotlinx.coroutines.CoroutineExceptionHandler$Key { *; }
+-keep,allowobfuscation class kotlinx.coroutines.CoroutineScopeKt { *; }
+-keep,allowobfuscation class kotlinx.coroutines.DelayKt { *; }
+-keep,allowobfuscation class kotlinx.coroutines.Job$Key { *; }
+-keep,allowobfuscation class kotlinx.coroutines.JobKt { *; }
+-keep,allowobfuscation class kotlinx.coroutines.MainCoroutineDispatcher { *; }
+-keep,allowobfuscation class kotlinx.coroutines.internal.MainDispatcherFactory { *; }
+
+# These owners survive target shrinking, but the separately optimized test APK
+# calls members that target R8 previously removed or changed incompatibly.
+# Preserve only the measured members and continue allowing mapped renaming.
+-keep,allowobfuscation class androidx.collection.IntSetKt {
+    androidx.collection.IntSet intSetOf(int[]);
+}
+-keep,allowobfuscation class androidx.compose.ui.platform.AbstractComposeView {
+    <init>(android.content.Context, android.util.AttributeSet, int, int, kotlin.jvm.internal.DefaultConstructorMarker);
+}
+-keep,allowobfuscation class androidx.compose.ui.unit.IntSize {
+    androidx.compose.ui.unit.IntSize box-impl(long);
+    long constructor-impl(long);
+}
+-keep,allowobfuscation class kotlin.ExceptionsKt {
+    void addSuppressed(java.lang.Throwable, java.lang.Throwable);
+}
+-keep,allowobfuscation class androidx.compose.runtime.ScopeUpdateScope {
+    void updateScope(kotlin.jvm.functions.Function2);
+}
+-keep,allowobfuscation class androidx.compose.ui.text.input.ImeAction {
+    androidx.compose.ui.text.input.ImeAction box-impl(int);
+    androidx.compose.ui.text.input.ImeAction$Companion Companion;
+}
+-keep,allowobfuscation class kotlin.jvm.internal.Reflection {
+    kotlin.reflect.KClass getOrCreateKotlinClass(java.lang.Class);
+}
+-keep,allowobfuscation class kotlin.jvm.internal.FunctionReferenceImpl {
+    <init>(int, java.lang.Object, java.lang.Class, java.lang.String, java.lang.String, int);
+}
+-keep,allowobfuscation class androidx.compose.ui.text.TextLayoutResult {
+    int getLineEnd$default(androidx.compose.ui.text.TextLayoutResult, int, boolean, int, java.lang.Object);
+    int getLineForOffset(int);
+}
+-keep,allowobfuscation class androidx.compose.ui.layout.MeasureScope {
+    androidx.compose.ui.layout.MeasureResult layout$default(androidx.compose.ui.layout.MeasureScope, int, int, java.util.Map, kotlin.jvm.functions.Function1, int, java.lang.Object);
+}
+-keep,allowobfuscation class kotlinx.coroutines.CoroutineDispatcher {
+    kotlin.coroutines.Continuation interceptContinuation(kotlin.coroutines.Continuation);
+}
+-keep,allowobfuscation class kotlin.time.Duration {
+    java.lang.String toString-impl(long);
+}
+-keep,allowobfuscation class androidx.core.os.LocaleListCompat {
+    androidx.core.os.LocaleListCompat forLanguageTags(java.lang.String);
+    java.util.Locale get(int);
+}
+-keep,allowobfuscation class com.runanywhere.runanywhereai.ui.navigation.Vision {
+    <init>(boolean, int, kotlin.jvm.internal.DefaultConstructorMarker);
+}
+-keep,allowobfuscation class androidx.compose.ui.unit.Density {
+    int roundToPx--R2X_6o(long);
+    float toDp-GaN1DYA(long);
+    androidx.compose.ui.geometry.Rect toRect(androidx.compose.ui.unit.DpRect);
+    long toSp-0xMU5do(float);
+    long toSp-kPz2Gy4(int);
+}
+-keep,allowobfuscation class androidx.core.view.ViewConfigurationCompat {
+    float getScaledHorizontalScrollFactor(android.view.ViewConfiguration, android.content.Context);
+    float getScaledVerticalScrollFactor(android.view.ViewConfiguration, android.content.Context);
+}
+-keep,allowobfuscation class androidx.compose.ui.layout.Placeable$PlacementScope {
+    void placeRelative$default(androidx.compose.ui.layout.Placeable$PlacementScope, androidx.compose.ui.layout.Placeable, int, int, float, int, java.lang.Object);
+}
+-keep,allowobfuscation class androidx.compose.ui.platform.PlatformTextInputModifierNodeKt {
+    void InterceptPlatformTextInput(androidx.compose.ui.platform.PlatformTextInputInterceptor, kotlin.jvm.functions.Function2, androidx.compose.runtime.Composer, int);
+}
+-keep,allowobfuscation class androidx.compose.ui.geometry.Offset {
+    long copy-dBAh8RU$default(long, float, float, int, java.lang.Object);
+    androidx.compose.ui.geometry.Offset box-impl(long);
+    long constructor-impl(long);
+    androidx.compose.ui.geometry.Offset$Companion Companion;
+}
+-keep,allowobfuscation class kotlin.math.MathKt {
+    int roundToInt(float);
+    long roundToLong(float);
+}
+-keep,allowobfuscation class kotlin.NotImplementedError {
+    <init>(java.lang.String);
+}
+-keep,allowobfuscation class androidx.activity.compose.ComponentActivityKt {
+    void setContent(androidx.activity.ComponentActivity, androidx.compose.runtime.CompositionContext, kotlin.jvm.functions.Function2);
+}
+-keep,allowobfuscation class kotlin.collections.SetsKt {
+    java.util.Set minus(java.util.Set, java.lang.Iterable);
+}
+-keep,allowobfuscation class androidx.compose.ui.text.AnnotatedString {
+    <init>(java.lang.String, java.util.List, int, kotlin.jvm.internal.DefaultConstructorMarker);
+    java.util.List getLinkAnnotations(int, int);
+    java.util.List getStringAnnotations(int, int);
+}
+-keep,allowobfuscation class androidx.compose.ui.unit.Dp {
+    androidx.compose.ui.unit.Dp box-impl(float);
+    float constructor-impl(float);
+    androidx.compose.ui.unit.Dp$Companion Companion;
+}
+-keep,allowobfuscation class kotlin.enums.EnumEntriesKt {
+    kotlin.enums.EnumEntries enumEntries(java.lang.Enum[]);
+}
+-keep,allowobfuscation class androidx.compose.ui.platform.WindowRecomposerPolicy {
+    boolean compareAndSetFactory(androidx.compose.ui.platform.WindowRecomposerFactory, androidx.compose.ui.platform.WindowRecomposerFactory);
+    androidx.compose.ui.platform.WindowRecomposerFactory getAndSetFactory(androidx.compose.ui.platform.WindowRecomposerFactory);
+    androidx.compose.ui.platform.WindowRecomposerPolicy INSTANCE;
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsConfiguration {
+    boolean contains(androidx.compose.ui.semantics.SemanticsPropertyKey);
+    java.lang.Object getOrElseNullable(androidx.compose.ui.semantics.SemanticsPropertyKey, kotlin.jvm.functions.Function0);
+}
+-keep,allowobfuscation class androidx.compose.ui.input.key.Key {
+    androidx.compose.ui.input.key.Key box-impl(long);
+    boolean equals-impl(long, java.lang.Object);
+    java.lang.String toString-impl(long);
+    androidx.compose.ui.input.key.Key$Companion Companion;
+}
+-keep,allowobfuscation class androidx.compose.runtime.ComposerKt {
+    void sourceInformation(androidx.compose.runtime.Composer, java.lang.String);
+    void sourceInformationMarkerEnd(androidx.compose.runtime.Composer);
+    void sourceInformationMarkerStart(androidx.compose.runtime.Composer, int, java.lang.String);
+    void traceEventStart(int, int, int, java.lang.String);
+}
+-keep,allowobfuscation class androidx.compose.ui.unit.DpSize {
+    androidx.compose.ui.unit.DpSize box-impl(long);
+}
+-keep,allowobfuscation class androidx.compose.ui.util.ListUtilsKt {
+    java.lang.String fastJoinToString$default(java.util.List, java.lang.CharSequence, java.lang.CharSequence, java.lang.CharSequence, int, java.lang.CharSequence, kotlin.jvm.functions.Function1, int, java.lang.Object);
+}
+-keep,allowobfuscation class androidx.compose.runtime.Recomposer {
+    java.lang.Object runRecomposeAndApplyChanges(kotlin.coroutines.Continuation);
+}
+-keep,allowobfuscation class kotlinx.coroutines.CancellableContinuation {
+    void invokeOnCancellation(kotlin.jvm.functions.Function1);
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsNode {
+    int getAlignmentLinePosition(androidx.compose.ui.layout.AlignmentLine);
+}
+-keep,allowobfuscation class kotlinx.coroutines.CancellableContinuationImpl {
+    <init>(kotlin.coroutines.Continuation, int);
+}
+-keep,allowobfuscation class kotlinx.coroutines.Delay {
+    java.lang.Object delay(long, kotlin.coroutines.Continuation);
+    void scheduleResumeAfterDelay(long, kotlinx.coroutines.CancellableContinuation);
+}
+-keep,allowobfuscation class androidx.compose.ui.node.RootForTest {
+    boolean sendKeyEvent-ZmokQxo(android.view.KeyEvent);
+}
+-keep,allowobfuscation class androidx.compose.runtime.ProvidableCompositionLocal {
+    androidx.compose.runtime.ProvidedValue provides(java.lang.Object);
+}
+-keep,allowobfuscation class androidx.compose.runtime.saveable.SaveableStateRegistryKt {
+    androidx.compose.runtime.saveable.SaveableStateRegistry SaveableStateRegistry(java.util.Map, kotlin.jvm.functions.Function1);
+}
+-keep,allowobfuscation class androidx.compose.runtime.snapshots.Snapshot {
+    androidx.compose.runtime.snapshots.Snapshot$Companion Companion;
+}
+-keep,allowobfuscation class androidx.compose.ui.unit.Constraints {
+    androidx.compose.ui.unit.Constraints$Companion Companion;
+}
+-keep,allowobfuscation class androidx.compose.ui.Modifier {
+    androidx.compose.ui.Modifier$Companion Companion;
+}
+-keep,allowobfuscation class kotlinx.coroutines.CoroutineExceptionHandler {
+    kotlinx.coroutines.CoroutineExceptionHandler$Key Key;
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsActions {
+    androidx.compose.ui.semantics.SemanticsActions INSTANCE;
+}
+-keep,allowobfuscation class kotlinx.coroutines.Job {
+    kotlinx.coroutines.Job$Key Key;
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsProperties {
+    androidx.compose.ui.semantics.SemanticsProperties INSTANCE;
+}
+-keep,allowobfuscation class androidx.compose.runtime.ProvidedValue {
+    int $stable;
+}
+
 # Release instrumentation calls these coroutine entry-point facades directly
 # (runBlocking/launch/withContext and withTimeout). The release app can inline
 # and remove them otherwise, leaving the separately packaged test APK with

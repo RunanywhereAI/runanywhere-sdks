@@ -5,9 +5,8 @@
 #
 # Usage:
 #   ./download-test-models.sh              # Download all models
-#   ./download-test-models.sh --minimal    # Skip LLM and wake word (VAD+STT+TTS only)
+#   ./download-test-models.sh --minimal    # Skip LLM (VAD+STT+TTS only)
 #   ./download-test-models.sh --skip-llm   # Skip LLM download
-#   ./download-test-models.sh --skip-wakeword  # Skip wake word
 #   ./download-test-models.sh --force      # Re-download everything
 #
 # Models downloaded:
@@ -15,7 +14,6 @@
 #   - Whisper Tiny EN (~150MB, via Sherpa-ONNX tar.bz2)
 #   - VITS Piper TTS Lessac Medium (~65MB, tar.bz2)
 #   - Qwen3 0.6B Q8 GGUF (~639MB)
-#   - openWakeWord embedding + melspec + Hey Jarvis (~20MB total)
 #
 # Environment:
 #   RAC_TEST_MODEL_DIR  Override default model directory
@@ -57,7 +55,6 @@ print_header() {
 MODEL_DIR="${RAC_TEST_MODEL_DIR:-${HOME}/.local/share/runanywhere/Models}"
 FORCE_DOWNLOAD=false
 SKIP_LLM=false
-SKIP_WAKEWORD=false
 
 # Parse arguments
 while [[ "$#" -gt 0 ]]; do
@@ -68,15 +65,10 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         --minimal)
             SKIP_LLM=true
-            SKIP_WAKEWORD=true
             shift
             ;;
         --skip-llm)
             SKIP_LLM=true
-            shift
-            ;;
-        --skip-wakeword)
-            SKIP_WAKEWORD=true
             shift
             ;;
         --help|-h)
@@ -84,9 +76,8 @@ while [[ "$#" -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --force           Re-download all models even if they exist"
-            echo "  --minimal         Skip LLM and wake word (VAD+STT+TTS only)"
+            echo "  --minimal         Skip LLM (VAD+STT+TTS only)"
             echo "  --skip-llm        Skip LLM download"
-            echo "  --skip-wakeword   Skip wake word download"
             echo "  --help            Show this help"
             echo ""
             echo "Environment:"
@@ -105,7 +96,6 @@ print_header "Download Test Models"
 echo "Model directory: ${MODEL_DIR}"
 echo "Force download:  ${FORCE_DOWNLOAD}"
 echo "Skip LLM:       ${SKIP_LLM}"
-echo "Skip wake word:  ${SKIP_WAKEWORD}"
 echo ""
 
 # Create base directories
@@ -232,67 +222,6 @@ else
 fi
 
 # =============================================================================
-# 5. openWakeWord (~20MB total: embedding + melspec + hey_jarvis)
-# =============================================================================
-
-if [ "${SKIP_WAKEWORD}" = false ]; then
-    OWW_DIR="${MODEL_DIR}/ONNX/openwakeword"
-    JARVIS_DIR="${MODEL_DIR}/ONNX/hey-jarvis"
-    mkdir -p "${OWW_DIR}"
-    mkdir -p "${JARVIS_DIR}"
-
-    # 5a. Embedding model
-    EMBED_FILE="${OWW_DIR}/embedding_model.onnx"
-    print_step "openWakeWord embedding model..."
-    if [ -f "${EMBED_FILE}" ] && verify_not_html "${EMBED_FILE}" && [ "${FORCE_DOWNLOAD}" = false ]; then
-        print_ok "Embedding model already exists, skipping"
-    else
-        rm -f "${EMBED_FILE}"
-        curl -L --progress-bar -o "${EMBED_FILE}" \
-            "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx"
-        if ! verify_not_html "${EMBED_FILE}"; then
-            print_error "Embedding model download failed (HTML redirect)"
-            exit 1
-        fi
-        print_ok "Embedding model downloaded"
-    fi
-
-    # 5b. Melspectrogram model
-    MELSPEC_FILE="${OWW_DIR}/melspectrogram.onnx"
-    print_step "openWakeWord melspectrogram model..."
-    if [ -f "${MELSPEC_FILE}" ] && verify_not_html "${MELSPEC_FILE}" && [ "${FORCE_DOWNLOAD}" = false ]; then
-        print_ok "Melspectrogram model already exists, skipping"
-    else
-        rm -f "${MELSPEC_FILE}"
-        curl -L --progress-bar -o "${MELSPEC_FILE}" \
-            "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx"
-        if ! verify_not_html "${MELSPEC_FILE}"; then
-            print_error "Melspectrogram model download failed (HTML redirect)"
-            exit 1
-        fi
-        print_ok "Melspectrogram model downloaded"
-    fi
-
-    # 5c. Hey Jarvis wake word model
-    JARVIS_FILE="${JARVIS_DIR}/hey_jarvis_v0.1.onnx"
-    print_step "Hey Jarvis wake word model..."
-    if [ -f "${JARVIS_FILE}" ] && verify_not_html "${JARVIS_FILE}" && [ "${FORCE_DOWNLOAD}" = false ]; then
-        print_ok "Hey Jarvis model already exists, skipping"
-    else
-        rm -f "${JARVIS_FILE}"
-        curl -L --progress-bar -o "${JARVIS_FILE}" \
-            "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.onnx"
-        if ! verify_not_html "${JARVIS_FILE}"; then
-            print_error "Hey Jarvis model download failed (HTML redirect)"
-            exit 1
-        fi
-        print_ok "Hey Jarvis model downloaded"
-    fi
-else
-    echo "  (skipping wake word models)"
-fi
-
-# =============================================================================
 # Summary
 # =============================================================================
 
@@ -330,14 +259,6 @@ if [ "${SKIP_LLM}" = false ]; then
     echo ""
     echo "LLM (Qwen3 0.6B):"
     print_size "Qwen3-0.6B-Q8_0.gguf" "${MODEL_DIR}/LlamaCpp/qwen3-0.6b/Qwen3-0.6B-Q8_0.gguf"
-fi
-
-if [ "${SKIP_WAKEWORD}" = false ]; then
-    echo ""
-    echo "Wake Word (openWakeWord):"
-    print_size "embedding_model.onnx" "${MODEL_DIR}/ONNX/openwakeword/embedding_model.onnx"
-    print_size "melspectrogram.onnx"  "${MODEL_DIR}/ONNX/openwakeword/melspectrogram.onnx"
-    print_size "hey_jarvis_v0.1.onnx" "${MODEL_DIR}/ONNX/hey-jarvis/hey_jarvis_v0.1.onnx"
 fi
 
 echo ""

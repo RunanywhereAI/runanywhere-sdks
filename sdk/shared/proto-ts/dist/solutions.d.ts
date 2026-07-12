@@ -12,7 +12,6 @@ export declare enum SolutionType {
     SOLUTION_TYPE_UNSPECIFIED = 0,
     SOLUTION_TYPE_VOICE_AGENT = 1,
     SOLUTION_TYPE_RAG = 2,
-    SOLUTION_TYPE_WAKEWORD = 3,
     SOLUTION_TYPE_TIME_SERIES = 4,
     SOLUTION_TYPE_AGENT_LOOP = 5,
     UNRECOGNIZED = -1
@@ -45,7 +44,6 @@ export declare function vectorStoreToJSON(object: VectorStore): string;
 export interface SolutionConfig {
     voiceAgent?: VoiceAgentConfig | undefined;
     rag?: RAGConfig | undefined;
-    wakeWord?: WakeWordConfig | undefined;
     agentLoop?: AgentLoopConfig | undefined;
     timeSeries?: TimeSeriesConfig | undefined;
 }
@@ -68,7 +66,7 @@ export interface SolutionHandle {
     handleId: string;
     /**
      * String discriminator for the solution kind, e.g. "voice_agent",
-     * "rag", "wakeword", "time_series", "agent_loop". Free-form for
+     * "rag", "time_series", "agent_loop". Free-form for
      * forward-compat with future solutions; canonical values match the
      * `SolutionType` enum names lower-cased.
      */
@@ -165,25 +163,6 @@ export interface RAGConfig {
 }
 /**
  * ---------------------------------------------------------------------------
- * Wake word — always-on listener that emits a pulse on keyword detection.
- * ---------------------------------------------------------------------------
- */
-export interface WakeWordConfig {
-    /** e.g. "hey-mycroft-v1", "kws-zipformer-gigaspeech" */
-    modelId: string;
-    /** Phrase to detect */
-    keyword: string;
-    /** 0.0..1.0, engine-dependent */
-    threshold: number;
-    /** How much audio to emit before the trigger */
-    preRollMs: number;
-    /** default 16000 */
-    sampleRateHz: number;
-    /** Optional explicit solution-kind tag. See `SolutionType`. */
-    typeKind?: SolutionType | undefined;
-}
-/**
- * ---------------------------------------------------------------------------
  * Agent loop — multi-turn LLM with tool calling.
  * ---------------------------------------------------------------------------
  */
@@ -222,7 +201,6 @@ export declare const SolutionConfig: MessageFns<SolutionConfig>;
 export declare const SolutionHandle: MessageFns<SolutionHandle>;
 export declare const VoiceAgentConfig: MessageFns<VoiceAgentConfig>;
 export declare const RAGConfig: MessageFns<RAGConfig>;
-export declare const WakeWordConfig: MessageFns<WakeWordConfig>;
 export declare const AgentLoopConfig: MessageFns<AgentLoopConfig>;
 export declare const ToolSpec: MessageFns<ToolSpec>;
 export declare const TimeSeriesConfig: MessageFns<TimeSeriesConfig>;

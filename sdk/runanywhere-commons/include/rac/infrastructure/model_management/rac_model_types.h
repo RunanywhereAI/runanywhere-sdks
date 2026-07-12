@@ -243,7 +243,7 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
     // Value 9 (WHISPERKIT_COREML) is retired.
     // Value 11 (GENIE) is retired.
-    RAC_FRAMEWORK_SHERPA = 12, /**< Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
+    RAC_FRAMEWORK_SHERPA = 12, /**< Sherpa-ONNX speech engine (STT/TTS/VAD) */
     RAC_FRAMEWORK_QHEXRT = 13, /**< QHexRT (Qualcomm Hexagon NPU runtime) */
     RAC_FRAMEWORK_UNKNOWN = 99 /**< Unknown framework */
 } rac_inference_framework_t;

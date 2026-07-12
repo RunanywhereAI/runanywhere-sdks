@@ -3,14 +3,14 @@
  *
  * Nitrogen HybridObject implementation for RunAnywhere ONNX backend.
  *
- * ONNX-specific provider registration for speech processing.
+ * Registers the generic ONNX engine and its co-distributed Sherpa speech engine.
  */
 
 #include "HybridRunAnywhereONNX.hpp"
 
 // Backend registration header - always available
 extern "C" {
-#include "rac_vad_onnx.h"
+#include "rac_plugin_entry_onnx.h"
 }
 
 #include "rac/core/rac_error.h"

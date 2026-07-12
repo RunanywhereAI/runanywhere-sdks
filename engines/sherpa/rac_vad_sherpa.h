@@ -1,13 +1,23 @@
 #ifndef RAC_VAD_SHERPA_H
 #define RAC_VAD_SHERPA_H
 
-#include "rac/backends/rac_vad_onnx.h"
+#include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
+#include "rac/features/vad/rac_vad.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef rac_vad_onnx_config_t rac_vad_sherpa_config_t;
+typedef struct rac_vad_sherpa_config {
+    int32_t sample_rate;
+    float energy_threshold;
+    float frame_length;
+    int32_t num_threads;
+} rac_vad_sherpa_config_t;
+
+static const rac_vad_sherpa_config_t RAC_VAD_SHERPA_CONFIG_DEFAULT = {
+    .sample_rate = 16000, .energy_threshold = 0.5f, .frame_length = 0.032f, .num_threads = 0};
 
 rac_result_t rac_vad_sherpa_create(const char* model_path, const rac_vad_sherpa_config_t* config,
                                    rac_handle_t* out_handle);

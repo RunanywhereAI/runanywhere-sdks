@@ -242,7 +242,7 @@ struct MockTts {
 };
 
 struct MockVad {
-    float threshold{0.1f};
+    float threshold{0.5f};
     bool active{false};
     bool speech{false};
 };
@@ -256,6 +256,7 @@ std::string g_last_tts_input;
 std::atomic<int> g_stt_active_calls{0};
 std::atomic<int> g_stt_max_active_calls{0};
 std::atomic<int> g_stt_delay_ms{0};
+MockVad* g_last_mock_vad{nullptr};
 std::mutex g_llm_cancel_mutex;
 std::condition_variable g_llm_cancel_cv;
 bool g_llm_block_until_cancel{false};
@@ -359,7 +360,8 @@ void mock_tts_destroy(void* impl) {
 }
 
 rac_result_t mock_vad_create(const char*, const char*, void** out_impl) {
-    *out_impl = new MockVad();
+    g_last_mock_vad = new MockVad();
+    *out_impl = g_last_mock_vad;
     return RAC_SUCCESS;
 }
 
@@ -404,6 +406,9 @@ rac_result_t mock_vad_process(void* impl, const float* samples, size_t num_sampl
 
 void mock_vad_destroy(void* impl) {
     delete static_cast<MockVad*>(impl);
+    if (g_last_mock_vad == impl) {
+        g_last_mock_vad = nullptr;
+    }
 }
 
 rac_result_t mock_llm_create(const char*, const char*, void** out_impl) {
@@ -705,6 +710,17 @@ int test_mocked_vad_and_activity() {
     CHECK(rac_vad_component_create(&vad) == RAC_SUCCESS, "mock VAD component creates");
     CHECK(rac_vad_component_load_model(vad, "mock-vad", "mock-vad", "Mock VAD") == RAC_SUCCESS,
           "mock VAD model loads");
+    CHECK(g_last_mock_vad && g_last_mock_vad->active,
+          "VAD load starts the model detector");
+    CHECK(rac_vad_component_get_energy_threshold(vad) == 0.5f,
+          "model VAD reports its detector threshold");
+    CHECK(rac_vad_component_set_energy_threshold(vad, 0.2f) == RAC_SUCCESS &&
+              g_last_mock_vad->threshold == 0.2f,
+          "model VAD threshold routes to the backend");
+    CHECK(rac_vad_component_stop(vad) == RAC_SUCCESS && !g_last_mock_vad->active,
+          "VAD stop routes to the model backend");
+    CHECK(rac_vad_component_start(vad) == RAC_SUCCESS && g_last_mock_vad->active,
+          "VAD start routes to the model backend");
 
     runanywhere::v1::VADOptions options;
     options.set_threshold(0.1f);
@@ -718,6 +734,14 @@ int test_mocked_vad_and_activity() {
     runanywhere::v1::VADResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "VADResult parses");
     CHECK(result.is_speech(), "mock VAD detects speech");
+    CHECK(rac_vad_component_get_energy_threshold(vad) == 0.2f &&
+              g_last_mock_vad->threshold == 0.2f,
+          "per-call model threshold override is restored");
+    CHECK(rac_vad_component_is_speech_active(vad) == RAC_TRUE,
+          "model VAD active-state query routes to the backend");
+    CHECK(rac_vad_component_reset(vad) == RAC_SUCCESS &&
+              rac_vad_component_is_speech_active(vad) == RAC_FALSE,
+          "VAD reset routes to the model backend");
     rac_proto_buffer_free(&out);
 
     rac_proto_buffer_init(&out);
